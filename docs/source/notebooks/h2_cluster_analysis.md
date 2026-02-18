@@ -21,8 +21,7 @@ Data does not typically come labeled and labeling/verifying labels is a time and
 data analysis (EDA) can often be enhanced by splitting data into similar groups.
 
 [Clustering](../concepts/Clustering.md) is a method which groups data in the format of (samples, features). This can be
-used with images or image
-embeddings as long as the arrays are flattened to only contain 2 dimensions.
+used with images or image embeddings as long as the arrays are flattened to only contain 2 dimensions.
 
 The `cluster` function utilizes a clustering algorithm based on the HDBSCAN algorithm. The `Outliers` and `Duplicates`
 detectors can then analyze the cluster results to identify outliers and duplicates.

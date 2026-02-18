@@ -14,8 +14,7 @@ kernelspec:
 # Identify out-of-distribution samples
 
 This guide demonstrates how to identify [out-of-distribution](../concepts/OOD.md) (OOD) samples using
-reconstruction-based methods with
-different model architectures.
+reconstruction-based methods with different model architectures.
 
 Estimated time to complete: 10-15 minutes
 

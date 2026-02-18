@@ -21,8 +21,7 @@ Exploratory data analysis (EDA) can be overwhelming. There are so many things to
 bad/corrupted images in the set, blurred or bright/dark images, the list goes on.
 
 DataEval created a [data cleaning](../concepts/DataCleaning.md) class to assist you with your EDA so you can start
-training your models on high quality
-data.
+training your models on high quality data.
 
 +++
 

@@ -17,8 +17,8 @@ kernelspec:
 
 ## Problem statement
 
-When working with object detection datasets, you often need to analyze
-[image statistics](../concepts/ImageStats.md) at different granularities:
+When working with object detection datasets, you often need to analyze [image statistics](../concepts/ImageStats.md) at
+different granularities:
 
 - Image-level statistics: Properties of entire images
 - Box-level statistics: Properties of individual bounding boxes within images

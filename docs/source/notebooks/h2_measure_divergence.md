@@ -19,9 +19,8 @@ kernelspec:
 
 When evaluating new testing data, or comparing two datasets, we often want to have a quantitative way of comparing and
 evaluating shifts in covariates. HP [divergence](../concepts/Divergence.md) is a nonparametric divergence metric which
-gives the distance between two
-datasets. A divergence of 0 means that the two datasets are approximately identically distributed. A divergence of 1
-means the two datasets are completely separable.
+gives the distance between two datasets. A divergence of 0 means that the two datasets are approximately identically
+distributed. A divergence of 1 means the two datasets are completely separable.
 
 +++
 

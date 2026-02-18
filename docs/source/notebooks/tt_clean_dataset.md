@@ -53,8 +53,8 @@ determining relationships in the data.
 
 One of the most important aspects of EDA is [data cleaning](../concepts/DataCleaning.md). A portion of DataEval is
 dedicated to being able to identify duplicates and [outliers](../concepts/Outliers.md) as well as data points that have
-missing or too many extreme values. These techniques help
-ensure that you only include high quality data for your projects.
+missing or too many extreme values. These techniques help ensure that you only include high quality data for your
+projects.
 
 +++
 
@@ -291,9 +291,9 @@ This table helps point out the wide variation in
 - and the number of objects of each class per image.
 
 This highlights an important concept - [class balance](../concepts/ClassBalancing.md). A dataset that is imbalanced can
-result in a model that chooses
-the more prominent class more often just because there are more samples in that class. To explore this concept further,
-see the bias tutorial in the [What's Next](#whats-next) section at the end of this tutorial.
+result in a model that chooses the more prominent class more often just because there are more samples in that class. To
+explore this concept further, see the bias tutorial in the [What's Next](#whats-next) section at the end of this
+tutorial.
 
 Now that the metadata has been examined, it's important to inspect random images to get an idea of the variety of
 backgrounds, the range of colors, the locations of objects in images, and how often an image is seen with a single

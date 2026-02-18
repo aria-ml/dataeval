@@ -52,9 +52,9 @@ geometric points in a high-dimensional abstract space called _feature space_. By
 distributed in feature space, you will become able to make the assessments you need.
 
 Specifically by grouping data points (i.e. images) into [clusters](../concepts/Clustering.md), you can explore the
-natural structure of the dataset
-to reveal hidden patterns and potential anomalies. Measuring coverage goes a step further by quantifying how well the
-clusters represent the entire dataset to ensure that no significant portion of the feature space is being overlooked.
+natural structure of the dataset to reveal hidden patterns and potential anomalies. Measuring coverage goes a step
+further by quantifying how well the clusters represent the entire dataset to ensure that no significant portion of the
+feature space is being overlooked.
 
 These techniques are critical for evaluating the quality and representativeness of your data, helping to avoid biases
 and missing information or overfitting issues in your models. By understanding the space your data occupies and how it

@@ -40,8 +40,9 @@ shows how to configure the default PyTorch device, batch size, and the maximum n
 ## Getting started
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -104,8 +105,8 @@ print(f"Current device for DataEval: {dataeval.config.get_device()}")
 DataEval allows setting a global default batch size for operations that process data in batches. The batch size must be
 a positive integer.
 
-Note that functions and methods that require a `batch_size` will fail if not provided and a global batch size is
-not set.
+Note that functions and methods that require a `batch_size` will fail if not provided and a global batch size is not
+set.
 
 +++
 
