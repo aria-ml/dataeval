@@ -6,10 +6,18 @@ All extractors implement the :class:`~dataeval.protocols.FeatureExtractor` proto
 :class:`~dataeval.Embeddings` for batching, caching, and memory-mapped storage.
 """
 
-__all__ = ["FlattenExtractor", "OnnxExtractor", "TorchExtractor", "BoVWExtractor", "ClassifierUncertaintyExtractor"]
+__all__ = [
+    "FlattenExtractor",
+    "OnnxExtractor",
+    "TorchExtractor",
+    "BoVWExtractor",
+    "ClassifierUncertaintyExtractor",
+    "VideoTorchExtractor",
+]
 
 from dataeval.extractors._bovw import BoVWExtractor
 from dataeval.extractors._flatten import FlattenExtractor
 from dataeval.extractors._onnx import OnnxExtractor
 from dataeval.extractors._torch import TorchExtractor
 from dataeval.extractors._uncertainty import ClassifierUncertaintyExtractor
+from dataeval.extractors._videotorch import VideoTorchExtractor
