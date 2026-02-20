@@ -5,8 +5,10 @@ import polars as pl
 import pytest
 
 from dataeval._metadata import Metadata
-from dataeval.bias import Parity
+from dataeval.bias._parity import Parity
 from tests.conftest import MockMetadata, to_metadata
+
+pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
 
 @pytest.mark.required

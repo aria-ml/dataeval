@@ -7,8 +7,9 @@ from typing import Any
 import polars as pl
 
 from dataeval import Metadata as _Metadata
+from dataeval._experimental import experimental
 from dataeval._helpers import _get_index2label
-from dataeval.core import parity
+from dataeval.core._parity import parity
 from dataeval.protocols import AnnotatedDataset, Metadata
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
@@ -18,10 +19,14 @@ DEFAULT_PARITY_SCORE_THRESHOLD = 0.3
 DEFAULT_PARITY_P_VALUE_THRESHOLD = 0.05
 
 
+@experimental
 @dataclass(frozen=True)
 class ParityOutput(DictOutput):
     """
     Output class for the :class:`.Parity` :term:`bias<Bias>` evaluator.
+
+    .. warning::
+       This class is experimental and may change or be removed in future releases.
 
     Contains a polars DataFrame with Cramér's V scores and threshold flags.
 
@@ -43,9 +48,13 @@ class ParityOutput(DictOutput):
     insufficient_data: dict[str, dict[int, dict[str, int]]]
 
 
+@experimental
 class Parity(Evaluator):
     """
     Calculate statistical parity using Bias-Corrected Cramér's V.
+
+    .. warning::
+       This evaluator is experimental and may change or be removed in future releases.
 
     This function measures the association between metadata factors and class labels
     to identify potential bias or spurious correlations. It assumes an equal distribution
