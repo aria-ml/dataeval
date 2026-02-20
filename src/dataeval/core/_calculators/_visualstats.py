@@ -14,7 +14,7 @@ from dataeval.flags import ImageStats
 from dataeval.utils.preprocessing import edge_filter
 
 if TYPE_CHECKING:
-    from dataeval.core._calculate import CalculatorCache
+    from dataeval.core._calculate_stats import CalculatorCache
 
 QUARTILES = (0, 25, 50, 75, 100)
 

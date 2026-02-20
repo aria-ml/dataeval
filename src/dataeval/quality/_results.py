@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.core._calculate import CalculationResult
+from dataeval.core._calculate_stats import CalculationResult
 
 StatsMap = Mapping[str, NDArray[Any]]
 

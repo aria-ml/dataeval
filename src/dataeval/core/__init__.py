@@ -20,8 +20,8 @@ __all__ = [
     "RankResult",
     "ber_knn",
     "ber_mst",
-    "calculate",
     "calculate_ratios",
+    "calculate_stats",
     "cluster",
     "completeness",
     "compute_cluster_stats",
@@ -61,8 +61,8 @@ __all__ = [
 ]
 
 from dataeval.core._ber import BERResult, ber_knn, ber_mst
-from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._calculate_ratios import calculate_ratios
+from dataeval.core._calculate_stats import CalculationResult, calculate_stats
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
 from dataeval.core._completeness import CompletenessResult, completeness
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive

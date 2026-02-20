@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval._helpers import _get_index2label, _get_item_indices
 from dataeval.config import EPSILON
-from dataeval.core._calculate import CalculationResult, calculate
+from dataeval.core._calculate_stats import CalculationResult, calculate_stats
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, Metadata
@@ -635,9 +635,9 @@ class Outliers(Evaluator):
         -------
         Evaluate the dataset using pre-computed stats:
 
-        >>> from dataeval.core import calculate
+        >>> from dataeval.core import calculate_stats
         >>> from dataeval.flags import ImageStats
-        >>> stats = calculate(images, stats=ImageStats.PIXEL)
+        >>> stats = calculate_stats(images, stats=ImageStats.PIXEL)
         >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=2.5)
         >>> results = outliers.from_stats(stats)
         >>> results.issues.head(10)
@@ -977,7 +977,7 @@ class Outliers(Evaluator):
 
         # Image statistics-based outlier detection
         if self.flags != ImageStats.NONE:
-            self.stats = calculate(data, None, stats=self.flags, per_image=per_image, per_target=per_target)
+            self.stats = calculate_stats(data, None, stats=self.flags, per_image=per_image, per_target=per_target)
             stats_outliers = self._get_outliers(self.stats["stats"], self.stats["source_index"])
             outliers_dfs.append(stats_outliers)
 

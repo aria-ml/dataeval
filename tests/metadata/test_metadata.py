@@ -7,7 +7,7 @@ import polars as pl
 import pytest
 
 from dataeval._metadata import FactorInfo, Metadata, _binned
-from dataeval.core import calculate
+from dataeval.core import calculate_stats
 from dataeval.core._calculate_ratios import calculate_ratios
 from dataeval.core._label_stats import label_stats
 from dataeval.flags import ImageStats
@@ -95,13 +95,13 @@ class TestMetadata:
 
         assert stats["label_counts_per_image"] == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
 
-        imgstats = calculate(
+        imgstats = calculate_stats(
             *unzip_dataset(mock_ds, False),
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
             per_image=True,
             per_target=False,
         )
-        boxstats = calculate(
+        boxstats = calculate_stats(
             *unzip_dataset(mock_ds, True),
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
             per_image=False,

@@ -1,8 +1,7 @@
 # Image statistical analysis
 
-The image statistics features assist with understanding the dataset.
-These can be used to get a big picture view of the dataset and its underlying
-distribution. The {func}`.calculate` function with {class}`.ImageStats` flags creates
+The image statistics features assist with understanding the dataset. These can be used to get a big picture view of the
+dataset and its underlying distribution. The {func}`.calculate_stats` function with {class}`.ImageStats` flags creates
 the data distribution that the {class}`.Outliers` class uses to identify outliers.
 
 ## What are the statistical analysis categories
@@ -22,7 +21,7 @@ metrics that are available in each.
 
 The `PIXEL` flag group calculates pixel-level statistics for each image.
 These statistics analyze the raw pixel value distribution and can be computed
-per-channel using the `per_channel=True` parameter with {func}`.calculate`.
+per-channel using the `per_channel=True` parameter with {func}`.calculate_stats`.
 
 Available individual pixel statistics:
 
@@ -120,14 +119,14 @@ duplicates (matched by both basic and D4 hashes) vs rotated/flipped duplicates (
 The `NearDuplicateGroup.orientation` field is automatically set to `"same"` or `"rotated"` when
 both hash types are computed.
 
-## When to use calculate with ImageStats
+## When to use calculate_stats with ImageStats
 
-The {func}`.calculate` function is automatically called when using `Outliers.evaluate` on data.
-Therefore, you don't usually need to call {func}`.calculate` directly.
-However, there are a few scenarios where using {func}`.calculate` independently is beneficial:
+The {func}`.calculate_stats` function is automatically called when using `Outliers.evaluate` on data.
+Therefore, you don't usually need to call {func}`.calculate_stats` directly.
+However, there are a few scenarios where using {func}`.calculate_stats` independently is beneficial:
 
 - When multiple sets of data as well as the combined set are to be analyzed,
-  it can be easier to run {func}`.calculate` on each individual set of data
+  it can be easier to run {func}`.calculate_stats` on each individual set of data
   and then pass the outputs to the {class}`.Outliers` class in each of the desired
   data combinations for analysis.
 - When comparing the resulting data distribution between two or more datasets
@@ -141,8 +140,8 @@ However, there are a few scenarios where using {func}`.calculate` independently 
 Example code for calculating all statistics for images:
 
 ```python
-# Import the calculate function and ImageStats flags
-from dataeval.core import calculate
+# Import the calculate_stats function and ImageStats flags
+from dataeval.core import calculate_stats
 from dataeval.flags import ImageStats
 from torchvision.datasets import VOCDetection
 from torchvision.transforms import v2
@@ -159,7 +158,7 @@ ds = VOCDetection(
 
 # Calculate all statistics for the images
 # Note: Images should be in (C,H,W) format
-result = calculate(ds, stats=ImageStats.ALL)
+result = calculate_stats(ds, stats=ImageStats.ALL)
 
 # Access the computed statistics
 print(f"Processed {result['image_count']} images")
@@ -169,24 +168,24 @@ print(f"Available statistics: {list(result['stats'].keys())}")
 Example code for calculating specific statistics:
 
 ```python
-from dataeval.core import calculate
+from dataeval.core import calculate_stats
 from dataeval.flags import ImageStats
 
 # Calculate only pixel and visual statistics
-result = calculate(
+result = calculate_stats(
     ds,
     stats=ImageStats.PIXEL | ImageStats.VISUAL
 )
 
 # Calculate only basic pixel statistics with per-channel breakdown
-result = calculate(
+result = calculate_stats(
     ds,
     stats=ImageStats.PIXEL_BASIC,
     per_channel=True
 )
 
 # Calculate dimension statistics for both full images and bounding boxes
-result = calculate(
+result = calculate_stats(
     ds,
     stats=ImageStats.DIMENSION,
     per_image=True,
@@ -196,7 +195,7 @@ result = calculate(
 
 ### Analyzing the results
 
-The `calculate` function returns a `CalculationResult` dictionary containing:
+The `calculate_stats` function returns a `CalculationResult` dictionary containing:
 
 - `source_index`: Sequence of `SourceIndex` objects tracking which image, box, and channel each statistic corresponds to
 - `object_count`: Number of objects (bounding boxes) per image
@@ -228,13 +227,13 @@ When analyzing distributions, look for:
 
 ### Using with Outliers and Duplicates
 
-The statistics from {func}`.calculate` are used internally by the {class}`.Outliers` and {class}`.Duplicates` classes:
+The statistics from {func}`.calculate_stats` are used internally by the {class}`.Outliers` and {class}`.Duplicates` classes:
 
 ```python
 from dataeval import Outliers, Duplicates
 from dataeval.flags import ImageStats
 
-# Outliers automatically calls calculate with appropriate stats
+# Outliers automatically calls calculate_stats with appropriate stats
 outliers = Outliers()
 outlier_results = outliers.evaluate(ds)
 
@@ -350,4 +349,4 @@ Based on the benchmark results:
 - Memory usage scales proportionally with per-channel analysis depth
 - Tests performed on an Intel Core i9-14900HX w/ 64GB DDR5 on Windows 11/Ubuntu
   22.04 (WSL2) with dataset loaded on local storage
-- Performance applies to the {func}`.calculate` function with various `ImageStats` flag combinations
+- Performance applies to the {func}`.calculate_stats` function with various `ImageStats` flag combinations
