@@ -64,7 +64,7 @@ except Exception:
 ```{code-cell} ipython3
 from maite_datasets.object_detection import SeaDrone
 
-from dataeval.core import calculate
+from dataeval.core import calculate_stats
 from dataeval.flags import ImageStats
 from dataeval.selection import Limit, Select
 ```
@@ -98,7 +98,7 @@ You can combine flags using the `|` (bitwise OR) operator.
 
 ```{code-cell} ipython3
 # Calculate custom individual statistics for full images only (per_image=True, per_target=False)
-results_image_only = calculate(
+results_image_only = calculate_stats(
     data=dataset,
     stats=ImageStats.PIXEL_MEAN | ImageStats.DIMENSION_ASPECT_RATIO | ImageStats.VISUAL_SHARPNESS,
     per_image=True,
@@ -133,7 +133,7 @@ Now let's compute statistics for just bounding box within the images.
 
 ```{code-cell} ipython3
 # Calculate basic pixel statistics for targets only (per_image=False, per_target=True)
-results_target_only = calculate(
+results_target_only = calculate_stats(
     data=dataset,
     stats=ImageStats.PIXEL_BASIC,
     per_image=False,
@@ -157,7 +157,7 @@ We can also compute statistics at both levels simultaneously.
 
 ```{code-cell} ipython3
 # Calculate basic dimension statistics for full images, boxes, and channels (per_image=True, per_target=True)
-results_both = calculate(
+results_both = calculate_stats(
     data=dataset,
     stats=ImageStats.DIMENSION_BASIC,
     per_image=True,

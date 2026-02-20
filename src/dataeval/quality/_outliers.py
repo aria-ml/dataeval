@@ -13,14 +13,13 @@ from dataeval.config import EPSILON
 from dataeval.core._calculate_stats import CalculationResult, calculate_stats
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
 from dataeval.flags import ImageStats
-from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, Metadata
+from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, Metadata, Threshold, ThresholdLike
 from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
 from dataeval.types import ArrayND, ClusterConfigMixin, Evaluator, EvaluatorConfig, Output, SourceIndex, set_metadata
 from dataeval.utils.arrays import flatten_samples, to_numpy
+from dataeval.utils.thresholds import resolve_threshold
 
 DEFAULT_OUTLIERS_FLAGS = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
-DEFAULT_OUTLIERS_OUTLIER_METHOD: Literal["zscore", "modzscore", "iqr"] = "modzscore"
-DEFAULT_OUTLIERS_OUTLIER_THRESHOLD: float | None = None
 DEFAULT_OUTLIERS_CLUSTER_THRESHOLD = 2.5
 
 TDataFrame = TypeVar("TDataFrame", pl.DataFrame, Sequence[pl.DataFrame])
@@ -313,61 +312,47 @@ class OutliersOutput(Output[TDataFrame]):
         return pivoted.with_columns(expressions).select(column_order).cast(schema).sort(index_cols)
 
 
-def _get_zscore_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
-    threshold = threshold if threshold is not None else 3.0
-    std_val = np.nanstd(values)
-    if std_val > EPSILON:
-        mean_val = np.nanmean(values)
-        abs_diff = np.abs(values - mean_val)
-        return (abs_diff / std_val) > threshold
-    return None
-
-
-def _get_modzscore_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
-    threshold = threshold if threshold is not None else 3.5
-    median_val = np.nanmedian(values)
-    abs_diff = np.abs(values - median_val)
-    m_abs_diff = np.nanmedian(abs_diff)
-    m_abs_diff = np.nanmean(abs_diff) if m_abs_diff <= EPSILON else m_abs_diff
-    if m_abs_diff > EPSILON:
-        mod_z_score = 0.6745 * abs_diff / m_abs_diff
-        return mod_z_score > threshold
-    return None
-
-
-def _get_iqr_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
-    threshold = threshold if threshold is not None else 1.5
-    qrt = np.nanpercentile(values, q=(25, 75), method="midpoint")
-    iqr_val = qrt[1] - qrt[0]
-    if iqr_val > EPSILON:
-        iqr_threshold = iqr_val * threshold
-        return (values < (qrt[0] - iqr_threshold)) | (values > (qrt[1] + iqr_threshold))
-    return None
-
-
 def _get_outlier_mask(
     values: NDArray[Any],
-    method: Literal["zscore", "modzscore", "iqr"],
-    threshold: float | None,
+    threshold: Threshold,
 ) -> NDArray[np.bool_]:
+    """Compute outlier boolean mask using a Threshold object.
+
+    Parameters
+    ----------
+    values : NDArray
+        1D array of metric values.
+    threshold : Threshold
+        Threshold instance to compute bounds.
+
+    Returns
+    -------
+    NDArray[np.bool_]
+        Boolean mask where True indicates an outlier.
+    """
     if len(values) == 0:
         return np.array([], dtype=bool)
 
     nan_mask = np.isnan(values)
 
     if np.all(nan_mask):
-        outliers = None
-    elif method == "zscore":
-        outliers = _get_zscore_mask(values.astype(np.float64), threshold)
-    elif method == "modzscore":
-        outliers = _get_modzscore_mask(values.astype(np.float64), threshold)
-    elif method == "iqr":
-        outliers = _get_iqr_mask(values.astype(np.float64), threshold)
-    else:
-        raise ValueError("Outlier method must be 'zscore' 'modzscore' or 'iqr'.")
+        return np.full(values.shape, False, dtype=bool)
 
-    # If outliers were found, return the mask with NaN values set to False, otherwise return all False
-    return outliers & ~nan_mask if outliers is not None else np.full(values.shape, False, dtype=bool)
+    float_values = values.astype(np.float64)
+    lower, upper = threshold(float_values)
+
+    # If both bounds are None, the threshold could not be computed (e.g., zero variance)
+    if lower is None and upper is None:
+        return np.full(values.shape, False, dtype=bool)
+
+    outlier_mask = np.full(values.shape, False, dtype=bool)
+    if lower is not None:
+        outlier_mask |= float_values < lower
+    if upper is not None:
+        outlier_mask |= float_values > upper
+
+    # NaN values are never outliers
+    return outlier_mask & ~nan_mask
 
 
 class Outliers(Evaluator):
@@ -377,7 +362,8 @@ class Outliers(Evaluator):
     Supports two complementary detection methods:
 
     1. **Image statistics-based**: Computes pixel-level statistics (brightness, contrast, etc.)
-       and flags images with unusual values using statistical methods (zscore, modzscore, iqr).
+       and flags images with unusual values using configurable :class:`~dataeval.utils.thresholds.Threshold`
+       objects.
     2. **Cluster-based**: Uses embeddings from a neural network to cluster images and identifies
        outliers based on distance from cluster centers in embedding space.
 
@@ -389,11 +375,19 @@ class Outliers(Evaluator):
         Statistics to compute for image statistics-based outlier detection. Set to
         ``ImageStats.NONE`` to skip image statistics and use only cluster-based detection
         (requires ``extractor``).
-    outlier_method : ["modzscore" | "zscore" | "iqr"], default "modzscore"
-        Statistical method used to identify outliers from image statistics.
-    outlier_threshold : float, optional
-        Threshold value for the given ``outlier_method``, above which data is considered an
-        outlier. Uses method-specific default if None.
+    outlier_threshold : ThresholdLike, dict, or None, default None
+        Threshold configuration for image statistics-based outlier detection.
+
+        - ``None``: uses ``ModifiedZScoreThreshold()`` with default multipliers (3.5)
+        - ``float``: symmetric multiplier for the default method (modified z-score)
+        - ``str``: named threshold type (e.g., ``"zscore"``, ``"iqr"``) with defaults
+        - ``tuple[float | None, float | None]``: asymmetric ``(lower, upper)`` multipliers
+        - ``tuple[str, ThresholdBounds]``: named threshold with bounds, e.g.
+          ``("zscore", 2.5)`` or ``("iqr", (1.0, 3.0))``
+        - :class:`~dataeval.utils.thresholds.Threshold`: a fully configured threshold
+          (e.g., ``ZScoreThreshold``, ``IQRThreshold``, ``ConstantThreshold``)
+        - ``dict[str, ThresholdLike]``: per-metric thresholds keyed by metric name.
+          Metrics not in the dict use the default (``ModifiedZScoreThreshold()``).
     extractor : FeatureExtractor, optional
         Feature extractor for cluster-based outlier detection. When provided, embeddings
         are extracted and clustered to find semantic/visual outliers in embedding space.
@@ -417,10 +411,8 @@ class Outliers(Evaluator):
         Contains dimension, pixel, and/or visual statistics based on the flags.
     flags : ImageStats
         Statistics to compute for outlier detection.
-    outlier_method : Literal["zscore", "modzscore", "iqr"]
-        Statistical method used to identify outliers.
-    outlier_threshold : float | None
-        Threshold value for the outlier method.
+    outlier_threshold : ThresholdLike | dict[str, ThresholdLike] | None
+        Threshold configuration for outlier detection.
     extractor : FeatureExtractor | None
         Feature extractor for cluster-based detection.
     cluster_threshold : float
@@ -436,14 +428,18 @@ class Outliers(Evaluator):
 
     Notes
     -----
-    **Image Statistics Methods:**
+    **Threshold Methods:**
 
-    - zscore: Based on difference from mean. Default threshold: 3.
-      Z score = :math:`|x_i - \mu| / \sigma`
-    - modzscore: Based on difference from median (robust to outliers). Default threshold: 3.5.
+    - ``ModifiedZScoreThreshold`` (default): Based on median absolute deviation. Default multiplier: 3.5.
       Modified z score = :math:`0.6745 * |x_i - x̃| / MAD`
-    - iqr: Based on interquartile range. Default threshold: 1.5.
+    - ``ZScoreThreshold``: Based on standard deviation from mean. Default multiplier: 3.
+      Z score = :math:`|x_i - \mu| / \sigma`
+    - ``IQRThreshold``: Based on interquartile range. Default multiplier: 1.5.
       Outliers are outside :math:`[Q_1 - 1.5 \cdot IQR, Q_3 + 1.5 \cdot IQR]`
+    - ``ConstantThreshold``: Hard lower/upper bounds (data-independent).
+
+    All threshold types support asymmetric lower/upper multipliers via
+    ``lower_multiplier`` and ``upper_multiplier`` parameters.
 
     **Cluster-based Detection:**
 
@@ -453,14 +449,39 @@ class Outliers(Evaluator):
 
     Examples
     --------
-    Basic image statistics-based outlier detection:
+    Basic image statistics-based outlier detection (default: modified z-score):
 
     >>> outliers = Outliers()
     >>> result = outliers.evaluate(dataset)
 
-    Specifying an outlier method:
+    Using a specific threshold method:
 
-    >>> outliers = Outliers(outlier_method="iqr")
+    >>> from dataeval.utils.thresholds import ZScoreThreshold
+    >>> outliers = Outliers(outlier_threshold=ZScoreThreshold(2.5))
+
+    Asymmetric thresholds (stricter on lower, lenient on upper):
+
+    >>> from dataeval.utils.thresholds import IQRThreshold
+    >>> outliers = Outliers(outlier_threshold=IQRThreshold(lower_multiplier=1.0, upper_multiplier=3.0))
+
+    Hard bounds:
+
+    >>> from dataeval.utils.thresholds import ConstantThreshold
+    >>> outliers = Outliers(outlier_threshold=ConstantThreshold(lower=0.1, upper=0.9))
+
+    Named threshold type with bounds (no need to import threshold classes):
+
+    >>> outliers = Outliers(outlier_threshold="iqr")
+    >>> outliers = Outliers(outlier_threshold=("zscore", 2.5))
+    >>> outliers = Outliers(outlier_threshold=("modzscore", (1.0, 3.0)))
+
+    Named threshold type with bounds and limits  (no need to import threshold classes):
+
+    >>> outliers = Outliers(outlier_threshold=("zscore", 4.0, (0.0, 1.0)))
+
+    Per-metric thresholds:
+
+    >>> outliers = Outliers(outlier_threshold={"mean": 2.0, "brightness": ("zscore", 2.0)})
 
     Cluster-based detection with embeddings:
 
@@ -471,7 +492,7 @@ class Outliers(Evaluator):
 
     Using configuration:
 
-    >>> config = Outliers.Config(outlier_method="zscore", outlier_threshold=2.5)
+    >>> config = Outliers.Config(outlier_threshold=2.5)
     >>> outliers = Outliers(config=config)
     """
 
@@ -483,10 +504,8 @@ class Outliers(Evaluator):
         ----------
         flags : ImageStats, default ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
             Statistics to compute for image statistics-based outlier detection.
-        outlier_method : {"zscore", "modzscore", "iqr"}, default "modzscore"
-            Statistical method used to identify outliers.
-        outlier_threshold : float or None, default None
-            Threshold value for the outlier method.
+        outlier_threshold : ThresholdLike | dict[str, ThresholdLike] | None, default None
+            Threshold configuration. See :class:`Outliers` for full description.
         cluster_threshold : float, default 2.5
             Number of standard deviations from cluster center for cluster-based detection.
         extractor : FeatureExtractor or None, default None
@@ -498,32 +517,46 @@ class Outliers(Evaluator):
         """
 
         flags: ImageStats = DEFAULT_OUTLIERS_FLAGS
-        outlier_method: Literal["zscore", "modzscore", "iqr"] = DEFAULT_OUTLIERS_OUTLIER_METHOD
-        outlier_threshold: float | None = DEFAULT_OUTLIERS_OUTLIER_THRESHOLD
+        outlier_threshold: ThresholdLike | dict[str, ThresholdLike] | None = None
         cluster_threshold: float = DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
 
     stats: CalculationResult
     flags: ImageStats
-    outlier_method: Literal["zscore", "modzscore", "iqr"]
-    outlier_threshold: float | None
-    cluster_threshold: float
+    outlier_threshold: ThresholdLike | dict[str, ThresholdLike] | None
     extractor: FeatureExtractor | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
+    cluster_threshold: float
     n_clusters: int | None
     config: Config
 
     def __init__(
         self,
         flags: ImageStats | None = None,
-        outlier_method: Literal["zscore", "modzscore", "iqr"] | None = None,
-        outlier_threshold: float | None = None,
-        cluster_threshold: float | None = None,
+        outlier_threshold: ThresholdLike | dict[str, ThresholdLike] | None = None,
         extractor: FeatureExtractor | None = None,
         cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
+        cluster_threshold: float | None = None,
         n_clusters: int | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
+
+    def _resolve_threshold(self, metric_name: str) -> Threshold:
+        """Resolve the Threshold object for a given metric name.
+
+        Priority:
+        1. If outlier_threshold is a dict and metric_name is in it, use that entry.
+        2. If outlier_threshold is a non-dict ThresholdLike, use it for all metrics.
+        3. Otherwise, use default (ModifiedZScoreThreshold with default parameters).
+        """
+        if isinstance(self.outlier_threshold, dict):
+            value = self.outlier_threshold.get(metric_name)
+            if value is not None:
+                return resolve_threshold(value)
+            # Fall through to default for metrics not in dict
+        elif self.outlier_threshold is not None:
+            return resolve_threshold(self.outlier_threshold)
+        return resolve_threshold(None)
 
     def _get_outliers(self, stats: StatsMap, source_index: Sequence[SourceIndex]) -> pl.DataFrame:
         item_ids: list[int] = []
@@ -538,6 +571,8 @@ class Outliers(Evaluator):
 
             for stat, values in stats.items():
                 if values.ndim == 1 and np.issubdtype(values.dtype, np.number):
+                    threshold = self._resolve_threshold(stat)
+
                     # Use boolean indexing instead of list comprehensions
                     image_level_mask_idx = is_image_level
                     target_level_mask_idx = is_target_level
@@ -547,8 +582,7 @@ class Outliers(Evaluator):
                         image_level_values = values[image_level_mask_idx]
                         image_level_outlier_mask = _get_outlier_mask(
                             image_level_values.astype(np.float64),
-                            self.outlier_method,
-                            self.outlier_threshold,
+                            threshold,
                         )
 
                         if np.any(image_level_outlier_mask):
@@ -568,8 +602,7 @@ class Outliers(Evaluator):
                         target_level_values = values[target_level_mask_idx]
                         target_level_outlier_mask = _get_outlier_mask(
                             target_level_values.astype(np.float64),
-                            self.outlier_method,
-                            self.outlier_threshold,
+                            threshold,
                         )
 
                         if np.any(target_level_outlier_mask):
@@ -609,7 +642,7 @@ class Outliers(Evaluator):
     @overload
     def from_stats(self, stats: Sequence[CalculationResult]) -> OutliersOutput[list[pl.DataFrame]]: ...
 
-    @set_metadata(state=["outlier_method", "outlier_threshold"])
+    @set_metadata(state=["outlier_threshold"])
     def from_stats(
         self,
         stats: CalculationResult | Sequence[CalculationResult],
@@ -620,7 +653,7 @@ class Outliers(Evaluator):
         Parameters
         ----------
         stats : CalculationResult | Sequence[CalculationResult]
-            The output(s) from calculate() with ImageStats.DIMENSION, PIXEL, or VISUAL flags
+            The output(s) from calculate_stats() with ImageStats.DIMENSION, PIXEL, or VISUAL flags
 
         Returns
         -------
@@ -637,8 +670,9 @@ class Outliers(Evaluator):
 
         >>> from dataeval.core import calculate_stats
         >>> from dataeval.flags import ImageStats
+        >>> from dataeval.utils.thresholds import ZScoreThreshold
         >>> stats = calculate_stats(images, stats=ImageStats.PIXEL)
-        >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=2.5)
+        >>> outliers = Outliers(outlier_threshold=ZScoreThreshold(2.5))
         >>> results = outliers.from_stats(stats)
         >>> results.issues.head(10)
         shape: (10, 3)
@@ -728,7 +762,7 @@ class Outliers(Evaluator):
         self,
         embeddings: ArrayND[float],
         cluster_result: ClusterResult,
-        threshold: float | None = None,
+        cluster_threshold: float | None = None,
     ) -> OutliersOutput[pl.DataFrame]:
         """
         Find outliers using cluster-based adaptive distance detection.
@@ -746,7 +780,7 @@ class Outliers(Evaluator):
         cluster_result : ClusterResult
             Clustering results from the cluster() function, containing cluster
             assignments and related metadata.
-        threshold : float, default=2.5
+        cluster_threshold : float, default=2.5
             Number of standard deviations beyond cluster mean to use for outlier
             threshold. Higher values are more permissive (fewer outliers), lower
             values are stricter (more outliers). Typical range: 1.5-3.5.
@@ -791,7 +825,7 @@ class Outliers(Evaluator):
         # Find outliers using adaptive method
         outlier_issues = self._find_outliers_adaptive(
             cluster_stats=cluster_stats,
-            threshold_std=threshold or self.outlier_threshold or 2.5,
+            threshold_std=cluster_threshold or self.cluster_threshold,
         )
 
         return OutliersOutput(outlier_issues)
@@ -881,7 +915,6 @@ class Outliers(Evaluator):
     @set_metadata(
         state=[
             "flags",
-            "outlier_method",
             "outlier_threshold",
             "cluster_threshold",
             "cluster_algorithm",
@@ -939,25 +972,21 @@ class Outliers(Evaluator):
         --------
         Basic outlier detection:
 
-        >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=2.5)
+        >>> outliers = Outliers(outlier_threshold=2.5)
         >>> results = outliers.evaluate(images)
-        >>> results.issues.head(10)
-        shape: (10, 3)
+        >>> results.issues.head(6)
+        shape: (6, 3)
         ┌─────────┬─────────────┬──────────────┐
         │ item_id ┆ metric_name ┆ metric_value │
         │ ---     ┆ ---         ┆ ---          │
         │ i64     ┆ cat         ┆ f64          │
         ╞═════════╪═════════════╪══════════════╡
+        │ 0       ┆ zeros       ┆ 0.000081     │
+        │ 1       ┆ brightness  ┆ 0.42235      │
+        │ 1       ┆ mean        ┆ 0.503471     │
+        │ 2       ┆ zeros       ┆ 0.000081     │
         │ 7       ┆ brightness  ┆ 0.98         │
         │ 7       ┆ contrast    ┆ 0.0          │
-        │ 7       ┆ darkness    ┆ 0.98         │
-        │ 7       ┆ entropy     ┆ 0.0          │
-        │ 7       ┆ mean        ┆ 0.98         │
-        │ 7       ┆ sharpness   ┆ 0.0          │
-        │ 7       ┆ std         ┆ 0.0          │
-        │ 7       ┆ var         ┆ 0.0          │
-        │ 8       ┆ skew        ┆ 0.062311     │
-        │ 11      ┆ brightness  ┆ 0.98         │
         └─────────┴─────────────┴──────────────┘
 
         Cluster-based detection with embeddings:

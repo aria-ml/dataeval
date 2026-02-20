@@ -91,7 +91,7 @@ from dataeval import Metadata
 
 # Load the classes from DataEval that are helpful for EDA
 from dataeval.config import set_max_processes
-from dataeval.core import calculate, label_stats
+from dataeval.core import calculate_stats, label_stats
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, Outliers
 
@@ -337,7 +337,7 @@ each flagged outlier.
 # This cell takes about 1-5 minutes to run depending on your hardware
 
 # Initialize the Outliers class
-outliers = Outliers(outlier_method="zscore")
+outliers = Outliers(outlier_threshold="zscore")
 
 # Find the extreme images
 outlier_imgs = outliers.evaluate(ds, per_target=False)
@@ -586,7 +586,7 @@ dupes = [
     np.flip(np.rot90(ds[200][0], k=2, axes=(1, 2)), axis=2),  # 180° rotation + horizontal flip
 ]
 
-dupes_stats = calculate(dupes, None, ImageStats.HASH)
+dupes_stats = calculate_stats(dupes, None, ImageStats.HASH)
 ```
 
 ```{code-cell} ipython3

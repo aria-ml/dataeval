@@ -833,7 +833,7 @@ class TestLowerDimensionalDimensionStats:
         assert stats["size"][0] == 1200  # 30 * 40
 
     def test_calculate_1d_dimension_stats(self):
-        """Test dimension statistics via calculate() with 1D data."""
+        """Test dimension statistics via calculate_stats() with 1D data."""
         data = [np.random.random(100)]
 
         result = calculate_stats(data, None, stats=ImageStats.DIMENSION, per_channel=False)
@@ -849,7 +849,7 @@ class TestLowerDimensionalDimensionStats:
         assert result["stats"]["size"][0] == 100
 
     def test_calculate_2d_dimension_stats(self):
-        """Test dimension statistics via calculate() with 2D data."""
+        """Test dimension statistics via calculate_stats() with 2D data."""
         data = [np.random.random((10, 20))]
 
         result = calculate_stats(data, None, stats=ImageStats.DIMENSION, per_channel=False)
@@ -903,7 +903,7 @@ class TestLowerDimensionalHashStats:
     @patch("dataeval.core._hash._xxhash")
     @patch("dataeval.core._hash._phash")
     def test_calculate_1d_hash_stats(self, mock_phash, mock_xxhash):
-        """Test hash statistics via calculate() with 1D data."""
+        """Test hash statistics via calculate_stats() with 1D data."""
         mock_xxhash.return_value = ("xxhash_calc_result", None)
         mock_phash.return_value = ("phash_calc_result", None)
 
@@ -932,7 +932,7 @@ class TestLowerDimensionalHashStats:
         assert stats["xxhash"][0] != ""
 
     def test_1d_data_phash_returns_empty_via_calculate(self):
-        """Test that phash returns empty string for 1D data via calculate().
+        """Test that phash returns empty string for 1D data via calculate_stats().
 
         Note: The warning is emitted but not captured due to multiprocessing.
         We test the behavior (empty string return) instead.
@@ -964,7 +964,7 @@ class TestLowerDimensionalHashStats:
 
 
 class TestImageClassificationDataset:
-    """Test calculate() with ImageClassificationDataset input."""
+    """Test calculate_stats() with ImageClassificationDataset input."""
 
     def test_ic_dataset_without_boxes(self, get_mock_ic_dataset):
         """Test ImageClassificationDataset processing without boxes."""
@@ -1067,7 +1067,7 @@ class TestImageClassificationDataset:
 
 
 class TestObjectDetectionDataset:
-    """Test calculate() with ObjectDetectionDataset input."""
+    """Test calculate_stats() with ObjectDetectionDataset input."""
 
     def test_od_dataset_with_boxes(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset automatically processes boxes."""
