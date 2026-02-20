@@ -219,7 +219,13 @@ def doctest(session: nox.Session) -> None:
 
 @session(uv_groups=["docs"], uv_extras=with_onnx(UV_EXTRAS) + ["opencv"])
 def docs(session: nox.Session) -> None:
-    """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
+    """Generate documentation.
+
+    Pass 'clean' to clear the jupyter cache: `nox -e docs -- clean`
+    Pass 'skip' to skip notebook execution: `nox -e docs -- skip`
+    """
+    skip_notebooks = "skip" in session.posargs
+
     if {"chart", "charts"} & set(session.posargs):
         try:
             session.run(
@@ -243,13 +249,17 @@ def docs(session: nox.Session) -> None:
     notebook_dir = "docs/source/notebooks"
     session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
 
-    # Fetch cached notebook results from orphan artifact branch
-    session.run("bash", "docs/fetch-docs-cache.sh", external=True)
+    if not skip_notebooks:
+        # Fetch cached notebook results from orphan artifact branch
+        session.run("bash", "docs/fetch-docs-cache.sh", external=True)
 
     session.run("rm", "-rf", "output/docs", external=True)
     session.chdir("docs/source")
-    # Fix any inconsistent cache state before building (e.g., db records without folders or vice versa)
-    session.run("python", "../../docs/check_notebook_cache.py", "--fix")
+
+    if not skip_notebooks:
+        # Fix any inconsistent cache state before building (e.g., db records without folders or vice versa)
+        session.run("python", "../../docs/check_notebook_cache.py", "--fix")
+
     session.run(
         "sphinx-build",
         "--fail-on-warning",
@@ -264,10 +274,12 @@ def docs(session: nox.Session) -> None:
         "language=en",
         ".",
         "../../output/docs/html",
-        env={**DOCS_ENVS},
+        env={**DOCS_ENVS, **({"NB_EXECUTION_MODE_OVERRIDE": "off"} if skip_notebooks else {})},
     )
-    # Clean up stale cache entries after sphinx-build updates the cache
-    session.run("python", "../../docs/check_notebook_cache.py", "--clean")
+
+    if not skip_notebooks:
+        # Clean up stale cache entries after sphinx-build updates the cache
+        session.run("python", "../../docs/check_notebook_cache.py", "--clean")
     session.run_always("bash", "-c", RESTORE_CMD, external=True)
 
 
