@@ -36,7 +36,9 @@ class TestExperimentalDecorator:
             """My docstring."""
 
         assert documented_func.__name__ == "documented_func"
-        assert documented_func.__doc__ == "My docstring."
+        assert documented_func.__doc__ is not None
+        assert "My docstring." in documented_func.__doc__
+        assert ".. warning::" in documented_func.__doc__
 
     def test_function_with_alternative(self):
         @experimental(alternative="stable_func")
@@ -82,6 +84,30 @@ class TestExperimentalDecorator:
 
         with pytest.warns(ExperimentalWarning, match="StableClass"):
             MyClass()
+
+    def test_function_warns_only_once(self):
+        @experimental
+        def my_func():
+            return 1
+
+        with pytest.warns(ExperimentalWarning):
+            my_func()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", ExperimentalWarning)
+            my_func()
+        assert len(w) == 0
+
+    def test_class_warns_only_once(self):
+        @experimental
+        class MyClass:
+            pass
+
+        with pytest.warns(ExperimentalWarning):
+            MyClass()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", ExperimentalWarning)
+            MyClass()
+        assert len(w) == 0
 
 
 class TestDeprecatedDecorator:
@@ -134,7 +160,9 @@ class TestDeprecatedDecorator:
             """My docstring."""
 
         assert documented_func.__name__ == "documented_func"
-        assert documented_func.__doc__ == "My docstring."
+        assert documented_func.__doc__ is not None
+        assert "My docstring." in documented_func.__doc__
+        assert ".. warning::" in documented_func.__doc__
 
     def test_class_warns_on_init(self):
         @deprecated(since="0.9")
@@ -154,6 +182,30 @@ class TestDeprecatedDecorator:
             warnings.simplefilter("ignore", DeprecatedWarning)
             obj = OldClass()
         assert isinstance(obj, OldClass)
+
+    def test_function_warns_only_once(self):
+        @deprecated
+        def old_func():
+            return 1
+
+        with pytest.warns(DeprecatedWarning):
+            old_func()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", DeprecatedWarning)
+            old_func()
+        assert len(w) == 0
+
+    def test_class_warns_only_once(self):
+        @deprecated
+        class OldClass:
+            pass
+
+        with pytest.warns(DeprecatedWarning):
+            OldClass()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", DeprecatedWarning)
+            OldClass()
+        assert len(w) == 0
 
 
 class TestWarningClasses:
