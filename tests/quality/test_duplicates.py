@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import numpy as np
 import pytest
 
-from dataeval.core._calculate import calculate
+from dataeval.core._calculate_stats import calculate_stats
 from dataeval.core._clusterer import ClusterResult
 from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
@@ -70,7 +70,7 @@ class TestDuplicates:
         data = np.random.random((20, 3, 16, 16))
         data = np.concatenate((data, data, data + 0.001))
         # Stats computed with full HASH (includes both xxhash and phash)
-        stats = calculate(data, None, ImageStats.HASH, per_image=True, per_target=False)
+        stats = calculate_stats(data, None, ImageStats.HASH, per_image=True, per_target=False)
         # Detector configured for exact only - but from_stats uses what's in the stats
         dupes = Duplicates(ImageStats.HASH_XXHASH)
         results = dupes.from_stats(stats)
@@ -89,9 +89,9 @@ class TestDuplicates:
         data1 = np.concatenate((ones, zeros, ones, zeros, ones))
         data2 = np.concatenate((zeros, ones, zeros))
         data3 = np.concatenate((zeros + 0.001, ones - 0.001))
-        dupes1 = calculate(data1, None, ImageStats.HASH, per_image=True, per_target=False)
-        dupes2 = calculate(data2, None, ImageStats.HASH, per_image=True, per_target=False)
-        dupes3 = calculate(data3, None, ImageStats.HASH, per_image=True, per_target=False)
+        dupes1 = calculate_stats(data1, None, ImageStats.HASH, per_image=True, per_target=False)
+        dupes2 = calculate_stats(data2, None, ImageStats.HASH, per_image=True, per_target=False)
+        dupes3 = calculate_stats(data3, None, ImageStats.HASH, per_image=True, per_target=False)
 
         dupes = Duplicates()
         results = dupes.from_stats([dupes1, dupes2, dupes3])
@@ -324,7 +324,7 @@ class TestDuplicates:
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
         # Calculate hashes for both full image and individual targets
-        result = calculate(dataset, stats=ImageStats.HASH, per_image=True, per_target=True, per_channel=False)
+        result = calculate_stats(dataset, stats=ImageStats.HASH, per_image=True, per_target=True, per_channel=False)
 
         # Should have 3 results: full image + 2 boxes
         assert len(result["source_index"]) == 3
@@ -451,8 +451,8 @@ class TestDuplicates:
         dataset1 = get_mock_od_dataset([image1], [[0]], [[[0, 0, 50, 50]]])
         dataset2 = get_mock_od_dataset([image2], [[0, 1]], [[[0, 0, 50, 50], [50, 50, 100, 100]]])
 
-        stats1 = calculate(dataset1, None, ImageStats.HASH, per_image=True, per_target=True)
-        stats2 = calculate(dataset2, None, ImageStats.HASH, per_image=True, per_target=True)
+        stats1 = calculate_stats(dataset1, None, ImageStats.HASH, per_image=True, per_target=True)
+        stats2 = calculate_stats(dataset2, None, ImageStats.HASH, per_image=True, per_target=True)
 
         detector = Duplicates()
         result = detector.from_stats([stats1, stats2])

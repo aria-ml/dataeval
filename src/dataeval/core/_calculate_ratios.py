@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
-from dataeval.core._calculate import CalculationResult
+from dataeval.core._calculate_stats import CalculationResult
 from dataeval.types import SourceIndex
 
 _logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def _build_image_lookup(source_indices: Sequence[SourceIndex]) -> dict[tuple[int
     Parameters
     ----------
     source_indices : Sequence[SourceIndex]
-        Sequence of source indices from calculate() output
+        Sequence of source indices from calculate_stats() output
     calculation_result : CalculationResult
         Calculation result containing stats dictionary
 
@@ -230,13 +230,13 @@ def _validate_unified_input(source_indices: Sequence[SourceIndex]) -> None:
     if not has_image_entries:
         raise ValueError(
             "stats_output must contain image-level statistics (entries with box=None). "
-            "Ensure per_image=True when calling calculate(), or provide box_stats_output parameter.",
+            "Ensure per_image=True when calling calculate_stats(), or provide box_stats_output parameter.",
         )
 
     if not has_target_entries:
         raise ValueError(
             "stats_output must contain box-level statistics (entries with box!=None). "
-            "Ensure per_target=True and boxes are provided when calling calculate(), "
+            "Ensure per_target=True and boxes are provided when calling calculate_stats(), "
             "or provide box_stats_output parameter.",
         )
 
@@ -248,12 +248,12 @@ def calculate_ratios(
     override_map: OverrideFunctionMap | None = None,
 ) -> CalculationResult:
     """
-    Calculate box-to-image ratios from calculate() output.
+    Calculate box-to-image ratios from calculate_stats() output.
 
     This function supports two usage patterns:
 
     1. **Unified input**: Pass a single stats_output containing both
-    image and box statistics (from calculate() with per_image=True, per_target=True).
+    image and box statistics (from calculate_stats() with per_image=True, per_target=True).
 
     2. **Separate inputs**: Pass image stats as stats_output and box
     stats as box_stats_output (useful when migrating from boxratiostats()).
@@ -263,10 +263,10 @@ def calculate_ratios(
     stats_output : CalculationResult
         Either:
 
-        - Output from calculate() with both per_image=True and per_target=True (unified), OR
-        - Output from calculate() with per_image=True, per_target=False (if box_stats_output provided)
+        - Output from calculate_stats() with both per_image=True and per_target=True (unified), OR
+        - Output from calculate_stats() with per_image=True, per_target=False (if box_stats_output provided)
     target_stats_output : CalculationResult | None, optional
-        Output from calculate() with per_image=False and per_target=True.
+        Output from calculate_stats() with per_image=False and per_target=True.
         When provided, stats_output is treated as image-only stats.
         Default is None (use unified input from stats_output).
     override_map : OverrideFunctionMap | None, optional
@@ -279,7 +279,7 @@ def calculate_ratios(
     Returns
     -------
     CalculationResult
-        Dictionary with same structure as calculate() output, including:
+        Dictionary with same structure as calculate_stats() output, including:
 
         - source_index: Sequence[SourceIndex] - SourceIndex objects with image/box/channel info
         - object_count: Sequence[int] - Object counts per image
@@ -307,11 +307,11 @@ def calculate_ratios(
     --------
     **Pattern 1: Unified input (recommended)**
 
-    >>> from dataeval.core import calculate, calculate_ratios
+    >>> from dataeval.core import calculate_stats, calculate_ratios
     >>> from dataeval.flags import ImageStats
     >>>
     >>> # Single call gets both image and target stats
-    >>> stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
+    >>> stats = calculate_stats(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
     >>> ratios = calculate_ratios(stats)
     >>> ratios["stats"]["width"][:12]
     array([0.25 , 0.203, 0.328, 0.266, 0.234, 0.297, 0.25 , 0.359, 0.297,
@@ -320,8 +320,8 @@ def calculate_ratios(
     **Pattern 2: Separate inputs (backward compatibility)**
 
     >>> # Separate calls for image and box stats
-    >>> img_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
-    >>> tgt_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
+    >>> img_stats = calculate_stats(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
+    >>> tgt_stats = calculate_stats(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
     >>> ratios = calculate_ratios(img_stats, target_stats_output=tgt_stats)
 
     **Custom override map:**
@@ -333,7 +333,9 @@ def calculate_ratios(
 
     **Per-channel statistics:**
 
-    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_target=True, per_channel=True)
+    >>> stats = calculate_stats(
+    ...     images, boxes, stats=ImageStats.PIXEL, per_image=True, per_target=True, per_channel=True
+    ... )
     >>> ratios = calculate_ratios(stats)
     >>> # Ratios are calculated per-channel automatically
     """
@@ -344,13 +346,13 @@ def calculate_ratios(
 
     # Validate input
     if SOURCE_INDEX_KEY not in stats_output:
-        raise KeyError(f"stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate() output")
+        raise KeyError(f"stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate_stats() output")
 
     # Determine which pattern we're using and validate
     if target_stats_output is not None:
         # Pattern 2: Separate image and box stats
         if SOURCE_INDEX_KEY not in target_stats_output:
-            raise KeyError(f"target_stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate() output")
+            raise KeyError(f"target_stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate_stats() output")
 
         img_source_indices, box_source_indices = _validate_separate_inputs(stats_output, target_stats_output)
         _logger.debug(
@@ -441,7 +443,7 @@ def calculate_ratios(
     }
 
     _logger.info(
-        "Calculate_ratios complete: %d ratio entries calculated for %d images",
+        "calculate_ratios complete: %d ratio entries calculated for %d images",
         len(ratio_source_indices),
         box_calc_result["image_count"],
     )

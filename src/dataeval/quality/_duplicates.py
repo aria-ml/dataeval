@@ -9,7 +9,7 @@ from typing import Any, Generic, Literal, NamedTuple, TypeVar, overload
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.core._calculate import CalculationResult, calculate
+from dataeval.core._calculate_stats import CalculationResult, calculate_stats
 from dataeval.core._clusterer import ClusterResult, cluster
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor
@@ -937,7 +937,9 @@ class Duplicates(Evaluator):
 
         # Hash-based duplicate detection
         if self.flags & ImageStats.HASH:
-            self.stats = calculate(data, None, self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target)
+            self.stats = calculate_stats(
+                data, None, self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target
+            )
             hash_item_result, hash_target_result = self._get_duplicates(self.stats["stats"], self.stats["source_index"])
 
         # Cluster-based duplicate detection (requires both extractor and cluster_threshold)

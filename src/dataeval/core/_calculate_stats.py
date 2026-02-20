@@ -413,7 +413,7 @@ def _aggregate(
     warning_list.extend(result.warnings_list)
 
 
-def calculate(
+def calculate_stats(
     data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
     stats: Flag = ImageStats.ALL,
@@ -424,7 +424,7 @@ def calculate(
     progress_callback: ProgressCallback | None = None,
 ) -> CalculationResult:
     """
-    Compute specified statistics on a set of images, optionally within bounding boxes.
+    Calculate specified statistics on a set of images, optionally within bounding boxes.
 
     Parameters
     ----------
@@ -466,31 +466,31 @@ def calculate(
 
     Examples
     --------
-    Compute all statistics:
+    Calculate all statistics:
 
     >>> from dataeval.flags import ImageStats
-    >>> stats = calculate(images, boxes)
+    >>> stats = calculate_stats(images, boxes)
 
-    Compute specific statistics:
+    Calculate specific statistics:
 
-    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
+    >>> stats = calculate_stats(images, boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
 
     Use convenience groups:
 
-    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
-    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL_BASIC, per_channel=True)
+    >>> stats = calculate_stats(images, boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
+    >>> stats = calculate_stats(images, boxes, stats=ImageStats.PIXEL_BASIC, per_channel=True)
 
-    Compute statistics only for bounding boxes (not full images):
+    Calculate statistics only for bounding boxes (not full images):
 
-    >>> stats = calculate(images, boxes, per_image=False, per_target=True)
+    >>> stats = calculate_stats(images, boxes, per_image=False, per_target=True)
 
-    Compute statistics for full images only (ignore boxes):
+    Calculate statistics for full images only (ignore boxes):
 
-    >>> stats = calculate(images, boxes, per_image=True, per_target=False)
+    >>> stats = calculate_stats(images, boxes, per_image=True, per_target=False)
 
-    Compute statistics for both full images and boxes with per-channel breakdown:
+    Calculate statistics for both full images and boxes with per-channel breakdown:
 
-    >>> stats = calculate(images, boxes, per_image=True, per_target=True, per_channel=True)
+    >>> stats = calculate_stats(images, boxes, per_image=True, per_target=True, per_channel=True)
     """
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
@@ -524,7 +524,7 @@ def calculate(
         f.name for f in type(stats) if f in stats and f.name and f.value and (f.value & (f.value - 1)) == 0
     ]
     _logger.info(
-        "Starting calculate: %d stats [%s], per_image=%s, per_target=%s, per_channel=%s",
+        "Starting calculate_stats: %d stats [%s], per_image=%s, per_target=%s, per_channel=%s",
         len(resolved_names),
         ", ".join(resolved_names),
         per_image,
@@ -577,7 +577,7 @@ def calculate(
     total_boxes = sum(object_count.values())
     total_invalid = sum(invalid_box_count.values())
     _logger.info(
-        "Calculate complete: %d images processed, %d total boxes (%d invalid), %d stats computed",
+        "calculate_stats complete: %d images processed, %d total boxes (%d invalid), %d stats computed",
         image_count,
         total_boxes,
         total_invalid,

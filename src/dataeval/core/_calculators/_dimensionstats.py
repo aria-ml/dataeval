@@ -12,7 +12,7 @@ from dataeval.flags import ImageStats
 from dataeval.utils.preprocessing import get_bitdepth
 
 if TYPE_CHECKING:
-    from dataeval.core._calculate import CalculatorCache
+    from dataeval.core._calculate_stats import CalculatorCache
 
 
 @CalculatorRegistry.register(ImageStats)

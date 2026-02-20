@@ -12,7 +12,7 @@ from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
 
 if TYPE_CHECKING:
-    from dataeval.core._calculate import CalculatorCache
+    from dataeval.core._calculate_stats import CalculatorCache
 
 
 @CalculatorRegistry.register(ImageStats)

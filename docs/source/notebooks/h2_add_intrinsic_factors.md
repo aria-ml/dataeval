@@ -21,7 +21,7 @@ When performing analysis on datasets, [metadata](../concepts/Metadata.md) may so
 metadata to a dataset for analysis may be necessary at times, and can come in the forms of calculated intrinsic values
 or additional information originally unavailable on the source dataset.
 
-This guide will show you how to add in the calculated statistics from DataEval's {func}`.calculate` function to the
+This guide will show you how to add in the calculated statistics from DataEval's {func}`.calculate_stats` function to the
 metadata for bias analysis.
 
 +++
@@ -69,7 +69,7 @@ from maite_datasets.image_classification import CIFAR10
 
 from dataeval import Metadata
 from dataeval.bias import Balance, Diversity, Parity
-from dataeval.core import calculate
+from dataeval.core import calculate_stats
 from dataeval.flags import ImageStats
 from dataeval.selection import Limit, Select, Shuffle
 
@@ -115,20 +115,20 @@ Balance().evaluate(metadata).balance[2]
 ## Add image statistics to the metadata
 
 In order to perform additional bias analysis on the dataset when no meaningful metadata are provided, you will augment
-the metadata with statistics of the images using the {func}`.calculate` function.
+the metadata with statistics of the images using the {func}`.calculate_stats` function.
 
-Begin by running `calculate` for the `PIXEL` and `VISUAL` image stats for the dataset and adding the stats factors to
-the `Metadata`.
+Begin by running `calculate_stats` for the `PIXEL` and `VISUAL` image stats for the dataset and adding the stats factors
+to the `Metadata`.
 
 ```{code-cell} ipython3
 # Calculate pixel and visual statistics
-calc_results = calculate(cifar10, stats=ImageStats.PIXEL | ImageStats.VISUAL)
+calc_results = calculate_stats(cifar10, stats=ImageStats.PIXEL | ImageStats.VISUAL)
 
 # Append the factors to the metadata
 metadata.add_factors(calc_results["stats"])
 ```
 
-Next you will add the `calculate` output to the metadata as factors, and exclude factors that are uniform or without
+Next you will add the `calculate_stats` output to the metadata as factors, and exclude factors that are uniform or without
 significance.
 
 Additionally, you will specify a binning strategy for continuous statistical factors, which are, for our purposes,
@@ -145,8 +145,8 @@ metadata.continuous_factor_bins = dict.fromkeys(keys, 5)
 
 ## Perform bias analysis
 
-Now you can run the bias analysis evaluators {class}`.Balance`, {class}`.Diversity` and {class}`.Parity` on the dataset
-metadata augmented with intrinsic statistical factors.
+Now you can run the bias analysis evaluators {class}`.Balance` and {class}`.Diversity` on the dataset metadata augmented
+with intrinsic statistical factors.
 
 ```{code-cell} ipython3
 balance_output = Balance().evaluate(metadata)

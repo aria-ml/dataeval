@@ -401,11 +401,11 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
     # -------------------------------------------------------------------------
     # Stats fixtures for Outliers.from_stats
     # -------------------------------------------------------------------------
-    from dataeval.core import calculate
+    from dataeval.core import calculate_stats
     from dataeval.flags import ImageStats
 
-    stats1 = calculate(images[:25], stats=ImageStats.PIXEL)
-    stats2 = calculate(images[25:], stats=ImageStats.PIXEL)
+    stats1 = calculate_stats(images[:25], stats=ImageStats.PIXEL)
+    stats2 = calculate_stats(images[25:], stats=ImageStats.PIXEL)
     doctest_namespace["stats1"] = stats1
     doctest_namespace["stats2"] = stats2
 
