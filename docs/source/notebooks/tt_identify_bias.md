@@ -13,8 +13,8 @@ kernelspec:
 
 # Identify bias and correlations
 
-This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/Balance.md),
-[diversity](../concepts/Diversity.md) and [parity](../concepts/Parity.md).
+This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/Balance.md) and
+[diversity](../concepts/Diversity.md).
 
 Estimated time to complete: 15 minutes
 
@@ -76,15 +76,13 @@ developing a dataset.
 ### DataEval metrics
 
 DataEval has three dedicated classes for identifying and understanding the bias or correlations that may be present in a
-dataset: {class}`.Balance`, {class}`.Diversity` and {class}`.Parity`.
+dataset: {class}`.Balance` and {class}`.Diversity`.
 
 The `Balance` evaluator measures correlational relationships between metadata factors and classes by calculating the
 mutual information between the metadata factors and the labels.
 
 The `Diversity` evaluator measures the evenness or uniformity of the sampling of metadata factors over a dataset using
 the inverse Simpson index or Shannon index.
-
-The `Parity` evaluator measures the relationship between metadata factors and classes using a chi-squared test.
 
 These techniques help ensure that when you split the data for your projects, you minimize things like shortcut learning
 and leakage between training and testing sets.
@@ -111,13 +109,12 @@ except Exception:
 ```{code-cell} ipython3
 import dataeval_plots as dep
 import plotly.io as pio
-from IPython.display import display
 from maite_datasets.object_detection import VOCDetection
 
 # Load the functions from DataEval that are helpful for bias
 # as well as the VOCDetection dataset for the tutorial
 from dataeval import Metadata
-from dataeval.bias import Balance, Diversity, Parity
+from dataeval.bias import Balance, Diversity
 
 # Use plotly to render plots
 dep.set_default_backend("plotly")
@@ -326,44 +323,6 @@ facing each direction, but only a few of them contain a _pose_ value.
 
 +++
 
-## Step 5: Assess dataset parity
-
-+++
-
-The {class}`.Parity` evaluator measures the relationship between metadata factors and classes using a chi-squared test.
-A high score with a low p-value suggests that a metadata factor is strongly correlated with a class label.
-
-The results can be retrieved using the _score_ and _p_value_ attributes of the output.
-
-```{code-cell} ipython3
-par = Parity().evaluate(metadata)
-```
-
-The warning above states that the metric works best when there are more than 5 samples in each value-label combination.
-However, because of the large number of total samples, the difference between 1 and 5 samples does not significantly
-affect the results.
-
-When evaluating the results of parity for a large number of factors, it may be easier to understand the results in a
-DataFrame.
-
-The {class}`.ParityOutput` class contains a `to_dataframe` function to format the results of the diversity function as a
-DataFrame.
-
-```{code-cell} ipython3
-display(par.factors)
-```
-
-According to the results, all metadata are correlated with _class_ labels. However, `parity` is based on the idea of an
-expected frequency and how the observed differs from what is expected. The expected frequencies are determined by sums
-of the values for each metadata category.
-
-This function works best when the expected frequencies for a given factor for each individual class are known _a
-priori_. For the case above, the expected frequency for the _pose_ metadata category shouldn't be the same for all
-classes. The _diningtable_, _pottedplant_, and _bottle_ classes only have a single value for _pose_ which automatically
-throws off the metric because not all of the classes have an identical expected frequency for _pose_.
-
-+++
-
 ## Conclusion
 
 +++
@@ -372,9 +331,9 @@ Having analyzed the dataset for bias with multiple metrics, the conclusion is th
 model on this dataset has the potential to learn shortcuts and underperform on operational data if the biases are not
 representative of biases in the operational dataset.
 
-The metadata categories identified by the `Balance`, `Diversity` and `Parity` evaluators contain issues such as
-imbalanced classes and imbalanced parameters per class. DataEval isn't able to tell you exactly why they are imbalanced,
-but it highlights the categories that you need to check.
+The metadata categories identified by the `Balance` and `Diversity` evaluators contain issues such as imbalanced classes
+and imbalanced parameters per class. DataEval isn't able to tell you exactly why they are imbalanced, but it highlights
+the categories that you need to check.
 
 As you can see, the DataEval methods are here to help you gain a deep understanding of your dataset and all of its
 strengths and limitations. It is designed to help you create representative and reliable datasets.
@@ -392,8 +351,8 @@ about dataset analysis:
 - To identify coverage gaps and outliers use the [Assessing the Data Space Guide](tt_assess_data_space.md).
 - To monitor data for shifts during operation use the [Data Monitoring Guide](tt_monitor_shift.md).
 
-To learn more about the balance, diversity and parity evaluators, see the [Balance](../concepts/Balance.md),
-[Diversity](../concepts/Diversity.md) and [Parity](../concepts/Parity.md) concept pages.
+To learn more about the balance and diversity evaluators, see the [Balance](../concepts/Balance.md) and
+[Diversity](../concepts/Diversity.md) concept pages.
 
 ## On your own
 

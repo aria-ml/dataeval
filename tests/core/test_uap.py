@@ -3,6 +3,8 @@ import pytest
 
 from dataeval.core._uap import uap
 
+pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+
 
 @pytest.mark.required
 class TestUAP:

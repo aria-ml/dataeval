@@ -21,8 +21,8 @@ When performing analysis on datasets, [metadata](../concepts/Metadata.md) may so
 metadata to a dataset for analysis may be necessary at times, and can come in the forms of calculated intrinsic values
 or additional information originally unavailable on the source dataset.
 
-This guide will show you how to add in the calculated statistics from DataEval's {func}`.calculate_stats` function to the
-metadata for bias analysis.
+This guide will show you how to add in the calculated statistics from DataEval's {func}`.calculate_stats` function to
+the metadata for bias analysis.
 
 +++
 
@@ -64,11 +64,10 @@ except Exception:
 import dataeval_plots as dep
 import plotly.io as pio
 import polars as pl
-from IPython.display import display
 from maite_datasets.image_classification import CIFAR10
 
 from dataeval import Metadata
-from dataeval.bias import Balance, Diversity, Parity
+from dataeval.bias import Balance, Diversity
 from dataeval.core import calculate_stats
 from dataeval.flags import ImageStats
 from dataeval.selection import Limit, Select, Shuffle
@@ -128,8 +127,8 @@ calc_results = calculate_stats(cifar10, stats=ImageStats.PIXEL | ImageStats.VISU
 metadata.add_factors(calc_results["stats"])
 ```
 
-Next you will add the `calculate_stats` output to the metadata as factors, and exclude factors that are uniform or without
-significance.
+Next you will add the `calculate_stats` output to the metadata as factors, and exclude factors that are uniform or
+without significance.
 
 Additionally, you will specify a binning strategy for continuous statistical factors, which are, for our purposes,
 continuous. For this example, bin everything into 10 uniform-width bins.
@@ -177,11 +176,6 @@ The diversity index also indicates uniform sampling of classes within the datase
 kurtosis across the dataset may indicate an inadequate binning strategy (for metric computation) given that the other
 statistical moments appear to be more evenly distributed. Further investigation and iteration could be done to assess
 sensitivity to binning strategy.
-
-```{code-cell} ipython3
-parity_output = Parity().evaluate(metadata)
-display(parity_output.factors)
-```
 
 You can now augment your datasets with additional metadata information, either from additional sources or using
 `dataeval` statistical functions for insights into your data.

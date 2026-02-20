@@ -6,6 +6,8 @@ from numpy.testing import assert_array_almost_equal
 
 from dataeval.core._parity import parity
 
+pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+
 
 @pytest.mark.required
 class TestParity:

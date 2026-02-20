@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats.contingency import chi2_contingency, crosstab
 
+from dataeval._experimental import experimental
 from dataeval.types import Array1D, Array2D
 from dataeval.utils.arrays import as_numpy
 
@@ -37,12 +38,16 @@ class ParityResult(TypedDict):
     insufficient_data: Mapping[int, Mapping[int, Mapping[int, int]]]
 
 
+@experimental
 def parity(
     factor_data: Array2D[int],
     class_labels: Array1D[int],
 ) -> ParityResult:
     """
     Calculate statistical parity using Bias-Corrected Cramér's V.
+
+    .. warning::
+       This function is experimental and may change or be removed in future releases.
 
     This function measures the association between metadata factors and class labels
     to identify potential bias or spurious correlations. It assumes an equal distribution
