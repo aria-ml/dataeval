@@ -5,11 +5,12 @@ __all__ = []
 import functools
 import importlib
 import warnings
-from typing import Any, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
 
 from dataeval.exceptions import DeprecatedWarning, ExperimentalWarning
 
-F = TypeVar("F")
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 def _make_warning_message(
@@ -38,16 +39,28 @@ def _make_warning_message(
     return msg
 
 
+def _prepend_doc_note(doc: str | None, note: str) -> str:
+    """Prepend a status note to a docstring."""
+    header = f".. warning::\n    {note}"
+    if doc:
+        return f"{header}\n\n{doc}"
+    return header
+
+
+@overload
+def experimental(_target: F) -> F: ...
+@overload
+def experimental(*, alternative: str | None = None, details: str | None = None) -> Callable[[F], F]: ...
 def experimental(
     _target: F | None = None,
     *,
     alternative: str | None = None,
     details: str | None = None,
-) -> F:
+) -> F | Callable[[F], F]:
     """Mark a function or class as experimental.
 
-    When applied to a function, warns on each call.
-    When applied to a class, warns on instantiation.
+    When applied to a function, warns on first call.
+    When applied to a class, warns on first instantiation.
 
     Can be used with or without arguments::
 
@@ -62,30 +75,49 @@ def experimental(
     def decorator(target: F) -> F:
         name = getattr(target, "__qualname__", getattr(target, "__name__", str(target)))
         msg = _make_warning_message(name, "experimental", alternative=alternative, details=details)
+        warned = False
 
         if isinstance(target, type):
             original_init = target.__init__
 
             @functools.wraps(original_init)
             def new_init(self: Any, *args: Any, **kwargs: Any) -> None:
-                warnings.warn(msg, ExperimentalWarning, stacklevel=2)
+                nonlocal warned
+                if not warned:
+                    warnings.warn(msg, ExperimentalWarning, stacklevel=2)
+                    warned = True
                 original_init(self, *args, **kwargs)
 
             target.__init__ = new_init  # type: ignore[attr-defined]
+            target.__doc__ = _prepend_doc_note(target.__doc__, msg)
             return target  # type: ignore[return-value]
 
-        @functools.wraps(target)  # type: ignore[arg-type]
+        @functools.wraps(target)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            warnings.warn(msg, ExperimentalWarning, stacklevel=2)
-            return target(*args, **kwargs)  # type: ignore[operator]
+            nonlocal warned
+            if not warned:
+                warnings.warn(msg, ExperimentalWarning, stacklevel=2)
+                warned = True
+            return target(*args, **kwargs)
 
+        wrapper.__doc__ = _prepend_doc_note(target.__doc__, msg)
         return wrapper  # type: ignore[return-value]
 
     if _target is not None:
         return decorator(_target)
-    return decorator  # type: ignore[return-value]
+    return decorator
 
 
+@overload
+def deprecated(_target: F) -> F: ...
+@overload
+def deprecated(
+    *,
+    since: str | None = None,
+    removal: str | None = None,
+    alternative: str | None = None,
+    details: str | None = None,
+) -> Callable[[F], F]: ...
 def deprecated(
     _target: F | None = None,
     *,
@@ -93,11 +125,11 @@ def deprecated(
     removal: str | None = None,
     alternative: str | None = None,
     details: str | None = None,
-) -> F:
+) -> F | Callable[[F], F]:
     """Mark a function or class as deprecated.
 
-    When applied to a function, warns on each call.
-    When applied to a class, warns on instantiation.
+    When applied to a function, warns on first call.
+    When applied to a class, warns on first instantiation.
 
     Can be used with or without arguments::
 
@@ -119,28 +151,37 @@ def deprecated(
             alternative=alternative,
             details=details,
         )
+        warned = False
 
         if isinstance(target, type):
             original_init = target.__init__
 
             @functools.wraps(original_init)
             def new_init(self: Any, *args: Any, **kwargs: Any) -> None:
-                warnings.warn(msg, DeprecatedWarning, stacklevel=2)
+                nonlocal warned
+                if not warned:
+                    warnings.warn(msg, DeprecatedWarning, stacklevel=2)
+                    warned = True
                 original_init(self, *args, **kwargs)
 
             target.__init__ = new_init  # type: ignore[attr-defined]
+            target.__doc__ = _prepend_doc_note(target.__doc__, msg)
             return target  # type: ignore[return-value]
 
-        @functools.wraps(target)  # type: ignore[arg-type]
+        @functools.wraps(target)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            warnings.warn(msg, DeprecatedWarning, stacklevel=2)
-            return target(*args, **kwargs)  # type: ignore[operator]
+            nonlocal warned
+            if not warned:
+                warnings.warn(msg, DeprecatedWarning, stacklevel=2)
+                warned = True
+            return target(*args, **kwargs)
 
+        wrapper.__doc__ = _prepend_doc_note(target.__doc__, msg)
         return wrapper  # type: ignore[return-value]
 
     if _target is not None:
         return decorator(_target)
-    return decorator  # type: ignore[return-value]
+    return decorator
 
 
 def _warn_on_access(

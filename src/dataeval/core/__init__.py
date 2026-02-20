@@ -16,7 +16,7 @@ __all__ = [
     "MutualInfoResult",
     "NullModelMetrics",
     "NullModelMetricsResult",
-    "ParityResult",  # type: ignore - experimental
+    "ParityResult",
     "RankResult",
     "ber_knn",
     "ber_mst",
@@ -46,7 +46,7 @@ __all__ = [
     "nullmodel_precision",
     "nullmodel_metrics",
     "nullmodel_recall",
-    "parity",  # type: ignore - experimental
+    "parity",
     "phash",
     "phash_d4",
     "rank_hdbscan_complexity",
@@ -57,10 +57,8 @@ __all__ = [
     "rank_result_class_balanced",
     "rank_result_stratified",
     "xxhash",
-    "uap",  # type: ignore - experimental
+    "uap",
 ]
-
-from typing import Any
 
 from dataeval.core._ber import BERResult, ber_knn, ber_mst
 from dataeval.core._calculate_ratios import calculate_ratios
@@ -86,6 +84,7 @@ from dataeval.core._nullmodel import (
     nullmodel_precision,
     nullmodel_recall,
 )
+from dataeval.core._parity import ParityResult, parity
 from dataeval.core._rank import (
     RankResult,
     rank_hdbscan_complexity,
@@ -96,18 +95,4 @@ from dataeval.core._rank import (
     rank_result_class_balanced,
     rank_result_stratified,
 )
-
-_EXPERIMENTAL: dict[str, tuple[str, str]] = {
-    "parity": ("dataeval.core._parity", "parity"),
-    "ParityResult": ("dataeval.core._parity", "ParityResult"),
-    "uap": ("dataeval.core._uap", "uap"),
-}
-
-
-def __getattr__(name: str) -> Any:
-    if name in _EXPERIMENTAL:
-        from dataeval._experimental import _lazy_import_with_warning
-
-        module_path, attr_name = _EXPERIMENTAL[name]
-        return _lazy_import_with_warning(module_path, attr_name, f"dataeval.core.{name}", "experimental")
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+from dataeval.core._uap import uap
