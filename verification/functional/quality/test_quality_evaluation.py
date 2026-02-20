@@ -43,20 +43,22 @@ class TestQualityEvaluation:
         assert hasattr(result, "issues")
         assert isinstance(result.issues, pl.DataFrame)
 
-    def test_outliers_supports_zscore_method(self):
+    def test_outliers_supports_zscore_threshold(self):
         from dataeval.quality import Outliers
+        from dataeval.utils.thresholds import ZScoreThreshold
 
         rng = np.random.default_rng(0)
         images = rng.random((50, 3, 16, 16)).astype(np.float32)
-        result = Outliers(outlier_method="zscore").evaluate(images)
+        result = Outliers(outlier_threshold=ZScoreThreshold()).evaluate(images)
         assert hasattr(result, "issues")
 
-    def test_outliers_supports_iqr_method(self):
+    def test_outliers_supports_iqr_threshold(self):
         from dataeval.quality import Outliers
+        from dataeval.utils.thresholds import IQRThreshold
 
         rng = np.random.default_rng(0)
         images = rng.random((50, 3, 16, 16)).astype(np.float32)
-        result = Outliers(outlier_method="iqr").evaluate(images)
+        result = Outliers(outlier_threshold=IQRThreshold()).evaluate(images)
         assert hasattr(result, "issues")
 
     def test_quality_outputs_support_meta(self):

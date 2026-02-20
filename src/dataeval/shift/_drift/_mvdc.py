@@ -26,10 +26,11 @@ from sklearn.model_selection import StratifiedKFold
 from typing_extensions import Self
 
 from dataeval.config import get_max_processes, get_seed
+from dataeval.protocols import Threshold
 from dataeval.shift._drift._chunk import Chunk, Chunker, CountBasedChunker, SizeBasedChunker
-from dataeval.shift._drift._thresholds import ConstantThreshold, Threshold
 from dataeval.types import Output, set_metadata
 from dataeval.utils.arrays import flatten_samples
+from dataeval.utils.thresholds import ConstantThreshold
 
 logger = logging.getLogger(__name__)
 
@@ -283,11 +284,8 @@ class _DomainClassifierCalculator:
     def _populate_alert_thresholds(self, result_data: pl.DataFrame) -> pl.DataFrame:
         """Populate alert threshold columns."""
         if self.result is None:
-            self._threshold_values = self.threshold.calculate(
+            self._threshold_values = self.threshold(
                 data=result_data["domain_classifier_auroc_value"].to_numpy(),
-                lower_limit=0.0,
-                upper_limit=1.0,
-                logger=self._logger,
             )
 
         result_data = result_data.with_columns(

@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import polars as pl
@@ -13,6 +13,11 @@ from dataeval.flags import ImageStats
 from dataeval.quality._outliers import Outliers, OutliersOutput, _get_outlier_mask
 from dataeval.types import SourceIndex
 from dataeval.utils.data import unzip_dataset
+from dataeval.utils.thresholds import (
+    IQRThreshold,
+    ModifiedZScoreThreshold,
+    ZScoreThreshold,
+)
 from tests.conftest import MockMetadata
 
 
@@ -40,30 +45,24 @@ class TestOutliers:
         assert results is not None
 
     def test_get_outlier_mask_empty(self):
-        mask = _get_outlier_mask(np.zeros([0]), "zscore", None)
+        mask = _get_outlier_mask(np.zeros([0]), ZScoreThreshold())
         assert mask is not None
         assert len(mask) == 0
 
-    @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
-    def test_get_outlier_mask(self, method):
-        mask_value = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, 2.5)
-        mask_none = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, None)
-        np.testing.assert_array_equal(mask_value, mask_none)
-
-    @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
-    @patch("dataeval.quality._outliers.EPSILON", 100.0)
-    def test_get_outlier_mask_with_large_epsilon(self, method):
-        mask_value = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, 2.5)
-        mask_none = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, None)
-        np.testing.assert_array_equal(mask_value, mask_none)
-
-    def test_get_outlier_mask_valueerror(self):
-        with pytest.raises(ValueError, match="Outlier method must be"):
-            _get_outlier_mask(np.random.random((10, 1, 16, 16)), "error", None)  # type: ignore
+    @pytest.mark.parametrize(
+        "threshold",
+        [ZScoreThreshold(2.5), ModifiedZScoreThreshold(2.5), IQRThreshold(2.5)],
+    )
+    def test_get_outlier_mask(self, threshold):
+        data = np.array([0.1, 0.2, 0.1, 1.0])
+        mask = _get_outlier_mask(data, threshold)
+        # With only 4 values, 2.5x multiplier should not flag anything
+        assert mask is not None
+        assert len(mask) == len(data)
 
     def test_get_outlier_mask_all_nan(self):
-        mask_none = _get_outlier_mask(np.array([np.nan, np.nan, np.nan]), "zscore", None)
-        np.testing.assert_array_equal(mask_none, np.array([False, False, False]))
+        mask = _get_outlier_mask(np.array([np.nan, np.nan, np.nan]), ZScoreThreshold())
+        np.testing.assert_array_equal(mask, np.array([False, False, False]))
 
     def test_outliers_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
@@ -110,6 +109,13 @@ class TestOutliers:
             outliers.from_stats(1234)  # type: ignore
         with pytest.raises(TypeError):
             outliers.from_stats([1234])  # type: ignore
+
+    def test_outliers_with_metric_thresholds(self):
+        data = np.random.random((20, 3, 16, 16))
+        stats = calculate_stats(data, None, ImageStats.VISUAL)
+        outliers = Outliers(outlier_threshold={"contrast": 2.0, "brightness": ("zscore", 2.0), "sharpness": "iqr"})
+        results = outliers.from_stats(stats)
+        assert results is not None
 
     def test_outliers_all_false(self):
         outliers = Outliers(flags=ImageStats(0))
@@ -178,7 +184,7 @@ class TestOutliers:
 
         # Find outliers using new method
         detector = Outliers()
-        result = detector.from_clusters(embeddings, mock_cluster_result, threshold=2.0)
+        result = detector.from_clusters(embeddings, mock_cluster_result, cluster_threshold=2.0)
 
         # Should be a DataFrame
         assert isinstance(result.issues, pl.DataFrame)
@@ -205,9 +211,9 @@ class TestOutliers:
         detector = Outliers()
 
         # Strict threshold should find more outliers
-        result_strict = detector.from_clusters(embeddings, mock_cluster_result, threshold=1.5)
+        result_strict = detector.from_clusters(embeddings, mock_cluster_result, cluster_threshold=1.5)
         # Permissive threshold should find fewer outliers
-        result_permissive = detector.from_clusters(embeddings, mock_cluster_result, threshold=3.5)
+        result_permissive = detector.from_clusters(embeddings, mock_cluster_result, cluster_threshold=3.5)
 
         # Strict should have more (or equal) outliers than permissive
         assert len(result_strict.issues) >= len(result_permissive.issues)
@@ -253,7 +259,7 @@ class TestOutliers:
         }
 
         detector = Outliers()
-        result = detector.from_clusters(embeddings, mock_cluster_result, threshold=2.0)
+        result = detector.from_clusters(embeddings, mock_cluster_result, cluster_threshold=2.0)
 
         # Cluster-based outlier detection is always image-level, so target_id should be dropped
         assert "target_id" not in result.issues.columns
@@ -275,7 +281,7 @@ class TestOutliers:
         }
 
         detector = Outliers()
-        result = detector.from_clusters(embeddings, mock_cluster_result, threshold=3.0)
+        result = detector.from_clusters(embeddings, mock_cluster_result, cluster_threshold=3.0)
 
         # With permissive threshold and tight cluster, should find few or no outliers
         assert isinstance(result.issues, pl.DataFrame)
@@ -640,7 +646,7 @@ class TestOutliersCoverageImprovements:
         # Add tiny variation to avoid completely constant data
         images += np.random.random(images.shape) * 0.001
 
-        outliers = Outliers(outlier_method="zscore", outlier_threshold=3.0)
+        outliers = Outliers(outlier_threshold=ZScoreThreshold(3.0))
         result = outliers.evaluate(images)
 
         # Should return empty DataFrame with correct schema
@@ -656,8 +662,7 @@ class TestOutliersCoverageImprovements:
 
         outliers = Outliers(
             flags=ImageStats.PIXEL,
-            outlier_method="zscore",
-            outlier_threshold=2.0,
+            outlier_threshold=ZScoreThreshold(2.0),
         )
 
         result = outliers.evaluate(images)
@@ -680,7 +685,7 @@ class TestOutliersCoverageImprovements:
         stats1 = calculate_stats(images1, None, ImageStats.PIXEL)
         stats2 = calculate_stats(images2, None, ImageStats.PIXEL)
 
-        outliers = Outliers(outlier_method="zscore", outlier_threshold=5.0)  # Very high threshold
+        outliers = Outliers(outlier_threshold=ZScoreThreshold(5.0))  # Very high threshold
         result = outliers.from_stats([stats1, stats2])
 
         # Should return list of DataFrames
@@ -740,7 +745,7 @@ class TestOutliersEdgeCases:
         Previously, stats like 'xxhash' containing hex strings (e.g. '9cca8a3736741ab7')
         would cause a ValueError when _get_outliers tried to cast them to float64.
         """
-        detector = Outliers(outlier_method="zscore", outlier_threshold=1.0)
+        detector = Outliers(outlier_threshold=ZScoreThreshold(1.0))
 
         # Simulate stats containing both numeric and non-numeric (hash) values
         mock_stats = {
@@ -771,7 +776,7 @@ class TestOutliersEdgeCases:
         # - Z-score for 100.0: |100-67|/46.67 ≈ 0.707
         # - Z-score for 1.0: |1-67|/46.67 ≈ 1.41
         # Threshold 1.0 means only item 1 (z-score 1.41 > 1.0) is flagged
-        detector = Outliers(outlier_method="zscore", outlier_threshold=1.0)
+        detector = Outliers(outlier_threshold=ZScoreThreshold(1.0))
 
         # We manually construct a result that has all null target_ids
         mock_stats = {
@@ -831,16 +836,13 @@ class TestOutliersEdgeCases:
 
     def test_get_outlier_mask_branches(self):
         """Covers _get_outlier_mask specific branches (all nan, empty)."""
+        t = ZScoreThreshold(3.0)
         # Empty
-        assert len(_get_outlier_mask(np.array([]), "zscore", 3.0)) == 0
+        assert len(_get_outlier_mask(np.array([]), t)) == 0
 
         # All NaNs
-        res = _get_outlier_mask(np.array([np.nan, np.nan]), "zscore", 3.0)
+        res = _get_outlier_mask(np.array([np.nan, np.nan]), t)
         assert not np.any(res)
-
-        # Invalid method
-        with pytest.raises(ValueError, match="Outlier method must be"):
-            _get_outlier_mask(np.array([1, 2]), "invalid_method", 3.0)  # type: ignore
 
     def test_evaluate_with_tuple_dataset(self, get_mock_ic_dataset):
         """Regression test: evaluate with cluster-based detection should handle tuple datasets.

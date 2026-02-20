@@ -6,7 +6,7 @@ in setting up data and architectures that are guaranteed to work with applicable
 DataEval metrics.
 """
 
-from dataeval.utils import arrays, data, losses, models, onnx, preprocessing, training
+from dataeval.utils import arrays, data, losses, models, onnx, preprocessing, thresholds, training
 
 __all__ = [
     "arrays",
@@ -15,5 +15,6 @@ __all__ = [
     "models",
     "onnx",
     "preprocessing",
+    "thresholds",
     "training",
 ]

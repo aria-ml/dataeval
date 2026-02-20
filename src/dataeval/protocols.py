@@ -23,6 +23,10 @@ __all__ = [
     "SegmentationTarget",
     "SegmentationDatum",
     "SegmentationDataset",
+    "Threshold",
+    "ThresholdBounds",
+    "ThresholdLike",
+    "ThresholdLimits",
     "TrainingStrategy",
     "Transform",
     "UpdateStrategy",
@@ -1111,3 +1115,66 @@ class ProgressCallback(Protocol):
         desc: str | None = None,
         extra_info: dict[str, Any] | None = None,
     ) -> None: ...
+
+
+# ========== THRESHOLD ==========
+
+
+@runtime_checkable
+class Threshold(Protocol):
+    """
+    Protocol for threshold objects used in bias and quality evaluators.
+
+    This protocol defines the interface for threshold objects that determine
+    whether a given score or metric exceeds a predefined threshold, indicating
+    potential bias or quality issues.
+
+    Methods
+    -------
+    __call__(self, data: NDArray[Any]) -> tuple[float | None, float | None]
+        Return the lower and upper threshold values based on the input data.
+    """
+
+    def __call__(self, data: NDArray[Any]) -> tuple[float | None, float | None]:
+        """
+        Calculate threshold values based on input data.
+
+        Parameters
+        ----------
+        data : NDArray[Any]
+            Input data used to calculate the threshold. The specific requirements
+            for this data depend on the implementation of the threshold.
+
+        Returns
+        -------
+        tuple[float | None, float | None]
+            A tuple containing the lower and upper threshold values. If a particular
+            threshold is not applicable, it can be set to None.
+        """
+        ...
+
+
+ThresholdBounds = float | tuple[float | None, float | None]
+ThresholdLimits = tuple[float | None, float | None]
+ThresholdLike = (
+    str
+    | ThresholdBounds
+    | tuple[str, ThresholdBounds]
+    | tuple[str, ThresholdBounds | None, ThresholdLimits]
+    | tuple[ThresholdBounds | None, ThresholdLimits]
+    | Threshold
+)
+"""Type alias for threshold specifications.
+
+Values default to modified z-score thresholds if not provided.
+- ``float``: symmetric multiplier (same for lower and upper)
+- ``str``: named threshold (e.g., "modzscore") with default bounds
+- ``tuple[float | None, float | None]``: ``(lower, upper)`` for asymmetric bounds
+- ``tuple[str, float | tuple[float | None, float | None]]``: named threshold with optional lower and upper bounds
+- ``tuple[str, bounds, (lower_limit, upper_limit)]``: named threshold with bounds and limit clamping,
+e.g. ``("zscore", (1.0, 3.5), (0.0, 1.0))``. Pass ``None`` for bounds to use defaults:
+``("zscore", None, (0.0, 1.0))``
+- ``tuple[bounds | None, (lower_limit, upper_limit)]``: default threshold with bounds and limit clamping,
+e.g. ``(2.5, (0.0, 1.0))`` or ``(None, (0.0, 1.0))`` for default multiplier
+- ``Threshold``: a fully configured Threshold instance
+"""

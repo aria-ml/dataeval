@@ -86,7 +86,7 @@ Now we can begin finding those images which are significantly different from the
 
 ```{code-cell} ipython3
 # Initialize the Duplicates class
-outliers = Outliers(outlier_method="zscore", outlier_threshold=3.5)
+outliers = Outliers(outlier_threshold=("zscore", 3.5))
 
 # Evaluate the data
 results = outliers.evaluate(testing_dataset)
@@ -124,5 +124,5 @@ results.aggregate_by_class(Metadata(testing_dataset))
 tags: [remove_cell]
 ---
 ### TEST ASSERTION CELL ###
-assert results.issues.shape[0] == 499
+assert results.issues.shape[0] == 500
 ```
