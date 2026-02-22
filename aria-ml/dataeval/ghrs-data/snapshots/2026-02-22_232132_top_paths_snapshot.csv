@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,90,42
+/aria-ml/dataeval/tree/main/src/dataeval,13,6
+/aria-ml/dataeval/tree/v0.95.0,9,2
+/aria-ml/dataeval/blob/main/tests/shift/test_drift_base.py,7,2
+/aria-ml/dataeval/actions,7,1
+/aria-ml/dataeval/tree/main/src,5,5
+/aria-ml/dataeval/issues,5,4
+/aria-ml/dataeval/pulls,5,3
+/aria-ml/dataeval/blob/v1.0.0-rc0/tests/shift/test_drift_base.py,5,2
+/aria-ml/dataeval/actions/workflows/ci.yml,5,1
