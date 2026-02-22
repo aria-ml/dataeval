@@ -9,30 +9,92 @@ Licensed under Apache Software License (Apache 2.0)
 
 __all__ = []
 
-import math
-from abc import abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Literal, TypeVar
+from typing import Any, Generic, Literal, TypedDict, TypeVar, cast
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
+from typing_extensions import Self
 
-from dataeval.protocols import Array, FeatureExtractor, UpdateStrategy
-from dataeval.types import DictOutput, set_metadata
+from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.shift._drift._chunk import BaseChunker, SizeChunker, resolve_chunker
+from dataeval.types import DictOutput, Output
 from dataeval.utils.arrays import flatten_samples
 
 R = TypeVar("R")
 
 
+class DriftUnivariateStats(TypedDict):
+    """Per-feature statistics from univariate drift detection.
+
+    Attributes
+    ----------
+    feature_drift : NDArray[bool]
+        Boolean array indicating which features show drift.
+        Shape matches the number of features in the input data.
+    feature_threshold : float
+        Uncorrected p-value threshold used for individual feature testing.
+        Typically the original p_val before multivariate correction.
+    p_vals : NDArray[np.float32]
+        P-values for each feature, all values between 0 and 1.
+        Shape matches the number of features in the input data.
+    distances : NDArray[np.float32]
+        Test statistics for each feature, all values >= 0.
+        Shape matches the number of features in the input data.
+    """
+
+    feature_drift: NDArray[np.bool_]
+    feature_threshold: float
+    p_vals: NDArray[np.float32]
+    distances: NDArray[np.float32]
+
+
+class DriftMMDStats(TypedDict):
+    """Statistics from MMD permutation test.
+
+    Attributes
+    ----------
+    distance_threshold : float
+        Squared Maximum Mean Discrepancy threshold above which drift is flagged.
+        Determined from permutation test at specified significance level.
+    """
+
+    distance_threshold: float
+
+
+class DriftMVDCStats(TypedDict):
+    """Statistics from Multivariate Domain Classifier drift detection.
+
+    Attributes
+    ----------
+    fold_aurocs : NDArray[np.float32]
+        Per-fold AUROC values from stratified K-fold cross-validation.
+        Shape is (n_folds,). Variance across folds indicates stability
+        of the AUROC estimate.
+    feature_importances : NDArray[np.float32]
+        Mean feature importances (split-based) from LightGBM, averaged
+        across CV folds. Shape is (n_features,). Higher values indicate
+        features that contribute more to distinguishing reference from
+        test data.
+    """
+
+    fold_aurocs: NDArray[np.float32]
+    feature_importances: NDArray[np.float32]
+
+
+T = TypeVar("T", DriftUnivariateStats, DriftMMDStats, DriftMVDCStats)
+
+
 @dataclass(frozen=True)
-class DriftBaseOutput(DictOutput):
-    """Base output class for drift detector classes.
+class DriftOutput(DictOutput, Generic[T]):
+    """Output class for drift detector classes.
 
     Provides common fields returned by all drift detection methods, containing
-    instance-level drift predictions and summary statistics. Subclasses extend
-    this with detector-specific additional fields.
+    instance-level drift predictions and summary statistics. Detector-specific
+    statistics are grouped into typed dictionaries.
 
     Attributes
     ----------
@@ -50,65 +112,156 @@ class DriftBaseOutput(DictOutput):
         Instance-level test statistic or distance metric, always >= 0.
         For univariate methods, this is the mean distance across all features.
         Higher values indicate greater deviation from reference distribution.
+    metric_name : str
+        Name of the metric used (e.g., "mmd2", "auroc", "ks_distance").
+        Matches :attr:`DriftChunkedOutput.metric_name` for a uniform interface.
+    stats : dict
+        Additional drift detector specific statistics.
     """
 
     drifted: bool
     threshold: float
     p_val: float
     distance: float
+    metric_name: str
+    stats: T
 
 
 @dataclass(frozen=True)
-class DriftOutput(DriftBaseOutput):
-    """Output class for univariate drift detectors.
-
-    Extends :class:`.DriftBaseOutput` with feature-level (per-pixel) drift information.
-    Used by Kolmogorov-Smirnov, Cramér-von Mises, and uncertainty-based
-    drift detectors that analyze each feature independently.
+class ChunkResult(DictOutput):
+    """Result for a single chunk in chunked drift detection.
 
     Attributes
     ----------
+    key : str
+        Human-readable identifier for this chunk.
+    index : int
+        Sequential chunk index.
+    start_index : int
+        Start index in the original array (-1 for non-contiguous chunks).
+    end_index : int
+        End index (inclusive) in the original array (-1 for non-contiguous chunks).
+    value : float
+        Raw metric value for this chunk (e.g., mean distance, MMD^2, AUROC).
+    upper_threshold : float or None
+        Upper threshold bound. Exceeding this indicates drift.
+    lower_threshold : float or None
+        Lower threshold bound. Falling below this indicates anomaly.
     drifted : bool
-        Overall drift prediction after multivariate correction.
-    threshold : float
-        Corrected threshold after Bonferroni or FDR correction for multiple testing.
-    p_val : float
-        Mean p-value across all features, between 0 and 1.
-        For descriptive purposes only; individual feature p-values are used
-        for drift detection decisions. Can appear high even when drifted=True
-        if only a subset of features show drift.
-    distance : float
-        Mean test statistic across all features, always >= 0.
-    feature_drift : NDArray[bool]
-        Boolean array indicating which features (pixels) show drift.
-        Shape matches the number of features in the input data.
-    feature_threshold : float
-        Uncorrected p-value threshold used for individual feature testing.
-        Typically the original p_val before multivariate correction.
-    p_vals : NDArray[np.float32]
-        P-values for each feature, all values between 0 and 1.
-        Shape matches the number of features in the input data.
-    distances : NDArray[np.float32]
-        Test statistics for each feature, all values >= 0.
-        Shape matches the number of features in the input data.
-
-    Notes
-    -----
-    Feature-level analysis enables identification of specific pixels or regions
-    that contribute most to detected drift, useful for interpretability.
+        Whether this chunk's metric exceeds the threshold bounds.
     """
 
-    feature_drift: NDArray[np.bool_]
-    feature_threshold: float
-    p_vals: NDArray[np.float32]
-    distances: NDArray[np.float32]
+    key: str
+    index: int
+    start_index: int
+    end_index: int
+    value: float
+    upper_threshold: float | None
+    lower_threshold: float | None
+    drifted: bool
+
+
+class DriftChunkedOutput(Output[pl.DataFrame]):
+    """Output for chunked drift detection across all detector types."""
+
+    def __init__(self, metric_name: str, chunk_results: pl.DataFrame) -> None:
+        self._metric_name = metric_name
+        self._data = chunk_results.clone()
+
+    def data(self) -> pl.DataFrame:
+        """Return a copy of the chunk results data."""
+        return self._data.clone()
+
+    @property
+    def metric_name(self) -> str:
+        """Name of the metric used for drift detection."""
+        return self._metric_name
+
+    @property
+    def drifted(self) -> bool:
+        """Whether any chunk triggered a drift alert."""
+        return bool(self._data["drifted"].any())
+
+    @property
+    def threshold(self) -> float:
+        """Upper threshold used for drift detection.
+
+        Returns the upper threshold bound that chunk metric values are
+        compared against. This mirrors :attr:`DriftOutput.threshold` to
+        provide a uniform interface across both output types.
+        """
+        val = self._data["upper_threshold"].cast(pl.Float64).to_list()[0]
+        return float(val) if val is not None else 0.0
+
+    @property
+    def distance(self) -> float:
+        """Mean metric value across all chunks.
+
+        Provides a single summary statistic comparable to
+        :attr:`DriftOutput.distance`. Computed as the mean of per-chunk
+        metric values.
+        """
+        vals = self._data["value"].cast(pl.Float64).mean() or 0.0
+        return cast(float, vals)
+
+    @property
+    def chunk_results(self) -> pl.DataFrame:
+        """Per-chunk drift detection results."""
+        return self._data
+
+    @property
+    def empty(self) -> bool:
+        """Check if the results are empty."""
+        return self._data is None or self._data.is_empty()
+
+    @property
+    def plot_type(self) -> Literal["drift_chunked"]:
+        """Return the plot type identifier."""
+        return "drift_chunked"
+
+    def __len__(self) -> int:
+        """Return the number of chunks in the results."""
+        return 0 if self.empty else len(self._data)
+
+    def __str__(self) -> str:
+        return str(self._data)
+
+
+def _make_chunk_result(
+    index: int,
+    indices: NDArray[np.intp],
+    value: float,
+    upper_threshold: float | None,
+    lower_threshold: float | None,
+) -> ChunkResult:
+    """Build a ChunkResult by deriving metadata from an index array."""
+    start = int(indices.min())
+    end = int(indices.max())
+    alert = (upper_threshold is not None and value > upper_threshold) or (
+        lower_threshold is not None and value < lower_threshold
+    )
+    return ChunkResult(
+        key=f"[{start}:{end}]",
+        index=index,
+        start_index=start,
+        end_index=end,
+        value=value,
+        upper_threshold=upper_threshold,
+        lower_threshold=lower_threshold,
+        drifted=alert,
+    )
+
+
+def _chunk_results_to_dataframe(chunk_results: list[ChunkResult]) -> pl.DataFrame:
+    """Convert a list of ChunkResult objects to a polars DataFrame."""
+    return pl.DataFrame([cr.data() for cr in chunk_results])
 
 
 def update_strategy(fn: Callable[..., R]) -> Callable[..., R]:
     """Update x_ref with x using selected update methodology."""
 
     @wraps(fn)
-    def _(self: BaseDrift, data: Array, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> R:
+    def _(self: "BaseDrift", data: Array, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> R:
         output = fn(self, data, *args, **kwargs)
 
         # update reference dataset
@@ -128,24 +281,22 @@ class BaseDrift:
     management, encoding of input data, and statistical correction methods.
     Subclasses implement specific drift detection algorithms.
 
+    Uses a fit/predict lifecycle: construct with hyperparameters, call
+    :meth:`fit` with reference data, then call :meth:`predict` with test data.
+
     Parameters
     ----------
-    data : Any
-        Reference dataset used as baseline for drift detection.
-        Can be image embeddings, raw arrays, or any data type that can be
-        converted to arrays via the extractor parameter.
     p_val : float, default 0.05
         Significance threshold for drift detection, between 0 and 1.
         Default 0.05 limits false drift alerts to 5% when no drift exists (Type I error rate).
     update_strategy : UpdateStrategy or None, default None
         Strategy for updating reference data when new data arrives.
         When None, reference data remains fixed throughout detection.
-        Default None maintains stable baseline for consistent comparison.
+        Ignored in chunked mode where a stable baseline is required.
     correction : {"bonferroni", "fdr"}, default "bonferroni"
         Multiple testing correction method for multivariate drift detection.
         "bonferroni" provides conservative family-wise error control.
         "fdr" (False Discovery Rate) offers less conservative control.
-        Default "bonferroni" minimizes false positive drift detections.
     extractor : FeatureExtractor or None, default None
         Optional feature extraction function to convert input data to arrays.
         When provided, enables drift detection on non-array inputs such as
@@ -175,7 +326,6 @@ class BaseDrift:
 
     def __init__(
         self,
-        data: Any,
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
@@ -189,23 +339,110 @@ class BaseDrift:
         if extractor is not None and not isinstance(extractor, FeatureExtractor):
             raise ValueError("`extractor` is not a valid FeatureExtractor.")
 
-        # Validate that data is Array-like (or will be after feature extraction)
-        if extractor is None and not isinstance(data, Array):
-            raise ValueError("`data` must be Array-like or provide a `extractor` to convert your data to an array.")
-
-        self._data = data
         self.p_val = p_val
         self.update_strategy = update_strategy
         self.correction = correction
         self.extractor = extractor
+        self._data: Any = None
+        self.n: int = 0
+        self._x_ref: NDArray[np.float32] | None = None
+        self._fitted: bool = False
+        self._chunker: BaseChunker | None = None
+        self._baseline_values: NDArray[np.float32] | None = None
+        self._threshold_bounds: tuple[float | None, float | None] = (None, None)
+
+    def fit(
+        self,
+        data: Any,
+        chunker: BaseChunker | None = None,
+        chunk_size: int | None = None,
+        chunk_count: int | None = None,
+        chunks: list[Any] | None = None,
+        chunk_indices: list[list[int]] | None = None,
+        threshold: Threshold | None = None,
+    ) -> Self:
+        """Fit detector with reference data, optionally enabling chunked mode.
+
+        When chunking is enabled, the detector computes per-chunk baseline
+        metrics from the reference data and derives threshold bounds. During
+        prediction, the test data is split into chunks of the **same size**
+        used here, so that per-chunk statistics are comparable to the baseline.
+
+        If ``chunk_count`` is provided, the effective chunk size is computed
+        as ``len(data) // chunk_count`` and locked in for prediction.  This
+        means the number of chunks produced by ``predict()`` depends on the
+        test set size, not the original ``chunk_count``.  Use ``chunk_size``
+        directly when you want explicit control over the chunk size used for
+        both fitting and prediction.
+
+        Parameters
+        ----------
+        data : Any
+            Reference dataset used as baseline for drift detection.
+            Can be Array or any type supported by the configured extractor.
+        chunker : ArrayChunker or None, default None
+            Explicit chunker instance for chunked mode.
+        chunk_size : int or None, default None
+            Create fixed-size chunks of this many samples. The same size is
+            used during prediction to keep statistics comparable.
+        chunk_count : int or None, default None
+            Split reference into this many equal chunks. Converted to a
+            fixed ``chunk_size`` based on the reference data length.
+        chunks : list[ArrayLike] or None, default None
+            Pre-split reference data arrays for chunked mode.
+        chunk_indices : list[list[int]] or None, default None
+            Index groupings for chunking reference data.
+        threshold : Threshold or None, default None
+            Threshold strategy for chunked mode. Defaults to
+            StandardDeviationThreshold (mean +/- 3*std).
+
+        Returns
+        -------
+        Self
+        """
+        # Validate that data is Array-like (or will be after feature extraction)
+        if self.extractor is None and not isinstance(data, Array):
+            raise ValueError("`data` must be Array-like or provide an `extractor` to convert your data to an array.")
+
+        self._data = data
+        self._x_ref = None  # reset lazy encoding
+
         # Compute length after feature extraction if needed
-        if extractor is not None:
-            extracted = extractor(data)
+        if self.extractor is not None:
+            extracted = self.extractor(data)
             self.n = len(extracted)
         else:
             self.n = len(data)
 
-        self._x_ref: NDArray[np.float32] | None = None
+        # Handle prebuilt chunks as a direct path (no chunker stored)
+        if chunks is not None:
+            prebuilt = [np.atleast_2d(np.asarray(c, dtype=np.float32)) for c in chunks]
+            self._chunker = None
+            self._fit_prebuilt(prebuilt, threshold)
+            self._fitted = True
+            return self
+
+        # Resolve chunker from convenience params
+        resolved = resolve_chunker(chunker, chunk_size, chunk_count, chunk_indices)
+
+        if resolved is not None:
+            self._fit_chunked(resolved, threshold)
+            # Normalize to SizeChunker so predict() uses the same chunk
+            # size regardless of test set size. This ensures the per-chunk
+            # statistics are comparable to the baseline computed during fit.
+            fit_chunk_size = len(resolved.split(self.n)[0])
+            self._chunker = SizeChunker(fit_chunk_size, incomplete="append")
+        else:
+            self._chunker = None
+
+        self._fitted = True
+        return self
+
+    def _fit_chunked(self, chunker: BaseChunker, threshold: Threshold | None) -> None:
+        """Compute chunked baselines. Override in subclasses for specific metrics."""
+
+    def _fit_prebuilt(self, chunks: list[NDArray[np.float32]], threshold: Threshold | None) -> None:
+        """Compute chunked baselines from prebuilt data arrays. Override in subclasses."""
 
     @property
     def x_ref(self) -> NDArray[np.float32]:
@@ -226,6 +463,8 @@ class BaseDrift:
         Data is cached after first access to avoid repeated encoding overhead.
         """
         if self._x_ref is None:
+            if self._data is None:
+                raise RuntimeError("Must call fit() before accessing x_ref.")
             self._x_ref = self._encode(self._data)
         return self._x_ref
 
@@ -252,208 +491,3 @@ class BaseDrift:
             data = self.extractor(data)
 
         return flatten_samples(np.asarray(data, dtype=np.float32))
-
-
-class BaseDriftUnivariate(BaseDrift):
-    """
-    Base class for univariate drift detection algorithms.
-
-    Extends BaseDrift with feature-wise drift detection capabilities.
-    Applies statistical tests independently to each feature (pixel) and
-    uses multiple testing correction to control false discovery rates.
-
-    Parameters
-    ----------
-    data : Any
-        Reference dataset used as baseline for drift detection.
-        Can be Array or any type supported by extractor.
-    p_val : float, default 0.05
-        Significance threshold for drift detection, between 0 and 1.
-        Default 0.05 limits false drift alerts to 5% when no drift exists (Type I error rate).
-    update_strategy : UpdateStrategy or None, default None
-        Strategy for updating reference data when new data arrives.
-        When None, reference data remains fixed throughout detection.
-        Default None maintains stable baseline for consistent comparison.
-    correction : {"bonferroni", "fdr"}, default "bonferroni"
-        Multiple testing correction method for controlling false positives
-        across multiple features. "bonferroni" divides significance level
-        by number of features. "fdr" uses Benjamini-Hochberg procedure.
-        Default "bonferroni" provides conservative family-wise error control.
-    n_features : int or None, default None
-        Number of features to analyze. When None, automatically inferred
-        from the first sample's flattened shape. Default None enables
-        automatic feature detection for flexible input handling.
-    extractor : FeatureExtractor or None, default None
-        Optional feature extraction function to convert input data to arrays.
-        When provided, enables drift detection on non-array inputs.
-
-    Attributes
-    ----------
-    p_val : float
-        Significance threshold for statistical tests.
-    update_strategy : UpdateStrategy or None
-        Reference data update strategy.
-    correction : {"bonferroni", "fdr"}
-        Multiple testing correction method.
-    n : int
-        Number of samples in the reference dataset.
-    extractor : FeatureExtractor or None
-        Feature extraction function for converting input data.
-    """
-
-    def __init__(
-        self,
-        data: Any,
-        p_val: float = 0.05,
-        update_strategy: UpdateStrategy | None = None,
-        correction: Literal["bonferroni", "fdr"] = "bonferroni",
-        n_features: int | None = None,
-        extractor: FeatureExtractor | None = None,
-    ) -> None:
-        super().__init__(data, p_val, update_strategy, correction, extractor)
-
-        self._n_features = n_features
-
-    @property
-    def n_features(self) -> int:
-        """Number of features in the reference data.
-
-        Lazily computes the number of features from the first data sample
-        if not provided during initialization. Features correspond to the
-        flattened dimensionality of the input data (e.g., pixels for images).
-
-        Returns
-        -------
-        int
-            Number of features (flattened dimensions) in the reference data.
-            Always > 0 for valid datasets.
-
-        Notes
-        -----
-        For image data, this equals C x H x W.
-        Computed once and cached for efficiency.
-        """
-        # lazy process n_features as needed
-        if self._n_features is None:
-            # Apply feature extractor to first sample if configured
-            if self.extractor is not None:
-                # Get first element to determine feature dimensionality
-                # We need to encode at least one sample to know the output shape
-                first_encoded = self._encode(self._data[:1])
-                self._n_features = first_encoded.shape[1]  # (1, n_features)
-            else:
-                self._n_features = int(math.prod(self._data[0].shape))
-
-        return self._n_features
-
-    def score(self, data: Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
-        """Calculate feature-wise p-values and test statistics.
-
-        Applies the detector's statistical test independently to each feature,
-        comparing the distribution of each feature between reference and test data.
-
-        Parameters
-        ----------
-        data : Array
-            Test dataset to compare against reference data.
-
-        Returns
-        -------
-        tuple[NDArray[np.float32], NDArray[np.float32]]
-            First array contains p-values for each feature (all between 0 and 1).
-            Second array contains test statistics for each feature (all >= 0).
-            Both arrays have shape (n_features,).
-
-        Notes
-        -----
-        Lower p-values indicate stronger evidence of drift for that feature.
-        Higher test statistics indicate greater distributional differences.
-        """
-        x_np = self._encode(data)
-        p_val = np.zeros(self.n_features, dtype=np.float32)
-        dist = np.zeros_like(p_val)
-        for f in range(self.n_features):
-            dist[f], p_val[f] = self._score_fn(self.x_ref[:, f], x_np[:, f])
-        return p_val, dist
-
-    @abstractmethod
-    def _score_fn(self, x: NDArray[np.float32], y: NDArray[np.float32]) -> tuple[np.float32, np.float32]: ...
-
-    def _apply_correction(self, p_vals: NDArray[np.float32]) -> tuple[bool, float]:
-        """
-        Apply multiple testing correction to feature-wise p-values.
-
-        Corrects for multiple comparisons across features to control
-        false positive rates. Bonferroni correction divides the significance
-        threshold by the number of features. FDR correction uses the
-        Benjamini-Hochberg procedure for less conservative control.
-
-        Parameters
-        ----------
-        p_vals : NDArray[np.float32]
-            Array of p-values from univariate tests for each feature.
-            All values should be between 0 and 1.
-
-        Returns
-        -------
-        tuple[bool, float]
-            Boolean indicating whether drift was detected after correction.
-            Float is the effective threshold used for detection.
-
-        Notes
-        -----
-        Bonferroni correction: threshold = p_val / n_features
-        FDR correction: Uses Benjamini-Hochberg step-up procedure
-        """
-        if self.correction == "bonferroni":
-            threshold = self.p_val / self.n_features
-            drift_pred = bool((p_vals < threshold).any())
-            return drift_pred, threshold
-        if self.correction == "fdr":
-            n = p_vals.shape[0]
-            i = np.arange(n) + np.intp(1)
-            p_sorted = np.sort(p_vals)
-            q_threshold = self.p_val * i / n
-            below_threshold = p_sorted < q_threshold
-            try:
-                idx_threshold = int(np.where(below_threshold)[0].max())
-            except ValueError:  # sorted p-values not below thresholds
-                return bool(below_threshold.any()), q_threshold.min()
-            return bool(below_threshold.any()), q_threshold[idx_threshold]
-        raise ValueError("`correction` needs to be either `bonferroni` or `fdr`.")
-
-    @set_metadata
-    @update_strategy
-    def predict(self, data: Array) -> DriftOutput:
-        """Predict drift and update reference data using specified strategy.
-
-        Performs feature-wise drift detection, applies multiple testing
-        correction, and optionally updates the reference dataset based
-        on the configured update strategy.
-
-        Parameters
-        ----------
-        data : Array
-            Test dataset to analyze for drift against reference data.
-
-        Returns
-        -------
-        DriftOutput
-            Complete drift detection results including overall :term:`drift<Drift>` prediction,
-            corrected thresholds, feature-level analysis, and summary :term:`statistics<Statistics>`.
-        """
-        # compute drift scores
-        p_vals, dist = self.score(data)
-
-        feature_drift = (p_vals < self.p_val).astype(np.bool_)
-        drift_pred, threshold = self._apply_correction(p_vals)
-        return DriftOutput(
-            drift_pred,
-            threshold,
-            float(np.mean(p_vals)),
-            float(np.mean(dist)),
-            feature_drift,
-            self.p_val,
-            p_vals,
-            dist,
-        )

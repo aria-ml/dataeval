@@ -6,7 +6,7 @@ jupytext:
     format_version: 0.13
     jupytext_version: 1.19.1
 kernelspec:
-  display_name: .venv
+  display_name: dataeval
   language: python
   name: python3
 ---
@@ -25,11 +25,13 @@ Relevant personas: Machine Learning Engineer, T&E Engineer
 
 - Construct [embeddings](../concepts/Embeddings.md) by training a simple neural network
 - Compare the embeddings between a training and operational set
+- Use chunked drift detection to monitor drift across data segments
 - Compare the label distributions between a training and operational set
 
 ## What you'll learn
 
 - Learn how to analyze embeddings for operational drift
+- Learn how to use chunked drift detection for temporal monitoring
 - Learn how to analyze label distributions
 
 ## What you'll need
@@ -74,6 +76,7 @@ except Exception:
 ```{code-cell} ipython3
 import numpy as np
 import torch
+from IPython.display import display  # noqa: A004
 from maite_datasets.object_detection import VOCDetection
 from torchvision.models import ResNet18_Weights, resnet18
 from torchvision.transforms.v2 import GaussianNoise
@@ -81,7 +84,7 @@ from torchvision.transforms.v2 import GaussianNoise
 from dataeval import Embeddings, Metadata
 from dataeval.core import label_parity
 from dataeval.extractors import TorchExtractor
-from dataeval.shift import DriftMMD, DriftUnivariate
+from dataeval.shift import DriftChunkedOutput, DriftMMD, DriftMVDC, DriftUnivariate
 
 # Set a random seed
 rng = np.random.default_rng(213)
@@ -199,7 +202,7 @@ mitigate performance degradation in a deployed model. Visit our [About Drift](..
 
 ### Drift detectors
 
-DataEval offers a few drift detectors: {class}`.DriftMMD`, {class}`.DriftUnivariate`
+DataEval offers a few drift detectors: {class}`.DriftMMD`, {class}`.DriftUnivariate`, and {class}`.DriftMVDC`.
 
 Since each detector outputs a binary decision on whether drift is detected, a **majority vote** will be used to make the
 determination of drift.\
@@ -213,13 +216,14 @@ will set the reference data to the training embeddings.
 
 ```{code-cell} ipython3
 # A type alias for all of the drift detectors
-DriftDetector = DriftMMD | DriftUnivariate
+DriftDetector = DriftMMD | DriftUnivariate | DriftMVDC
 
 # Create a mapping for the detectors to iterate over
 detectors: dict[str, DriftDetector] = {
-    "MMD": DriftMMD(train_embs),
-    "CVM": DriftUnivariate(train_embs, method="cvm"),
-    "KS": DriftUnivariate(train_embs, method="ks"),
+    "MMD": DriftMMD().fit(train_embs),
+    "CVM": DriftUnivariate(method="cvm").fit(train_embs),
+    "KS": DriftUnivariate(method="ks").fit(train_embs),
+    "MVDC": DriftMVDC().fit(train_embs),
 }
 ```
 
@@ -271,6 +275,59 @@ In this step, you learned how to take your generated embeddings and detect drift
 image data. While there was no drift originally, you were able to add small perturbations to the data that did affect
 the data distributions and cause drift.
 
++++
+
+### Monitor drift over time with chunking
+
+In real deployments, operational data arrives in batches over time. Rather than comparing all operational data at once,
+you can use **chunking** to split the data into segments and monitor how drift evolves across each chunk. This helps
+identify _when_ drift begins to appear.
+
+DataEval's drift detectors support chunking through the `chunk_count` or `chunk_size` parameters on `fit()`. During
+fitting, the detector establishes a baseline by computing the metric across chunks of the reference data. During
+prediction, each chunk of test data is compared against this baseline, returning a {class}`.DriftChunkedOutput` with
+per-chunk results.
+
+#### Simulate gradual drift onset
+
+To illustrate how chunking reveals _when_ drift begins, you will build a combined dataset where the first 40% of samples
+are clean operational embeddings and the remaining 60% are noisy. This simulates a scenario where data quality degrades
+partway through a monitoring window.
+
+```{code-cell} ipython3
+# Build a combined array: first 40% clean, last 60% noisy
+n_operational = len(operational_embs)
+split_idx = int(n_operational * 0.4)
+
+combined_embs = np.concatenate([operational_embs[:split_idx], noisy_embs[split_idx:]])
+print(f"Combined shape: {combined_embs.shape} (clean: {split_idx}, noisy: {n_operational - split_idx})")
+```
+
+#### Fit detectors with chunking
+
+```{code-cell} ipython3
+# Re-fit detectors with chunking enabled (5 chunks each)
+chunked_detectors: dict[str, DriftDetector] = {
+    "MMD": DriftMMD().fit(train_embs, chunk_count=5),
+    "CVM": DriftUnivariate(method="cvm").fit(train_embs, chunk_count=5),
+    "KS": DriftUnivariate(method="ks").fit(train_embs, chunk_count=5),
+    "MVDC": DriftMVDC(threshold=(0.45, 0.65)).fit(train_embs, chunk_count=5),
+}
+```
+
+#### Predict on combined data and display chunk results
+
+```{code-cell} ipython3
+for name, detector in chunked_detectors.items():
+    result = detector.predict(combined_embs)
+    print(f"\n{name} - Overall drift detected: {result.drifted} (metric: {result.metric_name})")
+    if isinstance(result, DriftChunkedOutput):
+        display(result.chunk_results)
+```
+
+The first two chunks (covering the clean 40%) should show no drift, while the later chunks (covering the noisy 60%)
+should trigger drift alerts. This chunk-level view makes it easy to pinpoint _when_ in a data stream drift begins.
+
 Next you will look at the labels' distributions.
 
 +++
@@ -294,8 +351,8 @@ operational_md = Metadata(operational_ds)
 label_parity(train_md.class_labels, operational_md.class_labels, num_classes=20)["p_value"]
 ```
 
-From the {class}`.ParityOutput` class, you can see that it calculated a p_value of ~**0.95**. Since this is close to
-1.0, it can be said that the two distributions **have** parity, or similar distributions.
+From the {func}`.label_parity` function, you can see that it calculated a p_value of ~**0.95**. Since this is close to
+1.0, it can be said that the two distributions **have** class label parity, or similar distributions.
 
 +++
 
@@ -307,7 +364,7 @@ parity can affect a model's ability to achieve performance recorded during model
 or the label distributions lack parity, it is a good idea to consider retraining the model and incorporating operational
 data into the dataset.
 
-______________________________________________________________________
++++
 
 ## What's next
 

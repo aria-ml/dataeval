@@ -876,7 +876,7 @@ class UpdateStrategy(Protocol):
     >>>
     >>> # Initialize drift detector with custom update strategy
     >>> update_strategy = MovingAverageUpdate(n=100, alpha=0.9)
-    >>> detector = DriftUnivariate(ref_data, method="ks", update_strategy=update_strategy)
+    >>> detector = DriftUnivariate(method="ks", update_strategy=update_strategy).fit(ref_data)
     >>>
     >>> # Detect drift on new data - reference will be updated automatically
     >>> new_data = np.random.normal(0.5, 1, (50, 10))
@@ -1084,6 +1084,54 @@ class EvidenceLowerBoundLossFn(Protocol):
         -------
         torch.Tensor
             Scalar loss value (reconstruction + KL divergence)
+        """
+        ...
+
+
+# ========== CHUNKERS =========
+
+
+@runtime_checkable
+class Chunker(Protocol):
+    """
+    Protocol for chunking datasets into subsets by returning index arrays.
+
+    Implementations must provide a `__call__` method that takes the number
+    of samples and returns a list of index arrays representing the chunks.
+
+    Examples
+    --------
+    Creating a simple chunker that splits the dataset into equal parts:
+
+    >>> import numpy as np
+    >>> from dataeval.protocols import Chunker
+    >>>
+    >>> class EqualChunker:
+    ...     def __init__(self, n_chunks: int):
+    ...         self.n_chunks = n_chunks
+    ...
+    ...     def __call__(self, n: int) -> list[NDArray[np.intp]]:
+    ...         return [idx.astype(np.intp) for idx in np.array_split(np.arange(n), self.n_chunks)]
+    >>>
+    >>> chunker = EqualChunker(n_chunks=5)
+    >>> isinstance(chunker, Chunker)
+    True
+    """
+
+    def __call__(self, n: int) -> list[NDArray[np.intp]]:
+        """
+        Split n samples into chunks, returning index arrays.
+
+        Parameters
+        ----------
+        n : int
+            Number of samples to chunk.
+
+        Returns
+        -------
+        list[NDArray[np.intp]]
+            List of index arrays, each containing integer indices for one chunk.
+            The union of all index arrays should cover ``range(n)`` without overlap.
         """
         ...
 

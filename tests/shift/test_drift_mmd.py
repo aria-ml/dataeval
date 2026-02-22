@@ -21,6 +21,7 @@ from dataeval._embeddings import Embeddings
 # from maite_datasets import to_image_classification_dataset
 from dataeval.config import get_device
 from dataeval.extractors import TorchExtractor
+from dataeval.shift._drift._base import DriftOutput
 from dataeval.shift._drift._mmd import (
     DriftMMD,
     GaussianRBF,
@@ -95,14 +96,14 @@ class TestMMDDrift:
 
         x_ref = get_embeddings(self.n, self.n_shape, self.n_classes, model, get_mock_ic_dataset, RNG)
         cd = DriftMMD(
-            data=x_ref,
             p_val=0.05,
             update_strategy=update_strategy,
             sigma=sigma,
             n_permutations=n_permutations,
             device="cpu",
-        )
+        ).fit(x_ref)
         preds = cd.predict(x_ref)
+        assert isinstance(preds, DriftOutput)
         assert not preds.drifted
         assert preds.p_val >= cd.p_val
         if isinstance(update_strategy, dict):
@@ -111,19 +112,20 @@ class TestMMDDrift:
             assert cd._data.shape[0] == min(update_strategy[k], self.n + self.n)  # type: ignore
 
         preds = cd.predict(get_embeddings(self.n, self.n_shape, self.n_classes, model, get_mock_ic_dataset, RNG))
+        assert isinstance(preds, DriftOutput)
         if preds.drifted:
             assert preds.p_val < preds.threshold == cd.p_val
-            assert preds.distance > preds.distance_threshold
+            assert preds.distance > preds.stats["distance_threshold"]
         else:
             assert preds.p_val >= preds.threshold == cd.p_val
-            assert preds.distance <= preds.distance_threshold
+            assert preds.distance <= preds.stats["distance_threshold"]
 
     def test_permutation_pvalue_not_degenerate(self, RNG):
         """Regression test: p-value should be between 0 and 1, not exactly 0 or 1."""
         x_ref = RNG.normal(size=(50, 10)).astype(np.float32)
         x_test = RNG.normal(size=(50, 10)).astype(np.float32)
 
-        cd = DriftMMD(data=x_ref, p_val=0.05, n_permutations=100, device="cpu")
+        cd = DriftMMD(p_val=0.05, n_permutations=100, device="cpu").fit(x_ref)
         p_val, _, _ = cd.score(x_test)
 
         assert 0 < p_val < 1
@@ -134,14 +136,14 @@ class TestMMDDrift:
         x_test = RNG.normal(size=(50, 10)).astype(np.float32)
 
         # Create detector with auto (default)
-        cd_auto = DriftMMD(data=x_ref, p_val=0.05, n_permutations=100, device="cpu")
+        cd_auto = DriftMMD(p_val=0.05, n_permutations=100, device="cpu").fit(x_ref)
         assert cd_auto.permutation_batch_size == "auto"
 
         # Create detector with explicit batching
-        cd_with_batch = DriftMMD(data=x_ref, p_val=0.05, n_permutations=100, permutation_batch_size=10, device="cpu")
+        cd_with_batch = DriftMMD(p_val=0.05, n_permutations=100, permutation_batch_size=10, device="cpu").fit(x_ref)
 
         # Create detector with batching disabled (batch_size >= n_permutations)
-        cd_no_batch = DriftMMD(data=x_ref, p_val=0.05, n_permutations=100, permutation_batch_size=100, device="cpu")
+        cd_no_batch = DriftMMD(p_val=0.05, n_permutations=100, permutation_batch_size=100, device="cpu").fit(x_ref)
 
         # All should produce consistent results (setting seed for reproducibility)
         torch.manual_seed(42)
@@ -154,6 +156,8 @@ class TestMMDDrift:
         result_no_batch = cd_no_batch.predict(x_test)
 
         # Check that drift detection is consistent across all modes
+        assert isinstance(result_auto, DriftOutput)
+        assert isinstance(result_with_batch, DriftOutput)
         assert result_auto.drifted == result_with_batch.drifted == result_no_batch.drifted
         # P-values and distances should be close (within reasonable tolerance due to random permutations)
         assert abs(result_auto.p_val - result_with_batch.p_val) < 0.2
@@ -750,3 +754,77 @@ class TestMMDKernelMatrixEdgeCases:
         # Should be a scalar (0-d tensor)
         assert mmd_scalar.ndim == 0
         assert isinstance(mmd_scalar.item(), float)
+
+
+@pytest.mark.required
+class TestMMDChunked:
+    """Tests for MMD chunked fit/predict paths."""
+
+    def test_fit_chunked(self, RNG):
+        """Test _fit_chunked computes baseline and thresholds."""
+        x_ref = RNG.normal(size=(100, 5)).astype(np.float32)
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref, chunk_size=20)
+        assert cd._chunker is not None
+        assert cd._baseline_values is not None
+        assert cd._threshold_bounds != (None, None)
+
+    def test_fit_prebuilt_chunks(self, RNG):
+        """Test _fit_prebuilt computes baseline from prebuilt chunks."""
+        x_ref = RNG.normal(size=(100, 5)).astype(np.float32)
+        chunks = [x_ref[:25], x_ref[25:50], x_ref[50:75], x_ref[75:]]
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref, chunks=chunks)
+        assert cd._baseline_values is not None
+        assert len(cd._baseline_values) == 4
+
+    def test_predict_chunked_from_fit(self, RNG):
+        """Test chunked predict after fitting with chunk_size."""
+        from dataeval.shift._drift._base import DriftChunkedOutput
+
+        x_ref = RNG.normal(size=(100, 5)).astype(np.float32)
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref, chunk_size=20)
+        x_test = RNG.normal(size=(60, 5)).astype(np.float32)
+        result = cd.predict(x_test)
+        assert isinstance(result, DriftChunkedOutput)
+        assert result.metric_name == "mmd2"
+        assert len(result) > 0
+
+    def test_predict_prebuilt_chunks(self, RNG):
+        """Test _predict_chunked with prebuilt test chunks."""
+        from dataeval.shift._drift._base import DriftChunkedOutput
+
+        x_ref = RNG.normal(size=(100, 5)).astype(np.float32)
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref, chunk_size=20)
+        test_chunks = [
+            RNG.normal(size=(20, 5)).astype(np.float32),
+            RNG.normal(size=(20, 5)).astype(np.float32),
+        ]
+        result = cd.predict(chunks=test_chunks)
+        assert isinstance(result, DriftChunkedOutput)
+        assert len(result) == 2
+
+    def test_predict_chunk_indices(self, RNG):
+        """Test _predict_chunked with chunk_indices override."""
+        from dataeval.shift._drift._base import DriftChunkedOutput
+
+        x_ref = RNG.normal(size=(100, 5)).astype(np.float32)
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref, chunk_size=20)
+        x_test = RNG.normal(size=(40, 5)).astype(np.float32)
+        result = cd.predict(x_test, chunk_indices=[[0, 1, 2, 3], [4, 5, 6, 7]])
+        assert isinstance(result, DriftChunkedOutput)
+        assert len(result) == 2
+
+    def test_predict_before_fit_raises(self):
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu")
+        with pytest.raises(RuntimeError, match="Must call fit"):
+            cd.predict(np.zeros((10, 5)))
+
+    def test_predict_no_data_raises(self, RNG):
+        x_ref = RNG.normal(size=(50, 5)).astype(np.float32)
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref)
+        with pytest.raises(ValueError, match="data is required"):
+            cd.predict(None)
+
+    def test_kernel_matrix_before_fit_raises(self):
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu")
+        with pytest.raises(RuntimeError, match="Must call fit"):
+            cd._compute_mmd2(np.zeros((10, 5), dtype=np.float32), np.zeros((10, 5), dtype=np.float32))

@@ -16,6 +16,7 @@ from sklearn.linear_model import LogisticRegression
 
 from dataeval.extractors._uncertainty import ClassifierUncertaintyExtractor, _classifier_uncertainty
 from dataeval.shift import DriftUnivariate
+from dataeval.shift._drift._base import DriftOutput
 from dataeval.shift.update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
 
@@ -92,25 +93,26 @@ class TestFunctionalClassifierUncertainty:
 
         # Create drift detector with uncertainty feature extractor
         cd = DriftUnivariate(
-            data=x_ref,
             method="ks",
             p_val=p_val,
             update_strategy=update_strategy,
             extractor=uncertainty_extractor,
-        )
+        ).fit(x_ref)
 
         preds_0 = cd.predict(x_test0)
+        assert isinstance(preds_0, DriftOutput)
         expected_n = len(x_ref) if update_strategy is None else len(x_test0) + len(x_ref)
         assert cd.n == expected_n
         assert not preds_0.drifted
-        assert preds_0.distances >= 0
+        assert preds_0.stats["distances"] >= 0
 
         preds_1 = cd.predict(x_test1)
+        assert isinstance(preds_1, DriftOutput)
         expected_n = len(x_ref) if update_strategy is None else len(x_test1) + len(x_test0) + len(x_ref)
         assert cd.n == expected_n
         assert preds_1.drifted
-        assert preds_1.distances >= 0
-        assert preds_0.distances < preds_1.distances
+        assert preds_1.stats["distances"] >= 0
+        assert preds_0.stats["distances"] < preds_1.stats["distances"]
 
 
 @pytest.mark.required
