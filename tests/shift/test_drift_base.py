@@ -9,11 +9,23 @@ Licensed under Apache Software License (Apache 2.0)
 from unittest.mock import MagicMock
 
 import numpy as np
+import polars as pl
 import pytest
 import torch
 
 from dataeval.protocols import Dataset
-from dataeval.shift._drift._base import BaseDriftUnivariate
+from dataeval.shift._drift._base import (
+    ChunkResult,
+    DriftChunkedOutput,
+    _chunk_results_to_dataframe,
+)
+from dataeval.shift._drift._chunk import (
+    CountChunker,
+    IndexChunker,
+    SizeChunker,
+    resolve_chunker,
+)
+from dataeval.shift._drift._univariate import DriftUnivariate
 
 
 @pytest.mark.required
@@ -32,25 +44,218 @@ class TestBaseDrift:
 
     def test_base_init_update_x_ref_valueerror(self):
         with pytest.raises(ValueError, match="not a valid UpdateStrategy"):
-            BaseDriftUnivariate(self.data, update_strategy="invalid")  # type: ignore
+            DriftUnivariate(update_strategy="invalid")  # type: ignore
 
     def test_base_init_correction_valueerror(self):
         with pytest.raises(ValueError, match="must be `bonferroni` or `fdr`"):
-            BaseDriftUnivariate(self.data, n_features=2, correction="invalid")  # type: ignore
+            DriftUnivariate(n_features=2, correction="invalid")  # type: ignore
+
+    def test_base_init_extractor_valueerror(self):
+        with pytest.raises(ValueError, match="not a valid FeatureExtractor"):
+            DriftUnivariate(extractor="invalid")  # type: ignore
 
     def test_base_init_infer_n_features(self):
-        base = BaseDriftUnivariate(self.data)
+        base = DriftUnivariate()
+        base.fit(self.data)
         assert base.n_features == 10
 
     def test_base_init_set_n_features(self):
-        base = BaseDriftUnivariate(self.data, n_features=1)
+        base = DriftUnivariate(n_features=1)
+        base.fit(self.data)
         assert base.n_features == 1
 
     def test_base_predict_correction_valueerror(self):
-        base = BaseDriftUnivariate(self.data)
+        base = DriftUnivariate()
+        base.fit(self.data)
         mock_score = MagicMock()
         mock_score.return_value = (np.array(0.5), np.array(0.5))
         base.score = mock_score
         base.correction = "invalid"  # type: ignore
         with pytest.raises(ValueError, match="needs to be either `bonferroni` or `fdr`"):
             base.predict(np.empty([]))
+
+    def test_base_fit_non_array_data_raises(self):
+        base = DriftUnivariate()
+        with pytest.raises(ValueError, match="Array-like"):
+            base.fit("not an array")  # type: ignore
+
+    def test_base_x_ref_before_fit_raises(self):
+        base = DriftUnivariate()
+        with pytest.raises(RuntimeError, match="Must call fit"):
+            _ = base.x_ref
+
+    def test_base_n_features_before_fit_raises(self):
+        base = DriftUnivariate()
+        with pytest.raises(RuntimeError, match="Must call fit"):
+            _ = base.n_features
+
+    def test_base_predict_before_fit_raises(self):
+        base = DriftUnivariate()
+        with pytest.raises(RuntimeError, match="Must call fit"):
+            base.predict(np.zeros((10, 5)))
+
+    def test_base_predict_no_data_raises(self):
+        base = DriftUnivariate()
+        base.fit(np.random.random((50, 5)).astype(np.float32))
+        with pytest.raises(ValueError, match="data is required"):
+            base.predict(None)
+
+
+@pytest.mark.required
+class TestDriftChunkedOutput:
+    """Tests for DriftChunkedOutput properties."""
+
+    @pytest.fixture
+    def sample_output(self):
+        chunks = [
+            ChunkResult(
+                key="[0:9]",
+                index=0,
+                start_index=0,
+                end_index=9,
+                value=0.3,
+                upper_threshold=0.5,
+                lower_threshold=0.1,
+                drifted=False,
+            ),
+            ChunkResult(
+                key="[10:19]",
+                index=1,
+                start_index=10,
+                end_index=19,
+                value=0.7,
+                upper_threshold=0.5,
+                lower_threshold=0.1,
+                drifted=True,
+            ),
+        ]
+        df = _chunk_results_to_dataframe(chunks)
+        return DriftChunkedOutput(metric_name="test_metric", chunk_results=df)
+
+    @pytest.fixture
+    def empty_output(self):
+        df = pl.DataFrame(
+            schema={
+                "key": pl.Utf8,
+                "index": pl.Int64,
+                "start_index": pl.Int64,
+                "end_index": pl.Int64,
+                "value": pl.Float64,
+                "upper_threshold": pl.Float64,
+                "lower_threshold": pl.Float64,
+                "drifted": pl.Boolean,
+            }
+        )
+        return DriftChunkedOutput(metric_name="test_metric", chunk_results=df)
+
+    def test_data_returns_copy(self, sample_output):
+        data = sample_output.data()
+        assert isinstance(data, pl.DataFrame)
+        assert len(data) == 2
+
+    def test_drifted_true(self, sample_output):
+        assert sample_output.drifted is True
+
+    def test_threshold(self, sample_output):
+        assert sample_output.threshold == 0.5
+
+    def test_threshold_none_returns_zero(self):
+        chunks = [
+            ChunkResult(
+                key="[0:9]",
+                index=0,
+                start_index=0,
+                end_index=9,
+                value=0.3,
+                upper_threshold=None,
+                lower_threshold=None,
+                drifted=False,
+            ),
+        ]
+        df = _chunk_results_to_dataframe(chunks)
+        output = DriftChunkedOutput(metric_name="m", chunk_results=df)
+        assert output.threshold == 0.0
+
+    def test_distance(self, sample_output):
+        assert sample_output.distance == pytest.approx(0.5, abs=1e-6)
+
+    def test_empty(self, sample_output, empty_output):
+        assert not sample_output.empty
+        assert empty_output.empty
+
+    def test_plot_type(self, sample_output):
+        assert sample_output.plot_type == "drift_chunked"
+
+    def test_len(self, sample_output, empty_output):
+        assert len(sample_output) == 2
+        assert len(empty_output) == 0
+
+    def test_str(self, sample_output):
+        s = str(sample_output)
+        assert "test_metric" not in s  # str shows DataFrame, not metric name
+        assert "[0:9]" in s
+
+
+@pytest.mark.required
+class TestChunkers:
+    """Tests for chunker validation and behavior."""
+
+    def test_count_chunker_invalid(self):
+        with pytest.raises(ValueError, match="invalid"):
+            CountChunker(0)
+        with pytest.raises(ValueError, match="invalid"):
+            CountChunker(-1)
+
+    def test_size_chunker_invalid_size(self):
+        with pytest.raises(ValueError, match="invalid"):
+            SizeChunker(0)
+
+    def test_size_chunker_invalid_incomplete(self):
+        with pytest.raises(ValueError, match="invalid"):
+            SizeChunker(10, incomplete="invalid")  # type: ignore
+
+    def test_size_chunker_keep(self):
+        chunker = SizeChunker(3, incomplete="keep")
+        groups = chunker.split(10)
+        assert len(groups) == 4  # 3+3+3+1
+        assert len(groups[-1]) == 1
+
+    def test_size_chunker_drop(self):
+        chunker = SizeChunker(3, incomplete="drop")
+        groups = chunker.split(10)
+        assert len(groups) == 3  # 3+3+3, drops last 1
+        total = sum(len(g) for g in groups)
+        assert total == 9
+
+    def test_size_chunker_append(self):
+        chunker = SizeChunker(3, incomplete="append")
+        groups = chunker.split(10)
+        assert len(groups) == 3  # 3+3+4
+        assert len(groups[-1]) == 4
+
+    def test_index_chunker_empty_raises(self):
+        with pytest.raises(ValueError, match="non-empty"):
+            IndexChunker([])
+
+    def test_index_chunker_split(self):
+        chunker = IndexChunker([[0, 2, 4], [1, 3, 5]])
+        groups = chunker.split(6)
+        assert len(groups) == 2
+        np.testing.assert_array_equal(groups[0], [0, 2, 4])
+        np.testing.assert_array_equal(groups[1], [1, 3, 5])
+
+    def test_base_chunker_callable(self):
+        chunker = CountChunker(3)
+        result = chunker(9)
+        assert len(result) == 3
+
+    def test_resolve_chunker_passthrough(self):
+        chunker = CountChunker(3)
+        assert resolve_chunker(chunker=chunker) is chunker
+
+    def test_resolve_chunker_none(self):
+        assert resolve_chunker() is None
+
+    def test_resolve_chunker_indices(self):
+        result = resolve_chunker(chunk_indices=[[0, 1], [2, 3]])
+        assert isinstance(result, IndexChunker)

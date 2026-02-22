@@ -7,6 +7,8 @@ Maps to meta repo test cases:
 import numpy as np
 import pytest
 
+from dataeval.shift._drift._base import DriftOutput
+
 
 @pytest.mark.test_case("4-1")
 class TestDriftDetection:
@@ -16,7 +18,7 @@ class TestDriftDetection:
         from dataeval.shift import DriftUnivariate
 
         ref = np.ones((50, 8), dtype=np.float32)
-        detector = DriftUnivariate(data=ref, method="ks")
+        detector = DriftUnivariate(method="ks").fit(ref)
         result = detector.predict(np.zeros((20, 8), dtype=np.float32))
         assert hasattr(result, "drifted")
         assert hasattr(result, "p_val")
@@ -27,7 +29,7 @@ class TestDriftDetection:
 
         ref = np.zeros((100, 8), dtype=np.float32)
         test = np.ones((50, 8), dtype=np.float32)
-        detector = DriftUnivariate(data=ref, method="ks")
+        detector = DriftUnivariate(method="ks").fit(ref)
         result = detector.predict(test)
         assert result.drifted is True
 
@@ -37,7 +39,7 @@ class TestDriftDetection:
         rng = np.random.default_rng(42)
         ref = rng.standard_normal((100, 8)).astype(np.float32)
         test = rng.standard_normal((50, 8)).astype(np.float32)
-        detector = DriftUnivariate(data=ref, method="ks")
+        detector = DriftUnivariate(method="ks").fit(ref)
         result = detector.predict(test)
         assert result.drifted is False
 
@@ -45,18 +47,18 @@ class TestDriftDetection:
         from dataeval.shift import DriftUnivariate
 
         ref = np.ones((50, 8), dtype=np.float32)
-        detector = DriftUnivariate(data=ref, method="ks")
+        detector = DriftUnivariate(method="ks").fit(ref)
         result = detector.predict(np.zeros((20, 8), dtype=np.float32))
-        assert hasattr(result, "feature_drift")
-        assert hasattr(result, "p_vals")
-        assert hasattr(result, "distances")
-        assert len(result.feature_drift) == 8
+        assert isinstance(result, DriftOutput)
+        assert len(result.stats["feature_drift"]) == 8
+        assert result.stats["p_vals"] is not None
+        assert result.stats["distances"] is not None
 
     def test_drift_univariate_cvm_method(self):
         from dataeval.shift import DriftUnivariate
 
         ref = np.ones((50, 8), dtype=np.float32)
-        detector = DriftUnivariate(data=ref, method="cvm")
+        detector = DriftUnivariate(method="cvm").fit(ref)
         result = detector.predict(np.zeros((20, 8), dtype=np.float32))
         assert hasattr(result, "drifted")
 
@@ -65,18 +67,18 @@ class TestDriftDetection:
 
         rng = np.random.default_rng(42)
         ref = rng.standard_normal((50, 8)).astype(np.float32)
-        detector = DriftMMD(data=ref, n_permutations=10)
+        detector = DriftMMD(n_permutations=10).fit(ref)
         result = detector.predict(rng.standard_normal((20, 8)).astype(np.float32))
         assert hasattr(result, "drifted")
         assert hasattr(result, "p_val")
         assert hasattr(result, "distance")
-        assert hasattr(result, "distance_threshold")
+        assert hasattr(result, "stats")
 
     def test_drift_mmd_detects_clear_shift(self):
         from dataeval.shift import DriftMMD
 
         ref = np.zeros((100, 8), dtype=np.float32)
         test = np.full((50, 8), 10.0, dtype=np.float32)
-        detector = DriftMMD(data=ref, n_permutations=20)
+        detector = DriftMMD(n_permutations=20).fit(ref)
         result = detector.predict(test)
         assert result.drifted is True

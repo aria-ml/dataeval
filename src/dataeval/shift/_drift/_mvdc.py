@@ -10,15 +10,12 @@ Licensed under Apache Software License (Apache 2.0)
 
 __all__ = []
 
-import copy
 import logging
 import warnings
 from dataclasses import dataclass
-from logging import Logger
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
-import polars as pl
 from lightgbm import LGBMClassifier
 from numpy.typing import ArrayLike, NDArray
 from sklearn.metrics import roc_auc_score
@@ -27,21 +24,24 @@ from typing_extensions import Self
 
 from dataeval.config import get_max_processes, get_seed
 from dataeval.protocols import Threshold
-from dataeval.shift._drift._chunk import Chunk, Chunker, CountBasedChunker, SizeBasedChunker
-from dataeval.types import Output, set_metadata
+from dataeval.shift._drift._base import (
+    ChunkResult,
+    DriftChunkedOutput,
+    DriftMVDCStats,
+    DriftOutput,
+    _chunk_results_to_dataframe,
+    _make_chunk_result,
+)
+from dataeval.shift._drift._chunk import (
+    BaseChunker,
+    SizeChunker,
+    resolve_chunker,
+)
+from dataeval.types import set_metadata
 from dataeval.utils.arrays import flatten_samples
 from dataeval.utils.thresholds import ConstantThreshold
 
 logger = logging.getLogger(__name__)
-
-
-def _validate(data: pl.DataFrame, expected_features: int | None = None) -> int:
-    """Validate DataFrame has data and expected number of features."""
-    if data.is_empty():
-        raise ValueError("data contains no rows. Please provide a valid data set.")
-    if expected_features is not None and data.shape[-1] != expected_features:
-        raise ValueError(f"expected '{expected_features}' features in data set:\n\t{data}")
-    return data.shape[-1]
 
 
 DEFAULT_LGBM_HYPERPARAMS = {
@@ -67,261 +67,117 @@ DEFAULT_LGBM_HYPERPARAMS = {
 }
 
 
-class DriftMVDCOutput(Output[pl.DataFrame]):
-    """Results of the multivariate domain classifier drift detection."""
+def _compute_auroc(
+    x: NDArray[np.float32],
+    y: NDArray[np.intp],
+    cv_folds_num: int = 5,
+    hyperparameters: dict[str, Any] | None = None,
+) -> tuple[float, NDArray[np.float32], NDArray[np.float32]]:
+    """Compute AUROC of a domain classifier distinguishing two classes.
 
-    def __init__(self, results_data: pl.DataFrame) -> None:
-        """Initialize a DriftMVDCOutput results object.
+    Parameters
+    ----------
+    x : NDArray[np.float32]
+        Combined feature matrix, shape (n_samples, n_features).
+    y : NDArray[np.intp]
+        Binary labels (0=reference, 1=test).
+    cv_folds_num : int
+        Number of stratified k-fold cross-validation splits.
+    hyperparameters : dict or None
+        LightGBM hyperparameters.
 
-        Parameters
-        ----------
-        results_data : pl.DataFrame
-            Results data returned by a DomainClassifierCalculator.
-        """
-        self._data = results_data.clone()
+    Returns
+    -------
+    tuple[float, NDArray[np.float32], NDArray[np.float32]]
+        - Overall AUROC score (0.5 = no discrimination, 1.0 = perfect).
+        - Per-fold AUROC values, shape (cv_folds_num,).
+        - Mean feature importances across folds, shape (n_features,).
+    """
+    hyperparameters = DEFAULT_LGBM_HYPERPARAMS if hyperparameters is None else hyperparameters
+    feature_names = [f"f{i}" for i in range(x.shape[1])]
 
-    def data(self) -> pl.DataFrame:
-        """Return a copy of the results data."""
-        return self._data.clone()
+    skf = StratifiedKFold(n_splits=cv_folds_num)
+    all_preds: list[NDArray[np.float32]] = []
+    all_tgts: list[NDArray[np.intp]] = []
+    fold_aurocs: list[float] = []
+    fold_importances: list[NDArray[np.float32]] = []
 
-    @property
-    def empty(self) -> bool:
-        """Check if the results are empty."""
-        return self._data is None or self._data.is_empty()
-
-    @property
-    def plot_type(self) -> Literal["drift_mvdc"]:
-        """Return the plot type identifier."""
-        return "drift_mvdc"
-
-    def __len__(self) -> int:
-        """Return the number of rows in the results."""
-        return 0 if self.empty else len(self._data)
-
-    def filter(self, period: str = "all", metrics: str | None = None) -> Self:
-        """Filter results by period and optionally by metric.
-
-        Parameters
-        ----------
-        period : str, default "all"
-            Filter by period: "all", "reference", or "analysis".
-        metrics : str or None, default None
-            Metric name to filter by. Currently only "domain_classifier_auroc" is supported.
-            If None, all metrics are included.
-
-        Returns
-        -------
-        DriftMVDCOutput
-            Filtered results object.
-
-        Raises
-        ------
-        ValueError
-            If metrics parameter is not a string or None.
-        KeyError
-            If the requested metric is not available.
-        """
-        if metrics is not None and not isinstance(metrics, str):
-            raise ValueError("metrics value provided is not a valid metric")
-
-        data = self._data
-        if period != "all":
-            data = data.filter(pl.col("chunk_period") == period)
-
-        # If a specific metric is requested, validate and filter columns
-        if metrics is not None:
-            if metrics != "domain_classifier_auroc":
-                raise KeyError(f"Metric '{metrics}' not found. Available metric: 'domain_classifier_auroc'")
-
-            # Select chunk columns and requested metric columns
-            chunk_cols = [col for col in data.columns if col.startswith("chunk_")]
-            metric_cols = [col for col in data.columns if col.startswith(f"{metrics}_")]
-            data = data.select(chunk_cols + metric_cols)
-
-        res = copy.deepcopy(self)
-        res._data = data
-        return res
-
-
-class _DomainClassifierCalculator:
-    """Internal calculator for domain classifier drift detection."""
-
-    def __init__(
-        self,
-        chunker: Chunker | None = None,
-        cv_folds_num: int = 5,
-        hyperparameters: dict[str, Any] | None = None,
-        threshold: Threshold | None = None,
-        logger_instance: Logger | None = None,
-    ) -> None:
-        """Create a new DomainClassifierCalculator instance.
-
-        Parameters
-        ----------
-        chunker : Chunker, default=None
-            The `Chunker` used to split the data sets into a lists of chunks.
-        cv_folds_num: int, default=5
-            Number of cross-validation folds to use when calculating DC discrimination value.
-        hyperparameters : dict[str, Any], default = None
-            A dictionary used to provide your own custom hyperparameters when training the discrimination model.
-        threshold: Threshold, default=ConstantThreshold(lower=0.45, upper=0.65)
-            The threshold you wish to evaluate values on.
-        logger_instance: Logger, default=None
-            Logger instance to use for logging. If None, uses the module logger.
-        """
-        self.chunker = chunker if isinstance(chunker, Chunker) else CountBasedChunker(10)
-        self.result: DriftMVDCOutput | None = None
-        self.n_features: int | None = None
-        self._logger = logger_instance if isinstance(logger_instance, Logger) else logger
-
-        self.cv_folds_num = cv_folds_num
-        self.hyperparameters = DEFAULT_LGBM_HYPERPARAMS if hyperparameters is None else hyperparameters
-        self.threshold = threshold if threshold is not None else ConstantThreshold(lower=0.45, upper=0.65)
-
-    def fit(self, reference_data: pl.DataFrame) -> Self:
-        """Train the calculator using reference data."""
-        self.n_features = _validate(reference_data)
-        self._logger.debug(f"fitting {str(self)}")
-
-        self._x_ref = reference_data
-        chunks = self.chunker.split(self._x_ref)
-
-        # Create records with flattened column names
-        records = [
-            {f"chunk_{k}": v for k, v in chunk.dict().items()}
-            | {
-                "chunk_period": "reference",
-                "domain_classifier_auroc_value": self._calculate_chunk(chunk=chunk),
-            }
-            for chunk in chunks
-        ]
-
-        res = pl.DataFrame(records)
-        res = self._populate_alert_thresholds(res)
-        self.result = DriftMVDCOutput(results_data=res)
-
-        return self
-
-    @set_metadata
-    def calculate(self, data: pl.DataFrame) -> DriftMVDCOutput:
-        """Perform calculation on the provided data."""
-        if self.result is None:
-            raise RuntimeError("must run fit with reference data before running calculate")
-        _validate(data, self.n_features)
-        self._logger.debug(f"calculating {str(self)}")
-
-        chunks = self.chunker.split(data)
-
-        # Create records with flattened column names
-        records = [
-            {f"chunk_{k}": v for k, v in chunk.dict().items()}
-            | {
-                "chunk_period": "analysis",
-                "domain_classifier_auroc_value": self._calculate_chunk(chunk=chunk),
-            }
-            for chunk in chunks
-        ]
-
-        res = pl.DataFrame(records)
-        res = self._populate_alert_thresholds(res)
-
-        # Combine with reference results
-        self.result = self.result.filter(period="reference")
-        self.result._data = pl.concat([self.result._data, res])
-
-        return self.result
-
-    def _calculate_chunk(self, chunk: Chunk) -> float:
-        """Calculate AUROC for a single chunk."""
-        if self.result is None:
-            # Use chunk indices to identify reference chunk's location
-            df_x = self._x_ref
-            y = np.zeros(len(df_x), dtype=np.intp)
-            y[chunk.start_index : chunk.end_index + 1] = 1
-        else:
-            chunk_x = chunk.data
-            reference_x = self._x_ref
-            chunk_y = np.ones(len(chunk_x), dtype=np.intp)
-            reference_y = np.zeros(len(reference_x), dtype=np.intp)
-            df_x = pl.concat([reference_x, chunk_x])
-            y = np.concatenate([reference_y, chunk_y])
-
-        # Extract feature names from Polars DataFrame and convert to numpy
-        feature_names = df_x.columns
-        x_numpy = df_x.to_numpy()
-
-        skf = StratifiedKFold(n_splits=self.cv_folds_num)
-        all_preds: list[NDArray[np.float32]] = []
-        all_tgts: list[NDArray[np.intp]] = []
-
-        # Suppress sklearn's feature name mismatch warning.
-        # We pass feature names to LightGBM.fit() but sklearn's predict_proba() validation
-        # still complains because the test arrays are plain numpy without feature metadata.
-        # This is expected behavior - we maintain feature order consistency via array indexing.
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="X does not have valid feature names")
-            for train_index, test_index in skf.split(x_numpy, y):
-                _trx = x_numpy[train_index]
-                _try = y[train_index]
-                _tsx = x_numpy[test_index]
-                _tsy = y[test_index]
-                model = LGBMClassifier(
-                    **self.hyperparameters,
-                    n_jobs=get_max_processes(),
-                    random_state=get_seed(),
-                )
-                # Pass feature names to LightGBM for internal bookkeeping
-                model.fit(_trx, _try, feature_name=feature_names)
-                preds = np.asarray(model.predict_proba(_tsx), dtype=np.float32)[:, 1]
-                all_preds.append(preds)
-                all_tgts.append(_tsy)
-
-        np_all_preds = np.concatenate(all_preds, axis=0)
-        np_all_tgts = np.concatenate(all_tgts, axis=0)
-        result = roc_auc_score(np_all_tgts, np_all_preds)
-        return 0.5 if result == np.nan else float(result)
-
-    def _populate_alert_thresholds(self, result_data: pl.DataFrame) -> pl.DataFrame:
-        """Populate alert threshold columns."""
-        if self.result is None:
-            self._threshold_values = self.threshold(
-                data=result_data["domain_classifier_auroc_value"].to_numpy(),
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="X does not have valid feature names")
+        for train_index, test_index in skf.split(x, y):
+            _trx = x[train_index]
+            _try = y[train_index]
+            _tsx = x[test_index]
+            _tsy = y[test_index]
+            model = LGBMClassifier(
+                **hyperparameters,
+                n_jobs=get_max_processes(),
+                random_state=get_seed(),
             )
+            model.fit(_trx, _try, feature_name=feature_names)
+            preds = np.asarray(model.predict_proba(_tsx), dtype=np.float32)[:, 1]
+            all_preds.append(preds)
+            all_tgts.append(_tsy)
+            fold_auroc = roc_auc_score(_tsy, preds)
+            fold_aurocs.append(0.5 if fold_auroc == np.nan else float(fold_auroc))
+            fold_importances.append(np.asarray(model.feature_importances_, dtype=np.float32))
 
-        result_data = result_data.with_columns(
-            [
-                pl.lit(self._threshold_values[1]).alias("domain_classifier_auroc_upper_threshold"),
-                pl.lit(self._threshold_values[0]).alias("domain_classifier_auroc_lower_threshold"),
-            ],
-        )
-
-        return result_data.with_columns(
-            (
-                (pl.col("domain_classifier_auroc_value") > pl.col("domain_classifier_auroc_upper_threshold"))
-                | (pl.col("domain_classifier_auroc_value") < pl.col("domain_classifier_auroc_lower_threshold"))
-            ).alias("domain_classifier_auroc_alert"),
-        )
+    np_all_preds = np.concatenate(all_preds, axis=0)
+    np_all_tgts = np.concatenate(all_tgts, axis=0)
+    result = roc_auc_score(np_all_tgts, np_all_preds)
+    auroc = 0.5 if result == np.nan else float(result)
+    return (
+        auroc,
+        np.array(fold_aurocs, dtype=np.float32),
+        np.mean(fold_importances, axis=0).astype(np.float32),
+    )
 
 
 class DriftMVDC:
-    """Multivariant Domain Classifier.
+    """Multivariate Domain Classifier based drift detector.
+
+    Detects drift by training a LightGBM classifier to distinguish between
+    reference and test data. If the classifier can discriminate well (high AUROC),
+    the distributions differ and drift is detected.
+
+    Uses a fit/predict lifecycle: construct with hyperparameters, call
+    :meth:`fit` with reference data, then call :meth:`predict` with test data.
+
+    Supports two modes:
+
+    - **Non-chunked** (default): Computes a single AUROC for the entire test set
+      vs reference. Drift is flagged when AUROC exceeds the threshold (default 0.55).
+    - **Chunked**: Splits data into chunks, computes AUROC per chunk, and uses
+      threshold bounds to flag drift per chunk. Enable by passing chunking
+      parameters to :meth:`fit`.
 
     Parameters
     ----------
     n_folds : int, default 5
         Number of cross-validation (CV) folds.
-    chunk_size : int or None, default None
-        Number of samples in a chunk used in CV, will get one metric & prediction per chunk.
-    chunk_count : int or None, default None
-        Number of total chunks used in CV, will get one metric & prediction per chunk.
-    threshold : Tuple[float, float], default (0.45, 0.65)
-        (lower, upper) metric bounds on roc_auc for identifying :term:`drift<Drift>`.
+    threshold : float or tuple[float, float], default 0.55
+        For non-chunked mode: float threshold where AUROC > threshold means drift.
+        For chunked mode: tuple (lower, upper) bounds on AUROC for identifying drift.
     config : DriftMVDC.Config or None, default None
         Optional configuration object with default parameters. Parameters
         specified directly in __init__ will override config defaults.
 
     Examples
     --------
+    Non-chunked mode:
+
+    >>> ref = np.random.randn(200, 4).astype(np.float32)
+    >>> test = np.random.randn(100, 4).astype(np.float32)
+    >>> detector = DriftMVDC().fit(ref)
+    >>> result = detector.predict(test)
+    >>> print(f"Drift: {result.drifted}")
+    Drift: ...
+
+    Chunked mode:
+
+    >>> detector = DriftMVDC(threshold=(0.45, 0.65)).fit(ref, chunk_size=100)
+    >>> result = detector.predict(test)
+
     Using configuration:
 
     >>> config = DriftMVDC.Config(n_folds=10, threshold=(0.4, 0.6))
@@ -337,25 +193,17 @@ class DriftMVDC:
         ----------
         n_folds : int, default 5
             Number of cross-validation folds.
-        chunk_size : int or None, default None
-            Number of samples in a chunk.
-        chunk_count : int or None, default None
-            Number of total chunks.
-        threshold : tuple[float, float], default (0.45, 0.65)
-            (lower, upper) metric bounds on roc_auc for drift identification.
+        threshold : float or tuple[float, float], default 0.55
+            Threshold for drift detection.
         """
 
         n_folds: int = 5
-        chunk_size: int | None = None
-        chunk_count: int | None = None
-        threshold: tuple[float, float] = (0.45, 0.65)
+        threshold: float | tuple[float, float] = 0.55
 
     def __init__(
         self,
         n_folds: int | None = None,
-        chunk_size: int | None = None,
-        chunk_count: int | None = None,
-        threshold: tuple[float, float] | None = None,
+        threshold: float | tuple[float, float] | None = None,
         config: Config | None = None,
     ) -> None:
         # Store config or create default
@@ -363,57 +211,254 @@ class DriftMVDC:
 
         # Use config defaults if parameters not specified
         n_folds = n_folds if n_folds is not None else self.config.n_folds
-        chunk_size = chunk_size if chunk_size is not None else self.config.chunk_size
-        chunk_count = chunk_count if chunk_count is not None else self.config.chunk_count
         threshold = threshold if threshold is not None else self.config.threshold
 
-        self.threshold: tuple[float, float] = max(0.0, min(threshold)), min(1.0, max(threshold))
-        chunker = (
-            CountBasedChunker(10 if chunk_count is None else chunk_count)
-            if chunk_size is None
-            else SizeBasedChunker(chunk_size)
-        )
-        self._calc = _DomainClassifierCalculator(
-            cv_folds_num=n_folds,
-            chunker=chunker,
-            threshold=ConstantThreshold(lower=self.threshold[0], upper=self.threshold[1]),
-        )
+        self._n_folds = n_folds
+        self._threshold_config = threshold
+        self._fitted = False
+        self._chunker: BaseChunker | None = None
+        self._x_ref_np: NDArray[np.float32] | None = None
+        self._baseline_values: NDArray[np.float32] | None = None
+        self._threshold_bounds: tuple[float | None, float | None] = (None, None)
 
-    def fit(self, x_ref: ArrayLike) -> Self:
-        """
-        Fit the domain classifier on the training dataframe.
+    @property
+    def x_ref(self) -> NDArray[np.float32]:
+        """Reference data as a numpy array."""
+        if self._x_ref_np is None:
+            raise RuntimeError("Must call fit() before accessing x_ref.")
+        return self._x_ref_np
+
+    def fit(
+        self,
+        x_ref: ArrayLike,
+        chunker: BaseChunker | None = None,
+        chunk_size: int | None = None,
+        chunk_count: int | None = None,
+        chunks: list[ArrayLike] | None = None,
+        chunk_indices: list[list[int]] | None = None,
+    ) -> Self:
+        """Fit the domain classifier on the reference data.
+
+        When chunking is enabled, the detector computes per-chunk baseline
+        AUROC values from the reference data and derives threshold bounds.
+        During prediction, the test data is split into chunks of the
+        **same size** used here, so that per-chunk statistics are comparable
+        to the baseline.
+
+        If ``chunk_count`` is provided, the effective chunk size is computed
+        as ``len(x_ref) // chunk_count`` and locked in for prediction.  Use
+        ``chunk_size`` directly when you want explicit control over the
+        chunk size used for both fitting and prediction.
 
         Parameters
         ----------
         x_ref : ArrayLike
             Reference data with dim[n_samples, n_features].
+        chunker : ArrayChunker or None, default None
+            Explicit chunker instance for chunked mode.
+        chunk_size : int or None, default None
+            Create fixed-size chunks. The same size is used during
+            prediction to keep statistics comparable.
+        chunk_count : int or None, default None
+            Split into this many equal chunks. Converted to a fixed
+            ``chunk_size`` based on the reference data length.
+        chunks : list[ArrayLike] or None, default None
+            Pre-split reference data for chunked mode.
+        chunk_indices : list[list[int]] or None, default None
+            Index groupings for chunking reference data.
 
         Returns
         -------
-        DriftMVDC
-
+        Self
         """
-        # for 1D input, assume that is 1 sample: dim[1,n_features]
-        self.x_ref: pl.DataFrame = pl.DataFrame(flatten_samples(np.atleast_2d(np.asarray(x_ref))))
-        self.n_features: int = self.x_ref.shape[-1]
-        self._calc.fit(self.x_ref)
+        self._x_ref_np = flatten_samples(np.atleast_2d(np.asarray(x_ref, dtype=np.float32)))
+        self.n_features: int = self._x_ref_np.shape[1]
+
+        # Handle prebuilt chunks as a direct path (no chunker stored)
+        if chunks is not None:
+            prebuilt = [flatten_samples(np.atleast_2d(np.asarray(c, dtype=np.float32))) for c in chunks]
+            self._chunker = None
+            self._fit_prebuilt(prebuilt)
+            self._fitted = True
+            return self
+
+        # Resolve chunker from convenience params
+        resolved = resolve_chunker(chunker, chunk_size, chunk_count, chunk_indices)
+
+        if resolved is not None:
+            self._fit_chunked(resolved)
+            # Normalize to SizeChunker so predict() uses the same chunk
+            # size regardless of test set size.
+            n_ref = len(self._x_ref_np)
+            fit_chunk_size = len(resolved.split(n_ref)[0])
+            self._chunker = SizeChunker(fit_chunk_size, incomplete="append")
+        else:
+            self._chunker = None
+
+        self._fitted = True
         return self
 
-    def predict(self, x: ArrayLike) -> DriftMVDCOutput:
+    def _resolve_threshold(self, baseline_values: NDArray[np.float32]) -> None:
+        """Store baseline values and compute threshold bounds from config."""
+        self._baseline_values = baseline_values
+
+        threshold_config = self._threshold_config
+        if isinstance(threshold_config, tuple):
+            t_lower, t_upper = max(0.0, min(threshold_config)), min(1.0, max(threshold_config))
+            threshold: Threshold = ConstantThreshold(lower=t_lower, upper=t_upper)
+        else:
+            t_lower = max(0.0, threshold_config - 0.1)
+            t_upper = min(1.0, threshold_config + 0.1)
+            threshold = ConstantThreshold(lower=t_lower, upper=t_upper)
+
+        self._threshold_bounds = threshold(data=self._baseline_values)
+
+    def _fit_chunked(self, chunker: BaseChunker) -> None:
+        """Compute per-chunk AUROC on reference data to establish baseline."""
+        x_ref = self.x_ref
+        n = len(x_ref)
+        index_groups = chunker.split(n)
+
+        baseline_values: list[float] = []
+        for indices in index_groups:
+            mask = np.ones(n, dtype=bool)
+            mask[indices] = False
+            rest_data = x_ref[mask]
+            chunk_data = x_ref[indices]
+            x = np.concatenate([rest_data, chunk_data], axis=0)
+            y = np.concatenate([np.zeros(len(rest_data), dtype=np.intp), np.ones(len(chunk_data), dtype=np.intp)])
+            auroc, _, _ = _compute_auroc(x, y, self._n_folds)
+            baseline_values.append(auroc)
+
+        self._resolve_threshold(np.array(baseline_values, dtype=np.float32))
+
+    def _fit_prebuilt(self, chunks: list[NDArray[np.float32]]) -> None:
+        """Compute per-chunk AUROC from prebuilt reference chunks."""
+        baseline_values: list[float] = []
+        for i, chunk_data in enumerate(chunks):
+            rest_data = np.concatenate([c for j, c in enumerate(chunks) if j != i], axis=0)
+            x = np.concatenate([rest_data, chunk_data], axis=0)
+            y = np.concatenate([np.zeros(len(rest_data), dtype=np.intp), np.ones(len(chunk_data), dtype=np.intp)])
+            auroc, _, _ = _compute_auroc(x, y, self._n_folds)
+            baseline_values.append(auroc)
+
+        self._resolve_threshold(np.array(baseline_values, dtype=np.float32))
+
+    @set_metadata
+    def predict(
+        self,
+        x: ArrayLike | None = None,
+        chunks: list[ArrayLike] | None = None,
+        chunk_indices: list[list[int]] | None = None,
+    ) -> DriftOutput | DriftChunkedOutput:
         """
-        Perform :term:`inference<Inference>` on the test dataframe.
+        Perform :term:`inference<Inference>` on the test data.
 
         Parameters
         ----------
-        x : ArrayLike
+        x : ArrayLike or None
             Test (analysis) data with dim[n_samples, n_features].
+            Required for non-chunked mode and chunked mode unless
+            pre-built chunks are provided.
+        chunks : list[ArrayLike] or None, default None
+            Pre-built test data chunks.
+        chunk_indices : list[list[int]] or None, default None
+            Index groupings for chunking test data.
 
         Returns
         -------
-        DomainClassifierDriftResult
+        DriftOutput or DriftChunkedOutput
+            Non-chunked mode returns :class:`DriftOutput`.
+            Chunked mode returns :class:`DriftChunkedOutput`.
         """
-        self.x_test: pl.DataFrame = pl.DataFrame(flatten_samples(np.atleast_2d(np.asarray(x))))
-        if self.x_test.shape[-1] != self.n_features:
+        if not self._fitted:
+            raise RuntimeError("Must call fit() before predict().")
+
+        if self._chunker is not None or chunks is not None or chunk_indices is not None:
+            return self._predict_chunked(x, chunks, chunk_indices)
+
+        if x is None:
+            raise ValueError("x is required for non-chunked prediction.")
+        return self._predict_single(x)
+
+    def _predict_single(self, x: ArrayLike) -> DriftOutput:
+        """Non-chunked prediction: single AUROC for entire test set."""
+        x_test = flatten_samples(np.atleast_2d(np.asarray(x, dtype=np.float32)))
+        if x_test.shape[1] != self.n_features:
             raise ValueError("Reference and test embeddings have different number of features")
 
-        return self._calc.calculate(self.x_test)
+        x_ref = self.x_ref
+        x_combined = np.concatenate([x_ref, x_test], axis=0)
+        y = np.concatenate([np.zeros(len(x_ref), dtype=np.intp), np.ones(len(x_test), dtype=np.intp)])
+        auroc, fold_aurocs, feature_importances = _compute_auroc(x_combined, y, cv_folds_num=self._n_folds)
+
+        threshold = self._threshold_config if isinstance(self._threshold_config, float) else 0.55
+        drifted = auroc > threshold
+
+        return DriftOutput(
+            drifted=drifted,
+            threshold=threshold,
+            p_val=auroc,
+            distance=auroc,
+            metric_name="auroc",
+            stats=DriftMVDCStats(fold_aurocs=fold_aurocs, feature_importances=feature_importances),
+        )
+
+    def _predict_chunked(
+        self,
+        x: ArrayLike | None = None,
+        chunks_override: list[ArrayLike] | None = None,
+        chunk_indices_override: list[list[int]] | None = None,
+    ) -> DriftChunkedOutput:
+        """Chunked prediction: per-chunk AUROC vs baseline threshold."""
+        x_ref = self.x_ref
+        lower, upper = self._threshold_bounds
+        chunk_results: list[ChunkResult] = []
+
+        if chunks_override is not None:
+            # Direct prebuilt path
+            for i, chunk_arr in enumerate(chunks_override):
+                chunk_data = flatten_samples(np.atleast_2d(np.asarray(chunk_arr, dtype=np.float32)))
+                if chunk_data.shape[1] != self.n_features:
+                    raise ValueError("Reference and test embeddings have different number of features")
+                x_combined = np.concatenate([x_ref, chunk_data], axis=0)
+                y = np.concatenate([np.zeros(len(x_ref), dtype=np.intp), np.ones(len(chunk_data), dtype=np.intp)])
+                auroc, _, _ = _compute_auroc(x_combined, y, cv_folds_num=self._n_folds)
+                alert = (upper is not None and auroc > upper) or (lower is not None and auroc < lower)
+                chunk_results.append(
+                    ChunkResult(
+                        key=f"chunk_{i}",
+                        index=i,
+                        start_index=-1,
+                        end_index=-1,
+                        value=auroc,
+                        upper_threshold=upper,
+                        lower_threshold=lower,
+                        drifted=alert,
+                    )
+                )
+        else:
+            if x is None:
+                raise ValueError("x is required for chunked prediction.")
+            x_test = flatten_samples(np.atleast_2d(np.asarray(x, dtype=np.float32)))
+            if x_test.shape[1] != self.n_features:
+                raise ValueError("Reference and test embeddings have different number of features")
+
+            if chunk_indices_override is not None:
+                index_groups = [np.asarray(idx, dtype=np.intp) for idx in chunk_indices_override]
+            elif self._chunker is not None:
+                index_groups = self._chunker.split(len(x_test))
+            else:
+                raise ValueError("No chunking specification provided.")
+
+            for i, indices in enumerate(index_groups):
+                chunk_data = x_test[indices]
+                x_combined = np.concatenate([x_ref, chunk_data], axis=0)
+                y = np.concatenate([np.zeros(len(x_ref), dtype=np.intp), np.ones(len(chunk_data), dtype=np.intp)])
+                auroc, _, _ = _compute_auroc(x_combined, y, cv_folds_num=self._n_folds)
+                chunk_results.append(_make_chunk_result(i, indices, auroc, upper, lower))
+
+        return DriftChunkedOutput(
+            metric_name="auroc",
+            chunk_results=_chunk_results_to_dataframe(chunk_results),
+        )

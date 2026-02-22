@@ -1,12 +1,9 @@
-from unittest.mock import MagicMock
-
 import numpy as np
-import polars as pl
 import pytest
 
 from dataeval.config import use_max_processes
-from dataeval.shift._drift._mvdc import DriftMVDC, DriftMVDCOutput, _validate
-from dataeval.utils.thresholds import ConstantThreshold
+from dataeval.shift._drift._base import DriftChunkedOutput, DriftOutput
+from dataeval.shift._drift._mvdc import DriftMVDC
 
 
 @pytest.fixture
@@ -29,157 +26,122 @@ def trn_data():
     return trnData
 
 
-@pytest.fixture
-def result_df():
-    # Convert from MultiIndex to flat column names with polars DataFrame
-    return pl.DataFrame(
-        {
-            "chunk_key": [f"[{i % 5 * 20}:{(i % 5 + 1) * 20 - 1}]" for i in range(10)],
-            "chunk_chunk_index": [i % 5 for i in range(10)],
-            "chunk_start_index": [i % 5 * 20 for i in range(10)],
-            "chunk_end_index": [(i % 5 + 1) * 20 - 1 for i in range(10)],
-            "chunk_period": ["reference" if i < 5 else "analysis" for i in range(10)],
-            "domain_classifier_auroc_value": [0.5 if i < 5 else 1.0 for i in range(10)],
-            "domain_classifier_auroc_upper_threshold": [0.65 for _ in range(10)],
-            "domain_classifier_auroc_lower_threshold": [0.45 for _ in range(10)],
-            "domain_classifier_auroc_alert": [i >= 5 for i in range(10)],
-        },
-    )
-
-
 @pytest.mark.required
 class TestMVDC:
     def test_init(self):
         """Test that the detector is instantiated correctly."""
-        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
-        assert dc._calc.cv_folds_num == 2
-        threshold = dc._calc.threshold
-        assert isinstance(threshold, ConstantThreshold)
-        assert (threshold.lower, threshold.upper) == (0.6, 0.9)  # threshold specific to this example data
+        dc = DriftMVDC(n_folds=2, threshold=(0.6, 0.9))
+        assert dc._n_folds == 2
+        assert dc._threshold_config == (0.6, 0.9)
 
     def test_fit_xref(self, trn_data):
-        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
-        dc._calc = MagicMock()
+        dc = DriftMVDC(n_folds=2)
         dc.fit(trn_data)
         assert dc.x_ref.shape == (100, 4)
         assert dc.n_features == 4
-        dc._calc.fit.assert_called()
-
-    def test_predict_xtest(self, tst_data):
-        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
-        dc._calc = MagicMock()
-        dc.n_features = 4
-        dc.predict(tst_data)
-        assert dc.x_test.shape == (100, 4)
-        assert dc.n_features == 4
-        dc._calc.calculate.assert_called()
-
-    def test_predict_xtest_mismatch_features(self, tst_data):
-        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
-        dc.n_features = 5
-        with pytest.raises(ValueError, match="different number of features"):
-            dc.predict(tst_data)
-
-    def test_validate_empty(self):
-        df = pl.DataFrame([])
-        with pytest.raises(ValueError, match="data contains no rows"):
-            _validate(df)
-
-    def test_validate_feature_mismatch(self):
-        df = pl.DataFrame({"col1": [1, 2]})
-        with pytest.raises(ValueError, match="expected '2' features"):
-            _validate(df, expected_features=2)
-
-    def test_calculate_before_fit(self):
-        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
-        with pytest.raises(RuntimeError):
-            dc._calc.calculate(None)  # type: ignore
+        assert dc._fitted
 
     @pytest.mark.optional
-    def test_sequence(self, trn_data, tst_data):
-        """Sequential tests, each step is required before proceeding to the next."""
-        dc = DriftMVDC(n_folds=2, chunk_count=5)
+    def test_fit_chunked(self, trn_data):
+        dc = DriftMVDC(n_folds=2, threshold=(0.6, 0.9))
         with use_max_processes(4):
-            dc.fit(trn_data)
-        assert dc._calc.result is not None
+            dc.fit(trn_data, chunk_size=10)
+        assert dc.x_ref.shape == (100, 4)
+        assert dc.n_features == 4
+        assert dc._chunker is not None
+        assert dc._n_folds == 2
+        assert dc._threshold_bounds != (None, None)
+
+    def test_predict_xtest_mismatch_features(self, trn_data):
+        dc = DriftMVDC(n_folds=2)
+        dc.fit(trn_data)  # 4 features
+        test_5features = np.zeros((100, 5))
+        with pytest.raises(ValueError, match="different number of features"):
+            dc.predict(test_5features)
+
+    def test_predict_before_fit(self):
+        dc = DriftMVDC(n_folds=2)
+        with pytest.raises(RuntimeError, match="Must call fit"):
+            dc.predict(np.zeros((10, 4)))
+
+    @pytest.mark.optional
+    def test_sequence_chunked(self, trn_data, tst_data):
+        """Sequential tests for chunked mode, each step is required before proceeding to the next."""
+        dc = DriftMVDC(n_folds=2, threshold=(0.45, 0.65))
+        with use_max_processes(4):
+            dc.fit(trn_data, chunk_count=5)
+        assert dc._chunker is not None
+        assert dc._baseline_values is not None
         results = dc.predict(tst_data)
-        resdf = results.data()
-        tstdf = resdf.filter(pl.col("chunk_period") == "analysis")
-        tst_auc_vals = tstdf["domain_classifier_auroc_value"].to_numpy()
-        assert np.all(tst_auc_vals > dc.threshold[0])
-        isdrift = tstdf["domain_classifier_auroc_alert"].to_numpy()
-        assert np.all(isdrift)
+        assert isinstance(results, DriftChunkedOutput)
+        assert results.metric_name == "auroc"
+        # All chunks should be flagged as drifted (zeros vs Gaussian)
+        assert results.drifted
+        assert results.chunk_results["drifted"].all()
+        assert results.chunk_results["upper_threshold"].null_count() == 0
 
+    @pytest.mark.optional
+    def test_non_chunked(self, trn_data, tst_data):
+        """Test non-chunked mode returns DriftOutput."""
+        dc = DriftMVDC(n_folds=2)
+        dc.fit(trn_data)
+        with use_max_processes(4):
+            result = dc.predict(tst_data)
+        assert isinstance(result, DriftOutput)
+        assert hasattr(result, "drifted")
+        assert hasattr(result, "threshold")
+        assert hasattr(result, "p_val")
+        assert hasattr(result, "distance")
 
-@pytest.mark.required
-class TestDriftMVDCOutput:
-    def test_output_data(self, result_df):
-        output = DriftMVDCOutput(result_df)
-        df = output.data()
-        assert not output.empty
-        assert len(df) == len(output.data())
-        assert len(output) == len(df)
-        np.testing.assert_equal(df.to_numpy(), output.data().to_numpy())
+    @pytest.mark.optional
+    def test_predict_prebuilt_chunks(self, trn_data, tst_data):
+        """Test predict with prebuilt test chunks."""
+        dc = DriftMVDC(n_folds=2, threshold=(0.45, 0.65))
+        with use_max_processes(4):
+            dc.fit(trn_data, chunk_count=5)
+        test_chunks = [tst_data[:50], tst_data[50:]]
+        result = dc.predict(chunks=test_chunks)
+        assert isinstance(result, DriftChunkedOutput)
+        assert len(result) == 2
+        assert result.metric_name == "auroc"
 
-    def test_output_empty(self):
-        output = DriftMVDCOutput(pl.DataFrame([]))
-        df = output.data()
-        assert output.empty
-        assert len(df) == len(output.data())
-        assert len(output) == len(df)
+    @pytest.mark.optional
+    def test_predict_chunk_indices(self, trn_data, tst_data):
+        """Test predict with chunk_indices override."""
+        dc = DriftMVDC(n_folds=2, threshold=(0.45, 0.65))
+        with use_max_processes(4):
+            dc.fit(trn_data, chunk_count=5)
+        indices = [list(range(0, 50)), list(range(50, 100))]
+        result = dc.predict(tst_data, chunk_indices=indices)
+        assert isinstance(result, DriftChunkedOutput)
+        assert len(result) == 2
 
-    def test_output_filter(self, result_df):
-        output = DriftMVDCOutput(result_df)
-        o_all = output.filter("all")
-        o_ref = output.filter("reference")
-        o_anl = output.filter("analysis")
-        assert len(o_all) == len(o_ref) + len(o_anl)
-        assert len(o_all.data().columns) == len(o_ref.data().columns) == len(o_anl.data().columns)
+    @pytest.mark.optional
+    def test_fit_prebuilt_chunks(self, trn_data):
+        """Test fit with prebuilt reference chunks."""
+        dc = DriftMVDC(n_folds=2, threshold=(0.45, 0.65))
+        chunks = [trn_data[:25], trn_data[25:50], trn_data[50:75], trn_data[75:]]
+        with use_max_processes(4):
+            dc.fit(trn_data, chunks=chunks)
+        assert dc._baseline_values is not None
+        assert len(dc._baseline_values) == 4
 
-    def test_output_filter_invalid_metric_raises(self, result_df):
-        output = DriftMVDCOutput(result_df)
-        with pytest.raises(ValueError, match="not a valid metric"):
-            output.filter(metrics=1)  # type: ignore
+    def test_predict_non_chunked_no_data_raises(self, trn_data):
+        """Test that non-chunked predict without data raises."""
+        dc = DriftMVDC(n_folds=2)
+        dc.fit(trn_data)
+        with pytest.raises(ValueError, match="x is required"):
+            dc.predict(None)
 
-    def test_output_filter_no_metric(self, result_df):
-        output = DriftMVDCOutput(result_df)
-        with pytest.raises(KeyError):
-            output.filter(metrics="foo")
-
-
-@pytest.mark.skip
-def driftmvdc_demo():
-    # Demo code (uses more features than the pytest, but has the same result)
-
-    # Data defined params
-    n_samples, n_features = 100, 1024
-    mean, std_dev = 0.0, 1.0
-
-    # User defined params
-    chunksz = 10
-    bounds = (0.6, 0.9)
-    cvfold = 5
-
-    # Create train/test sample data just for the demo
-    size = n_samples * n_features
-    x = np.linspace(-3, 3, size)
-    trnData = (1 / (np.sqrt(2 * np.pi) * std_dev)) * np.exp(-0.5 * ((x - mean) / std_dev) ** 2)
-    trnData = trnData.reshape((n_samples, n_features))
-    tstData = np.zeros((n_samples, n_features))
-
-    # Domain classifier training (fit) and inference (predict)
-    dc = DriftMVDC(n_folds=cvfold, chunk_size=chunksz, threshold=bounds)
-    dc.fit(trnData)
-    results = dc.predict(tstData)
-
-    # Test domain data using Polars backend
-    resdf = results.data()  # Returns pl.DataFrame directly
-    tstdf = resdf.filter(pl.col("chunk_period") == "analysis")
-    isdrift = tstdf["domain_classifier_auroc_alert"].to_numpy()
-
-    # Display the Polars DataFrame
-    print("Results DataFrame (Polars):")
-    print(resdf)
-    print("\nAnalysis period data:")
-    print(tstdf)
-    print(f"\nDrift detected: {isdrift}")
+    @pytest.mark.optional
+    def test_mvdc_stats_populated(self, trn_data, tst_data):
+        """Test that DriftMVDCStats has fold_aurocs and feature_importances."""
+        dc = DriftMVDC(n_folds=2)
+        dc.fit(trn_data)
+        with use_max_processes(4):
+            result = dc.predict(tst_data)
+        assert isinstance(result, DriftOutput)
+        assert "fold_aurocs" in result.stats
+        assert "feature_importances" in result.stats
+        assert len(result.stats["fold_aurocs"]) == 2  # n_folds=2
+        assert len(result.stats["feature_importances"]) == 4  # n_features=4

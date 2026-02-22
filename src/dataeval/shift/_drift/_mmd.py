@@ -13,12 +13,26 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
+import numpy as np
 import torch
+from numpy.typing import NDArray
+from typing_extensions import Self
 
 from dataeval.config import get_device
-from dataeval.protocols import Array, DeviceLike, UpdateStrategy
-from dataeval.shift._drift._base import BaseDrift, DriftBaseOutput, update_strategy
+from dataeval.protocols import Array, DeviceLike, Threshold, UpdateStrategy
+from dataeval.shift._drift._base import (
+    BaseDrift,
+    ChunkResult,
+    DriftChunkedOutput,
+    DriftMMDStats,
+    DriftOutput,
+    _chunk_results_to_dataframe,
+    _make_chunk_result,
+    update_strategy,
+)
+from dataeval.shift._drift._chunk import BaseChunker
 from dataeval.types import set_metadata
+from dataeval.utils.thresholds import ZScoreThreshold
 
 
 def _auto_detect_permutation_batch_size(
@@ -98,45 +112,16 @@ def _auto_detect_permutation_batch_size(
         return 1
 
 
-@dataclass(frozen=True)
-class DriftMMDOutput(DriftBaseOutput):
-    """
-    Output class for :class:`.DriftMMD` (Maximum Mean Discrepancy) drift detector.
-
-    Extends :class:`.DriftBaseOutput` with MMD-specific distance threshold information.
-    Used by MMD-based drift detectors that compare kernel embeddings between
-    reference and test distributions.
-
-    Attributes
-    ----------
-    drifted : bool
-        Whether drift was detected based on MMD permutation test.
-    threshold : float
-        P-value threshold used for significance of the permutation test.
-    p_val : float
-        P-value obtained from the MMD permutation test, between 0 and 1.
-    distance : float
-        Squared Maximum Mean Discrepancy between reference and test set.
-        Always >= 0, with higher values indicating greater distributional difference.
-    distance_threshold : float
-        Squared Maximum Mean Discrepancy threshold above which drift is flagged, always >= 0.
-        Determined from permutation test at specified significance level.
-
-    Notes
-    -----
-    MMD uses kernel methods to compare distributions in reproducing kernel
-    Hilbert spaces, making it effective for high-dimensional data like images.
-    """
-
-    distance_threshold: float
-
-
 class DriftMMD(BaseDrift):
     """Drift detector using :term:`Maximum Mean Discrepancy (MMD) Drift Detection` with permutation test.
 
     Detects distributional differences by comparing kernel embeddings of reference
     and test datasets in a reproducing kernel Hilbert space (RKHS). Uses permutation
     testing to assess statistical significance of the observed MMD^2 statistic.
+
+    Uses a fit/predict lifecycle: construct with hyperparameters, call
+    :meth:`fit` with reference data, then call :meth:`predict` with test data.
+    Supports chunked mode when chunking parameters are provided to :meth:`fit`.
 
     MMD is particularly effective for high-dimensional data like images as it can
     capture complex distributional differences that univariate tests might miss.
@@ -145,9 +130,6 @@ class DriftMMD(BaseDrift):
 
     Parameters
     ----------
-    data : Array
-        Reference dataset used as baseline distribution for drift detection.
-        Should represent the expected data distribution.
     p_val : float, default 0.05
         Significance threshold for statistical tests, between 0 and 1.
         For FDR correction, this represents the acceptable false discovery rate.
@@ -155,6 +137,7 @@ class DriftMMD(BaseDrift):
     update_strategy : UpdateStrategy or None, default None
         Strategy for updating reference data when new data arrives.
         When None, reference data remains fixed throughout detection.
+        Ignored in chunked mode.
     sigma : Array or None, default None
         Bandwidth parameter(s) for the Gaussian RBF kernel. Controls the
         kernel's sensitivity to distance between data points. When None,
@@ -170,9 +153,7 @@ class DriftMMD(BaseDrift):
         automatically detects appropriate batch size based on available GPU memory
         (on CUDA devices) or computes all permutations at once (on CPU). Set to an
         integer to manually specify batch size. Useful when working with large kernel
-        matrices or many permutations to avoid GPU out-of-memory errors. For example,
-        with n_permutations=100 and permutation_batch_size=10, permutations are computed
-        in 10 batches of 10 each.
+        matrices or many permutations to avoid GPU out-of-memory errors.
     device : DeviceLike or None, default None
         Hardware device for computation. When None, automatically selects
         DataEval's configured device, falling back to PyTorch's default.
@@ -202,7 +183,7 @@ class DriftMMD(BaseDrift):
     Initialize with image embeddings
 
     >>> train_emb = np.ones((100, 128), dtype=np.float32)
-    >>> drift = DriftMMD(train_emb)
+    >>> drift = DriftMMD().fit(train_emb)
 
     Test incoming images for drift
 
@@ -215,10 +196,15 @@ class DriftMMD(BaseDrift):
     >>> print(f"Mean MMD statistic: {result.distance:.2f}")
     Mean MMD statistic: 1.26
 
+    Chunked drift detection with z-score thresholds
+
+    >>> drift = DriftMMD().fit(train_emb, chunk_size=20)
+    >>> result = drift.predict(test_emb)
+
     Using configuration:
 
     >>> config = DriftMMD.Config(p_val=0.01, n_permutations=200)
-    >>> drift = DriftMMD(train_emb, config=config)
+    >>> drift = DriftMMD(config=config).fit(train_emb)
     """
 
     @dataclass
@@ -251,7 +237,6 @@ class DriftMMD(BaseDrift):
 
     def __init__(
         self,
-        data: Array,
         p_val: float | None = None,
         update_strategy: UpdateStrategy | None = None,
         sigma: Array | None = None,
@@ -272,7 +257,7 @@ class DriftMMD(BaseDrift):
         )
         device = device if device is not None else self.config.device
 
-        super().__init__(data, p_val, update_strategy)
+        super().__init__(p_val, update_strategy)
 
         self.n_permutations = n_permutations  # nb of iterations through permutation test
         self.permutation_batch_size: int | Literal["auto"] = permutation_batch_size
@@ -280,18 +265,126 @@ class DriftMMD(BaseDrift):
         # set device
         self.device: torch.device = get_device(device)
 
-        # initialize kernel
-        sigma_tensor = torch.as_tensor(sigma, device=self.device) if sigma is not None else None
+        # Store sigma for kernel initialization during fit
+        self._sigma_init = sigma
+        self._kernel: GaussianRBF | None = None
+        self._k_xx: torch.Tensor | None = None
+
+    def fit(
+        self,
+        data: Array,
+        chunker: BaseChunker | None = None,
+        chunk_size: int | None = None,
+        chunk_count: int | None = None,
+        chunks: list[Any] | None = None,
+        chunk_indices: list[list[int]] | None = None,
+        threshold: Threshold | None = None,
+    ) -> Self:
+        """Fit detector with reference data.
+
+        Stores reference data, initializes the kernel, and precomputes
+        the reference kernel matrix. Optionally enables chunked mode.
+
+        Parameters
+        ----------
+        data : Array
+            Reference dataset used as baseline distribution for drift detection.
+        chunker : ArrayChunker or None, default None
+            Explicit chunker instance for chunked mode.
+        chunk_size : int or None, default None
+            Create fixed-size chunks of this many samples.
+        chunk_count : int or None, default None
+            Split reference into this many equal chunks.
+        chunks : list[ArrayLike] or None, default None
+            Pre-split reference data arrays for chunked mode.
+        chunk_indices : list[list[int]] or None, default None
+            Index groupings for chunking reference data.
+        threshold : Threshold or None, default None
+            Threshold strategy for chunked mode. Defaults to
+            StandardDeviationThreshold (mean +/- 3*std).
+
+        Returns
+        -------
+        Self
+        """
+        # Call base fit (stores data, resolves chunker)
+        super().fit(data, chunker, chunk_size, chunk_count, chunks, chunk_indices, threshold)
+
+        # Initialize kernel now that reference data is available
+        sigma_tensor = torch.as_tensor(self._sigma_init, device=self.device) if self._sigma_init is not None else None
         self._kernel = GaussianRBF(sigma_tensor).to(self.device)
 
-        # compute kernel matrix for the reference data
-        if isinstance(sigma_tensor, torch.Tensor):
+        # Precompute reference kernel matrix for non-chunked mode
+        if self._chunker is None and isinstance(sigma_tensor, torch.Tensor):
             self._k_xx = self._kernel(self.x_ref, self.x_ref)
         else:
             self._k_xx = None
 
+        return self
+
+    def _fit_chunked(self, chunker: BaseChunker, threshold: Threshold | None) -> None:
+        """Compute per-chunk MMD^2 on reference to establish baseline.
+
+        For each reference chunk, computes the raw MMD^2 against the
+        rest of the reference data (excluding the chunk itself).
+        """
+        x_ref = self.x_ref  # trigger lazy encoding
+        n = len(x_ref)
+        index_groups = chunker.split(n)
+
+        # Initialize kernel for scoring chunks
+        sigma_tensor = torch.as_tensor(self._sigma_init, device=self.device) if self._sigma_init is not None else None
+        self._kernel = GaussianRBF(sigma_tensor).to(self.device)
+
+        baseline_values: list[float] = []
+        for indices in index_groups:
+            mask = np.ones(n, dtype=bool)
+            mask[indices] = False
+            mmd2_value = self._compute_mmd2(x_ref[mask], x_ref[indices])
+            baseline_values.append(mmd2_value)
+
+        self._baseline_values = np.array(baseline_values, dtype=np.float32)
+
+        # Compute threshold bounds using StandardDeviationThreshold (z-score)
+        thresh = threshold if threshold is not None else ZScoreThreshold()
+        self._threshold_bounds = thresh(data=self._baseline_values)
+
+    def _fit_prebuilt(self, chunks: list[NDArray[np.float32]], threshold: Threshold | None) -> None:
+        """Compute per-chunk MMD^2 from prebuilt reference chunks."""
+        _ = self.x_ref  # trigger lazy encoding
+
+        sigma_tensor = torch.as_tensor(self._sigma_init, device=self.device) if self._sigma_init is not None else None
+        self._kernel = GaussianRBF(sigma_tensor).to(self.device)
+
+        baseline_values: list[float] = []
+        for i, chunk_data in enumerate(chunks):
+            rest_data = np.concatenate([c for j, c in enumerate(chunks) if j != i], axis=0)
+            mmd2_value = self._compute_mmd2(rest_data, chunk_data)
+            baseline_values.append(mmd2_value)
+
+        self._baseline_values = np.array(baseline_values, dtype=np.float32)
+
+        thresh = threshold if threshold is not None else ZScoreThreshold()
+        self._threshold_bounds = thresh(data=self._baseline_values)
+
+    def _compute_mmd2(self, x_ref: NDArray[np.float32], x_test: NDArray[np.float32]) -> float:
+        """Compute raw MMD^2 between reference and test data (no permutation test)."""
+        if self._kernel is None:
+            raise RuntimeError("Must call fit() before _compute_mmd2().")
+
+        k_xy = self._kernel(x_ref, x_test)
+        k_xx = self._kernel(x_ref, x_ref)
+        k_yy = self._kernel(x_test, x_test)
+        kernel_mat = torch.cat([torch.cat([k_xx, k_xy], 1), torch.cat([k_xy.T, k_yy], 1)], 0)
+        kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())
+        mmd2 = mmd2_from_kernel_matrix(kernel_mat, len(x_test), False)
+        return float(mmd2.item())
+
     def _kernel_matrix(self, x: Array, y: Array) -> torch.Tensor:
         """Compute and return full kernel matrix between arrays x and y."""
+        if self._kernel is None:
+            raise RuntimeError("Must call fit() before _kernel_matrix().")
+
         k_xy = self._kernel(x, y)
         k_xx = self._k_xx if self._k_xx is not None and self.update_strategy is None else self._kernel(x, x)
         k_yy = self._kernel(y, y)
@@ -337,30 +430,109 @@ class DriftMMD(BaseDrift):
         return float(p_val.item()), float(mmd2.item()), float(distance_threshold.item())
 
     @set_metadata
-    @update_strategy
-    def predict(self, data: Array) -> DriftMMDOutput:
+    def predict(
+        self,
+        data: Any = None,
+        chunks: list[Any] | None = None,
+        chunk_indices: list[list[int]] | None = None,
+    ) -> DriftOutput | DriftChunkedOutput:
         """
         Predict whether a batch of data has drifted from the reference data.
 
-        Then updates reference data using specified strategy.
+        In non-chunked mode, uses permutation test. In chunked mode, computes
+        per-chunk MMD^2 and compares against baseline thresholds.
 
         Parameters
         ----------
-        data : Array
-            Batch of instances to predict drift on.
+        data : Any, optional
+            Batch of instances to predict drift on. Required for non-chunked mode
+            and for chunked mode unless pre-built chunks are provided.
+        chunks : list[ArrayLike] or None, default None
+            Pre-built test data chunks.
+        chunk_indices : list[list[int]] or None, default None
+            Index groupings for chunking ``data``.
 
         Returns
         -------
-        DriftMMDOutput
-            Output class containing the :term:`drift<Drift>` prediction, :term:`p-value<P-Value>`,
-            threshold and MMD metric.
+        DriftOutput or DriftChunkedOutput
+            :class:`DriftOutput` for non-chunked mode.
+            :class:`DriftChunkedOutput` for chunked mode with per-chunk results.
         """
+        if not self._fitted:
+            raise RuntimeError("Must call fit() before predict().")
+
+        if self._chunker is not None or chunks is not None or chunk_indices is not None:
+            return self._predict_chunked(data, chunks, chunk_indices)
+
+        if data is None:
+            raise ValueError("data is required for non-chunked prediction.")
+        return self._predict_single(data)
+
+    @update_strategy
+    def _predict_single(self, data: Array) -> DriftOutput:
+        """Non-chunked prediction with permutation test."""
         # compute drift scores
         p_val, dist, distance_threshold = self.score(data)
         drift_pred = bool(p_val < self.p_val)
 
-        # populate drift dict
-        return DriftMMDOutput(drift_pred, self.p_val, p_val, dist, distance_threshold)
+        return DriftOutput(
+            drifted=drift_pred,
+            threshold=self.p_val,
+            p_val=p_val,
+            distance=dist,
+            metric_name="mmd2",
+            stats=DriftMMDStats(distance_threshold=distance_threshold),
+        )
+
+    def _predict_chunked(
+        self,
+        data: Any = None,
+        chunks_override: list[Any] | None = None,
+        chunk_indices_override: list[list[int]] | None = None,
+    ) -> DriftChunkedOutput:
+        """Chunked prediction: per-chunk MMD^2 vs baseline threshold."""
+        x_ref = self.x_ref
+        lower, upper = self._threshold_bounds
+        chunk_results: list[ChunkResult] = []
+
+        if chunks_override is not None:
+            # Direct prebuilt path
+            for i, chunk_arr in enumerate(chunks_override):
+                chunk_data = np.atleast_2d(np.asarray(chunk_arr, dtype=np.float32))
+                value = self._compute_mmd2(x_ref, chunk_data)
+                alert = (upper is not None and value > upper) or (lower is not None and value < lower)
+                chunk_results.append(
+                    ChunkResult(
+                        key=f"chunk_{i}",
+                        index=i,
+                        start_index=-1,
+                        end_index=-1,
+                        value=value,
+                        upper_threshold=upper,
+                        lower_threshold=lower,
+                        drifted=alert,
+                    )
+                )
+        else:
+            if data is None:
+                raise ValueError("data is required for chunked prediction.")
+            x_test = self._encode(data)
+
+            if chunk_indices_override is not None:
+                index_groups = [np.asarray(idx, dtype=np.intp) for idx in chunk_indices_override]
+            elif self._chunker is not None:
+                index_groups = self._chunker.split(len(x_test))
+            else:
+                raise ValueError("No chunking specification provided.")
+
+            for i, indices in enumerate(index_groups):
+                value = self._compute_mmd2(x_ref, x_test[indices])
+                chunk_results.append(_make_chunk_result(i, indices, value, upper, lower))
+
+        return DriftChunkedOutput(
+            metric_name="mmd2",
+            chunk_results=_chunk_results_to_dataframe(chunk_results),
+        )
 
 
 @torch.jit.script

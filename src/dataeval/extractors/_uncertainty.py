@@ -133,7 +133,7 @@ class ClassifierUncertaintyExtractor:
     >>> uncertainty_extractor = ClassifierUncertaintyExtractor(model=model, preds_type="probs", batch_size=32)
     >>>
     >>> # Use with DriftUnivariate for uncertainty-based drift detection
-    >>> drift_detector = DriftUnivariate(train_dataset, method="ks", extractor=uncertainty_extractor)
+    >>> drift_detector = DriftUnivariate(method="ks", extractor=uncertainty_extractor).fit(train_dataset)
     >>>
     >>> # Detect drift on new data
     >>> result = drift_detector.predict(test_dataset)
@@ -154,7 +154,7 @@ class ClassifierUncertaintyExtractor:
     >>>
     >>> uncertainty_extractor = ClassifierUncertaintyExtractor(model=model, transforms=transforms, device="cpu")
     >>>
-    >>> drift_detector = DriftUnivariate(train_dataset, method="ks", extractor=uncertainty_extractor)
+    >>> drift_detector = DriftUnivariate(method="ks", extractor=uncertainty_extractor).fit(train_dataset)
 
     Using different statistical methods
 
@@ -166,17 +166,15 @@ class ClassifierUncertaintyExtractor:
     >>>
     >>> # Use Cramér-von Mises test instead of Kolmogorov-Smirnov
     >>> drift_detector = DriftUnivariate(
-    ...     train_dataset,
     ...     method="cvm",  # More sensitive to overall distributional changes
     ...     extractor=uncertainty_extractor,
-    ... )
+    ... ).fit(train_dataset)
     >>>
     >>> # Or use Mann-Whitney U test for robust median shift detection
     >>> drift_detector = DriftUnivariate(
-    ...     train_dataset,
     ...     method="mwu",  # Robust to outliers
     ...     extractor=uncertainty_extractor,
-    ... )
+    ... ).fit(train_dataset)
 
     Notes
     -----
