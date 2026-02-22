@@ -50,7 +50,7 @@ fetch_cache() {
     echo "Extracting .jupyter_cache from $branch..."
 
     CACHE_SOURCE_FILE="$CACHE_DIR/.cache_source"
-    if [ -d "$CACHE_DIR" ] && [ -f "$CACHE_SOURCE_FILE" ] && [ "$(cat "$CACHE_SOURCE_FILE")" = "$branch" ]; then
+    if [ -z "$CI" ] && [ -d "$CACHE_DIR" ] && [ -f "$CACHE_SOURCE_FILE" ] && [ "$(cat "$CACHE_SOURCE_FILE")" = "$branch" ]; then
         echo "  Cache source matches '$branch', preserving newer local files"
         git archive "FETCH_HEAD" .jupyter_cache | tar -x --keep-newer-files -C docs/source/
     else
