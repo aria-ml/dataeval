@@ -166,6 +166,12 @@ torch = [
   { index = "pytorch-cu124", extra = "cu124" },
   { index = "pytorch-cu128", extra = "cu128" },
 ]
+torchvision = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu118", extra = "cu118" },
+  { index = "pytorch-cu124", extra = "cu124" },
+  { index = "pytorch-cu128", extra = "cu128" },
+]
 
 [tool.uv.extra-build-dependencies]
 numba = ["tbb>=2021.6"]
