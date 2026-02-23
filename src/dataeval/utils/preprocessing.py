@@ -374,6 +374,8 @@ def get_bitdepth(image: NDArray[Any]) -> BitDepth:
     BitDepth
         Bit depth information
     """
+    if image.size == 0 or np.isnan(image).all():
+        return BitDepth(0, np.nan, np.nan)
     pmin, pmax = np.nanmin(image), np.nanmax(image)
     if pmin < 0:
         return BitDepth(0, pmin, pmax)

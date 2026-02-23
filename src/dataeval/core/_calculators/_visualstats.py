@@ -30,6 +30,10 @@ class VisualStatCalculator(Calculator[ImageStats]):
 
     @cached_property
     def percentiles(self) -> NDArray[np.float64]:
+        if self.cache.is_all_nan:
+            if self.per_channel_mode:
+                return np.full((self.cache.image.shape[0], len(QUARTILES)), np.nan, dtype=np.float64)
+            return np.full(len(QUARTILES), np.nan, dtype=np.float64)
         if self.per_channel_mode:
             return np.nanpercentile(self.cache.per_channel, q=QUARTILES, axis=1).T.astype(np.float64)
         return np.nanpercentile(self.cache.scaled, q=QUARTILES).astype(np.float64)
@@ -57,7 +61,9 @@ class VisualStatCalculator(Calculator[ImageStats]):
         return [float(self.percentiles[-2])]
 
     def _sharpness(self) -> list[float]:
-        # Sharpness requires 2D spatial data; return NaN for low-dimensional data
+        # Sharpness requires 2D spatial data; return NaN for low-dimensional or all-NaN data
+        if self.cache.is_all_nan:
+            return [np.nan] * self.cache.image.shape[0] if self.per_channel_mode else [np.nan]
         if self.cache.image.ndim < 2:
             return [np.nan] if not self.per_channel_mode else [np.nan] * self.cache.image.shape[0]
         if self.cache.image.ndim == 2:

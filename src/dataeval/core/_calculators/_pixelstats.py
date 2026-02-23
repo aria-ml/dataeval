@@ -35,27 +35,43 @@ class PixelStatCalculator(Calculator[ImageStats]):
         """Return which flags this calculator handles."""
         return ImageStats.PIXEL
 
+    def _nan_list(self) -> list[float]:
+        """Return NaN values matching the expected output shape for all-NaN data."""
+        if self.per_channel_mode:
+            return [np.nan] * self.cache.image.shape[0]
+        return [np.nan]
+
     def _mean(self) -> list[float]:
+        if self.cache.is_all_nan:
+            return self._nan_list()
         if self.per_channel_mode:
             return np.nanmean(self.cache.per_channel, axis=1).tolist()
         return [float(np.nanmean(self.cache.scaled))]
 
     def _std(self) -> list[float]:
+        if self.cache.is_all_nan:
+            return self._nan_list()
         if self.per_channel_mode:
             return np.nanstd(self.cache.per_channel, axis=1).tolist()
         return [float(np.nanstd(self.cache.scaled))]
 
     def _var(self) -> list[float]:
+        if self.cache.is_all_nan:
+            return self._nan_list()
         if self.per_channel_mode:
             return np.nanvar(self.cache.per_channel, axis=1).tolist()
         return [float(np.nanvar(self.cache.scaled))]
 
     def _skew(self) -> list[float]:
+        if self.cache.is_all_nan:
+            return self._nan_list()
         if self.per_channel_mode:
             return skew(self.cache.per_channel, axis=1, nan_policy="omit").tolist()
         return [float(skew(self.cache.scaled.ravel(), nan_policy="omit"))]
 
     def _kurtosis(self) -> list[float]:
+        if self.cache.is_all_nan:
+            return self._nan_list()
         if self.per_channel_mode:
             return kurtosis(self.cache.per_channel, axis=1, nan_policy="omit").tolist()
         return [float(kurtosis(self.cache.scaled.ravel(), nan_policy="omit"))]

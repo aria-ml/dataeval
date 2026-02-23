@@ -125,6 +125,11 @@ class CalculatorCache:
         return self.raw
 
     @cached_property
+    def is_all_nan(self) -> bool:
+        """Check if the image data is entirely NaN (e.g. from an out-of-bounds bounding box)."""
+        return bool(np.isnan(self.image).all())
+
+    @cached_property
     def scaled(self) -> NDArray[Any]:
         return rescale(self.image)
 
