@@ -21,7 +21,7 @@ class TestDriftDetection:
         detector = DriftUnivariate(method="ks").fit(ref)
         result = detector.predict(np.zeros((20, 8), dtype=np.float32))
         assert hasattr(result, "drifted")
-        assert hasattr(result, "p_val")
+        assert "p_val" in result.details
         assert hasattr(result, "distance")
 
     def test_drift_univariate_detects_clear_shift(self):
@@ -50,9 +50,9 @@ class TestDriftDetection:
         detector = DriftUnivariate(method="ks").fit(ref)
         result = detector.predict(np.zeros((20, 8), dtype=np.float32))
         assert isinstance(result, DriftOutput)
-        assert len(result.stats["feature_drift"]) == 8
-        assert result.stats["p_vals"] is not None
-        assert result.stats["distances"] is not None
+        assert len(result.details["feature_drift"]) == 8
+        assert result.details["p_vals"] is not None
+        assert result.details["distances"] is not None
 
     def test_drift_univariate_cvm_method(self):
         from dataeval.shift import DriftUnivariate
@@ -70,9 +70,9 @@ class TestDriftDetection:
         detector = DriftMMD(n_permutations=10).fit(ref)
         result = detector.predict(rng.standard_normal((20, 8)).astype(np.float32))
         assert hasattr(result, "drifted")
-        assert hasattr(result, "p_val")
+        assert "p_val" in result.details
         assert hasattr(result, "distance")
-        assert hasattr(result, "stats")
+        assert hasattr(result, "details")
 
     def test_drift_mmd_detects_clear_shift(self):
         from dataeval.shift import DriftMMD

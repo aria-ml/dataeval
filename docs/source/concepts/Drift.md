@@ -9,7 +9,7 @@ DriftBWS
 DriftCVM
 DriftKS
 DriftMMD
-DriftMVDC
+DriftDomainClassifier
 DriftMWU
 DriftUncertainty
 ```
@@ -158,8 +158,11 @@ DataEval's drift detection classes are:
   - **Baumgartner-Weiss-Schindler (bws)**: Modern high-power test with tail sensitivity
 - **{class}`.DriftMMD`**: Utilizes the Maximum Mean Discrepancy (MMD) test to
   detect drift in multivariate data using kernel methods.
-- **{class}`.DriftMVDC`**: Utilizes multivariate domain classifier (MVDC) to detect drift by
+- **{class}`.DriftDomainClassifier`**: Utilizes multivariate domain classifier (MVDC) to detect drift by
   comparing the distance between the reference and test data.
+- **{class}`.DriftKNeighbors`**: Detects drift by comparing k-nearest neighbor
+  distances between test and reference data, providing a lightweight and fast
+  distance-based approach.
 
 Classifier uncertainty drift detection is available by creating a
 {class}`.ClassifierUncertaintyExtractor`, which computes prediction uncertainty
@@ -247,7 +250,7 @@ with the resulting AUROC score indicating drift severity (0.5 suggesting no
 drift, values approaching 1.0 indicating significant drift). This method excels
 at detecting subtle shifts in joint feature distributions that might be missed
 by univariate approaches, making it particularly effective for complex,
-non-linear relationships in data. [Read more...](DriftMVDC.md)
+non-linear relationships in data. [Read more...](DriftDomainClassifier.md)
 
 ## References
 
