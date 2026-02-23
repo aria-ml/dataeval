@@ -1410,7 +1410,12 @@ class Metadata(Array, FeatureExtractor):
             return self._process_categorical_factor(df, col, ordinal, is_od)
         if is_continuous(data, self.item_indices):
             return self._process_continuous_factor(df, col, data, is_od)
-        return df, FactorInfo("discrete")
+        # Digitize discrete numeric factors so that factor_data always
+        # contains non-negative integers (required by np.bincount in
+        # downstream bias evaluators).
+        col_dg = _digitized(col)
+        df = self._add_column_with_padding(df, col_dg, ordinal.astype(np.int64), is_od)
+        return df, FactorInfo("discrete", is_digitized=True)
 
     def _bin(
         self,
