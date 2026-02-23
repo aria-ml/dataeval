@@ -1,6 +1,19 @@
-[//]: # (82c2b1e178017f5cbcafd4f3115116dca9ccc954)
+[//]: # (18cfefe6930385ff69065ad50097d2da066f4ebb)
 
 # DataEval Change Log
+
+## v1.0.0-rc4
+
+🚧 **Deprecations and Removals**
+- `f17b2270` - Mark parity and uap functions as experimental
+- `239f2f43` - Rename calculate to calculate_stats
+
+🛠️ **Improvements and Enhancements**
+- `18cfefe6` - Refactor shift classes to utilize shared code across Drift and OOD and reduce duplication of code
+- `280b3a2a` - Standardize Drift API to support chunking and cumulative tests across all detectors
+- `8f1d029b` - [impr] Switch to using Threshold classes for thresholding
+- `4233ae83` - Rework experimental imports and warn-once on use/instantiation
+- `ee784e18` - Add framework for annotating with experimental and deprecated
 
 ## v1.0.0-rc3
 
