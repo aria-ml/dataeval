@@ -1202,7 +1202,7 @@ class Threshold(Protocol):
         ...
 
 
-ThresholdBounds = float | tuple[float | None, float | None]
+ThresholdBounds = float | tuple[float | None, float | None] | None
 ThresholdLimits = tuple[float | None, float | None]
 ThresholdLike = (
     str
