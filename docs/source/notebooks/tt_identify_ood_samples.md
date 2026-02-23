@@ -27,6 +27,7 @@ Relevant personas: Machine Learning Engineer, T&E Engineer, Data Scientist
 
 - Train different reconstruction models (AE, VAE) for OOD detection
 - Use Gaussian Mixture Models (GMM) to enhance OOD detection
+- Compare KNN-based OOD detection with cosine and Euclidean distance metrics
 - Compare model performance on different OOD scenarios
 - Visualize reconstruction quality and OOD scores
 
@@ -34,6 +35,7 @@ Relevant personas: Machine Learning Engineer, T&E Engineer, Data Scientist
 
 - When to use Autoencoder (AE) vs Variational Autoencoder (VAE) for OOD detection
 - How GMM in latent space improves OOD detection
+- When to choose cosine vs Euclidean distance for KNN-based detection
 - How to interpret OOD scores and set appropriate thresholds
 - Different use cases for each model configuration
 
@@ -49,7 +51,7 @@ Relevant personas: Machine Learning Engineer, T&E Engineer, Data Scientist
 
 Out-of-distribution (OOD) detection is critical for ensuring model reliability in production. When models encounter data
 that differs significantly from their training distribution, predictions become unreliable. This tutorial demonstrates
-six different approaches to OOD detection:
+seven different approaches to OOD detection:
 
 **Reconstruction-Based Methods:**
 
@@ -58,9 +60,10 @@ six different approaches to OOD detection:
 1. **AE with GMM**: Enhanced detection by modeling latent space with Gaussian Mixture Models
 1. **VAE with GMM**: Combining probabilistic encoding with GMM for robust detection
 
-**Distance-Based Methods**: 5. **K-Nearest Neighbors (KNN) - Raw Pixels**: Detects OOD by measuring distance in pixel
-space 6. **K-Nearest Neighbors (KNN) - Embeddings**: Uses learned [embeddings](../concepts/Embeddings.md) for better
-similarity
+**Distance-Based Methods:**
+
+1. **KNN with Cosine Distance**: Measures angular similarity in learned [embeddings](../concepts/Embeddings.md)
+1. **KNN with Euclidean Distance**: Measures straight-line distance in learned embeddings
 
 For this tutorial, you'll use the MNIST dataset of handwritten digits. You'll train models to recognize digits 0-7 and
 test their ability to detect digits 8-9 as out-of-distribution samples.
@@ -337,27 +340,58 @@ print(f"Test OOD embeddings shape: {test_ood_emb.shape}")
 
 ```{code-cell} ipython3
 # Create KNN detector with learned embeddings
-ood_knn = OODKNeighbors(k=10, distance_metric="cosine")
+ood_knn_cos = OODKNeighbors(k=10, distance_metric="cosine")
 
 print("\nFitting KNN detector with learned embeddings...")
-ood_knn.fit(train_in_emb, threshold_perc=95.0)
+ood_knn_cos.fit(train_in_emb, threshold_perc=95.0)
 print("Done!")
 ```
 
 ```{code-cell} ipython3
 # Get predictions with learned embeddings
-knn_result_in = ood_knn.predict(test_in_emb)
-knn_result_ood = ood_knn.predict(test_ood_emb)
+knn_cos_result_in = ood_knn_cos.predict(test_in_emb)
+knn_cos_result_ood = ood_knn_cos.predict(test_ood_emb)
 
 # Calculate detection accuracy
-in_acc_knn = 100 * (1 - knn_result_in.is_ood.mean())
-ood_rate_knn = 100 * knn_result_ood.is_ood.mean()
+in_acc_knn = 100 * (1 - knn_cos_result_in.is_ood.mean())
+ood_rate_knn = 100 * knn_cos_result_ood.is_ood.mean()
 
-print("\n--- KNN (Embeddings) Results ---")
+print("\n--- KNN Cosine (Embeddings) Results ---")
 print(f"In-distribution correctly identified: {in_acc_knn:.1f}%")
 print(f"OOD samples detected: {ood_rate_knn:.1f}%")
-print(f"Average score (in-dist): {knn_result_in.instance_score.mean():.4f}")
-print(f"Average score (OOD): {knn_result_ood.instance_score.mean():.4f}")
+print(f"Average score (in-dist): {knn_cos_result_in.instance_score.mean():.4f}")
+print(f"Average score (OOD): {knn_cos_result_ood.instance_score.mean():.4f}")
+```
+
+### KNN with Euclidean distance
+
+Euclidean distance measures the straight-line distance between points in the embedding space. Unlike cosine similarity,
+which only considers the angle between vectors, Euclidean distance also accounts for their magnitude. This makes it
+better suited for embeddings where the scale of the vectors carries meaningful information.
+
+```{code-cell} ipython3
+# Create KNN detector with Euclidean distance
+ood_knn_euc = OODKNeighbors(k=10, distance_metric="euclidean")
+
+print("Fitting KNN (Euclidean) detector with learned embeddings...")
+ood_knn_euc.fit(train_in_emb, threshold_perc=95.0)
+print("Done!")
+```
+
+```{code-cell} ipython3
+# Get predictions with Euclidean distance
+knn_euc_result_in = ood_knn_euc.predict(test_in_emb)
+knn_euc_result_ood = ood_knn_euc.predict(test_ood_emb)
+
+# Calculate detection accuracy
+in_acc_knn_euc = 100 * (1 - knn_euc_result_in.is_ood.mean())
+ood_rate_knn_euc = 100 * knn_euc_result_ood.is_ood.mean()
+
+print("\n--- KNN Euclidean (Embeddings) Results ---")
+print(f"In-distribution correctly identified: {in_acc_knn_euc:.1f}%")
+print(f"OOD samples detected: {ood_rate_knn_euc:.1f}%")
+print(f"Average score (in-dist): {knn_euc_result_in.instance_score.mean():.4f}")
+print(f"Average score (OOD): {knn_euc_result_ood.instance_score.mean():.4f}")
 ```
 
 ## Standard autoencoder (AE) for OOD detection
@@ -588,14 +622,14 @@ Now let's visualize and compare the performance of all six approaches.
 
 ```{code-cell} ipython3
 # Summary comparison
-methods = ["KNN", "AE", "VAE", "AE+GMM", "VAE+GMM"]
-in_dist_acc = [in_acc_knn, in_acc_ae, in_acc_vae, in_acc_ae_gmm, in_acc_vae_gmm]
-ood_detect = [ood_rate_knn, ood_rate_ae, ood_rate_vae, ood_rate_ae_gmm, ood_rate_vae_gmm]
+methods = ["KNN\nCosine", "KNN\nEuclidean", "AE", "VAE", "AE+GMM", "VAE+GMM"]
+in_dist_acc = [in_acc_knn, in_acc_knn_euc, in_acc_ae, in_acc_vae, in_acc_ae_gmm, in_acc_vae_gmm]
+ood_detect = [ood_rate_knn, ood_rate_knn_euc, ood_rate_ae, ood_rate_vae, ood_rate_ae_gmm, ood_rate_vae_gmm]
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 5))
 
 # Plot in-distribution accuracy
-colors = ["#3498db", "#9b59b6", "#8e44ad", "#2ecc71", "#e74c3c", "#f39c12"]
+colors = ["#3498db", "#2980b9", "#9b59b6", "#8e44ad", "#2ecc71", "#e74c3c"]
 bars1 = ax1.bar(methods, in_dist_acc, color=colors)
 ax1.set_ylabel("Accuracy (%)", fontsize=12)
 ax1.set_title("In-Distribution Samples Correctly Identified", fontsize=14, fontweight="bold")
@@ -625,8 +659,9 @@ plt.show()
 ### Key observations
 
 1. In-distribution accuracy should be close to threshold (95%)
-1. KNN (Pixels) provides a fast baseline without neural network training
-1. KNN (Embeddings) shows how learned representations improve distance-based methods
+1. KNN (Cosine) uses angular similarity, which is effective when embedding magnitude is less informative
+1. KNN (Euclidean) uses absolute distance, which can capture magnitude differences in embeddings
+1. Comparing both KNN variants reveals how distance metric choice affects detection sensitivity
 1. GMM models add latent density information for better separation
 1. All models show some OOD detection capability
 
@@ -637,10 +672,10 @@ rates (20-70%) are expected and realistic for this hard case.
 # Visualize OOD score distributions
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 results = [
-    (knn_result_in, knn_result_ood, "KNN"),
+    (knn_cos_result_in, knn_cos_result_ood, "KNN (Cosine)"),
     (ae_result_in, ae_result_ood, "AE"),
     (vae_result_in, vae_result_ood, "VAE"),
-    None,  # Skip this subplot
+    (knn_euc_result_in, knn_euc_result_ood, "KNN (Euclidean)"),
     (ae_gmm_result_in, ae_gmm_result_ood, "AE + GMM"),
     (vae_gmm_result_in, vae_gmm_result_ood, "VAE + GMM"),
 ]
@@ -648,10 +683,6 @@ results = [
 for idx, result in enumerate(results):
     row, col = idx // 3, idx % 3
     ax = axes[row, col]
-
-    if result is None:
-        ax.set_visible(False)
-        continue
 
     result_in, result_ood, title = result
 
@@ -675,7 +706,8 @@ What to look for:
 
 - Good separation: Blue (in-dist) and red (OOD) histograms are well-separated
 - Poor separation: Significant overlap between distributions
-- KNN: Distance in learned feature space - often better separation
+- KNN (Cosine): Scores based on angular distance - effective for normalized embeddings
+- KNN (Euclidean): Scores based on absolute distance - captures magnitude differences
 - GMM models: Add latent density information for better separation
 
 Expected behavior:
@@ -865,7 +897,14 @@ plt.show()
 
 ```{code-cell} ipython3
 # Evaluate all models on all three OOD scenarios
-models = {"KNN": ood_knn, "AE": ood_ae, "VAE": ood_vae, "AE+GMM": ood_ae_gmm, "VAE+GMM": ood_vae_gmm}
+models = {
+    "KNN Cosine": ood_knn_cos,
+    "KNN Euclidean": ood_knn_euc,
+    "AE": ood_ae,
+    "VAE": ood_vae,
+    "AE+GMM": ood_ae_gmm,
+    "VAE+GMM": ood_vae_gmm,
+}
 
 scenarios = {
     "Easy (CIFAR10)": (easy_ood, easy_ood_emb),
@@ -880,7 +919,7 @@ for model_name, model in models.items():
     results_matrix[model_name] = {}
     for scenario_name, (ood_data, ood_data_emb) in scenarios.items():
         # Use appropriate data format
-        data_to_use = ood_data_emb if model_name == "KNN" else ood_data
+        data_to_use = ood_data_emb if model_name.startswith("KNN") else ood_data
 
         result = model.predict(data_to_use)
         detection_rate = 100 * result.is_ood.mean()
@@ -926,18 +965,21 @@ plt.show()
 
 ⚠️ Medium OOD (Rotations): Wide variation (5-87%)
 
-- KNN and GMM methods (with proper fusion) perform best
+- KNN variants and GMM methods (with proper fusion) perform best
+- Cosine and Euclidean KNN may differ depending on embedding geometry
 - VAE struggles with limited training
 
 ❌ Hard OOD (Digits 8-9): Challenging for all (5-50%)
 
-- KNN is strongest (40-50%)
+- KNN variants are strongest (40-50%)
+- Cosine vs Euclidean performance gap depends on embedding structure
 - GMM methods competitive with proper score fusion (10-20%)
 - Standard AE provides baseline performance (20-25%)
 - VAE underperforms without extensive training (5-10%)
 
-💡 Takeaway: KNN with good embeddings and GMM methods with proper score fusion show the strongest performance. Simpler
-methods (AE) provide reliable baselines.
+💡 Takeaway: KNN with good embeddings and GMM methods with proper score fusion show the strongest performance. Comparing
+cosine and Euclidean distance reveals how embedding geometry affects detection. Simpler methods (AE) provide reliable
+baselines.
 
 +++
 
@@ -957,14 +999,14 @@ methods (AE) provide reliable baselines.
 
 **Medium OOD (Rotated digits - same objects, different orientation):**
 
-- **KNN**: Strong performance (75-85%) - learned embeddings capture orientation-invariant features
+- **KNN (both metrics)**: Strong performance (75-85%) - learned embeddings capture orientation-invariant features
 - **GMM methods**: Excellent with proper fusion (85-90%)
 - **Standard AE**: Moderate (50-55%) - reconstruction sensitive to orientation
 - **VAE**: Poor (5-10%) - insufficient training for robust latent structure
 
 **Hard OOD (Digits 8-9 - similar features to training data):**
 
-- **KNN**: Best performer (40-50%) - distance metrics in embedding space most discriminative
+- **KNN (both metrics)**: Best performers (40-50%) - distance metrics in embedding space most discriminative
 - **Standard AE**: Reliable baseline (20-25%)
 - **GMM methods**: Competitive with tuning (10-20%) - sensitive to `gmm_weight` parameter
 - **VAE**: Struggles (5-10%) - needs extensive training to show advantages
@@ -972,6 +1014,8 @@ methods (AE) provide reliable baselines.
 #### Summary observations
 
 1. **KNN with learned embeddings** consistently outperformed reconstruction-based methods
+1. **Cosine vs Euclidean**: Performance depends on embedding properties - cosine excels with normalized embeddings while
+   Euclidean captures magnitude differences
 1. **GMM score fusion is critical**: Proper `gmm_weight` (0.6-0.8) significantly impacts performance
 1. **VAE underperforms** with limited training - requires 10-20x more epochs to converge
 1. **Simpler methods (AE) provide reliable baselines** with minimal tuning
@@ -981,19 +1025,48 @@ methods (AE) provide reliable baselines.
 
 ## Conclusion
 
-In this tutorial, you learned how to use DataEval's OOD detection capabilities with five different approaches: KNN (with
-embeddings), Standard AE, VAE, AE+GMM, and VAE+GMM.
+In this tutorial, you learned how to use DataEval's OOD detection capabilities with six different approaches: KNN with
+cosine distance, KNN with Euclidean distance, Standard AE, VAE, AE+GMM, and VAE+GMM.
 
 ### Method selection guide
 
 Based on the comparative analysis across three OOD difficulty levels, here's how to choose the right method for your use
 case:
 
+#### When to choose cosine vs Euclidean distance
+
+When using KNN-based OOD detection, the choice of distance metric matters:
+
+**Choose cosine distance when:**
+
+- Your embeddings come from models that produce **normalized** or **direction-oriented** vectors (e.g., CLIP,
+  sentence-transformers, contrastive learning models)
+- You care about **semantic similarity** rather than absolute magnitude
+- Embedding dimensions vary in scale and you want to ignore that variation
+- Your embeddings are **high-dimensional** — cosine similarity is more robust to the "curse of dimensionality" than
+  Euclidean distance
+
+**Choose Euclidean distance when:**
+
+- Your embeddings come from models where **magnitude carries meaning** (e.g., autoencoders, raw feature extractors,
+  PCA-reduced features)
+- You want to capture **absolute differences** between samples, not just angular ones
+- Your embeddings are **low-dimensional** or have been standardized to similar scales
+- You are working with **raw pixel features** or **tabular data** where L2 distance is natural
+
+**In practice:**
+
+- Cosine is the safer default for pretrained model embeddings (ResNet, ViT, CLIP)
+- Euclidean works well when embeddings have been explicitly standardized or when magnitude is informative
+- When unsure, try both — as shown in this tutorial, the performance difference depends on the specific embedding space
+  and data distribution
+
 #### **Quick decision table:**
 
 | Your Situation                           | Recommended Method   | Why                                                  |
 | ---------------------------------------- | -------------------- | ---------------------------------------------------- |
-| Have pretrained embeddings               | **KNN**              | Best overall performer, no training needed           |
+| Pretrained normalized embeddings         | **KNN (Cosine)**     | Best for direction-oriented embeddings               |
+| Embeddings where magnitude matters       | **KNN (Euclidean)**  | Captures absolute distance differences               |
 | Need fast baseline                       | **Standard AE**      | Simple, reliable, minimal tuning                     |
 | Multi-modal data clusters                | **AE + GMM**         | Enhanced detection with density modeling             |
 | Maximum accuracy (can train extensively) | **KNN or VAE + GMM** | KNN for strong embeddings, VAE+GMM for 30-50+ epochs |
@@ -1021,13 +1094,21 @@ embedding_model = YourPretrainedModel()  # ResNet, ViT, CLIP, etc.
 train_emb = Embeddings(train_data, model=embedding_model)
 test_emb = Embeddings(test_data, model=embedding_model)
 
-# Fit and predict
-ood_knn = OODKNeighbors(k=10, distance_metric="cosine")
-ood_knn.fit(train_emb, threshold_perc=95.0)
-result = ood_knn.predict(test_emb)
+# Cosine distance — best for normalized/pretrained embeddings
+ood_knn_cos = OODKNeighbors(k=10, distance_metric="cosine")
+ood_knn_cos.fit(train_emb, threshold_perc=95.0)
+result_cos = ood_knn_cos.predict(test_emb)
+
+# Euclidean distance — best when magnitude is informative
+ood_knn_euc = OODKNeighbors(k=10, distance_metric="euclidean")
+ood_knn_euc.fit(train_emb, threshold_perc=95.0)
+result_euc = ood_knn_euc.predict(test_emb)
 ```
 
-**Key Success Factor**: Embedding quality - invest in domain-specific pretrained models
+**Key Success Factors**:
+
+- Embedding quality — invest in domain-specific pretrained models
+- Distance metric — use cosine for normalized embeddings, Euclidean when magnitude matters
 
 #### **For standard AE (reliable baseline)**
 
@@ -1108,6 +1189,7 @@ To learn more about OOD detection and related concepts:
 Experiment with:
 
 - **Better embeddings for KNN**: ResNet, ViT, CLIP, or domain-specific pretrained models
+- **Distance metrics**: Compare cosine vs Euclidean on your embeddings to find the best fit
 - **More training**: 10-20 epochs for AE/AE+GMM, 30-50+ for VAE/VAE+GMM
 - **GMM tuning**: Try `gmm_weight` values in [0.5, 0.9] and different `n_gmm` (match to data clusters)
 - **Custom architectures**: Design models for your specific data type (not generic examples)
