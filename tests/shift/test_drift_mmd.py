@@ -105,7 +105,7 @@ class TestMMDDrift:
         preds = cd.predict(x_ref)
         assert isinstance(preds, DriftOutput)
         assert not preds.drifted
-        assert preds.p_val >= cd.p_val
+        assert preds.details["p_val"] >= cd.p_val
         if isinstance(update_strategy, dict):
             k = list(update_strategy.keys())[0]
             assert cd.n == self.n + self.n
@@ -114,11 +114,11 @@ class TestMMDDrift:
         preds = cd.predict(get_embeddings(self.n, self.n_shape, self.n_classes, model, get_mock_ic_dataset, RNG))
         assert isinstance(preds, DriftOutput)
         if preds.drifted:
-            assert preds.p_val < preds.threshold == cd.p_val
-            assert preds.distance > preds.stats["distance_threshold"]
+            assert preds.details["p_val"] < preds.threshold == cd.p_val
+            assert preds.distance > preds.details["distance_threshold"]
         else:
-            assert preds.p_val >= preds.threshold == cd.p_val
-            assert preds.distance <= preds.stats["distance_threshold"]
+            assert preds.details["p_val"] >= preds.threshold == cd.p_val
+            assert preds.distance <= preds.details["distance_threshold"]
 
     def test_permutation_pvalue_not_degenerate(self, RNG):
         """Regression test: p-value should be between 0 and 1, not exactly 0 or 1."""
@@ -160,7 +160,7 @@ class TestMMDDrift:
         assert isinstance(result_with_batch, DriftOutput)
         assert result_auto.drifted == result_with_batch.drifted == result_no_batch.drifted
         # P-values and distances should be close (within reasonable tolerance due to random permutations)
-        assert abs(result_auto.p_val - result_with_batch.p_val) < 0.2
+        assert abs(result_auto.details["p_val"] - result_with_batch.details["p_val"]) < 0.2
         assert abs(result_auto.distance - result_with_batch.distance) < 0.1
 
 
@@ -778,19 +778,19 @@ class TestMMDChunked:
 
     def test_predict_chunked_from_fit(self, RNG):
         """Test chunked predict after fitting with chunk_size."""
-        from dataeval.shift._drift._base import DriftChunkedOutput
+        import polars as pl
 
         x_ref = RNG.normal(size=(100, 5)).astype(np.float32)
         cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref, chunk_size=20)
         x_test = RNG.normal(size=(60, 5)).astype(np.float32)
         result = cd.predict(x_test)
-        assert isinstance(result, DriftChunkedOutput)
+        assert isinstance(result.details, pl.DataFrame)
         assert result.metric_name == "mmd2"
-        assert len(result) > 0
+        assert len(result.details) > 0
 
     def test_predict_prebuilt_chunks(self, RNG):
         """Test _predict_chunked with prebuilt test chunks."""
-        from dataeval.shift._drift._base import DriftChunkedOutput
+        import polars as pl
 
         x_ref = RNG.normal(size=(100, 5)).astype(np.float32)
         cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref, chunk_size=20)
@@ -799,19 +799,19 @@ class TestMMDChunked:
             RNG.normal(size=(20, 5)).astype(np.float32),
         ]
         result = cd.predict(chunks=test_chunks)
-        assert isinstance(result, DriftChunkedOutput)
-        assert len(result) == 2
+        assert isinstance(result.details, pl.DataFrame)
+        assert len(result.details) == 2
 
     def test_predict_chunk_indices(self, RNG):
         """Test _predict_chunked with chunk_indices override."""
-        from dataeval.shift._drift._base import DriftChunkedOutput
+        import polars as pl
 
         x_ref = RNG.normal(size=(100, 5)).astype(np.float32)
         cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu").fit(x_ref, chunk_size=20)
         x_test = RNG.normal(size=(40, 5)).astype(np.float32)
         result = cd.predict(x_test, chunk_indices=[[0, 1, 2, 3], [4, 5, 6, 7]])
-        assert isinstance(result, DriftChunkedOutput)
-        assert len(result) == 2
+        assert isinstance(result.details, pl.DataFrame)
+        assert len(result.details) == 2
 
     def test_predict_before_fit_raises(self):
         cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu")

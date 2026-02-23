@@ -104,15 +104,15 @@ class TestFunctionalClassifierUncertainty:
         expected_n = len(x_ref) if update_strategy is None else len(x_test0) + len(x_ref)
         assert cd.n == expected_n
         assert not preds_0.drifted
-        assert preds_0.stats["distances"] >= 0
+        assert preds_0.details["distances"] >= 0
 
         preds_1 = cd.predict(x_test1)
         assert isinstance(preds_1, DriftOutput)
         expected_n = len(x_ref) if update_strategy is None else len(x_test1) + len(x_test0) + len(x_ref)
         assert cd.n == expected_n
         assert preds_1.drifted
-        assert preds_1.stats["distances"] >= 0
-        assert preds_0.stats["distances"] < preds_1.stats["distances"]
+        assert preds_1.details["distances"] >= 0
+        assert preds_0.details["distances"] < preds_1.details["distances"]
 
 
 @pytest.mark.required

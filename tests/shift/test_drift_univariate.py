@@ -72,9 +72,9 @@ class TestKSDrift:
         assert not preds.drifted
         assert cd.n == self.n + self.n
         assert cd.x_ref.shape[0] == min(update_strategy.n, self.n + self.n)  # type: ignore
-        assert preds.stats["feature_drift"].shape[0] == cd.n_features
-        assert (preds.stats["feature_drift"] == (preds.stats["p_vals"] < cd.p_val)).all()
-        assert preds.stats["feature_threshold"] == cd.p_val
+        assert preds.details["feature_drift"].shape[0] == cd.n_features
+        assert (preds.details["feature_drift"] == (preds.details["p_vals"] < cd.p_val)).all()
+        assert preds.details["feature_threshold"] == cd.p_val
 
         np.random.seed(0)
         X_randn = np.random.randn(self.n * n_features).reshape(self.n, n_features).astype("float32")
@@ -93,7 +93,7 @@ class TestKSDrift:
         if alternative != "greater":
             assert preds_low.drifted
 
-        assert preds_low.stats["distances"].min() >= 0.0
+        assert preds_low.details["distances"].min() >= 0.0
 
         if correction == "bonferroni":
             assert preds_low.threshold == cd.p_val / cd.n_features
@@ -128,14 +128,14 @@ class TestCVMDrift:
         preds = cd.predict(ref_emb)
         assert isinstance(preds, DriftOutput)
         assert not preds.drifted
-        assert (preds.stats["p_vals"] >= cd.p_val).any()
+        assert (preds.details["p_vals"] >= cd.p_val).any()
 
         # Test predict on heavily drifted data
         x = self.get_embeddings(self.n_test, value=0.5)
         preds = cd.predict(x)
         assert isinstance(preds, DriftOutput)
         assert preds.drifted
-        assert preds.stats["distances"].min() >= 0.0
+        assert preds.details["distances"].min() >= 0.0
 
 
 @pytest.mark.required
@@ -167,14 +167,14 @@ class TestMWUDrift:
         preds = cd.predict(ref_emb)
         assert isinstance(preds, DriftOutput)
         assert not preds.drifted
-        assert (preds.stats["p_vals"] >= cd.p_val).any()
+        assert (preds.details["p_vals"] >= cd.p_val).any()
 
         # Test predict on heavily drifted data
         x = self.get_embeddings(self.n_test, value=0.5)
         preds = cd.predict(x)
         assert isinstance(preds, DriftOutput)
         assert preds.drifted
-        assert preds.stats["distances"].min() >= 0.0
+        assert preds.details["distances"].min() >= 0.0
 
 
 @pytest.mark.required
@@ -208,7 +208,7 @@ class TestAndersonDrift:
         preds = cd.predict(ref_emb)
         assert isinstance(preds, DriftOutput)
         assert not preds.drifted
-        assert (preds.stats["p_vals"] >= cd.p_val).any()
+        assert (preds.details["p_vals"] >= cd.p_val).any()
 
         # Test predict on heavily drifted data (shifted distribution)
         np.random.seed(43)
@@ -218,7 +218,7 @@ class TestAndersonDrift:
         preds = cd.predict(x_shifted)
         assert isinstance(preds, DriftOutput)
         assert preds.drifted
-        assert preds.stats["distances"].min() >= 0.0
+        assert preds.details["distances"].min() >= 0.0
 
 
 @pytest.mark.required
@@ -256,14 +256,14 @@ class TestBWSDrift:
         preds = cd.predict(ref_emb)
         assert isinstance(preds, DriftOutput)
         assert not preds.drifted
-        assert (preds.stats["p_vals"] >= cd.p_val).any()
+        assert (preds.details["p_vals"] >= cd.p_val).any()
 
         # Test predict on heavily drifted data
         x = self.get_embeddings(self.n_test, value=0.5)
         preds = cd.predict(x)
         assert isinstance(preds, DriftOutput)
         assert preds.drifted
-        assert preds.stats["distances"].min() >= 0.0
+        assert preds.details["distances"].min() >= 0.0
 
     def test_bws_import_error(self):
         """Test that using bws without scipy 1.12+ raises ImportError."""
@@ -322,20 +322,20 @@ class TestUnivariateChunked:
 
     def test_predict_chunked_from_fit(self):
         """Test chunked predict after fitting with chunk_size."""
-        from dataeval.shift._drift._base import DriftChunkedOutput
+        import polars as pl
 
         np.random.seed(42)
         x_ref = np.random.random((100, 5)).astype(np.float32)
         cd = DriftUnivariate(method="ks").fit(x_ref, chunk_size=20)
         x_test = np.random.random((60, 5)).astype(np.float32)
         result = cd.predict(x_test)
-        assert isinstance(result, DriftChunkedOutput)
+        assert isinstance(result.details, pl.DataFrame)
         assert "ks" in result.metric_name
-        assert len(result) > 0
+        assert len(result.details) > 0
 
     def test_predict_prebuilt_chunks(self):
         """Test _predict_chunked with prebuilt test chunks."""
-        from dataeval.shift._drift._base import DriftChunkedOutput
+        import polars as pl
 
         np.random.seed(42)
         x_ref = np.random.random((100, 5)).astype(np.float32)
@@ -345,20 +345,20 @@ class TestUnivariateChunked:
             np.random.random((20, 5)).astype(np.float32),
         ]
         result = cd.predict(chunks=test_chunks)
-        assert isinstance(result, DriftChunkedOutput)
-        assert len(result) == 2
+        assert isinstance(result.details, pl.DataFrame)
+        assert len(result.details) == 2
 
     def test_predict_chunk_indices(self):
         """Test _predict_chunked with chunk_indices override."""
-        from dataeval.shift._drift._base import DriftChunkedOutput
+        import polars as pl
 
         np.random.seed(42)
         x_ref = np.random.random((100, 5)).astype(np.float32)
         cd = DriftUnivariate(method="ks").fit(x_ref, chunk_size=20)
         x_test = np.random.random((40, 5)).astype(np.float32)
         result = cd.predict(x_test, chunk_indices=[[0, 1, 2, 3], [4, 5, 6, 7]])
-        assert isinstance(result, DriftChunkedOutput)
-        assert len(result) == 2
+        assert isinstance(result.details, pl.DataFrame)
+        assert len(result.details) == 2
 
     def test_predict_chunked_no_data_raises(self):
         """Test that chunked predict without data raises."""

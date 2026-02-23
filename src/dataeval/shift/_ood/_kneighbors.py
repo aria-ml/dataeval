@@ -3,16 +3,13 @@ from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
-from sklearn.neighbors import NearestNeighbors
 
-from dataeval.config import get_max_processes
-from dataeval.protocols import Array, ArrayLike
-from dataeval.shift._ood._base import OODOutput, OODScoreOutput
-from dataeval.types import set_metadata
-from dataeval.utils.arrays import as_numpy, to_numpy
+from dataeval.protocols import Array
+from dataeval.shift._ood._base import BaseOOD, OODScoreOutput
+from dataeval.shift._shared._kneighbors import KNeighborsScorer
 
 
-class OODKNeighbors:
+class OODKNeighbors(BaseOOD):
     """
     K-Nearest Neighbors Out-of-Distribution detector.
 
@@ -87,6 +84,8 @@ class OODKNeighbors:
         distance_metric: Literal["cosine", "euclidean"] | None = None,
         config: Config | None = None,
     ) -> None:
+        super().__init__()
+
         # Store config or create default
         self.config: OODKNeighbors.Config = config or OODKNeighbors.Config()
 
@@ -95,11 +94,12 @@ class OODKNeighbors:
         self.distance_metric: Literal["cosine", "euclidean"] = (
             distance_metric if distance_metric is not None else self.config.distance_metric
         )
-        self._nn_model: NearestNeighbors
-        self._ref_score: OODScoreOutput
-        self._threshold_perc: float
-        self._data_info: tuple[tuple, type] | None = None
-        self.reference_embeddings: NDArray[np.float32]
+        self._scorer = KNeighborsScorer(self.k, self.distance_metric)
+
+    @property
+    def reference_embeddings(self) -> NDArray[np.float32]:
+        """Reference embeddings stored by the scorer."""
+        return self._scorer.reference_embeddings
 
     def fit(self, embeddings: Array, threshold_perc: float | None = None) -> None:
         """
@@ -120,59 +120,19 @@ class OODKNeighbors:
         # Use config default if not specified
         threshold_perc = threshold_perc if threshold_perc is not None else self.config.threshold_perc
 
-        self.reference_embeddings = np.asarray(embeddings, dtype=np.float32)
-
-        # Validate inputs
-        if not isinstance(self.reference_embeddings, np.ndarray):
-            raise TypeError("Embeddings should be of type: `NDArray`.")
-        if self.k >= len(self.reference_embeddings):
-            raise ValueError(
-                f"k ({self.k}) must be less than number of reference embeddings ({len(self.reference_embeddings)})",
-            )
+        embeddings_np = np.asarray(embeddings, dtype=np.float32)
 
         # Store data info for validation
-        self._data_info = (self.reference_embeddings.shape[1:], self.reference_embeddings.dtype.type)
+        self._data_info = (embeddings_np.shape[1:], embeddings_np.dtype.type)
 
-        # Build k-NN index using sklearn
-        self._nn_model = NearestNeighbors(
-            n_neighbors=self.k,
-            metric=self.distance_metric,
-            algorithm="auto",  # Let sklearn choose the best algorithm
-            n_jobs=get_max_processes(),
-        )
-        self._nn_model.fit(self.reference_embeddings)
+        # Delegate math to scorer
+        self._scorer.fit(embeddings_np)
 
         # Compute reference scores for automatic thresholding
-        ref_scores = self._compute_reference_scores()
-        self._ref_score = OODScoreOutput(instance_score=ref_scores)
+        self._ref_score = OODScoreOutput(instance_score=self._scorer.reference_scores)
         self._threshold_perc = threshold_perc
 
-    def _compute_reference_scores(self) -> NDArray[np.float32]:
-        """Efficiently compute reference scores by excluding self-matches."""
-        # Find k+1 neighbors (including self) for reference points
-        distances, _ = self._nn_model.kneighbors(self.reference_embeddings, n_neighbors=self.k + 1)
-        # Skip first neighbor (self with distance 0) and average the rest
-        return np.mean(distances[:, 1:], axis=1).astype(np.float32)
-
-    def _validate(self, x: NDArray) -> None:
-        """Validate that input data matches expected shape and dtype."""
-        if not isinstance(x, np.ndarray):
-            raise TypeError("Dataset should be of type: `NDArray`.")
-
-        check_data_info = (x.shape[1:], x.dtype.type)
-        if self._data_info is not None and check_data_info != self._data_info:
-            raise RuntimeError(
-                f"Expect data of type: {self._data_info[1]} and shape: {self._data_info[0]}. "
-                f"Provided data is type: {check_data_info[1]} and shape: {check_data_info[0]}.",
-            )
-
-    def _validate_state(self, x: NDArray) -> None:
-        """Validate that detector has been fitted and data is valid."""
-        if not hasattr(self, "_ref_score") or not hasattr(self, "_threshold_perc"):
-            raise RuntimeError("Detector needs to be `fit` before calling predict or score.")
-        self._validate(x)
-
-    def _score(self, x: NDArray[np.float32]) -> OODScoreOutput:
+    def _score(self, x: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:  # noqa: ARG002
         """
         Compute OOD scores for input embeddings.
 
@@ -180,73 +140,12 @@ class OODKNeighbors:
         ----------
         x : NDArray
             Input embeddings to score
+        batch_size : int
+            Not used by this detector.
 
         Returns
         -------
         OODScoreOutput
             OOD scores (higher = more likely to be OOD)
         """
-        # Compute OOD scores using sklearn's efficient k-NN search
-        distances, _ = self._nn_model.kneighbors(x)
-        return OODScoreOutput(instance_score=np.mean(distances, axis=1).astype(np.float32))
-
-    @set_metadata
-    def score(self, x: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:  # noqa: ARG002
-        """
-        Compute the :term:`out of distribution<Out-of-distribution (OOD)>` scores for a given dataset.
-
-        Parameters
-        ----------
-        x : ArrayLike
-            Input embeddings to score.
-        batch_size : int, default 1e10
-            Batch size parameter for API consistency. Not used by this detector.
-
-        Returns
-        -------
-        OODScoreOutput
-            An object containing the instance-level OOD scores.
-            Higher scores indicate samples are more likely to be OOD.
-        """
-        x_np = as_numpy(x).astype(np.float32)
-        self._validate(x_np)
-        return self._score(x_np)
-
-    def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
-        """Get the threshold score for a given OOD type."""
-        return np.percentile(self._ref_score.get(ood_type), self._threshold_perc)
-
-    @set_metadata
-    def predict(
-        self,
-        x: ArrayLike,
-        batch_size: int = int(1e10),
-        ood_type: Literal["feature", "instance"] = "instance",
-    ) -> OODOutput:
-        """
-        Predict whether instances are :term:`out of distribution<Out-of-distribution (OOD)>` or not.
-
-        Parameters
-        ----------
-        x : ArrayLike
-            Input embeddings for out-of-distribution prediction.
-        batch_size : int, default 1e10
-            Batch size parameter for API consistency. Not used by this detector.
-        ood_type : "feature" | "instance", default "instance"
-            OOD type parameter for API consistency. This detector only supports "instance" level.
-
-        Returns
-        -------
-        OODOutput
-            Dictionary containing:
-            - is_ood: Boolean array indicating which samples are OOD
-            - instance_score: OOD scores for all samples
-            - feature_score: None (not supported by this detector)
-        """
-        x_np = to_numpy(x).astype(np.float32)
-        self._validate_state(x_np)
-
-        # Compute OOD scores
-        score = self.score(x_np, batch_size=batch_size)
-        ood_pred = score.get(ood_type) > self._threshold_score(ood_type)
-        return OODOutput(is_ood=ood_pred, **score.data())
+        return OODScoreOutput(instance_score=self._scorer.score(x))

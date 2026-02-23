@@ -13,7 +13,8 @@ import pytest
 import torch
 from sklearn.datasets import load_digits
 
-from dataeval.shift._ood._reconstruction import OODReconstruction, gmm_energy, gmm_params
+from dataeval.shift._ood._reconstruction import OODReconstruction
+from dataeval.shift._shared._reconstruction import gmm_energy, gmm_params
 from dataeval.utils.losses import ELBOLoss
 from dataeval.utils.models import AE, VAE
 
@@ -62,7 +63,7 @@ def test_ae(ood_type, x_ref):
 
 
 @pytest.mark.required
-@patch("dataeval.shift._ood._reconstruction.train")
+@patch("dataeval.shift._shared._reconstruction.train")
 def test_custom_loss_fn(mock_train, x_ref):
     mock_loss_fn = MagicMock()
     ae = OODReconstruction(AE(input_shape=input_shape))
@@ -74,7 +75,7 @@ def test_custom_loss_fn(mock_train, x_ref):
 
 
 @pytest.mark.required
-@patch("dataeval.shift._ood._reconstruction.train")
+@patch("dataeval.shift._shared._reconstruction.train")
 def test_custom_optimizer(mock_train, x_ref):
     mock_opt = MagicMock()
     ae = OODReconstruction(AE(input_shape=input_shape))
@@ -151,13 +152,13 @@ def test_ae_vs_vae_loss():
     x_ref = np.random.rand(10, *input_shape).astype(np.float32)
 
     # Check that fit doesn't raise errors and uses appropriate losses
-    with patch("dataeval.shift._ood._reconstruction.train") as mock_train:
+    with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
         ae.fit(x_ref, threshold_perc=90, epochs=1)
         # Check that MSE loss was used for AE
         assert mock_train.called
         assert isinstance(mock_train.call_args.kwargs["loss_fn"], torch.nn.MSELoss)
 
-    with patch("dataeval.shift._ood._reconstruction.train") as mock_train:
+    with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
         vae.fit(x_ref, threshold_perc=90, epochs=1)
         # Check that VAE loss was used
         assert mock_train.called
@@ -182,11 +183,11 @@ def test_use_gmm_parameter():
     """Test that use_gmm parameter is properly set."""
     ae_no_gmm = OODReconstruction(AE(input_shape=input_shape), use_gmm=False)
     assert ae_no_gmm.use_gmm is False
-    assert ae_no_gmm._gmm_params is None
+    assert ae_no_gmm._scorer._gmm_params is None
 
     vae_with_gmm = OODReconstruction(VAE(input_shape=input_shape), model_type="vae", use_gmm=True)
     assert vae_with_gmm.use_gmm is True
-    assert vae_with_gmm._gmm_params is None  # Not computed until fit() is called
+    assert vae_with_gmm._scorer._gmm_params is None  # Not computed until fit() is called
 
 
 @pytest.mark.required
@@ -374,7 +375,7 @@ def test_config_usage_with_overrides():
 
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
-    with patch("dataeval.shift._ood._reconstruction.train") as mock_train:
+    with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
         # Fit without overrides - should use config defaults
         ae.fit(x_ref_small)
         assert mock_train.call_args.kwargs["epochs"] == 15
@@ -382,7 +383,7 @@ def test_config_usage_with_overrides():
 
     # Create new instance to override config
     ae2 = OODReconstruction(AE(input_shape=input_shape), config=config)
-    with patch("dataeval.shift._ood._reconstruction.train") as mock_train:
+    with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
         # Fit with overrides
         ae2.fit(x_ref_small, epochs=5, batch_size=8)
         assert mock_train.call_args.kwargs["epochs"] == 5
@@ -677,7 +678,7 @@ def test_auto_detect_gmm_false():
 
     ood = OODReconstruction(ae_model)
     assert ood.use_gmm is False
-    assert ood._gmm_params is None
+    assert ood._scorer._gmm_params is None
 
 
 @pytest.mark.required
@@ -685,13 +686,13 @@ def test_use_gmm_explicit_false():
     """Test explicitly setting use_gmm=False."""
     ae = OODReconstruction(AE(input_shape=input_shape), use_gmm=False)
     assert ae.use_gmm is False
-    assert ae._gmm_params is None
+    assert ae._scorer._gmm_params is None
 
     # Fit and verify no GMM params are computed
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
     ae.fit(x_ref_small, threshold_perc=90, epochs=1)
-    assert ae._gmm_params is None
-    assert ae._gmm_energy_ref_mean is None
+    assert ae._scorer._gmm_params is None
+    assert ae._scorer._gmm_energy_ref_mean is None
 
 
 @pytest.mark.required
@@ -731,7 +732,7 @@ def test_default_optimizer_creation():
     ae = OODReconstruction(AE(input_shape=input_shape))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
-    with patch("dataeval.shift._ood._reconstruction.train") as mock_train:
+    with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
         ae.fit(x_ref_small, threshold_perc=90, epochs=1)
 
         # Check that an optimizer was passed
@@ -747,7 +748,7 @@ def test_vae_default_loss():
     vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
-    with patch("dataeval.shift._ood._reconstruction.train") as mock_train:
+    with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
         vae.fit(x_ref_small, threshold_perc=90, epochs=1)
 
         assert mock_train.called
@@ -761,7 +762,7 @@ def test_ae_default_loss():
     ae = OODReconstruction(AE(input_shape=input_shape), model_type="ae")
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
-    with patch("dataeval.shift._ood._reconstruction.train") as mock_train:
+    with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
         ae.fit(x_ref_small, threshold_perc=90, epochs=1)
 
         assert mock_train.called
@@ -775,8 +776,8 @@ def test_internal_state_initialization():
     ae = OODReconstruction(AE(input_shape=input_shape))
 
     # Before fit
-    assert ae._gmm_params is None
-    assert ae._gmm_energy_ref_mean is None
+    assert ae._scorer._gmm_params is None
+    assert ae._scorer._gmm_energy_ref_mean is None
     assert ae._data_info is None
     assert not hasattr(ae, "_ref_score")
     assert not hasattr(ae, "_threshold_perc")
@@ -849,7 +850,7 @@ def test_gmm_reconstruction_loss_path():
     x_ref_small = np.random.rand(30, *input_shape).astype(np.float32)
 
     # Fit with GMM - this should use the custom gmm_reconstruction_loss
-    with patch("dataeval.shift._ood._reconstruction.train") as mock_train:
+    with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
         ood.fit(x_ref_small, threshold_perc=90, epochs=1)
 
         # Verify custom loss function was created
@@ -896,16 +897,16 @@ def test_gmm_params_computed_after_fit():
     x_ref_small = np.random.rand(30, *input_shape).astype(np.float32)
 
     # Before fit
-    assert ood._gmm_params is None
-    assert ood._gmm_energy_ref_mean is None
+    assert ood._scorer._gmm_params is None
+    assert ood._scorer._gmm_energy_ref_mean is None
 
     # Fit with GMM
     ood.fit(x_ref_small, threshold_perc=90, epochs=1)
 
     # After fit, GMM params should be computed
-    assert ood._gmm_params is not None
-    assert ood._gmm_energy_ref_mean is not None
-    assert isinstance(ood._gmm_energy_ref_mean, float)
+    assert ood._scorer._gmm_params is not None
+    assert ood._scorer._gmm_energy_ref_mean is not None
+    assert isinstance(ood._scorer._gmm_energy_ref_mean, float)
 
 
 @pytest.mark.required
@@ -950,7 +951,7 @@ def test_gmm_scoring_with_energy():
     assert score.feature_score.shape == x_test.shape
 
     # Verify scoring path was executed
-    assert ood._gmm_params is not None
+    assert ood._scorer._gmm_params is not None
 
 
 @pytest.mark.required
@@ -1043,7 +1044,7 @@ def test_gmm_z_normalization_prevents_covariance_error():
     ood.fit(x_ref_small, threshold_perc=90, epochs=1)
 
     # Verify that normalization statistics were computed
-    assert ood._gmm_params is not None
+    assert ood._scorer._gmm_params is not None
 
     # Verify that scoring works with normalized latents
     x_test = np.random.rand(10, *input_shape).astype(np.float32)
@@ -1097,10 +1098,10 @@ def test_combine_gmm_percentile():
     ood.fit(x_ref, threshold_perc=90, epochs=1)
 
     # Check that reference statistics were computed
-    assert ood._recon_ref_mean is not None
-    assert ood._recon_ref_std is not None
-    assert ood._gmm_energy_ref_mean is not None
-    assert ood._gmm_energy_ref_std is not None
+    assert ood._scorer._recon_ref_mean is not None
+    assert ood._scorer._recon_ref_std is not None
+    assert ood._scorer._gmm_energy_ref_mean is not None
+    assert ood._scorer._gmm_energy_ref_std is not None
 
     # Test scoring with percentile mode
     x_test = np.random.rand(10, *input_shape).astype(np.float32)
@@ -1159,17 +1160,17 @@ def test_combine_gmm_percentile_direct():
 
     ood = OODReconstruction(DummyGMMModel(), model_type="ae", use_gmm=True)
 
-    # Set known reference statistics
-    ood._recon_ref_mean = 0.0
-    ood._recon_ref_std = 1.0
-    ood._gmm_energy_ref_mean = 0.0
-    ood._gmm_energy_ref_std = 1.0
+    # Set known reference statistics on the scorer
+    ood._scorer._recon_ref_mean = 0.0
+    ood._scorer._recon_ref_std = 1.0
+    ood._scorer._gmm_energy_ref_mean = 0.0
+    ood._scorer._gmm_energy_ref_std = 1.0
 
     # Test with specific values
     recon_scores = np.array([0.0, 1.0, -1.0, 2.0])
     gmm_energy = np.array([0.0, 1.0, -1.0, 2.0])
 
-    combined = ood._combine_gmm_percentile(recon_scores, gmm_energy)
+    combined = ood._scorer._combine_gmm_percentile(recon_scores, gmm_energy)
 
     # Verify output shape
     assert combined.shape == recon_scores.shape

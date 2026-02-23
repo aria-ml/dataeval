@@ -16,7 +16,7 @@ import torch
 from dataeval.protocols import Dataset
 from dataeval.shift._drift._base import (
     ChunkResult,
-    DriftChunkedOutput,
+    DriftOutput,
     _chunk_results_to_dataframe,
 )
 from dataeval.shift._drift._chunk import (
@@ -103,7 +103,7 @@ class TestBaseDrift:
 
 @pytest.mark.required
 class TestDriftChunkedOutput:
-    """Tests for DriftChunkedOutput properties."""
+    """Tests for DriftOutput with chunked (pl.DataFrame) details."""
 
     @pytest.fixture
     def sample_output(self):
@@ -130,28 +130,17 @@ class TestDriftChunkedOutput:
             ),
         ]
         df = _chunk_results_to_dataframe(chunks)
-        return DriftChunkedOutput(metric_name="test_metric", chunk_results=df)
-
-    @pytest.fixture
-    def empty_output(self):
-        df = pl.DataFrame(
-            schema={
-                "key": pl.Utf8,
-                "index": pl.Int64,
-                "start_index": pl.Int64,
-                "end_index": pl.Int64,
-                "value": pl.Float64,
-                "upper_threshold": pl.Float64,
-                "lower_threshold": pl.Float64,
-                "drifted": pl.Boolean,
-            }
+        return DriftOutput(
+            drifted=bool(df["drifted"].any()),
+            threshold=0.5,
+            distance=float(df["value"].cast(pl.Float64).mean() or 0.0),  # type: ignore
+            metric_name="test_metric",
+            details=df,
         )
-        return DriftChunkedOutput(metric_name="test_metric", chunk_results=df)
 
-    def test_data_returns_copy(self, sample_output):
-        data = sample_output.data()
-        assert isinstance(data, pl.DataFrame)
-        assert len(data) == 2
+    def test_details_is_dataframe(self, sample_output):
+        assert isinstance(sample_output.details, pl.DataFrame)
+        assert len(sample_output.details) == 2
 
     def test_drifted_true(self, sample_output):
         assert sample_output.drifted is True
@@ -159,41 +148,8 @@ class TestDriftChunkedOutput:
     def test_threshold(self, sample_output):
         assert sample_output.threshold == 0.5
 
-    def test_threshold_none_returns_zero(self):
-        chunks = [
-            ChunkResult(
-                key="[0:9]",
-                index=0,
-                start_index=0,
-                end_index=9,
-                value=0.3,
-                upper_threshold=None,
-                lower_threshold=None,
-                drifted=False,
-            ),
-        ]
-        df = _chunk_results_to_dataframe(chunks)
-        output = DriftChunkedOutput(metric_name="m", chunk_results=df)
-        assert output.threshold == 0.0
-
     def test_distance(self, sample_output):
         assert sample_output.distance == pytest.approx(0.5, abs=1e-6)
-
-    def test_empty(self, sample_output, empty_output):
-        assert not sample_output.empty
-        assert empty_output.empty
-
-    def test_plot_type(self, sample_output):
-        assert sample_output.plot_type == "drift_chunked"
-
-    def test_len(self, sample_output, empty_output):
-        assert len(sample_output) == 2
-        assert len(empty_output) == 0
-
-    def test_str(self, sample_output):
-        s = str(sample_output)
-        assert "test_metric" not in s  # str shows DataFrame, not metric name
-        assert "[0:9]" in s
 
 
 @pytest.mark.required

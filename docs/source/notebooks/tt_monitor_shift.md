@@ -24,13 +24,16 @@ Relevant personas: Machine Learning Engineer, T&E Engineer
 ## What you'll do
 
 - Construct [embeddings](../concepts/Embeddings.md) by training a simple neural network
-- Compare the embeddings between a training and operational set
+- Compare different drift detectors and understand their strengths
+- Inspect detector-specific outputs for root-cause analysis
 - Use chunked drift detection to monitor drift across data segments
 - Compare the label distributions between a training and operational set
 
 ## What you'll learn
 
+- Learn the strengths and trade-offs of each drift detector
 - Learn how to analyze embeddings for operational drift
+- Learn how to inspect per-feature and per-detector statistics
 - Learn how to use chunked drift detection for temporal monitoring
 - Learn how to analyze label distributions
 
@@ -62,9 +65,8 @@ this guide. You will then determine if the labels within these two datasets has 
 You'll begin by importing the necessary libraries for this tutorial.
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 try:
     import google.colab  # noqa: F401
 
@@ -75,6 +77,7 @@ except Exception:
 
 ```{code-cell} ipython3
 import numpy as np
+import polars as pl
 import torch
 from IPython.display import display  # noqa: A004
 from maite_datasets.object_detection import VOCDetection
@@ -84,7 +87,7 @@ from torchvision.transforms.v2 import GaussianNoise
 from dataeval import Embeddings, Metadata
 from dataeval.core import label_parity
 from dataeval.extractors import TorchExtractor
-from dataeval.shift import DriftChunkedOutput, DriftMMD, DriftMVDC, DriftUnivariate
+from dataeval.shift import DriftDomainClassifier, DriftKNeighbors, DriftMMD, DriftUnivariate
 
 # Set a random seed
 rng = np.random.default_rng(213)
@@ -194,6 +197,27 @@ algorithms without impacting the accuracy of the results.
 
 +++
 
+## Understanding drift detectors
+
+Before testing for drift, it helps to understand the different approaches available. Each detector has distinct
+strengths that make it better suited for certain scenarios. This tutorial uses four detectors that represent
+fundamentally different strategies for detecting distributional change.
+
+| Detector                        | Approach                                         | Strengths                                   | Best For                              |
+| ------------------------------- | ------------------------------------------------ | ------------------------------------------- | ------------------------------------- |
+| {class}`.DriftUnivariate` (CVM) | Statistical test per feature                     | Fast, interpretable per-feature results     | Identifying _which_ features drifted  |
+| {class}`.DriftMMD`              | Kernel-based multivariate test                   | Captures feature dependencies               | High-dimensional data, complex shifts |
+| {class}`.DriftDomainClassifier` | Trains a classifier to distinguish distributions | Feature importances for root-cause analysis | Understanding _why_ drift occurred    |
+| {class}`.DriftKNeighbors`       | Compares k-NN distances                          | Lightweight and fast                        | Quick monitoring checks               |
+
+> **Other univariate methods**
+>
+> `DriftUnivariate` supports several statistical tests beyond CVM, including Kolmogorov-Smirnov (`ks`), Mann-Whitney U
+> (`mwu`), Anderson-Darling (`anderson`), and Baumgartner-Weiss-Schindler (`bws`). Each has different sensitivity
+> characteristics — see the [drift concept page](../concepts/Drift.md#understanding-the-drift-detectors) for details.
+
++++
+
 ## Test for drift
 
 In this step, you will be checking for drift between the training embeddings and the operational embeddings from before.
@@ -202,9 +226,10 @@ mitigate performance degradation in a deployed model. Visit our [About Drift](..
 
 ### Drift detectors
 
-DataEval offers a few drift detectors: {class}`.DriftMMD`, {class}`.DriftUnivariate`, and {class}`.DriftMVDC`.
+DataEval offers several drift detectors. This tutorial demonstrates four that each take a different approach:
+{class}`.DriftUnivariate`, {class}`.DriftMMD`, {class}`.DriftDomainClassifier`, and {class}`.DriftKNeighbors`.
 
-Since each detector outputs a binary decision on whether drift is detected, a **majority vote** will be used to make the
+Since each detector outputs a binary decision on whether drift is detected, a **majority vote** can be used to make the
 determination of drift.\
 To learn more about these algorithms, see the [theory behind drift detection](../concepts/Drift.md#what-is-drift)
 concept page.
@@ -216,14 +241,14 @@ will set the reference data to the training embeddings.
 
 ```{code-cell} ipython3
 # A type alias for all of the drift detectors
-DriftDetector = DriftMMD | DriftUnivariate | DriftMVDC
+DriftDetector = DriftUnivariate | DriftMMD | DriftDomainClassifier | DriftKNeighbors
 
 # Create a mapping for the detectors to iterate over
 detectors: dict[str, DriftDetector] = {
-    "MMD": DriftMMD().fit(train_embs),
     "CVM": DriftUnivariate(method="cvm").fit(train_embs),
-    "KS": DriftUnivariate(method="ks").fit(train_embs),
-    "MVDC": DriftMVDC().fit(train_embs),
+    "MMD": DriftMMD().fit(train_embs),
+    "MVDC": DriftDomainClassifier().fit(train_embs),
+    "KNN": DriftKNeighbors().fit(train_embs),
 }
 ```
 
@@ -271,9 +296,99 @@ Adding Gaussian noise was enough to cause a noticeable change in the drift detec
 There are many [types of drift](../concepts/Drift.md#formal-definition-and-types-of-drift) that data can and will
 experience.
 
-In this step, you learned how to take your generated embeddings and detect drift between the training and operational
-image data. While there was no drift originally, you were able to add small perturbations to the data that did affect
-the data distributions and cause drift.
++++
+
+### Inspecting detector outputs
+
+Each detector doesn't just report whether drift occurred — it provides statistics that reveal _different things_ about
+the drift. Let's look at what each detector tells us.
+
+```{code-cell} ipython3
+# Store results for inspection
+results = {name: detector.predict(noisy_embs) for name, detector in detectors.items()}
+```
+
+#### DriftUnivariate: per-feature analysis
+
+The univariate detector tests each feature independently and reports which features drifted and their p-values. This is
+useful for identifying _which_ dimensions of the embedding space shifted.
+
+```{code-cell} ipython3
+cvm_result = results["CVM"]
+cvm_details = cvm_result.details
+
+n_drifted = sum(cvm_details["feature_drift"])
+n_features = len(cvm_details["feature_drift"])
+print(f"Features drifted: {n_drifted}/{n_features}")
+print(f"Corrected p-value threshold: {cvm_details['feature_threshold']:.6f}")
+print(f"Min feature p-value: {min(cvm_details['p_vals']):.6f}")
+print(f"Max feature p-value: {max(cvm_details['p_vals']):.6f}")
+```
+
+#### DriftDomainClassifier: feature importances
+
+The domain classifier trains a model to distinguish reference from test data and reports how important each feature was
+in making that distinction. High AUROC means the distributions are easily separable — a strong signal of drift.
+
+```{code-cell} ipython3
+mvdc_result = results["MVDC"]
+mvdc_details = mvdc_result.details
+
+print(f"AUROC: {mvdc_result.distance:.4f} (threshold: {mvdc_result.threshold})")
+print(f"Per-fold AUROCs: {[round(a, 4) for a in mvdc_details['fold_aurocs']]}")
+
+# Show top 5 most important features
+importances = np.array(mvdc_details["feature_importances"])
+top_indices = np.argsort(importances)[::-1][:5]
+print("\nTop 5 features driving drift:")
+for idx in top_indices:
+    print(f"  Feature {idx}: importance = {importances[idx]:.4f}")
+```
+
+#### DriftKNeighbors: distance comparison
+
+The k-NN detector compares how far test samples are from their nearest neighbors in the reference set versus the
+expected baseline distance. A large increase signals that test data occupies different regions of feature space.
+
+```{code-cell} ipython3
+knn_result = results["KNN"]
+knn_details = knn_result.details
+
+print(f"Mean reference k-NN distance: {knn_details['mean_ref_distance']:.4f}")
+print(f"Mean test k-NN distance:      {knn_details['mean_test_distance']:.4f}")
+print(f"Distance increase:             {knn_details['mean_test_distance'] - knn_details['mean_ref_distance']:.4f}")
+print(f"P-value: {knn_details['p_val']:.6f}")
+```
+
+#### DriftMMD: multivariate distribution distance
+
+MMD measures the overall distance between two distributions in a kernel feature space. It captures both marginal and
+joint distributional changes that univariate tests might miss.
+
+```{code-cell} ipython3
+mmd_result = results["MMD"]
+mmd_details = mmd_result.details
+
+print(f"MMD² distance:   {mmd_result.distance:.6f}")
+print(f"MMD² threshold:  {mmd_details['distance_threshold']:.6f}")
+print(f"P-value:         {mmd_details['p_val']:.6f}")
+```
+
+Each detector reveals a different facet of drift: the univariate detector pinpoints _which_ features changed, the domain
+classifier shows _which features matter most_ for distinguishing the distributions, the k-NN detector quantifies _how
+far_ the data moved, and MMD provides a single _multivariate distance_ between the distributions.
+
++++
+
+### Choosing the right detector
+
+The best detector depends on what you need to know:
+
+- **Which features drifted?** Use {class}`.DriftUnivariate` — it provides per-feature p-values and drift flags
+- **Why did drift occur?** Use {class}`.DriftDomainClassifier` — its feature importances show what drives the shift
+- **How sensitive to multivariate changes?** Use {class}`.DriftMMD` — it captures complex dependencies between features
+- **Need fast, lightweight checks?** Use {class}`.DriftKNeighbors` — simple distance comparison with minimal overhead
+- **Want robust detection?** Use multiple detectors with a **majority vote** to reduce false positives
 
 +++
 
@@ -285,8 +400,8 @@ identify _when_ drift begins to appear.
 
 DataEval's drift detectors support chunking through the `chunk_count` or `chunk_size` parameters on `fit()`. During
 fitting, the detector establishes a baseline by computing the metric across chunks of the reference data. During
-prediction, each chunk of test data is compared against this baseline, returning a {class}`.DriftChunkedOutput` with
-per-chunk results.
+prediction, each chunk of test data is compared against this baseline, returning a {class}`.DriftOutput` with a
+`polars.DataFrame` in the `details` field containing per-chunk results.
 
 #### Simulate gradual drift onset
 
@@ -308,10 +423,10 @@ print(f"Combined shape: {combined_embs.shape} (clean: {split_idx}, noisy: {n_ope
 ```{code-cell} ipython3
 # Re-fit detectors with chunking enabled (5 chunks each)
 chunked_detectors: dict[str, DriftDetector] = {
-    "MMD": DriftMMD().fit(train_embs, chunk_count=5),
     "CVM": DriftUnivariate(method="cvm").fit(train_embs, chunk_count=5),
-    "KS": DriftUnivariate(method="ks").fit(train_embs, chunk_count=5),
-    "MVDC": DriftMVDC(threshold=(0.45, 0.65)).fit(train_embs, chunk_count=5),
+    "MMD": DriftMMD().fit(train_embs, chunk_count=5),
+    "MVDC": DriftDomainClassifier(threshold=(0.45, 0.65)).fit(train_embs, chunk_count=5),
+    "KNN": DriftKNeighbors().fit(train_embs, chunk_count=5),
 }
 ```
 
@@ -321,8 +436,8 @@ chunked_detectors: dict[str, DriftDetector] = {
 for name, detector in chunked_detectors.items():
     result = detector.predict(combined_embs)
     print(f"\n{name} - Overall drift detected: {result.drifted} (metric: {result.metric_name})")
-    if isinstance(result, DriftChunkedOutput):
-        display(result.chunk_results)
+    if isinstance(result.details, pl.DataFrame):
+        display(result.details)
 ```
 
 The first two chunks (covering the clean 40%) should show no drift, while the later chunks (covering the noisy 60%)
@@ -358,11 +473,21 @@ From the {func}`.label_parity` function, you can see that it calculated a p_valu
 
 ## Conclusion
 
-In this tutorial, you have learned to create embeddings from the VOC dataset, look for drift between two sets of data,
-and calculate the parity of two label distributions. These are important steps when monitoring data as drift and lack of
-parity can affect a model's ability to achieve performance recorded during model training. When data drift is detected
-or the label distributions lack parity, it is a good idea to consider retraining the model and incorporating operational
-data into the dataset.
+In this tutorial, you have learned to create embeddings from the VOC dataset, compare different drift detectors and
+their unique outputs, use chunked monitoring to identify when drift begins, and calculate the parity of label
+distributions.
+
+Key takeaways:
+
+- **DriftUnivariate** reveals _which_ features drifted through per-feature statistical tests
+- **DriftDomainClassifier** explains _why_ drift occurred through feature importances
+- **DriftMMD** provides a single multivariate distance that captures complex distributional changes
+- **DriftKNeighbors** offers fast, lightweight detection based on distance comparisons
+- **Chunked monitoring** helps pinpoint _when_ drift begins in a data stream
+
+These are important steps when monitoring data, as drift and lack of parity can affect a model's ability to achieve
+performance recorded during model training. When data drift is detected or the label distributions lack parity, it is a
+good idea to consider retraining the model and incorporating operational data into the dataset.
 
 +++
 
