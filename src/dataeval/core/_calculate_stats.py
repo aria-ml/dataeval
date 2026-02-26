@@ -1,18 +1,15 @@
 __all__ = []
 
 import logging
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
+from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
 from functools import cached_property, partial
 from itertools import zip_longest
-from multiprocessing import Pool
-from os import cpu_count
-from typing import Any, TypedDict, TypeVar, cast
+from typing import Any, TypedDict, cast
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
@@ -27,6 +24,7 @@ from dataeval.protocols import (
 )
 from dataeval.types import SourceIndex
 from dataeval.utils.data import unzip_dataset
+from dataeval.utils.poolwrapper import PoolWrapper
 from dataeval.utils.preprocessing import (
     BoundingBox,
     BoxLike,
@@ -35,10 +33,6 @@ from dataeval.utils.preprocessing import (
     rescale,
     to_bounding_box,
 )
-
-_S = TypeVar("_S")
-_T = TypeVar("_T")
-
 
 _logger = logging.getLogger(__name__)
 
@@ -141,30 +135,6 @@ class CalculatorCache:
             return self.scaled.reshape(self.image.shape[0], -1)
         # For lower-dimensional data, add a channel dimension
         return self.scaled.reshape(1, -1)
-
-
-class PoolWrapper:
-    """
-    Wrap `multiprocessing.Pool` to allow for easy switching between multiprocessing and single-threaded execution.
-
-    This helps with debugging and profiling, as well as usage with Jupyter notebooks
-    in VS Code, which does not support subprocess debugging.
-    """
-
-    def __init__(self, processes: int | None) -> None:
-        procs = 1 if processes is None else max(1, (cpu_count() or 1) + processes + 1) if processes < 0 else processes
-        self.pool = Pool(procs) if procs > 1 else None
-
-    def imap_unordered(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
-        return map(func, iterable) if self.pool is None else self.pool.imap_unordered(func, iterable)
-
-    def __enter__(self, *args: Any, **kwargs: Any) -> Self:
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        if self.pool is not None:
-            self.pool.close()
-            self.pool.join()
 
 
 def _collect_calculator_stats(

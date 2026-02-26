@@ -2,17 +2,54 @@
 
 __all__ = []
 
-from collections.abc import Iterator
+from functools import partial
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 from sklearn.cluster import MiniBatchKMeans
 
-from dataeval.config import get_seed
+from dataeval.config import get_max_processes, get_seed
 from dataeval.protocols import Array
 from dataeval.utils.arrays import as_numpy
+from dataeval.utils.poolwrapper import PoolWrapper
 from dataeval.utils.preprocessing import rescale, to_canonical_grayscale
+
+
+def _extract_single(args: tuple[int, Any]) -> tuple[int, NDArray[np.float32]]:
+    """Extract SIFT descriptors from a single image. Module-level for pickling."""
+    import cv2
+
+    idx, img = args
+    img = as_numpy(img[0] if isinstance(img, tuple) else img)
+    if img.dtype != np.uint8:
+        img = rescale(img, depth=8)
+    gray = to_canonical_grayscale(img)
+    sift = cv2.SIFT.create()
+    _, des = sift.detectAndCompute(gray, None)
+    des = np.zeros((0, 128), dtype=np.float32) if des is None else des.astype(np.float32)
+    return idx, des
+
+
+def _transform_single(
+    args: tuple[int, Any],
+    kmeans: MiniBatchKMeans,
+    n_clusters: int,
+) -> tuple[int, NDArray[np.float32]]:
+    """Extract descriptors and build histogram for a single image. Module-level for pickling."""
+    _, des = _extract_single(args)
+    idx = args[0]
+    histogram = np.zeros(n_clusters, dtype=np.float32)
+
+    if len(des) > 0:
+        words = kmeans.predict(des.astype(np.float64))
+        unique, counts = np.unique(words, return_counts=True)
+        histogram[unique] = counts
+        norm = np.linalg.norm(histogram)
+        if norm > 0:
+            histogram /= norm
+
+    return idx, histogram
 
 
 class BoVWExtractor:
@@ -118,7 +155,7 @@ class BoVWExtractor:
 
     def __init__(self, vocab_size: int = 2048) -> None:
         try:
-            import cv2
+            import cv2  # noqa: F401
         except ImportError as e:
             raise ImportError(
                 "BoVWExtractor requires 'opencv-python' or related package. "
@@ -129,41 +166,6 @@ class BoVWExtractor:
             raise ValueError("vocab_size must be at least 1")
         self.vocab_size = vocab_size
         self._kmeans: MiniBatchKMeans | None = None
-        self._sift = cv2.SIFT.create()
-
-    def _preprocess_image(self, img: Any) -> NDArray[np.uint8]:
-        """
-        Convert an image to grayscale uint8 format for SIFT processing.
-
-        Parameters
-        ----------
-        img : Array
-            Input image in (C, H, W) format. Supports torch tensors and numpy arrays.
-
-        Returns
-        -------
-        NDArray[np.uint8]
-            Grayscale image in (H, W) format as uint8.
-        """
-        img = as_numpy(img[0] if isinstance(img, tuple) else img)
-        if img.dtype != np.uint8:
-            img = rescale(img, depth=8)
-        return to_canonical_grayscale(img)
-
-    def _extract_descriptors(self, data: Any) -> Iterator[NDArray[np.float32]]:
-        """
-        Extract SIFT descriptors from images.
-
-        Yields
-        ------
-        NDArray[np.float32]
-            SIFT descriptors for each image. May be empty (shape (0, 128))
-            for images with no detected features.
-        """
-        for img in data:
-            img = self._preprocess_image(img)
-            _, des = self._sift.detectAndCompute(img, None)
-            yield np.zeros((0, 128), dtype=np.float32) if des is None else des.astype(np.float32)
 
     def fit(self, data: Any) -> None:
         """
@@ -190,7 +192,10 @@ class BoVWExtractor:
             If no SIFT features are found in any image. This typically occurs
             when all images are uniform (e.g., solid color).
         """
-        all_descriptors = [des for des in self._extract_descriptors(data) if len(des) > 0]
+        with PoolWrapper(get_max_processes()) as pool:
+            all_descriptors = [
+                des for _, des in sorted(pool.imap_unordered(_extract_single, enumerate(data))) if len(des) > 0
+            ]
 
         if not all_descriptors:
             raise ValueError("No SIFT features found in any image. Cannot build vocabulary.")
@@ -236,26 +241,16 @@ class BoVWExtractor:
 
         n_clusters: int = int(self._kmeans.n_clusters)  # type: ignore
 
-        embeddings: list[NDArray[np.float32]] = []
-        for des in self._extract_descriptors(data):
-            histogram = np.zeros(n_clusters, dtype=np.float32)
+        result = np.zeros((len(data), n_clusters), dtype=np.float32)
 
-            if len(des) > 0:
-                # Assign each keypoint to the nearest visual word
-                words = self._kmeans.predict(des.astype(np.float64))
+        with PoolWrapper(get_max_processes()) as pool:
+            for idx, histogram in pool.imap_unordered(
+                partial(_transform_single, kmeans=self._kmeans, n_clusters=n_clusters),
+                enumerate(data),
+            ):
+                result[idx] = histogram
 
-                # Count occurrences
-                unique, counts = np.unique(words, return_counts=True)
-                histogram[unique] = counts
-
-                # L2 normalize - crucial for comparison
-                norm = np.linalg.norm(histogram)
-                if norm > 0:
-                    histogram /= norm
-
-            embeddings.append(histogram)
-
-        return np.array(embeddings)
+        return result
 
     def __call__(self, data: Any) -> Array:
         """
