@@ -420,9 +420,9 @@ def _aggregate(
 
 def calculate_stats(
     data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
     stats: Flag = ImageStats.ALL,
-    *,
     per_image: bool = True,
     per_target: bool = True,
     per_channel: bool = False,
@@ -474,28 +474,28 @@ def calculate_stats(
     Calculate all statistics:
 
     >>> from dataeval.flags import ImageStats
-    >>> stats = calculate_stats(images, boxes)
+    >>> stats = calculate_stats(images, boxes=boxes)
 
     Calculate specific statistics:
 
-    >>> stats = calculate_stats(images, boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
+    >>> stats = calculate_stats(images, boxes=boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
 
     Use convenience groups:
 
-    >>> stats = calculate_stats(images, boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
-    >>> stats = calculate_stats(images, boxes, stats=ImageStats.PIXEL_BASIC, per_channel=True)
+    >>> stats = calculate_stats(images, boxes=boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
+    >>> stats = calculate_stats(images, boxes=boxes, stats=ImageStats.PIXEL_BASIC, per_channel=True)
 
     Calculate statistics only for bounding boxes (not full images):
 
-    >>> stats = calculate_stats(images, boxes, per_image=False, per_target=True)
+    >>> stats = calculate_stats(images, boxes=boxes, per_image=False, per_target=True)
 
     Calculate statistics for full images only (ignore boxes):
 
-    >>> stats = calculate_stats(images, boxes, per_image=True, per_target=False)
+    >>> stats = calculate_stats(images, boxes=boxes, per_image=True, per_target=False)
 
     Calculate statistics for both full images and boxes with per-channel breakdown:
 
-    >>> stats = calculate_stats(images, boxes, per_image=True, per_target=True, per_channel=True)
+    >>> stats = calculate_stats(images, boxes=boxes, per_image=True, per_target=True, per_channel=True)
     """
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}

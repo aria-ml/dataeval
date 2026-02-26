@@ -1006,7 +1006,7 @@ class Outliers(Evaluator):
 
         # Image statistics-based outlier detection
         if self.flags != ImageStats.NONE:
-            self.stats = calculate_stats(data, None, stats=self.flags, per_image=per_image, per_target=per_target)
+            self.stats = calculate_stats(data, stats=self.flags, per_image=per_image, per_target=per_target)
             stats_outliers = self._get_outliers(self.stats["stats"], self.stats["source_index"])
             outliers_dfs.append(stats_outliers)
 

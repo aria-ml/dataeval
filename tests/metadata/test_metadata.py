@@ -95,14 +95,18 @@ class TestMetadata:
 
         assert stats["label_counts_per_image"] == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
 
+        _img, _box = unzip_dataset(mock_ds, False)
         imgstats = calculate_stats(
-            *unzip_dataset(mock_ds, False),
+            _img,
+            boxes=_box,
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
             per_image=True,
             per_target=False,
         )
+        _img, _box = unzip_dataset(mock_ds, True)
         boxstats = calculate_stats(
-            *unzip_dataset(mock_ds, True),
+            _img,
+            boxes=_box,
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
             per_image=False,
             per_target=True,

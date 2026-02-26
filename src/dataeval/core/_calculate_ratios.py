@@ -311,7 +311,7 @@ def calculate_ratios(
     >>> from dataeval.flags import ImageStats
     >>>
     >>> # Single call gets both image and target stats
-    >>> stats = calculate_stats(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
+    >>> stats = calculate_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
     >>> ratios = calculate_ratios(stats)
     >>> ratios["stats"]["width"][:12]
     array([0.25 , 0.203, 0.328, 0.266, 0.234, 0.297, 0.25 , 0.359, 0.297,
@@ -320,8 +320,8 @@ def calculate_ratios(
     **Pattern 2: Separate inputs (backward compatibility)**
 
     >>> # Separate calls for image and box stats
-    >>> img_stats = calculate_stats(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
-    >>> tgt_stats = calculate_stats(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
+    >>> img_stats = calculate_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
+    >>> tgt_stats = calculate_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
     >>> ratios = calculate_ratios(img_stats, target_stats_output=tgt_stats)
 
     **Custom override map:**
@@ -334,7 +334,7 @@ def calculate_ratios(
     **Per-channel statistics:**
 
     >>> stats = calculate_stats(
-    ...     images, boxes, stats=ImageStats.PIXEL, per_image=True, per_target=True, per_channel=True
+    ...     images, boxes=boxes, stats=ImageStats.PIXEL, per_image=True, per_target=True, per_channel=True
     ... )
     >>> ratios = calculate_ratios(stats)
     >>> # Ratios are calculated per-channel automatically

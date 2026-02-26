@@ -938,7 +938,7 @@ class Duplicates(Evaluator):
         # Hash-based duplicate detection
         if self.flags & ImageStats.HASH:
             self.stats = calculate_stats(
-                data, None, self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target
+                data, stats=self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target
             )
             hash_item_result, hash_target_result = self._get_duplicates(self.stats["stats"], self.stats["source_index"])
 

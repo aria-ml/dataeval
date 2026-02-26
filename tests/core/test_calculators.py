@@ -18,7 +18,7 @@ class TestPixelStats:
         # Create deterministic image
         images = [np.random.random((n_channels, 10, 10))]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.PIXEL, per_channel=False)
 
         assert "mean" in result["stats"]
         assert "std" in result["stats"]
@@ -38,7 +38,7 @@ class TestPixelStats:
         """Test pixel statistics with NaN values."""
         images = [np.array([[[np.nan, 0.5], [0.5, 0.5]]])]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.PIXEL, per_channel=False)
         assert result["stats"]["missing"][0] > 0
 
     def test_missing_global_mode_counts_all_channels(self):
@@ -61,7 +61,7 @@ class TestPixelStats:
             ),
         ]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.PIXEL_MISSING, per_channel=False)
 
         # Global mode should count: 3 NaN values / 12 total values = 0.25
         expected_missing = 3 / 12
@@ -80,7 +80,7 @@ class TestPixelStats:
             ),
         ]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=True)
+        result = calculate_stats(images, stats=ImageStats.PIXEL_MISSING, per_channel=True)
 
         # Per-channel mode should return list with one value per channel
         assert len(result["stats"]["missing"]) == 3
@@ -93,7 +93,7 @@ class TestPixelStats:
         # Single channel (1, 3, 3) with 2 NaNs out of 9 pixels
         images = [np.array([[[np.nan, 1.0, 1.0], [1.0, np.nan, 1.0], [1.0, 1.0, 1.0]]])]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.PIXEL_MISSING, per_channel=False)
 
         # 2 NaNs / 9 total = 0.222...
         expected_missing = 2 / 9
@@ -120,7 +120,7 @@ class TestPixelStats:
             ),
         ]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
 
         # Global mode should count: 3 zero values / 12 total values = 0.25
         expected_zeros = 3 / 12
@@ -139,7 +139,7 @@ class TestPixelStats:
             ),
         ]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=True)
+        result = calculate_stats(images, stats=ImageStats.PIXEL_ZEROS, per_channel=True)
 
         # Per-channel mode should return list with one value per channel
         assert len(result["stats"]["zeros"]) == 3
@@ -152,7 +152,7 @@ class TestPixelStats:
         # Single channel (1, 3, 3) with 2 zeros out of 9 pixels
         images = [np.array([[[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.0]]])]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
 
         # 2 zeros / 9 total = 0.222...
         expected_zeros = 2 / 9
@@ -162,7 +162,7 @@ class TestPixelStats:
         """Test zeros calculation when entire image is zeros."""
         images = [np.zeros((3, 10, 10))]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
 
         # All pixels are zero, so should be 1.0
         assert result["stats"]["zeros"][0] == pytest.approx(1.0, abs=1e-4)
@@ -171,7 +171,7 @@ class TestPixelStats:
         """Test missing calculation when entire image is NaN."""
         images = [np.full((3, 10, 10), np.nan)]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.PIXEL_MISSING, per_channel=False)
 
         # All pixels are NaN, so should be 1.0
         assert result["stats"]["missing"][0] == pytest.approx(1.0, abs=1e-4)
@@ -183,7 +183,7 @@ class TestVisualStats:
         """Test visual statistics calculation."""
         images = [np.random.random((n_channels, 10, 10))]
 
-        result = calculate_stats(images, None, stats=ImageStats.VISUAL, per_channel=False)
+        result = calculate_stats(images, stats=ImageStats.VISUAL, per_channel=False)
 
         assert "brightness" in result["stats"]
         assert "contrast" in result["stats"]
@@ -202,7 +202,7 @@ class TestPixelStatsPerChannel:
         """Test per-channel pixel statistics."""
         images = [np.random.random((n_channels, 10, 10))]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL, per_channel=True)
+        result = calculate_stats(images, stats=ImageStats.PIXEL, per_channel=True)
 
         assert len(result["stats"]["mean"]) == n_channels
         assert len(result["stats"]["std"]) == n_channels
@@ -216,7 +216,7 @@ class TestVisualStatsPerChannel:
         """Test per-channel visual statistics."""
         images = [np.random.random((n_channels, 10, 10))]
 
-        result = calculate_stats(images, None, stats=ImageStats.VISUAL, per_channel=True)
+        result = calculate_stats(images, stats=ImageStats.VISUAL, per_channel=True)
 
         assert len(result["stats"]["brightness"]) == n_channels
         assert len(result["stats"]["contrast"]) == n_channels
@@ -394,7 +394,6 @@ class TestPerImagePerBox:
 
         result = calculate_stats(
             images,
-            None,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
@@ -420,7 +419,7 @@ class TestPerImagePerBox:
 
         result = calculate_stats(
             images,
-            boxes,
+            boxes=boxes,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
@@ -453,7 +452,7 @@ class TestPerImagePerBox:
 
         result = calculate_stats(
             images,
-            boxes,
+            boxes=boxes,
             stats=ImageStats.PIXEL_MEAN,
             per_image=False,
             per_target=True,
@@ -482,7 +481,7 @@ class TestPerImagePerBox:
 
         result = calculate_stats(
             images,
-            boxes,
+            boxes=boxes,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=False,
@@ -504,7 +503,7 @@ class TestPerImagePerBox:
 
         result = calculate_stats(
             images,
-            boxes,
+            boxes=boxes,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
@@ -555,7 +554,7 @@ class TestPerImagePerBox:
 
         result = calculate_stats(
             images,
-            boxes,
+            boxes=boxes,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
@@ -591,9 +590,7 @@ class TestPerImagePerBox:
         images = [np.random.random((3, 10, 10))]
 
         with pytest.raises(ValueError, match="At least one of 'per_image' or 'per_target' must be True"):
-            calculate_stats(
-                images, None, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=False, per_channel=False
-            )
+            calculate_stats(images, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=False, per_channel=False)
 
     def test_object_count_tracking(self):
         """Test that object_count is correctly tracked with per_image and per_target."""
@@ -607,7 +604,7 @@ class TestPerImagePerBox:
 
         result = calculate_stats(
             images,
-            boxes,
+            boxes=boxes,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
@@ -627,7 +624,7 @@ class TestLowerDimensionalPixelStats:
         # Create 1D data (shape: (length,))
         data = [np.random.random(100)]
 
-        result = calculate_stats(data, None, stats=ImageStats.PIXEL, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.PIXEL, per_channel=False)
 
         assert "mean" in result["stats"]
         assert "std" in result["stats"]
@@ -648,7 +645,7 @@ class TestLowerDimensionalPixelStats:
         # Create 2D data (shape: (height, width))
         data = [np.random.random((10, 10))]
 
-        result = calculate_stats(data, None, stats=ImageStats.PIXEL, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.PIXEL, per_channel=False)
 
         assert "mean" in result["stats"]
         assert "std" in result["stats"]
@@ -668,14 +665,14 @@ class TestLowerDimensionalPixelStats:
         """Test pixel statistics with 1D data containing NaN values."""
         data = [np.array([np.nan, 0.5, 0.5, 0.5, np.nan])]
 
-        result = calculate_stats(data, None, stats=ImageStats.PIXEL, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.PIXEL, per_channel=False)
         assert result["stats"]["missing"][0] > 0
 
     def test_1d_data_per_channel(self):
         """Test that 1D data is treated as single channel when per_channel=True."""
         data = [np.random.random(100)]
 
-        result = calculate_stats(data, None, stats=ImageStats.PIXEL, per_channel=True)
+        result = calculate_stats(data, stats=ImageStats.PIXEL, per_channel=True)
 
         # Should be treated as 1 channel
         assert len(result["stats"]["mean"]) == 1
@@ -686,7 +683,7 @@ class TestLowerDimensionalPixelStats:
         """Test that 2D data is treated as single channel when per_channel=True."""
         data = [np.random.random((10, 10))]
 
-        result = calculate_stats(data, None, stats=ImageStats.PIXEL, per_channel=True)
+        result = calculate_stats(data, stats=ImageStats.PIXEL, per_channel=True)
 
         # Should be treated as 1 channel
         assert len(result["stats"]["mean"]) == 1
@@ -701,7 +698,7 @@ class TestLowerDimensionalVisualStats:
         """Test visual statistics calculation with 1D data."""
         data = [np.random.random(100)]
 
-        result = calculate_stats(data, None, stats=ImageStats.VISUAL, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.VISUAL, per_channel=False)
 
         assert "brightness" in result["stats"]
         assert "contrast" in result["stats"]
@@ -719,7 +716,7 @@ class TestLowerDimensionalVisualStats:
         """Test visual statistics calculation with 2D data."""
         data = [np.random.random((10, 10))]
 
-        result = calculate_stats(data, None, stats=ImageStats.VISUAL, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.VISUAL, per_channel=False)
 
         assert "brightness" in result["stats"]
         assert "contrast" in result["stats"]
@@ -738,7 +735,7 @@ class TestLowerDimensionalVisualStats:
         """Test visual statistics with 1D data and per_channel=True."""
         data = [np.random.random(100)]
 
-        result = calculate_stats(data, None, stats=ImageStats.VISUAL, per_channel=True)
+        result = calculate_stats(data, stats=ImageStats.VISUAL, per_channel=True)
 
         # Should be treated as 1 channel
         assert len(result["stats"]["brightness"]) == 1
@@ -751,7 +748,7 @@ class TestLowerDimensionalVisualStats:
         """Test visual statistics with 2D data and per_channel=True."""
         data = [np.random.random((10, 10))]
 
-        result = calculate_stats(data, None, stats=ImageStats.VISUAL, per_channel=True)
+        result = calculate_stats(data, stats=ImageStats.VISUAL, per_channel=True)
 
         # Should be treated as 1 channel
         assert len(result["stats"]["brightness"]) == 1
@@ -836,7 +833,7 @@ class TestLowerDimensionalDimensionStats:
         """Test dimension statistics via calculate_stats() with 1D data."""
         data = [np.random.random(100)]
 
-        result = calculate_stats(data, None, stats=ImageStats.DIMENSION, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.DIMENSION, per_channel=False)
 
         assert "width" in result["stats"]
         assert "height" in result["stats"]
@@ -852,7 +849,7 @@ class TestLowerDimensionalDimensionStats:
         """Test dimension statistics via calculate_stats() with 2D data."""
         data = [np.random.random((10, 20))]
 
-        result = calculate_stats(data, None, stats=ImageStats.DIMENSION, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.DIMENSION, per_channel=False)
 
         assert "width" in result["stats"]
         assert "height" in result["stats"]
@@ -909,7 +906,7 @@ class TestLowerDimensionalHashStats:
 
         data = [np.random.random(100)]
 
-        result = calculate_stats(data, None, stats=ImageStats.HASH, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.HASH, per_channel=False)
 
         assert "xxhash" in result["stats"]
         assert "phash" in result["stats"]
@@ -939,7 +936,7 @@ class TestLowerDimensionalHashStats:
         """
         data = [np.random.random(100)]
 
-        result = calculate_stats(data, None, stats=ImageStats.HASH, per_channel=False)
+        result = calculate_stats(data, stats=ImageStats.HASH, per_channel=False)
 
         # phash should return empty string for 1D data
         assert result["stats"]["phash"][0] == ""
@@ -1322,7 +1319,7 @@ class TestProgressCallback:
         def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
             callback_calls.append({"step": step, "total": total})
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL, progress_callback=callback)
+        result = calculate_stats(images, stats=ImageStats.PIXEL, progress_callback=callback)
 
         # Callback should have been called for each image
         assert len(callback_calls) == 5
@@ -1337,7 +1334,7 @@ class TestProgressCallback:
         """Test that no error occurs when progress_callback is None."""
         images = [np.random.random((3, 10, 10)) for _ in range(3)]
 
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL, progress_callback=None)
+        result = calculate_stats(images, stats=ImageStats.PIXEL, progress_callback=None)
 
         # Should work without error
         assert result["image_count"] == 3
@@ -1351,7 +1348,7 @@ class TestProgressCallback:
         def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
             callback_calls.append({"step": step, "total": total})
 
-        result = calculate_stats(images, boxes, stats=ImageStats.DIMENSION, progress_callback=callback)
+        result = calculate_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, progress_callback=callback)
 
         # Callback should be called for each image (not each box)
         assert len(callback_calls) == 3
@@ -1392,7 +1389,7 @@ class TestProgressCallback:
         def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
             callback_calls.append(step)
 
-        calculate_stats(images, None, stats=ImageStats.PIXEL_BASIC, progress_callback=callback)
+        calculate_stats(images, stats=ImageStats.PIXEL_BASIC, progress_callback=callback)
 
         # Steps should be 1, 2, 3, ..., 10
         assert callback_calls == list(range(1, 11))
@@ -1400,7 +1397,7 @@ class TestProgressCallback:
     def test_calculate_with_empty_dataset(self):
         """Test calculate with empty dataset."""
         images = []
-        result = calculate_stats(images, None, stats=ImageStats.PIXEL)
+        result = calculate_stats(images, stats=ImageStats.PIXEL)
 
         assert result["image_count"] == 0
         assert len(result["source_index"]) == 0

@@ -65,8 +65,9 @@ this guide. You will then determine if the labels within these two datasets has 
 You'll begin by importing the necessary libraries for this tutorial.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
