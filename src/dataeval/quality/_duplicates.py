@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, Literal, NamedTuple, TypeVar, overload
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.core._calculate_stats import CalculationResult, calculate_stats
@@ -123,6 +124,73 @@ class DuplicateDetectionResult(Generic[TIndexType]):
     near: Sequence[NearDuplicateGroup[TIndexType]] | None = None
 
 
+_EMPTY_DUPS_SCHEMA: dict[str, pl.DataType | type] = {
+    "group_id": pl.Int64,
+    "item_indices": pl.List(pl.Int64),
+    "target_indices": pl.List(pl.Int64),
+    "dup_type": pl.Utf8,
+    "methods": pl.Utf8,
+    "orientation": pl.Utf8,
+}
+
+
+def _dup_group_to_row(
+    group: Sequence[Any] | NearDuplicateGroup[Any],
+    group_id: int,
+    dup_type: str,
+) -> tuple[dict[str, Any], bool]:
+    """Convert a single duplicate group to a single row dict.
+
+    Returns the row and whether any DatasetItemTuple indices were found.
+    """
+    is_near = isinstance(group, NearDuplicateGroup)
+    indices: Sequence[Any] = group.indices if is_near else group
+    methods = ",".join(sorted(group.methods)) if is_near else "xxhash"
+    orientation = group.orientation if is_near else None
+    has_dataset_id = False
+
+    item_indices: list[int] = []
+    target_indices: list[int | None] = []
+    dataset_ids: list[int | None] = []
+
+    for idx in indices:
+        item_idx: int
+        target_idx: int | None = None
+        dataset_id: int | None = None
+
+        if isinstance(idx, DatasetItemTuple):
+            has_dataset_id = True
+            dataset_id = idx.dataset_id
+            inner = idx.id
+            if isinstance(inner, SourceIndex):
+                item_idx = inner.item
+                target_idx = inner.target
+            else:
+                item_idx = inner
+        elif isinstance(idx, SourceIndex):
+            item_idx = idx.item
+            target_idx = idx.target
+        else:
+            item_idx = idx
+
+        item_indices.append(item_idx)
+        target_indices.append(target_idx)
+        dataset_ids.append(dataset_id)
+
+    row: dict[str, Any] = {
+        "group_id": group_id,
+        "item_indices": item_indices,
+        "target_indices": target_indices,
+        "dup_type": dup_type,
+        "methods": methods,
+        "orientation": orientation,
+    }
+    if has_dataset_id:
+        row["dataset_ids"] = dataset_ids
+
+    return row, has_dataset_id
+
+
 @dataclass(frozen=True)
 class DuplicatesOutput(DictOutput):
     """
@@ -153,6 +221,54 @@ class DuplicatesOutput(DictOutput):
 
     items: DuplicateDetectionResult[int] | DuplicateDetectionResult[DatasetItemTuple]
     targets: DuplicateDetectionResult[SourceIndex] | DuplicateDetectionResult[DatasetItemTuple]
+
+    def to_dataframe(self) -> pl.DataFrame:
+        """Convert duplicate groups to a standardized Polars DataFrame.
+
+        Each row represents one duplicate group, with indices collected into lists.
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with columns:
+
+            - group_id: int - Auto-incrementing ID for each duplicate group
+            - item_indices: list[int] - Indices of items in the group
+            - target_indices: list[int] | None - Target indices within items (omitted for item-level)
+            - dup_type: str - ``"exact"`` or ``"near"``
+            - methods: str - Comma-separated sorted detection method names
+            - orientation: str | None - ``"same"``, ``"rotated"``, or None
+
+            Additional columns when cross-dataset results are present:
+
+            - dataset_ids: list[int] | None - Dataset indices for cross-dataset results
+        """
+        rows: list[dict[str, Any]] = []
+        group_id = 0
+        has_dataset_id = False
+
+        for level in (self.items, self.targets):
+            for dup_type, groups in (("exact", level.exact), ("near", level.near)):
+                if groups is None:
+                    continue
+                for group in groups:
+                    row, has_ds = _dup_group_to_row(group, group_id, dup_type)
+                    has_dataset_id = has_dataset_id or has_ds
+                    rows.append(row)
+                    group_id += 1
+
+        if not rows:
+            return pl.DataFrame(schema=_EMPTY_DUPS_SCHEMA)
+
+        df = pl.DataFrame(rows)
+
+        # Omit target_indices when all values are lists of nulls
+        if "target_indices" in df.columns:
+            all_null = df["target_indices"].list.eval(pl.element().is_null().all()).list.first().all()
+            if all_null:
+                df = df.drop("target_indices")
+
+        return df
 
 
 class Duplicates(Evaluator):
@@ -906,6 +1022,18 @@ class Duplicates(Evaluator):
         >>> for group in result.items.near:
         ...     print(f"Index count: {len(group.indices)}, Methods: {sorted(group.methods)}")
         Index count: 50, Methods: ['dhash', 'phash']
+        >>> result.to_dataframe()
+        shape: (4, 5)
+        ┌──────────┬───────────────┬──────────┬─────────────┬─────────────┐
+        │ group_id ┆ item_indices  ┆ dup_type ┆ methods     ┆ orientation │
+        │ ---      ┆ ---           ┆ ---      ┆ ---         ┆ ---         │
+        │ i64      ┆ list[i64]     ┆ str      ┆ str         ┆ null        │
+        ╞══════════╪═══════════════╪══════════╪═════════════╪═════════════╡
+        │ 0        ┆ [3, 20]       ┆ exact    ┆ xxhash      ┆ null        │
+        │ 1        ┆ [7, 11, … 25] ┆ exact    ┆ xxhash      ┆ null        │
+        │ 2        ┆ [16, 37]      ┆ exact    ┆ xxhash      ┆ null        │
+        │ 3        ┆ [0, 1, … 49]  ┆ near     ┆ dhash,phash ┆ null        │
+        └──────────┴───────────────┴──────────┴─────────────┴─────────────┘
 
         Fast exact-only detection:
 

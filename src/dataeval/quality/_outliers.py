@@ -34,9 +34,11 @@ class OutliersOutput(Output[TDataFrame]):
     ----------
     issues : pl.DataFrame | Sequence[pl.DataFrame]
         DataFrame of outlier issues with columns:
-        - item_id: int - Index of the outlier image
-        - target_id: int | None - Index of the target/detection within the image (None for image-level outliers).
-        This column is omitted when all outliers are image-level (all target_id values would be None).
+        - item_index: int - Index of the outlier item
+        - target_index: int | None - Index of the target/detection within the item (None for item-level outliers).
+        This column is omitted when all outliers are item-level (all target_index values would be None).
+        - channel_index: int | None - Index of the image channel (None for aggregated stats).
+        This column is omitted when all stats are aggregated across channels.
         - metric_name: str - Name of the metric that flagged this image/target
         - metric_value: float - Value of the metric for this image/target
 
@@ -52,11 +54,11 @@ class OutliersOutput(Output[TDataFrame]):
 
     def __len__(self) -> int:
         if isinstance(self.issues, pl.DataFrame):
-            # Use target_id if present, otherwise just item_id
-            cols = ["item_id", "target_id"] if "target_id" in self.issues.columns else ["item_id"]
+            # Use target_index if present, otherwise just item_index
+            cols = ["item_index", "target_index"] if "target_index" in self.issues.columns else ["item_index"]
             return self.issues.select(cols).n_unique()
         return sum(
-            df.select(["item_id", "target_id"] if "target_id" in df.columns else ["item_id"]).n_unique()
+            df.select(["item_index", "target_index"] if "target_index" in df.columns else ["item_index"]).n_unique()
             for df in self.issues
         )
 
@@ -126,10 +128,10 @@ class OutliersOutput(Output[TDataFrame]):
         index2label = _get_index2label(metadata)
         class_names = [index2label[label] for label in metadata.class_labels]
 
-        labels_df = pl.DataFrame({"item_id": item_ids, "class_name": class_names})
+        labels_df = pl.DataFrame({"item_index": item_ids, "class_name": class_names})
 
         # Join the Issues with the Labels
-        joined_df = self.issues.join(labels_df, on="item_id", how="left")
+        joined_df = self.issues.join(labels_df, on="item_index", how="left")
 
         # Create the Summary Pivot (classes as rows, metrics as columns)
         summary_df = (
@@ -205,13 +207,13 @@ class OutliersOutput(Output[TDataFrame]):
         # Group by metric_name and count unique images
         return (
             self.issues.group_by("metric_name")
-            .agg(pl.col("item_id").n_unique().alias("Total"))
+            .agg(pl.col("item_index").n_unique().alias("Total"))
             .sort(["Total", "metric_name"], descending=[True, False])
         )
 
     def aggregate_by_item(self) -> pl.DataFrame:
         """
-        Return a Polars DataFrame summarizing outliers per item (item_id, target_id pair) and metric.
+        Return a Polars DataFrame summarizing outliers per item (item_index, target_index pair) and metric.
 
         Creates a pivot table showing whether each item is flagged by each metric (1 if flagged, 0 if not).
         Includes a Total column showing the total number of metrics that flagged each item.
@@ -220,8 +222,8 @@ class OutliersOutput(Output[TDataFrame]):
         -------
         pl.DataFrame
             DataFrame with columns:
-            - item_id: int - Image identifier
-            - target_id: int or None - Target identifier (Only with per_target outliers)
+            - item_index: int - Item identifier
+            - target_index: int or None - Target identifier (Only with per_target outliers)
             - <metric_name>: int - Binary indicator (1 or 0) for each metric
             - count: int - Total number of metrics that flagged this item
 
@@ -237,32 +239,32 @@ class OutliersOutput(Output[TDataFrame]):
         >>> summary = results.aggregate_by_item()
         >>> summary
         shape: (20, 13)
-        ┌─────────┬───────────┬────────────┬──────────┬───┬─────┬─────┬───────┬───────┐
-        │ item_id ┆ target_id ┆ brightness ┆ contrast ┆ … ┆ std ┆ var ┆ zeros ┆ Total │
-        │ ---     ┆ ---       ┆ ---        ┆ ---      ┆   ┆ --- ┆ --- ┆ ---   ┆ ---   │
-        │ i64     ┆ i64       ┆ u32        ┆ u32      ┆   ┆ u32 ┆ u32 ┆ u32   ┆ u32   │
-        ╞═════════╪═══════════╪════════════╪══════════╪═══╪═════╪═════╪═══════╪═══════╡
-        │ 0       ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
-        │ 2       ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
-        │ 7       ┆ null      ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 7       ┆ 0         ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 11      ┆ null      ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ …       ┆ …         ┆ …          ┆ …        ┆ … ┆ …   ┆ …   ┆ …     ┆ …     │
-        │ 34      ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
-        │ 36      ┆ 2         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 2     │
-        │ 38      ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
-        │ 40      ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
-        │ 41      ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
-        └─────────┴───────────┴────────────┴──────────┴───┴─────┴─────┴───────┴───────┘
+        ┌────────────┬──────────────┬────────────┬──────────┬───┬─────┬─────┬───────┬───────┐
+        │ item_index ┆ target_index ┆ brightness ┆ contrast ┆ … ┆ std ┆ var ┆ zeros ┆ Total │
+        │ ---        ┆ ---          ┆ ---        ┆ ---      ┆   ┆ --- ┆ --- ┆ ---   ┆ ---   │
+        │ i64        ┆ i64          ┆ u32        ┆ u32      ┆   ┆ u32 ┆ u32 ┆ u32   ┆ u32   │
+        ╞════════════╪══════════════╪════════════╪══════════╪═══╪═════╪═════╪═══════╪═══════╡
+        │ 0          ┆ null         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 2          ┆ null         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 7          ┆ null         ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
+        │ 7          ┆ 0            ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
+        │ 11         ┆ null         ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
+        │ …          ┆ …            ┆ …          ┆ …        ┆ … ┆ …   ┆ …   ┆ …     ┆ …     │
+        │ 34         ┆ null         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 36         ┆ 2            ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 2     │
+        │ 38         ┆ null         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 40         ┆ null         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 41         ┆ null         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        └────────────┴──────────────┴────────────┴──────────┴───┴─────┴─────┴───────┴───────┘
         """
         # Handle the case where self.issues might be a list of DataFrames
         if not isinstance(self.issues, pl.DataFrame):
             raise ValueError("Aggregation by item only works with output from a single dataset.")
 
-        # Check if target_id column exists
-        has_target_id = "target_id" in self.issues.columns
+        # Check if target_index column exists
+        has_target_id = "target_index" in self.issues.columns
 
-        index_cols = ["item_id", "target_id"] if has_target_id else ["item_id"]
+        index_cols = ["item_index", "target_index"] if has_target_id else ["item_index"]
 
         # Build schema for known types
         schema: Any = dict.fromkeys(index_cols, pl.Int64) | {"Total": pl.UInt32}
@@ -271,8 +273,8 @@ class OutliersOutput(Output[TDataFrame]):
         if self.issues.shape[0] == 0:
             return pl.DataFrame(schema=schema)
 
-        # Create a binary indicator for each (item_id, [target_id,] metric_name) combination
-        # Group by item_id, [target_id,] and metric_name, then pivot
+        # Create a binary indicator for each (item_index, [target_index,] metric_name) combination
+        # Group by item_index, [target_index,] and metric_name, then pivot
 
         grouped = (
             self.issues.group_by(index_cols + ["metric_name"])
@@ -283,9 +285,9 @@ class OutliersOutput(Output[TDataFrame]):
         # Note: Polars 1.0.0 pivot cannot handle null values in index columns, so we use a placeholder
         temp_null_placeholder = -1
 
-        # Replace null target_id with placeholder before pivot (if target_id exists)
+        # Replace null target_index with placeholder before pivot (if target_index exists)
         if has_target_id:
-            grouped = grouped.with_columns(pl.col("target_id").fill_null(temp_null_placeholder))
+            grouped = grouped.with_columns(pl.col("target_index").fill_null(temp_null_placeholder))
 
         pivoted = grouped.pivot(on="metric_name", index=index_cols, values="flagged")
 
@@ -296,10 +298,10 @@ class OutliersOutput(Output[TDataFrame]):
         expressions = []
         if has_target_id:
             expressions.append(
-                pl.when(pl.col("target_id") == temp_null_placeholder)
+                pl.when(pl.col("target_index") == temp_null_placeholder)
                 .then(None)
-                .otherwise(pl.col("target_id"))
-                .alias("target_id"),
+                .otherwise(pl.col("target_index"))
+                .alias("target_index"),
             )
 
         if metric_cols:
@@ -353,6 +355,14 @@ def _get_outlier_mask(
 
     # NaN values are never outliers
     return outlier_mask & ~nan_mask
+
+
+def _drop_null_index_columns(df: pl.DataFrame) -> pl.DataFrame:
+    """Drop target_index and channel_index columns when all values are null."""
+    for col in ("target_index", "channel_index"):
+        if col in df.columns and df[col].null_count() == len(df):
+            df = df.drop(col)
+    return df
 
 
 class Outliers(Evaluator):
@@ -620,8 +630,8 @@ class Outliers(Evaluator):
         if not item_ids:
             return pl.DataFrame(
                 schema={
-                    "item_id": pl.Int64,
-                    "target_id": pl.Int64,
+                    "item_index": pl.Int64,
+                    "target_index": pl.Int64,
                     "metric_name": pl.Categorical("lexical"),
                     "metric_value": pl.Float64,
                 },
@@ -629,12 +639,81 @@ class Outliers(Evaluator):
 
         return pl.DataFrame(
             {
-                "item_id": pl.Series(item_ids, dtype=pl.Int64),
-                "target_id": pl.Series(target_ids, dtype=pl.Int64),
+                "item_index": pl.Series(item_ids, dtype=pl.Int64),
+                "target_index": pl.Series(target_ids, dtype=pl.Int64),
                 "metric_name": pl.Series(metric_names, dtype=pl.Categorical("lexical")),
                 "metric_value": pl.Series(metric_values, dtype=pl.Float64),
             },
-        ).sort(["item_id", "target_id", "metric_name"])
+        ).sort(["item_index", "target_index", "metric_name"])
+
+    def _split_outliers_by_dataset(
+        self,
+        outliers_df: pl.DataFrame,
+        num_datasets: int,
+        dataset_steps: Sequence[int],
+    ) -> list[pl.DataFrame]:
+        """Split a combined outliers DataFrame back into per-dataset DataFrames.
+
+        Parameters
+        ----------
+        outliers_df : pl.DataFrame
+            Combined outliers DataFrame with global item indices.
+        num_datasets : int
+            Number of datasets to split into.
+        dataset_steps : Sequence[int]
+            Cumulative item counts per dataset for index remapping.
+
+        Returns
+        -------
+        list[pl.DataFrame]
+            One DataFrame per dataset with local item indices.
+        """
+        has_channel_id = "channel_index" in outliers_df.columns
+        output_list: list[pl.DataFrame] = []
+
+        for dataset_idx in range(num_datasets):
+            dataset_item_ids: list[int] = []
+            dataset_target_ids: list[int | None] = []
+            dataset_channel_ids: list[int | None] = []
+            dataset_metric_names: list[str] = []
+            dataset_metric_values: list[float] = []
+
+            for row in outliers_df.iter_rows(named=True):
+                k, v = get_dataset_step_from_idx(row["item_index"], dataset_steps)
+                if k == dataset_idx:
+                    dataset_item_ids.append(v)
+                    dataset_target_ids.append(row["target_index"])
+                    if has_channel_id:
+                        dataset_channel_ids.append(row["channel_index"])
+                    dataset_metric_names.append(row["metric_name"])
+                    dataset_metric_values.append(row["metric_value"])
+
+            if dataset_item_ids:
+                data: dict[str, pl.Series] = {
+                    "item_index": pl.Series(dataset_item_ids, dtype=pl.Int64),
+                    "target_index": pl.Series(dataset_target_ids, dtype=pl.Int64),
+                }
+                if has_channel_id:
+                    data["channel_index"] = pl.Series(dataset_channel_ids, dtype=pl.Int64)
+                data["metric_name"] = pl.Series(dataset_metric_names, dtype=pl.Categorical("lexical"))
+                data["metric_value"] = pl.Series(dataset_metric_values, dtype=pl.Float64)
+                dataset_df = pl.DataFrame(data).sort(
+                    ["item_index", "target_index", "metric_name"], descending=[False, False, False]
+                )
+                output_list.append(_drop_null_index_columns(dataset_df))
+            else:
+                output_list.append(
+                    pl.DataFrame(
+                        schema={
+                            "item_index": pl.Int64,
+                            "target_index": pl.Int64,
+                            "metric_name": pl.Categorical("lexical"),
+                            "metric_value": pl.Float64,
+                        },
+                    ),
+                )
+
+        return output_list
 
     @overload
     def from_stats(self, stats: CalculationResult) -> OutliersOutput[pl.DataFrame]: ...
@@ -659,10 +738,10 @@ class Outliers(Evaluator):
         -------
         OutliersOutput
             Output class containing a DataFrame of outlier issues with columns:
-            - item_id: int - Index of the outlier image
-            - target_id: int | None - Index of the target within the image (None for image-level outliers)
-            - metric_name: str - Name of the metric that flagged this image/target
-            - metric_value: float - Value of the metric for this image/target
+            - item_index: int - Index of the outlier item
+            - target_index: int | None - Index of the target within the item (None for item-level outliers)
+            - metric_name: str - Name of the metric that flagged this item/target
+            - metric_value: float - Value of the metric for this item/target
 
         Example
         -------
@@ -671,27 +750,28 @@ class Outliers(Evaluator):
         >>> from dataeval.core import calculate_stats
         >>> from dataeval.flags import ImageStats
         >>> from dataeval.utils.thresholds import ZScoreThreshold
+
         >>> stats = calculate_stats(images, stats=ImageStats.PIXEL)
         >>> outliers = Outliers(outlier_threshold=ZScoreThreshold(2.5))
         >>> results = outliers.from_stats(stats)
         >>> results.issues.head(10)
         shape: (10, 3)
-        ┌─────────┬─────────────┬──────────────┐
-        │ item_id ┆ metric_name ┆ metric_value │
-        │ ---     ┆ ---         ┆ ---          │
-        │ i64     ┆ cat         ┆ f64          │
-        ╞═════════╪═════════════╪══════════════╡
-        │ 7       ┆ entropy     ┆ 0.0          │
-        │ 7       ┆ mean        ┆ 0.98         │
-        │ 7       ┆ std         ┆ 0.0          │
-        │ 7       ┆ var         ┆ 0.0          │
-        │ 8       ┆ skew        ┆ 0.062311     │
-        │ 11      ┆ entropy     ┆ 0.0          │
-        │ 11      ┆ mean        ┆ 0.98         │
-        │ 11      ┆ std         ┆ 0.0          │
-        │ 11      ┆ var         ┆ 0.0          │
-        │ 18      ┆ entropy     ┆ 0.0          │
-        └─────────┴─────────────┴──────────────┘
+        ┌────────────┬─────────────┬──────────────┐
+        │ item_index ┆ metric_name ┆ metric_value │
+        │ ---        ┆ ---         ┆ ---          │
+        │ i64        ┆ cat         ┆ f64          │
+        ╞════════════╪═════════════╪══════════════╡
+        │ 7          ┆ entropy     ┆ 0.0          │
+        │ 7          ┆ mean        ┆ 0.98         │
+        │ 7          ┆ std         ┆ 0.0          │
+        │ 7          ┆ var         ┆ 0.0          │
+        │ 8          ┆ skew        ┆ 0.062311     │
+        │ 11         ┆ entropy     ┆ 0.0          │
+        │ 11         ┆ mean        ┆ 0.98         │
+        │ 11         ┆ std         ┆ 0.0          │
+        │ 11         ┆ var         ┆ 0.0          │
+        │ 18         ┆ entropy     ┆ 0.0          │
+        └────────────┴─────────────┴──────────────┘
         """
         combined_stats, dataset_steps = combine_results(stats)
 
@@ -706,56 +786,9 @@ class Outliers(Evaluator):
         outliers_df = self._get_outliers(combined_stats, combined_source_index)
 
         if not isinstance(stats, Sequence):
-            # Drop target_id column if all values are None
-            if "target_id" in outliers_df.columns and outliers_df["target_id"].null_count() == len(outliers_df):
-                outliers_df = outliers_df.drop("target_id")
-            return OutliersOutput(outliers_df)
+            return OutliersOutput(_drop_null_index_columns(outliers_df))
 
-        # Split results back to individual datasets
-        output_list: list[pl.DataFrame] = []
-        for dataset_idx in range(len(stats)):
-            # Filter rows that belong to this dataset
-            dataset_item_ids: list[int] = []
-            dataset_target_ids: list[int | None] = []
-            dataset_metric_names: list[str] = []
-            dataset_metric_values: list[float] = []
-
-            for row in outliers_df.iter_rows(named=True):
-                k, v = get_dataset_step_from_idx(row["item_id"], dataset_steps)
-                if k == dataset_idx:
-                    dataset_item_ids.append(v)
-                    dataset_target_ids.append(row["target_id"])
-                    dataset_metric_names.append(row["metric_name"])
-                    dataset_metric_values.append(row["metric_value"])
-
-            if dataset_item_ids:
-                dataset_df = pl.DataFrame(
-                    {
-                        "item_id": pl.Series(dataset_item_ids, dtype=pl.Int64),
-                        "target_id": pl.Series(dataset_target_ids, dtype=pl.Int64),
-                        "metric_name": pl.Series(dataset_metric_names, dtype=pl.Categorical("lexical")),
-                        "metric_value": pl.Series(dataset_metric_values, dtype=pl.Float64),
-                    },
-                ).sort(["item_id", "target_id", "metric_name"], descending=[False, False, False])
-
-                # Drop target_id column if all values are None
-                if "target_id" in dataset_df.columns and dataset_df["target_id"].null_count() == len(dataset_df):
-                    dataset_df = dataset_df.drop("target_id")
-
-                output_list.append(dataset_df)
-            else:
-                output_list.append(
-                    pl.DataFrame(
-                        schema={
-                            "item_id": pl.Int64,
-                            "target_id": pl.Int64,
-                            "metric_name": pl.Categorical("lexical"),
-                            "metric_value": pl.Float64,
-                        },
-                    ),
-                )
-
-        return OutliersOutput(output_list)
+        return OutliersOutput(self._split_outliers_by_dataset(outliers_df, len(stats), dataset_steps))
 
     @set_metadata(state=["outlier_threshold"])
     def from_clusters(
@@ -857,7 +890,7 @@ class Outliers(Evaluator):
         -------
         pl.DataFrame
             DataFrame with outlier details containing columns:
-            - item_id: int - Index of the outlier
+            - item_index: int - Index of the outlier
             - metric_name: str - Always "cluster_distance"
             - metric_value: float - Distance in std dev from cluster mean
         """
@@ -882,7 +915,7 @@ class Outliers(Evaluator):
         if len(outlier_indices) == 0:
             return pl.DataFrame(
                 schema={
-                    "item_id": pl.Int64,
+                    "item_index": pl.Int64,
                     "metric_name": pl.Categorical("lexical"),
                     "metric_value": pl.Float64,
                 },
@@ -903,14 +936,63 @@ class Outliers(Evaluator):
             item_ids.append(int(idx))
             metric_values.append(std_devs)
 
-        # Cluster-based detection is always image-level, so we don't include target_id
+        # Cluster-based detection is always item-level, so we don't include target_index
         return pl.DataFrame(
             {
-                "item_id": pl.Series(item_ids, dtype=pl.Int64),
+                "item_index": pl.Series(item_ids, dtype=pl.Int64),
                 "metric_name": pl.Series(["cluster_distance"] * len(item_ids), dtype=pl.Categorical("lexical")),
                 "metric_value": pl.Series(metric_values, dtype=pl.Float64),
             },
-        ).sort(["item_id", "metric_name"], descending=[False, False])
+        ).sort(["item_index", "metric_name"], descending=[False, False])
+
+    def _get_cluster_outliers(
+        self,
+        data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    ) -> pl.DataFrame:
+        """Extract embeddings, cluster them, and return cluster-based outlier DataFrame."""
+        images = [item[0] if isinstance(item, tuple) else item for item in data]
+        embeddings = self.extractor(images)  # type: ignore[union-attr]
+        embeddings_array = flatten_samples(to_numpy(embeddings))
+
+        cluster_result = cluster(
+            embeddings_array,
+            algorithm=self.cluster_algorithm,
+            n_clusters=self.n_clusters,
+        )
+
+        cluster_stats = compute_cluster_stats(
+            embeddings=embeddings_array,
+            cluster_labels=cluster_result["clusters"],
+        )
+
+        return self._find_outliers_adaptive(
+            cluster_stats=cluster_stats,
+            threshold_std=self.cluster_threshold,
+        )
+
+    @staticmethod
+    def _merge_outlier_dfs(outliers_dfs: list[pl.DataFrame]) -> pl.DataFrame:
+        """Merge multiple outlier DataFrames, aligning columns and sorting."""
+        if len(outliers_dfs) == 0:
+            return pl.DataFrame(
+                schema={
+                    "item_index": pl.Int64,
+                    "target_index": pl.Int64,
+                    "metric_name": pl.Categorical("lexical"),
+                    "metric_value": pl.Float64,
+                },
+            )
+
+        if len(outliers_dfs) == 1:
+            return outliers_dfs[0]
+
+        column_order = ["item_index", "target_index", "metric_name", "metric_value"]
+        normalized_dfs: list[pl.DataFrame] = []
+        for df in outliers_dfs:
+            if "target_index" not in df.columns:
+                df = df.with_columns(pl.lit(None, dtype=pl.Int64).alias("target_index"))
+            normalized_dfs.append(df.select(column_order))
+        return pl.concat(normalized_dfs).sort(["item_index", "target_index", "metric_name"])
 
     @set_metadata(
         state=[
@@ -954,12 +1036,12 @@ class Outliers(Evaluator):
         OutliersOutput
             Output class containing a DataFrame of outlier issues with columns:
 
-            - item_id: int - Index of the outlier image
-            - target_id: int | None - Index of the target within the image
-              (None for image-level outliers, omitted if all are image-level)
-            - metric_name: str - Name of the metric that flagged this image/target.
+            - item_index: int - Index of the outlier item
+            - target_index: int | None - Index of the target within the item
+              (None for item-level outliers, omitted if all are item-level)
+            - metric_name: str - Name of the metric that flagged this item/target.
               Includes "cluster_distance" when extractor is provided.
-            - metric_value: float - Value of the metric for this image/target.
+            - metric_value: float - Value of the metric for this item/target.
               For cluster_distance, this is the number of std devs from cluster mean.
 
         Raises
@@ -976,18 +1058,18 @@ class Outliers(Evaluator):
         >>> results = outliers.evaluate(images)
         >>> results.issues.head(6)
         shape: (6, 3)
-        ┌─────────┬─────────────┬──────────────┐
-        │ item_id ┆ metric_name ┆ metric_value │
-        │ ---     ┆ ---         ┆ ---          │
-        │ i64     ┆ cat         ┆ f64          │
-        ╞═════════╪═════════════╪══════════════╡
-        │ 0       ┆ zeros       ┆ 0.000081     │
-        │ 1       ┆ brightness  ┆ 0.42235      │
-        │ 1       ┆ mean        ┆ 0.503471     │
-        │ 2       ┆ zeros       ┆ 0.000081     │
-        │ 7       ┆ brightness  ┆ 0.98         │
-        │ 7       ┆ contrast    ┆ 0.0          │
-        └─────────┴─────────────┴──────────────┘
+        ┌────────────┬─────────────┬──────────────┐
+        │ item_index ┆ metric_name ┆ metric_value │
+        │ ---        ┆ ---         ┆ ---          │
+        │ i64        ┆ cat         ┆ f64          │
+        ╞════════════╪═════════════╪══════════════╡
+        │ 0          ┆ zeros       ┆ 0.000081     │
+        │ 1          ┆ brightness  ┆ 0.42235      │
+        │ 1          ┆ mean        ┆ 0.503471     │
+        │ 2          ┆ zeros       ┆ 0.000081     │
+        │ 7          ┆ brightness  ┆ 0.98         │
+        │ 7          ┆ contrast    ┆ 0.0          │
+        └────────────┴─────────────┴──────────────┘
 
         Cluster-based detection with embeddings:
         >>> from dataeval.extractors import FlattenExtractor
@@ -995,7 +1077,6 @@ class Outliers(Evaluator):
         >>> outliers = Outliers(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_threshold=2.0)
         >>> results = outliers.evaluate(train_ds)
         """
-        # Validate parameters
         if self.flags == ImageStats.NONE and self.extractor is None:
             raise ValueError("Either flags must not be ImageStats.NONE or extractor must be provided.")
 
@@ -1004,65 +1085,11 @@ class Outliers(Evaluator):
 
         outliers_dfs: list[pl.DataFrame] = []
 
-        # Image statistics-based outlier detection
         if self.flags != ImageStats.NONE:
             self.stats = calculate_stats(data, stats=self.flags, per_image=per_image, per_target=per_target)
-            stats_outliers = self._get_outliers(self.stats["stats"], self.stats["source_index"])
-            outliers_dfs.append(stats_outliers)
+            outliers_dfs.append(self._get_outliers(self.stats["stats"], self.stats["source_index"]))
 
-        # Cluster-based outlier detection
         if self.extractor is not None:
-            # Extract embeddings
-            images = [item[0] if isinstance(item, tuple) else item for item in data]
-            embeddings = self.extractor(images)
-            embeddings_array = flatten_samples(to_numpy(embeddings))
+            outliers_dfs.append(self._get_cluster_outliers(data))
 
-            # Cluster the embeddings
-            cluster_result = cluster(
-                embeddings_array,
-                algorithm=self.cluster_algorithm,
-                n_clusters=self.n_clusters,
-            )
-
-            # Compute cluster statistics
-            cluster_stats = compute_cluster_stats(
-                embeddings=embeddings_array,
-                cluster_labels=cluster_result["clusters"],
-            )
-
-            # Find cluster-based outliers
-            cluster_outliers = self._find_outliers_adaptive(
-                cluster_stats=cluster_stats,
-                threshold_std=self.cluster_threshold,
-            )
-            outliers_dfs.append(cluster_outliers)
-
-        # Merge results
-        if len(outliers_dfs) == 0:
-            # This shouldn't happen due to validation above, but handle gracefully
-            outliers = pl.DataFrame(
-                schema={
-                    "item_id": pl.Int64,
-                    "target_id": pl.Int64,
-                    "metric_name": pl.Categorical("lexical"),
-                    "metric_value": pl.Float64,
-                },
-            )
-        elif len(outliers_dfs) == 1:
-            outliers = outliers_dfs[0]
-        else:
-            # Ensure both DataFrames have target_id column with consistent column order
-            column_order = ["item_id", "target_id", "metric_name", "metric_value"]
-            normalized_dfs: list[pl.DataFrame] = []
-            for df in outliers_dfs:
-                if "target_id" not in df.columns:
-                    df = df.with_columns(pl.lit(None, dtype=pl.Int64).alias("target_id"))
-                normalized_dfs.append(df.select(column_order))
-            outliers = pl.concat(normalized_dfs).sort(["item_id", "target_id", "metric_name"])
-
-        # Drop target_id column if there are no target-level stats (all target_id values are None)
-        # This happens when per_target=False or when the dataset has no bounding boxes
-        if "target_id" in outliers.columns and outliers["target_id"].null_count() == len(outliers):
-            outliers = outliers.drop("target_id")
-
-        return OutliersOutput(outliers)
+        return OutliersOutput(_drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs)))

@@ -90,7 +90,7 @@ class TestOutliers:
         # Check that all metric values are not NaN
         assert all(val != np.nan for val in results.issues["metric_value"].to_list())
         # Check that target_id column exists
-        assert "target_id" in results.issues.columns
+        assert "target_index" in results.issues.columns
         # For object detection with per_target=True, we should have some target_ids
         # (either None for image-level or int for target-level)
 
@@ -227,8 +227,8 @@ class TestOutliers:
         result = outliers.evaluate(np.random.random((20, 3, 16, 16)), per_target=False)
 
         # target_id column should be dropped since per_target=False
-        assert "target_id" not in result.issues.columns
-        assert "item_id" in result.issues.columns
+        assert "target_index" not in result.issues.columns
+        assert "item_index" in result.issues.columns
         assert "metric_name" in result.issues.columns
         assert "metric_value" in result.issues.columns
 
@@ -243,9 +243,9 @@ class TestOutliers:
         result = outliers.evaluate(dataset, per_image=True, per_target=True)
 
         # target_id column should be kept since we have target-level outliers
-        assert "target_id" in result.issues.columns
+        assert "target_index" in result.issues.columns
         # Verify we have some non-None target_id values
-        assert result.issues["target_id"].null_count() < len(result.issues)
+        assert result.issues["target_index"].null_count() < len(result.issues)
 
     def test_outliers_from_clusters_drops_target_id(self):
         """Test that from_clusters drops target_id column (always image-level)."""
@@ -264,8 +264,8 @@ class TestOutliers:
         result = detector.from_clusters(embeddings, mock_cluster_result, cluster_threshold=2.0)
 
         # Cluster-based outlier detection is always image-level, so target_id should be dropped
-        assert "target_id" not in result.issues.columns
-        assert "item_id" in result.issues.columns
+        assert "target_index" not in result.issues.columns
+        assert "item_index" in result.issues.columns
 
     def test_outliers_from_clusters_no_outliers(self):
         """Test with well-clustered data that has no clear outliers."""
@@ -295,22 +295,22 @@ class TestOutliersOutput:
     # Convert dict format to DataFrame format
     outlier = pl.DataFrame(
         [
-            {"item_id": 1, "target_id": None, "metric_name": "a", "metric_value": 1.0},
-            {"item_id": 1, "target_id": None, "metric_name": "b", "metric_value": 1.0},
-            {"item_id": 3, "target_id": None, "metric_name": "a", "metric_value": 1.0},
-            {"item_id": 3, "target_id": None, "metric_name": "b", "metric_value": 1.0},
-            {"item_id": 5, "target_id": None, "metric_name": "a", "metric_value": 1.0},
-            {"item_id": 5, "target_id": None, "metric_name": "b", "metric_value": 1.0},
+            {"item_index": 1, "target_index": None, "metric_name": "a", "metric_value": 1.0},
+            {"item_index": 1, "target_index": None, "metric_name": "b", "metric_value": 1.0},
+            {"item_index": 3, "target_index": None, "metric_name": "a", "metric_value": 1.0},
+            {"item_index": 3, "target_index": None, "metric_name": "b", "metric_value": 1.0},
+            {"item_index": 5, "target_index": None, "metric_name": "a", "metric_value": 1.0},
+            {"item_index": 5, "target_index": None, "metric_name": "b", "metric_value": 1.0},
         ],
     )
     outlier2 = pl.DataFrame(
         [
-            {"item_id": 2, "target_id": None, "metric_name": "a", "metric_value": 2.0},
-            {"item_id": 2, "target_id": None, "metric_name": "d", "metric_value": 2.0},
-            {"item_id": 6, "target_id": None, "metric_name": "a", "metric_value": 1.0},
-            {"item_id": 6, "target_id": None, "metric_name": "d", "metric_value": 1.0},
-            {"item_id": 7, "target_id": None, "metric_name": "a", "metric_value": 0.5},
-            {"item_id": 7, "target_id": None, "metric_name": "c", "metric_value": 0.5},
+            {"item_index": 2, "target_index": None, "metric_name": "a", "metric_value": 2.0},
+            {"item_index": 2, "target_index": None, "metric_name": "d", "metric_value": 2.0},
+            {"item_index": 6, "target_index": None, "metric_name": "a", "metric_value": 1.0},
+            {"item_index": 6, "target_index": None, "metric_name": "d", "metric_value": 1.0},
+            {"item_index": 7, "target_index": None, "metric_name": "a", "metric_value": 0.5},
+            {"item_index": 7, "target_index": None, "metric_name": "c", "metric_value": 0.5},
         ],
     )
     lstat: LabelStatsResult = {
@@ -354,12 +354,12 @@ class TestOutliersOutput:
         """Test aggregate_by_metric with varying counts per metric."""
         df = pl.DataFrame(
             [
-                {"item_id": 1, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},
-                {"item_id": 2, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},
-                {"item_id": 3, "target_id": None, "metric_name": "depth", "metric_value": 1.0},
-                {"item_id": 4, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
-                {"item_id": 5, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
-                {"item_id": 6, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
+                {"item_index": 1, "target_index": None, "metric_name": "contrast", "metric_value": 1.0},
+                {"item_index": 2, "target_index": None, "metric_name": "contrast", "metric_value": 1.0},
+                {"item_index": 3, "target_index": None, "metric_name": "depth", "metric_value": 1.0},
+                {"item_index": 4, "target_index": None, "metric_name": "skew", "metric_value": 1.0},
+                {"item_index": 5, "target_index": None, "metric_name": "skew", "metric_value": 1.0},
+                {"item_index": 6, "target_index": None, "metric_name": "skew", "metric_value": 1.0},
             ],
         )
         output = OutliersOutput(df)
@@ -386,13 +386,13 @@ class TestOutliersOutput:
         # item_id: 0,3,7=horse(0), 1,4,6,9=dog(1), 2,5,8=mule(2)
         df = pl.DataFrame(
             [
-                {"item_id": 0, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},  # horse
-                {"item_id": 1, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},  # dog
-                {"item_id": 1, "target_id": None, "metric_name": "depth", "metric_value": 1.0},  # dog
-                {"item_id": 2, "target_id": None, "metric_name": "depth", "metric_value": 1.0},  # mule
-                {"item_id": 3, "target_id": None, "metric_name": "skew", "metric_value": 1.0},  # horse
-                {"item_id": 4, "target_id": None, "metric_name": "skew", "metric_value": 1.0},  # dog
-                {"item_id": 6, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},  # dog
+                {"item_index": 0, "target_index": None, "metric_name": "contrast", "metric_value": 1.0},  # horse
+                {"item_index": 1, "target_index": None, "metric_name": "contrast", "metric_value": 1.0},  # dog
+                {"item_index": 1, "target_index": None, "metric_name": "depth", "metric_value": 1.0},  # dog
+                {"item_index": 2, "target_index": None, "metric_name": "depth", "metric_value": 1.0},  # mule
+                {"item_index": 3, "target_index": None, "metric_name": "skew", "metric_value": 1.0},  # horse
+                {"item_index": 4, "target_index": None, "metric_name": "skew", "metric_value": 1.0},  # dog
+                {"item_index": 6, "target_index": None, "metric_name": "contrast", "metric_value": 1.0},  # dog
             ],
         )
         output = OutliersOutput(df)
@@ -429,12 +429,12 @@ class TestOutliersOutput:
         # Create test data with known structure
         df = pl.DataFrame(
             [
-                {"item_id": 0, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},
-                {"item_id": 0, "target_id": None, "metric_name": "depth", "metric_value": 1.0},
-                {"item_id": 0, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
-                {"item_id": 1, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},
-                {"item_id": 2, "target_id": None, "metric_name": "depth", "metric_value": 1.0},
-                {"item_id": 2, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
+                {"item_index": 0, "target_index": None, "metric_name": "contrast", "metric_value": 1.0},
+                {"item_index": 0, "target_index": None, "metric_name": "depth", "metric_value": 1.0},
+                {"item_index": 0, "target_index": None, "metric_name": "skew", "metric_value": 1.0},
+                {"item_index": 1, "target_index": None, "metric_name": "contrast", "metric_value": 1.0},
+                {"item_index": 2, "target_index": None, "metric_name": "depth", "metric_value": 1.0},
+                {"item_index": 2, "target_index": None, "metric_name": "skew", "metric_value": 1.0},
             ],
         )
         output = OutliersOutput(df)
@@ -444,19 +444,19 @@ class TestOutliersOutput:
         assert result.shape == (3, 6)
 
         # Check column names
-        assert "item_id" in result.columns
-        assert "target_id" in result.columns
+        assert "item_index" in result.columns
+        assert "target_index" in result.columns
         assert "Total" in result.columns
-        assert set(result.columns) == {"item_id", "target_id", "contrast", "depth", "skew", "Total"}
+        assert set(result.columns) == {"item_index", "target_index", "contrast", "depth", "skew", "Total"}
 
         # Verify items sorted by Total
         assert result["Total"].to_list() == [3, 1, 2]
-        assert result["item_id"].to_list() == [0, 1, 2]
+        assert result["item_index"].to_list() == [0, 1, 2]
 
         # Check data types
-        assert result["item_id"].dtype == pl.Int64
+        assert result["item_index"].dtype == pl.Int64
         # target_id can be Null if all values are None, or Int64 if there are actual values
-        assert result["target_id"].dtype in [pl.Null, pl.Int64]
+        assert result["target_index"].dtype in [pl.Null, pl.Int64]
         for col in ["contrast", "depth", "skew", "Total"]:
             assert result[col].dtype == pl.UInt32
 
@@ -469,11 +469,11 @@ class TestOutliersOutput:
         """Test aggregate_by_item with items having different metrics."""
         df = pl.DataFrame(
             [
-                {"item_id": 0, "target_id": None, "metric_name": "a", "metric_value": 1.0},
-                {"item_id": 0, "target_id": None, "metric_name": "b", "metric_value": 1.0},
-                {"item_id": 1, "target_id": None, "metric_name": "c", "metric_value": 1.0},
-                {"item_id": 2, "target_id": None, "metric_name": "a", "metric_value": 1.0},
-                {"item_id": 2, "target_id": None, "metric_name": "c", "metric_value": 1.0},
+                {"item_index": 0, "target_index": None, "metric_name": "a", "metric_value": 1.0},
+                {"item_index": 0, "target_index": None, "metric_name": "b", "metric_value": 1.0},
+                {"item_index": 1, "target_index": None, "metric_name": "c", "metric_value": 1.0},
+                {"item_index": 2, "target_index": None, "metric_name": "a", "metric_value": 1.0},
+                {"item_index": 2, "target_index": None, "metric_name": "c", "metric_value": 1.0},
             ],
         )
         output = OutliersOutput(df)
@@ -484,21 +484,21 @@ class TestOutliersOutput:
 
         # Check that missing combinations are 0
         # Image 0: has a, b (not c)
-        row_0 = result.filter(pl.col("item_id") == 0)
+        row_0 = result.filter(pl.col("item_index") == 0)
         assert row_0["a"][0] == 1
         assert row_0["b"][0] == 1
         assert row_0["c"][0] == 0
         assert row_0["Total"][0] == 2
 
         # Image 1: has c (not a, b)
-        row_1 = result.filter(pl.col("item_id") == 1)
+        row_1 = result.filter(pl.col("item_index") == 1)
         assert row_1["a"][0] == 0
         assert row_1["b"][0] == 0
         assert row_1["c"][0] == 1
         assert row_1["Total"][0] == 1
 
         # Image 2: has a, c (not b)
-        row_2 = result.filter(pl.col("item_id") == 2)
+        row_2 = result.filter(pl.col("item_index") == 2)
         assert row_2["a"][0] == 1
         assert row_2["b"][0] == 0
         assert row_2["c"][0] == 1
@@ -508,8 +508,8 @@ class TestOutliersOutput:
         """Test aggregate_by_item with empty DataFrame."""
         df = pl.DataFrame(
             schema={
-                "item_id": pl.Int64,
-                "target_id": pl.Int64,
+                "item_index": pl.Int64,
+                "target_index": pl.Int64,
                 "metric_name": pl.Categorical("lexical"),
                 "metric_value": pl.Float64,
             },
@@ -519,8 +519,8 @@ class TestOutliersOutput:
 
         # Should return empty DataFrame with item_id, target_id, and Total columns
         assert result.shape[0] == 0
-        assert "item_id" in result.columns
-        assert "target_id" in result.columns
+        assert "item_index" in result.columns
+        assert "target_index" in result.columns
         assert "Total" in result.columns
 
     def test_aggregate_by_item_raises_on_list(self):
@@ -533,11 +533,11 @@ class TestOutliersOutput:
         """Test aggregate_by_item with actual target_ids (object detection)."""
         df = pl.DataFrame(
             [
-                {"item_id": 0, "target_id": 0, "metric_name": "contrast", "metric_value": 1.0},
-                {"item_id": 0, "target_id": 0, "metric_name": "depth", "metric_value": 1.0},
-                {"item_id": 0, "target_id": 1, "metric_name": "contrast", "metric_value": 1.0},
-                {"item_id": 1, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},  # image-level
-                {"item_id": 1, "target_id": 0, "metric_name": "depth", "metric_value": 1.0},
+                {"item_index": 0, "target_index": 0, "metric_name": "contrast", "metric_value": 1.0},
+                {"item_index": 0, "target_index": 0, "metric_name": "depth", "metric_value": 1.0},
+                {"item_index": 0, "target_index": 1, "metric_name": "contrast", "metric_value": 1.0},
+                {"item_index": 1, "target_index": None, "metric_name": "contrast", "metric_value": 1.0},  # image-level
+                {"item_index": 1, "target_index": 0, "metric_name": "depth", "metric_value": 1.0},
             ],
         )
         output = OutliersOutput(df)
@@ -548,10 +548,10 @@ class TestOutliersOutput:
         assert result.shape == (4, 5)
 
         # Check column names
-        assert "item_id" in result.columns
-        assert "target_id" in result.columns
+        assert "item_index" in result.columns
+        assert "target_index" in result.columns
         assert "Total" in result.columns
-        assert set(result.columns) == {"item_id", "target_id", "contrast", "depth", "Total"}
+        assert set(result.columns) == {"item_index", "target_index", "contrast", "depth", "Total"}
 
         # Verify correct grouping by (item_id, target_id)
         # Image 0, target 0: has both contrast and depth (Total=2)
@@ -561,15 +561,15 @@ class TestOutliersOutput:
         assert result["Total"].to_list() == [2, 1, 1, 1]
 
         # Check data types - target_id should be Int64 since we have actual values
-        assert result["item_id"].dtype == pl.Int64
-        assert result["target_id"].dtype == pl.Int64
+        assert result["item_index"].dtype == pl.Int64
+        assert result["target_index"].dtype == pl.Int64
 
     def test_aggregate_by_metric_empty(self):
         """Test aggregate_by_metric with empty DataFrame."""
         df = pl.DataFrame(
             schema={
-                "item_id": pl.Int64,
-                "target_id": pl.Int64,
+                "item_index": pl.Int64,
+                "target_index": pl.Int64,
                 "metric_name": pl.Categorical("lexical"),
                 "metric_value": pl.Float64,
             },
@@ -589,12 +589,12 @@ class TestOutliersOutput:
         # Create DataFrame without target_id column (image-level only)
         df = pl.DataFrame(
             [
-                {"item_id": 0, "metric_name": "contrast", "metric_value": 1.0},
-                {"item_id": 0, "metric_name": "depth", "metric_value": 1.0},
-                {"item_id": 0, "metric_name": "skew", "metric_value": 1.0},
-                {"item_id": 1, "metric_name": "contrast", "metric_value": 1.0},
-                {"item_id": 2, "metric_name": "depth", "metric_value": 1.0},
-                {"item_id": 2, "metric_name": "skew", "metric_value": 1.0},
+                {"item_index": 0, "metric_name": "contrast", "metric_value": 1.0},
+                {"item_index": 0, "metric_name": "depth", "metric_value": 1.0},
+                {"item_index": 0, "metric_name": "skew", "metric_value": 1.0},
+                {"item_index": 1, "metric_name": "contrast", "metric_value": 1.0},
+                {"item_index": 2, "metric_name": "depth", "metric_value": 1.0},
+                {"item_index": 2, "metric_name": "skew", "metric_value": 1.0},
             ],
         )
         output = OutliersOutput(df)
@@ -605,14 +605,14 @@ class TestOutliersOutput:
         assert result.shape == (3, 5)
 
         # Check column names - should NOT have target_id
-        assert "item_id" in result.columns
-        assert "target_id" not in result.columns
+        assert "item_index" in result.columns
+        assert "target_index" not in result.columns
         assert "Total" in result.columns
-        assert set(result.columns) == {"item_id", "contrast", "depth", "skew", "Total"}
+        assert set(result.columns) == {"item_index", "contrast", "depth", "skew", "Total"}
 
         # Verify items sorted by Total
         assert result["Total"].to_list() == [3, 1, 2]
-        assert result["item_id"].to_list() == [0, 1, 2]
+        assert result["item_index"].to_list() == [0, 1, 2]
 
     def test_aggregate_by_class_empty(self):
         """Test aggregate_by_class with empty DataFrame."""
@@ -620,8 +620,8 @@ class TestOutliersOutput:
 
         df = pl.DataFrame(
             schema={
-                "item_id": pl.Int64,
-                "target_id": pl.Int64,
+                "item_index": pl.Int64,
+                "target_index": pl.Int64,
                 "metric_name": pl.Categorical("lexical"),
                 "metric_value": pl.Float64,
             },
@@ -653,7 +653,7 @@ class TestOutliersCoverageImprovements:
 
         # Should return empty DataFrame with correct schema
         assert isinstance(result.issues, pl.DataFrame)
-        assert "item_id" in result.issues.columns
+        assert "item_index" in result.issues.columns
         assert "metric_name" in result.issues.columns
         assert "metric_value" in result.issues.columns
 
@@ -696,7 +696,7 @@ class TestOutliersCoverageImprovements:
 
         # Check that empty DataFrames have correct schema
         for df in result.issues:
-            assert "item_id" in df.columns
+            assert "item_index" in df.columns
             assert "metric_name" in df.columns
             assert "metric_value" in df.columns
 
@@ -707,8 +707,8 @@ class TestOutliersEdgeCases:
         """Covers __len__ for multiple dataframes."""
         # Single DF - must have the required columns for __len__ to work
         empty_schema = {
-            "item_id": pl.Int64,
-            "target_id": pl.Int64,
+            "item_index": pl.Int64,
+            "target_index": pl.Int64,
             "metric_name": pl.Categorical("lexical"),
             "metric_value": pl.Float64,
         }
@@ -792,8 +792,8 @@ class TestOutliersEdgeCases:
 
         # Test from_stats which uses the same logic
         output = detector.from_stats(mock_stats)  # type: ignore
-        assert "target_id" not in output.issues.columns
-        assert output.issues["item_id"].to_list() == [1]
+        assert "target_index" not in output.issues.columns
+        assert output.issues["item_index"].to_list() == [1]
 
     def test_from_stats_multiple_datasets_filtering(self):
         """
@@ -834,7 +834,7 @@ class TestOutliersEdgeCases:
         # The outlier is at combined index 2 (value 1000.0), with source_index.item = 1
         # After splitting via get_dataset_step_from_idx(1, [1, 4]) -> (1, 0)
         assert output.issues[1].shape[0] == 1
-        assert output.issues[1]["item_id"][0] == 0
+        assert output.issues[1]["item_index"][0] == 0
 
     def test_get_outlier_mask_branches(self):
         """Covers _get_outlier_mask specific branches (all nan, empty)."""
