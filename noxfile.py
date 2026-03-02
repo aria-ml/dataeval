@@ -94,11 +94,6 @@ nox.options.sessions = ["test", "type", "deps", "lint", "docsync", "doclint", "d
 
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
-RESTORE_CMD = """
-if (which git) > /dev/null; then
-    git restore ./reference/autoapi/dataeval/index.rst;
-fi
-"""
 
 
 def get_python_version(session: nox.Session) -> str:
@@ -280,7 +275,6 @@ def docs(session: nox.Session) -> None:
     if not skip_notebooks:
         # Clean up stale cache entries after sphinx-build updates the cache
         session.run("python", "../../docs/check_notebook_cache.py", "--clean")
-    session.run_always("bash", "-c", RESTORE_CMD, external=True)
 
 
 @session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"], uv_sync_locked=False)
