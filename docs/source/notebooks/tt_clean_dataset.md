@@ -131,7 +131,7 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result,
 
     # Filter issues DataFrame for the specific metric
     metric_issues = outlier_result.issues.filter(pl.col("metric_name") == metric)
-    image_ids = metric_issues["item_id"].unique().to_list()
+    image_ids = metric_issues["item_index"].unique().to_list()
 
     if not image_ids:
         print(f"No images flagged for metric: {metric}")
@@ -145,7 +145,7 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result,
     # Calculate distance from median for each flagged image and sort by distance (descending)
     metric_values_with_ids = []
     for img_id in image_ids:
-        metric_value = metric_issues.filter(pl.col("item_id") == img_id)["metric_value"][0]
+        metric_value = metric_issues.filter(pl.col("item_index") == img_id)["metric_value"][0]
         distance_from_median = abs(metric_value - median)
         metric_values_with_ids.append((img_id, metric_value, distance_from_median))
 

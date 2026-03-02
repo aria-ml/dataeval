@@ -1,4 +1,4 @@
-"""Tests for dual-key (image_index, target_index) indexing in Metadata."""
+"""Tests for dual-key (item_index, target_index) indexing in Metadata."""
 
 import numpy as np
 import pytest
@@ -59,7 +59,7 @@ class TestDualKeyIndexing:
         image_rows = md.image_data
         assert len(image_rows) == 3
         assert all(image_rows["target_index"].is_null())
-        assert image_rows["image_index"].to_list() == [0, 1, 2]
+        assert image_rows["item_index"].to_list() == [0, 1, 2]
 
         # Check target-level rows (2 + 1 + 3 = 6 detections)
         target_rows = md.target_data
@@ -72,15 +72,15 @@ class TestDualKeyIndexing:
         target_rows = md.target_data
 
         # Image 0 should have targets 0, 1
-        img0_targets = target_rows.filter(target_rows["image_index"] == 0)
+        img0_targets = target_rows.filter(target_rows["item_index"] == 0)
         assert img0_targets["target_index"].to_list() == [0, 1]
 
         # Image 1 should have target 0
-        img1_targets = target_rows.filter(target_rows["image_index"] == 1)
+        img1_targets = target_rows.filter(target_rows["item_index"] == 1)
         assert img1_targets["target_index"].to_list() == [0]
 
         # Image 2 should have targets 0, 1, 2
-        img2_targets = target_rows.filter(target_rows["image_index"] == 2)
+        img2_targets = target_rows.filter(target_rows["item_index"] == 2)
         assert img2_targets["target_index"].to_list() == [0, 1, 2]
 
     def test_image_level_metadata_no_duplication(self, od_dataset_with_metadata):
@@ -121,7 +121,7 @@ class TestDualKeyIndexing:
         img0_factors = md.get_image_factors(0)
         assert img0_factors["weather"] == "sunny"
         assert img0_factors["time"] == "morning"
-        assert img0_factors["image_index"] == 0
+        assert img0_factors["item_index"] == 0
 
         # Get factors for image 1
         img1_factors = md.get_image_factors(1)
@@ -134,19 +134,19 @@ class TestDualKeyIndexing:
 
         # Get first target of image 0
         target_factors = md.get_target_factors(0, 0)
-        assert target_factors["image_index"] == 0
+        assert target_factors["item_index"] == 0
         assert target_factors["target_index"] == 0
         assert target_factors["class_label"] == 0
 
         # Get second target of image 0
         target_factors = md.get_target_factors(0, 1)
-        assert target_factors["image_index"] == 0
+        assert target_factors["item_index"] == 0
         assert target_factors["target_index"] == 1
         assert target_factors["class_label"] == 1
 
         # Get only target of image 1
         target_factors = md.get_target_factors(1, 0)
-        assert target_factors["image_index"] == 1
+        assert target_factors["item_index"] == 1
         assert target_factors["target_index"] == 0
         assert target_factors["class_label"] == 1
 

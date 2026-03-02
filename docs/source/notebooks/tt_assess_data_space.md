@@ -65,9 +65,8 @@ groups, you can build more robust and reliable models that generalize well in re
 You'll begin by importing the necessary libraries for this tutorial.
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 try:
     import google.colab  # noqa: F401
 
@@ -263,10 +262,10 @@ Let's see how many images were flagged by using the `Outliers` detector.
 ```{code-cell} ipython3
 # Use the new Outliers.from_clusters() method
 detector = Outliers()
-result = detector.from_clusters(normalized_embs, output, threshold=3.0)
+result = detector.from_clusters(normalized_embs, output, cluster_threshold=3.0)
 
 # Extract the outlier indices from the result
-outliers = result.aggregate_by_item()["item_id"].to_list()
+outliers = result.aggregate_by_item()["item_index"].to_list()
 
 print(f"Number of outliers: {len(outliers)}")
 ```

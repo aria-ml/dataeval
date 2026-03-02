@@ -56,9 +56,8 @@ dimension being \<=1000).
 Let's import the required libraries needed to set up a minimal working example.
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 try:
     import google.colab  # noqa: F401
 
@@ -146,9 +145,8 @@ clusters["clusters"]
 ```
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 ### TEST ASSERTION CELL ###
 assert clusters["clusters"].max() == 4
 assert clusters["clusters"].min() == -1
@@ -182,7 +180,7 @@ duplicates_result = duplicates_detector.from_clusters(clusters)
 print("near image duplicates: ", duplicates_result.items.near)
 
 outliers_detector = Outliers()
-outliers_result = outliers_detector.from_clusters(test_data, clusters, threshold=3)
+outliers_result = outliers_detector.from_clusters(test_data, clusters, cluster_threshold=3)
 print("outliers: ", outliers_result.issues)
 ```
 
@@ -190,9 +188,8 @@ We can see that there was one outlier and there are also 2 sets of near duplicat
 points).
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 ### TEST ASSERTION CELL ###
 assert len(outliers_result.issues) == 1
 assert duplicates_result.items.near is not None

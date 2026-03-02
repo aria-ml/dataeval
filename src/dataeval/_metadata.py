@@ -531,9 +531,9 @@ class Metadata(Array, FeatureExtractor):
         Returns
         -------
         pl.DataFrame
-            DataFrame with columns for image_index, target_index, class_label, scores,
+            DataFrame with columns for item_index, target_index, class_label, scores,
             bounding boxes (when applicable), and all processed metadata factors.
-            Rows where target_index is None contain image-level data.
+            Rows where target_index is None contain datum-level data.
             Rows where target_index is an integer contain target/detection-level data.
 
         Notes
@@ -770,19 +770,19 @@ class Metadata(Array, FeatureExtractor):
         Examples
         --------
         >>> metadata = Metadata(dataset)
-        >>> metadata.image_data.select("image_index", "time_of_day", "weather", "location").head(5)
+        >>> metadata.image_data.select("item_index", "time_of_day", "weather", "location").head(5)
         shape: (5, 4)
-        ┌─────────────┬─────────────┬─────────┬──────────┐
-        │ image_index ┆ time_of_day ┆ weather ┆ location │
-        │ ---         ┆ ---         ┆ ---     ┆ ---      │
-        │ i64         ┆ str         ┆ str     ┆ str      │
-        ╞═════════════╪═════════════╪═════════╪══════════╡
-        │ 0           ┆ dawn        ┆ rainy   ┆ suburban │
-        │ 1           ┆ day         ┆ rainy   ┆ rural    │
-        │ 2           ┆ dawn        ┆ clear   ┆ maritime │
-        │ 3           ┆ dusk        ┆ rainy   ┆ maritime │
-        │ 4           ┆ dusk        ┆ clear   ┆ suburban │
-        └─────────────┴─────────────┴─────────┴──────────┘
+        ┌────────────┬─────────────┬─────────┬──────────┐
+        │ item_index ┆ time_of_day ┆ weather ┆ location │
+        │ ---        ┆ ---         ┆ ---     ┆ ---      │
+        │ i64        ┆ str         ┆ str     ┆ str      │
+        ╞════════════╪═════════════╪═════════╪══════════╡
+        │ 0          ┆ dawn        ┆ rainy   ┆ suburban │
+        │ 1          ┆ day         ┆ rainy   ┆ rural    │
+        │ 2          ┆ dawn        ┆ clear   ┆ maritime │
+        │ 3          ┆ dusk        ┆ rainy   ┆ maritime │
+        │ 4          ┆ dusk        ┆ clear   ┆ suburban │
+        └────────────┴─────────────┴─────────┴──────────┘
         """
         self._structure()
         if self.has_targets():
@@ -814,19 +814,19 @@ class Metadata(Array, FeatureExtractor):
         Examples
         --------
         >>> metadata = Metadata(dataset)
-        >>> metadata.target_data.select("image_index", "target_index", "class_label").head(5)
+        >>> metadata.target_data.select("item_index", "target_index", "class_label").head(5)
         shape: (5, 3)
-        ┌─────────────┬──────────────┬─────────────┐
-        │ image_index ┆ target_index ┆ class_label │
-        │ ---         ┆ ---          ┆ ---         │
-        │ i64         ┆ i64          ┆ i64         │
-        ╞═════════════╪══════════════╪═════════════╡
-        │ 0           ┆ 0            ┆ 0           │
-        │ 1           ┆ 0            ┆ 3           │
-        │ 1           ┆ 1            ┆ 2           │
-        │ 1           ┆ 2            ┆ 1           │
-        │ 2           ┆ 0            ┆ 1           │
-        └─────────────┴──────────────┴─────────────┘
+        ┌────────────┬──────────────┬─────────────┐
+        │ item_index ┆ target_index ┆ class_label │
+        │ ---        ┆ ---          ┆ ---         │
+        │ i64        ┆ i64          ┆ i64         │
+        ╞════════════╪══════════════╪═════════════╡
+        │ 0          ┆ 0            ┆ 0           │
+        │ 1          ┆ 0            ┆ 3           │
+        │ 1          ┆ 1            ┆ 2           │
+        │ 1          ┆ 2            ┆ 1           │
+        │ 2          ┆ 0            ┆ 1           │
+        └────────────┴──────────────┴─────────────┘
         """
         self._structure()
         return self._dataframe.filter(pl.col("target_index").is_not_null())
@@ -856,7 +856,7 @@ class Metadata(Array, FeatureExtractor):
         'suburban'
         """
         self._structure()
-        row = self.image_data.filter(pl.col("image_index") == image_idx)
+        row = self.image_data.filter(pl.col("item_index") == image_idx)
         if row.height == 0:
             raise ValueError(f"No image found with index {image_idx}")
         return row.to_dicts()[0]
@@ -880,7 +880,7 @@ class Metadata(Array, FeatureExtractor):
         --------
         >>> metadata = Metadata(dataset)
         >>> factors = metadata.get_target_factors(1, 1)
-        >>> factors["image_index"]
+        >>> factors["item_index"]
         1
         >>> factors["target_index"]
         1
@@ -888,9 +888,9 @@ class Metadata(Array, FeatureExtractor):
         2
         """
         self._structure()
-        row = self.target_data.filter((pl.col("image_index") == image_idx) & (pl.col("target_index") == target_idx))
+        row = self.target_data.filter((pl.col("item_index") == image_idx) & (pl.col("target_index") == target_idx))
         if row.height == 0:
-            raise ValueError(f"No target found with image_index={image_idx}, target_index={target_idx}")
+            raise ValueError(f"No target found with item_index={image_idx}, target_index={target_idx}")
         return row.to_dicts()[0]
 
     def _filter(self, factor: str | tuple[str, Any]) -> bool:
@@ -949,7 +949,7 @@ class Metadata(Array, FeatureExtractor):
             Used to replicate image metadata to target rows
         """
         target_rows = {
-            "image_index": srcidx.tolist() if isinstance(srcidx, np.ndarray) else list(srcidx),
+            "item_index": srcidx.tolist() if isinstance(srcidx, np.ndarray) else list(srcidx),
             "target_index": target_idx.tolist() if isinstance(target_idx, np.ndarray) else list(target_idx),
             "class_label": labels.tolist() if isinstance(labels, np.ndarray) else list(labels),
             "score": scores.tolist() if isinstance(scores, np.ndarray) else list(scores),
@@ -1007,7 +1007,7 @@ class Metadata(Array, FeatureExtractor):
     def _build_image_rows(self, datum_count: int, image_factor_dict: dict[str, Any]) -> dict[str, list]:
         """Build image-level rows with metadata."""
         image_rows = {
-            "image_index": list(range(datum_count)),
+            "item_index": list(range(datum_count)),
             "target_index": [None] * datum_count,
             "class_label": [None] * datum_count,
             "score": [None] * datum_count,
@@ -1026,7 +1026,7 @@ class Metadata(Array, FeatureExtractor):
     def _combine_rows(self, image_rows: dict[str, list], target_rows: dict[str, list]) -> dict[str, list]:
         """Combine image-level and target-level rows into a single dictionary."""
         combined_rows = {}
-        num_image_rows = len(image_rows["image_index"])
+        num_image_rows = len(image_rows["item_index"])
 
         for key in target_rows:
             if key in image_rows:
@@ -1277,7 +1277,7 @@ class Metadata(Array, FeatureExtractor):
 
         index2label = self._dataset.metadata.get("index2label", {i: str(i) for i in np.unique(labels)})
         target_idx = self._compute_target_indices(srcidx, datum_count, bool(self._has_targets))
-        reserved = ["image_index", "target_index", "class_label", "score", "box"]
+        reserved = ["item_index", "target_index", "class_label", "score", "box"]
         target_factor_dict = {}
 
         # Build target-level and image-level rows
