@@ -58,8 +58,8 @@ class ResultAggregator:
         value : float | NDArray
             Metric value (scalar or array)
         """
-        # Convert value to array and flatten
-        value_array = np.array(value).ravel()
+        # Convert value to float64 array and flatten
+        value_array = np.asarray(value, dtype=np.float64).ravel()
 
         # Initialize storage if first time seeing this metric
         if metric_name not in self._storage:
@@ -73,8 +73,12 @@ class ResultAggregator:
 
             self._storage[metric_name] = np.zeros(shape)
 
-        # Store the value
-        self._storage[metric_name][run, step] = value_array
+        # Store the value — use .item() for scalar metrics to avoid
+        # assigning an ndim>0 array to a scalar position (NumPy >= 1.25)
+        if self._storage[metric_name].ndim == 2:
+            self._storage[metric_name][run, step] = value_array.item()
+        else:
+            self._storage[metric_name][run, step] = value_array
 
     def get_results(self) -> dict[str, NDArray[np.floating]]:
         """
