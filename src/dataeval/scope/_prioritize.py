@@ -393,7 +393,6 @@ class Prioritize(Evaluator):
 
     See Also
     --------
-    :class:`~dataeval.quality.Outliers`
     :class:`~dataeval.selection.Indices`
     :func:`dataeval.core.rank_knn`
     :func:`dataeval.core.rank_kmeans_distance`
@@ -405,7 +404,7 @@ class Prioritize(Evaluator):
     --------
     Using factory methods (recommended):
 
-    >>> from dataeval.quality import Prioritize
+    >>> from dataeval.scope import Prioritize
     >>>
     >>> # KNN with default policy (difficulty/easy_first)
     >>> result = Prioritize.knn(extractor, k=10).evaluate(unlabeled_data)

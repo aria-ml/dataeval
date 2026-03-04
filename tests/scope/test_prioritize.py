@@ -8,7 +8,7 @@ from dataeval._embeddings import Embeddings
 from dataeval.core._rank import RankResult
 from dataeval.extractors import TorchExtractor
 from dataeval.protocols import AnnotatedDataset
-from dataeval.quality._prioritize import Prioritize, PrioritizeOutput
+from dataeval.scope._prioritize import Prioritize, PrioritizeOutput
 
 
 class TestPrioritize:

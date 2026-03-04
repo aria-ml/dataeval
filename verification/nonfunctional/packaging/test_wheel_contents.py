@@ -25,6 +25,7 @@ class TestWheelContents:
             "dataeval.bias",
             "dataeval.core",
             "dataeval.quality",
+            "dataeval.scope",
             "dataeval.selection",
             "dataeval.shift",
             "dataeval.extractors",
