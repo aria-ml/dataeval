@@ -203,7 +203,7 @@ class BoundingBox:
         return self._image_shape[-2], self._image_shape[-1]
 
     def area(self) -> float:
-        """Calculate bounding box area."""
+        """Compute bounding box area."""
         return (self._x1 - self._x0) * (self._y1 - self._y0)
 
     def center(self) -> tuple[float, float]:

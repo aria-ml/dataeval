@@ -4,7 +4,7 @@ import logging
 from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
-from functools import cached_property, partial
+from functools import partial
 from itertools import zip_longest
 from typing import Any, TypedDict, cast
 
@@ -14,32 +14,21 @@ from numpy.typing import NDArray
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
+from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats, resolve_dependencies
-from dataeval.protocols import (
-    ArrayLike,
-    Dataset,
-    ObjectDetectionTarget,
-    ProgressCallback,
-)
+from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback
 from dataeval.types import SourceIndex
 from dataeval.utils.data import unzip_dataset
 from dataeval.utils.poolwrapper import PoolWrapper
-from dataeval.utils.preprocessing import (
-    BoundingBox,
-    BoxLike,
-    clip_and_pad,
-    normalize_image_shape,
-    rescale,
-    to_bounding_box,
-)
+from dataeval.utils.preprocessing import BoundingBox, BoxLike, to_bounding_box
 
 _logger = logging.getLogger(__name__)
 
 SOURCE_INDEX = "source_index"
 
 
-class CalculationResult(TypedDict):
+class StatsResult(TypedDict):
     """
     Type definition for calculation output.
 
@@ -68,7 +57,7 @@ class CalculationResult(TypedDict):
 
 
 @dataclass
-class CalculatorResult:
+class DatumResult:
     """Result from processing a single image/box combination."""
 
     source_indices: list[SourceIndex]
@@ -76,65 +65,13 @@ class CalculatorResult:
 
 
 @dataclass
-class CalculatorOutput:
+class DatumBatchResult:
     """Output from processing multiple images."""
 
-    results: list[CalculatorResult]
+    results: list[DatumResult]
     object_count: int
     invalid_box_count: int
     warnings_list: list[str]
-
-
-class CalculatorCache:
-    """
-    A calculator cache for a single datum (image, text, etc.).
-
-    Provides preprocessing and cached transformations of the raw datum.
-    This class adapts based on the data type passed in.
-    """
-
-    def __init__(self, datum: Any, box: BoundingBox | None = None, per_channel: bool = False) -> None:
-        is_spatial = len(datum.shape) >= 2
-        self.raw = datum
-        # Assume image data for now (will be generic in future)
-        self.width: int = datum.shape[-1] if is_spatial else 0
-        self.height: int = datum.shape[-2] if is_spatial else 0
-        self.shape: tuple[int, ...] = datum.shape
-        self.per_channel_mode = per_channel
-        self.has_box = box is not None
-
-        # Ensure bounding box
-        self.box = BoundingBox(0, 0, self.width, self.height, image_shape=datum.shape) if box is None else box
-
-    @cached_property
-    def image(self) -> NDArray[Any]:
-        # Only normalize image shape if we have bounding boxes, since only image/video data
-        # will have bounding box concepts. Otherwise, we cannot assume dimensionality >= 3.
-        if self.has_box:
-            return clip_and_pad(normalize_image_shape(self.raw), self.box.xyxy_int)
-        # For non-image data or data without boxes, return as-is after ensuring minimum shape
-        if self.raw.ndim >= 3:
-            return clip_and_pad(normalize_image_shape(self.raw), self.box.xyxy_int)
-        # For data with < 3 dimensions, don't normalize or clip
-        return self.raw
-
-    @cached_property
-    def is_all_nan(self) -> bool:
-        """Check if the image data is entirely NaN (e.g. from an out-of-bounds bounding box)."""
-        return bool(np.isnan(self.image).all())
-
-    @cached_property
-    def scaled(self) -> NDArray[Any]:
-        return rescale(self.image)
-
-    @cached_property
-    def per_channel(self) -> NDArray[Any]:
-        # For data with >= 3 dimensions, reshape as (channels, -1)
-        # For data with < 3 dimensions, treat as single channel
-        if self.image.ndim >= 3:
-            return self.scaled.reshape(self.image.shape[0], -1)
-        # For lower-dimensional data, add a channel dimension
-        return self.scaled.reshape(1, -1)
 
 
 def _collect_calculator_stats(
@@ -257,16 +194,15 @@ def _get_items(
     return process_items
 
 
-def _calculate_datum(
-    i: int,
-    datum: NDArray[Any],
-    boxes: list[BoundingBox] | None,
+def _compute_batch(
+    args: tuple[int, NDArray[Any], list[BoundingBox] | None],
     calculators: Iterable[tuple[type[Any], Flag]],
     per_image: bool,
     per_target: bool,
     per_channel: bool,
-) -> CalculatorOutput:
-    results: list[CalculatorResult] = []
+) -> DatumBatchResult:
+    i, datum, boxes = args
+    results: list[DatumResult] = []
     box_count = 0
     invalid_box_count = 0
     warnings_list: list[str] = []
@@ -306,22 +242,12 @@ def _calculate_datum(
         channel_indices = sorted_channels
         source = [SourceIndex(i, i_b if box is not None else None, c) for c in channel_indices]
 
-        results.append(CalculatorResult(source_indices=source, stats=reconciled_stats))
+        results.append(DatumResult(source_indices=source, stats=reconciled_stats))
 
-    return CalculatorOutput(results, box_count, invalid_box_count, warnings_list)
-
-
-def _unpack(
-    args: tuple[int, NDArray[Any], list[BoundingBox] | None],
-    calculators: Iterable[tuple[type[Any], Flag]],
-    per_image: bool,
-    per_target: bool,
-    per_channel: bool,
-) -> CalculatorOutput:
-    return _calculate_datum(*args, calculators, per_image, per_target, per_channel)
+    return DatumBatchResult(results, box_count, invalid_box_count, warnings_list)
 
 
-def _enumerate(
+def _enumerate_datum(
     images: Iterable[ArrayLike],
     boxes: Iterable[Iterable[BoxLike] | None] | None,
 ) -> Iterator[tuple[int, NDArray[Any], list[BoundingBox] | None]]:
@@ -366,8 +292,8 @@ def _sort(
     return sorted_source_indices, sorted_aggregated_stats
 
 
-def _aggregate(
-    result: CalculatorOutput,
+def _aggregate_batch(
+    result: DatumBatchResult,
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
     object_count: dict[int, int],
@@ -388,7 +314,7 @@ def _aggregate(
     warning_list.extend(result.warnings_list)
 
 
-def calculate_stats(
+def compute_stats(
     data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
@@ -397,9 +323,9 @@ def calculate_stats(
     per_target: bool = True,
     per_channel: bool = False,
     progress_callback: ProgressCallback | None = None,
-) -> CalculationResult:
+) -> StatsResult:
     """
-    Calculate specified statistics on a set of images, optionally within bounding boxes.
+    Compute specified statistics on a set of images, optionally within bounding boxes.
 
     Parameters
     ----------
@@ -427,7 +353,7 @@ def calculate_stats(
 
     Returns
     -------
-    CalculationResult
+    StatsResult
         Mapping containing computed statistics and metadata:
 
         - source_index: Sequence[SourceIndex] - SourceIndex objects with image/box/channel info
@@ -441,31 +367,31 @@ def calculate_stats(
 
     Examples
     --------
-    Calculate all statistics:
+    Compute all statistics:
 
     >>> from dataeval.flags import ImageStats
-    >>> stats = calculate_stats(images, boxes=boxes)
+    >>> stats = compute_stats(images, boxes=boxes)
 
-    Calculate specific statistics:
+    Compute specific statistics:
 
-    >>> stats = calculate_stats(images, boxes=boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
+    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
 
     Use convenience groups:
 
-    >>> stats = calculate_stats(images, boxes=boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
-    >>> stats = calculate_stats(images, boxes=boxes, stats=ImageStats.PIXEL_BASIC, per_channel=True)
+    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
+    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL_BASIC, per_channel=True)
 
-    Calculate statistics only for bounding boxes (not full images):
+    Compute statistics only for bounding boxes (not full images):
 
-    >>> stats = calculate_stats(images, boxes=boxes, per_image=False, per_target=True)
+    >>> stats = compute_stats(images, boxes=boxes, per_image=False, per_target=True)
 
-    Calculate statistics for full images only (ignore boxes):
+    Compute statistics for full images only (ignore boxes):
 
-    >>> stats = calculate_stats(images, boxes=boxes, per_image=True, per_target=False)
+    >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=False)
 
-    Calculate statistics for both full images and boxes with per-channel breakdown:
+    Compute statistics for both full images and boxes with per-channel breakdown:
 
-    >>> stats = calculate_stats(images, boxes=boxes, per_image=True, per_target=True, per_channel=True)
+    >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=True, per_channel=True)
     """
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
@@ -499,7 +425,7 @@ def calculate_stats(
         f.name for f in type(stats) if f in stats and f.name and f.value and (f.value & (f.value - 1)) == 0
     ]
     _logger.info(
-        "Starting calculate_stats: %d stats [%s], per_image=%s, per_target=%s, per_channel=%s",
+        "Starting compute_stats: %d stats [%s], per_image=%s, per_target=%s, per_channel=%s",
         len(resolved_names),
         ", ".join(resolved_names),
         per_image,
@@ -524,15 +450,15 @@ def calculate_stats(
     with PoolWrapper(processes=get_max_processes()) as p:
         for result in p.imap_unordered(
             partial(
-                _unpack,
+                _compute_batch,
                 calculators=calculators,
                 per_image=per_image,
                 per_target=per_target,
                 per_channel=per_channel,
             ),
-            _enumerate(images, boxes),
+            _enumerate_datum(images, boxes),
         ):
-            _aggregate(result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list)
+            _aggregate_batch(result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list)
             image_count += 1
 
             if progress_callback:
@@ -552,14 +478,14 @@ def calculate_stats(
     total_boxes = sum(object_count.values())
     total_invalid = sum(invalid_box_count.values())
     _logger.info(
-        "calculate_stats complete: %d images processed, %d total boxes (%d invalid), %d stats computed",
+        "compute_stats complete: %d images processed, %d total boxes (%d invalid), %d stats computed",
         image_count,
         total_boxes,
         total_invalid,
         len(sorted_aggregated_stats),
     )
 
-    return CalculationResult(
+    return StatsResult(
         source_index=sorted_source_indices,
         object_count=[object_count.get(i, 0) for i in range(image_count)],
         invalid_box_count=[invalid_box_count.get(i, 0) for i in range(image_count)],

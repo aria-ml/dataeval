@@ -191,7 +191,7 @@ def label_errors(embeddings: NDArray[Any], labels: NDArray[np.int64], k: int = 5
     """
     Identify potential label errors in a dataset using embedding geometry.
 
-    Calculates an "Intra/Extra Class Distance Ratio" for every sample. Samples are flagged
+    Computes an "Intra/Extra Class Distance Ratio" for every sample. Samples are flagged
     as errors if they are significantly closer to samples of a different class than to
     samples of their own class (score >= 1.0).
 

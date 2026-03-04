@@ -5,7 +5,7 @@ import polars as pl
 import pytest
 
 from dataeval.config import use_max_processes
-from dataeval.core import calculate_stats
+from dataeval.core import compute_stats
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
 from dataeval.extractors import FlattenExtractor
@@ -66,7 +66,7 @@ class TestOutliers:
 
     def test_outliers_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
-        stats = calculate_stats(data, stats=ImageStats.PIXEL)
+        stats = compute_stats(data, stats=ImageStats.PIXEL)
         outliers = Outliers()
         results = outliers.from_stats(stats)
         assert results is not None
@@ -79,7 +79,7 @@ class TestOutliers:
 
         with use_max_processes(1):
             _images, _boxes = unzip_dataset(dataset, True)
-            stats = calculate_stats(
+            stats = compute_stats(
                 _images,
                 boxes=_boxes,
                 stats=ImageStats.PIXEL | ImageStats.VISUAL,
@@ -98,9 +98,9 @@ class TestOutliers:
         dataset1 = np.zeros((50, 3, 16, 16))
         dataset2 = np.zeros((50, 3, 16, 16))
         dataset2[0] = 1
-        stats1 = calculate_stats(dataset1, stats=ImageStats.PIXEL)
-        stats2 = calculate_stats(dataset2, stats=ImageStats.PIXEL)
-        stats3 = calculate_stats(dataset1, stats=ImageStats.DIMENSION)
+        stats1 = compute_stats(dataset1, stats=ImageStats.PIXEL)
+        stats2 = compute_stats(dataset2, stats=ImageStats.PIXEL)
+        stats3 = compute_stats(dataset1, stats=ImageStats.DIMENSION)
         outliers = Outliers()
         results = outliers.from_stats((stats1, stats2, stats3))
         assert results is not None
@@ -114,7 +114,7 @@ class TestOutliers:
 
     def test_outliers_with_metric_thresholds(self):
         data = np.random.random((20, 3, 16, 16))
-        stats = calculate_stats(data, stats=ImageStats.VISUAL)
+        stats = compute_stats(data, stats=ImageStats.VISUAL)
         outliers = Outliers(outlier_threshold={"contrast": 2.0, "brightness": ("zscore", 2.0), "sharpness": "iqr"})
         results = outliers.from_stats(stats)
         assert results is not None
@@ -684,8 +684,8 @@ class TestOutliersCoverageImprovements:
         images1 += np.random.random(images1.shape) * 0.001
         images2 += np.random.random(images2.shape) * 0.001
 
-        stats1 = calculate_stats(images1, stats=ImageStats.PIXEL)
-        stats2 = calculate_stats(images2, stats=ImageStats.PIXEL)
+        stats1 = compute_stats(images1, stats=ImageStats.PIXEL)
+        stats2 = compute_stats(images2, stats=ImageStats.PIXEL)
 
         outliers = Outliers(outlier_threshold=ZScoreThreshold(5.0))  # Very high threshold
         result = outliers.from_stats([stats1, stats2])

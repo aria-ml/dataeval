@@ -655,7 +655,7 @@ def _multilabel_single_split(
 
 def calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: float) -> float:
     """
-    Calculate possible validation fraction based on the number of folds and test fraction.
+    Compute possible validation fraction based on the number of folds and test fraction.
 
     Parameters
     ----------

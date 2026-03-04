@@ -10,8 +10,8 @@ import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
-from dataeval.core._calculate_stats import CalculationResult, calculate_stats
 from dataeval.core._clusterer import ClusterResult, cluster
+from dataeval.core._compute_stats import StatsResult, compute_stats
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor
 from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
@@ -323,7 +323,7 @@ class Duplicates(Evaluator):
 
     Attributes
     ----------
-    stats : CalculationResult
+    stats : StatsResult
         Hash statistics computed during the last evaluate() call.
     flags : ImageStats
         Statistics to compute for duplicate detection.
@@ -392,7 +392,7 @@ class Duplicates(Evaluator):
         cluster_threshold: float | None = DEFAULT_DUPLICATES_CLUSTER_THRESHOLD
         merge_near_duplicates: bool = DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES
 
-    stats: CalculationResult
+    stats: StatsResult
     flags: ImageStats
     cluster_threshold: float | None
     merge_near_duplicates: bool
@@ -729,27 +729,27 @@ class Duplicates(Evaluator):
     @overload
     def from_stats(
         self,
-        stats: CalculationResult,
+        stats: StatsResult,
     ) -> DuplicatesOutput: ...
 
     @overload
     def from_stats(
         self,
-        stats: CalculationResult,
-        *other_stats: CalculationResult,
+        stats: StatsResult,
+        *other_stats: StatsResult,
     ) -> DuplicatesOutput: ...
 
     @overload
     def from_stats(
         self,
-        stats: Sequence[CalculationResult],
+        stats: Sequence[StatsResult],
     ) -> DuplicatesOutput: ...
 
     @set_metadata
     def from_stats(
         self,
-        stats: CalculationResult | Sequence[CalculationResult],
-        *other_stats: CalculationResult,
+        stats: StatsResult | Sequence[StatsResult],
+        *other_stats: StatsResult,
     ) -> DuplicatesOutput:
         """
         Find duplicates from pre-computed hash statistics.
@@ -759,12 +759,12 @@ class Duplicates(Evaluator):
 
         Parameters
         ----------
-        stats : CalculationResult | Sequence[CalculationResult]
+        stats : StatsResult | Sequence[StatsResult]
             Pre-computed statistics containing hash values. Must include
             at least one of: xxhash, phash, dhash, rhash. Can be a single
             result, a sequence of results, or multiple results passed as
             positional arguments.
-        *other_stats : CalculationResult
+        *other_stats : StatsResult
             Additional statistics from other datasets for cross-dataset
             duplicate detection.
 
@@ -785,7 +785,7 @@ class Duplicates(Evaluator):
             return DuplicatesOutput(items=item_result, targets=target_result)
 
         # Handle multiple stats case
-        stats_list: list[CalculationResult]
+        stats_list: list[StatsResult]
         stats_list = [stats, *other_stats] if isinstance(stats, dict) else list(stats)
 
         # Combine stats from multiple datasets
@@ -1065,7 +1065,7 @@ class Duplicates(Evaluator):
 
         # Hash-based duplicate detection
         if self.flags & ImageStats.HASH:
-            self.stats = calculate_stats(
+            self.stats = compute_stats(
                 data, stats=self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target
             )
             hash_item_result, hash_target_result = self._get_duplicates(self.stats["stats"], self.stats["source_index"])

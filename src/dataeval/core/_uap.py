@@ -23,7 +23,7 @@ def uap(labels: Array2D[int], scores: Array2D[float]) -> float:
     Estimate the empirical mean precision for the upperbound average precision.
 
     .. warning::
-       This function is experimental and may change or be removed in future releases.
+       This feature is experimental and may change or be removed in future releases.
 
     Uses the FR Test Statistic based approach.
 

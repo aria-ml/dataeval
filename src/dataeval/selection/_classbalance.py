@@ -255,7 +255,7 @@ class ClassBalance(Selection[Any]):
         current_list: Sequence[int],
     ) -> list[float]:
         """
-        Calculate normalized selection probabilities for images to minimize duplicates.
+        Compute normalized selection probabilities for images to minimize duplicates.
 
         Computes a score for each candidate image that penalizes images already selected
         multiple times and images containing labels other than the target class.

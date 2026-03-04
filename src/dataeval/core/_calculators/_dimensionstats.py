@@ -1,18 +1,16 @@
 __all__ = []
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.core._calculators._base import Calculator
+from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
 from dataeval.utils.preprocessing import get_bitdepth
-
-if TYPE_CHECKING:
-    from dataeval.core._calculate_stats import CalculatorCache
 
 
 @CalculatorRegistry.register(ImageStats)

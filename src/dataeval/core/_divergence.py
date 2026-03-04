@@ -81,7 +81,7 @@ def _compute_fnn_errors(embeddings: ArrayND[float], labels: ArrayND[int]) -> int
 
 def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceResult:
     """
-    Calculate the :term:`divergence` by counting "between dataset" edges in the minimum spanning tree.
+    Compute the :term:`divergence` by counting "between dataset" edges in the minimum spanning tree.
 
     Parameters
     ----------
@@ -135,7 +135,7 @@ def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
 
 def divergence_fnn(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceResult:
     """
-    Calculate the :term:`divergence` by counting label disagreements between nearest neighbors.
+    Compute the :term:`divergence` by counting label disagreements between nearest neighbors.
 
     Counts the label disagreements between nearest neighbors in the datasets.
 

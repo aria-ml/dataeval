@@ -20,6 +20,9 @@ class ParityResult(TypedDict):
     """
     Type definition for parity output.
 
+    .. warning::
+       This feature is experimental and may change or be removed in future releases.
+
     Attributes
     ----------
     scores : NDArray[np.float64]
@@ -44,10 +47,10 @@ def parity(
     class_labels: Array1D[int],
 ) -> ParityResult:
     """
-    Calculate statistical parity using Bias-Corrected Cramér's V.
+    Compute statistical parity using Bias-Corrected Cramér's V.
 
     .. warning::
-       This function is experimental and may change or be removed in future releases.
+       This feature is experimental and may change or be removed in future releases.
 
     This function measures the association between metadata factors and class labels
     to identify potential bias or spurious correlations. It assumes an equal distribution

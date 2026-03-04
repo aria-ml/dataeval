@@ -1,5 +1,5 @@
 """
-DataEval provides a simple interface to characterize image data and its impact on model performance.
+DataEval provides a simple interface to characterize visual data and its impact on model performance.
 
 It works across classification and object-detection tasks. It also provides capabilities to select and curate
 datasets to test and train performant, robust, unbiased and reliable AI models and monitor for data

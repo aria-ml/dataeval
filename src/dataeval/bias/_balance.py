@@ -57,7 +57,7 @@ class BalanceOutput(DictOutput):
 
 class Balance(Evaluator):
     """
-    Calculates mutual information (MI) between factors (class label, metadata, label/image properties).
+    Computes mutual information (MI) between factors (class label, metadata, label/image properties).
 
     Identifies imbalanced classes and highly correlated metadata factors based on
     mutual information thresholds.

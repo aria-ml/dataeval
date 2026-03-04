@@ -91,7 +91,7 @@ from dataeval import Metadata
 
 # Load the classes from DataEval that are helpful for EDA
 from dataeval.config import set_max_processes
-from dataeval.core import calculate_stats, label_stats
+from dataeval.core import compute_stats, label_stats
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, Outliers
 
@@ -586,7 +586,7 @@ dupes = [
     np.flip(np.rot90(ds[200][0], k=2, axes=(1, 2)), axis=2),  # 180° rotation + horizontal flip
 ]
 
-dupes_stats = calculate_stats(dupes, stats=ImageStats.HASH)
+dupes_stats = compute_stats(dupes, stats=ImageStats.HASH)
 ```
 
 ```{code-cell} ipython3
