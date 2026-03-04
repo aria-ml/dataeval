@@ -7,8 +7,8 @@ import polars as pl
 import pytest
 
 from dataeval._metadata import FactorInfo, Metadata, _binned
-from dataeval.core import calculate_stats
-from dataeval.core._calculate_ratios import calculate_ratios
+from dataeval.core import compute_stats
+from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._label_stats import label_stats
 from dataeval.flags import ImageStats
 from dataeval.utils.data import unzip_dataset
@@ -96,7 +96,7 @@ class TestMetadata:
         assert stats["label_counts_per_image"] == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
 
         _img, _box = unzip_dataset(mock_ds, False)
-        imgstats = calculate_stats(
+        imgstats = compute_stats(
             _img,
             boxes=_box,
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
@@ -104,14 +104,14 @@ class TestMetadata:
             per_target=False,
         )
         _img, _box = unzip_dataset(mock_ds, True)
-        boxstats = calculate_stats(
+        boxstats = compute_stats(
             _img,
             boxes=_box,
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
             per_image=False,
             per_target=True,
         )
-        ratiostats = calculate_ratios(imgstats, target_stats_output=boxstats)
+        ratiostats = compute_ratios(imgstats, target_stats_output=boxstats)
         assert len(imgstats["source_index"]) == 10
         assert len(boxstats["source_index"]) == 16
         assert len(ratiostats["source_index"]) == 16

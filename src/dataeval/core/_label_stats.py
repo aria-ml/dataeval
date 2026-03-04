@@ -59,7 +59,7 @@ def label_stats(
     image_count: int | None = None,
 ) -> LabelStatsResult:
     """
-    Calculate statistics for data labels.
+    Compute statistics for data labels.
 
     This function computes counting metrics (e.g., total per class, total per image)
     on the labels. This is a core computation function that operates on basic data
@@ -100,7 +100,7 @@ def label_stats(
 
     Examples
     --------
-    Calculate basic statistics on labels for object detection.
+    Compute basic statistics on labels for object detection.
 
     >>> class_labels = [0, 0, 1, 1, 2, 0, 1, 2, 3]
     >>> item_indices = [0, 0, 0, 1, 1, 3, 3, 3, 3]  # image 2 is empty
@@ -115,7 +115,7 @@ def label_stats(
     >>> stats["empty_image_count"]
     1
 
-    Calculate basic statistics on labels for image classification (1:1 mapping).
+    Compute basic statistics on labels for image classification (1:1 mapping).
 
     >>> class_labels = [0, 1, 2, 0]
     >>> index2label = {0: "cat", 1: "dog", 2: "bird"}

@@ -65,8 +65,9 @@ groups, you can build more robust and reliable models that generalize well in re
 You'll begin by importing the necessary libraries for this tutorial.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 

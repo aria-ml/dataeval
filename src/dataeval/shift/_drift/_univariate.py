@@ -407,7 +407,7 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
         return p_val, dist
 
     def score(self, data: Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
-        """Calculate feature-wise p-values and test statistics.
+        """Compute feature-wise p-values and test statistics.
 
         Applies the detector's statistical test independently to each feature,
         comparing the distribution of each feature between reference and test data.

@@ -2,7 +2,7 @@
 
 __all__ = [
     "BERResult",
-    "CalculationResult",
+    "StatsResult",
     "ClusterResult",
     "ClusterStats",
     "CompletenessResult",
@@ -20,12 +20,12 @@ __all__ = [
     "RankResult",
     "ber_knn",
     "ber_mst",
-    "calculate_ratios",
-    "calculate_stats",
     "cluster",
     "completeness",
     "compute_cluster_stats",
     "compute_neighbors",
+    "compute_ratios",
+    "compute_stats",
     "coverage_adaptive",
     "coverage_naive",
     "dhash",
@@ -61,10 +61,10 @@ __all__ = [
 ]
 
 from dataeval.core._ber import BERResult, ber_knn, ber_mst
-from dataeval.core._calculate_ratios import calculate_ratios
-from dataeval.core._calculate_stats import CalculationResult, calculate_stats
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
 from dataeval.core._completeness import CompletenessResult, completeness
+from dataeval.core._compute_ratios import compute_ratios
+from dataeval.core._compute_stats import StatsResult, compute_stats
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance

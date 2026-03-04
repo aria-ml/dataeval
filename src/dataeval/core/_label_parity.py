@@ -112,11 +112,11 @@ def label_parity(
     num_classes: int | None = None,
 ) -> LabelParityResult:
     """
-    Calculate the chi-square statistic to assess label distribution parity.
+    Compute the chi-square statistic to assess label distribution parity.
 
     Assess the :term:`parity<Parity>` between expected and observed label distributions.
     This function computes the frequency distribution of classes in both expected and observed labels, normalizes
-    the expected distribution to match the total number of observed labels, and then calculates the chi-square
+    the expected distribution to match the total number of observed labels, and then computes the chi-square
     statistic to determine if there is a significant difference between the two distributions.
 
     Parameters

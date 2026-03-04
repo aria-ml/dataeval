@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.core._calculate_stats import CalculationResult
+from dataeval.core._compute_stats import StatsResult
 
 StatsMap = Mapping[str, NDArray[Any]]
 
@@ -15,8 +15,8 @@ def add_calculation_results(a: StatsMap, b: StatsMap) -> StatsMap:
     return {k: np.concatenate([a[k], b[k]]) for k in a if k in b}
 
 
-def combine_results(results: CalculationResult | Sequence[CalculationResult]) -> tuple[StatsMap, list[int]]:
-    """Combine multiple CalculationResult dicts into one."""
+def combine_results(results: StatsResult | Sequence[StatsResult]) -> tuple[StatsMap, list[int]]:
+    """Combine multiple StatsResult dicts into one."""
     if isinstance(results, dict):
         return results["stats"], []
 

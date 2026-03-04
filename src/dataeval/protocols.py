@@ -921,7 +921,7 @@ class EvaluationSchedule(Protocol):
 
     def get_steps(self, dataset_length: int) -> np.typing.NDArray[np.intp]:
         """
-        Calculate evaluation points for given dataset length.
+        Compute evaluation points for given dataset length.
 
         Parameters
         ----------
@@ -1185,12 +1185,12 @@ class Threshold(Protocol):
 
     def __call__(self, data: NDArray[Any]) -> tuple[float | None, float | None]:
         """
-        Calculate threshold values based on input data.
+        Compute threshold values based on input data.
 
         Parameters
         ----------
         data : NDArray[Any]
-            Input data used to calculate the threshold. The specific requirements
+            Input data used to compute the threshold. The specific requirements
             for this data depend on the implementation of the threshold.
 
         Returns

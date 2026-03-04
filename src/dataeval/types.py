@@ -197,8 +197,7 @@ class ExecutionMetadata:
     version: str
 
     @classmethod
-    def empty(cls) -> Self:
-        """Return an empty ExecutionMetadata instance."""
+    def _empty(cls) -> Self:
         return cls(
             name="",
             execution_time=datetime.min,
@@ -224,7 +223,7 @@ class Output(Generic[T]):
         -------
         ExecutionMetadata
         """
-        return self._meta or ExecutionMetadata.empty()
+        return self._meta or ExecutionMetadata._empty()
 
 
 class DictOutput(Output[dict[str, Any]]):

@@ -10,8 +10,8 @@ from numpy.typing import NDArray
 
 from dataeval._helpers import _get_index2label, _get_item_indices
 from dataeval.config import EPSILON
-from dataeval.core._calculate_stats import CalculationResult, calculate_stats
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
+from dataeval.core._compute_stats import StatsResult, compute_stats
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, Metadata, Threshold, ThresholdLike
 from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
@@ -367,7 +367,7 @@ def _drop_null_index_columns(df: pl.DataFrame) -> pl.DataFrame:
 
 class Outliers(Evaluator):
     r"""
-    Calculates statistical outliers of a dataset using various statistical tests applied to each image.
+    Computes statistical outliers of a dataset using various statistical tests applied to each image.
 
     Supports two complementary detection methods:
 
@@ -416,7 +416,7 @@ class Outliers(Evaluator):
 
     Attributes
     ----------
-    stats : CalculationResult
+    stats : StatsResult
         Statistics computed during the last evaluate() call.
         Contains dimension, pixel, and/or visual statistics based on the flags.
     flags : ImageStats
@@ -530,7 +530,7 @@ class Outliers(Evaluator):
         outlier_threshold: ThresholdLike | dict[str, ThresholdLike] | None = None
         cluster_threshold: float = DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
 
-    stats: CalculationResult
+    stats: StatsResult
     flags: ImageStats
     outlier_threshold: ThresholdLike | dict[str, ThresholdLike] | None
     extractor: FeatureExtractor | None
@@ -716,23 +716,23 @@ class Outliers(Evaluator):
         return output_list
 
     @overload
-    def from_stats(self, stats: CalculationResult) -> OutliersOutput[pl.DataFrame]: ...
+    def from_stats(self, stats: StatsResult) -> OutliersOutput[pl.DataFrame]: ...
 
     @overload
-    def from_stats(self, stats: Sequence[CalculationResult]) -> OutliersOutput[list[pl.DataFrame]]: ...
+    def from_stats(self, stats: Sequence[StatsResult]) -> OutliersOutput[list[pl.DataFrame]]: ...
 
     @set_metadata(state=["outlier_threshold"])
     def from_stats(
         self,
-        stats: CalculationResult | Sequence[CalculationResult],
+        stats: StatsResult | Sequence[StatsResult],
     ) -> OutliersOutput[pl.DataFrame] | OutliersOutput[list[pl.DataFrame]]:
         """
         Return indices of Outliers with the issues identified for each.
 
         Parameters
         ----------
-        stats : CalculationResult | Sequence[CalculationResult]
-            The output(s) from calculate_stats() with ImageStats.DIMENSION, PIXEL, or VISUAL flags
+        stats : StatsResult | Sequence[StatsResult]
+            The output(s) from compute_stats() with ImageStats.DIMENSION, PIXEL, or VISUAL flags
 
         Returns
         -------
@@ -747,11 +747,11 @@ class Outliers(Evaluator):
         -------
         Evaluate the dataset using pre-computed stats:
 
-        >>> from dataeval.core import calculate_stats
+        >>> from dataeval.core import compute_stats
         >>> from dataeval.flags import ImageStats
         >>> from dataeval.utils.thresholds import ZScoreThreshold
 
-        >>> stats = calculate_stats(images, stats=ImageStats.PIXEL)
+        >>> stats = compute_stats(images, stats=ImageStats.PIXEL)
         >>> outliers = Outliers(outlier_threshold=ZScoreThreshold(2.5))
         >>> results = outliers.from_stats(stats)
         >>> results.issues.head(10)
@@ -1086,7 +1086,7 @@ class Outliers(Evaluator):
         outliers_dfs: list[pl.DataFrame] = []
 
         if self.flags != ImageStats.NONE:
-            self.stats = calculate_stats(data, stats=self.flags, per_image=per_image, per_target=per_target)
+            self.stats = compute_stats(data, stats=self.flags, per_image=per_image, per_target=per_target)
             outliers_dfs.append(self._get_outliers(self.stats["stats"], self.stats["source_index"]))
 
         if self.extractor is not None:

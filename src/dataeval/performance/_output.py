@@ -169,7 +169,7 @@ class SufficiencyOutput(DictOutput):
 
     def inv_project(self, targets: Mapping[str, ArrayLike] | ArrayLike, n_iter: int = 1000) -> pl.DataFrame:
         """
-        Calculate training samples needed to achieve target metric values.
+        Compute training samples needed to achieve target metric values.
 
         Parameters
         ----------
@@ -272,7 +272,7 @@ class SufficiencyOutput(DictOutput):
 
 def f_out(n_i: NDArray[Any], x: NDArray[Any]) -> NDArray[Any]:
     """
-    Calculate the line of best fit based on its free parameters.
+    Compute the line of best fit based on its free parameters.
 
     Parameters
     ----------
@@ -482,7 +482,7 @@ def get_curve_params(
     niter: int,
     unit_interval: bool,
 ) -> Mapping[str, NDArray[np.float64]]:
-    """Calculate and aggregate parameters for both single and multiclass metrics."""
+    """Compute and aggregate parameters for both single and multiclass metrics."""
     output = {}
     for name, measure in averaged_measures.items():
         measure = cast(np.ndarray, measure)

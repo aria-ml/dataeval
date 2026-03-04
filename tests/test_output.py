@@ -111,7 +111,7 @@ class TestCollectionOutput:
     def test_mapping_output(self):
         t = MockMappingOutput(self.dict_data)
 
-        assert t.meta() == ExecutionMetadata.empty()
+        assert t.meta() == ExecutionMetadata._empty()
         assert len(t) == 1
         assert t.data() == self.dict_data
         assert repr(t)
@@ -130,7 +130,7 @@ class TestCollectionOutput:
     def test_sequence_output(self):
         t = MockSequenceOutput(self.list_data)
 
-        assert t.meta() == ExecutionMetadata.empty()
+        assert t.meta() == ExecutionMetadata._empty()
         assert len(t) == 1
         assert t.data() == self.list_data
         assert str(t)

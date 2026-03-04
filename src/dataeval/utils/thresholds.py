@@ -132,7 +132,7 @@ class _Threshold(Threshold, ABC):
         return threshold_cls(**obj)
 
     def __call__(self, data: NDArray[Any]) -> tuple[float | None, float | None]:
-        """Calculate lower and upper threshold values, clamped by configured limits.
+        """Compute lower and upper threshold values, clamped by configured limits.
 
         Parameters
         ----------

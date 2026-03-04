@@ -26,7 +26,7 @@ class ParityOutput(DictOutput):
     Output class for the :class:`.Parity` :term:`bias<Bias>` evaluator.
 
     .. warning::
-       This class is experimental and may change or be removed in future releases.
+       This feature is experimental and may change or be removed in future releases.
 
     Contains a polars DataFrame with Cramér's V scores and threshold flags.
 
@@ -51,10 +51,10 @@ class ParityOutput(DictOutput):
 @experimental
 class Parity(Evaluator):
     """
-    Calculate statistical parity using Bias-Corrected Cramér's V.
+    Compute statistical parity using Bias-Corrected Cramér's V.
 
     .. warning::
-       This evaluator is experimental and may change or be removed in future releases.
+       This feature is experimental and may change or be removed in future releases.
 
     This function measures the association between metadata factors and class labels
     to identify potential bias or spurious correlations. It assumes an equal distribution
@@ -153,7 +153,7 @@ class Parity(Evaluator):
     @set_metadata(state=["score_threshold", "p_value_threshold"])
     def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> ParityOutput:
         """
-        Calculate chi-square statistics for the dataset.
+        Compute chi-square statistics for the dataset.
 
         Parameters
         ----------

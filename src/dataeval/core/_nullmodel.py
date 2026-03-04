@@ -81,7 +81,7 @@ def nullmodel_accuracy(
     multiclass: bool = False,
 ) -> np.float64:
     """
-    Calculate accuracy from binary classification results.
+    Compute accuracy from binary classification results.
 
     Parameters
     ----------
@@ -90,12 +90,12 @@ def nullmodel_accuracy(
     model_prob : Array1D[float]
         Probability distribution for given null model. Can be a 1D list, or array-like object.
     multiclass : bool, default False
-        Whether to calculate multiclass accuracy
+        Whether to compute multiclass accuracy
 
     Returns
     -------
     np.float64
-        Calculated accuracy for binary classification
+        Computed accuracy for binary classification
     """
     return (
         _calculate_multiclass_accuracy(class_prob, model_prob)
@@ -118,7 +118,7 @@ def _calculate_multiclass_accuracy(class_prob: Array1D[float], model_prob: Array
 
 def nullmodel_precision(class_prob: Array1D[float], model_prob: Array1D[float]) -> np.float64:
     """
-    Calculate precision from binary classification results.
+    Compute precision from binary classification results.
 
     Parameters
     ----------
@@ -130,7 +130,7 @@ def nullmodel_precision(class_prob: Array1D[float], model_prob: Array1D[float]) 
     Returns
     -------
     np.float64
-        Calculated precision for binary classification
+        Computed precision for binary classification
     """
     return _calculate_precision(_to_confusion_matrix(class_prob, model_prob))
 
@@ -146,7 +146,7 @@ def _calculate_precision(counts: ConfusionMatrix) -> np.float64:
 
 def nullmodel_recall(class_prob: Array1D[float], model_prob: Array1D[float]) -> np.float64:
     """
-    Calculate recall (True Positive Rate) from binary classification results.
+    Compute recall (True Positive Rate) from binary classification results.
 
     Parameters
     ----------
@@ -158,7 +158,7 @@ def nullmodel_recall(class_prob: Array1D[float], model_prob: Array1D[float]) -> 
     Returns
     -------
     np.float64
-        Calculated True Positive Rate for binary classification
+        Computed True Positive Rate for binary classification
     """
     return _calculate_recall(_to_confusion_matrix(class_prob, model_prob))
 
@@ -174,7 +174,7 @@ def _calculate_recall(counts: ConfusionMatrix) -> np.float64:
 
 def nullmodel_fpr(class_prob: Array1D[float], model_prob: Array1D[float]) -> np.float64:
     """
-    Calculate FPR (False Positive Rate) from binary classification results.
+    Compute FPR (False Positive Rate) from binary classification results.
 
     Parameters
     ----------
@@ -198,7 +198,7 @@ def _calculate_fpr(counts: ConfusionMatrix) -> np.float64:
 
 def _to_confusion_matrix(class_prob: Array1D[float], pred_prob: Array1D[float]) -> ConfusionMatrix:
     """
-    Calculate confusion matrix values from class probabilities and null model probabilities.
+    Compute confusion matrix values from class probabilities and null model probabilities.
 
     Parameters
     ----------
@@ -210,7 +210,7 @@ def _to_confusion_matrix(class_prob: Array1D[float], pred_prob: Array1D[float]) 
     Returns
     -------
     ConfusionMatrix
-        Calculated confusion matrix values [True Positive, False Positive, True Negative, False Negative]
+        Computed confusion matrix values [True Positive, False Positive, True Negative, False Negative]
     """
     confusion_matrix = np.outer(
         as_numpy(class_prob, dtype=np.float64, required_ndim=1),
@@ -235,7 +235,7 @@ def _reduce_micro(method: BinaryClassMetricFunction, counts: Sequence[ConfusionM
     Returns
     -------
     np.float64
-        Calculated metric reduced with micro-averaging
+        Computed metric reduced with micro-averaging
     """
     return method(np.sum(counts, axis=0))
 
@@ -256,7 +256,7 @@ def _reduce_macro(method: BinaryClassMetricFunction, counts: Sequence[ConfusionM
     Returns
     -------
     np.float64
-        Calculated metric reduced with macro-averaging
+        Computed metric reduced with macro-averaging
     """
     return np.mean([method(c) for c in counts], dtype=np.float64)
 
@@ -334,7 +334,7 @@ def _calculate_null_model_metrics(
     classes: NDArray[np.intp],
 ) -> NullModelMetrics:
     """
-    Calculate metrics for a given null model prediction probability distribution.
+    Compute metrics for a given null model prediction probability distribution.
 
     Parameters
     ----------
@@ -350,16 +350,16 @@ def _calculate_null_model_metrics(
     Returns
     -------
     NullModelMetrics
-        Calculated metrics for the null model
+        Computed metrics for the null model
     """
-    # Calculate confusion matrices for each class (one-vs-rest)
+    # Compute confusion matrices for each class (one-vs-rest)
     confusion_matrices: list[ConfusionMatrix] = []
     for class_idx in classes:
         pred_1vr = np.array([prediction_probs[class_idx], 1 - prediction_probs[class_idx]])
         test_1vr = np.array([test_probs[class_idx], 1 - test_probs[class_idx]])
         confusion_matrices.append(_to_confusion_matrix(test_1vr, pred_1vr))
 
-    # Calculate binary metrics
+    # Compute binary metrics
     result: NullModelMetrics = {
         "precision_macro": float(_AVERAGES["macro"](_BASE_METRICS["precision"], confusion_matrices)),
         "precision_micro": float(_AVERAGES["micro"](_BASE_METRICS["precision"], confusion_matrices)),
@@ -387,9 +387,9 @@ def _calculate_null_model_metrics(
 
 def nullmodel_metrics(test_labels: ArrayLike, train_labels: ArrayLike | None = None) -> NullModelMetricsResult:
     """
-    Calculate null model metrics (dummy classifiers metrics) for given class distributions.
+    Compute null model metrics (dummy classifiers metrics) for given class distributions.
 
-    This function calculates benchmark performance metrics for random classifiers on the training and testing labels
+    This function computes benchmark performance metrics for random classifiers on the training and testing labels
     based on the class distributions.
 
     Null models to be evaluated:
@@ -398,7 +398,7 @@ def nullmodel_metrics(test_labels: ArrayLike, train_labels: ArrayLike | None = N
     - Dominant Class: Classifier will choose the most frequent class in the training set (requires training labels)
     - Proportional Random: Classifier applies distribution probabilities from training set (requires training labels)
 
-    The calculated metrics are to be used as a lower-bound performance baseline for model evaluation.
+    The computed metrics are to be used as a lower-bound performance baseline for model evaluation.
 
     Parameters
     ----------
