@@ -220,6 +220,7 @@ def docs(session: nox.Session) -> None:
     Pass 'skip' to skip notebook execution: `nox -e docs -- skip`
     """
     skip_notebooks = "skip" in session.posargs
+    clean_notebooks = "clean" in session.posargs
 
     if {"chart", "charts"} & set(session.posargs):
         try:
@@ -244,7 +245,12 @@ def docs(session: nox.Session) -> None:
     notebook_dir = "docs/source/notebooks"
     session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
 
-    if not skip_notebooks:
+    if clean_notebooks:
+        # Clear local jupyter cache to force re-execution of all notebooks
+        cache_dir = "docs/source/.jupyter_cache"
+        session.log(f"Clearing jupyter cache at {cache_dir} to force re-execution...")
+        session.run("rm", "-rf", cache_dir, external=True)
+    elif not skip_notebooks:
         # Fetch cached notebook results from orphan artifact branch
         session.run("bash", "docs/fetch-docs-cache.sh", external=True)
 
