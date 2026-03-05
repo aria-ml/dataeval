@@ -1,9 +1,9 @@
 """Utility to wrap multiprocessing.Pool for easier debugging and profiling."""
 
+import multiprocessing
 from collections.abc import Callable, Iterable, Iterator
-from multiprocessing import Pool
 from os import cpu_count
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 from typing_extensions import Self
 
@@ -17,11 +17,13 @@ class PoolWrapper:
 
     This helps with debugging and profiling, as well as usage with Jupyter notebooks
     in VS Code, which does not support subprocess debugging.
+
+    Uses 'spawn' multiprocessing context by default to avoid deadlocks with libraries like OpenCV.
     """
 
-    def __init__(self, processes: int | None) -> None:
+    def __init__(self, processes: int | None, context: Literal["fork", "spawn"] = "spawn") -> None:
         procs = 1 if processes is None else max(1, (cpu_count() or 1) + processes + 1) if processes < 0 else processes
-        self._pool = Pool(procs) if procs > 1 else None
+        self._pool = multiprocessing.get_context(context).Pool(procs) if procs > 1 else None
 
     def imap_unordered(self, func: Callable[[_T], _R], iterable: Iterable[_T]) -> Iterator[_R]:
         """Apply `func` to each item in `iterable`, optionally using multiprocessing."""
