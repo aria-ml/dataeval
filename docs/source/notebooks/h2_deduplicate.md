@@ -59,9 +59,8 @@ except Exception:
 ```
 
 ```{code-cell} ipython3
-from dataclasses import asdict
-
 import numpy as np
+from IPython.display import display
 from maite_datasets.image_classification import MNIST
 
 from dataeval import Metadata
@@ -114,16 +113,10 @@ identifyDuplicates = Duplicates()
 results = identifyDuplicates.evaluate(duplicates_ds)
 ```
 
-The results can be returned as a dictionary with exact and near as the keys. So we will extract those to view the
-results.
+The results can be viewd as a DataFrame with exact and near groups enumerated.
 
 ```{code-cell} ipython3
-for category, dupe_types in results.data().items():
-    for dupe_type, groups in asdict(dupe_types).items():
-        if groups is not None:
-            print(f"{dupe_type} duplicate {category} : {len(groups)}")
-            for group in groups:
-                print(f"\t{group}")
+display(results)
 ```
 
 The `Duplicates` class was able to find all 4 exact duplicates out of the 10,000 samples.
@@ -136,8 +129,8 @@ digits we would expect it to find some images that were nearly identical.
 tags: [remove_cell]
 ---
 ### TEST ASSERTION CELL ###
-assert results.items.exact is not None
-assert len(results.items.exact) == len(duplicates)
+assert results.exact
+assert len(results.exact) == len(duplicates)
 for k, v in duplicates.items():
-    assert [v, k] in results.items.exact
+    assert [v, k] in results.exact
 ```

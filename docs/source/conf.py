@@ -81,7 +81,7 @@ autoapi_options = [
 ]
 autoapi_generate_api_docs = True
 # uncomment to review or debug generated content
-# autoapi_keep_files = True
+autoapi_keep_files = True
 autodoc_typehints = "description"
 autodoc_typehints_description_target = "documented"
 autoapi_own_page_level = "function"

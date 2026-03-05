@@ -179,11 +179,11 @@ For the duplicates results, the clusterer provides a list of sets of points whic
 # Show results using the new detector classes
 duplicates_detector = Duplicates(cluster_threshold=0.1)
 duplicates_result = duplicates_detector.from_clusters(clusters)
-print("near image duplicates: ", duplicates_result.items.near)
+print("near duplicates: ", duplicates_result.near)
 
 outliers_detector = Outliers()
 outliers_result = outliers_detector.from_clusters(test_data, clusters, cluster_threshold=3)
-print("outliers: ", outliers_result.issues)
+print("outliers: ", outliers_result.outliers)
 ```
 
 We can see that there was one outlier and there are also 2 sets of near duplicates (the intentionally duplicated
@@ -194,7 +194,6 @@ points).
 tags: [remove_cell]
 ---
 ### TEST ASSERTION CELL ###
-assert len(outliers_result.issues) == 1
-assert duplicates_result.items.near is not None
-assert len(duplicates_result.items.near) == 2
+assert len(outliers_result.outliers) == 1
+assert len(duplicates_result.near) == 2
 ```

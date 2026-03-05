@@ -78,6 +78,9 @@ this demonstration, we are just going to use the test set.
 ```{code-cell} ipython3
 # Load in the CIFAR10 dataset
 testing_dataset = CIFAR10("./data", image_set="test", download=True)
+
+# Create the metadata for the dataset
+metadata = Metadata(testing_dataset)
 ```
 
 ## Cleaning the dataset
@@ -90,6 +93,9 @@ outliers = Outliers(outlier_threshold=("zscore", 3.5))
 
 # Evaluate the data
 results = outliers.evaluate(testing_dataset)
+
+# Also evaluate the data classwise
+results_classwise = results.classwise(metadata)
 ```
 
 The results are a dictionary with the keys being the image that has an issue in one of the listed properties below:
@@ -110,13 +116,27 @@ print(f"Total number of images with an issue: {len(results.aggregate_by_item())}
 ```
 
 ```{code-cell} ipython3
+print(f"Total number of images with an issue (classwise): {len(results_classwise.aggregate_by_item())}")
+```
+
+```{code-cell} ipython3
 # View issues by metric
 results.aggregate_by_metric()
 ```
 
 ```{code-cell} ipython3
+# View issues by metric (classwise)
+results_classwise.aggregate_by_metric()
+```
+
+```{code-cell} ipython3
 # View issues by class
-results.aggregate_by_class(Metadata(testing_dataset))
+results.aggregate_by_class(metadata)
+```
+
+```{code-cell} ipython3
+# View issues by class (classwise)
+results_classwise.aggregate_by_class(metadata)
 ```
 
 ```{code-cell} ipython3
@@ -124,5 +144,5 @@ results.aggregate_by_class(Metadata(testing_dataset))
 tags: [remove_cell]
 ---
 ### TEST ASSERTION CELL ###
-assert results.issues.shape[0] == 500
+assert results.shape[0] == 500
 ```

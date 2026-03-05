@@ -11,8 +11,9 @@ __all__ = [
     "Array8D",
     "Array9D",
     "ArrayND",
-    "SourceIndex",
     "ExecutionMetadata",
+    "SourceIndex",
+    "StatsMap",
 ]
 
 
@@ -25,6 +26,8 @@ from functools import partial, wraps
 from typing import Any, ClassVar, Generic, Literal, NamedTuple, ParamSpec, TypeAlias, TypeVar, overload
 
 import numpy as np
+import polars as pl
+from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
 
@@ -57,6 +60,12 @@ ArrayND: TypeAlias = (
     | Array9D[DType]
 )
 
+StatsMap: TypeAlias = Mapping[str, NDArray[Any]]
+"""
+A mapping of metric names to their corresponding numpy array values.
+Each array should have the same length along the first dimension, representing the number of samples.
+"""
+
 # Default values for ClusterConfigMixin
 DEFAULT_CLUSTER_ALGORITHM: Literal["kmeans", "hdbscan"] = "hdbscan"
 DEFAULT_CLUSTER_N_CLUSTERS: int | None = None
@@ -69,6 +78,7 @@ class EvaluatorConfig(BaseModel):
 class ClusterConfigMixin(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
     extractor: FeatureExtractor | None = None
+    batch_size: int | None = None
     cluster_algorithm: Literal["kmeans", "hdbscan"] = DEFAULT_CLUSTER_ALGORITHM
     n_clusters: int | None = DEFAULT_CLUSTER_N_CLUSTERS
 
@@ -224,6 +234,79 @@ class Output(Generic[T]):
         ExecutionMetadata
         """
         return self._meta or ExecutionMetadata._empty()
+
+
+class DataFrameOutput(Output[pl.DataFrame]):
+    """An Output that wraps a Polars DataFrame and proxies its interface.
+
+    Attribute access, indexing, and iteration are delegated to the underlying
+    DataFrame so instances can be used directly in DataFrame contexts.
+    :meth:`data` and :meth:`meta` remain available alongside all DataFrame
+    methods and properties.
+
+    Subclasses pass the required DataFrame as the first positional argument
+    and may accept additional keyword arguments.
+
+    .. warning:: **Return-type loss on DataFrame operations**
+
+        Methods delegated via :meth:`__getattr__` (e.g. ``filter``,
+        ``select``, ``sort``) return a plain :class:`polars.DataFrame`, *not*
+        an instance of the subclass. Any subclass-specific attributes such as
+        :attr:`~OutliersOutput.calculation_results` or :meth:`meta` will not
+        be available on the result.
+
+    .. note:: **Instance attribute names to avoid in subclasses**
+
+        Because instance attributes shadow the proxy, do not use any of the
+        following names for subclass ``__init__`` parameters or attributes:
+        ``columns``, ``schema``, ``dtypes``, ``shape``, ``height``, ``width``.
+
+    Parameters
+    ----------
+    data : pl.DataFrame
+        The underlying DataFrame.
+    """
+
+    def __init__(self, data: pl.DataFrame) -> None:
+        self._df = data
+
+    def data(self) -> pl.DataFrame:
+        """Return the output data as a polars DataFrame."""
+        return self._df
+
+    # --- DataFrame proxy ---
+    # Special (dunder) methods are looked up on the type, not the instance,
+    # so they bypass __getattr__ entirely and must be forwarded explicitly.
+
+    def __repr__(self) -> str:
+        return repr(self.data())
+
+    def __str__(self) -> str:
+        return str(self.data())
+
+    def __len__(self) -> int:
+        return len(self.data())
+
+    def __iter__(self) -> Iterator[pl.Series]:
+        return iter(self.data())
+
+    def __contains__(self, item: str) -> bool:
+        return item in self.data()
+
+    def __getitem__(self, item: Any) -> Any:
+        return self.data()[item]
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying DataFrame.
+
+        .. note::
+            Returns whatever Polars returns — typically a
+            :class:`polars.DataFrame` — so subclass methods and metadata
+            are not preserved on the result.
+        """
+        if name.startswith("_"):
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        return getattr(self.data(), name)
 
 
 class DictOutput(Output[dict[str, Any]]):

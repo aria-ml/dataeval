@@ -1488,7 +1488,7 @@ class Metadata(Array, FeatureExtractor):
 
         Examples
         --------
-        >>> metadata = Metadata(od_dataset)
+        >>> metadata = Metadata(dataset)
         >>> # Add image-level factors (e.g., from imagestats)
         >>> image_factors = {
         ...     "brightness": np.random.rand(50),  # One per image

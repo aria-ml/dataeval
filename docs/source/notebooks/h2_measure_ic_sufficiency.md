@@ -85,7 +85,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
-from IPython.display import display  # noqa: A004
+from IPython.display import display
 from maite_datasets.image_classification import MNIST
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, Subset

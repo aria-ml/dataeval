@@ -20,10 +20,9 @@ class TestOutputContracts:
         assert "class_count" in result
         assert "label_count" in result
 
-    def test_duplicates_returns_items_and_targets(self):
+    def test_duplicates_returns_duplicates_dataframe(self):
         from dataeval.quality import Duplicates
 
         data = np.random.default_rng(0).random((20, 3, 16, 16)).astype(np.float32)
         result = Duplicates().evaluate(data)
-        assert hasattr(result, "items")
-        assert hasattr(result, "targets")
+        assert "item_indices" in result.data().columns

@@ -18,7 +18,7 @@ from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats, resolve_dependencies
 from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback
-from dataeval.types import SourceIndex
+from dataeval.types import SourceIndex, StatsMap
 from dataeval.utils.data import unzip_dataset
 from dataeval.utils.poolwrapper import PoolWrapper
 from dataeval.utils.preprocessing import BoundingBox, BoxLike, to_bounding_box
@@ -492,3 +492,63 @@ def compute_stats(
         image_count=image_count,
         stats=sorted_aggregated_stats,
     )
+
+
+def combine_stats_results(
+    results: StatsResult | Sequence[StatsResult],
+) -> tuple[StatsMap, list[SourceIndex], list[int]]:
+    """Combine one or more StatsResults into unified stats, source_index, and dataset_steps.
+
+    For a single StatsResult, returns its stats and source_index directly
+    with empty dataset_steps.
+
+    For multiple results, concatenates stats arrays by key, applies cumulative
+    item offsets to source_index entries (making item indices globally unique
+    across datasets), and computes cumulative dataset_steps boundaries.
+
+    Parameters
+    ----------
+    results : StatsResult or Sequence[StatsResult]
+        A single result or sequence of results to combine.
+
+    Returns
+    -------
+    tuple[StatsMap, list[SourceIndex], list[int]]
+        - stats: Combined statistics mapping (arrays concatenated by key).
+        - source_index: Combined source indices with globally unique item values.
+        - dataset_steps: Cumulative boundaries where each dataset ends in the
+          combined arrays. Empty list for a single result.
+
+    Raises
+    ------
+    TypeError
+        If an empty sequence is provided.
+    """
+    if isinstance(results, dict):
+        return results["stats"], list(results["source_index"]), []
+
+    if len(results) == 0:
+        raise TypeError("Cannot combine empty sequence of stats.")
+
+    if len(results) == 1:
+        return results[0]["stats"], list(results[0]["source_index"]), []
+
+    combined_stats: StatsMap = {}
+    combined_source_index: list[SourceIndex] = []
+    dataset_steps: list[int] = []
+    offset = 0
+
+    for r in results:
+        stats = r["stats"]
+        if not combined_stats:
+            combined_stats = stats
+        else:
+            combined_stats = {k: np.concatenate([combined_stats[k], stats[k]]) for k in combined_stats if k in stats}
+
+        combined_source_index.extend(
+            SourceIndex(item=s.item + offset, target=s.target, channel=s.channel) for s in r["source_index"]
+        )
+        offset += len(r["source_index"])
+        dataset_steps.append(offset)
+
+    return combined_stats, combined_source_index, dataset_steps

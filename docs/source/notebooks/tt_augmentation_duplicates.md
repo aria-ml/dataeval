@@ -97,7 +97,7 @@ from PIL import Image
 from dataeval import config
 from dataeval.extractors import BoVWExtractor
 from dataeval.flags import ImageStats
-from dataeval.quality import Duplicates
+from dataeval.quality import Duplicates, DuplicatesOutput
 
 config.set_seed(42)
 ```
@@ -349,12 +349,11 @@ d4_results = d4_detector.evaluate(images)
 
 print("=== D4 Hash Results ===")
 print("\nNear duplicates detected:")
-if d4_results.items.near:
-    for group in d4_results.items.near:
-        indices = [i[0] if isinstance(i, tuple) else i for i in group.indices]
-        print(f"  Group: {indices}")
-        print(f"    Labels: {[labels[i] for i in indices]}")
-        print(f"    Methods: {sorted(group.methods)}")
+if d4_results.near:
+    for i, (indices, methods) in enumerate(d4_results.near):
+        print(f"  Group: {i} - {methods}")
+        for idx in indices:
+            print(f"    {idx:<2} - {labels[idx]}")
         print()
 else:
     print("  None found")
@@ -376,11 +375,11 @@ bovw_results = bovw_detector.evaluate(images)
 
 print("=== BoVW Results ===")
 print("\nNear duplicates detected:")
-if bovw_results.items.near:
-    for group in bovw_results.items.near:
-        indices = [i[0] if isinstance(i, tuple) else i for i in group.indices]
-        print(f"  Group: {indices}")
-        print(f"    Labels: {[labels[i] for i in indices]}")
+if bovw_results.near:
+    for i, (indices, methods) in enumerate(bovw_results.near):
+        print(f"  Group: {i} - {methods}")
+        for idx in indices:
+            print(f"    {idx:<2} - {labels[idx]}")
         print()
 else:
     print("  None found")
@@ -397,12 +396,11 @@ combined_results = combined_detector.evaluate(images)
 
 print("=== Combined (D4 Hash + BoVW) Results ===")
 print("\nNear duplicates detected:")
-if combined_results.items.near:
-    for group in combined_results.items.near:
-        indices = [i[0] if isinstance(i, tuple) else i for i in group.indices]
-        print(f"  Group: {indices}")
-        print(f"    Labels: {[labels[i] for i in indices]}")
-        print(f"    Methods: {sorted(group.methods)}")
+if combined_results.near:
+    for i, (indices, methods) in enumerate(combined_results.near):
+        print(f"  Group: {i} - {methods}")
+        for idx in indices:
+            print(f"    {idx:<2} - {labels[idx]}")
         print()
 else:
     print("  None found")
@@ -413,13 +411,13 @@ else:
 Let's analyze which transformations were detected as near-duplicates.
 
 ```{code-cell} ipython3
-def get_detected_indices(results):
+def get_detected_indices(results: DuplicatesOutput):
     """Extract all indices detected as duplicates of index 0 (original)."""
     detected = set()
-    if results.items.near:
-        for group in results.items.near:
-            if 0 in group.indices:  # Group contains the original
-                detected.update(group.indices)
+    if results.near:
+        for indices, _ in results.near:
+            if 0 in indices:  # Group contains the original
+                detected.update(indices)
     detected.discard(0)  # Remove the original itself
     return detected
 

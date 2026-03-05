@@ -80,7 +80,7 @@ except Exception:
 import numpy as np
 import polars as pl
 import torch
-from IPython.display import display  # noqa: A004
+from IPython.display import display
 from maite_datasets.object_detection import VOCDetection
 from torchvision.models import ResNet18_Weights, resnet18
 from torchvision.transforms.v2 import GaussianNoise

@@ -6,7 +6,7 @@ jupytext:
     format_version: 0.13
     jupytext_version: 1.19.1
 kernelspec:
-  display_name: dataeval
+  display_name: dataeval (3.14.2)
   language: python
   name: python3
 ---
@@ -85,6 +85,7 @@ except Exception:
 import numpy as np
 import polars as pl
 from dataeval_plots import plot
+from IPython.display import display
 from maite_datasets.object_detection import VOCDetection
 
 from dataeval import Metadata
@@ -124,40 +125,37 @@ def plot_sample_images_by_class(dataset, image_indices_per_class) -> None:
 
 
 # Helper method to plot images of interest
-def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result, metric, layout) -> None:
+def plot_sample_outlier_images_by_metric(dataset, outlier_result, metric, layout) -> None:
+    import matplotlib.gridspec as gridspec
     import matplotlib.pyplot as plt
     from matplotlib.cm import ScalarMappable
     from matplotlib.colors import Normalize
 
-    # Filter issues DataFrame for the specific metric
-    metric_issues = outlier_result.issues.filter(pl.col("metric_name") == metric)
-    image_ids = metric_issues["item_index"].unique().to_list()
+    # Filter outliers DataFrame for the specific metric
+    metric_outliers = outlier_result.data().filter(pl.col("metric_name") == metric)
 
-    if not image_ids:
+    if metric_outliers.is_empty():
         print(f"No images flagged for metric: {metric}")
         return
 
-    # Get all metric values for the entire dataset to understand the distribution
-    all_metric_values = outlier_class.stats["stats"][metric]
+    # Get all metric values from stored calculation results to understand the distribution
+    all_metric_values = outlier_result.calculation_results["stats"][metric]
     quantiles = np.quantile(all_metric_values, [0, 0.25, 0.5, 0.75, 1])
     median = quantiles[2]
 
-    # Calculate distance from median for each flagged image and sort by distance (descending)
-    metric_values_with_ids = []
-    for img_id in image_ids:
-        metric_value = metric_issues.filter(pl.col("item_index") == img_id)["metric_value"][0]
-        distance_from_median = abs(metric_value - median)
-        metric_values_with_ids.append((img_id, metric_value, distance_from_median))
+    # Compute distance from median and sort by most extreme first
+    ranked = (
+        metric_outliers.unique(subset=["item_index"])
+        .with_columns((pl.col("metric_value") - median).abs().alias("_distance"))
+        .sort("_distance", descending=True)
+        .drop("_distance")
+    )
 
-    # Sort by distance from median (most outlier first)
-    metric_values_with_ids.sort(key=lambda x: x[2], reverse=True)
+    # Determine number of samples to plot
+    n_samples = min(int(np.prod(layout)), ranked.height)
 
     # Create figure with space for colorbar
     fig = plt.figure(figsize=(12, layout[0] * 4))
-
-    # Create grid spec with extra space for colorbar
-    import matplotlib.gridspec as gridspec
-
     gs = gridspec.GridSpec(
         layout[0],
         layout[1] + 1,
@@ -170,9 +168,6 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result,
         bottom=0.02,
     )
 
-    # Determine number of samples to plot
-    n_samples = min(int(np.prod(layout)), len(image_ids))
-
     # Create colormap normalization based on full metric distribution
     vmin, vmax = quantiles[0], quantiles[4]
     norm = Normalize(vmin=vmin, vmax=vmax)
@@ -180,26 +175,18 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result,
 
     # Plot images
     for i in range(n_samples):
-        row = i // layout[1]
-        col = i % layout[1]
-        ax = fig.add_subplot(gs[row, col])
-
-        img_id, metric_value, _ = metric_values_with_ids[i]
-
-        # Get color for this metric value
+        row = ranked.row(i, named=True)
+        img_id = row["item_index"]
+        metric_value = row["metric_value"]
         color = cmap(norm(metric_value))
 
-        # Plot image
+        ax = fig.add_subplot(gs[i // layout[1], i % layout[1]])
         ax.imshow(dataset[img_id][0].transpose(1, 2, 0))
-
-        # Place metric details as footer below the image using xlabel (black text for legibility)
         ax.set_xlabel(f"index: {img_id}\n{metric}: {np.round(metric_value, 3)}", fontsize=9, color="black")
-
-        # Turn off ticks but keep spines for colored border
         ax.set_xticks([])
         ax.set_yticks([])
 
-        # Add 5-pixel colored border to indicate extremeness
+        # Add colored border to indicate extremeness
         for spine in ax.spines.values():
             spine.set_edgecolor(color)
             spine.set_linewidth(5)
@@ -212,7 +199,6 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result,
     cbar = plt.colorbar(sm, cax=cbar_ax)
     cbar.set_ticks([])
 
-    # Add quantile markers on colorbar
     quantile_labels = ["Min (Q0)", "Q1 (25%)", "Median (Q2)", "Q3 (75%)", "Max (Q4)"]
     for q_val, q_label in zip(quantiles, quantile_labels, strict=False):
         cbar.ax.axhline(q_val, color="black", linestyle="--", linewidth=0.8, alpha=0.7)
@@ -225,9 +211,7 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result,
             transform=cbar.ax.get_yaxis_transform(),
         )
 
-    # Add overall title with more top space
     fig.suptitle(f'Outlier Images for "{metric}" (sorted by distance from median)', fontsize=12, y=0.99)
-
     plt.show()
 ```
 
@@ -427,7 +411,7 @@ your model to develop biases or limit your model's ability to generalize to non-
 
 ```{code-cell} ipython3
 # Plot images flagged for "entropy"
-plot_sample_outlier_images_by_metric(ds, outliers, outlier_imgs, "entropy", (1, 4))
+plot_sample_outlier_images_by_metric(ds, outlier_imgs, "entropy", (1, 4))
 ```
 
 When you examine the flagged images for entropy, look for patterns in the content of the images. Many of these images
@@ -448,7 +432,7 @@ as outliers.
 
 ```{code-cell} ipython3
 # Plot images flagged for "aspect_ratio"
-plot_sample_outlier_images_by_metric(ds, outliers, outlier_imgs, "aspect_ratio", (1, 4))
+plot_sample_outlier_images_by_metric(ds, outlier_imgs, "aspect_ratio", (1, 4))
 ```
 
 Flagged images for aspect ratio often include examples where the objects in the image are unusually wide or tall
@@ -470,7 +454,7 @@ imbalances.
 
 ```{code-cell} ipython3
 # Plot images flagged for "zeros"
-plot_sample_outlier_images_by_metric(ds, outliers, outlier_imgs, "zeros", (1, 4))
+plot_sample_outlier_images_by_metric(ds, outlier_imgs, "zeros", (1, 4))
 ```
 
 Images flagged for zeros typically feature large regions of completely black or gray pixels. Some of these may also
@@ -491,7 +475,7 @@ irrelevant anomalies.
 
 ```{code-cell} ipython3
 # Plot images flagged for "sharpness"
-plot_sample_outlier_images_by_metric(ds, outliers, outlier_imgs, "sharpness", (1, 2))
+plot_sample_outlier_images_by_metric(ds, outlier_imgs, "sharpness", (1, 2))
 ```
 
 Sharpness measures the clarity of edges in an image. Flagged images often include those with unusually crisp or blurry
@@ -552,12 +536,12 @@ results = dups.evaluate(ds, per_target=False)
 ```
 
 ```{code-cell} ipython3
-print(f"Exact image duplicates: {results.items.exact}")
-print(f"Near image duplicates: {results.items.near}")
+# View duplicate groups
+display(results)
 ```
 
-As expected there are no duplicate images in this dataset, since it was curated for a specific competition. But there
-are 2 near duplicates.
+As expected there are no exact duplicate images in this dataset, since it was curated for a specific competition. But
+there are near duplicates detected by phash and dhash.
 
 ```{code-cell} ipython3
 _ = plot(ds, figsize=(12, 6), indices=(1548, 1561))
@@ -593,15 +577,13 @@ dupes_stats = compute_stats(dupes, stats=ImageStats.HASH)
 # Find the duplicates appended to the dataset
 duplicates = dups.from_stats([dups.stats, dupes_stats])
 
-print(f"Exact duplicates: {duplicates.items.exact}")
-
-# Distinguish same-orientation vs rotated/flipped duplicates
-print("\nNear duplicates:")
-for group in duplicates.items.near or []:
-    print(f"Group of duplicates: {group}")
+# View all duplicate groups
+display(duplicates)
 ```
 
-As shown above, the `Duplicates` class identified all images from the second dataset as exact or near duplicates.
+As shown above, the `Duplicates` class identified all images from the second dataset as exact or near duplicates. The
+results are returned as a DataFrame where each row is a duplicate group with columns for group_id, level, dup_type
+(exact/near), item_indices, methods, orientation, and dataset_index (for cross-dataset results).
 
 - **Exact duplicates**: Images 23 and 46 from dataset 0 are identified as exact duplicates of images 0 and 1 from
   dataset 1 respectively.
@@ -609,10 +591,12 @@ As shown above, the `Duplicates` class identified all images from the second dat
   and 3 from dataset 1 (cropped versions). These are detected by both basic hashes (phash, dhash) and D4 hashes.
 - **Rotated/flipped duplicates**: Images 100 and 200 from dataset 0 are identified as duplicates of images 4 and 5 from
   dataset 1 (rotated and mirrored+rotated versions). These are detected **only** by D4 hashes (phash_d4, dhash_d4)
-  because the basic perceptual hashes are orientation-sensitive.
+  because the basic perceptual hashes are orientation-sensitive. The orientation column shows "rotated" for these
+  groups.
 
 By using `ImageStats.HASH` (which computes both basic and D4 hashes), you can distinguish between same-orientation
-duplicates and rotated/flipped duplicates by checking which methods detected the group. This is useful when you want to:
+duplicates and rotated/flipped duplicates by checking the methods and orientation columns. This is useful when you want
+to:
 
 - Keep one version of each rotated duplicate set
 - Identify images that may have been augmented with rotations

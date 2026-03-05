@@ -164,6 +164,7 @@ class MockMetadata:
     factor_names: Sequence[str]
     is_discrete: Sequence[bool]
     index2label: Mapping[int, str]
+    item_indices: NDArray[np.int64] | None = None
 
 
 # =============================================================================
@@ -372,8 +373,34 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
     )
     doctest_namespace["dataset"] = dataset
 
-    # Also expose as od_dataset for backwards compatibility
-    doctest_namespace["od_dataset"] = dataset
+    # -------------------------------------------------------------------------
+    # MockMetadata matching the object detection dataset
+    # -------------------------------------------------------------------------
+    # Flatten per-image labels into per-target arrays
+    flat_class_labels = []
+    flat_item_indices = []
+    for i, img_labels in enumerate(labels):
+        for label in img_labels:
+            flat_class_labels.append(label)
+            flat_item_indices.append(i)
+
+    # Encode image-level metadata factors as integers, replicated per target
+    sorted_factor_names = sorted(METADATA_FACTORS.keys())
+    factor_data = np.zeros((len(flat_class_labels), len(sorted_factor_names)), dtype=np.int64)
+    for i, item_idx in enumerate(flat_item_indices):
+        meta = image_metadata[item_idx]
+        for j, fname in enumerate(sorted_factor_names):
+            factor_data[i, j] = METADATA_FACTORS[fname].index(meta[fname])
+
+    metadata = MockMetadata(
+        class_labels=np.array(flat_class_labels, dtype=np.intp),
+        factor_data=factor_data,
+        factor_names=sorted_factor_names,
+        is_discrete=[True] * len(sorted_factor_names),
+        index2label=INDEX2LABEL,
+        item_indices=np.array(flat_item_indices, dtype=np.int64),
+    )
+    doctest_namespace["metadata"] = metadata
 
     # -------------------------------------------------------------------------
     # Train/test splits

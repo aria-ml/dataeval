@@ -27,14 +27,18 @@ class TestInputContracts:
 
     def test_duplicates_handles_empty_dataset(self):
         """Empty dataset should either raise or return an empty result."""
+        import polars as pl
+
         from dataeval.quality import Duplicates
 
         result = Duplicates().evaluate(np.array([]))
-        assert hasattr(result, "items")
+        assert isinstance(result.data(), pl.DataFrame)
 
     def test_outliers_handles_empty_dataset(self):
         """Empty dataset should either raise or return an empty result."""
+        import polars as pl
+
         from dataeval.quality import Outliers
 
         result = Outliers().evaluate(np.array([]))
-        assert hasattr(result, "issues")
+        assert isinstance(result.data(), pl.DataFrame)

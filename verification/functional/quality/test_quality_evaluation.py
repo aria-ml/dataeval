@@ -13,6 +13,8 @@ class TestQualityEvaluation:
     """Verify Duplicates and Outliers evaluators."""
 
     def test_duplicates_detects_exact_copies(self):
+        import polars as pl
+
         from dataeval.quality import Duplicates
 
         rng = np.random.default_rng(0)
@@ -20,8 +22,7 @@ class TestQualityEvaluation:
         # Add exact duplicates
         images_with_dupes = np.concatenate([images, images[:3]])
         result = Duplicates().evaluate(images_with_dupes)
-        assert hasattr(result, "items")
-        assert hasattr(result, "targets")
+        assert isinstance(result.data(), pl.DataFrame)
 
     def test_duplicates_items_has_exact_field(self):
         from dataeval.quality import Duplicates
@@ -30,7 +31,9 @@ class TestQualityEvaluation:
         images = rng.random((10, 3, 16, 16)).astype(np.float32)
         images_with_dupes = np.concatenate([images, images[:3]])
         result = Duplicates().evaluate(images_with_dupes)
-        assert hasattr(result.items, "exact")
+        df = result.data()
+        exact_items = df.filter((df["level"] == "item") & (df["dup_type"] == "exact"))
+        assert exact_items.shape[0] > 0
 
     def test_outliers_returns_issues_dataframe(self):
         import polars as pl
@@ -40,26 +43,29 @@ class TestQualityEvaluation:
         rng = np.random.default_rng(0)
         images = rng.random((50, 3, 16, 16)).astype(np.float32)
         result = Outliers().evaluate(images)
-        assert hasattr(result, "issues")
-        assert isinstance(result.issues, pl.DataFrame)
+        assert isinstance(result.data(), pl.DataFrame)
 
     def test_outliers_supports_zscore_threshold(self):
+        import polars as pl
+
         from dataeval.quality import Outliers
         from dataeval.utils.thresholds import ZScoreThreshold
 
         rng = np.random.default_rng(0)
         images = rng.random((50, 3, 16, 16)).astype(np.float32)
         result = Outliers(outlier_threshold=ZScoreThreshold()).evaluate(images)
-        assert hasattr(result, "issues")
+        assert isinstance(result.data(), pl.DataFrame)
 
     def test_outliers_supports_iqr_threshold(self):
+        import polars as pl
+
         from dataeval.quality import Outliers
         from dataeval.utils.thresholds import IQRThreshold
 
         rng = np.random.default_rng(0)
         images = rng.random((50, 3, 16, 16)).astype(np.float32)
         result = Outliers(outlier_threshold=IQRThreshold()).evaluate(images)
-        assert hasattr(result, "issues")
+        assert isinstance(result.data(), pl.DataFrame)
 
     def test_quality_outputs_support_meta(self):
         from dataeval.quality import Duplicates, Outliers

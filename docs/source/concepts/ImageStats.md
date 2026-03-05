@@ -116,7 +116,7 @@ The D4 variants detect duplicates regardless of image orientation (90°/180°/27
 
 Use `ImageStats.HASH` to compute both hash sets and distinguish between same-orientation
 duplicates (matched by both basic and D4 hashes) vs rotated/flipped duplicates (matched only by D4 hashes).
-The `NearDuplicateGroup.orientation` field is automatically set to `"same"` or `"rotated"` when
+The `orientation` column in the duplicates DataFrame is automatically set to `"same"` or `"rotated"` when
 both hash types are computed.
 
 ## When to use compute_stats with ImageStats
