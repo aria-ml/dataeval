@@ -1053,6 +1053,7 @@ class Outliers(Evaluator):
     flags: ImageStats
     outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None
     extractor: FeatureExtractor | None
+    batch_size: int | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
     cluster_threshold: float
     n_clusters: int | None
@@ -1399,7 +1400,7 @@ class Outliers(Evaluator):
         data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     ) -> tuple[pl.DataFrame, ClusterStats]:
         """Extract embeddings, cluster them, and return cluster-based outlier DataFrame and stats."""
-        embeddings = Embeddings(data, self.extractor)
+        embeddings = Embeddings(data, self.extractor, batch_size=self.batch_size)
 
         cluster_result = cluster(
             embeddings,

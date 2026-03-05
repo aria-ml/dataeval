@@ -946,6 +946,7 @@ class Duplicates(Evaluator):
     cluster_threshold: float | None
     merge_near_duplicates: bool
     extractor: FeatureExtractor | None
+    batch_size: int | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
     n_clusters: int | None
     config: Config
@@ -1262,7 +1263,7 @@ class Duplicates(Evaluator):
 
         # Cluster-based duplicate detection (requires both extractor and cluster_threshold)
         if self.extractor is not None and self.cluster_threshold is not None:
-            embeddings = Embeddings(data, self.extractor)
+            embeddings = Embeddings(data, self.extractor, batch_size=self.batch_size)
 
             stored_cluster_result = cluster(
                 embeddings,

@@ -100,6 +100,9 @@ from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, DuplicatesOutput
 
 config.set_seed(42)
+
+# Set default batch size
+config.set_batch_size(64)
 ```
 
 ## Creating test data
@@ -369,6 +372,7 @@ cluster_threshold = 1.75
 bovw_detector = Duplicates(
     flags=ImageStats.NONE,  # Skip hash computation, use only clustering
     extractor=bovw_extractor,
+    batch_size=64,
     cluster_threshold=cluster_threshold,
 )
 bovw_results = bovw_detector.evaluate(images)
