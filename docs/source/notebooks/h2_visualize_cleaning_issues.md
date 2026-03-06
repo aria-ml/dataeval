@@ -20,7 +20,7 @@ kernelspec:
 Exploratory data analysis (EDA) can be overwhelming. There are so many things to check. Duplicates in your dataset,
 bad/corrupted images in the set, blurred or bright/dark images, the list goes on.
 
-DataEval created a [data cleaning](../concepts/DataCleaning.md) class to assist you with your EDA so you can start
+DataEval created a [data cleaning](../concepts/DataIntegrity.md) class to assist you with your EDA so you can start
 training your models on high quality data.
 
 +++
@@ -144,5 +144,28 @@ results_classwise.aggregate_by_class(metadata)
 tags: [remove_cell]
 ---
 ### TEST ASSERTION CELL ###
+print(results.shape[0])
 assert results.shape[0] == 500
 ```
+
++++
+
+## Related concepts
+
+- [Data Integrity](../concepts/DataIntegrity.md)
+- [Clustering](../concepts/Clustering.md)
+- [Acting on Results](../concepts/ActingOnResults.md)
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+
+## See also
+
+### How-to guides
+
+- [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.md)
+- [How to run clustering analysis](./h2_cluster_analysis.md)
+- [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.md)
+
+### Tutorials
+
+- [Introduction to data cleaning](./tt_clean_dataset.md)
+- [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.md)

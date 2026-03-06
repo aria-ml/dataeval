@@ -17,7 +17,7 @@ This guide provides a beginner friendly introduction to exploratory data analysi
 
 Estimated time to complete: 10 minutes
 
-Relevant ML stages: [Data Engineering](../concepts/users/ML_Lifecycle.md#data-engineering)
+Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 
 Relevant personas: Data Engineer, Data Scientist
 
@@ -26,8 +26,10 @@ Relevant personas: Data Engineer, Data Scientist
 ## What you'll do
 
 - Construct [embeddings](../concepts/Embeddings.md) by inferencing the PASCAL VOC 2012 through a model
-- Analyze clustered embeddings to find [outliers](../concepts/Outliers.md)
-- Run additional analysis to find gaps in data [coverage](../concepts/Coverage.md)
+- Analyze clustered embeddings to find
+  [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings)
+- Run additional analysis to find gaps in data
+  [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space)
 
 ## What you'll learn
 
@@ -410,6 +412,8 @@ algorithms to find outliers, to check for gaps in coverage, and to make decision
 
 Good luck with your data!
 
++++
+
 ## What's next
 
 In addition to exploring a dataset in its feature space, DataEval offers additional tutorials on exploratory data
@@ -419,8 +423,11 @@ analysis:
 - [Identify Bias and Correlations](./tt_identify_bias.md) in your metadata
 
 Explore deeper explanations on topics such as [clustering](../concepts/Clustering.md),
-[coverage](../concepts/Coverage.md), and [outliers](../concepts/Outliers.md) in the
+[coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space), and
+[outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings) in the
 [Concept pages](../concepts/index.md).
+
++++
 
 ## On your own
 

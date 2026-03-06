@@ -17,7 +17,7 @@ This guide provides a beginner friendly introduction on monitoring post deployme
 
 Estimated time to complete: 5 minutes
 
-Relevant ML stages: [Monitoring](../concepts/users/ML_Lifecycle.md#monitoring)
+Relevant ML stages: [Monitoring](../getting-started/roles/ML_Lifecycle.md#monitoring)
 
 Relevant personas: Machine Learning Engineer, T&E Engineer
 
@@ -46,17 +46,17 @@ Relevant personas: Machine Learning Engineer, T&E Engineer
 
 ## Introduction
 
-Monitoring is a critical step in the [AI/ML lifecycle](../concepts/users/ML_Lifecycle.md). When a model is deployed,
-data can, and generally will, [drift](../concepts/Drift.md) from the distribution on which the model was originally
-trained. One critical step in AI T&E is the detection of changes in the operational distribution so that they may be
-proactively addressed. While some change might not affect performance, significant deviation is often associated with
-model degradation.
+Monitoring is a critical step in the [AI/ML lifecycle](../getting-started/roles/ML_Lifecycle.md). When a model is deployed,
+data can, and generally will, [drift](../concepts/DistributionShift.md) from the distribution on which the model was
+originally trained. One critical step in AI T&E is the detection of changes in the operational distribution so that they
+may be proactively addressed. While some change might not affect performance, significant deviation is often associated
+with model degradation.
 
 For this tutorial, you will use the popular
 [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main) computer vision dataset to detect drift
 between the image distribution of the `train` split and the `val` split, which will represent an operational dataset in
 this guide. You will then determine if the labels within these two datasets has high
-[parity](../concepts/LabelParity.md), or equivalent label distributions.
+[parity](../concepts/DistributionShift.md#label-parity), or equivalent label distributions.
 
 +++
 
@@ -65,9 +65,8 @@ this guide. You will then determine if the labels within these two datasets has 
 You'll begin by importing the necessary libraries for this tutorial.
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 try:
     import google.colab  # noqa: F401
 
@@ -215,7 +214,7 @@ fundamentally different strategies for detecting distributional change.
 >
 > `DriftUnivariate` supports several statistical tests beyond CVM, including Kolmogorov-Smirnov (`ks`), Mann-Whitney U
 > (`mwu`), Anderson-Darling (`anderson`), and Baumgartner-Weiss-Schindler (`bws`). Each has different sensitivity
-> characteristics — see the [drift concept page](../concepts/Drift.md#understanding-the-drift-detectors) for details.
+> characteristics — see the [drift concept page](../concepts/DistributionShift.md#drift-detection) for details.
 
 +++
 
@@ -223,7 +222,8 @@ fundamentally different strategies for detecting distributional change.
 
 In this step, you will be checking for drift between the training embeddings and the operational embeddings from before.
 If drift is detected, a model trained on this training data should be retrained with new operational data. This can help
-mitigate performance degradation in a deployed model. Visit our [About Drift](../concepts/Drift.md) page to learn more.
+mitigate performance degradation in a deployed model. Visit our [About Drift](../concepts/DistributionShift.md) page to
+learn more.
 
 ### Drift detectors
 
@@ -232,8 +232,8 @@ DataEval offers several drift detectors. This tutorial demonstrates four that ea
 
 Since each detector outputs a binary decision on whether drift is detected, a **majority vote** can be used to make the
 determination of drift.\
-To learn more about these algorithms, see the [theory behind drift detection](../concepts/Drift.md#what-is-drift)
-concept page.
+To learn more about these algorithms, see the
+[theory behind drift detection](../concepts/DistributionShift.md#taxonomy-of-shift) concept page.
 
 ### Fit the detectors
 
@@ -294,8 +294,7 @@ for name, detector in detectors.items():
 Now drift is detected!
 
 Adding Gaussian noise was enough to cause a noticeable change in the drift detectors, but this is not always the case.
-There are many [types of drift](../concepts/Drift.md#formal-definition-and-types-of-drift) that data can and will
-experience.
+There are many [types of drift](../concepts/DistributionShift.md#taxonomy-of-shift) that data can and will experience.
 
 +++
 
@@ -453,7 +452,7 @@ Next you will look at the labels' distributions.
 +++
 
 Instead of looking at the images, you can compare the distributions of the labels using a method called
-[label parity](../concepts/LabelParity.md).\
+[label parity](../concepts/DistributionShift.md#label-parity).\
 There is parity between two sets of labels if the label frequencies are approximately equal.
 
 You will now compare the label distributions using the `label_parity` function.
@@ -497,5 +496,22 @@ good idea to consider retraining the model and incorporating operational data in
 DataEval plays a small, but impactful role in data monitoring as a metrics library.\
 Visit these additional resources for more information on other aspects:
 
-- Read about the entire [monitoring in AI/ML](../concepts/users/ML_Lifecycle.md#monitoring) stage
+- Increase your understanding of the types of [data shifts](../concepts/DistributionShift.md) that occur during monitoring
+- Read about the entire [monitoring in AI/ML](../getting-started/roles/ML_Lifecycle.md#monitoring) stage
 - Explore DataEval's [API reference](../reference/autoapi/dataeval/index.rst) for drift and other monitoring tools
+- Learn about [identifying out-of-distribution samples](./tt_identify_ood_samples.md)
+
+To learn more about setting a global seed in DataEval, see the [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
+
++++
+
+## On your own
+
+Once you are familiar with DataEval and data monitoring, run this analysis using your own reference and operational
+datasets.
+
+Experiment with:
+
+- **Different embeddings for KNN**: ResNet, ViT, CLIP, or domain-specific pretrained models
+- **Custom architectures**: Design models for your specific data type (not generic examples)
+- **Different drift scenarios**: Test on your own data with varying difficulty levels

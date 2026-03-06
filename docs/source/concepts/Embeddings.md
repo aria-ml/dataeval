@@ -1,9 +1,7 @@
 # Embeddings
 
 This page explains the role and importance of embeddings in vision tasks and
-guides you through understanding how to work with them using our tools. For
-curated examples using embeddings, see our
-[tutorials](../tutorials/index.md).
+guides you through understanding how to work with them using our tools.
 
 ## What are they
 
@@ -120,3 +118,47 @@ variety of metrics and tasks.
 | **Self-Supervised** | DINO, MAE, SimCLR | Drift, Prioritization, Duplicate Detection | Embeddings capture general visual patterns without class bias, good for broad visual similarity |
 | **Contrastive Learning** | CLIP, SwAV, MoCo | Similarity Search, Nearest Neighbor Analysis | Embeddings optimized for distinguishing similar vs. dissimilar pairs, excellent for comparison tasks |
 | **Segmentation** | U-Net, Mask R-CNN, DeepLab | Fine-grained Analysis, Pixel-level Quality | Embeddings understand detailed spatial structure and boundaries within images |
+
+## Related concept pages
+
+- [Clustering](Clustering.md) — how the data are grouped in the embedding space
+- [Dataset Bias and Coverage](DatasetBias.md) — how coverage and completeness
+  analyze the embedding space
+- [Distribution Shift](DistributionShift.md) — monitoring shifts in the embedding space
+- [Acting on Results](ActingOnResults.md) — how to interpret and respond to
+  analyses that rely on embeddings
+
+## See this in practice
+
+### How-to guides
+
+- [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.md)
+- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.md)
+
+### Tutorials
+
+- [Identify bias and correlations tutorial](../notebooks/tt_identify_bias.md) —
+  acting on balance and diversity findings
+- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.md) —
+  coverage gaps and embedding-space decisions
+- [Monitoring distribution shift tutorial](../notebooks/tt_monitor_shift.md) —
+  responding to drift detection
+- [Identifying OOD samples tutorial](../notebooks/tt_identify_ood_samples.md) —
+  responding to OOD detection
+
+## References
+
+1. Bengio, Y., Courville, A., & Vincent, P. (2013). Representation learning:
+A review and new perspectives. *IEEE Transactions on Pattern Analysis
+and Machine Intelligence*, 35(8), 1798–1828. [paper](https://arxiv.org/abs/1206.5538)
+
+2. Chen, T., Kornblith, S., Norouzi, M., & Hinton, G. (2020). A simple framework
+for contrastive learning of visual representations. *Proceedings of the 37th
+International Conference on Machine Learning (ICML)*, 1597–1607. [paper](https://arxiv.org/abs/2002.05709)
+
+3. Beyer, K., Goldstein, J., Ramakrishnan, R., & Shaft, U. (1999). When is
+"nearest neighbor" meaningful? *Proceedings of the 7th International Conference
+on Database Theory (ICDT)*, 217–235. [paper](https://link.springer.com/chapter/10.1007/3-540-49257-7_15)
+
+4. Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. *Proceedings
+of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 1521–1528. [paper](https://ieeexplore.ieee.org/document/5995347)

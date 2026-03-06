@@ -20,8 +20,8 @@ kernelspec:
 For machine learning tasks, a discrepancy in label frequencies between train and test datasets can result in poor model
 performance.
 
-To help with this, DataEval has a [label parity](../concepts/LabelParity.md) tool that compares the label distributions
-of two datasets.
+To help with this, DataEval has a [label parity](../concepts/DistributionShift.md#label-parity) tool that compares the
+label distributions of two datasets.
 
 +++
 
@@ -105,3 +105,24 @@ tags: [remove_cell]
 assert 0 <= results["chi_squared"] < 4
 assert 0.9 < results["p_value"] <= 1.0
 ```
+
++++
+
+## Related concepts
+
+- [Distribution Shift](../concepts/DistributionShift.md)
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+
+## See also
+
+### How-to guides
+
+- [How to measure train and test dataset divergence](./h2_measure_divergence.md)
+- [How to detect undersampled data subsets](./h2_detect_undersampling.md)
+- [How to run clustering analysis](./h2_cluster_analysis.md)
+
+### Tutorials
+
+- [Monitor shifts in operational data](./tt_monitor_shift.md)
+- [Assess an unlabeled data space](./tt_assess_data_space.md)
+- [Identify bias and correlations](./tt_identify_bias.md)

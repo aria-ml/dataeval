@@ -17,7 +17,7 @@ Part 1 of our introduction to exploratory data analysis guide
 
 Estimated time to complete: 15 minutes
 
-Relevant ML stages: [Data Engineering](../concepts/users/ML_Lifecycle.md#data-engineering)
+Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 
 Relevant personas: Data Engineer, ML Engineer
 
@@ -51,9 +51,10 @@ incongruencies in the data. Before diving into machine learning or statistical m
 data you are working with. EDA helps in understanding the patterns, detecting anomalies, checking assumptions, and
 determining relationships in the data.
 
-One of the most important aspects of EDA is [data cleaning](../concepts/DataCleaning.md). A portion of DataEval is
-dedicated to being able to identify duplicates and [outliers](../concepts/Outliers.md) as well as data points that have
-missing or too many extreme values. These techniques help ensure that you only include high quality data for your
+One of the most important aspects of EDA is [data cleaning](../concepts/DataIntegrity.md). A portion of DataEval is
+dedicated to being able to identify duplicates and
+[outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings) as well as data points that
+have missing or too many extreme values. These techniques help ensure that you only include high quality data for your
 projects.
 
 +++
@@ -274,7 +275,8 @@ This table helps point out the wide variation in
 - the number of objects per image,
 - and the number of objects of each class per image.
 
-This highlights an important concept - [class balance](../concepts/ClassBalancing.md). A dataset that is imbalanced can
+This highlights an important concept -
+[class balance](../concepts/DatasetBias.md#correcting-for-imbalance-classbalance). A dataset that is imbalanced can
 result in a model that chooses the more prominent class more often just because there are more samples in that class. To
 explore this concept further, see the bias tutorial in the [What's Next](#whats-next) section at the end of this
 tutorial.
@@ -311,7 +313,7 @@ Now, you can move on to identifying which images have a statistical difference f
 
 Here you will detect and identify the images associated with the extreme values from DataEval's stat functions. To
 detect these extreme values, you will use the :class:`.Outliers` class. The `Outliers` class has multiple methods to
-determine the extreme values, which are discussed in the [Data Cleaning explanation](../concepts/DataCleaning.md). For
+determine the extreme values, which are discussed in the [Data Cleaning explanation](../concepts/DataIntegrity.md). For
 this guide, you will use the "zscore" as the Z score defines outliers in a normal distribution.
 
 The output of the `Outliers` class contains a DataFrame with columns for image_id, metric_name, and metric_value for
@@ -643,7 +645,7 @@ Learn how to do the following:
 - [Monitor shifting operational data](./tt_monitor_shift.md)
 
 To learn more about specific functions or classes, see the [API Reference](../reference/autoapi/dataeval/index.rst)
-section. To learn more about data cleaning, see the [Data Cleaning](../concepts/DataCleaning.md) explanation page.
+section. To learn more about data cleaning, see the [Data Integrity](../concepts/DataIntegrity.md) explanation page.
 
 +++
 

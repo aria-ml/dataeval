@@ -19,7 +19,8 @@ kernelspec:
 
 For most computer vision tasks like **image classification** and **object detection**, we often have a lot of images,
 but certain subsets of the images can be undersampled, such as label, style within a label, etc. A way to detect this
-regional sparsity is through [coverage](../concepts/Coverage.md) analysis.
+regional sparsity is through [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space)
+analysis.
 
 To help with this, DataEval has introduced a {func}`.coverage` function, that provides a user with example images which
 have few similar instances within the provided dataset.
@@ -250,3 +251,32 @@ wonky = sum(labels[i] == 2 or labels[i] == 7 for idx, i in enumerate(cvrg["uncov
 print(wonky)
 assert (wonky / 20) > 0.4
 ```
+
++++
+
+## Related concepts
+
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+- [Embeddings](../concepts/Embeddings.md)
+- [Clustering](../concepts/Clustering.md)
+- [Acting on Results](../concepts/ActingOnResults.md)
+- [Data Integrity](../concepts/DataIntegrity.md)
+- [Performance Limits](../concepts/PerformanceLimits.md)
+
+## See also
+
+### How-to guides
+
+- [How to run clustering analysis](./h2_cluster_analysis.md)
+- [How to encode images with ONNX models](./h2_encode_with_onnx.md)
+- [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.md)
+- [How to visualize cleaning issues](./h2_visualize_cleaning_issues.md)
+- [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.md)
+- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.md)
+
+### Tutorials
+
+- [Assess an unlabeled data space](./tt_assess_data_space.md)
+- [Introduction to data cleaning](./tt_clean_dataset.md)
+- [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.md)
+- [Identify bias and correlations](./tt_identify_bias.md)

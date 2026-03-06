@@ -17,9 +17,9 @@ kernelspec:
 
 ## Problem statement
 
-When performing analysis on datasets, [metadata](../concepts/Metadata.md) may sometimes be sparse or unavailable. Adding
-metadata to a dataset for analysis may be necessary at times, and can come in the forms of calculated intrinsic values
-or additional information originally unavailable on the source dataset.
+When performing analysis on datasets, [metadata](../concepts/DatasetBias.md#measuring-bias-mutual-information) may
+sometimes be sparse or unavailable. Adding metadata to a dataset for analysis may be necessary at times, and can come in
+the forms of calculated intrinsic values or additional information originally unavailable on the source dataset.
 
 This guide will show you how to add in the calculated statistics from DataEval's {func}`.compute_stats` function to the
 metadata for bias analysis.
@@ -179,3 +179,17 @@ sensitivity to binning strategy.
 
 You can now augment your datasets with additional metadata information, either from additional sources or using
 `dataeval` statistical functions for insights into your data.
+
++++
+
+## Related concepts
+
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+- [Acting on Results](../concepts/ActingOnResults.md)
+
+## See also
+
+### How-to guides
+
+- [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.md)
+- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.md)

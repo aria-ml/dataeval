@@ -5,6 +5,8 @@
 
 from os import getenv
 
+import dataeval
+
 # -----------------------------------------------------------------------------
 # Project configuration
 # -----------------------------------------------------------------------------
@@ -81,7 +83,7 @@ autoapi_options = [
 ]
 autoapi_generate_api_docs = True
 # uncomment to review or debug generated content
-autoapi_keep_files = True
+# autoapi_keep_files = True
 autodoc_typehints = "description"
 autodoc_typehints_description_target = "documented"
 autoapi_own_page_level = "function"
@@ -127,9 +129,18 @@ myst_enable_extensions = [
     "dollarmath",
     "html_image",
     "html_admonition",
+    "substitution",
+    "fieldlist",
 ]
 myst_heading_anchors = 4
 myst_footnote_transition = False
+
+rtd_version = getenv("READTHEDOCS_VERSION")
+date_label = "Latest Build" if rtd_version == "latest" else "Date"
+myst_substitutions = {
+    "release": dataeval.__version__,
+    "date_label": f"**{date_label}**",
+}
 
 # -----------------------------------------------------------------------------
 # HTML output
@@ -173,8 +184,13 @@ html_theme_options = {
         "navigation.sections",
         "navigation.tabs",
         "navigation.tabs.sticky",
+        "navigation.top",
     ],
 }
+
+# -----------------------------------------------------------------------------
+# Functions
+# -----------------------------------------------------------------------------
 
 
 def inherits_from(obj, full_name: str) -> bool:

@@ -11,7 +11,7 @@ from versiontag import VersionTag
 
 CHANGELOG_FILE = "CHANGELOG.md"
 # need to read this to update the doc links
-HOWTO_INDEX_FILE = "docs/source/how_to/index.md"
+HOWTO_INDEX_FILE = "docs/source/how-to/index.md"
 TUTORIAL_INDEX_FILE = "docs/source/tutorials/index.md"
 TAB = "    "
 

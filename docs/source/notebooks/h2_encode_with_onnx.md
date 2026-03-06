@@ -19,8 +19,9 @@ kernelspec:
 
 When working with image datasets, generating [embeddings](../concepts/Embeddings.md) is a common first step for many
 analysis tasks like [clustering](../concepts/Clustering.md), duplicate detection, and
-[coverage](../concepts/Coverage.md) analysis. While PyTorch models are widely used, ONNX (Open Neural Network Exchange)
-provides a framework-agnostic format that offers portability and often better inference performance.
+[coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) analysis. While PyTorch models are
+widely used, ONNX (Open Neural Network Exchange) provides a framework-agnostic format that offers portability and often
+better inference performance.
 
 DataEval's `OnnxExtractor` allows you to use any ONNX model to generate embeddings from your image datasets.
 
@@ -179,3 +180,30 @@ tags: [remove_cell]
 assert embeddings.shape[0] == 100
 assert embeddings.shape[1] == 2048
 ```
+
++++
+
+## Related concepts
+
+- [Embeddings](../concepts/Embeddings.md)
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+- [Distribution Shift](../concepts/DistributionShift.md)
+- [Clustering](../concepts/Clustering.md)
+- [Data Integrity](../concepts/DataIntegrity.md)
+
+## See also
+
+### How-to guides
+
+- [How to detect undersampled data subsets](./h2_detect_undersampling.md)
+- [How to measure train and test dataset divergence](./h2_measure_divergence.md)
+- [How to run clustering analysis](./h2_cluster_analysis.md)
+- [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.md)
+
+### Tutorials
+
+- [Assess an unlabeled data space](./tt_assess_data_space.md)
+- [Introduction to data cleaning](./tt_clean_dataset.md)
+- [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.md)
+- [Identify out-of-distribution samples](./tt_identify_ood_samples.md)
+- [Monitor shifts in operational data](./tt_monitor_shift.md)

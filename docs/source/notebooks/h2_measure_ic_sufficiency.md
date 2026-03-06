@@ -17,7 +17,7 @@ This guide walks you through analyzing an image classification model's hypotheti
 
 Estimated time to complete: 10 minutes
 
-Relevant ML stages: [Model Development](../concepts/users/ML_Lifecycle.md#model-development)
+Relevant ML stages: [Model Development](../getting-started/roles/ML_Lifecycle.md#model-development)
 
 Relevant personas: ML Engineer
 
@@ -29,7 +29,8 @@ For machine learning tasks, often we would like to evaluate the performance of a
 In situations where data collection is expensive, we would like to extrapolate hypothetical performance out to a larger
 dataset.
 
-DataEval has introduced a method projecting performance via _[sufficiency](../concepts/Sufficiency.md) curves_.
+DataEval has introduced a method projecting performance via
+_[sufficiency](../concepts/PerformanceLimits.md#sufficiency--the-diminishing-returns-curve) curves_.
 
 +++
 
@@ -342,3 +343,19 @@ output.inv_project([0.90, 0.93, 0.99])
 
 With a value of "-1" samples, the projection shows that given the current model, hitting an accuracy of 99% is
 improbable.
+
++++
+
+## Related concepts
+
+- [Performance Limits](../concepts/PerformanceLimits.md)
+- [Embeddings](../concepts/Embeddings.md)
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+
+## See also
+
+### How-to guides
+
+- [How to determine image classification feasibility](./h2_measure_ic_feasibility.md)
+- [How to detect undersampled data subsets](./h2_detect_undersampling.md)
+- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.md)

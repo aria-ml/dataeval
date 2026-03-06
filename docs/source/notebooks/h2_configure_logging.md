@@ -272,3 +272,11 @@ for log_file in log_files:
 
 print("\nCleanup complete!")
 ```
+
++++
+
+## See also
+
+### How-to guides
+
+- [How to configure global hardware configuration defaults in DataEval](./h2_configure_hardware_settings.md)
