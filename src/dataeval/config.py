@@ -299,20 +299,26 @@ def use_max_processes(processes: int) -> _ConfigContextManager:
     return _ConfigContextManager("max_processes", processes)
 
 
-def set_seed(seed: int | None, all_generators: bool = False) -> None:
+def set_seed(seed: int | None, all_generators: bool = False, deterministic: bool = False) -> None:
     """
     Set the seed for use by classes that allow for a random state or seed.
 
     Parameters
     ----------
     seed : int or None
-        The seed to use.
+        The seed to use. When None, clears the DataEval seed and resets
+        all generators (NumPy, PyTorch) and deterministic settings
+        regardless of other parameters.
     all_generators : bool, default False
         Whether to set the seed for all generators, including NumPy and PyTorch.
+    deterministic : bool, default False
+        Whether to force PyTorch to use deterministic algorithms. When True,
+        calls ``torch.use_deterministic_algorithms(True)``, which ensures
+        reproducible results but may reduce performance.
     """
     _config.seed = seed
 
-    if all_generators:
+    if all_generators or seed is None:
         np.random.seed(seed)
         if seed is not None:
             torch.manual_seed(seed)
@@ -320,6 +326,9 @@ def set_seed(seed: int | None, all_generators: bool = False) -> None:
         else:
             torch.seed()
             torch.cuda.seed_all()
+
+    if deterministic or seed is None:
+        torch.use_deterministic_algorithms(seed is not None)
 
 
 def get_seed() -> int | None:

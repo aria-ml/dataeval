@@ -158,6 +158,88 @@ dataeval.config.set_max_processes(None)
 print(f"Max processes: {dataeval.config.get_max_processes()}")
 ```
 
+## Configuring the global seed
+
++++
+
+DataEval uses a global seed to control randomness in operations that rely on random state, such as clustering (KMeans),
+mutual information estimation, domain classification, data selection, and bag-of-visual-words extraction. Setting a seed
+ensures reproducible results across runs.
+
++++
+
+### Set the global seed
+
+This sets the seed used internally by DataEval functions that accept a `random_state` or seed parameter.
+
+```{code-cell} ipython3
+dataeval.config.set_seed(42)
+
+print(f"Current seed: {dataeval.config.get_seed()}")
+```
+
+### Set the seed for all generators
+
+When `all_generators=True`, the seed is also applied to NumPy (`np.random.seed`) and PyTorch (`torch.manual_seed`,
+`torch.cuda.manual_seed_all`). This is useful when you need full reproducibility across all numeric libraries, not just
+DataEval's internal operations.
+
+```{code-cell} ipython3
+import numpy as np
+import torch
+
+# Set the seed with all_generators to seed NumPy and PyTorch
+dataeval.config.set_seed(42, all_generators=True)
+
+# Generate random values — these will be the same every time
+np_result = np.random.rand(3)
+torch_result = torch.rand(3)
+print(f"NumPy:   {np_result}")
+print(f"PyTorch: {torch_result}")
+
+# Reset and set the same seed again
+dataeval.config.set_seed(42, all_generators=True)
+
+# The same values are produced
+np_result_2 = np.random.rand(3)
+torch_result_2 = torch.rand(3)
+print(f"NumPy:   {np_result_2}")
+print(f"PyTorch: {torch_result_2}")
+
+assert np.array_equal(np_result, np_result_2)
+assert torch.equal(torch_result, torch_result_2)
+```
+
+Even without `all_generators`, the global seed is automatically passed as the `random_state` to internal library calls
+such as scikit-learn's `KMeans`, `KNeighborsClassifier`, and `StratifiedKFold`, ensuring consistent results from
+DataEval operations.
+
+### Enable deterministic algorithms
+
+When `deterministic=True`, PyTorch is forced to use deterministic implementations of its algorithms via
+`torch.use_deterministic_algorithms(True)`. This guarantees bitwise reproducibility for PyTorch operations, but may
+reduce performance since some optimized (non-deterministic) algorithm implementations will be disabled. If no
+deterministic implementation exists for an operation, PyTorch will raise a `RuntimeError`.
+
+This is most useful when combined with `all_generators=True` for full reproducibility.
+
+```{code-cell} ipython3
+dataeval.config.set_seed(42, all_generators=True, deterministic=True)
+
+print(f"Current seed: {dataeval.config.get_seed()}")
+```
+
+### Reset the seed to unset
+
+Setting the seed to `None` always resets all generators (NumPy, PyTorch) and disables deterministic algorithms,
+regardless of the other parameters.
+
+```{code-cell} ipython3
+dataeval.config.set_seed(None)
+
+print(f"Current seed: {dataeval.config.get_seed()}")
+```
+
 ## Using temporary context managers
 
 +++
