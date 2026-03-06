@@ -134,3 +134,27 @@ assert len(results.exact) == len(duplicates)
 for k, v in duplicates.items():
     assert [v, k] in results.exact
 ```
+
++++
+
+## Related concepts
+
+- [Data Integrity](../concepts/DataIntegrity.md)
+- [Clustering](../concepts/Clustering.md)
+- [Acting on Results](../concepts/ActingOnResults.md)
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+
+## See also
+
+### How-to guides
+
+- [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.md)
+- [How to visualize cleaning issues](./h2_visualize_cleaning_issues.md)
+- [How to run clustering analysis](./h2_cluster_analysis.md)
+- [How to encode images with ONNX models](./h2_encode_with_onnx.md)
+- [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.md)
+
+### Tutorials
+
+- [Introduction to data cleaning](./tt_clean_dataset.md)
+- [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.md)

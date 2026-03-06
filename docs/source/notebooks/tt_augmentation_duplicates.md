@@ -17,7 +17,7 @@ This tutorial demonstrates how DataEval's duplicate detection methods handle com
 
 Estimated time to complete: 10 minutes
 
-Relevant ML stages: [Data Engineering](../concepts/users/ML_Lifecycle.md#data-engineering)
+Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 
 Relevant personas: Data Engineer, ML Engineer
 
@@ -643,3 +643,28 @@ print(f"  Total transformations tested: {n_transforms}")
 print(f"  Detected by combined method: {len(combined_detected)}")
 print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 ```
+
++++
+
+## What's next
+
+In addition to exploring the duplicates in a dataset, DataEval offers additional tutorials on exploratory data
+analysis:
+
+- Clean a dataset with the labels in the [Data Cleaning Guide](./tt_clean_dataset.md)
+- [Identify Bias and Correlations](./tt_identify_bias.md) in your metadata
+- Determine how the data groups by [assessing the data space](./tt_assess_data_space.md)
+
+Explore deeper explanations on topics such as [duplicates](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering),
+[outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings), and
+[coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) in the
+[Concept pages](../concepts/index.md).
+
+To learn more about setting a global seed in DataEval, see the [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
+
++++
+
+## On your own
+
+Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. When you do, make sure
+that you analyze all of your data and not just the training set.

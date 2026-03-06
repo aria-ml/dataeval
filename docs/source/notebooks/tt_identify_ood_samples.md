@@ -13,13 +13,14 @@ kernelspec:
 
 # Identify out-of-distribution samples
 
-This guide demonstrates how to identify [out-of-distribution](../concepts/OOD.md) (OOD) samples using
+This guide demonstrates how to identify
+[out-of-distribution](../concepts/DistributionShift.md#out-of-distribution-detection) (OOD) samples using
 reconstruction-based methods with different model architectures.
 
 Estimated time to complete: 10-15 minutes
 
-Relevant ML stages: [Monitoring](../concepts/users/ML_Lifecycle.md#monitoring),
-[Data Engineering](../concepts/users/ML_Lifecycle.md#data-engineering)
+Relevant ML stages: [Monitoring](../getting-started/roles/ML_Lifecycle.md#monitoring),
+[Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 
 Relevant personas: Machine Learning Engineer, T&E Engineer, Data Scientist
 
@@ -1176,15 +1177,24 @@ Based on OOD similarity to in-distribution data:
 Remember: Digits 8-9 vs 0-7 is a **hard** OOD case (shared features). Real-world performance depends on your specific
 data distributions.
 
++++
+
 ### What's next
 
 To learn more about OOD detection and related concepts:
 
-- Read the [OOD Detection concept page](../concepts/OOD.md)
+- Read the [OOD Detection concept page](../concepts/DistributionShift.md#out-of-distribution-detection)
 - Learn about [monitoring operational data](./tt_monitor_shift.md)
 - Try the [data cleaning tutorial](./tt_clean_dataset.md)
 
-### Try it yourself
+To learn more about setting a global seed in DataEval, see the [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
+
++++
+
+## On your own
+
+Once you are familiar with DataEval and data monitoring, run this analysis using your own reference and operational
+datasets.
 
 Experiment with:
 

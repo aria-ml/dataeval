@@ -2,7 +2,7 @@
 Documentation How-to Issue Template
 
 This template is to be used when a new feature has been completed. \
-How-tos are currently optional (on a as-needed basis) and should reside in the docs/how_to folder.\
+How-tos are currently optional (on a as-needed basis) and should reside in the docs/how-to folder.\
 All new features should have at least a tutorial, concept page, and reference page. How-tos are optional.
 -->
 
@@ -14,7 +14,7 @@ All new features should have at least a tutorial, concept page, and reference pa
 
 ## Definition of Done
 
-- [ ] File in the docs/how_to folder
+- [ ] File in the docs/how-to folder
 - [ ] Has all steps listed for process
 - [ ] Code does not error
 - [ ] All links work properly

@@ -1,10 +1,5 @@
-.font-title {
-    font-size: x-large;
-}
-
-.red-text {
-    color: red;
-}
+/* Import Fira Code font from Google Fonts as backup */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap');
 
 :root .graphviz a:hover > text {
   text-decoration: underline;
@@ -13,42 +8,6 @@
 .md-typeset table.data:not(.plain) {
     width: 90%;
 }
-
-@media screen and (min-width: 76.25em) {
-    .md-grid {
-        max-width: 80rem;
-    }
-
-    .md-sidebar--primary{
-        flex: 2 1 16rem;
-        max-width: 17rem;
-        min-width: 14rem;
-    }
-
-    .md-sidebar--primary .md-sidebar__inner{
-        padding-right: 1.5rem;
-    }
-
-    .md-content{
-        flex-shrink: 2;
-    }
-}
-
-@media screen and (min-width: 60em) {
-    .md-sidebar--secondary{
-        flex: 2 1 14rem;
-        max-width: 15rem;
-        min-width: 10rem;
-    }
-
-    .md-sidebar--secondary .md-sidebar__inner{
-        padding-right: 1rem;
-        padding-left: 0.5rem;
-    }
-}
-
-/* Import Fira Code font from Google Fonts as backup */
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap');
 
 /* Change font for inline code in docstrings - optimized for box-drawing characters */
 code, .docutils.literal {
@@ -94,4 +53,191 @@ pre, pre code, div.highlight pre {
 /* Add hover effect for better readability */
 .dataframe tr:hover td {
     background-color: var(--md-default-bg-color--lighter);
+}
+
+/* Adjusting text headers */
+.md-typeset h1 {
+    color: var(--md-default-fg-color);
+    font-size: 2.6rem;
+    margin: 0 0 .5em;
+    font-weight: 600;
+}
+.md-typeset h2 {
+    font-size: 2rem;
+    margin: 1em 0 .5em;
+    font-weight: 500;
+}
+.md-typeset h3 {
+    font-size: 1.5rem;
+    margin: 1em 0 .5em;
+    font-weight: 400;
+}
+
+
+/* Main index page & where to go next overview cards */
+.sd-card .sd-card-img-top {
+  height: 60px;
+  width: 60px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 10px;
+}
+body[data-md-color-scheme="slate"] {
+
+    .sd-card-img-top[src*='.svg'] {
+        filter: invert(.85) brightness(.9);
+    }
+    .sd-card-header {
+        border-bottom-color: rgba(255,255,255,0.125);
+    }
+    .sd-card {
+        border-color: rgba(255,255,255,0.125);
+    }
+    .sd-card:hover {
+        border-color: var(--sd-color-card-border-hover);
+        transform: scale(1.01);
+    }
+}
+
+/* Adjusting content size */
+.md-grid {
+    max-width: 80rem;
+}
+
+/* Adjusting resizing rates */
+.md-content {
+    flex-shrink: 1;
+}
+
+/* Scroll bars show if text height greater than 15 rem */
+.md-sidebar__scrollwrap {
+    min-height: 20rem;
+}
+
+/* Adjusting when the navigational tabs appear */
+@media screen and (max-width: 47.984375em) {
+    .md-tabs {
+        display: none;
+    }
+}
+@media screen and (min-width: 48em) {
+    .md-tabs {
+        display: block;
+    }
+}
+
+/* Showing the logo even when the screen is smaller */
+@media screen and (min-width: 30em) {
+    .md-header__button.md-logo {
+        display: inline-block;
+    }
+}
+@media screen and (min-width: 30em) and (max-width: 76.2344em) {
+  .md-header__button.md-logo {
+    order: 1;   /* push logo to the right of the drawer button */
+  }
+  .md-header__button[for=__drawer] {
+    order: 0;   /* pull drawer button to the left of the logo  */
+  }
+  .md-header__title {
+    order: 2;
+  }
+  .md-header__option {
+    order: 3;
+  }
+  .md-header__button[for=__search] {
+    order: 4;
+  }
+  .md-search {
+    order: 4;
+  }
+  .md-header__source {
+    order: 5;
+  }
+}
+@media screen and (min-width: 76.25em) {
+    .md-header__button[for=__drawer] {
+        display: none;
+    }
+}
+
+/* Shrink the screen size at which the secondary sidebar appears */
+@media screen and (min-width: 54em) {
+    .md-nav {
+        margin-bottom:-.4rem;
+        transition: max-height .25s cubic-bezier(.86,0,.07,1);
+    }
+
+    .md-nav__current-toc {
+        display: none!important
+    }
+
+    .md-nav--secondary .md-nav__title {
+        padding: 0;
+        background: var(--md-default-bg-color);
+        box-shadow: 0 0 .4rem .4rem var(--md-default-bg-color);
+        position: sticky;
+        top: 0;
+        z-index: 1
+    }
+
+    .md-nav--secondary .md-nav__title[for=__toc] {
+        scroll-snap-align: start
+    }
+
+    .md-nav--secondary .md-nav__title .md-nav__icon {
+        display: none
+    }
+
+    [dir=ltr] .md-nav--secondary .md-nav__list {
+        padding-left: .6rem
+    }
+
+    [dir=rtl] .md-nav--secondary .md-nav__list {
+        padding-right: .6rem
+    }
+
+    .md-nav--secondary .md-nav__list {
+        padding-bottom: .4rem;
+        padding-top: .4rem;
+    }
+
+    [dir=ltr] .md-nav--secondary .md-nav__item>.md-nav__link {
+        margin-right: .4rem
+    }
+
+    [dir=rtl] .md-nav--secondary .md-nav__item>.md-nav__link {
+        margin-left: .4rem
+    }
+
+    .md-sidebar {
+        height: auto;
+    }
+
+    .md-sidebar--secondary{
+        flex: 2 2 14rem;
+        max-width: 15rem;
+        min-width: 11rem;
+    }
+
+    .no-js .md-sidebar--secondary {
+        height: auto
+    }
+
+    .md-sidebar--secondary:not([hidden]) {
+        display: block
+    }
+
+    .md-sidebar--secondary .md-sidebar__scrollwrap {
+        touch-action: pan-y;
+    }
+
+    .md-sidebar__scrollwrap {
+        margin: 0;
+    }
+
+    .md-sidebar--secondary .md-sidebar__inner{
+        padding-right: 1rem;
+        padding-left: 0.5rem;
+    }
 }

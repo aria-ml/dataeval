@@ -13,12 +13,12 @@ kernelspec:
 
 # Identify bias and correlations
 
-This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/Balance.md) and
-[diversity](../concepts/Diversity.md).
+This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/DatasetBias.md)
+and [diversity](../concepts/DatasetBias.md).
 
 Estimated time to complete: 15 minutes
 
-Relevant ML stages: [Data Engineering](../concepts/users/ML_Lifecycle.md#data-engineering)
+Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 
 Relevant personas: Data Engineer, T&E Engineer
 
@@ -41,7 +41,8 @@ Relevant personas: Data Engineer, T&E Engineer
 ## What you'll need
 
 - Basic familiarity with Python
-- Basic understanding of your dataset structure, including but not limited to its [metadata](../concepts/Metadata.md)
+- Basic understanding of your dataset structure, including but not limited to its
+  [metadata](../concepts/ActingOnResults.md#diagnosing-findings-with-metadata)
 - An environment with DataEval installed
 
 +++
@@ -263,7 +264,7 @@ which becomes a problem if the test/operational dataset doesn't have the same im
 
 The {class}`.Diversity` evaluator measures the evenness or uniformity of the sampling of metadata factors over a
 dataset. Values near 1 indicate uniform sampling, while values near 0 indicate imbalanced sampling, e.g. all values
-taking a single value. For more information see the [Diversity](../concepts/Diversity.md) concept page.
+taking a single value. For more information see the [Diversity](../concepts/DatasetBias.md) concept page.
 
 The results can be retrieved using the _diversity_index_ attribute of the output.
 
@@ -351,8 +352,10 @@ about dataset analysis:
 - To identify coverage gaps and outliers use the [Assessing the Data Space Guide](tt_assess_data_space.md).
 - To monitor data for shifts during operation use the [Data Monitoring Guide](tt_monitor_shift.md).
 
-To learn more about the balance and diversity evaluators, see the [Balance](../concepts/Balance.md) and
-[Diversity](../concepts/Diversity.md) concept pages.
+To learn more about the balance and diversity evaluators, see the [Balance](../concepts/DatasetBias.md) and
+[Diversity](../concepts/DatasetBias.md) concept pages.
+
++++
 
 ## On your own
 

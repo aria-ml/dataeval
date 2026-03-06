@@ -18,8 +18,9 @@ kernelspec:
 ## Problem statement
 
 For classification machine learning tasks, there is an _inherent difficulty_ associated with signal to noise ratio in
-the images. One way of quantifying this difficulty is the [Bayes Error Rate](../concepts/BER.md), or irreducable error.
-This metric tells you if it would be _feasible_ to use a given feature set to predict a target variable.
+the images. One way of quantifying this difficulty is the
+[Bayes Error Rate](../concepts/PerformanceLimits.md#bayes-error-rate--the-irreducible-floor), or irreducable error. This
+metric tells you if it would be _feasible_ to use a given feature set to predict a target variable.
 
 DataEval has introduced a method of calculating this error rate that uses image embeddings.
 
@@ -37,7 +38,7 @@ that your data is noisy.
 
 ### What you will need
 
-1. A set of image [embeddings](../concepts/Embeddings.md) and their corresponding class labels. This requires training
+1. A set of image {term}`embeddings <Embeddings>` and their corresponding class labels. This requires training
    an autoencoder to compress the images.
 1. A Python environment with the following packages installed:
    - `dataeval`
@@ -198,3 +199,19 @@ requirement.
 
 By using BER to check for feasibility early on, we were able to reformulate the problem such that it is feasible under
 our specifications
+
++++
+
+## Related concepts
+
+- [Performance Limits](../concepts/PerformanceLimits.md)
+- [Embeddings](../concepts/Embeddings.md)
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+
+## See also
+
+### How-to guides
+
+- [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.md)
+- [How to detect undersampled data subsets](./h2_detect_undersampling.md)
+- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.md)

@@ -17,8 +17,8 @@ kernelspec:
 
 ## Problem statement
 
-When working with object detection datasets, you often need to analyze [image statistics](../concepts/ImageStats.md) at
-different granularities:
+When working with object detection datasets, you often need to analyze
+[image statistics](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary) at different granularities:
 
 - Image-level statistics: Properties of entire images
 - Box-level statistics: Properties of individual bounding boxes within images
@@ -206,3 +206,25 @@ These techniques are valuable for:
 - Understanding object characteristics
 - Optimizing preprocessing pipelines
 - Detecting outliers or anomalies
+
++++
+
+## Related concepts
+
+- [Data Integrity](../concepts/DataIntegrity.md)
+- [Acting on Results](../concepts/ActingOnResults.md)
+- [Clustering](../concepts/Clustering.md)
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+
+## See also
+
+### How-to guides
+
+- [How to visualize cleaning issues](./h2_visualize_cleaning_issues.md)
+- [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.md)
+- [How to run clustering analysis](./h2_cluster_analysis.md)
+
+### Tutorials
+
+- [Introduction to data cleaning](./tt_clean_dataset.md)
+- [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.md)

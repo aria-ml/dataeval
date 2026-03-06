@@ -27,7 +27,7 @@ distributed. A divergence of 1 means the two datasets are completely separable.
 ### When to use
 
 The `Divergence` class should be used when you would like to know how far two datasets are diverged for one another. For
-example, if you would like to measure [operational drift](../concepts/Drift.md).
+example, if you would like to measure [operational drift](../concepts/DistributionShift.md#drift-detection).
 
 +++
 
@@ -141,3 +141,25 @@ assert div["divergence"] > 0.95
 ```
 
 We conclude that the translated MNIST images are significantly different from the original images.
+
++++
+
+## Related concepts
+
+- [Embeddings](../concepts/Embeddings.md)
+- [Distribution Shift](../concepts/DistributionShift.md)
+- [Clustering](../concepts/Clustering.md)
+
+## See also
+
+### How-to guides
+
+- [How to encode images with ONNX models](./h2_encode_with_onnx.md)
+- [How to detect undersampled data subsets](./h2_detect_undersampling.md)
+- [How to run clustering analysis](./h2_cluster_analysis.md)
+
+### Tutorials
+
+- [Monitor shifts in operational data](./tt_monitor_shift.md)
+- [Identify out-of-distribution samples](./tt_identify_ood_samples.md)
+- [Assess an unlabeled data space](./tt_assess_data_space.md)

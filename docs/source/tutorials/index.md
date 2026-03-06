@@ -5,14 +5,14 @@ as a machine learning testing and evaluation engineer through easy-to-follow
 examples that are handcrafted to give you the best experience possible.
 
 The tutorials are split into sections based on which stage they fall under in
-the [machine learning life cycle](../concepts/users/ML_Lifecycle.md).
+the [machine learning life cycle](../getting-started/roles/ML_Lifecycle.md).
 Currently, there are tutorials for the following stages:
 
 1. [Data engineering](#data-engineering)
 2. [Monitoring](#monitoring)
 
 More tutorials are always in development, but you can suggest specific
-tutorials by [requesting a topic](../home/contributing.md).
+tutorials by [requesting a topic](../getting-started/contributing.md).
 
 To view the tutorial directly in the browser, click the title.
 
@@ -72,7 +72,6 @@ To run the tutorial interactively in Google Colab, click the
 :caption: Monitoring
 
 ../notebooks/tt_monitor_shift.md
-../notebooks/tt_error_analysis.md
 ../notebooks/tt_identify_ood_samples.md
 ```
 

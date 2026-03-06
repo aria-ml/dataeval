@@ -34,7 +34,8 @@ The clustering workflow can be used during the EDA process to perform the follow
 
 - group a dataset into clusters
 - verify labeling as a quality control
-- identify [outliers](../concepts/Outliers.md) in your dataset using the `Outliers` detector
+- identify [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings) in your dataset
+  using the `Outliers` detector
 - identify duplicates in your dataset using the `Duplicates` detector
 
 +++
@@ -197,3 +198,24 @@ tags: [remove_cell]
 assert len(outliers_result.outliers) == 1
 assert len(duplicates_result.near) == 2
 ```
+
++++
+
+## Related concepts
+
+- [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+- [Embeddings](../concepts/Embeddings.md)
+- [Acting on Results](../concepts/ActingOnResults.md)
+- [Data Integrity](../concepts/DataIntegrity.md)
+- [Distribution Shift](../concepts/DistributionShift.md)
+
+## See also
+
+### How-to guides
+
+- [How to identify duplicates](./h2_deduplicate.md)
+- [How to visualize cleaning issues](./h2_visualize_cleaning_issues.md)
+
+### Tutorials
+
+- [Assess an unlabeled data space](./tt_assess_data_space.md)
