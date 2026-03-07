@@ -2,11 +2,15 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+from scipy.stats import entropy as scipy_entropy
+from scipy.stats import kurtosis as scipy_kurtosis
+from scipy.stats import skew as scipy_skew
 
 from dataeval.core import compute_stats
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._dimensionstats import DimensionStatCalculator
 from dataeval.core._calculators._hashstats import HashStatCalculator
+from dataeval.core._calculators._pixelstats import PixelStatCalculator
 from dataeval.flags import ImageStats
 from dataeval.utils.preprocessing import BoundingBox
 
@@ -175,6 +179,179 @@ class TestPixelStats:
 
         # All pixels are NaN, so should be 1.0
         assert result["stats"]["missing"][0] == pytest.approx(1.0, abs=1e-4)
+
+
+class TestSkewKurtosisEntropySciPyEquivalence:
+    """Verify our NumPy implementations match scipy.stats for skew, kurtosis, and entropy."""
+
+    @pytest.fixture
+    def rng(self):
+        return np.random.default_rng(42)
+
+    def _make_calculator(self, image, per_channel=False):
+        cache = CalculatorCache(image, box=None, per_channel=per_channel)
+        return PixelStatCalculator(image, cache, per_channel=per_channel)
+
+    # --- Skew ---
+
+    def test_skew_matches_scipy_global(self, rng):
+        image = rng.random((3, 32, 32), dtype=np.float64)
+        calc = self._make_calculator(image)
+        result = calc._skew()
+        expected = float(scipy_skew(calc.cache.scaled.ravel(), nan_policy="omit"))
+        assert result[0] == pytest.approx(expected, rel=1e-5)
+
+    def test_skew_matches_scipy_per_channel(self, rng):
+        image = rng.random((3, 32, 32), dtype=np.float64)
+        calc = self._make_calculator(image, per_channel=True)
+        result = calc._skew()
+        for ch in range(3):
+            expected = float(scipy_skew(calc.cache.per_channel[ch], nan_policy="omit"))
+            assert result[ch] == pytest.approx(expected, rel=1e-5)
+
+    def test_skew_with_nans(self, rng):
+        image = rng.random((1, 20, 20), dtype=np.float64)
+        image[0, :5, :5] = np.nan
+        calc = self._make_calculator(image)
+        result = calc._skew()
+        expected = float(scipy_skew(calc.cache.scaled.ravel(), nan_policy="omit"))
+        assert result[0] == pytest.approx(expected, rel=1e-5)
+
+    def test_skew_uniform_image_is_zero(self):
+        image = np.full((1, 10, 10), 0.5)
+        calc = self._make_calculator(image)
+        result = calc._skew()
+        assert result[0] == 0.0
+
+    def test_skew_asymmetric_distribution(self):
+        """Right-skewed data should produce positive skew."""
+        rng = np.random.default_rng(99)
+        vals = rng.exponential(scale=0.2, size=(1, 50, 50)).clip(0, 1)
+        calc = self._make_calculator(vals)
+        result = calc._skew()
+        expected = float(scipy_skew(calc.cache.scaled.ravel(), nan_policy="omit"))
+        assert result[0] == pytest.approx(expected, rel=1e-4)
+        assert result[0] > 0  # exponential is right-skewed
+
+    # --- Kurtosis ---
+
+    def test_kurtosis_matches_scipy_global(self, rng):
+        image = rng.random((3, 32, 32), dtype=np.float64)
+        calc = self._make_calculator(image)
+        result = calc._kurtosis()
+        expected = float(scipy_kurtosis(calc.cache.scaled.ravel(), nan_policy="omit"))
+        assert result[0] == pytest.approx(expected, rel=1e-5)
+
+    def test_kurtosis_matches_scipy_per_channel(self, rng):
+        image = rng.random((3, 32, 32), dtype=np.float64)
+        calc = self._make_calculator(image, per_channel=True)
+        result = calc._kurtosis()
+        for ch in range(3):
+            expected = float(scipy_kurtosis(calc.cache.per_channel[ch], nan_policy="omit"))
+            assert result[ch] == pytest.approx(expected, rel=1e-5)
+
+    def test_kurtosis_with_nans(self, rng):
+        image = rng.random((1, 20, 20), dtype=np.float64)
+        image[0, :5, :5] = np.nan
+        calc = self._make_calculator(image)
+        result = calc._kurtosis()
+        expected = float(scipy_kurtosis(calc.cache.scaled.ravel(), nan_policy="omit"))
+        assert result[0] == pytest.approx(expected, rel=1e-5)
+
+    def test_kurtosis_uniform_image_is_zero(self):
+        image = np.full((1, 10, 10), 0.5)
+        calc = self._make_calculator(image)
+        result = calc._kurtosis()
+        assert result[0] == 0.0
+
+    def test_kurtosis_heavy_tailed_is_positive(self):
+        """Data from a heavy-tailed distribution should have positive excess kurtosis."""
+        rng = np.random.default_rng(99)
+        vals = rng.standard_t(df=3, size=(1, 100, 100)).clip(-5, 5)
+        vals = (vals - vals.min()) / (vals.max() - vals.min())  # scale to [0,1]
+        calc = self._make_calculator(vals)
+        result = calc._kurtosis()
+        expected = float(scipy_kurtosis(calc.cache.scaled.ravel(), nan_policy="omit"))
+        assert result[0] == pytest.approx(expected, rel=1e-4)
+        assert result[0] > 0  # t(3) has heavy tails
+
+    # --- Entropy ---
+
+    def test_entropy_matches_scipy_global(self, rng):
+        image = rng.random((3, 32, 32), dtype=np.float64)
+        calc = self._make_calculator(image)
+        result = calc._entropy()
+        h = calc.histogram.astype(np.float64)
+        h = h / h.sum()
+        expected = float(scipy_entropy(h))
+        assert result[0] == pytest.approx(expected, rel=1e-10)
+
+    def test_entropy_matches_scipy_per_channel(self, rng):
+        image = rng.random((3, 32, 32), dtype=np.float64)
+        calc = self._make_calculator(image, per_channel=True)
+        result = calc._entropy()
+        for ch in range(3):
+            h = calc.histogram[ch].astype(np.float64)
+            h = h / h.sum()
+            expected = float(scipy_entropy(h))
+            assert result[ch] == pytest.approx(expected, rel=1e-10)
+
+    def test_entropy_uniform_histogram_is_max(self):
+        """A perfectly uniform distribution should have maximum entropy = log(256)."""
+        # Create image with values spread across all 256 bins
+        vals = np.linspace(0, 1, 256 * 4, endpoint=False).reshape(1, 32, 32)
+        calc = self._make_calculator(vals)
+        result = calc._entropy()
+        # Not perfectly uniform due to binning, but should be close to log(256)
+        assert result[0] > 5.0  # log(256) ≈ 5.545
+
+    def test_entropy_single_value_is_zero(self):
+        """A constant image has zero entropy."""
+        image = np.full((1, 10, 10), 0.5)
+        calc = self._make_calculator(image)
+        result = calc._entropy()
+        assert result[0] == pytest.approx(0.0, abs=1e-10)
+
+    def test_entropy_all_nan_is_zero(self):
+        """An all-NaN image should produce zero entropy (empty histogram)."""
+        image = np.full((1, 10, 10), np.nan)
+        calc = self._make_calculator(image)
+        result = calc._entropy()
+        assert result[0] == 0.0
+
+    # --- Edge cases applied across all three ---
+
+    def test_all_nan_image_returns_nan(self):
+        """Skew and kurtosis should return NaN for all-NaN images."""
+        image = np.full((3, 10, 10), np.nan)
+        calc = self._make_calculator(image)
+        assert all(np.isnan(v) for v in calc._skew())
+        assert all(np.isnan(v) for v in calc._kurtosis())
+
+    @pytest.mark.parametrize("dtype", [np.uint8, np.float32, np.float64])
+    def test_different_dtypes(self, rng, dtype):
+        """Results should be consistent across input dtypes."""
+        if np.issubdtype(dtype, np.integer):
+            image = rng.integers(0, 256, (3, 32, 32), dtype=dtype)
+        else:
+            image = rng.random((3, 32, 32)).astype(dtype)
+        calc = self._make_calculator(image)
+        skew_val = calc._skew()
+        kurt_val = calc._kurtosis()
+        ent_val = calc._entropy()
+        assert all(np.isfinite(v) for v in skew_val)
+        assert all(np.isfinite(v) for v in kurt_val)
+        assert all(np.isfinite(v) for v in ent_val)
+
+    @pytest.mark.parametrize("shape", [(1, 8, 8), (3, 64, 64), (1, 256, 256)])
+    def test_various_image_sizes(self, rng, shape):
+        """Equivalence should hold across different image sizes."""
+        image = rng.random(shape, dtype=np.float64)
+        calc = self._make_calculator(image)
+        expected_skew = float(scipy_skew(calc.cache.scaled.ravel(), nan_policy="omit"))
+        expected_kurt = float(scipy_kurtosis(calc.cache.scaled.ravel(), nan_policy="omit"))
+        assert calc._skew()[0] == pytest.approx(expected_skew, rel=1e-5)
+        assert calc._kurtosis()[0] == pytest.approx(expected_kurt, rel=1e-5)
 
 
 class TestVisualStats:

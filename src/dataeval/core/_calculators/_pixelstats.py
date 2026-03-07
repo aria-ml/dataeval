@@ -6,7 +6,6 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.stats import entropy, kurtosis, skew
 
 from dataeval.core._calculators._base import Calculator
 from dataeval.core._calculators._cache import CalculatorCache
@@ -22,6 +21,23 @@ class PixelStatCalculator(Calculator[ImageStats]):
         self.datum = datum
         self.cache = cache
         self.per_channel_mode = per_channel
+
+    @cached_property
+    def _has_nan(self) -> bool:
+        """Check once whether the scaled data contains any NaN values."""
+        if self.per_channel_mode:
+            return bool(np.isnan(self.cache.per_channel).any())
+        return bool(np.isnan(self.cache.scaled).any())
+
+    def _mean_func(self, data: NDArray[Any], **kw: Any) -> Any:
+        """Use fast .mean() when no NaN, fall back to nanmean."""
+        return np.nanmean(data, **kw) if self._has_nan else np.mean(data, **kw)
+
+    def _std_func(self, data: NDArray[Any], **kw: Any) -> Any:
+        return np.nanstd(data, **kw) if self._has_nan else np.std(data, **kw)
+
+    def _var_func(self, data: NDArray[Any], **kw: Any) -> Any:
+        return np.nanvar(data, **kw) if self._has_nan else np.var(data, **kw)
 
     @cached_property
     def histogram(self) -> NDArray[np.float64]:
@@ -43,41 +59,89 @@ class PixelStatCalculator(Calculator[ImageStats]):
         if self.cache.is_all_nan:
             return self._nan_list()
         if self.per_channel_mode:
-            return np.nanmean(self.cache.per_channel, axis=1).tolist()
-        return [float(np.nanmean(self.cache.scaled))]
+            return self._mean_func(self.cache.per_channel, axis=1).tolist()
+        return [float(self._mean_func(self.cache.scaled))]
 
     def _std(self) -> list[float]:
         if self.cache.is_all_nan:
             return self._nan_list()
         if self.per_channel_mode:
-            return np.nanstd(self.cache.per_channel, axis=1).tolist()
-        return [float(np.nanstd(self.cache.scaled))]
+            return self._std_func(self.cache.per_channel, axis=1).tolist()
+        return [float(self._std_func(self.cache.scaled))]
 
     def _var(self) -> list[float]:
         if self.cache.is_all_nan:
             return self._nan_list()
         if self.per_channel_mode:
-            return np.nanvar(self.cache.per_channel, axis=1).tolist()
-        return [float(np.nanvar(self.cache.scaled))]
+            return self._var_func(self.cache.per_channel, axis=1).tolist()
+        return [float(self._var_func(self.cache.scaled))]
+
+    @cached_property
+    def _moments(self) -> tuple[Any, Any, Any]:
+        """Compute variance (m2), 3rd central moment (m3), and 4th central moment (m4).
+
+        Uses fast .mean() when no NaN, caches only scalars (or per-channel arrays),
+        not full-image-sized intermediates.
+        """
+        mean_fn = self._mean_func
+        if self.per_channel_mode:
+            data = self.cache.per_channel
+            d = data - mean_fn(data, axis=1, keepdims=True)
+            d2 = d * d
+            m2 = mean_fn(d2, axis=1)
+            m3 = mean_fn(d2 * d, axis=1)
+            np.multiply(d2, d2, out=d2)
+            m4 = mean_fn(d2, axis=1)
+            return m2, m3, m4
+        data = self.cache.scaled.ravel()
+        d = data - mean_fn(data)
+        d2 = d * d
+        m2 = float(mean_fn(d2))
+        m3 = float(mean_fn(d2 * d))
+        np.multiply(d2, d2, out=d2)
+        m4 = float(mean_fn(d2))
+        return m2, m3, m4
 
     def _skew(self) -> list[float]:
         if self.cache.is_all_nan:
             return self._nan_list()
+        m2, m3, _ = self._moments
         if self.per_channel_mode:
-            return skew(self.cache.per_channel, axis=1, nan_policy="omit").tolist()
-        return [float(skew(self.cache.scaled.ravel(), nan_policy="omit"))]
+            s3 = np.float_power(m2, 1.5)
+            s3 = np.where(s3 == 0, 1.0, s3)
+            return (m3 / s3).tolist()
+        if m2 == 0:
+            return [0.0]
+        return [m3 / (m2**1.5)]
 
     def _kurtosis(self) -> list[float]:
         if self.cache.is_all_nan:
             return self._nan_list()
+        m2, _, m4 = self._moments
         if self.per_channel_mode:
-            return kurtosis(self.cache.per_channel, axis=1, nan_policy="omit").tolist()
-        return [float(kurtosis(self.cache.scaled.ravel(), nan_policy="omit"))]
+            s4 = m2 * m2
+            s4_safe = np.where(s4 == 0, 1.0, s4)
+            k = m4 / s4_safe - 3.0
+            return np.where(s4 == 0, 0.0, k).tolist()
+        if m2 == 0:
+            return [0.0]
+        return [m4 / (m2 * m2) - 3.0]
 
     def _entropy(self) -> list[float]:
         if self.per_channel_mode:
-            return np.asarray(entropy(self.histogram, axis=1)).tolist()
-        return [float(entropy(self.histogram))]
+            h = self.histogram.astype(np.float64)
+            totals = h.sum(axis=1, keepdims=True)
+            totals = np.where(totals == 0, 1.0, totals)
+            h = h / totals
+            with np.errstate(divide="ignore", invalid="ignore"):
+                return (-np.nansum(h * np.log(np.where(h > 0, h, 1.0)), axis=1) + 0.0).tolist()
+        h = self.histogram.astype(np.float64)
+        total = h.sum()
+        if total == 0:
+            return [0.0]
+        h = h / total
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return [float(-np.nansum(h * np.log(np.where(h > 0, h, 1.0))) + 0.0)]
 
     def _missing(self) -> list[float]:
         if self.per_channel_mode:

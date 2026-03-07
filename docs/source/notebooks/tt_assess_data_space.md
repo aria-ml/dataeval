@@ -87,6 +87,7 @@ from maite_datasets.object_detection import VOCDetection
 from torchvision.models import ResNet18_Weights, resnet18
 
 from dataeval import Embeddings
+from dataeval.config import set_max_processes
 from dataeval.core import cluster, coverage_adaptive
 from dataeval.extractors import TorchExtractor
 from dataeval.quality import Outliers
@@ -100,6 +101,9 @@ dep.set_default_backend("plotly")
 
 # Use the notebook renderer so JS is embedded
 pio.renderers.default = "notebook"
+
+# Set the maximum number of processes to use
+set_max_processes(4)
 ```
 
 :::{note}

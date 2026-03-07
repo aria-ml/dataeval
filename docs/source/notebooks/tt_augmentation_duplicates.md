@@ -99,10 +99,9 @@ from dataeval.extractors import BoVWExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, DuplicatesOutput
 
-config.set_seed(42)
-
-# Set default batch size
 config.set_batch_size(64)
+config.set_max_processes(4)
+config.set_seed(42)
 ```
 
 ## Creating test data
