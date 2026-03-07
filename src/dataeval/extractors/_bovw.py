@@ -192,7 +192,7 @@ class BoVWExtractor:
             If no SIFT features are found in any image. This typically occurs
             when all images are uniform (e.g., solid color).
         """
-        with PoolWrapper(get_max_processes()) as pool:
+        with PoolWrapper(get_max_processes(), context="spawn") as pool:
             all_descriptors = [
                 des for _, des in sorted(pool.imap_unordered(_extract_single, enumerate(data))) if len(des) > 0
             ]
@@ -243,7 +243,7 @@ class BoVWExtractor:
 
         result = np.zeros((len(data), n_clusters), dtype=np.float32)
 
-        with PoolWrapper(get_max_processes()) as pool:
+        with PoolWrapper(get_max_processes(), context="spawn") as pool:
             for idx, histogram in pool.imap_unordered(
                 partial(_transform_single, kmeans=self._kmeans, n_clusters=n_clusters),
                 enumerate(data),

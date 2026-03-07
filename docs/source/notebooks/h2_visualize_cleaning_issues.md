@@ -63,8 +63,10 @@ import polars as pl
 from maite_datasets.image_classification import CIFAR10
 
 from dataeval import Metadata
+from dataeval.config import set_max_processes
 from dataeval.quality import Outliers
 
+set_max_processes(4)
 _ = pl.Config.set_tbl_rows(-1)
 ```
 
