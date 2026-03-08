@@ -46,9 +46,8 @@ data in your dataset.
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 try:
     import google.colab  # noqa: F401
 
@@ -90,8 +89,8 @@ metadata = Metadata(testing_dataset)
 Now we can begin finding those images which are significantly different from the rest of the data.
 
 ```{code-cell} ipython3
-# Initialize the Duplicates class
-outliers = Outliers(outlier_threshold=("zscore", 3.5))
+# Initialize the Outliers class
+outliers = Outliers()
 
 # Evaluate the data
 results = outliers.evaluate(testing_dataset)
@@ -142,15 +141,12 @@ results_classwise.aggregate_by_class(metadata)
 ```
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 ### TEST ASSERTION CELL ###
 print(results.shape[0])
-assert results.shape[0] == 500
+assert results.shape[0] == 404
 ```
-
-+++
 
 ## Related concepts
 

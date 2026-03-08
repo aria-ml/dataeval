@@ -553,12 +553,12 @@ class TestDuplicatesMultiDataset:
         data1 = np.random.random((10, 3, 16, 16))
         data2 = data1.copy()
 
-        dupes = Duplicates(extractor=FlattenExtractor(), cluster_threshold=1.0)
+        dupes = Duplicates(extractor=FlattenExtractor(), cluster_sensitivity=1.0)
         result = dupes.evaluate(data1, data2)
 
         assert "dataset_index" in result.data().columns
         # Re-detect with tighter threshold
-        strict = result.with_threshold(0.5)
+        strict = result.with_sensitivity(0.5)
         assert isinstance(strict, DuplicatesOutput)
         assert "dataset_index" in strict.data().columns
 
@@ -593,8 +593,8 @@ class TestDuplicatesEdgeCases:
         indices, methods, orientation = result[0]
         assert set(indices) == {1, 2, 3, 4}
 
-    def test_cluster_threshold_none_raises_error(self):
-        """When flags=NONE and cluster_threshold=None, should raise ValueError."""
+    def test_cluster_distance_factor_none_raises_error(self):
+        """When flags=NONE and cluster_sensitivity=None, should raise ValueError."""
 
         class DummyExtractor:
             def __call__(self, data):
@@ -603,7 +603,7 @@ class TestDuplicatesEdgeCases:
         detector = Duplicates(
             flags=ImageStats.NONE,
             extractor=DummyExtractor(),
-            cluster_threshold=None,
+            cluster_sensitivity=None,
             cluster_algorithm="kmeans",
             n_clusters=2,
         )
@@ -628,7 +628,7 @@ class TestDuplicatesEdgeCases:
         labels = list(range(len(data_with_dupes)))
         dataset = get_mock_ic_dataset(list(data_with_dupes), labels)
 
-        detector = Duplicates(extractor=FlattenExtractor(), cluster_threshold=1.0)
+        detector = Duplicates(extractor=FlattenExtractor(), cluster_sensitivity=1.0)
         result = detector.evaluate(dataset)
         assert isinstance(result, DuplicatesOutput)
 
@@ -638,7 +638,7 @@ class TestDuplicatesEdgeCases:
         labels = list(range(len(data)))
         dataset = get_mock_ic_dataset(list(data), labels)
 
-        detector = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_threshold=1.0)
+        detector = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0)
         result = detector.evaluate(dataset)
         assert isinstance(result, DuplicatesOutput)
 
@@ -765,7 +765,7 @@ class TestDuplicatesOutputAPI:
         result = detector.from_clusters(mock_cluster_result)
 
         # Tighten threshold — should have fewer or equal near duplicates
-        strict_result = result.with_threshold(0.1)
+        strict_result = result.with_sensitivity(0.1)
         assert isinstance(strict_result, DuplicatesOutput)
         strict_near = _get_near_groups(strict_result, "item")
         original_near = _get_near_groups(result, "item")
@@ -779,7 +779,7 @@ class TestDuplicatesOutputAPI:
         result = dupes.evaluate(np.concatenate((data, data)))
 
         with pytest.raises(ValueError, match="requires cluster results"):
-            result.with_threshold(0.5)
+            result.with_sensitivity(0.5)
 
     def test_aggregate_by_image_raises_multi_dataset(self):
         """aggregate_by_image should raise for multi-dataset output."""

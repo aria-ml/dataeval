@@ -138,8 +138,6 @@ for k, v in duplicates.items():
     assert [v, k] in results.exact
 ```
 
-+++
-
 ## Related concepts
 
 - [Data Integrity](../concepts/DataIntegrity.md)

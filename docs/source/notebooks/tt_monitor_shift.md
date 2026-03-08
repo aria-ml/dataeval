@@ -46,11 +46,11 @@ Relevant personas: Machine Learning Engineer, T&E Engineer
 
 ## Introduction
 
-Monitoring is a critical step in the [AI/ML lifecycle](../getting-started/roles/ML_Lifecycle.md). When a model is deployed,
-data can, and generally will, [drift](../concepts/DistributionShift.md) from the distribution on which the model was
-originally trained. One critical step in AI T&E is the detection of changes in the operational distribution so that they
-may be proactively addressed. While some change might not affect performance, significant deviation is often associated
-with model degradation.
+Monitoring is a critical step in the [AI/ML lifecycle](../getting-started/roles/ML_Lifecycle.md). When a model is
+deployed, data can, and generally will, [drift](../concepts/DistributionShift.md) from the distribution on which the
+model was originally trained. One critical step in AI T&E is the detection of changes in the operational distribution so
+that they may be proactively addressed. While some change might not affect performance, significant deviation is often
+associated with model degradation.
 
 For this tutorial, you will use the popular
 [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main) computer vision dataset to detect drift
@@ -65,8 +65,9 @@ this guide. You will then determine if the labels within these two datasets has 
 You'll begin by importing the necessary libraries for this tutorial.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -496,12 +497,14 @@ good idea to consider retraining the model and incorporating operational data in
 DataEval plays a small, but impactful role in data monitoring as a metrics library.\
 Visit these additional resources for more information on other aspects:
 
-- Increase your understanding of the types of [data shifts](../concepts/DistributionShift.md) that occur during monitoring
+- Increase your understanding of the types of [data shifts](../concepts/DistributionShift.md) that occur during
+  monitoring
 - Read about the entire [monitoring in AI/ML](../getting-started/roles/ML_Lifecycle.md#monitoring) stage
 - Explore DataEval's [API reference](../reference/autoapi/dataeval/index.rst) for drift and other monitoring tools
 - Learn about [identifying out-of-distribution samples](./tt_identify_ood_samples.md)
 
-To learn more about setting a global seed in DataEval, see the [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
+To learn more about setting a global seed in DataEval, see the
+[hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
 
 +++
 

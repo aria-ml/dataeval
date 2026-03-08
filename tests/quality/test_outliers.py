@@ -240,8 +240,8 @@ class TestOutliers:
         # Create dataset with bounding boxes
         dataset = get_od_dataset(images, 2, True, {0: [(0, 0, 64, 64)], 5: [(0, 0, 64, 64)]})
 
-        # Test with per_target=True (should have target-level stats)
-        outliers = Outliers(flags=ImageStats.DIMENSION)
+        # Use a tight threshold to guarantee outliers are detected in this small dataset
+        outliers = Outliers(flags=ImageStats.DIMENSION, outlier_threshold=1.0)
         result = outliers.evaluate(dataset, per_image=True, per_target=True)
 
         # target_id column should be kept since we have target-level outliers
@@ -1001,7 +1001,7 @@ class TestOutliersPerClass:
             index2label={0: "bright", 1: "dark"},
         )
 
-        outliers = Outliers(flags=ImageStats.PIXEL)
+        outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold=1.5)
         result = outliers.evaluate(images, per_class=True, metadata=metadata)
         assert isinstance(result.data(), pl.DataFrame)
         # Image 5 should be detected as an outlier within class 0
@@ -1070,7 +1070,7 @@ class TestOutliersPerClass:
             index2label={0: "bright", 1: "dark"},
         )
 
-        outliers = Outliers(flags=ImageStats.PIXEL)
+        outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold=1.5)
         result = outliers.evaluate(images)
         classwise_result = result.classwise(metadata)
         assert isinstance(classwise_result.data(), pl.DataFrame)
@@ -1396,6 +1396,40 @@ class TestOutliersPerClass:
         # Should be chainable — cluster_threshold with no cluster stats is a no-op
         chained = result.classwise(metadata).with_threshold(cluster_threshold=2.0)
         assert isinstance(chained.data(), pl.DataFrame)
+
+    def test_with_cluster_threshold_object(self):
+        """cluster_threshold accepts Threshold objects (ThresholdLike)."""
+        main_cluster = np.random.RandomState(42).randn(8, 5) * 0.5
+        outlier_points = np.random.RandomState(42).randn(2, 5) * 2.0 + 5.0
+        embeddings = np.vstack([main_cluster, outlier_points])
+
+        mock_cluster_result: ClusterResult = {
+            "clusters": np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=np.intp),
+            "mst": np.array([], dtype=np.float32),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int64),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+
+        # Use a Threshold object directly
+        detector = Outliers(cluster_threshold=ZScoreThreshold(upper_multiplier=2.0, lower_multiplier=None))
+        result = detector.from_clusters(embeddings, mock_cluster_result)
+        assert isinstance(result.data(), pl.DataFrame)
+
+        # Use IQR threshold via with_threshold
+        detector2 = Outliers()
+        result2 = detector2.from_clusters(embeddings, mock_cluster_result, cluster_threshold=3.5)
+        iqr_result = result2.with_threshold(cluster_threshold=IQRThreshold(1.5))
+        assert isinstance(iqr_result.data(), pl.DataFrame)
+
+        # Use string shorthand
+        str_result = result2.with_threshold(cluster_threshold="iqr")
+        assert isinstance(str_result.data(), pl.DataFrame)
+
+        # Use tuple shorthand
+        tuple_result = result2.with_threshold(cluster_threshold=("zscore", 2.0))
+        assert isinstance(tuple_result.data(), pl.DataFrame)
 
 
 @pytest.mark.required

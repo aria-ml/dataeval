@@ -268,8 +268,6 @@ with dataeval.config.use_max_processes(2):
 print(f"After context: {dataeval.config.get_max_processes()}")
 ```
 
-+++
-
 ## See also
 
 ### How-to guides

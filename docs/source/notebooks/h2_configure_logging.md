@@ -273,8 +273,6 @@ for log_file in log_files:
 print("\nCleanup complete!")
 ```
 
-+++
-
 ## See also
 
 ### How-to guides

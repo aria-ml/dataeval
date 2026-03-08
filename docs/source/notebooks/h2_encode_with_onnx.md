@@ -181,8 +181,6 @@ assert embeddings.shape[0] == 100
 assert embeddings.shape[1] == 2048
 ```
 
-+++
-
 ## Related concepts
 
 - [Embeddings](../concepts/Embeddings.md)

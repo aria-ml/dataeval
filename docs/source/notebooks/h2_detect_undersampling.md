@@ -252,8 +252,6 @@ print(wonky)
 assert (wonky / 20) > 0.4
 ```
 
-+++
-
 ## Related concepts
 
 - [Dataset Bias and Coverage](../concepts/DatasetBias.md)

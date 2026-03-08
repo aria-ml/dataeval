@@ -26,7 +26,7 @@ Relevant personas: Data Engineer, ML Engineer
 - Create synthetic test images and apply 30+ torchvision transformations
 - Run both D4 hash-based and BoVW embedding-based duplicate detection
 - Compare which transformations each method catches or misses
-- Tune detection sensitivity with the `cluster_threshold` parameter
+- Tune detection sensitivity with the `cluster_sensitivity` parameter
 
 ## What you'll learn
 
@@ -366,13 +366,13 @@ else:
 # Use a smaller vocab_size for this small dataset (~32 images).
 # Large vocabularies create sparse histograms that cluster poorly.
 bovw_extractor = BoVWExtractor(vocab_size=32)
-cluster_threshold = 1.75
+cluster_sensitivity = 1.75
 
 bovw_detector = Duplicates(
     flags=ImageStats.NONE,  # Skip hash computation, use only clustering
     extractor=bovw_extractor,
     batch_size=64,
-    cluster_threshold=cluster_threshold,
+    cluster_sensitivity=cluster_sensitivity,
 )
 bovw_results = bovw_detector.evaluate(images)
 
@@ -393,7 +393,7 @@ else:
 combined_detector = Duplicates(
     flags=ImageStats.HASH_DUPLICATES_D4,
     extractor=bovw_extractor,
-    cluster_threshold=cluster_threshold,
+    cluster_sensitivity=cluster_sensitivity,
 )
 combined_results = combined_detector.evaluate(images)
 
@@ -530,7 +530,7 @@ visualize_category(missed_by_both, "MISSED by Both Methods")
 
 ## Adjusting detection sensitivity
 
-The `cluster_threshold` parameter controls how strict the near-duplicate detection is. Let's see how different
+The `cluster_sensitivity` parameter controls how strict the near-duplicate detection is. Let's see how different
 thresholds affect detection.
 
 ```{code-cell} ipython3
@@ -542,7 +542,7 @@ for threshold in thresholds:
     detector = Duplicates(
         flags=ImageStats.NONE,
         extractor=bovw_extractor,
-        cluster_threshold=threshold,
+        cluster_sensitivity=threshold,
     )
     results = detector.evaluate(images)
     detected = get_detected_indices(results)
@@ -611,10 +611,11 @@ The combined method detected **22 out of 30** transformations (73%) by merging g
 
 1. **Use both methods together** for best coverage — they complement each other well
 1. **For detecting rotated copies**: D4 hashes handle 90° increments and flips; add BoVW for arbitrary angles
-1. **For data augmentation validation**: Use BoVW with a higher `cluster_threshold` (1.5–2.0) to catch subtle duplicates
+1. **For data augmentation validation**: Use BoVW with a higher `cluster_sensitivity` (1.5–2.0) to catch subtle
+   duplicates
 1. **For large datasets**: Start with fast D4 hashes, then run BoVW on remaining candidates
-1. **Adjust `cluster_threshold`**: Lower (1.0–1.25) for strict matching, higher (1.5–2.0) for permissive — note that no
-   transformations are detected at 0.75
+1. **Adjust `cluster_sensitivity`**: Lower (1.0–1.25) for strict matching, higher (1.5–2.0) for permissive — note that
+   no transformations are detected at 0.75
 
 ```{code-cell} ipython3
 ---
@@ -643,23 +644,22 @@ print(f"  Detected by combined method: {len(combined_detected)}")
 print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 ```
 
-+++
-
 ## What's next
 
-In addition to exploring the duplicates in a dataset, DataEval offers additional tutorials on exploratory data
-analysis:
+In addition to exploring the duplicates in a dataset, DataEval offers additional tutorials on exploratory data analysis:
 
 - Clean a dataset with the labels in the [Data Cleaning Guide](./tt_clean_dataset.md)
 - [Identify Bias and Correlations](./tt_identify_bias.md) in your metadata
 - Determine how the data groups by [assessing the data space](./tt_assess_data_space.md)
 
-Explore deeper explanations on topics such as [duplicates](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering),
+Explore deeper explanations on topics such as
+[duplicates](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering),
 [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings), and
 [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) in the
 [Concept pages](../concepts/index.md).
 
-To learn more about setting a global seed in DataEval, see the [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
+To learn more about setting a global seed in DataEval, see the
+[hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
 
 +++
 

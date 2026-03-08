@@ -34,10 +34,11 @@ from dataeval.types import (
     set_metadata,
 )
 from dataeval.utils.arrays import flatten_samples, to_numpy
-from dataeval.utils.thresholds import resolve_threshold
+from dataeval.utils.thresholds import AdaptiveThreshold, ZScoreThreshold, resolve_threshold
 
 DEFAULT_OUTLIERS_FLAGS = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
-DEFAULT_OUTLIERS_CLUSTER_THRESHOLD = 2.5
+DEFAULT_OUTLIERS_CLUSTER_THRESHOLD: Threshold = ZScoreThreshold(upper_multiplier=2.5, lower_multiplier=None)
+DEFAULT_OUTLIERS_OUTLIER_THRESHOLD: Threshold = AdaptiveThreshold()
 
 OutlierReasons = Sequence[str]
 SingleOutliersMap = Mapping[int, Sequence[str]]
@@ -73,10 +74,10 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     cluster_stats : ClusterStats or None
         Pre-computed cluster statistics for cluster-based outlier re-detection
         via :meth:`with_threshold`.
-    cluster_threshold : float or None
-        Threshold (in standard deviations) used for cluster-based outlier
-        detection. Preserved across re-detection calls unless overridden
-        via :meth:`with_threshold`.
+    cluster_threshold : ThresholdLike or None
+        Threshold configuration used for cluster-based outlier detection.
+        Preserved across re-detection calls unless overridden via
+        :meth:`with_threshold`.
     dataset_steps : list[int] or None
         Cumulative dataset boundaries for multi-dataset index remapping.
         None for single-dataset output.
@@ -89,7 +90,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         calculation_results: StatsResult | Sequence[StatsResult] | None = None,
         outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None = None,
         cluster_stats: ClusterStats | None = None,
-        cluster_threshold: float | None = None,
+        cluster_threshold: ThresholdLike | None = None,
         dataset_steps: Sequence[int] | None = None,
     ) -> None:
         super().__init__(data)
@@ -205,7 +206,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         >>> from dataeval.flags import ImageStats
         >>> from dataeval.quality import Outliers
 
-        >>> outliers = Outliers(flags=ImageStats.VISUAL)
+        >>> outliers = Outliers(flags=ImageStats.VISUAL, outlier_threshold="modzscore")
         >>> results = outliers.evaluate(dataset)
         >>> metadata = Metadata(dataset)
         >>> summary = results.aggregate_by_class(metadata)
@@ -286,17 +287,16 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         Examples
         --------
-        >>> outliers = Outliers(flags=ImageStats.PIXEL)
+        >>> outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold="zscore")
         >>> results = outliers.evaluate(dataset)
         >>> summary = results.aggregate_by_metric()
         >>> summary
-        shape: (5, 2)
+        shape: (4, 2)
         ┌─────────────┬───────┐
         │ metric_name ┆ Total │
         │ ---         ┆ ---   │
         │ cat         ┆ u32   │
         ╞═════════════╪═══════╡
-        │ zeros       ┆ 8     │
         │ entropy     ┆ 4     │
         │ mean        ┆ 4     │
         │ std         ┆ 4     │
@@ -342,11 +342,11 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         Examples
         --------
-        >>> outliers = Outliers()
+        >>> outliers = Outliers(outlier_threshold=("modzscore", 3.0))
         >>> results = outliers.evaluate(dataset, per_target=True)
         >>> summary = results.aggregate_by_item()
         >>> summary.head(10)
-        shape: (10, 13)
+        shape: (10, 14)
         ┌────────────┬──────────────┬────────────┬──────────┬───┬─────┬─────┬───────┬───────┐
         │ item_index ┆ target_index ┆ brightness ┆ contrast ┆ … ┆ std ┆ var ┆ zeros ┆ Total │
         │ ---        ┆ ---          ┆ ---        ┆ ---      ┆   ┆ --- ┆ --- ┆ ---   ┆ ---   │
@@ -460,7 +460,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         # Cluster-based re-detection
         ct = self.cluster_threshold if cluster_threshold is self._UNSET else cluster_threshold
-        resolved_ct = ct if ct is not None else DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
+        resolved_ct = resolve_threshold(ct) if ct is not None else DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
         if self.cluster_stats is not None:
             cluster_df = Outliers._find_outliers_adaptive(self.cluster_stats, resolved_ct)
             if self.dataset_steps:
@@ -510,7 +510,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         Examples
         --------
-        >>> outliers = Outliers(flags=ImageStats.PIXEL)
+        >>> outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold="modzscore")
         >>> result = outliers.evaluate(dataset)
         >>> classwise_result = result.classwise(metadata)
         >>> classwise_result.aggregate_by_class(metadata)
@@ -561,7 +561,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     def with_threshold(
         self,
         outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None = _UNSET,  # type: ignore[arg-type]
-        cluster_threshold: float | None = _UNSET,  # type: ignore[arg-type]
+        cluster_threshold: ThresholdLike | None = _UNSET,  # type: ignore[arg-type]
     ) -> Self:
         """Re-detect outliers using a different threshold configuration.
 
@@ -578,17 +578,16 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             New threshold configuration for stats-based outliers. Accepts
             the same formats as :class:`Outliers`:
 
-            - ``None``: ``ModifiedZScoreThreshold()`` with default multipliers
+            - ``None``: ``AdaptiveThreshold(3.5)`` (Double-MAD with asymmetric bounds)
             - ``float``: symmetric multiplier for modified z-score
             - ``str``: named threshold type (``"zscore"``, ``"iqr"``, etc.)
             - ``tuple``: named threshold with bounds, e.g. ``("zscore", 2.5)``
             - :class:`~dataeval.utils.thresholds.Threshold`: fully configured
               threshold
             - ``Mapping[str, ThresholdLike]``: per-metric thresholds
-        cluster_threshold : float or None
-            New threshold for cluster-based outlier detection, in standard
-            deviations from cluster mean distance. Lower values are stricter
-            (more outliers), higher values are more permissive. Only applies
+        cluster_threshold : ThresholdLike or None
+            New threshold configuration for cluster-based outlier detection.
+            Accepts the same formats as ``outlier_threshold``. Only applies
             when cluster statistics are stored from :meth:`evaluate` or
             :meth:`~Outliers.from_clusters`.
 
@@ -737,6 +736,17 @@ def _build_class_ids(
     return class_ids
 
 
+def _resolve_outlier_threshold(
+    outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None,
+) -> Threshold | Mapping[str, Threshold]:
+    """Eagerly resolve an outlier_threshold value so that None is replaced with the default."""
+    if isinstance(outlier_threshold, Mapping):
+        return {k: resolve_threshold(v) for k, v in outlier_threshold.items()}
+    if outlier_threshold is not None:
+        return resolve_threshold(outlier_threshold)
+    return resolve_threshold(None)
+
+
 def _resolve_metric_threshold(
     outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None,
     metric_name: str,
@@ -746,7 +756,7 @@ def _resolve_metric_threshold(
     Priority:
     1. If outlier_threshold is a dict and metric_name is in it, use that entry.
     2. If outlier_threshold is a non-dict ThresholdLike, use it for all metrics.
-    3. Otherwise, use default (ModifiedZScoreThreshold with default parameters).
+    3. Otherwise, use default AdaptiveThreshold (Double-MAD with asymmetric bounds).
     """
     if isinstance(outlier_threshold, Mapping):
         value = outlier_threshold.get(metric_name)
@@ -754,7 +764,7 @@ def _resolve_metric_threshold(
             return resolve_threshold(value)
     elif outlier_threshold is not None:
         return resolve_threshold(outlier_threshold)
-    return resolve_threshold(None)
+    return DEFAULT_OUTLIERS_OUTLIER_THRESHOLD
 
 
 def _compute_outlier_mask(
@@ -904,23 +914,29 @@ class Outliers(Evaluator):
     outlier_threshold : ThresholdLike, dict, or None, default None
         Threshold configuration for image statistics-based outlier detection.
 
-        - ``None``: uses ``ModifiedZScoreThreshold()`` with default multipliers (3.5)
-        - ``float``: symmetric multiplier for the default method (modified z-score)
-        - ``str``: named threshold type (e.g., ``"zscore"``, ``"iqr"``) with defaults
+        - ``None``: uses ``AdaptiveThreshold()`` with default multiplier (3.5),
+          which computes both z-score and modified z-score bounds and takes the
+          wider (more lenient) bound on each side.
+        - ``float``: symmetric multiplier for the default method (modified z-score
+          via ``resolve_threshold``)
+        - ``str``: named threshold type (e.g., ``"zscore"``, ``"iqr"``,
+          ``"adaptive"``) with defaults
         - ``tuple[float | None, float | None]``: asymmetric ``(lower, upper)`` multipliers
         - ``tuple[str, ThresholdBounds]``: named threshold with bounds, e.g.
           ``("zscore", 2.5)`` or ``("iqr", (1.0, 3.0))``
         - :class:`~dataeval.utils.thresholds.Threshold`: a fully configured threshold
-          (e.g., ``ZScoreThreshold``, ``IQRThreshold``, ``ConstantThreshold``)
+          (e.g., ``ZScoreThreshold``, ``IQRThreshold``, ``ConstantThreshold``,
+          ``AdaptiveThreshold``)
         - ``Mapping[str, ThresholdLike]``: per-metric thresholds keyed by metric name.
-          Metrics not in the dict use the default (``ModifiedZScoreThreshold()``).
+          Metrics not in the dict use the default (``AdaptiveThreshold()``).
     extractor : FeatureExtractor, optional
         Feature extractor for cluster-based outlier detection. When provided, embeddings
         are extracted and clustered to find semantic/visual outliers in embedding space.
-    cluster_threshold : float, default 2.5
-        Number of standard deviations from cluster center beyond which a point is
-        considered an outlier. Only used when ``extractor`` is provided.
-        Higher values are more permissive (fewer outliers).
+    cluster_threshold : ThresholdLike or None, default None
+        Threshold configuration for cluster-based outlier detection. When None,
+        defaults to ``ZScoreThreshold(upper_multiplier=2.5)``.
+        Accepts the same formats as ``outlier_threshold``.
+        Only used when ``extractor`` is provided.
     cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
         Clustering algorithm for cluster-based detection.
     n_clusters : int, optional
@@ -941,8 +957,8 @@ class Outliers(Evaluator):
         Threshold configuration for outlier detection.
     extractor : FeatureExtractor | None
         Feature extractor for cluster-based detection.
-    cluster_threshold : float
-        Threshold for cluster-based outlier detection.
+    cluster_threshold : ThresholdLike | None
+        Threshold configuration for cluster-based detection.
     cluster_algorithm : Literal["kmeans", "hdbscan"]
         Clustering algorithm to use.
     n_clusters : int | None
@@ -956,7 +972,10 @@ class Outliers(Evaluator):
     -----
     **Threshold Methods:**
 
-    - ``ModifiedZScoreThreshold`` (default): Based on median absolute deviation. Default multiplier: 3.5.
+    - ``AdaptiveThreshold`` (default): Uses tail-weighted Double-MAD (separate MAD for
+      data below and above the median) with automatic multiplier scaling for heavy
+      tails to produce asymmetric bounds. Default multiplier: 3.0.
+    - ``ModifiedZScoreThreshold``: Based on median absolute deviation. Default multiplier: 3.5.
       Modified z score = :math:`0.6745 * |x_i - x̃| / MAD`
     - ``ZScoreThreshold``: Based on standard deviation from mean. Default multiplier: 3.
       Z score = :math:`|x_i - \mu| / \sigma`
@@ -970,8 +989,9 @@ class Outliers(Evaluator):
     **Cluster-based Detection:**
 
     Uses adaptive distance-based detection that accounts for varying cluster densities.
-    Points are flagged as outliers if their distance from the nearest cluster center
-    exceeds ``cluster_threshold`` standard deviations from the cluster's mean distance.
+    A :class:`~dataeval.utils.thresholds.Threshold` is applied per-cluster to the distance
+    distribution (default: ``ZScoreThreshold(upper_multiplier=2.5)``), and points whose
+    distance exceeds the upper bound are flagged as outliers.
 
     Examples
     --------
@@ -1031,9 +1051,11 @@ class Outliers(Evaluator):
         flags : ImageStats, default ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
             Statistics to compute for image statistics-based outlier detection.
         outlier_threshold : ThresholdLike | Mapping[str, ThresholdLike] | None, default None
-            Threshold configuration. See :class:`Outliers` for full description.
-        cluster_threshold : float, default 2.5
-            Number of standard deviations from cluster center for cluster-based detection.
+            Threshold configuration. When None, uses ``AdaptiveThreshold(3.5)``
+            (Double-MAD with asymmetric bounds). See :class:`Outliers` for full description.
+        cluster_threshold : ThresholdLike or None, default None
+            Threshold configuration for cluster-based detection. When None,
+            defaults to ``ZScoreThreshold(upper_multiplier=2.5)``.
         extractor : FeatureExtractor or None, default None
             Feature extractor for cluster-based outlier detection.
         batch_size : int or None, default None
@@ -1047,15 +1069,15 @@ class Outliers(Evaluator):
 
         flags: ImageStats = DEFAULT_OUTLIERS_FLAGS
         outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None = None
-        cluster_threshold: float = DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
+        cluster_threshold: ThresholdLike | None = None
 
     stats: StatsResult
     flags: ImageStats
-    outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None
+    outlier_threshold: Threshold | Mapping[str, Threshold]
     extractor: FeatureExtractor | None
     batch_size: int | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
-    cluster_threshold: float
+    cluster_threshold: ThresholdLike | None
     n_clusters: int | None
     config: Config
 
@@ -1066,11 +1088,12 @@ class Outliers(Evaluator):
         extractor: FeatureExtractor | None = None,
         batch_size: int | None = None,
         cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
-        cluster_threshold: float | None = None,
+        cluster_threshold: ThresholdLike | None = None,
         n_clusters: int | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
+        self.outlier_threshold = _resolve_outlier_threshold(self.outlier_threshold)
 
     def _get_outliers(
         self,
@@ -1211,7 +1234,7 @@ class Outliers(Evaluator):
         self,
         embeddings: ArrayND[float],
         cluster_result: ClusterResult,
-        cluster_threshold: float | None = None,
+        cluster_threshold: ThresholdLike | None = None,
     ) -> SingleOutliersOutput:
         """
         Find outliers using cluster-based adaptive distance detection.
@@ -1229,10 +1252,10 @@ class Outliers(Evaluator):
         cluster_result : ClusterResult
             Clustering results from the cluster() function, containing cluster
             assignments and related metadata.
-        cluster_threshold : float, default=2.5
-            Number of standard deviations beyond cluster mean to use for outlier
-            threshold. Higher values are more permissive (fewer outliers), lower
-            values are stricter (more outliers). Typical range: 1.5-3.5.
+        cluster_threshold : ThresholdLike or None, default None
+            Threshold configuration for cluster-based outlier detection.
+            Accepts the same formats as ``outlier_threshold``. When None,
+            uses the detector's configured ``cluster_threshold``.
 
         Returns
         -------
@@ -1257,10 +1280,7 @@ class Outliers(Evaluator):
         embeddings with varying density distributions.
 
         The threshold parameter allows experimentation with different sensitivity
-        levels without recomputing clusters. Recommended values:
-        - 1.5-2.0: Very strict (many outliers)
-        - 2.5: Balanced (default)
-        - 3.0-3.5: Permissive (fewer outliers)
+        levels and methods without recomputing clusters.
         """
         # Convert embeddings to numpy array and flatten if needed
         embeddings_array = flatten_samples(to_numpy(embeddings))
@@ -1271,12 +1291,13 @@ class Outliers(Evaluator):
             cluster_labels=cluster_result["clusters"],
         )
 
-        resolved_ct = cluster_threshold if cluster_threshold is not None else self.cluster_threshold
+        ct = cluster_threshold if cluster_threshold is not None else self.cluster_threshold
+        resolved_ct = resolve_threshold(ct) if ct is not None else DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
 
         # Find outliers using adaptive method
-        outlier_issues = self._find_outliers_adaptive(cluster_stats=cs, threshold_std=resolved_ct)
+        outlier_issues = self._find_outliers_adaptive(cluster_stats=cs, threshold=resolved_ct)
 
-        return OutliersOutput(outlier_issues, cluster_stats=cs, cluster_threshold=resolved_ct)
+        return OutliersOutput(outlier_issues, cluster_stats=cs, cluster_threshold=ct)
 
     @staticmethod
     def _merge_outlier_dfs(outliers_dfs: Sequence[pl.DataFrame]) -> pl.DataFrame:
@@ -1316,14 +1337,14 @@ class Outliers(Evaluator):
     @staticmethod
     def _find_outliers_adaptive(
         cluster_stats: ClusterStats,
-        threshold_std: float,
+        threshold: Threshold,
     ) -> pl.DataFrame:
         """
         Find outliers using pre-calculated cluster statistics.
 
         This method uses pre-calculated cluster centers and distance statistics to identify
-        outliers. Points are considered outliers if they are further than the
-        threshold distance from their nearest cluster center.
+        outliers. A :class:`Threshold` is applied per-cluster to the distance distribution,
+        and points whose distance exceeds the upper bound are flagged as outliers.
 
         Parameters
         ----------
@@ -1331,10 +1352,8 @@ class Outliers(Evaluator):
             Pre-calculated cluster centers, distance statistics, and nearest cluster indices.
             Should contain keys: 'distances', 'nearest_cluster_idx', 'cluster_distances_mean',
             'cluster_distances_std'.
-        threshold_std : float
-            Number of standard deviations beyond cluster mean to use for threshold.
-            Higher values are more permissive (fewer outliers), lower values are
-            stricter (more outliers).
+        threshold : Threshold
+            Threshold instance to compute per-cluster upper bounds from distance arrays.
 
         Returns
         -------
@@ -1350,14 +1369,16 @@ class Outliers(Evaluator):
         cluster_distances_mean = cluster_stats["cluster_distances_mean"]
         cluster_distances_std = cluster_stats["cluster_distances_std"]
 
-        # Compute thresholds on-the-fly based on the provided threshold_std
-        thresholds = cluster_distances_mean + threshold_std * cluster_distances_std
+        # Compute per-cluster upper bounds using the threshold
+        unique_clusters = np.unique(nearest_cluster_idx[nearest_cluster_idx >= 0])
+        is_outlier = np.full(len(min_distances), False, dtype=bool)
 
-        # Get the threshold for each point's nearest cluster
-        nearest_thresholds = thresholds[nearest_cluster_idx]
-
-        # Points are outliers if their distance exceeds the threshold of their nearest cluster
-        is_outlier = min_distances > nearest_thresholds
+        for cluster_id in unique_clusters:
+            mask = nearest_cluster_idx == cluster_id
+            cluster_distances = min_distances[mask]
+            _, upper = threshold(cluster_distances)
+            if upper is not None:
+                is_outlier[mask] = cluster_distances > upper
 
         # Build the result DataFrame with issue details
         outlier_indices = np.nonzero(is_outlier)[0]
@@ -1413,7 +1434,12 @@ class Outliers(Evaluator):
             cluster_labels=cluster_result["clusters"],
         )
 
-        return self._find_outliers_adaptive(cluster_stats=cs, threshold_std=self.cluster_threshold), cs
+        resolved_ct = (
+            resolve_threshold(self.cluster_threshold)
+            if self.cluster_threshold is not None
+            else DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
+        )
+        return self._find_outliers_adaptive(cluster_stats=cs, threshold=resolved_ct), cs
 
     _DatasetInput = Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
 
@@ -1544,11 +1570,11 @@ class Outliers(Evaluator):
         │ i64        ┆ cat         ┆ f64          │
         ╞════════════╪═════════════╪══════════════╡
         │ 0          ┆ zeros       ┆ 0.000081     │
-        │ 1          ┆ brightness  ┆ 0.42235      │
-        │ 1          ┆ mean        ┆ 0.503471     │
         │ 2          ┆ zeros       ┆ 0.000081     │
         │ 7          ┆ brightness  ┆ 0.98         │
         │ 7          ┆ contrast    ┆ 0.0          │
+        │ 7          ┆ darkness    ┆ 0.98         │
+        │ 7          ┆ entropy     ┆ 0.0          │
         └────────────┴─────────────┴──────────────┘
 
         Cross-dataset detection:
@@ -1683,7 +1709,12 @@ class Outliers(Evaluator):
                 cluster_labels=cluster_result["clusters"],
             )
 
-            cluster_df = self._find_outliers_adaptive(stored_cluster_stats, self.cluster_threshold)
+            resolved_ct = (
+                resolve_threshold(self.cluster_threshold)
+                if self.cluster_threshold is not None
+                else DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
+            )
+            cluster_df = self._find_outliers_adaptive(stored_cluster_stats, resolved_ct)
             cluster_df = add_dataset_index(cluster_df, dataset_steps)
             outliers_dfs.append(cluster_df)
 

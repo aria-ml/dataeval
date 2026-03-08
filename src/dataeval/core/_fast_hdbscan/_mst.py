@@ -36,10 +36,6 @@ LARGE_CLUSTER_EDGE_RATIO = 0.01  # Edge points as fraction of cluster size for l
 SMALL_CLUSTER_EDGE_RATIO = 0.1  # Edge points as fraction of cluster size for small clusters (10%)
 MIN_EDGE_POINTS = 10  # Minimum number of edge points to consider
 
-# Constants for duplicate detection
-EXACT_DUPLICATE_MAGNITUDE_OFFSET = -3  # Orders of magnitude below mean to consider exact duplicate
-EXACT_DUPLICATE_FALLBACK_OFFSET = 3  # Additional offset when mean is very small
-
 
 @numba.njit(cache=True)
 def _expand_tree(
@@ -135,7 +131,7 @@ def _update_tree(
     for i in range(points.size):
         point = points[i]
         nbr = n_neighbors[i]
-        if ds_union_by_rank(disjoint_set, point, np.int64(nbr)) and nbr >= 0:
+        if nbr >= 0 and ds_union_by_rank(disjoint_set, point, np.int64(nbr)):
             dist = n_distance[i]
             # Store edge as (point_i, neighbor, distance)
             # Note: Storing indices as float32 for array homogeneity with distances
@@ -265,15 +261,14 @@ def _flatten_and_sort(
 def compare_links_to_cluster_std(
     mst: NDArray[np.float32],
     clusters: NDArray[np.int64],
-    cluster_threshold: float = 1.0,
-) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    cluster_sensitivity: float = 1.0,
+) -> NDArray[np.int64]:
     """
-    Identify exact and near duplicate pairs based on MST edge distances and cluster statistics.
+    Identify duplicate pairs based on MST edge distances and cluster statistics.
 
-    Analyzes edges in the minimum spanning tree to find duplicates. Exact duplicates are
-    identified by edges with distances orders of magnitude smaller than the mean. Near
-    duplicates are edges within each cluster that fall below the cluster's standard deviation
-    scaled by ``cluster_threshold``.
+    Analyzes edges in the minimum spanning tree to find duplicates by comparing
+    intra-cluster edge distances to the cluster's standard deviation scaled by
+    ``cluster_sensitivity``.
 
     Parameters
     ----------
@@ -282,31 +277,34 @@ def compare_links_to_cluster_std(
         Each row is [point_i, point_j, distance].
     clusters : NDArray[np.int64]
         Cluster assignment for each point, shape (n_samples,)
-    cluster_threshold : float, default 1.0
-        Multiplier on cluster standard deviation for near duplicate detection.
-        Lower values are stricter (fewer near duplicates). A value of 1.0
-        uses the raw cluster standard deviation as the threshold.
+    cluster_sensitivity : float, default 1.0
+        Controls how aggressively points within a cluster are considered
+        duplicates, by scaling the cluster's standard deviation of MST edge
+        distances. An edge is marked as a duplicate link when its distance
+        is less than ``cluster_sensitivity * cluster_std``.
+
+        - **Lower values** (e.g. 0.5) are stricter — only very close pairs
+          are flagged, yielding fewer duplicates.
+        - **Higher values** (e.g. 2.0) are more sensitive — pairs farther
+          apart relative to the cluster spread are also flagged.
+        - A value of **1.0** uses the raw cluster standard deviation as the
+          cutoff.
+
+        Typical range: 0.1 – 3.0. Must be positive.
 
     Returns
     -------
-    exact_duplicates : NDArray[np.int64]
-        Array of exact duplicate pairs with shape (n_exact, 2).
+    duplicates : NDArray[np.int64]
+        Array of duplicate pairs with shape (n_duplicates, 2).
         Each row is [point_i, point_j] indices.
-    near_duplicates : NDArray[np.int64]
-        Array of near duplicate pairs with shape (n_near, 2).
-        Each row is [point_i, point_j] indices. Excludes pairs already in exact_duplicates.
 
     Notes
     -----
     Performance: This function performs BETTER without parallel=True. Benchmarks show
     serial execution is 6-25x faster due to small workload size and parallel overhead.
 
-    Exact duplicate threshold is calculated as:
-    - If mean distance >= 1: threshold = 10^-3 (3 orders of magnitude below mean)
-    - If mean distance < 1: threshold = mean * 10^(order_of_magnitude - 3)
-
-    Near duplicates are found per-cluster by comparing edge distances to
-    ``cluster_threshold * cluster_std``.
+    Duplicates are found per-cluster by comparing edge distances to
+    ``cluster_sensitivity * cluster_std``.
     """
     cluster_ids = np.unique(clusters)
     cluster_grouping = np.full(mst.shape[0], -1, dtype=np.int16)
@@ -318,20 +316,8 @@ def compare_links_to_cluster_std(
         if cluster_id == clusters[np.int64(mst[i, 1])]:
             cluster_grouping[i] = np.int16(cluster_id)
 
-    # Calculate threshold for exact duplicates based on mean distance
-    overall_mean = mst.T[2].mean()
-    order_mag = np.floor(np.log10(overall_mean)) if overall_mean > 0 else 0
-
-    # Threshold is 3 orders of magnitude below mean (or offset by 3 if mean < 1)
-    compare_mag = EXACT_DUPLICATE_MAGNITUDE_OFFSET if order_mag >= 0 else order_mag - EXACT_DUPLICATE_FALLBACK_OFFSET
-
-    # Find exact duplicates: edges with very small distances
-    exact_dup = np.full((mst.shape[0], 2), -1, dtype=np.int64)
-    exact_dups_index = np.nonzero(mst[:, 2] < 10**compare_mag)[0]
-    exact_dup[exact_dups_index] = mst[exact_dups_index, :2]
-
-    # Find near duplicates: per-cluster edges below cluster std dev
-    near_dup = np.full((mst.shape[0], 2), -1, dtype=np.int64)
+    # Find duplicates: per-cluster edges below cluster std dev
+    dup = np.full((mst.shape[0], 2), -1, dtype=np.int64)
     for i in range(cluster_ids.size):
         cluster_links = np.nonzero(cluster_grouping == cluster_ids[i])[0]
 
@@ -341,14 +327,11 @@ def compare_links_to_cluster_std(
 
         cluster_std = mst[cluster_links, 2].std()
 
-        # Edges in this cluster with distance < threshold * std dev are near duplicates
-        near_dups = np.nonzero(mst[cluster_links, 2] < cluster_threshold * cluster_std)[0]
-        near_dups_index = cluster_links[near_dups]
-        near_dup[near_dups_index] = mst[near_dups_index, :2]
+        # Edges in this cluster with distance < threshold * std dev are duplicates
+        dups = np.nonzero(mst[cluster_links, 2] < cluster_sensitivity * cluster_std)[0]
+        dups_index = cluster_links[dups]
+        dup[dups_index] = mst[dups_index, :2]
 
-    # Remove exact duplicates from near duplicates list
-    exact_idx = np.nonzero(exact_dup.T[0] != -1)[0]
-    near_dup[exact_idx] = np.full((exact_idx.size, 2), -1, dtype=np.int64)
-    near_idx = np.nonzero(near_dup.T[0] != -1)[0]
+    dup_idx = np.nonzero(dup.T[0] != -1)[0]
 
-    return exact_dup[exact_idx], near_dup[near_idx]
+    return dup[dup_idx]
