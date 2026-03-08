@@ -138,6 +138,12 @@ conflicts = [
     { extra = "cu128" },
   ],
 ]
+constraint-dependencies = [
+    "cryptography>=46.0.5",    # CVE-2026-26007: Missing Subgroup Validation for SECT Curves
+    "pillow>=12.1.1",          # CVE-2026-25990: OOB write via PSD image
+    "setuptools>=82.0.0",      # CVE-2026-23949: (jaraco_context) path traversal in tarball()
+                               # CVE-2026-24049: (wheel) privilege escalation via unpack
+]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
