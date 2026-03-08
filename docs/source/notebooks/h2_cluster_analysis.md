@@ -178,7 +178,7 @@ For the duplicates results, the clusterer provides a list of sets of points whic
 
 ```{code-cell} ipython3
 # Show results using the new detector classes
-duplicates_detector = Duplicates(cluster_threshold=0.1)
+duplicates_detector = Duplicates(cluster_sensitivity=0.1)
 duplicates_result = duplicates_detector.from_clusters(clusters)
 print("near duplicates: ", duplicates_result.near)
 
@@ -198,8 +198,6 @@ tags: [remove_cell]
 assert len(outliers_result.outliers) == 1
 assert len(duplicates_result.near) == 2
 ```
-
-+++
 
 ## Related concepts
 

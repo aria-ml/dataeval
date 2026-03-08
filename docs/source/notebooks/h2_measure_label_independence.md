@@ -106,8 +106,6 @@ assert 0 <= results["chi_squared"] < 4
 assert 0.9 < results["p_value"] <= 1.0
 ```
 
-+++
-
 ## Related concepts
 
 - [Distribution Shift](../concepts/DistributionShift.md)

@@ -9,6 +9,7 @@ Licensed under Apache Software License (Apache 2.0)
 """
 
 __all__ = [
+    "AdaptiveThreshold",
     "ConstantThreshold",
     "IQRThreshold",
     "ModifiedZScoreThreshold",
@@ -425,6 +426,236 @@ class IQRThreshold(_Threshold, threshold_type="iqr"):
         return lower, upper
 
 
+class AdaptiveThreshold(_Threshold, threshold_type="adaptive"):
+    """Threshold using tail-weighted Double-MAD for robust asymmetric outlier detection.
+
+    Computes separate dispersion metrics for data below and above the median
+    (Double-MAD), producing naturally asymmetric bounds.  On each side the
+    multiplier is automatically scaled up when the tail is heavier than a
+    normal distribution, preventing over-flagging on skewed or heavy-tailed
+    metrics while keeping tight bounds on well-behaved data.
+
+    **Tail-weight adjustment**: for each half, the ratio of the 90th-percentile
+    deviation to the MAD is compared against the expected ratio for normal data
+    (~1.91).  When the observed ratio exceeds this, the effective multiplier
+    is increased by ``log1p(excess)``, widening the bound on that side only.
+
+    **Point-mass handling**: when both half-MADs are zero (>50% of data at one
+    value), a gap-ratio test determines whether non-mode values form a smooth
+    continuous tail (wider bounds via non-mode MAD) or discrete categorical
+    jumps (tight bounds via global mean absolute deviation).
+
+    Parameters
+    ----------
+    multiplier : float or None, default 3.0
+        Symmetric multiplier applied to both bounds. Overridden per-side
+        by *lower_multiplier* / *upper_multiplier* when provided.
+    lower_multiplier : float or None
+        Override for the lower bound: ``median - lower_multiplier * tail_factor * scale_left``.
+        ``None`` means no lower bound.
+    upper_multiplier : float or None
+        Override for the upper bound: ``median + upper_multiplier * tail_factor * scale_right``.
+        ``None`` means no upper bound.
+
+    Examples
+    --------
+    >>> symmetric = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    >>> t = AdaptiveThreshold(2.0)
+    >>> lower, upper = t(symmetric)
+
+    >>> skewed = np.array([1.0, 1.0, 1.0, 2.0, 10.0, 50.0])
+    >>> lower, upper = t(skewed)
+    """
+
+    # Expected p90/p50 ratio for |X| where X ~ N(0, 1) (half-normal)
+    _NORMAL_P90_MAD: float = 1.91
+
+    lower_multiplier: float | None
+    upper_multiplier: float | None
+
+    def __init__(
+        self,
+        multiplier: float | None = 3.5,
+        *,
+        lower_multiplier: float | None = _UNSET,  # type: ignore[assignment]
+        upper_multiplier: float | None = _UNSET,  # type: ignore[assignment]
+        lower_limit: float | None = None,
+        upper_limit: float | None = None,
+    ) -> None:
+        super().__init__(lower_limit=lower_limit, upper_limit=upper_limit)
+        self.lower_multiplier = multiplier if lower_multiplier is _UNSET else lower_multiplier
+        self.upper_multiplier = multiplier if upper_multiplier is _UNSET else upper_multiplier
+        _validate_multiplier("lower_multiplier", self.lower_multiplier)
+        _validate_multiplier("upper_multiplier", self.upper_multiplier)
+
+    @staticmethod
+    def _tail_factor(mad: float, p90: float) -> float:
+        """Compute a tail-weight scaling factor for one half of the distribution.
+
+        Compares ``p90 / mad`` to the expected ratio for normal data (~1.91).
+        Returns 1.0 for normal-like tails and >1.0 for heavier tails.
+        """
+        if mad <= EPSILON:
+            return 1.0
+        ratio = (p90 / mad) / AdaptiveThreshold._NORMAL_P90_MAD
+        return 1.0 + np.log1p(max(0.0, ratio - 1.0))
+
+    def _derive(self, data: NDArray[Any]) -> tuple[float | None, float | None]:
+        """Compute asymmetric, tail-weighted thresholds using Double-MAD.
+
+        Splits the data at the median and computes a separate MAD for each
+        half.  Each half-MAD is scaled to normal units (``/ 0.6745``) and
+        multiplied by the corresponding multiplier.  The multiplier is
+        further scaled by a per-side tail-weight factor derived from the
+        ratio of the 90th-percentile deviation to the MAD: normal tails
+        leave the multiplier unchanged, while heavier tails widen the bound.
+
+        When a half-MAD is zero (e.g., >50% of that half equals the median),
+        a gap-ratio test distinguishes two cases:
+
+        - **Smooth tail** (gap ratio < 1): non-mode values blend continuously
+          from the mode (e.g. zero-inflated metrics).  The MAD of the
+          non-mode deviations (with tail adjustment) is used as the scale,
+          producing wider bounds that avoid over-flagging.
+        - **Discrete jumps** (gap ratio >= 1): non-mode values are
+          categorically different from the mode (e.g. wrong channel count).
+          The global mean absolute deviation is used, keeping bounds tight
+          so all non-mode values are flagged.
+
+        Parameters
+        ----------
+        data : NDArray[Any]
+            Array of values to compute thresholds from.
+
+        Returns
+        -------
+        tuple[float | None, float | None]
+            ``(median - lower_multiplier * tail_factor_left * scale_left,
+            median + upper_multiplier * tail_factor_right * scale_right)``.
+            Returns ``(None, None)`` when spread is effectively zero
+            on both sides.
+        """
+        clean = data[~np.isnan(data)] if np.any(np.isnan(data)) else data
+        if len(clean) < 3:
+            return None, None
+
+        median_val = float(np.median(clean))
+
+        # --- split at the median ---
+        left_half = clean[clean <= median_val]
+        right_half = clean[clean >= median_val]
+
+        # --- asymmetric MADs and tail-weight factors ---
+        left_devs = np.abs(left_half - median_val)
+        right_devs = np.abs(right_half - median_val)
+
+        mad_left = float(np.median(left_devs)) if len(left_half) > 0 else 0.0
+        mad_right = float(np.median(right_devs)) if len(right_half) > 0 else 0.0
+
+        # Compute tail factors before fallback (needs original MADs)
+        p90_left = float(np.percentile(left_devs, 90)) if len(left_half) > 1 else 0.0
+        p90_right = float(np.percentile(right_devs, 90)) if len(right_half) > 1 else 0.0
+        tf_left = self._tail_factor(mad_left, p90_left)
+        tf_right = self._tail_factor(mad_right, p90_right)
+
+        # --- zero-variance fallback with gap-ratio awareness ---
+        if mad_left <= EPSILON or mad_right <= EPSILON:
+            result = self._zero_mad_fallback(clean, median_val, mad_left, mad_right)
+            if result is not None:
+                return result
+            # _zero_mad_fallback returns None when it falls through to
+            # the discrete-jump path; mad_left/mad_right are updated below.
+
+            # Discrete-jump fallback: use global MeanAD (tight bounds)
+            global_meanad = float(np.mean(np.abs(clean - median_val)))
+            if global_meanad <= EPSILON:
+                return None, None
+            if mad_left <= EPSILON:
+                mad_left = global_meanad
+            if mad_right <= EPSILON:
+                mad_right = global_meanad
+
+        # --- scale to normal units (1 / 0.6745 ≈ 1.4826) ---
+        scale_left = mad_left / 0.6745
+        scale_right = mad_right / 0.6745
+
+        lower = (
+            float(median_val - self.lower_multiplier * tf_left * scale_left)
+            if self.lower_multiplier is not None
+            else None
+        )
+        upper = (
+            float(median_val + self.upper_multiplier * tf_right * scale_right)
+            if self.upper_multiplier is not None
+            else None
+        )
+
+        return lower, upper
+
+    def _zero_mad_fallback(
+        self,
+        clean: NDArray[Any],
+        median_val: float,
+        mad_left: float,
+        mad_right: float,
+    ) -> tuple[float | None, float | None] | None:
+        """Handle the MAD=0 case using gap-ratio detection.
+
+        When both half-MADs are zero, determines whether non-mode values
+        form a smooth continuous tail (use non-mode MAD for wider bounds)
+        or discrete jumps (return ``None`` to fall through to tight MeanAD
+        bounds in the caller).
+
+        Returns
+        -------
+        tuple or None
+            ``(lower, upper)`` if smooth-tail handling applies, or ``None``
+            to signal the caller should use the tight MeanAD fallback.
+        """
+        # Only apply smooth-tail logic when BOTH half-MADs are zero
+        # (true point-mass distribution). If only one side is zero,
+        # fall through to the discrete-jump path.
+        if mad_left > EPSILON or mad_right > EPSILON:
+            return None
+
+        global_meanad = float(np.mean(np.abs(clean - median_val)))
+        if global_meanad <= EPSILON:
+            return None, None
+
+        meanad_scale = global_meanad / 0.6745
+
+        # Find the mode and non-mode values
+        unique, counts = np.unique(clean, return_counts=True)
+        mode_val = float(unique[np.argmax(counts)])
+        non_mode = clean[clean != mode_val]
+
+        # Need enough non-mode values for a meaningful MAD
+        if len(non_mode) <= 10:
+            return None
+
+        non_mode_devs = np.abs(non_mode - mode_val)
+        min_dev = float(np.min(non_mode_devs))
+        gap_ratio = min_dev / meanad_scale
+
+        # Gap ratio >= 1: non-mode values are discrete jumps from the mode.
+        # Fall through to tight MeanAD bounds in the caller.
+        if gap_ratio >= 1.0:
+            return None
+
+        # Smooth tail: use the non-mode deviations' own MAD + tail factor
+        nm_mad = float(np.median(non_mode_devs))
+        if nm_mad <= EPSILON:
+            return None
+
+        nm_p90 = float(np.percentile(non_mode_devs, 90))
+        nm_tf = self._tail_factor(nm_mad, nm_p90)
+        nm_scale = nm_mad / 0.6745 * nm_tf
+
+        lower = float(median_val - self.lower_multiplier * nm_scale) if self.lower_multiplier is not None else None
+        upper = float(median_val + self.upper_multiplier * nm_scale) if self.upper_multiplier is not None else None
+        return lower, upper
+
+
 def _resolve_cls(threshold_type: str) -> type:
     """Look up a threshold class by its registered type name."""
     try:
@@ -468,7 +699,7 @@ def _make_threshold(
         return cls(lower_multiplier=bounds[0], upper_multiplier=bounds[1], **limit_kwargs)
 
 
-_DEFAULT_THRESHOLD_TYPE = "modzscore"
+_DEFAULT_THRESHOLD_TYPE = "adaptive"
 
 
 def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:
@@ -479,9 +710,9 @@ def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:
     value : ThresholdLike or None, default None
         The threshold specification:
 
-        - ``None``: default ``ModifiedZScoreThreshold()``
+        - ``None``: default ``AdaptiveThreshold()``
         - ``str``: named threshold with defaults (e.g. ``"zscore"``,
-          ``"modzscore"``, ``"iqr"``, ``"constant"``)
+          ``"modzscore"``, ``"iqr"``, ``"constant"``, ``"adaptive"``)
         - ``float``: symmetric multiplier for the default method
         - ``tuple[float | None, float | None]``: asymmetric bounds
           for the default method
@@ -511,16 +742,16 @@ def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:
     Examples
     --------
     >>> resolve_threshold()
-    ModifiedZScoreThreshold({'lower_multiplier': 3.5, 'upper_multiplier': 3.5})
+    AdaptiveThreshold({'lower_multiplier': 3.5, 'upper_multiplier': 3.5})
 
     >>> resolve_threshold("zscore")
     ZScoreThreshold({'lower_multiplier': 3.0, 'upper_multiplier': 3.0})
 
     >>> resolve_threshold(2.5)
-    ModifiedZScoreThreshold({'lower_multiplier': 2.5, 'upper_multiplier': 2.5})
+    AdaptiveThreshold({'lower_multiplier': 2.5, 'upper_multiplier': 2.5})
 
     >>> resolve_threshold((None, 5.0))
-    ModifiedZScoreThreshold({'lower_multiplier': None, 'upper_multiplier': 5.0})
+    AdaptiveThreshold({'lower_multiplier': None, 'upper_multiplier': 5.0})
 
     >>> resolve_threshold(("zscore", 2.5))
     ZScoreThreshold({'lower_multiplier': 2.5, 'upper_multiplier': 2.5})
@@ -547,10 +778,10 @@ def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:
     IQRThreshold({'upper_limit': 0.9, 'lower_multiplier': 1.0, 'upper_multiplier': 2.0})
 
     >>> resolve_threshold((None, (0.0, 1.0)))
-    ModifiedZScoreThreshold({'lower_limit': 0.0, 'upper_limit': 1.0, 'lower_multiplier': 3.5, 'upper_multiplier': 3.5})
+    AdaptiveThreshold({'lower_limit': 0.0, 'upper_limit': 1.0, 'lower_multiplier': 3.5, 'upper_multiplier': 3.5})
 
     >>> resolve_threshold((2.5, (0.0, 1.0)))
-    ModifiedZScoreThreshold({'lower_limit': 0.0, 'upper_limit': 1.0, 'lower_multiplier': 2.5, 'upper_multiplier': 2.5})
+    AdaptiveThreshold({'lower_limit': 0.0, 'upper_limit': 1.0, 'lower_multiplier': 2.5, 'upper_multiplier': 2.5})
     """
     if isinstance(value, Threshold):
         return value

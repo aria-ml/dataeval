@@ -38,8 +38,8 @@ that your data is noisy.
 
 ### What you will need
 
-1. A set of image {term}`embeddings <Embeddings>` and their corresponding class labels. This requires training
-   an autoencoder to compress the images.
+1. A set of image {term}`embeddings <Embeddings>` and their corresponding class labels. This requires training an
+   autoencoder to compress the images.
 1. A Python environment with the following packages installed:
    - `dataeval`
 

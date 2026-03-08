@@ -1,4 +1,5 @@
 <!-- markdownlint-disable MD051 -->
+
 # Data Integrity
 
 The performance of any machine learning (ML) model is strictly bounded by the
@@ -200,14 +201,15 @@ set to `"same"` (detected by basic hashes) or `"rotated"` (detected only by D4
 hashes), letting practitioners distinguish the two cases.
 
 **Cluster-based detection** is an optional third mode that operates in
-embedding space rather than pixel space. When a {mod}`feature extractor <.extractors>` and a
-`cluster_threshold` are provided, images are projected into embedding space,
-clustered, and pairs whose embeddings fall within the threshold distance are
-treated as near-duplicates. Because embeddings are approximate representations,
-cluster-based matches are always reported as near rather than exact duplicates,
-even when their embedding distance is zero. This mode catches **semantic
-duplicates** — distinct photographs of the same object or scene that are not
-similar at the pixel level but occupy the same region of embedding space.
+embedding space rather than pixel space. When a {mod}`feature extractor <.extractors>`
+and a `cluster_sensitivity` are provided, images are projected into embedding
+space, clustered, and pairs whose embeddings fall within the threshold distance
+are treated as near-duplicates. Because embeddings are approximate
+representations, cluster-based matches are always reported as near rather than
+exact duplicates, even when their embedding distance is zero. This mode catches
+**semantic duplicates** — distinct photographs of the same object or scene that
+are not similar at the pixel level but occupy the same region of embedding
+space.
 
 ### Outlier detection: image statistics and embeddings
 
@@ -411,16 +413,16 @@ flags remain valid.
 ## References
 
 1. [Birodkar, V., Mobahi, H., & Bengio, S. (2019). Semantic redundancy in image
-classification datasets. _arXiv preprint arXiv:1901.11409._ [paper](https://arxiv.org/abs/1901.11409)]{#ref1}
+   classification datasets. _arXiv preprint arXiv:1901.11409._ [paper](https://arxiv.org/abs/1901.11409)]{#ref1}
 
 2. [Polyzotis, N., Roy, S., Whang, S. E., & Zinkevich, M. (2018). Data management
-challenges in production machine learning. In _Proceedings of the 2017 ACM
-SIGMOD International Conference on Management of Data_ (pp. 1723–1726). [paper](https://dl.acm.org/doi/10.1145/3035918.3054782)]{#ref2}
+   challenges in production machine learning. In _Proceedings of the 2017 ACM
+   SIGMOD International Conference on Management of Data_ (pp. 1723–1726). [paper](https://dl.acm.org/doi/10.1145/3035918.3054782)]{#ref2}
 
 3. [Sculley, D., Holt, G., Golovin, D., Davydov, E., Phillips, T., Ebner, D.,
-Chaudhuri, V., Young, M., Crespo, J.-F., & Dennison, D. (2015). Hidden
-technical debt in machine learning systems. In _Advances in Neural Information
-Processing Systems_ (Vol. 28). [paper](https://proceedings.neurips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf)]{#ref3}
+   Chaudhuri, V., Young, M., Crespo, J.-F., & Dennison, D. (2015). Hidden
+   technical debt in machine learning systems. In _Advances in Neural Information
+   Processing Systems_ (Vol. 28). [paper](https://proceedings.neurips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf)]{#ref3}
 
 4. [Zauner, C. (2010). Implementation and benchmarking of perceptual image hash
-functions. _Bachelor's thesis, Upper Austria University of Applied Sciences._ [thesis](https://www.phash.org/docs/pubs/thesis_zauner.pdf)]{#ref4}
+   functions. _Bachelor's thesis, Upper Austria University of Applied Sciences._ [thesis](https://www.phash.org/docs/pubs/thesis_zauner.pdf)]{#ref4}

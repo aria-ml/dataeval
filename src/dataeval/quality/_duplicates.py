@@ -27,7 +27,7 @@ from dataeval.types import (
 from dataeval.utils.arrays import flatten_samples, to_numpy
 
 DEFAULT_DUPLICATES_FLAGS = ImageStats.HASH_DUPLICATES_BASIC
-DEFAULT_DUPLICATES_CLUSTER_THRESHOLD: float | None = None
+DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR: float | None = None
 DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES = True
 
 
@@ -183,9 +183,9 @@ def _merge_near_groups(
 def _find_cluster_duplicates(
     mst: NDArray[np.float32],
     clusters: NDArray[np.intp],
-    cluster_threshold: float = 1.0,
-) -> tuple[list[list[int]], list[list[int]]]:
-    """Find duplicate and near duplicate data based on cluster average distance.
+    cluster_sensitivity: float = 1.0,
+) -> list[list[int]]:
+    """Find duplicate data based on cluster average distance.
 
     Parameters
     ----------
@@ -193,21 +193,22 @@ def _find_cluster_duplicates(
         Minimum spanning tree from cluster() output.
     clusters : NDArray[np.intp]
         Cluster labels from cluster() output.
-    cluster_threshold : float, default 1.0
-        Multiplier on cluster standard deviation for near duplicate detection.
+    cluster_sensitivity : float, default 1.0
+        Controls how aggressively points are considered duplicates by
+        scaling the cluster's standard deviation. Lower values are
+        stricter (fewer duplicates). Typical range: 0.1 – 3.0.
 
     Returns
     -------
-    tuple[list[list[int]], list[list[int]]]
-        Exact duplicates and near duplicates as lists of related indices.
+    list[list[int]]
+        Duplicates as lists of related indices.
     """
     from dataeval.core._fast_hdbscan._mst import compare_links_to_cluster_std
 
-    exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters, cluster_threshold)
-    exact_dupes = _sorted_union_find(exact_indices)
-    near_dupes = _sorted_union_find(near_indices)
+    indices = compare_links_to_cluster_std(mst, clusters, cluster_sensitivity)
+    dupes = _sorted_union_find(indices)
 
-    return [[int(ii) for ii in il] for il in exact_dupes], [[int(ii) for ii in il] for il in near_dupes]
+    return [[int(ii) for ii in il] for il in dupes]
 
 
 def _sorted_union_find(index_groups: Any) -> list[list[Any]]:
@@ -502,8 +503,9 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     cluster_result : ClusterResult or None
         The clustering result (MST + cluster assignments). Used internally
         for redetection via :meth:`with_threshold`.
-    cluster_threshold : float or None
-        Threshold used for cluster-based near duplicate detection.
+    cluster_sensitivity : float or None
+        Factor used for cluster-based near duplicate detection.
+        Scales the cluster standard deviation to set the duplicate cutoff.
     merge_near_duplicates : bool
         Whether overlapping near duplicate groups were merged.
     flags : ImageStats
@@ -516,14 +518,14 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         *,
         calculation_results: StatsResult | Sequence[StatsResult] | None = None,
         cluster_result: ClusterResult | None = None,
-        cluster_threshold: float | None = None,
+        cluster_sensitivity: float | None = None,
         merge_near_duplicates: bool = True,
         flags: ImageStats = ImageStats.NONE,
     ) -> None:
         super().__init__(data)
         self.calculation_results = calculation_results
         self.cluster_result = cluster_result
-        self.cluster_threshold = cluster_threshold
+        self.cluster_sensitivity = cluster_sensitivity
         self.merge_near_duplicates = merge_near_duplicates
         self.flags = flags
 
@@ -576,6 +578,36 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         if is_cross:
             return _get_groups_cross(filtered, has_targets, is_near)
         return _get_groups_single(filtered, has_targets, is_near)
+
+    def _filtered_by_level(self, level: Literal["item", "target"]) -> Self:
+        """Return a new DuplicatesOutput filtered to only rows matching the given level."""
+        filtered = self.data().filter(pl.col("level") == level)
+        return type(self)(  # type: ignore[return-value]
+            filtered,
+            calculation_results=self.calculation_results,
+            cluster_result=self.cluster_result,
+            cluster_sensitivity=self.cluster_sensitivity,
+            merge_near_duplicates=self.merge_near_duplicates,
+            flags=self.flags,
+        )
+
+    @property
+    def items(self) -> Self:
+        """Return a filtered DuplicatesOutput containing only item-level duplicate groups.
+
+        The returned object supports the same properties (``exact``, ``near``)
+        and aggregation methods as the original output.
+        """
+        return self._filtered_by_level("item")
+
+    @property
+    def targets(self) -> Self:
+        """Return a filtered DuplicatesOutput containing only target-level duplicate groups.
+
+        The returned object supports the same properties (``exact``, ``near``)
+        and aggregation methods as the original output.
+        """
+        return self._filtered_by_level("target")
 
     @property
     def exact(self) -> TExactDuplicatesGroup:
@@ -734,8 +766,8 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     # Redetection
     # ------------------------------------------------------------------
 
-    def with_threshold(self, cluster_threshold: float) -> Self:
-        """Re-detect cluster-based duplicates with a different threshold.
+    def with_sensitivity(self, cluster_sensitivity: float) -> Self:
+        """Re-detect cluster-based duplicates with a different distance factor.
 
         Hash-based duplicates are deterministic and are not affected.
         Only cluster-based near duplicates are recomputed using the stored
@@ -743,14 +775,18 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
 
         Parameters
         ----------
-        cluster_threshold : float
-            New threshold for cluster-based near duplicate detection.
-            Lower values are stricter (fewer near duplicates).
+        cluster_sensitivity : float
+            Controls how aggressively points are considered duplicates by
+            scaling the cluster's standard deviation. An edge is flagged as
+            a duplicate link when its distance is below
+            ``cluster_sensitivity * cluster_std``. Lower values are stricter
+            (fewer near duplicates), higher values are more sensitive.
+            Typical range: 0.1 – 3.0. Must be positive.
 
         Returns
         -------
         DuplicatesOutput
-            New output with re-detected duplicates using the new threshold.
+            New output with re-detected duplicates using the new distance factor.
 
         Raises
         ------
@@ -758,11 +794,11 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             If this output was not created from an evaluation with cluster results.
         """
         if self.cluster_result is None:
-            raise ValueError("with_threshold() requires cluster results stored from evaluate() or from_clusters().")
-        return self._redetect(cluster_threshold=cluster_threshold)
+            raise ValueError("with_sensitivity() requires cluster results stored from evaluate() or from_clusters().")
+        return self._redetect(cluster_sensitivity=cluster_sensitivity)
 
-    def _redetect(self, cluster_threshold: float) -> Self:
-        """Re-run duplicate detection with a new cluster threshold.
+    def _redetect(self, cluster_sensitivity: float) -> Self:
+        """Re-run duplicate detection with a new cluster distance factor.
 
         Recomputes hash results from stored calculation_results (deterministic
         and cheap) and cluster results from the stored ClusterResult.
@@ -781,14 +817,14 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             item_exact, item_near = i_e or None, i_n
             target_exact, target_near = t_e or None, t_n
 
-        # Recompute cluster results with new threshold
+        # Recompute cluster results with new distance factor
         if self.cluster_result is not None:
-            cluster_exact, cluster_near = _find_cluster_duplicates(
+            cluster_dupes = _find_cluster_duplicates(
                 mst=self.cluster_result["mst"],
                 clusters=self.cluster_result["clusters"],
-                cluster_threshold=cluster_threshold,
+                cluster_sensitivity=cluster_sensitivity,
             )
-            item_near = item_near + [(group, "cluster") for group in cluster_exact + cluster_near]
+            item_near = item_near + [(group, "cluster") for group in cluster_dupes]
 
         df = _build_duplicates_dataframe(
             item_exact,
@@ -804,7 +840,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             df,
             calculation_results=self.calculation_results,
             cluster_result=self.cluster_result,
-            cluster_threshold=cluster_threshold,
+            cluster_sensitivity=cluster_sensitivity,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
         )
@@ -846,13 +882,18 @@ class Duplicates(Evaluator):
         ``ImageStats.NONE`` to disable hash-based detection.
     extractor : FeatureExtractor, optional
         Feature extractor for cluster-based duplicate detection. Must be provided
-        together with cluster_threshold to enable clustering. When provided alone
-        without cluster_threshold, clustering is skipped.
-    cluster_threshold : float, optional
-        Threshold for cluster-based near duplicate detection. Must be provided
-        together with extractor to enable clustering. When None or when
-        extractor is None, cluster-based detection is skipped entirely.
-        Lower values are stricter.
+        together with cluster_sensitivity to enable clustering. When provided alone
+        without cluster_sensitivity, clustering is skipped.
+    cluster_sensitivity : float, optional
+        Controls how aggressively points within a cluster are considered
+        duplicates, by scaling the cluster's standard deviation of MST edge
+        distances. An edge is flagged as a duplicate link when its distance
+        is less than ``cluster_sensitivity * cluster_std``. Lower values
+        (e.g. 0.5) are stricter (fewer duplicates); higher values (e.g. 2.0)
+        are more sensitive. Typical range: 0.1 – 3.0. Must be positive.
+        Must be provided together with ``extractor`` to enable clustering.
+        When None or when extractor is None, cluster-based detection is
+        skipped entirely.
     cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
         Clustering algorithm for cluster-based detection.
     n_clusters : int, optional
@@ -875,8 +916,9 @@ class Duplicates(Evaluator):
         Statistics to compute for duplicate detection.
     extractor : FeatureExtractor | None
         Feature extractor for cluster-based detection.
-    cluster_threshold : float | None
-        Threshold for cluster-based near duplicate detection.
+    cluster_sensitivity : float | None
+        Sensitivity for cluster-based near duplicate detection. Values should be positive,
+        with typical range 0.1 – 3.0. When None, cluster-based detection is disabled.
     cluster_algorithm : Literal["kmeans", "hdbscan"]
         Clustering algorithm to use.
     n_clusters : int | None
@@ -900,7 +942,7 @@ class Duplicates(Evaluator):
 
     >>> from dataeval.extractors import FlattenExtractor
 
-    >>> detector = Duplicates(extractor=FlattenExtractor(), cluster_threshold=1.0)
+    >>> detector = Duplicates(extractor=FlattenExtractor(), cluster_sensitivity=1.0)
     >>> result = detector.evaluate(train_ds)
 
     Using configuration:
@@ -921,9 +963,10 @@ class Duplicates(Evaluator):
         ----------
         flags : ImageStats, default ImageStats.HASH
             Statistics to compute for hash-based duplicate detection.
-        cluster_threshold : float or None, default None
-            Threshold for cluster-based near duplicate detection. Must be
-            provided together with extractor to enable clustering.
+        cluster_sensitivity : float or None, default None
+            Distance factor for cluster-based near duplicate detection. Scales
+            the cluster's standard deviation to set the duplicate cutoff.
+            Must be provided together with extractor to enable clustering.
         merge_near_duplicates : bool, default True
             Whether to merge overlapping near duplicate groups.
         extractor : FeatureExtractor or None, default None
@@ -938,12 +981,12 @@ class Duplicates(Evaluator):
         """
 
         flags: ImageStats = DEFAULT_DUPLICATES_FLAGS
-        cluster_threshold: float | None = DEFAULT_DUPLICATES_CLUSTER_THRESHOLD
+        cluster_sensitivity: float | None = DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR
         merge_near_duplicates: bool = DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES
 
     stats: StatsResult
     flags: ImageStats
-    cluster_threshold: float | None
+    cluster_sensitivity: float | None
     merge_near_duplicates: bool
     extractor: FeatureExtractor | None
     batch_size: int | None
@@ -954,7 +997,7 @@ class Duplicates(Evaluator):
     def __init__(
         self,
         flags: ImageStats | None = None,
-        cluster_threshold: float | None = None,
+        cluster_sensitivity: float | None = None,
         merge_near_duplicates: bool | None = None,
         extractor: FeatureExtractor | None = None,
         batch_size: int | None = None,
@@ -1061,7 +1104,7 @@ class Duplicates(Evaluator):
             flags=self.flags,
         )
 
-    @set_metadata(state=["cluster_threshold", "cluster_algorithm", "n_clusters"])
+    @set_metadata(state=["cluster_sensitivity", "cluster_algorithm", "n_clusters"])
     def from_clusters(
         self,
         cluster_result: ClusterResult,
@@ -1096,16 +1139,14 @@ class Duplicates(Evaluator):
         from_stats : Find duplicates from pre-computed hash statistics
         evaluate : Find duplicates by computing hashes from images
         """
-        threshold = self.cluster_threshold if self.cluster_threshold is not None else 1.0
-        exact_duplicates, near_duplicates = _find_cluster_duplicates(
+        threshold = self.cluster_sensitivity if self.cluster_sensitivity is not None else 1.0
+        cluster_dupes = _find_cluster_duplicates(
             mst=cluster_result["mst"],
             clusters=cluster_result["clusters"],
-            cluster_threshold=threshold,
+            cluster_sensitivity=threshold,
         )
 
-        # Treat ALL cluster-based duplicates as near duplicates since embeddings
-        # are approximate representations.
-        cluster_method_groups: MethodGroups = [(group, "cluster") for group in exact_duplicates + near_duplicates]
+        cluster_method_groups: MethodGroups = [(group, "cluster") for group in cluster_dupes]
 
         df = _build_duplicates_dataframe(
             item_exact=None,
@@ -1118,7 +1159,7 @@ class Duplicates(Evaluator):
         return DuplicatesOutput(
             df,
             cluster_result=cluster_result,
-            cluster_threshold=threshold,
+            cluster_sensitivity=threshold,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
         )
@@ -1161,7 +1202,7 @@ class Duplicates(Evaluator):
         per_target: Literal[True],
     ) -> MultiTargetDuplicatesOutput: ...
 
-    @set_metadata(state=["flags", "cluster_threshold", "cluster_algorithm", "n_clusters"])
+    @set_metadata(state=["flags", "cluster_sensitivity", "cluster_algorithm", "n_clusters"])
     def evaluate(
         self,
         data: _DatasetInput,
@@ -1236,13 +1277,13 @@ class Duplicates(Evaluator):
     ) -> SingleDuplicatesOutput:
         """Single-dataset evaluate implementation."""
         # Validate parameters - need either hash-based or cluster-based detection
-        # Cluster-based detection requires both extractor AND cluster_threshold
+        # Cluster-based detection requires both extractor AND cluster_sensitivity
         has_hash_detection = bool(self.flags & ImageStats.HASH)
-        has_cluster_detection = self.extractor is not None and self.cluster_threshold is not None
+        has_cluster_detection = self.extractor is not None and self.cluster_sensitivity is not None
         if not has_hash_detection and not has_cluster_detection:
             raise ValueError(
                 "Either flags must contain hash stats, or both extractor and "
-                "cluster_threshold must be provided for cluster-based detection.",
+                "cluster_sensitivity must be provided for cluster-based detection.",
             )
 
         # Initialize results
@@ -1261,8 +1302,8 @@ class Duplicates(Evaluator):
                 self.stats["stats"], self.stats["source_index"]
             )
 
-        # Cluster-based duplicate detection (requires both extractor and cluster_threshold)
-        if self.extractor is not None and self.cluster_threshold is not None:
+        # Cluster-based duplicate detection (requires both extractor and cluster_sensitivity)
+        if self.extractor is not None and self.cluster_sensitivity is not None:
             embeddings = Embeddings(data, self.extractor, batch_size=self.batch_size)
 
             stored_cluster_result = cluster(
@@ -1271,13 +1312,13 @@ class Duplicates(Evaluator):
                 n_clusters=self.n_clusters,
             )
 
-            cluster_exact, cluster_near = _find_cluster_duplicates(
+            factor = self.cluster_sensitivity if self.cluster_sensitivity is not None else 1.0
+            cluster_dupes = _find_cluster_duplicates(
                 mst=stored_cluster_result["mst"],
                 clusters=stored_cluster_result["clusters"],
-                cluster_threshold=self.cluster_threshold if self.cluster_threshold is not None else 1.0,
+                cluster_sensitivity=factor,
             )
-            # Treat ALL cluster results as near duplicates (embeddings are approximate)
-            item_near = item_near + [(group, "cluster") for group in cluster_exact + cluster_near]
+            item_near = item_near + [(group, "cluster") for group in cluster_dupes]
 
         available_stats = set(self.stats["stats"].keys()) if self.flags & ImageStats.HASH else set()
         df = _build_duplicates_dataframe(
@@ -1292,7 +1333,7 @@ class Duplicates(Evaluator):
             df,
             calculation_results=self.stats if has_hash_detection else None,
             cluster_result=stored_cluster_result,
-            cluster_threshold=self.cluster_threshold,
+            cluster_sensitivity=self.cluster_sensitivity,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
         )
@@ -1306,11 +1347,11 @@ class Duplicates(Evaluator):
     ) -> MultiDuplicatesOutput:
         """Multi-dataset evaluate: compute stats per dataset, then combine."""
         has_hash_detection = bool(self.flags & ImageStats.HASH)
-        has_cluster_detection = self.extractor is not None and self.cluster_threshold is not None
+        has_cluster_detection = self.extractor is not None and self.cluster_sensitivity is not None
         if not has_hash_detection and not has_cluster_detection:
             raise ValueError(
                 "Either flags must contain hash stats, or both extractor and "
-                "cluster_threshold must be provided for cluster-based detection.",
+                "cluster_sensitivity must be provided for cluster-based detection.",
             )
 
         # Hash-based: compute stats per dataset, delegate to from_stats
@@ -1347,12 +1388,13 @@ class Duplicates(Evaluator):
                 n_clusters=self.n_clusters,
             )
 
-            cluster_exact, cluster_near = _find_cluster_duplicates(
+            factor = self.cluster_sensitivity if self.cluster_sensitivity is not None else 1.0
+            cluster_dupes = _find_cluster_duplicates(
                 mst=stored_cluster_result["mst"],
                 clusters=stored_cluster_result["clusters"],
-                cluster_threshold=self.cluster_threshold if self.cluster_threshold is not None else 1.0,
+                cluster_sensitivity=factor,
             )
-            item_near = item_near + [(group, "cluster") for group in cluster_exact + cluster_near]
+            item_near = item_near + [(group, "cluster") for group in cluster_dupes]
 
         df = _build_duplicates_dataframe(
             item_exact or None,
@@ -1367,7 +1409,7 @@ class Duplicates(Evaluator):
             df,
             calculation_results=calc_results if calc_results else None,
             cluster_result=stored_cluster_result,
-            cluster_threshold=self.cluster_threshold,
+            cluster_sensitivity=self.cluster_sensitivity,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
         )

@@ -1187,7 +1187,8 @@ To learn more about OOD detection and related concepts:
 - Learn about [monitoring operational data](./tt_monitor_shift.md)
 - Try the [data cleaning tutorial](./tt_clean_dataset.md)
 
-To learn more about setting a global seed in DataEval, see the [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
+To learn more about setting a global seed in DataEval, see the
+[hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
 
 +++
 
