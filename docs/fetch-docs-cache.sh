@@ -27,6 +27,76 @@ ARTIFACT_BRANCH="docs-artifacts/$BRANCH_NAME"
 FALLBACK_BRANCH="docs-artifacts/main"
 CACHE_DIR="docs/source/.jupyter_cache"
 
+# For version tags (e.g., v1.0.1), find the nearest prior version's artifact branch
+# so patch releases pull cache from the prior release instead of main.
+find_version_fallback() {
+    local version="$1"
+    # Extract major.minor.patch
+    if [[ "$version" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+        local major="${BASH_REMATCH[1]}"
+        local minor="${BASH_REMATCH[2]}"
+        local patch="${BASH_REMATCH[3]}"
+
+        # List all docs-artifacts/v* branches on remote and find the best match
+        local best_branch=""
+        local best_patch=-1
+
+        while IFS= read -r ref; do
+            local ref_name="${ref##*/}"  # strip refs/heads/docs-artifacts/
+            ref_name="${ref#*refs/heads/docs-artifacts/}"
+            if [[ "$ref_name" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+                local ref_major="${BASH_REMATCH[1]}"
+                local ref_minor="${BASH_REMATCH[2]}"
+                local ref_patch="${BASH_REMATCH[3]}"
+                # Same major.minor, lower or equal patch, higher than current best
+                if [ "$ref_major" -eq "$major" ] && [ "$ref_minor" -eq "$minor" ] && \
+                   [ "$ref_patch" -lt "$patch" ] && [ "$ref_patch" -gt "$best_patch" ]; then
+                    best_patch="$ref_patch"
+                    best_branch="docs-artifacts/v${ref_major}.${ref_minor}.${ref_patch}"
+                fi
+            fi
+        done < <(git ls-remote --heads origin 'refs/heads/docs-artifacts/v*' 2>/dev/null)
+
+        if [ -n "$best_branch" ]; then
+            echo "$best_branch"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# For release branches (e.g., release/v1.0), find the latest version artifact branch
+find_release_branch_fallback() {
+    local branch="$1"
+    if [[ "$branch" =~ ^release/v([0-9]+)\.([0-9]+) ]]; then
+        local major="${BASH_REMATCH[1]}"
+        local minor="${BASH_REMATCH[2]}"
+
+        local best_branch=""
+        local best_patch=-1
+
+        while IFS= read -r ref; do
+            local ref_name="${ref#*refs/heads/docs-artifacts/}"
+            if [[ "$ref_name" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+                local ref_major="${BASH_REMATCH[1]}"
+                local ref_minor="${BASH_REMATCH[2]}"
+                local ref_patch="${BASH_REMATCH[3]}"
+                if [ "$ref_major" -eq "$major" ] && [ "$ref_minor" -eq "$minor" ] && \
+                   [ "$ref_patch" -gt "$best_patch" ]; then
+                    best_patch="$ref_patch"
+                    best_branch="docs-artifacts/v${ref_major}.${ref_minor}.${ref_patch}"
+                fi
+            fi
+        done < <(git ls-remote --heads origin 'refs/heads/docs-artifacts/v*' 2>/dev/null)
+
+        if [ -n "$best_branch" ]; then
+            echo "$best_branch"
+            return 0
+        fi
+    fi
+    return 1
+}
+
 # Fetch and extract .jupyter_cache from an artifact branch.
 # Returns 0 on success, 1 on failure.
 fetch_cache() {
@@ -75,7 +145,23 @@ echo "Artifact branch: $ARTIFACT_BRANCH"
 echo "================================================"
 
 if ! fetch_cache "$ARTIFACT_BRANCH"; then
-    if [ "$ARTIFACT_BRANCH" != "$FALLBACK_BRANCH" ]; then
+    # For version tags or release branches, try the nearest version artifact branch
+    VERSION_FALLBACK=""
+    if [[ "$BRANCH_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        VERSION_FALLBACK=$(find_version_fallback "$BRANCH_NAME") || true
+    elif [[ "$BRANCH_NAME" =~ ^release/v ]]; then
+        VERSION_FALLBACK=$(find_release_branch_fallback "$BRANCH_NAME") || true
+    fi
+
+    if [ -n "$VERSION_FALLBACK" ]; then
+        echo "Falling back to nearest version artifact: $VERSION_FALLBACK..."
+        if ! fetch_cache "$VERSION_FALLBACK"; then
+            echo "Falling back to $FALLBACK_BRANCH..."
+            if ! fetch_cache "$FALLBACK_BRANCH"; then
+                echo "⚠ No cache available (normal for first-time builds)"
+            fi
+        fi
+    elif [ "$ARTIFACT_BRANCH" != "$FALLBACK_BRANCH" ]; then
         echo "Falling back to $FALLBACK_BRANCH..."
         if ! fetch_cache "$FALLBACK_BRANCH"; then
             echo "⚠ No cache available (normal for first-time builds)"

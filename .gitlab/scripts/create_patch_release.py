@@ -122,3 +122,8 @@ if __name__ == "__main__":
     commit_id = gl.commit(branch_name, f"Release {next_version}", payload)["id"]
     gl.add_tag(next_version, commit_id, message=f"DataEval {next_version}")
     print(f"Successfully created patch release {next_version}")
+
+    # Trigger API pipeline on the release branch for docs build and artifact publishing
+    # (push-triggered pipelines are skipped due to CHANGELOG.md change filter)
+    gl.create_pipeline(branch_name)
+    print(f"Triggered pipeline on {branch_name}")
