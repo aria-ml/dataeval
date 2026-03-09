@@ -80,7 +80,7 @@ object detection tasks.
 
 A MAITE-compliant image classification dataset implements `__len__` and
 `__getitem__`, where each item is a tuple of `(image, label, metadata)`.
-Images must be NumPy arrays of shape `(H, W, C)`. Labels must be one-hot
+Images must be NumPy arrays of shape `(C, H, W)`. Labels must be one-hot
 encoded arrays of shape `(num_classes,)`. Metadata must be a `DatumMetadata`
 object with at minimum an `id` field.
 
@@ -94,7 +94,7 @@ class MyImageClassificationDataset(ic.Dataset):
     metadata: mp.DatasetMetadata
 
     def __init__(self, images: list[np.ndarray], labels: list[int], num_classes: int) -> None:
-        # images: list of np.ndarray, each shape (H, W, C)
+        # images: list of np.ndarray, each shape (C, H, W)
         # labels: list of int (class indices)
         self._images = images
         self._labels = labels
@@ -110,7 +110,7 @@ class MyImageClassificationDataset(ic.Dataset):
 
     def __getitem__(self, idx: int) -> tuple[ic.InputType, ic.TargetType, ic.DatumMetadataType]:
         return (
-            self._images[idx],  # np.ndarray (H, W, C)
+            self._images[idx],  # np.ndarray (C, H, W)
             np.eye(self._num_classes, dtype=np.float32)[self._labels[idx]],  # np.ndarray (num_classes,)
             ic.DatumMetadataType(id=idx),
         )
@@ -156,7 +156,7 @@ class MyObjectDetectionDataset(od.Dataset):
     def __init__(
         self, images: list[np.ndarray], labels: list[list[int]], boxes: list[list[list[float]]], num_classes: int
     ) -> None:
-        # images: list of np.ndarray, each shape (H, W, C)
+        # images: list of np.ndarray, each shape (C, H, W)
         # labels: list of list[int] — per-box class indices, one list per image
         # boxes:  list of list[[x0,y0,x1,y1]] — one list per image
         self._images = images
@@ -174,7 +174,7 @@ class MyObjectDetectionDataset(od.Dataset):
 
     def __getitem__(self, idx: int) -> tuple[od.InputType, od.TargetType, od.DatumMetadataType]:
         return (
-            self._images[idx],  # np.ndarray (H, W, C)
+            self._images[idx],  # np.ndarray (C, H, W)
             DetectionTarget(self._labels[idx], self._boxes[idx], self._num_classes),
             od.DatumMetadataType(id=idx),
         )
@@ -183,8 +183,8 @@ class MyObjectDetectionDataset(od.Dataset):
 ### Wrapping a PyTorch dataset
 
 If your data is in a PyTorch `Dataset`, wrap it to conform to the MAITE
-protocol. Note that `torchvision` tensors are `(C, H, W)` — permute to
-`(H, W, C)` before passing to DataEval.
+protocol. Note that `torchvision` tensors are `(C, H, W)` which is the
+supported format by DataEval.
 
 ```python
 import maite.protocols as mp
@@ -221,7 +221,7 @@ class MyCIFAR10Wrapper(ic.Dataset):
 
     def __getitem__(self, idx: int) -> tuple[ic.InputType, ic.TargetType, ic.DatumMetadataType]:
         tv_datum: tuple[torch.Tensor, int] = tv_cifar10[idx]
-        image = tv_datum[0].permute(1, 2, 0).numpy()  # Permute image from (C, H, W) to (H, W, C)
+        image = tv_datum[0].numpy()
         label = np.eye(10, dtype=np.float32)[tv_datum[1]]  # Convert label to one-hot encoding
         return image, label, mp.DatumMetadata(id=idx)
 
