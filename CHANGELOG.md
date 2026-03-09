@@ -9,7 +9,16 @@
 
 ## v1.0.0
 
+🚀 **Major Release**
+
+- `ed11b75a` - Add support for python 3.14
+
+🌟 **Feature Release**
+
+- `089072d6` - Add SIFT based BoVW extractor and implement with Duplicates
+
 🛠️ **Improvements and Enhancements**
+
 - `49631303` - Address all flagged issues from API review for v1.0
 - `0886cd36` - [impr] Improve Duplicates and Outliers threshold capabilities
 - `6d1999b2` - Improve multiprocessing implementation and stats performance
@@ -17,58 +26,45 @@
 - `72e6547b` - [feat] Store duplicate and outlier outputs in dataframes
 - `60e78334` - [misc] Move Prioritize to dataeval.scope
 - `c143c51f` - [impr] Switch to _index suffix for source indexing
-
-📝 **Miscellaneous**
-- `7a7445db` - [docs] Update set_seed and configuration how-to
-- `422108a9` - [misc] Standardize on `compute` as verb
-
-🚧 **Deprecations and Removals**
-- `f17b2270` - Mark parity and uap functions as experimental
-- `239f2f43` - Rename calculate to calculate_stats
-
-🛠️ **Improvements and Enhancements**
 - `18cfefe6` - Refactor shift classes to utilize shared code across Drift and OOD and reduce duplication of code
 - `280b3a2a` - Standardize Drift API to support chunking and cumulative tests across all detectors
 - `8f1d029b` - [impr] Switch to using Threshold classes for thresholding
 - `4233ae83` - Rework experimental imports and warn-once on use/instantiation
 - `ee784e18` - Add framework for annotating with experimental and deprecated
-
-👾 **Fixes**
-- `28faf1d5` - Fix split_dataset to work with OD datasets
-
-📝 **Miscellaneous**
-- `8f75bcdf` - Improve logging output
-
-👾 **Fixes**
-- `4607cedc` - Exclude non-numeric values from outlier calculation
-
-👾 **Fixes**
-- `613a3c57` - [fix] Fallback to class label value if not present in index2label
-- `fdea0473` - Fixed unwanted dtype conversion in to_numpy for int arrays
-
-📝 **Miscellaneous**
-- `9a9eb12b` - Expose core function result types and completeness
-- `5de0d7c3` - [docs] Clean up documentation headers and structure and delete redundant how-to
-- `68c7c48e` - Add augmentation duplicate detection notebook
-
-🚀 **Major Release**
-- `ed11b75a` - Add support for python 3.14
-
-🌟 **Feature Release**
-- `089072d6` - Add SIFT based BoVW extractor and implement with Duplicates
-
-🛠️ **Improvements and Enhancements**
 - `b518d633` - Refactor encoders as extractors
 - `a196e1fe` - Use dataframes for Sufficiency tabular outputs
 - `2ecfa179` - Add ResetModelStrategy protocol for Sufficiency
 - `4a2ef1dd` - Enhance prioritize to offer hdbscan clustering and fix for different length...
 
+📝 **Miscellaneous**
+
+- `7a7445db` - [docs] Update set_seed and configuration how-to
+- `422108a9` - [misc] Standardize on `compute` as verb
+- `8f75bcdf` - Improve logging output
+- `9a9eb12b` - Expose core function result types and completeness
+- `5de0d7c3` - [docs] Clean up documentation headers and structure and delete redundant how-to
+- `68c7c48e` - Add augmentation duplicate detection notebook
+
+🚧 **Deprecations and Removals**
+
+- `f17b2270` - Mark parity and uap functions as experimental
+- `239f2f43` - Rename calculate to calculate_stats
+
+👾 **Fixes**
+
+- `28faf1d5` - Fix split_dataset to work with OD datasets
+- `4607cedc` - Exclude non-numeric values from outlier calculation
+- `613a3c57` - [fix] Fallback to class label value if not present in index2label
+- `fdea0473` - Fixed unwanted dtype conversion in to_numpy for int arrays
+
 ## v0.95.0
 
 🌟 **Feature Release**
+
 - `593f60f6` - Add optional ONNX encoder and utilities to DataEval
 
 🛠️ **Improvements and Enhancements**
+
 - `f8ec65b6` - Enhance duplicates with rotation/flip invariant hashing
 - `bb4eb501` - Make prioritize configurable at init
 - `347675c4` - Switch to using encoder protocol for encoding
@@ -78,27 +74,32 @@
 - `397d0fe1` - Unify clustering algorithms
 
 👾 **Fixes**
+
 - `7002c856` - New plan for computing balance metric from MI in cases where a discrete factor is present vs. cases where both factors are continuous.
 - `19a77d8f` - fix missing class_label from outputs
 
 📝 **Miscellaneous**
+
 - `9c7515dd` - Cleanup doctest fixtures
 - `52a1669b` - Feature Extractor
 
 ## v0.94.0
 
 🌟 **Feature Release**
+
 - `1765195b` - Adding in detection of label errors through clustering
 - `7481c4c3` - Refactor evaluate into private helper methods.
 - `67445937` - Release new config-based Sufficiency API
 - `f37da8f1` - Add calculate_ratio function to replace boxratiostats
 
 🚧 **Deprecations and Removals**
+
 - `e8d6fce3` - Remove matplotlib dependency and switch to dataeval-plots package for visualization
 - `ee320402` - Remove dataeval.metrics.estimators
 - `8fe4ba33` - Remove dataeval.metrics.stats
 
 🛠️ **Improvements and Enhancements**
+
 - `d9be329b` - Overhaul OOD classes and concept page
 - `938735b5` - Fix duplicates and enhance functionality
 - `05fabdd2` - Add Class Balance concept page
@@ -129,12 +130,14 @@
 - `cdbf5dfe` - [improvement] allow stats to be run on lower dimensional data
 
 👾 **Fixes**
+
 - `37362f26` - [fix] Correct the denominator for missing and zeros stats calculation
 - `496c675a` - Bug fix in the MST creation algorithm
 - `a6d75805` - Update fast_hdbscan to v0.2.2
 - `9d739f8c` - fix bug - Drift permutation bug - p-value in drift test is either 0.0 or 1.0 and nothing in between
 
 📝 **Miscellaneous**
+
 - `a10f5e7f` - Update pipeline jobs to use uvx (uv tool) and switch to CUDA 12.4 for docs
 - `2199d878` - Refactor utils module
 - `fd4e3479` - Fix coverage and remove annotations from future
@@ -152,14 +155,17 @@
 ## v0.93.0
 
 🚧 **Deprecations and Removals**
+
 - `12b102e3` - Remove unused modules and duplicate/deprecated model architectures
 
 🛠️ **Improvements and Enhancements**
+
 - `ed01aed2` - Add ability for stats calculator to specify per_image and per_box
 - `3f6116b0` - Expose dataeval core stateless functions
 - `ef5f07ed` - Change embeddings to be numpy backed with memmap caching
 
 📝 **Miscellaneous**
+
 - `880070f7` - Split responsibility of `typing` into `protocols` and `types` for SRP
 - `737453db` - Make embeddings typing a Callable to allow for generic non-torch models
 - `e1a7dfd9` - Add generic typing to Array Protocol and add typing support for native python data structures
@@ -167,14 +173,17 @@
 ## v0.92.3
 
 🛠️ **Improvements and Enhancements**
+
 - `bf50c042` - Remove Embeddings from input parameters and replace with Array
 
 📝 **Miscellaneous**
+
 - `369fcb22` - Additional clarifications to Embeddings concept page
 
 ## v0.92.2
 
 🛠️ **Improvements and Enhancements**
+
 - `52b9c6da` - Added layer_name keyword to Embeddings
 
 ## v0.92.1
@@ -182,18 +191,22 @@
 ## v0.92.0
 
 🚧 **Deprecations and Removals**
+
 - `36790e59` - [depr] Remove AE Trainer and DataEvalDataset helper class
 
 ## v0.91.3
 
 🛠️ **Improvements and Enhancements**
+
 - `33350af3` - [deps] Add support for python 3.13
 - `cd713751` - Sufficiency multiple model plots
 
 👾 **Fixes**
+
 - `5682073c` - [fix] Restore missing submodules for documention
 
 📝 **Miscellaneous**
+
 - `e8e54816` - [misc] clean up yaml anchors
 - `dc86b10f` - Remove tqdm dependency
 - `2acb629d` - [misc] build docs directly on runner
@@ -201,118 +214,146 @@
 ## v0.91.2
 
 👾 **Fixes**
+
 - `a6382915` - Changed stopping criterion when stepping trhough kNN graph and forming clusters.
 
 📝 **Miscellaneous**
+
 - `56ad8657` - [misc] Remove unused code and clean up delay loaded module imports
 
 ## v0.91.1
 
 🛠️ **Improvements and Enhancements**
+
 - `5a00001d` - [impr] Remove torch dataset requirement from Embeddings class
 
 👾 **Fixes**
+
 - `696ef5bf` - New test_simple_nodes() unit test for core.mst.minimum_spanning_tree()
 
 ## v0.91.0
 
 🚧 **Deprecations and Removals**
+
 - `a37019ff` - Remove MAITE dataset helpers
 
 🛠️ **Improvements and Enhancements**
+
 - `e6a3f2d3` - added resolve_indices() and related unit tests
 - `e8a32098` - Refactor stats to core module and remove dimensionstats from imagestats
 
 👾 **Fixes**
+
 - `dd8f1cf5` - Connect BER to MST implementation in _fast_mst.py
 
 📝 **Miscellaneous**
+
 - `6609e929` - Refactor core functionality to dataeval.core submodule
 
 ## v0.90.1
 
 🛠️ **Improvements and Enhancements**
+
 - `789fb41a` - Speedup for MST option in Divergence
 
 👾 **Fixes**
+
 - `a4802a52` - Issue #922 Indexing Bug Fix
 
 📝 **Miscellaneous**
+
 - `2a94dfa4` - Refactor NullModelMetrics for typing and encapsulation
 
 ## v0.90.0
 
 🌟 **Feature Release**
+
 - `7581907a` - Integrate null model metrics
 
 📝 **Miscellaneous**
+
 - `512a6385` - Refactor and move functions to new `functional` submodule to prepare for new API
 - `0cd25665` - Minor changes to notebooks
 
 ## v0.89.1
 
 🛠️ **Improvements and Enhancements**
+
 - `9e0b441b` - Additional clarification to Embeddings Concept page
 - `1567f818` - Sufficiency: Improve Global Minimization
 
 📝 **Miscellaneous**
+
 - `ecbf11bb` - Update Duplicates docstring
 - `59f56fd1` - Address security vulnerabilities found in lock file
 
 ## v0.89.0
 
 🌟 **Feature Release**
+
 - `08984b1a` - Embeddings Concept page
 
 🛠️ **Improvements and Enhancements**
+
 - `356052b6` - Sufficiency: explicitly implement for operational metrics
 - `3ca1b01a` - pruning concept page
 
 📝 **Miscellaneous**
+
 - `7ed52bd9` - Drift docstring update
 
 ## v0.88.1
 
 🛠️ **Improvements and Enhancements**
+
 - `b3e258d3` - Sufficiency: Adjust measure plots
 - `ca707ba6` - Blended metadata exploration tools into Metadata concept page.
 
 ## v0.88.0
 
 🚧 **Deprecations and Removals**
+
 - `1e86ffb8` - Remove dataset builders and update min python target for the project
 - `6d11a131` - Remove Python 3.9 support
 
 🛠️ **Improvements and Enhancements**
+
 - `fdc9b015` - 947 Sufficiency: Return data from all runs
 
 📝 **Miscellaneous**
+
 - `95446290` - Update docstrings to be imperative and include all methods, attributes, and properties
 
 ## v0.87.0
 
 🌟 **Feature Release**
+
 - `28e238ed` - New OOD_KNN detector, works with Embeddings class
 
 🚧 **Deprecations and Removals**
+
 - `808bf568` - Remove utility datasets from the dataeval package
 
 🛠️ **Improvements and Enhancements**
+
 - `75a22785` - Implement dataset validation function
 - `e83b4c31` - Integrate prioritization re-ranking policies
 - `14eeb978` - Switch to using is_continuous function for metadata binning
 
 👾 **Fixes**
+
 - `75995b42` - 412 Sufficiency inverse projection does not handle unachievable target
 - `ef7da431` - Fix datasets datum metadata to be MAITE protocol compliant
 - `06a5727d` - Fix balance to treat arrays of discrete distinct values as continuous
 
 📝 **Miscellaneous**
+
 - `bf8c7ea6` - Improved Selection docstrings
 
 ## v0.86.9
 
 🛠️ **Improvements and Enhancements**
+
 - `52218096` - Expanded sufficiency docstring with descriptions of parameter default values...
 
 ## v0.86.8
@@ -320,6 +361,7 @@
 ## v0.86.7
 
 👾 **Fixes**
+
 - `a93ccfa2` - Hotfix: Address metadata issues for datasets with empty targets
 
 ## v0.86.6
@@ -327,33 +369,40 @@
 ## v0.86.5
 
 🛠️ **Improvements and Enhancements**
+
 - `a5154294` - Add dataframe format to StatsOutputs
 
 👾 **Fixes**
+
 - `980eee6f` - Hotfix: Allow for nan values in outliers and account for them correctly
 - `2a484972` - Hotfix: Labelstats do not correctly account for 0 targets on an image
 
 ## v0.86.4
 
 👾 **Fixes**
+
 - `1a7a6ca1` - Fix metadata and labelstats regressions
 
 ## v0.86.3
 
 🛠️ **Improvements and Enhancements**
+
 - `3f301870` - Remove targets and switch to DataFrames for label stats calculations
 
 ## v0.86.2
 
 🛠️ **Improvements and Enhancements**
+
 - `5caee32e` - Update Metadata class to use Polars DataFrame
 
 👾 **Fixes**
+
 - `f04da307` - MILCO has trouble reading box coordinates delimited by a variable number of spaces.
 
 ## v0.86.1
 
 🛠️ **Improvements and Enhancements**
+
 - `28d186c5` - Adjusting dataset loaders for uniformity and deterministic behavior
 - `b0873930` - Improvements to DimensionStats and plotting
 - `8ea38cfe` - Add array types for inputs to dataset helpers
@@ -362,33 +411,40 @@
 - `96fd2e23` - include empty factors
 
 👾 **Fixes**
+
 - `897e4e0f` - Translated MILCO box corners for MAITE compliance
 
 ## v0.86.0
 
 🌟 **Feature Release**
+
 - `3a6c1e8b` - Port multi-variate domain classifier from NannyML
 
 🛠️ **Improvements and Enhancements**
+
 - `6615745b` - Add functionality for image level factors on object detection target metadata
 - `485bc051` - Make pandas a required dependency
 
 👾 **Fixes**
+
 - `27758e18` - Fix indexing error in subselection
 
 ## v0.85.0
 
 🌟 **Feature Release**
+
 - `019d011d` - Enable ClassFilter for ObjectDetectionDataset
 - `9d15be15` - Add concept page for Completeness
 
 🛠️ **Improvements and Enhancements**
+
 - `140cec9d` - Refactor data classes (Embeddings, Images, Metadata, Targets) and function (split_dataset) to be in a first level submodule
 - `9eec7e96` - Add save and load functionality to embeddings
 
 ## v0.84.1
 
 🛠️ **Improvements and Enhancements**
+
 - `82329adc` - Move to new MAITE/NumPy ArrayLike and loosen type restriction on Datasets
 - `c31915dc` - Split ClassBalance from ClassFilter
 - `48bc2426` - Update drift classes to use DataEval data structures and simplify torch utility functions
@@ -396,11 +452,13 @@
 ## v0.84.0
 
 🌟 **Feature Release**
+
 - `0c41ca26` - Add factory class method to Embeddings to create from array
 - `3d585e81` - Implement completeness
 - `77bba6d7` - Add caching (in-memory) to embeddings
 
 🛠️ **Improvements and Enhancements**
+
 - `5a2dc69e` - Change split_dataset to take in Datasets and use Metadata internally
 - `e07b8297` - Add plot function to Images and change coverage plot to take Images
 - `656c8166` - Add user sections to welcome page
@@ -408,25 +466,31 @@
 ## v0.83.0
 
 🌟 **Feature Release**
+
 - `22206752` - Add transforms to Select dataset class
 - `fca7e907` - Add metadata_ood_mi function as find_ood_predictors
 
 🛠️ **Improvements and Enhancements**
+
 - `54c28111` - Adjust tagline/purpose statement to mention user effort
 
 📝 **Miscellaneous**
+
 - `bf415bf8` - Update datatsets docstrings for completeness and move Transform type to typing module
 
 ## v0.82.1
 
 🛠️ **Improvements and Enhancements**
+
 - `4b6bbab8` - Intrinsic metadata using image statistics
 
 👾 **Fixes**
-- `9bae7f1a` - Perform __dict__ override hack before setting other parameters
+
+- `9bae7f1a` - Perform **dict** override hack before setting other parameters
 - `a9e3fde1` - HOTFIX: remove cyclical call to getattr in Select wrapper class
 
 📝 **Miscellaneous**
+
 - `94b31bf1` - Create a package wide configuration for random seeds
 - `36746ef9` - Switch to DeviceLike for typing of torch device
 - `13ff9fd0` - Better genericize output classes and add Sequence based output collection class
@@ -434,22 +498,27 @@
 ## v0.82.0
 
 🌟 **Feature Release**
+
 - `7ad22a7c` - Switch all stats classes to use dataset inputs and change `datasetstats` to `imagestats`
 - `e1da1768` - Integrate meta_distribution_compare as metadata_distance
 
 🛠️ **Improvements and Enhancements**
+
 - `fc8b68c2` - Spike: Define which metrics comprise completeness metrics
 
 📝 **Miscellaneous**
+
 - `70a8e1e2` - Create lightweight dataset wrapper factory functions
 - `fef938d5` - Simplify typing and add more docstrings to dataeval.typing module
 
 ## v0.81.0
 
 🌟 **Feature Release**
+
 - `101fea34` - Add selection feature for datasets
 
 📝 **Miscellaneous**
+
 - `efc90630` - Add index based selection helper
 - `666e2866` - Add collate helper functions for Dataloaders
 - `4e92ae90` - Restructure typing for Datasets to allow better extensibility for other data classes
@@ -457,23 +526,28 @@
 ## v0.80.0
 
 🌟 **Feature Release**
+
 - `94a10b03` - Refactor Images, Embeddings and Metadata as a stateful classes using Dataset inputs
 - `353ac6bd` - Add DataProcessor class to handle extraction of images, embeddings, targets and metadata from datasets
 
 🛠️ **Improvements and Enhancements**
+
 - `529e5595` - Merging current WIP state of OODdetector, based on universal embeddings from sigma-optimal-VAE, along with OOD_VAE_minimal notebook.
 
 👾 **Fixes**
+
 - `a2a7057e` - Adjust merge to handle numpy arrays
 
     Adds in a numpy array check and if true returns the array as a list prior to normal processing
 
 📝 **Miscellaneous**
+
 - `e55cb3f2` - Use cpu as default torch device
 
 ## v0.79.0
 
 🌟 **Feature Release**
+
 - `841425ff` - Release Metadata OOD function most_deviated_factors
 
     Adds a new explanatory function using Metadata and an OODOutput
@@ -481,56 +555,66 @@
 ## v0.78.0
 
 🌟 **Feature Release**
+
 - `bff82522` - Add collate function and convert packaged datasets to MAITE protocols
 
-    * Changes all dataset utility classes to use `MAITE` protocol formats (`MNIST`, `CIFAR10`, and `VOCDetection`)
-    * Addes `collate` to aggregate (and encode) `MAITE`datasets into images/embeddings, targets, and metadata
+  - Changes all dataset utility classes to use `MAITE` protocol formats (`MNIST`, `CIFAR10`, and `VOCDetection`)
+  - Addes `collate` to aggregate (and encode) `MAITE`datasets into images/embeddings, targets, and metadata
 
 🛠️ **Improvements and Enhancements**
+
 - `d9e0f8b0` - Enforce embeddings on functions/methods that take embedding inputs
 
 ## v0.77.1
 
 🛠️ **Improvements and Enhancements**
+
 - `9a420f7d` - Update Assess the data space tutorial to fit JATIC DR-2.3
 - `3ab63f3e` - Integrate clusterer speed improvements with numba
 
 ## v0.77.0
 
 🌟 **Feature Release**
+
 - `a1974e41` - Add global config module to control default device and max processes
 
 👾 **Fixes**
+
 - `c5ca814d` - Enforce unit interval in OOD detector and coverage metric
 - `41c4437b` - CoverageOutput attributes renamed for clarity
 
     Attributes renamed:
-    - `indices` -> `uncovered_indices`
-    - `radii` -> `critical_value_radii`
-    - `critical_value` -> `coverage_radius`
+  - `indices` -> `uncovered_indices`
+  - `radii` -> `critical_value_radii`
+  - `critical_value` -> `coverage_radius`
 - `99631a94` - Fix ax.hist on small ranges in NumPy 2.1+
 
 ## v0.76.1
 
 🛠️ **Improvements and Enhancements**
+
 - `a8a4cd4f` - Remove merge from preprocess and address metadata array length inconsistencies
 - `f8061eca` - Add option to return dropped keys from metadata utility functions
 - `a4ddbed1` - Add pandas dependency to `all` extras option
 - `5b05981e` - Expose dropped keys from nested lists and inconsistent keys in metadata merge and preprocess
 
 📝 **Miscellaneous**
+
 - `a20766ec` - Updates to documentation
 - `961ad923` - Miscellaneous docs changes
 
 ## v0.76.0
 
 🌟 **Feature Release**
+
 - `4647edca` - Expose flatten metadata function and update docstring
 
 🛠️ **Improvements and Enhancements**
+
 - `27d34a0c` - Incorporating NAWCAD feedback to improve the documentation for the stat functions, outliers class and coverage class
 
 📝 **Miscellaneous**
+
 - `c9998971` - Switch themes to sphinx-immaterial, enable graphviz and restructure documentation
 - `3dedde8f` - Adding templates for auto generation of docs
 - `8aaa89f3` - add deep dive prototype
@@ -546,11 +630,13 @@
 ## v0.75.0
 
 🌟 **Feature Release**
+
 - `3aa12cb3` - Refactor bias metadata helpers
 
     Metadata preprocessing functions have been moved from `dataeval.metrics.bias.metadata_preprocessing` to `dataeval.utils.metadata`.
 
 🛠️ **Improvements and Enhancements**
+
 - `ed98b6b1` - Return empty string for hashes on too small images
 
     `pchash` now returns empty string when attempting to perform perception hashing against images or chips that are too small to meaningfully hash. `Duplicates` also ignore empty perception hashes to avoid false positive detections.
@@ -559,6 +645,7 @@
     PyTorch is now a required dependency and the `torch` extra is no longer required for full functionality
 
 📝 **Miscellaneous**
+
 - `6e4474b2` - Refactor utils and fix associated docstrings, documentation and notebooks
 - `ff87cee6` - Update documentation and CI pipelines to comply with SDP DR-3
 - `aa7d9205` - Updated README.md format, added tagline and cdao funding acknowledgment
@@ -567,6 +654,7 @@
 ## v0.74.2
 
 📝 **Miscellaneous**
+
 - `e7a284de` - Update dataset split unit tests
 - `f8731a44` - Add initial logging framework and unit test
 - `771dc1d1` - Add conda tests to pipeline
@@ -576,6 +664,7 @@
 ## v0.74.1
 
 📝 **Miscellaneous**
+
 - `102664de` - Remove tensorflow from project
 - `e782dad1` - Refactor OutputMetadata and clean up set_metadata decorator
 - `80aae3a6` - Just use KSOutput as a MappingOutput instance instead of extracting the dict attribute it no longer has.
@@ -586,14 +675,17 @@
 ## v0.74.0
 
 🌟 **Feature Release**
+
 - `73c1e1be` - Implement PyTorch AutoEncoder based OOD detector
 
     Adds initial PyTorch based Autoencoder OOD detector available when installed with the `torch` extra.
 
 🛠️ **Improvements and Enhancements**
+
 - `70794b5f` - Moved discretization of metadata out of bias functions
 
 📝 **Miscellaneous**
+
 - `4d94e602` - Added test assertions for how_to notebooks
 - `7723e242` - Introduce Pytorch OOD detector, with its new training procedure, into OOD howto notebook.
 - `f5ac4bdd` - Added new KSOutput class and adapted tests and other functions accordingly
@@ -605,9 +697,11 @@
 ## v0.73.1
 
 👾 **Fixes**
+
 - `cac3e2b8` - Fixes drift with pre-processing and shuffles MNIST by default
 
 📝 **Miscellaneous**
+
 - `bacbd0e7` - Use build script specifically for docs
 - `0a87e912` - docker build for docs only
 - `671b60a5` - Prototype function to infer whether a 1D sample is continuous or discrete
@@ -618,10 +712,12 @@
 ## v0.73.0
 
 🌟 **Feature Release**
+
 - `e055acf0` - Metadata utility function to merge, extend and flatten metadata
 - `95b28ae1` - Adjust bias plotting functions to return figure
 
 📝 **Miscellaneous**
+
 - `532f92a2` - Minimum spanning tree and Clusterer are rewritten using numba for large code speed up
 - `7377e012` - Switch jobs to use uv and tox natively
 - `7af75016` - Add lazyloading for tensorflow modules
@@ -629,9 +725,11 @@
 ## v0.72.2
 
 🛠️ **Improvements and Enhancements**
+
 - `ba52ef2e` - Refactor away _internal module
 
 📝 **Miscellaneous**
+
 - `6e55451c` - Integration of distribution compare and OOD MI metadata tools (continued)
 - `e4f82173` - Streamlined tests
 - `ac8fe3ee` - Fix type mismatch on training AEGMM
@@ -641,6 +739,7 @@
 ## v0.72.1
 
 📝 **Miscellaneous**
+
 - `32ba1f29` - Data split tests
 - `76f73770` - Updated glossary and other files to use new style of links
 - `20efd27e` - Add support for Python 3.12
@@ -648,14 +747,17 @@
 ## v0.72.0
 
 🌟 **Feature Release**
+
 - `14ef382c` - Update dependencies for conda compatibility
 
 ## v0.71.1
 
 🛠️ **Improvements and Enhancements**
+
 - `97849b01` - Update support for tensorflow >=2.16 with explicit keras v2
 
 📝 **Miscellaneous**
+
 - `85bafa30` - Swap brightness and darkness
 - `96a30ad0` - Make optional checks more granular
 - `55ca81d6` - Use native int for dict keys for Outliers
@@ -664,29 +766,33 @@
 ## v0.71.0
 
 🌟 **Feature Release**
+
 - `cdae8a17` - Parallelize existing stats metric functions and introduce dedicated channelstats function
 
     Running statistical analysis functions take significant time against large datasets.  Due to the natural parallelism of analyzing individual images, we introduced parallel processing leveraging the `multiprocessing` library to accelerate processing times.
-    
+
     Affected functions:
-    
-    * `datasetstats`
-    * `dimensionstats`
-    * `hashstats`
-    * `pixelstats`
-    * `visualstats`
-    
+
+  - `datasetstats`
+  - `dimensionstats`
+  - `hashstats`
+  - `pixelstats`
+  - `visualstats`
+
     Additionally, `channelstats` was added which performs the functionality of `datasetstats` but only for the functions that support per-channel stat calculation, `pixelstats` and `visualstats`.
 
 📝 **Miscellaneous**
+
 - `552668a0` - Update EDA part 1 tutorial with miscellaneous changes
 
 ## v0.70.1
 
 🛠️ **Improvements and Enhancements**
+
 - `d1cdcda5` - API changes with supporting documentation updates
 
 📝 **Miscellaneous**
+
 - `5ecd4d3a` - expose datasets API
 - `6c19bba7` - Make sufficiency args more permissive
 - `1bc2d067` - Improving MNIST class
@@ -696,16 +802,20 @@
 ## v0.70.0
 
 🌟 **Feature Release**
+
 - `71e7ff06` - Integrate labelstats function
 - `f40bf0e4` - Redesign stats functions for expansion to per-box, per-channel, and boxratiostats
 
 🛠️ **Improvements and Enhancements**
+
 - `72390edc` - Change input format of balance and diversity to be the same as parity
 
 👾 **Fixes**
+
 - `f598c46a` - Update pytorch to 2.2.0+
 
 📝 **Miscellaneous**
+
 - `b8f0d502` - Create copy on `to_numpy` by default
 - `04a71337` - Fix CI docs job to load on build
 - `9286f5e8` - Skip or rework MNIST based unit tests
@@ -717,18 +827,21 @@
 ## v0.69.4
 
 📝 **Miscellaneous**
+
 - `7bca6ed4` - Unified all MNIST and MNIST corrupt datasets to a single internal MNIST class
 - `66ad1c92` - new drift detector: multivariate domain classifier
 
 ## v0.69.3
 
 📝 **Miscellaneous**
+
 - `6745e39d` - Document: Class Label Statistical Independence and Coverage Documentation
 - `1f7689ac` - Adding bias tutorial (parity-balance-diversity)
 
 ## v0.69.2
 
 📝 **Miscellaneous**
+
 - `f7d5bac3` - Adds stats for bounding boxes
 - `18be58a3` - Adding label stats
 - `809d1d7a` - Always produce p-val and distance metrics for drift
@@ -741,19 +854,23 @@
 ## v0.69.1
 
 📝 **Miscellaneous**
+
 - `d9068a2c` - Fix release and changelog script
 
 ## v0.69.0
 
 📝 **Miscellaneous**
+
 - `63ab70d7` - Remove automatic update of documentation notebooks
 
 ## v0.68.0
 
 🌟 **Feature Release**
+
 - `47b48e14` - Allow Duplicates and Outliers detectors to take in multiple StatsOutput objects
 
 📝 **Miscellaneous**
+
 - `65d8f3de` - Combine classwise bias metric outputs with non-classwise
 - `ccfd72ef` - Adding clustering/coverage tutorial
 - `6d09d710` - Add CONTRIBUTING.md
@@ -765,35 +882,38 @@
 ## v0.67.0
 
 🌟 **Feature Release**
+
 - `a0b04800` - Refactor DataEval functions and classes and update documentation
 
-    - Changes DataEval functions and classes to be more hierarchical in modules:
-      - detectors
-        - drift (DriftCVS, DriftKS, DriftMMD, DriftUncertainty)
-        - linters (Clusterer, Duplicates, Outliers)
-        - ood (OOD_AE, OOD_AEGMM, OOD_LLR, OOD_VAE, OOD_VAEGMM)
-      - flags (ImageStat)
-      - metrics
-        - bias (balance, coverage, diversity, parity)
-        - estimators (ber, divergence, uap)
-        - stats (imagestats, channelstats)
-      - workflows (Sufficiency)
-    - Backends have been moved from `models` to `tensorflow` and `torch`
-    - Renamed following classes:
-      - `Linter` -> `Outliers`
-      - `parity` -> `label_parity`
-      - `parity_metadata` -> `parity`
-      - `DriftOutput` -> `DriftBaseOutput`
-      - `DriftUnivariateOutput` -> `DriftOutput`
-    - Miscellaneous fixes:
-      - Documentation updated
-      - Streamlined optional import checks in the `__init__.py` tree
-       - Fixed misspelling in glossary
+  - Changes DataEval functions and classes to be more hierarchical in modules:
+    - detectors
+      - drift (DriftCVS, DriftKS, DriftMMD, DriftUncertainty)
+      - linters (Clusterer, Duplicates, Outliers)
+      - ood (OOD_AE, OOD_AEGMM, OOD_LLR, OOD_VAE, OOD_VAEGMM)
+    - flags (ImageStat)
+    - metrics
+      - bias (balance, coverage, diversity, parity)
+      - estimators (ber, divergence, uap)
+      - stats (imagestats, channelstats)
+    - workflows (Sufficiency)
+  - Backends have been moved from `models` to `tensorflow` and `torch`
+  - Renamed following classes:
+    - `Linter` -> `Outliers`
+    - `parity` -> `label_parity`
+    - `parity_metadata` -> `parity`
+    - `DriftOutput` -> `DriftBaseOutput`
+    - `DriftUnivariateOutput` -> `DriftOutput`
+  - Miscellaneous fixes:
+    - Documentation updated
+    - Streamlined optional import checks in the `__init__.py` tree
+    - Fixed misspelling in glossary
 
 👾 **Fixes**
+
 - `84aae760` - balance test cleanup
 
 📝 **Miscellaneous**
+
 - `6d09d710` - Add CONTRIBUTING.md
 - `72387d9c` - Updated version replacement script to include cache files
 - `5285f01b` - Prototype Performance  Estimation
@@ -818,40 +938,44 @@
 ## v0.66.0
 
 🌟 **Feature Release**
+
 - `a0b04800` - Refactor DataEval functions and classes and update documentation
 
-    - Changes DataEval functions and classes to be more hierarchical in modules:
-      - detectors
-        - drift (DriftCVS, DriftKS, DriftMMD, DriftUncertainty)
-        - linters (Clusterer, Duplicates, Outliers)
-        - ood (OOD_AE, OOD_AEGMM, OOD_LLR, OOD_VAE, OOD_VAEGMM)
-      - flags (ImageStat)
-      - metrics
-        - bias (balance, coverage, diversity, parity)
-        - estimators (ber, divergence, uap)
-        - stats (imagestats, channelstats)
-      - workflows (Sufficiency)
-    - Backends have been moved from `models` to `tensorflow` and `torch`
-    - Renamed following classes:
-      - `Linter` -> `Outliers`
-      - `parity` -> `label_parity`
-      - `parity_metadata` -> `parity`
-      - `DriftOutput` -> `DriftBaseOutput`
-      - `DriftUnivariateOutput` -> `DriftOutput`
-    - Miscellaneous fixes:
-      - Documentation updated
-      - Streamlined optional import checks in the `__init__.py` tree
-       - Fixed misspelling in glossary
+  - Changes DataEval functions and classes to be more hierarchical in modules:
+    - detectors
+      - drift (DriftCVS, DriftKS, DriftMMD, DriftUncertainty)
+      - linters (Clusterer, Duplicates, Outliers)
+      - ood (OOD_AE, OOD_AEGMM, OOD_LLR, OOD_VAE, OOD_VAEGMM)
+    - flags (ImageStat)
+    - metrics
+      - bias (balance, coverage, diversity, parity)
+      - estimators (ber, divergence, uap)
+      - stats (imagestats, channelstats)
+    - workflows (Sufficiency)
+  - Backends have been moved from `models` to `tensorflow` and `torch`
+  - Renamed following classes:
+    - `Linter` -> `Outliers`
+    - `parity` -> `label_parity`
+    - `parity_metadata` -> `parity`
+    - `DriftOutput` -> `DriftBaseOutput`
+    - `DriftUnivariateOutput` -> `DriftOutput`
+  - Miscellaneous fixes:
+    - Documentation updated
+    - Streamlined optional import checks in the `__init__.py` tree
+    - Fixed misspelling in glossary
 
 🛠️ **Improvements and Enhancements**
+
 - `5f730baa` - Refactor ImageStats and ChannelStats as metric functions
 
 👾 **Fixes**
+
 - `84aae760` - balance test cleanup
 - `3ebd278c` - handle float-type categorical variables in balance metric
 - `066b7153` - Fixes modzscore to account for division by 0
 
 📝 **Miscellaneous**
+
 - `d50d9cd1` - Update Landing Page
 - `2fd7fa59` - Author drift detection tutorial
 - `49b5af42` - Use uv instead of pyenv for python deployment
@@ -873,25 +997,31 @@
 ## v0.65.0
 
 🛠️ **Improvements and Enhancements**
+
 - `5f730baa` - Refactor ImageStats and ChannelStats as metric functions
 
 👾 **Fixes**
+
 - `3ebd278c` - handle float-type categorical variables in balance metric
 - `066b7153` - Fixes modzscore to account for division by 0
 
 📝 **Miscellaneous**
+
 - `fe1e292d` - Use output dataclass with metadata
 - `b3f6a027` - Unify handling of image reshaping
 
 ## v0.64.0
 
 🌟 **Feature Release**
+
 - `bea0446c` - Torch Dataset Reader
 
 🛠️ **Improvements and Enhancements**
+
 - `eda88822` - Refactor metrics
 
 📝 **Miscellaneous**
+
 - `a4b8e919` - Created new documentation issue templates
 - `1028d082` - Remove is_arraylike function
 - `dbcecec6` - Refactored read_dataset to handle common dataset returns
@@ -910,6 +1040,7 @@
 ## v0.63.0
 
 🛠️ **Improvements and Enhancements**
+
 - `3225cf18` - Convert remaining metrics and detectors to ArrayLike
 - `5d88b82a` - Add Torch and Tensorflow interop through ArrayLike protocol and to_numpy converter
 - `d3342275` - Refactor linter and duplicates to call evaluate with data
@@ -918,6 +1049,7 @@
 ## v0.61.0
 
 🛠️ **Improvements and Enhancements**
+
 - `cd59debb` - Release DataEval v0.61.0!
 
     DAML is now officially rebranded as DataEval!  New name, same great camel flavor.
@@ -925,37 +1057,40 @@
 ## v0.56.0
 
 🌟 **Feature Release**
+
 - `64416675` - Update clusterer class and documentation
 
-    * `Clusterer` detector released
-    
+  - `Clusterer` detector released
+
     This class assists in exploratory data analysis of unlabeled data by identifying duplicates and outliers. Additional information on usage is available in our documentation.
 
 ## v0.55.0
 
 🌟 **Feature Release**
+
 - `278b4dc1` - Release Linter, Duplicates, ImageStats, ChannelStats and Parity
 
     `Linter`, `Duplicates` detectors and `ImageStats`, `ChannelStats`, and `Parity` metrics are now released. The existing metrics available have also been moved into different modules (`detectors` and `workflows`) that better reflect their functionality.
-    
-    * `detectors`
-      * Drift detectors: `DriftCVM`, `DriftKS`, `DriftMMD`, `DriftUncertainty` and supporting classes
-      * Out-of-distribution detectors: `OOD_AE`, `OOD_AEGMM`, `OOD_LLR`, `OOD_VAE`, `OOD_VAEGMM` and supporting classes
-      * `Linter`
-      * `Duplicates`
-    * `metrics`
-      * `BER`
-      * `Divergence`
-      * `Parity`
-      * `ImageStats`
-      * `ChannelStats`
-      * `UAP`
-    * `workflows`
-      * `Sufficiency`
+
+  - `detectors`
+    - Drift detectors: `DriftCVM`, `DriftKS`, `DriftMMD`, `DriftUncertainty` and supporting classes
+    - Out-of-distribution detectors: `OOD_AE`, `OOD_AEGMM`, `OOD_LLR`, `OOD_VAE`, `OOD_VAEGMM` and supporting classes
+    - `Linter`
+    - `Duplicates`
+  - `metrics`
+    - `BER`
+    - `Divergence`
+    - `Parity`
+    - `ImageStats`
+    - `ChannelStats`
+    - `UAP`
+  - `workflows`
+    - `Sufficiency`
 
 ## v0.54.0
 
 🛠️ **Improvements and Enhancements**
+
 - `58263ac7` - Move niter param to evaluate and calculate and retain curve coefficients in output dictionary
 
     This change enhances the output of the `Sufficiency` metric to provide the coefficients for the learning curve by measure/class when running the metric. These parameters were previously recalculated each call to project and plot. The parameters are provided as a `Dict[str, np.ndarray]` under the `_CURVE_PARAMS_` key in the output dictionary.
@@ -963,11 +1098,13 @@
 ## v0.53.0
 
 🌟 **Feature Release**
+
 - `322fc830` - Add parameter `k` to BER estimator for KNN to enable `k>1` for better consistency with ground truth in certain cases
 
 ## v0.52.0
 
 🛠️ **Improvements and Enhancements**
+
 - `07b12ac2` - Fully integrate outlier detection
 
     Outlier Detection API has been changed.  Additional details are available in our documentation.
@@ -975,20 +1112,22 @@
 ## v0.51.0
 
 🌟 **Feature Release**
+
 - `2ed88a07` - Implement Drift Detection Metrics
 
     This change adds 4 types of Drift Detection metrics which allow for the detection of potential drift in the dataset.
-    
-    * Kolmogorov-Smirnov
-    * Cramér-von Mises
-    * Maximum Mean Discrepancy
-    * Classifier Uncertainty
-    
+
+  - Kolmogorov-Smirnov
+  - Cramér-von Mises
+  - Maximum Mean Discrepancy
+  - Classifier Uncertainty
+
     The conceptual source is derived from [Failing Loudly: An Empirical Study of Methods for Detecting Dataset Shift](https://arxiv.org/abs/1810.11953) and the implementation is derived from [Alibi-Detect v0.11.4](https://github.com/SeldonIO/alibi-detect/tree/v0.11.4).
 
 ## v0.45.0
 
 🚧 **Deprecations and Removals**
+
 - `5cc48bec` - Divergence metric naming corrected to HP Divergence
 
     Divergence metric output now returns a dictionary of `{ "divergence": float, "error": int }` instead of `{ "dpdivergence": float, "error": int }`.  Code, documentation and tutorials have been updated to the correct nomenclature of HP (Henze-Penrose) divergence.
@@ -996,25 +1135,30 @@
 ## v0.44.6
 
 🌟 **Feature Release**
+
 - `41b20d3a` - Add rules for release label pipeline workflow and merge request release template
 
 🛠️ **Improvements and Enhancements**
+
 - `7ee53c9c` - Update Divergence default to MST
 
 ## v0.44.2
 
 🛠️ **Improvements and Enhancements**
+
 - `1468aa5c` - Switch to markdown and updated docs
 
 ## v0.43.0
 
 🛠️ **Improvements and Enhancements**
+
 - `670a0db5` - Add support for classwise Sufficiency metrics
 - `b96ee099` - Have sufficiency train and eval functions take indices and batch size instead of a DataLoader
 
 ## v0.42.2
 
 🛠️ **Improvements and Enhancements**
+
 - `5225c491` - Change output classes to dictionaries
 - `45040682` - Make Sufficiency a stateful class and revise SufficiencyOutput
 - `7c5fdcff` - Pass method as a parameter to determine metric algorithm to use
@@ -1022,126 +1166,153 @@
 - `c3c78680` - Expose AETrainer to public API to use model multiple times after training
 
 👾 **Fixes**
+
 - `93564b95` - Updating pyproject.toml and lock file to set dependency less than numpy 2.0
 
 ## v0.42.0
 
 🛠️ **Improvements and Enhancements**
+
 - `601cfae8` - Sufficiency Plotting of Multiple Metrics during one run
 - `3d68a6f1` - Add parameter to plot function for optional file output
 
 🚧 **Deprecations and Removals**
+
 - `a6ce3e72` - Remove UAP_MST metric
 
 ## v0.40.2
 
 🛠️ **Improvements and Enhancements**
+
 - `f3eddaed` - Flavor 2 - Remove models from metrics entirely
 
 ## v0.40.1
 
 🚧 **Deprecations and Removals**
+
 - `db888bb7` - Remove usage of DamlDataset for ARiA metrics
 
 ## v0.38.1
 
 🛠️ **Improvements and Enhancements**
+
 - `42617f43` - Enable GPU functionality in pytorch features
 
 ## v0.38.0
 
 🌟 **Feature Release**
+
 - `c9b5116e` - ARiA Autoencoder as PyTorch Model
 
 🛠️ **Improvements and Enhancements**
+
 - `8fe97232` - Add export_model functionality and improve test coverage
 - `42cc77ea` - Add empirical upper bound to UAP metric output
 
 👾 **Fixes**
-- `636dfdaf` - update project with __version__ metadata
+
+- `636dfdaf` - update project with **version** metadata
 
 ## v0.36.1
 
 🌟 **Feature Release**
+
 - `7d1a599f` - Implement the uap class
 
 ## v0.36.0
 
 🛠️ **Improvements and Enhancements**
+
 - `0799523b` - Object detection model training
 
 ## v0.29.0
 
 🌟 **Feature Release**
+
 - `166df3b0` - Implement Dataset Sufficiency Metric
 
 🛠️ **Improvements and Enhancements**
+
 - `5c4e6e06` - Use convolutional autoencoder for BER and Divergence metrics
 
 👾 **Fixes**
+
 - `c78e5502` - Sufficiency typecheck bugfix
 
 ## v0.28.5
 
 🛠️ **Improvements and Enhancements**
+
 - `9d1c354c` - Add fit_dataset, format_dataset to DpDivergence & BER
 
 ## v0.28.4
 
 👾 **Fixes**
+
 - `c39e009e` - Fix typecheck issues found with pyright-1.1.333
 
 ## v0.26.13
 
 🌟 **Feature Release**
+
 - `949e09bd` - Add kNN BER implementation
 
 ## v0.26.10
 
 🛠️ **Improvements and Enhancements**
+
 - `dab0a8ff` - Handle MST edge cases
 
 ## v0.26.4
 
 🛠️ **Improvements and Enhancements**
+
 - `bf31996f` - BER lower bound capability
 
 ## v0.25.11
 
 🛠️ **Improvements and Enhancements**
+
 - `dfe0bddb` - Add support for python 3.11
 
 ## v0.25.4
 
 🛠️ **Improvements and Enhancements**
+
 - `2ca285cc` - update BER metric to return a dataclass instead of dict
 
 ## v0.25.3
 
 👾 **Fixes**
+
 - `67f08b27` - Fix: Alibi-detect-models-have-fixed-architecture-shapes
 
 ## v0.25.2
 
 🛠️ **Improvements and Enhancements**
+
 - `db4adaff` - 69 convert metric output dictionary to dataclass
 
 ## v0.24.8
 
 🌟 **Feature Release**
+
 - `79614577` - Implement Multiclass MST version of BER
 
 ## v0.24.6
 
 🌟 **Feature Release**
+
 - `2ad9fed5` - Implement BER estimate
 
 ## v0.23.1
 
 🌟 **Feature Release**
+
 - `99d2fd22` - Implement outlier detection metrics using the alibi-detect VAE method
 
 ## v0.23.0
 
 🌟 **Feature Release**
+
 - `85eb2c1f` - Implement outlier detection metrics using the alibi-detect auto-encoder method
