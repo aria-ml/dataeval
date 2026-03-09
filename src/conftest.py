@@ -424,6 +424,9 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
     doctest_namespace["test_ds"] = test_ds
     doctest_namespace["train_dataset"] = train_ds
     doctest_namespace["test_dataset"] = test_ds
+    doctest_namespace["train_ds_area1"] = train_ds
+    doctest_namespace["train_ds_area2"] = train_ds
+    doctest_namespace["train_ds_area3"] = train_ds
 
     # -------------------------------------------------------------------------
     # Stats fixtures for Outliers.from_stats

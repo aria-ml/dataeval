@@ -1576,10 +1576,11 @@ class Outliers(Evaluator):
         │ 7          ┆ entropy     ┆ 0.0          │
         └────────────┴─────────────┴──────────────┘
 
-        Cross-dataset detection:
+        Evaluate two or more datasets (cross-dataset detection):
 
         >>> outliers = Outliers()
         >>> results = outliers.evaluate(train_ds, test_ds)
+        >>> results = outliers.evaluate(train_ds_area1, train_ds_area2, train_ds_area3, test_ds)  # or more
         """
         if other:
             return self._evaluate_multi(
