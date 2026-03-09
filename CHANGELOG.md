@@ -1,6 +1,17 @@
-[//]: # (e79d103604248e1bc460e59f2c2bfb88f466d937)
+[//]: # (ced0ba7936c9ff6449eada0fd84a590b31d374f8)
 
 # DataEval Change Log
+
+## v1.0.2
+
+👾 **Fixes**
+- `ced0ba79` - Patch v1.0.2
+
+    - [test] Add edge case tests for Metadata
+    - [docs] Bump maite-datasets dependency to v0.0.12
+    - [docs] Adjust compute_stats docstring
+    - [impr] Ensure Metadata index2label handling is robust
+    - [dsop] Update Changelog.md generation and patch job triggers
 
 ## v1.0.1
 
