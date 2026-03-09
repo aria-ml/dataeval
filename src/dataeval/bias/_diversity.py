@@ -6,11 +6,11 @@ from typing import Any, Literal
 import numpy as np
 import polars as pl
 
-from dataeval import Metadata as _Metadata
+from dataeval import Metadata
 from dataeval._helpers import _get_index2label
 from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
-from dataeval.protocols import AnnotatedDataset, Metadata
+from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
@@ -19,7 +19,7 @@ DEFAULT_DIVERSITY_THRESHOLD = 0.5
 DEFAULT_DIVERSITY_METHOD = "simpson"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class DiversityOutput(DictOutput):
     """
     Output class for the :class:`.Diversity` :term:`bias<Bias>` evaluator.
@@ -73,7 +73,7 @@ class Diversity(Evaluator):
 
     Attributes
     ----------
-    metadata : Metadata
+    metadata : MetadataLike
         Preprocessed metadata from the last evaluate() call.
     method : Literal["simpson", "shannon"]
         The methodology used for defining diversity
@@ -121,7 +121,7 @@ class Diversity(Evaluator):
         method: Literal["simpson", "shannon"] = DEFAULT_DIVERSITY_METHOD
         threshold: float = DEFAULT_DIVERSITY_THRESHOLD
 
-    metadata: Metadata
+    metadata: MetadataLike
     method: Literal["simpson", "shannon"]
     threshold: float
     config: Config
@@ -135,15 +135,15 @@ class Diversity(Evaluator):
         super().__init__(locals())
 
     @set_metadata(state=["method", "threshold"])
-    def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> DiversityOutput:
+    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> DiversityOutput:
         """
         Compute diversity and classwise diversity for the dataset.
 
         Parameters
         ----------
-        data : AnnotatedDataset[Any] or Metadata
+        data : AnnotatedDataset[Any] or MetadataLike
             Either an annotated dataset (which will be converted to Metadata)
-            or any object implementing the Metadata protocol.
+            or any object implementing the MetadataLike protocol.
 
         Returns
         -------
@@ -197,10 +197,10 @@ class Diversity(Evaluator):
         └────────────┴─────────────┴─────────────────┴──────────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
-        if isinstance(data, Metadata):
+        if isinstance(data, MetadataLike):
             self.metadata = data
         else:
-            self.metadata = _Metadata(data)
+            self.metadata = Metadata(data)
 
         if not self.metadata.factor_names:
             raise ValueError("No factors found in provided metadata.")

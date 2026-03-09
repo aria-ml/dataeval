@@ -7,8 +7,9 @@ from typing import NamedTuple, TypedDict, cast
 import numpy as np
 from scipy.stats import iqr, ks_2samp, wasserstein_distance
 
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, Array2D
-from dataeval.utils.arrays import as_numpy
+from dataeval.utils._internal import as_numpy
 
 _logger = logging.getLogger(__name__)
 
@@ -99,7 +100,7 @@ def feature_distance(
     _logger.debug("Data 1 shape: %s, Data 2 shape: %s", cont1.shape, cont2.shape)
 
     if len(cont1.T) != len(cont2.T):
-        raise ValueError(f"Data must have the same numbers of features. ({len(cont1.T)} != {len(cont2.T)})")
+        raise ShapeMismatchError(f"Data must have the same numbers of features. ({len(cont1.T)} != {len(cont2.T)})")
 
     n = len(cont1)
     m = len(cont2)

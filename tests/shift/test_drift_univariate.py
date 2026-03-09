@@ -71,7 +71,7 @@ class TestKSDrift:
         assert isinstance(preds, DriftOutput)
         assert not preds.drifted
         assert cd.n == self.n + self.n
-        assert cd.x_ref.shape[0] == min(update_strategy.n, self.n + self.n)  # type: ignore
+        assert cd.reference_data.shape[0] == min(update_strategy.n, self.n + self.n)  # type: ignore
         assert preds.details["feature_drift"].shape[0] == cd.n_features
         assert (preds.details["feature_drift"] == (preds.details["p_vals"] < cd.p_val)).all()
         assert preds.details["feature_threshold"] == cd.p_val
@@ -303,22 +303,13 @@ class TestUnivariateChunked:
     """Tests for univariate chunked fit/predict paths."""
 
     def test_fit_chunked(self):
-        """Test _fit_chunked computes baseline and thresholds."""
+        """Test chunked fit computes baseline and thresholds."""
         np.random.seed(42)
         x_ref = np.random.random((100, 5)).astype(np.float32)
-        cd = DriftUnivariate(method="ks").fit(x_ref, chunk_size=20)
+        cd = DriftUnivariate(method="ks").chunked(chunk_size=20).fit(x_ref)
         assert cd._chunker is not None
         assert cd._baseline_values is not None
         assert cd._threshold_bounds != (None, None)
-
-    def test_fit_prebuilt_chunks(self):
-        """Test _fit_prebuilt computes baseline from prebuilt chunks."""
-        np.random.seed(42)
-        x_ref = np.random.random((100, 5)).astype(np.float32)
-        chunks = [x_ref[:25], x_ref[25:50], x_ref[50:75], x_ref[75:]]
-        cd = DriftUnivariate(method="ks").fit(x_ref, chunks=chunks)
-        assert cd._baseline_values is not None
-        assert len(cd._baseline_values) == 4
 
     def test_predict_chunked_from_fit(self):
         """Test chunked predict after fitting with chunk_size."""
@@ -326,7 +317,7 @@ class TestUnivariateChunked:
 
         np.random.seed(42)
         x_ref = np.random.random((100, 5)).astype(np.float32)
-        cd = DriftUnivariate(method="ks").fit(x_ref, chunk_size=20)
+        cd = DriftUnivariate(method="ks").chunked(chunk_size=20).fit(x_ref)
         x_test = np.random.random((60, 5)).astype(np.float32)
         result = cd.predict(x_test)
         assert isinstance(result.details, pl.DataFrame)
@@ -334,12 +325,12 @@ class TestUnivariateChunked:
         assert len(result.details) > 0
 
     def test_predict_prebuilt_chunks(self):
-        """Test _predict_chunked with prebuilt test chunks."""
+        """Test predict with prebuilt test chunks."""
         import polars as pl
 
         np.random.seed(42)
         x_ref = np.random.random((100, 5)).astype(np.float32)
-        cd = DriftUnivariate(method="ks").fit(x_ref, chunk_size=20)
+        cd = DriftUnivariate(method="ks").chunked(chunk_size=20).fit(x_ref)
         test_chunks = [
             np.random.random((20, 5)).astype(np.float32),
             np.random.random((20, 5)).astype(np.float32),
@@ -349,12 +340,12 @@ class TestUnivariateChunked:
         assert len(result.details) == 2
 
     def test_predict_chunk_indices(self):
-        """Test _predict_chunked with chunk_indices override."""
+        """Test predict with chunk_indices override."""
         import polars as pl
 
         np.random.seed(42)
         x_ref = np.random.random((100, 5)).astype(np.float32)
-        cd = DriftUnivariate(method="ks").fit(x_ref, chunk_size=20)
+        cd = DriftUnivariate(method="ks").chunked(chunk_size=20).fit(x_ref)
         x_test = np.random.random((40, 5)).astype(np.float32)
         result = cd.predict(x_test, chunk_indices=[[0, 1, 2, 3], [4, 5, 6, 7]])
         assert isinstance(result.details, pl.DataFrame)
@@ -364,6 +355,6 @@ class TestUnivariateChunked:
         """Test that chunked predict without data raises."""
         np.random.seed(42)
         x_ref = np.random.random((100, 5)).astype(np.float32)
-        cd = DriftUnivariate(method="ks").fit(x_ref, chunk_size=20)
+        cd = DriftUnivariate(method="ks").chunked(chunk_size=20).fit(x_ref)
         with pytest.raises(ValueError, match="data is required"):
             cd.predict(None)

@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from dataeval.exceptions import NotFittedError
 from dataeval.shift._ood._base import OODOutput, OODScoreOutput
 from dataeval.shift._ood._domain_classifier import OODDomainClassifier
 
@@ -56,7 +57,7 @@ class TestOODDomainClassifierInit:
 class TestOODDomainClassifierValidation:
     def test_predict_before_fit_raises(self):
         det = OODDomainClassifier()
-        with pytest.raises(RuntimeError, match="fit"):
+        with pytest.raises(NotFittedError, match="fit"):
             det.predict(np.zeros((10, 8)))
 
     def test_score_validates_shape(self, ref_data):

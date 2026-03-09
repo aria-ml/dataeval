@@ -159,10 +159,11 @@ class TestEmbeddings:
         assert len(em) == len(ds)
 
         for i in range(len(ds)):
-            np.testing.assert_allclose(em[i], data[i])
+            np.testing.assert_allclose(em[i], data[i].reshape(-1) if hasattr(data[i], "reshape") else data[i])
 
         for idx, e in enumerate(em):
-            np.testing.assert_allclose(ds[idx][0], e)
+            expected = ds[idx][0]
+            np.testing.assert_allclose(expected.reshape(-1) if hasattr(expected, "reshape") else expected, e)
 
     def test_embeddings(self, identity_extractor):
         extractor = TorchExtractor(torch.nn.Identity(), transforms=lambda x: x + 1, device="cpu")
@@ -174,7 +175,7 @@ class TestEmbeddings:
         assert len(embs_np) == len(embs)
 
         for emb in embs:
-            assert np.array_equal(emb, np.ones((3, 16, 16)))
+            assert np.array_equal(emb, np.ones(3 * 16 * 16))
 
         with pytest.raises(TypeError):
             embs["string"]  # type: ignore
@@ -262,11 +263,11 @@ class TestEmbeddings:
 
         # Output should be flattened (1D)
         assert output_result.shape == (36,)
-        # Input should be the pre-flattened tensor (3D)
-        assert input_result.shape == (4, 3, 3)
+        # Input is pre-flattened tensor, but TorchExtractor also flattens it to 2D
+        assert input_result.shape == (36,)
 
-        # Verify they contain the same data, just in different shapes
-        assert np.allclose(output_result, input_result.flatten())
+        # Verify they contain the same data
+        assert np.allclose(output_result, input_result)
 
     def test_hook_fn_captures_output(self, sequential_model):
         """Test that _hook_fn correctly captures output when use_output=True."""
@@ -375,18 +376,18 @@ class TestEmbeddings:
                 "sequential_model",
                 "1",
                 "2",
-                (4, 3, 3),
-                (4, 3, 3),
+                (36,),
+                (36,),
                 True,
-            ),  # ReLU output → Flatten input: direct connection
+            ),  # ReLU output → Flatten input: both flattened by TorchExtractor
             (
                 "model_with_functional_ops",
                 "relu",
                 "linear",
-                (4, 3, 3),
                 (36,),
-                False,
-            ),  # relu output → linear input: functional op between
+                (36,),
+                True,
+            ),  # relu output → linear input: both flattened by TorchExtractor
         ],
     )
     def test_layer_output_vs_next_layer_input(

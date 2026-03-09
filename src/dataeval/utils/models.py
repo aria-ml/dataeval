@@ -8,6 +8,8 @@ from typing import Any
 import torch
 import torch.nn as nn
 
+from dataeval.exceptions import ShapeMismatchError
+
 
 class GMMDensityNet(nn.Module):
     """
@@ -254,7 +256,7 @@ class AE(nn.Module):
         super().__init__()
 
         if len(input_shape) != 3:
-            raise ValueError("Expected input_shape to be in CHW format.")
+            raise ShapeMismatchError("Expected input_shape to be in CHW format.")
 
         input_dim = math.prod(input_shape)
 
@@ -267,7 +269,7 @@ class AE(nn.Module):
 
         # Validate GMM density net latent dimension matches encoder output
         if self.gmm_density_net is not None and self.gmm_density_net.latent_dim != encoding_dim:
-            raise ValueError(
+            raise ShapeMismatchError(
                 f"GMMDensityNet latent_dim ({self.gmm_density_net.latent_dim}) must match "
                 f"encoder encoding_dim ({encoding_dim}). Either create GMMDensityNet with "
                 f"latent_dim={encoding_dim}, or let AE auto-create it by passing n_gmm instead.",
@@ -469,7 +471,7 @@ class VAE(nn.Module):
         super().__init__()
 
         if len(input_shape) != 3:
-            raise ValueError("Expected input_shape to be in CHW format.")
+            raise ShapeMismatchError("Expected input_shape to be in CHW format.")
 
         if latent_dim is None:
             input_dim = math.prod(input_shape)
@@ -482,7 +484,7 @@ class VAE(nn.Module):
 
         # Validate GMM density net latent dimension matches VAE latent dimension
         if self.gmm_density_net is not None and self.gmm_density_net.latent_dim != latent_dim:
-            raise ValueError(
+            raise ShapeMismatchError(
                 f"GMMDensityNet latent_dim ({self.gmm_density_net.latent_dim}) must match "
                 f"VAE latent_dim ({latent_dim}). Create GMMDensityNet with latent_dim={latent_dim}.",
             )

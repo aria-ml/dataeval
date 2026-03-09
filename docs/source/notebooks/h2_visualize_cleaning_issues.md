@@ -46,8 +46,9 @@ data in your dataset.
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -141,8 +142,9 @@ results_classwise.aggregate_by_class(metadata)
 ```
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 print(results.shape[0])
 assert results.shape[0] == 404

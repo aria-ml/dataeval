@@ -23,11 +23,6 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from dataeval.protocols import DeviceLike
 
-### CONSTS ###
-
-EPSILON = 1e-12
-
-
 ### GLOBAL CONFIG ###
 
 

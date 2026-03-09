@@ -250,12 +250,12 @@ class TestBiasFunctionsWithOD:
         # parity() uses binned_data and class_labels
         result = Parity().evaluate(md)
 
-        # result.factors is a DataFrame with factor_name, score, p_value, is_correlated, has_insufficient_data
+        # result.factors is a DataFrame with factor_name, score, p_value, is_significant, has_insufficient_data
         assert result.factors.height == len(md.factor_names)
         assert "factor_name" in result.factors.columns
         assert "score" in result.factors.columns
         assert "p_value" in result.factors.columns
-        assert "is_correlated" in result.factors.columns
+        assert "is_significant" in result.factors.columns
         assert "has_insufficient_data" in result.factors.columns
 
         # Verify factor names match
@@ -282,7 +282,7 @@ class TestBiasFunctionsWithOD:
         assert parity_result.factors.height == len(md.factor_names)
 
 
-class TestFactorDataConsistency:
+class TestMetadataLikeConsistency:
     """Test that factor_data is consistent with what bias functions expect."""
 
     def test_od_factor_data_length_matches_class_labels(self, od_dataset_for_bias):

@@ -13,8 +13,8 @@ from typing import Any, Literal, TypedDict
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.config import EPSILON
 from dataeval.core._clusterer import _SORTER_MAP
+from dataeval.utils._internal import EPSILON
 
 _logger = logging.getLogger(__name__)
 

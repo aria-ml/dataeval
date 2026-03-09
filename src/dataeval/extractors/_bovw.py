@@ -10,9 +10,9 @@ from numpy.typing import NDArray
 from sklearn.cluster import MiniBatchKMeans
 
 from dataeval.config import get_max_processes, get_seed
+from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array
-from dataeval.utils.arrays import as_numpy
-from dataeval.utils.poolwrapper import PoolWrapper
+from dataeval.utils._internal import PoolWrapper, as_numpy
 from dataeval.utils.preprocessing import rescale, to_canonical_grayscale
 
 
@@ -103,6 +103,7 @@ class BoVWExtractor:
     >>> # Create extractor and fit vocabulary
     >>> extractor = BoVWExtractor(vocab_size=64)
     >>> extractor.fit(images)
+    BoVWExtractor(vocab_size=64, fitted=True)
     >>>
     >>> # Transform images to embeddings
     >>> embeddings = extractor.transform(images)
@@ -116,6 +117,7 @@ class BoVWExtractor:
     >>> # Fit extractor on reference dataset
     >>> extractor = BoVWExtractor(vocab_size=128)
     >>> extractor.fit(reference_data)
+    BoVWExtractor(vocab_size=128, fitted=True)
     >>>
     >>> # Use embeddings for duplicate detection
     >>> embeddings = extractor.transform(unlabeled_data)
@@ -167,7 +169,7 @@ class BoVWExtractor:
         self.vocab_size = vocab_size
         self._kmeans: MiniBatchKMeans | None = None
 
-    def fit(self, data: Any) -> None:
+    def fit(self, data: Any) -> "BoVWExtractor":
         """
         Train the visual vocabulary on the provided images.
 
@@ -209,6 +211,7 @@ class BoVWExtractor:
         seed = get_seed()
         self._kmeans = MiniBatchKMeans(n_clusters=n_clusters, n_init="auto", random_state=seed)
         self._kmeans.fit(train_data)
+        return self
 
     def transform(self, data: Any) -> Array:
         """
@@ -233,11 +236,11 @@ class BoVWExtractor:
 
         Raises
         ------
-        RuntimeError
+        NotFittedError
             If called before :meth:`fit`.
         """
         if self._kmeans is None:
-            raise RuntimeError("Extractor has not been fitted. Call fit() first.")
+            raise NotFittedError("Extractor has not been fitted. Call fit() first.")
 
         n_clusters: int = int(self._kmeans.n_clusters)  # type: ignore
 
@@ -254,10 +257,15 @@ class BoVWExtractor:
 
     def __call__(self, data: Any) -> Array:
         """
-        Fit vocabulary and transform images in one step.
+        Extract BoVW histogram embeddings from images.
 
-        Convenience method that combines :meth:`fit` and :meth:`transform`.
-        Equivalent to calling ``extractor.fit(data).transform(data)``.
+        If the vocabulary has not been fitted yet, this method will first
+        train the vocabulary on the input data before transforming.
+        If the vocabulary is already fitted, this method only transforms.
+
+        This allows the extractor to be used as a
+        :class:`~dataeval.protocols.FeatureExtractor` where ``__call__``
+        should produce embeddings without retraining.
 
         Parameters
         ----------
@@ -272,15 +280,10 @@ class BoVWExtractor:
         Raises
         ------
         ValueError
-            If no SIFT features are found in any image.
-
-        Note
-        ----
-        This method retrains the vocabulary on the input data. If you want to
-        use a pre-trained vocabulary, call :meth:`fit` once on training data
-        and then use :meth:`transform` for new images.
+            If no SIFT features are found in any image (only when fitting).
         """
-        self.fit(data)
+        if self._kmeans is None:
+            self.fit(data)
         return self.transform(data)
 
     def __repr__(self) -> str:

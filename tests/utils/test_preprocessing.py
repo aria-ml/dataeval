@@ -3,6 +3,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.utils.preprocessing import (
     BitDepth,
     BoundingBox,
@@ -284,7 +285,7 @@ class TestImageUtils:
 
     def test_normalize_image_valueerror(self):
         image = np.zeros(10)
-        with pytest.raises(ValueError, match="2 or more dimensions"):
+        with pytest.raises(ShapeMismatchError, match="2 or more dimensions"):
             normalize_image_shape(image)
 
     def testedge_filter(self):

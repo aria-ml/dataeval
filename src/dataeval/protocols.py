@@ -2,27 +2,33 @@
 
 __all__ = [
     "AnnotatedDataset",
+    "AnnotatedModel",
     "Array",
     "ArrayLike",
+    "Chunker",
     "Dataset",
     "DatasetMetadata",
+    "DatumMetadata",
     "DeviceLike",
     "EvaluationSchedule",
     "EvaluationStrategy",
-    "FeatureExtractor",
     "EvidenceLowerBoundLossFn",
+    "FeatureExtractor",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
     "LossFn",
-    "Metadata",
+    "MetadataLike",
+    "ModelMetadata",
     "ModelResetStrategy",
-    "ObjectDetectionTarget",
     "ObjectDetectionDatum",
     "ObjectDetectionDataset",
+    "ObjectDetectionTarget",
+    "ProgressCallback",
     "ReconstructionLossFn",
-    "SegmentationTarget",
     "SegmentationDatum",
     "SegmentationDataset",
+    "SegmentationTarget",
+    "SequenceLike",
     "Threshold",
     "ThresholdBounds",
     "ThresholdLike",
@@ -33,7 +39,7 @@ __all__ = [
 ]
 
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from typing import (
     Any,
     Protocol,
@@ -97,6 +103,11 @@ class Array(Protocol):
     """
 
     @property
+    def ndim(self) -> int:
+        """Number of dimensions of the array."""
+        ...
+
+    @property
     def shape(self) -> tuple[int, ...]:
         """Shape of the array."""
         ...
@@ -131,8 +142,14 @@ class SequenceLike(Protocol[_T_co]):
     def __getitem__(self, key: int, /) -> _T_co: ...
     @overload
     def __getitem__(self, key: Any, /) -> _T_co | Self: ...
-    def __iter__(self) -> Iterator[_T_co]: ...
-    def __len__(self) -> int: ...
+
+    def __iter__(self) -> Iterator[_T_co]:
+        """Return an iterator over the sequence."""
+        ...
+
+    def __len__(self) -> int:
+        """Return the length of the sequence."""
+        ...
 
 
 # ========== METADATA ==========
@@ -184,7 +201,7 @@ class DatumMetadata(TypedDict, total=False):
 
 
 @runtime_checkable
-class Metadata(Protocol):
+class MetadataLike(Protocol):
     """
     Minimal protocol for metadata objects used in bias and quality analysis.
 
@@ -206,9 +223,9 @@ class Metadata(Protocol):
     Creating a simple metadata container:
 
     >>> import numpy as np
-    >>> from dataeval.protocols import Metadata
+    >>> from dataeval.protocols import MetadataLike
     >>>
-    >>> class SimpleMetadata(Metadata):
+    >>> class SimpleMetadata(MetadataLike):
     ...     def __init__(self, factors, labels, names, discrete):
     ...         self._factors = factors
     ...         self._labels = labels
@@ -237,7 +254,7 @@ class Metadata(Protocol):
     ...     names=["age_bin", "gender"],
     ...     discrete=[True, True],
     ... )
-    >>> isinstance(meta, Metadata)
+    >>> isinstance(meta, MetadataLike)
     True
     """
 
@@ -406,7 +423,7 @@ class SegmentationTarget(Protocol):
 
 SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, DatumMetadata]
 """
-Type alias for an image classification datum tuple.
+Type alias for a segmentation datum tuple.
 
 - :class:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
 - :class:`SegmentationTarget` - Segmentation target information for the image.
@@ -537,16 +554,9 @@ class AnnotatedModel(Protocol):
     """Protocol for an annotated model."""
 
     @property
-    def metadata(self) -> ModelMetadata: ...
-
-
-EmbeddingModel: TypeAlias = Callable[[Array], Array] | Callable[[Iterable[Array]], Iterable[Array]]
-"""
-Type alias for a callable embedding model.
-
-Embedding models should take an input array or a batch of arrays and return an output
-representing the input data in a lower dimensional space.
-"""
+    def metadata(self) -> ModelMetadata:
+        """:class:`.ModelMetadata` or derivatives."""
+        ...
 
 
 # ========== SUFFICIENCY STRATEGIES ==========
@@ -824,7 +834,6 @@ class UpdateStrategy(Protocol):
 
     >>> import numpy as np
     >>> from numpy.typing import NDArray
-    >>> from dataeval.utils.arrays import flatten_samples
     >>>
     >>> class MovingAverageUpdate:
     ...     '''Update strategy that maintains a moving average of reference data.'''
@@ -841,15 +850,15 @@ class UpdateStrategy(Protocol):
     ...         self.n = n
     ...         self.alpha = alpha
     ...
-    ...     def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
+    ...     def __call__(self, reference_data: NDArray[np.float32], data: NDArray[np.float32]) -> NDArray[np.float32]:
     ...         '''
     ...         Update reference data with exponential moving average.
     ...
     ...         Parameters
     ...         ----------
-    ...         x_ref : NDArray[np.float32]
+    ...         reference_data : NDArray[np.float32]
     ...             Current reference data of shape (n_ref, n_features)
-    ...         x_new : NDArray[np.float32]
+    ...         data : NDArray[np.float32]
     ...             New observations of shape (n_new, n_features)
     ...
     ...         Returns
@@ -857,13 +866,15 @@ class UpdateStrategy(Protocol):
     ...         NDArray[np.float32]
     ...             Updated reference data of shape (n_updated, n_features)
     ...         '''
-    ...         x_new_flat = flatten_samples(x_new)
+    ...         data_flat = np.atleast_2d(np.asarray(data, dtype=np.float32))
     ...         # Compute moving average for overlapping samples
-    ...         n_overlap = min(len(x_ref), len(x_new_flat))
+    ...         n_overlap = min(len(reference_data), len(data_flat))
     ...         if n_overlap > 0:
-    ...             x_ref[:n_overlap] = self.alpha * x_ref[:n_overlap] + (1 - self.alpha) * x_new_flat[:n_overlap]
+    ...             reference_data[:n_overlap] = (
+    ...                 self.alpha * reference_data[:n_overlap] + (1 - self.alpha) * data_flat[:n_overlap]
+    ...             )
     ...         # Append remaining new samples
-    ...         result = np.concatenate([x_ref, x_new_flat[n_overlap:]], axis=0)
+    ...         result = np.concatenate([reference_data, data_flat[n_overlap:]], axis=0)
     ...         return result[-self.n :]
 
     Using a custom update strategy with a drift detector:
@@ -897,7 +908,7 @@ class UpdateStrategy(Protocol):
     ReservoirSamplingUpdate : Built-in strategy using reservoir sampling
     """
 
-    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
+    def __call__(self, reference_data: NDArray[np.float32], data: NDArray[np.float32]) -> NDArray[np.float32]:
         """Return updated reference data."""
         ...
 
@@ -915,7 +926,7 @@ class EvaluationSchedule(Protocol):
     Custom scheduler evaluating at 0%, 50%, 100% of the dataset
 
     >>> class MidpointSchedule:
-    ...     def get_step(self, dataset_length: int) -> np.typing.NDArray[np.intp]:
+    ...     def get_steps(self, dataset_length: int) -> np.typing.NDArray[np.intp]:
     ...         return np.array([0, dataset_length // 2, dataset_length - 1], dtype=np.intp)
     """
 
@@ -1139,20 +1150,33 @@ class Chunker(Protocol):
 # ========== CALLBACKS ==========
 
 
+@runtime_checkable
 class ProgressCallback(Protocol):
     """
     Protocol for a callable progress callback function.
 
-    Parameters
-    ----------
-    step : int
-        The current step or iteration number.
-    total : int or None
-        The total number of steps or iterations, if known.
-    desc : str or None
-        Optional description of the progress.
-    extra_info : Mapping[str, Any] or None
-        Optional dictionary of additional information.
+    Examples
+    --------
+    Creating a simple progress callback:
+
+    >>> from dataeval.protocols import ProgressCallback
+    >>>
+    >>> class PrintProgress:
+    ...     def __call__(
+    ...         self,
+    ...         step: int,
+    ...         *,
+    ...         total: int | None = None,
+    ...         desc: str | None = None,
+    ...         extra_info: dict[str, Any] | None = None,
+    ...     ) -> None:
+    ...         pct = f" ({step}/{total})" if total else ""
+    ...         prefix = f"{desc}: " if desc else ""
+    ...         print(f"{prefix}Step {step}{pct}")
+    >>>
+    >>> callback = PrintProgress()
+    >>> isinstance(callback, ProgressCallback)
+    True
     """
 
     def __call__(
@@ -1162,7 +1186,27 @@ class ProgressCallback(Protocol):
         total: int | None = None,
         desc: str | None = None,
         extra_info: dict[str, Any] | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Call the progress callback with the current step information.
+
+        Parameters
+        ----------
+        step : int
+            The current step or iteration number.
+        total : int or None, optional
+            The total number of steps or iterations, if known.
+        desc : str or None, optional
+            Optional description of the progress.
+        extra_info : Mapping[str, Any] or None, optional
+            Optional dictionary of additional information.
+
+        Returns
+        -------
+        None
+            This method is intended for side effects (e.g., updating a progress bar).
+        """
+        ...
 
 
 # ========== THRESHOLD ==========

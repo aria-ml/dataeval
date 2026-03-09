@@ -1,5 +1,6 @@
 __all__ = []
 
+import copy
 from collections.abc import Callable, Iterable, Sized
 from typing import Any, Generic, TypeVar
 
@@ -46,18 +47,15 @@ class Sufficiency(Evaluator, Generic[T, M]):
     model : Any
         Model to train (reset for each run). Can be any model type supported
         by your training and evaluation strategies.
-    train_ds : Dataset
-        Full training data
-    test_ds : Dataset
-        Test/validation data
     training_strategy : TrainingStrategy or None, default None
         Strategy for training models. If None, uses config.training_strategy.
     evaluation_strategy : EvaluationStrategy or None, default None
         Strategy for evaluating models. If None, uses config.evaluation_strategy.
-    reset_strategy : Callable[[Any], Any]
-        Strategy for resetting model parameters between runs. Required.
+    reset_strategy : Callable[[Any], Any] or None, default None
+        Strategy for resetting model parameters between runs.
         Must be a callable that takes the model and returns a reset model
-        (e.g., with re-initialized weights).
+        (e.g., with re-initialized weights). If None, defaults to
+        ``copy.deepcopy`` of the model captured at construction time.
     runs : int or None, default None
         Number of independent training runs. If None, uses config.runs (default 1).
     substeps : int or None, default None
@@ -73,14 +71,9 @@ class Sufficiency(Evaluator, Generic[T, M]):
 
     Notes
     -----
-    Datasets are immutable after construction. To use different data, create a new instance.
-
     Multiple runs average results to reduce variance.
 
     Parameters passed directly to __init__ override config defaults.
-
-    You must provide a `reset_strategy` that knows how to reset your model
-    to its initial state between runs.
 
     See Also
     --------
@@ -187,8 +180,6 @@ class Sufficiency(Evaluator, Generic[T, M]):
     def __init__(
         self,
         model: M,
-        train_ds: Dataset[T],
-        test_ds: Dataset[T],
         training_strategy: TrainingStrategy[T] | None = None,
         evaluation_strategy: EvaluationStrategy[T] | None = None,
         reset_strategy: Callable[[M], M] | None = None,
@@ -199,27 +190,18 @@ class Sufficiency(Evaluator, Generic[T, M]):
     ) -> None:
         self.model = model
 
-        # Validate and store datasets
-        self._length = validate_dataset_len(train_ds)
-        self._train_ds = train_ds
-
-        validate_dataset_len(test_ds)
-        self._test_ds = test_ds
-
         # Store reset_strategy before super().__init__ as Pydantic can't serialize callables properly
-        # Priority: direct param > config > default
+        # Priority: direct param > config > deepcopy default
         _reset_strategy = reset_strategy
         if _reset_strategy is None and config is not None:
             _reset_strategy = config.reset_strategy
-
-        super().__init__(locals(), exclude={"model", "train_ds", "test_ds", "reset_strategy"})
-
-        # Set up reset strategy (required)
         if _reset_strategy is None:
-            raise ValueError(
-                "reset_strategy is required. Provide a callable that takes the model "
-                "and returns a reset model (e.g., with re-initialized weights).",
-            )
+            # Default: deepcopy the model at init time, return a fresh copy on each reset
+            clean_model = copy.deepcopy(model)
+            _reset_strategy = lambda _: copy.deepcopy(clean_model)  # noqa: E731
+
+        super().__init__(locals(), exclude={"model", "reset_strategy"})
+
         self.reset_strategy = _reset_strategy
 
         # Validate parameters
@@ -227,28 +209,6 @@ class Sufficiency(Evaluator, Generic[T, M]):
             raise ValueError(f"runs must be positive, got {self.runs}")
         if self.substeps <= 0:
             raise ValueError(f"substeps must be positive, got {self.substeps}")
-
-    @property
-    def train_ds(self) -> Dataset[T]:
-        """
-        Training dataset (read-only).
-
-        Notes
-        -----
-        This property is read-only. To use a different training dataset, create a new Sufficiency instance
-        """
-        return self._train_ds
-
-    @property
-    def test_ds(self) -> Dataset[T]:
-        """
-        Test dataset (read-only).
-
-        Notes
-        -----
-        This property is read-only. To use a different test dataset, create a new Sufficiency instance
-        """
-        return self._test_ds
 
     def _create_schedule(self, schedule: EvaluationSchedule | int | Iterable[int] | None) -> EvaluationSchedule:
         """
@@ -273,7 +233,15 @@ class Sufficiency(Evaluator, Generic[T, M]):
         # Wrap int or iterable
         return ManualSchedule(schedule)
 
-    def _execute_run(self, run_index: int, steps: Iterable[int], aggregator: ResultAggregator) -> None:
+    def _execute_run(
+        self,
+        run_index: int,
+        steps: Iterable[int],
+        aggregator: ResultAggregator,
+        train_dataset: Dataset[T],
+        test_dataset: Dataset[T],
+        length: int,
+    ) -> None:
         """
         Execute a single training run across all evaluation steps.
 
@@ -288,9 +256,15 @@ class Sufficiency(Evaluator, Generic[T, M]):
             Evaluation points (dataset sizes)
         aggregator : ResultAggregator
             Accumulator for storing results
+        train_dataset : Dataset
+            Training dataset
+        test_dataset : Dataset
+            Test/validation dataset
+        length : int
+            Length of the training dataset
         """
         # Step 1: Create randomized indices for this run
-        indices = np.random.randint(0, self._length, size=self._length)
+        indices = np.random.randint(0, length, size=length)
 
         # Step 2: Reset model to fresh initialization using the configured strategy
         model = self.reset_strategy(self.model)
@@ -298,17 +272,22 @@ class Sufficiency(Evaluator, Generic[T, M]):
         # Step 3: Train and evaluate at each step (temporal coupling explicit)
         for step_index, dataset_size in enumerate(steps):
             # Train on subset
-            self.training_strategy.train(model, self.train_ds, indices[: int(dataset_size)].tolist())
+            self.training_strategy.train(model, train_dataset, indices[: int(dataset_size)].tolist())
 
             # Evaluate on test set
-            metrics = self.evaluation_strategy.evaluate(model, self.test_ds)
+            metrics = self.evaluation_strategy.evaluate(model, test_dataset)
 
             # Store results
             for metric_name, metric_value in metrics.items():
                 aggregator.add_result(run=run_index, step=step_index, metric_name=metric_name, value=metric_value)
 
     @set_metadata(state=["runs", "substeps"])
-    def evaluate(self, schedule: EvaluationSchedule | int | Iterable[int] | None = None) -> SufficiencyOutput:
+    def evaluate(
+        self,
+        train_dataset: Dataset[T],
+        test_dataset: Dataset[T],
+        schedule: EvaluationSchedule | int | Iterable[int] | None = None,
+    ) -> SufficiencyOutput:
         """
         Train and evaluate model across multiple dataset sizes.
 
@@ -322,7 +301,11 @@ class Sufficiency(Evaluator, Generic[T, M]):
 
         Parameters
         ----------
-        schedule : EvaluationStrategy or int or Iterable[int] or None, default None
+        train_dataset : Dataset
+            Full training data
+        test_dataset : Dataset
+            Test/validation data
+        schedule : EvaluationSchedule or int or Iterable[int] or None, default None
             Specify this to collect metrics over a specific set of dataset lengths.
             If `None`, evaluates at each step calculated by
             `np.geomspace` over the length of the dataset
@@ -336,8 +319,6 @@ class Sufficiency(Evaluator, Generic[T, M]):
         --------
         >>> sufficiency = Sufficiency(
         ...     model=model,
-        ...     train_ds=train_ds,
-        ...     test_ds=test_ds,
         ...     training_strategy=CustomTrainingStrategy(),
         ...     evaluation_strategy=CustomEvaluationStrategy(),
         ...     reset_strategy=CustomResetStrategy(),
@@ -345,33 +326,44 @@ class Sufficiency(Evaluator, Generic[T, M]):
 
         Default runs and substeps:
 
-        >>> output = sufficiency.evaluate()
+        >>> output = sufficiency.evaluate(train_dataset, test_dataset)
 
         Evaluate at specific points:
 
-        >>> output = sufficiency.evaluate(schedule=[100, 500, 1000])
+        >>> output = sufficiency.evaluate(train_dataset, test_dataset, schedule=[100, 500, 1000])
 
         Evaluate at a custom geometric spacing
 
         >>> from dataeval.performance.schedules import GeometricSchedule
-        >>> output = sufficiency.evaluate(schedule=GeometricSchedule(substeps=20))
+        >>> output = sufficiency.evaluate(train_dataset, test_dataset, schedule=GeometricSchedule(substeps=20))
 
         Evaluate at custom linear steps from 0-100 inclusive
 
         >>> class LinearSchedule:
         ...     def get_steps(self, dataset_length):
         ...         return np.arange(0, 101, 20)
-        >>> output = sufficiency.evaluate(schedule=LinearSchedule())
+        >>> output = sufficiency.evaluate(train_dataset, test_dataset, schedule=LinearSchedule())
         """
+        # Validate datasets
+        length = validate_dataset_len(train_dataset)
+        validate_dataset_len(test_dataset)
+
         # Create evaluation schedule
         schedule_obj = self._create_schedule(schedule=schedule)
-        steps = schedule_obj.get_steps(self._length)
+        steps = schedule_obj.get_steps(length)
 
         aggregator = ResultAggregator(runs=self.runs, substeps=len(steps))
 
         # Execute all runs
         for run_index in range(self.runs):
-            self._execute_run(run_index=run_index, steps=steps, aggregator=aggregator)
+            self._execute_run(
+                run_index=run_index,
+                steps=steps,
+                aggregator=aggregator,
+                train_dataset=train_dataset,
+                test_dataset=test_dataset,
+                length=length,
+            )
 
         # Create output
         results = aggregator.get_results()

@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from dataeval import Embeddings
+from dataeval.exceptions import NotFittedError
 from dataeval.extractors import TorchExtractor
 from tests.embeddings.test_embeddings import MockDataset
 
@@ -67,7 +68,7 @@ class TestEmbeddingsFeatureExtractor:
     def test_call_unbound_raises(self, simple_encoder):
         """Test __call__ raises ValueError when data is None and no dataset is bound."""
         embeddings = Embeddings(extractor=simple_encoder)
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             _ = embeddings()
 
     def test_call_with_data_unbound(self, mock_ds, simple_encoder):
@@ -100,13 +101,13 @@ class TestEmbeddingsFeatureExtractor:
     def test_shape_unbound_raises(self, simple_encoder):
         """Test shape property raises ValueError when no dataset is bound."""
         embeddings = Embeddings(extractor=simple_encoder)
-        with pytest.raises(ValueError, match="Cannot determine shape"):
+        with pytest.raises(NotFittedError, match="Cannot determine shape"):
             _ = embeddings.shape
 
     def test_len_unbound_raises(self, simple_encoder):
         """Test __len__ raises ValueError when no dataset is bound."""
         embeddings = Embeddings(extractor=simple_encoder)
-        with pytest.raises(ValueError, match="Cannot determine length"):
+        with pytest.raises(NotFittedError, match="Cannot determine length"):
             _ = len(embeddings)
 
 
@@ -116,20 +117,20 @@ class TestEmbeddingsErrorCases:
     def test_batch_unbound_raises(self, simple_encoder):
         """Test _batch raises ValueError when no dataset is bound."""
         embeddings = Embeddings(extractor=simple_encoder)
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             list(embeddings._batch([0, 1, 2]))
 
     def test_initialize_storage_unbound_raises(self, simple_encoder):
         """Test _initialize_storage raises ValueError when no dataset is bound."""
         embeddings = Embeddings(extractor=simple_encoder)
         sample = np.random.randn(512)
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             embeddings._initialize_storage(sample)
 
     def test_should_use_memmap_unbound_raises(self, simple_encoder, tmp_path):
         """Test _should_use_memmap raises ValueError when no dataset is bound."""
         embeddings = Embeddings(extractor=simple_encoder, path=tmp_path / "embeddings.npy")
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             embeddings._should_use_memmap((512,))
 
     def test_getitem_invalid_type_raises(self, mock_ds, simple_encoder):

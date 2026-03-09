@@ -7,11 +7,11 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.config import EPSILON
 from dataeval.core._calculators._base import Calculator
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
+from dataeval.utils._internal import EPSILON
 from dataeval.utils.preprocessing import edge_filter
 
 QUARTILES = (0, 25, 50, 75, 100)

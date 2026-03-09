@@ -11,12 +11,7 @@ of how many test samples are provided, keeping per-chunk statistics
 comparable to the baseline established during fitting.
 """
 
-__all__ = [
-    "CountChunker",
-    "IndexChunker",
-    "SizeChunker",
-    "resolve_chunker",
-]
+__all__ = []
 
 from abc import ABC, abstractmethod
 from typing import Literal
@@ -25,9 +20,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.protocols import Chunker
+from dataeval.types import ReprMixin
 
 
-class BaseChunker(Chunker, ABC):
+class BaseChunker(ReprMixin, Chunker, ABC):
     """Base class for numpy array chunkers."""
 
     @abstractmethod

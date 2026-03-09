@@ -16,16 +16,40 @@ import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
-from dataeval.flags import ImageStats, resolve_dependencies
+from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback
 from dataeval.types import SourceIndex, StatsMap
+from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.data import unzip_dataset
-from dataeval.utils.poolwrapper import PoolWrapper
 from dataeval.utils.preprocessing import BoundingBox, BoxLike, to_bounding_box
 
 _logger = logging.getLogger(__name__)
 
 SOURCE_INDEX = "source_index"
+
+
+# Dependency mapping: stat -> required dependency
+_STAT_DEPENDENCIES: dict[ImageStats, ImageStats] = {
+    ImageStats.PIXEL_ENTROPY: ImageStats.PIXEL_HISTOGRAM,
+    ImageStats.VISUAL_BRIGHTNESS: ImageStats.VISUAL_PERCENTILES,
+    ImageStats.VISUAL_CONTRAST: ImageStats.VISUAL_PERCENTILES,
+    ImageStats.VISUAL_DARKNESS: ImageStats.VISUAL_PERCENTILES,
+}
+
+
+def _resolve_dependencies(flags: Flag) -> Flag:
+    resolved = flags
+    changed = True
+
+    # Iterate until no new dependencies are added
+    while changed:
+        old_resolved = resolved
+        for stat, dependency in _STAT_DEPENDENCIES.items():
+            if stat in resolved:
+                resolved |= dependency
+        changed = resolved != old_resolved
+
+    return resolved
 
 
 class StatsResult(TypedDict):
@@ -415,7 +439,7 @@ def compute_stats(
         raise ValueError("At least one of 'per_image' or 'per_target' must be True")
 
     # Resolve dependencies
-    stats = resolve_dependencies(stats)
+    stats = _resolve_dependencies(stats)
 
     # Get calculators from registry based on flags
     calculators = CalculatorRegistry.get_calculators(stats)

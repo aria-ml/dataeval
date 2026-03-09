@@ -15,7 +15,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import Self
 
-from dataeval import Metadata as _Metadata
+from dataeval import Metadata
 from dataeval.core._rank import (
     RankResult,
     rank_hdbscan_complexity,
@@ -55,6 +55,10 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
     """
 
     _fields: tuple[str, ...] = ("indices", "scores", "method", "order", "policy")
+
+    def data(self) -> NDArray[np.intp]:
+        """Return the ranked indices as the output data."""
+        return self.indices
 
     def __init__(
         self,
@@ -167,8 +171,16 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
 
     def __repr__(self) -> str:
         return (
-            f"PriorityOutput(method={self._method!r}, order={self._order!r}, "
+            f"PrioritizeOutput(method={self._method!r}, order={self._order!r}, "
             f"policy={self._policy!r}, n_samples={len(self._rank_result['indices'])})"
+        )
+
+    def __str__(self) -> str:
+        n = len(self._rank_result["indices"])
+        has_scores = self._rank_result["scores"] is not None
+        return (
+            f"PrioritizeOutput: {n} samples, method={self._method}, order={self._order}, "
+            f"policy={self._policy}, scores={'yes' if has_scores else 'no'}"
         )
 
     def easy_first(self) -> Self:
@@ -469,6 +481,9 @@ class Prioritize(Evaluator):
             Number of K-means initializations (kmeans methods only).
         max_cluster_size : int or None, default None
             Maximum cluster size for HDBSCAN methods.
+        batch_size : int or None, default None
+            Batch size for embedding computation. When None, uses the global
+            batch size from :func:`~dataeval.config.get_batch_size`.
         order : {"easy_first", "hard_first"}, default "easy_first"
             Sort direction for output indices.
         policy : {"difficulty", "stratified", "class_balanced"}, default "difficulty"
@@ -478,6 +493,7 @@ class Prioritize(Evaluator):
         """
 
         extractor: FeatureExtractor | None = None
+        batch_size: int | None = None
         method: MethodType = DEFAULT_PRIORITIZE_METHOD
         k: int | None = None
         c: int | None = None
@@ -489,6 +505,7 @@ class Prioritize(Evaluator):
 
     # Type declarations for attributes set by apply_config
     extractor: FeatureExtractor
+    batch_size: int | None
     method: MethodType
     k: int | None
     c: int | None
@@ -502,6 +519,7 @@ class Prioritize(Evaluator):
     def __init__(
         self,
         extractor: FeatureExtractor | None = None,
+        batch_size: int | None = None,
         method: MethodType | None = None,
         k: int | None = None,
         c: int | None = None,
@@ -782,9 +800,11 @@ class Prioritize(Evaluator):
             try:
                 from dataeval._embeddings import Embeddings as _Embeddings
 
-                embeddings_array = np.asarray(_Embeddings(dataset, extractor=self.extractor))
+                embeddings_array = np.asarray(
+                    _Embeddings(dataset, extractor=self.extractor, batch_size=self.batch_size)
+                )
                 if class_labels is None:
-                    self._metadata = _Metadata(dataset)
+                    self._metadata = Metadata(dataset)
                     class_labels = self._metadata.class_labels
             except Exception as e:
                 raise TypeError(
@@ -798,7 +818,9 @@ class Prioritize(Evaluator):
         else:
             from dataeval._embeddings import Embeddings as _Embeddings
 
-            reference_array = np.asarray(_Embeddings(self._reference, extractor=self.extractor))
+            reference_array = np.asarray(
+                _Embeddings(self._reference, extractor=self.extractor, batch_size=self.batch_size)
+            )
 
         # Check if we have labels for the requested policy
         if self.policy == "class_balanced" and class_labels is None:

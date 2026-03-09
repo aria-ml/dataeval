@@ -292,8 +292,6 @@ in parallel (stability), as well as the number of steps along the learning curve
 # Instantiate sufficiency metric
 suff = Sufficiency(
     model=model,
-    train_ds=train_ds,
-    test_ds=test_ds,
     config=mnist_config,
 )
 ```
@@ -304,7 +302,7 @@ Now we can evaluate the metric to train the models and produce the learning curv
 
 ```{code-cell} ipython3
 # Train & test model
-output = suff.evaluate()
+output = suff.evaluate(train_ds, test_ds)
 ```
 
 ```{code-cell} ipython3

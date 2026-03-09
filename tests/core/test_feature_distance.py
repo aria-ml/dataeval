@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval._metadata import FactorInfo, Metadata
 from dataeval.core._feature_distance import _calculate_drift, feature_distance
+from dataeval.exceptions import ShapeMismatchError
 
 
 def mock_metadata(
@@ -106,7 +107,7 @@ class TestFeatureDistance:
         c1 = np.ones((32, 1))
         c2 = np.ones((32, 2))
 
-        with pytest.raises(ValueError, match="same numbers of features"):
+        with pytest.raises(ShapeMismatchError, match="same numbers of features"):
             feature_distance(c1, c2)
 
 

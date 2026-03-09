@@ -57,13 +57,13 @@ class TestParityUnit:
             "factor_name",
             "score",
             "p_value",
-            "is_correlated",
+            "is_significant",
             "has_insufficient_data",
         }
         assert result.factors.schema["factor_name"].base_type() == pl.Categorical
         assert result.factors.schema["score"] == pl.Float64
         assert result.factors.schema["p_value"] == pl.Float64
-        assert result.factors.schema["is_correlated"] == pl.Boolean
+        assert result.factors.schema["is_significant"] == pl.Boolean
         assert result.factors.schema["has_insufficient_data"] == pl.Boolean
 
     def test_empty_metadata(self):
@@ -101,8 +101,8 @@ class TestParityUnit:
         result2 = parity_obj2.evaluate(metadata)
 
         # Lower thresholds should detect more correlated factors (or equal)
-        correlated_1 = result1.factors.filter(pl.col("is_correlated")).height
-        correlated_2 = result2.factors.filter(pl.col("is_correlated")).height
+        correlated_1 = result1.factors.filter(pl.col("is_significant")).height
+        correlated_2 = result2.factors.filter(pl.col("is_significant")).height
         assert correlated_1 >= correlated_2
 
 

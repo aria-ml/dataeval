@@ -3,6 +3,7 @@ import polars as pl
 import pytest
 
 from dataeval.config import use_max_processes
+from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.shift._drift._base import DriftOutput
 from dataeval.shift._drift._domain_classifier import DriftDomainClassifier
 
@@ -38,7 +39,7 @@ class TestDriftDomainClassifier:
     def test_fit_xref(self, trn_data):
         dc = DriftDomainClassifier(n_folds=2)
         dc.fit(trn_data)
-        assert dc.x_ref.shape == (100, 4)
+        assert dc.reference_data.shape == (100, 4)
         assert dc.n_features == 4
         assert dc._fitted
 
@@ -46,23 +47,23 @@ class TestDriftDomainClassifier:
     def test_fit_chunked(self, trn_data):
         dc = DriftDomainClassifier(n_folds=2, threshold=(0.6, 0.9))
         with use_max_processes(4):
-            dc.fit(trn_data, chunk_size=10)
-        assert dc.x_ref.shape == (100, 4)
+            chunked = dc.chunked(chunk_size=10).fit(trn_data)
+        assert dc.reference_data.shape == (100, 4)
         assert dc.n_features == 4
-        assert dc._chunker is not None
+        assert chunked._chunker is not None
         assert dc._n_folds == 2
-        assert dc._threshold_bounds != (None, None)
+        assert chunked._threshold_bounds != (None, None)
 
     def test_predict_xtest_mismatch_features(self, trn_data):
         dc = DriftDomainClassifier(n_folds=2)
         dc.fit(trn_data)  # 4 features
         test_5features = np.zeros((100, 5))
-        with pytest.raises(ValueError, match="different number of features"):
+        with pytest.raises(ShapeMismatchError, match="different number of features"):
             dc.predict(test_5features)
 
     def test_predict_before_fit(self):
         dc = DriftDomainClassifier(n_folds=2)
-        with pytest.raises(RuntimeError, match="Must call fit"):
+        with pytest.raises(NotFittedError, match="Must call fit"):
             dc.predict(np.zeros((10, 4)))
 
     @pytest.mark.optional
@@ -70,10 +71,11 @@ class TestDriftDomainClassifier:
         """Sequential tests for chunked mode, each step is required before proceeding to the next."""
         dc = DriftDomainClassifier(n_folds=2, threshold=(0.45, 0.65))
         with use_max_processes(4):
-            dc.fit(trn_data, chunk_count=5)
-        assert dc._chunker is not None
-        assert dc._baseline_values is not None
-        results = dc.predict(tst_data)
+            chunked = dc.chunked(chunk_count=5).fit(trn_data)
+        assert chunked._chunker is not None
+        assert chunked._baseline_values is not None
+        results = chunked.predict(tst_data)
+        assert isinstance(results, DriftOutput)
         assert isinstance(results.details, pl.DataFrame)
         assert results.metric_name == "auroc"
         # All chunks should be flagged as drifted (zeros vs Gaussian)
@@ -99,9 +101,9 @@ class TestDriftDomainClassifier:
         """Test predict with prebuilt test chunks."""
         dc = DriftDomainClassifier(n_folds=2, threshold=(0.45, 0.65))
         with use_max_processes(4):
-            dc.fit(trn_data, chunk_count=5)
+            chunked = dc.chunked(chunk_count=5).fit(trn_data)
         test_chunks = [tst_data[:50], tst_data[50:]]
-        result = dc.predict(chunks=test_chunks)
+        result = chunked.predict(chunks=test_chunks)
         assert isinstance(result.details, pl.DataFrame)
         assert len(result.details) == 2
         assert result.metric_name == "auroc"
@@ -111,32 +113,15 @@ class TestDriftDomainClassifier:
         """Test predict with chunk_indices override."""
         dc = DriftDomainClassifier(n_folds=2, threshold=(0.45, 0.65))
         with use_max_processes(4):
-            dc.fit(trn_data, chunk_count=5)
+            chunked = dc.chunked(chunk_count=5).fit(trn_data)
         indices = [list(range(0, 50)), list(range(50, 100))]
-        result = dc.predict(tst_data, chunk_indices=indices)
+        result = chunked.predict(tst_data, chunk_indices=indices)
         assert isinstance(result.details, pl.DataFrame)
         assert len(result.details) == 2
 
     @pytest.mark.optional
-    def test_fit_prebuilt_chunks(self, trn_data):
-        """Test fit with prebuilt reference chunks."""
-        dc = DriftDomainClassifier(n_folds=2, threshold=(0.45, 0.65))
-        chunks = [trn_data[:25], trn_data[25:50], trn_data[50:75], trn_data[75:]]
-        with use_max_processes(4):
-            dc.fit(trn_data, chunks=chunks)
-        assert dc._baseline_values is not None
-        assert len(dc._baseline_values) == 4
-
-    def test_predict_non_chunked_no_data_raises(self, trn_data):
-        """Test that non-chunked predict without data raises."""
-        dc = DriftDomainClassifier(n_folds=2)
-        dc.fit(trn_data)
-        with pytest.raises(ValueError, match="x is required"):
-            dc.predict(None)
-
-    @pytest.mark.optional
     def test_mvdc_stats_populated(self, trn_data, tst_data):
-        """Test that DriftDomainClassifierStats has fold_aurocs and feature_importances."""
+        """Test that DriftDomainClassifier.Stats has fold_aurocs and feature_importances."""
         dc = DriftDomainClassifier(n_folds=2)
         dc.fit(trn_data)
         with use_max_processes(4):

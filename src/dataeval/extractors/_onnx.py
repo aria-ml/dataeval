@@ -12,7 +12,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.protocols import Array, Transform
-from dataeval.utils.arrays import as_numpy
+from dataeval.types import ReprMixin
+from dataeval.utils._internal import as_numpy
 
 if TYPE_CHECKING:
     from onnxruntime import InferenceSession
@@ -68,7 +69,7 @@ def _get_execution_providers() -> list[str]:
     return providers
 
 
-class OnnxExtractor:
+class OnnxExtractor(ReprMixin):
     """
     Extracts embeddings via ONNX Runtime with lazy model loading.
 
@@ -124,9 +125,11 @@ class OnnxExtractor:
         if isinstance(model, bytes):
             self._model_bytes: bytes | None = model
             self._model_path: Path | None = None
+            self._model: str | Path | bytes = b"<bytes>"
         else:
             self._model_bytes = None
             self._model_path = Path(model)
+            self._model = self._model_path
 
         self._transforms = self._normalize_transforms(transforms)
         self._output_name = output_name

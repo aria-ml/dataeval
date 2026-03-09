@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from sklearn.datasets import load_digits
 
+from dataeval.exceptions import NotFittedError
 from dataeval.shift._ood._kneighbors import OODKNeighbors
 
 # Embedding dimensions for test
@@ -48,10 +49,10 @@ def test_knn(ood_type, k, distance_metric, reference_embeddings, query_embedding
     threshold_perc = 90.0
 
     # init OOD_KNN
-    knn = OODKNeighbors(k=k, distance_metric=distance_metric)
+    knn = OODKNeighbors(k=k, distance_metric=distance_metric, threshold_perc=threshold_perc)
 
     # fit OOD_KNN, infer threshold and compute reference scores
-    knn.fit(reference_embeddings, threshold_perc=threshold_perc)
+    knn.fit(reference_embeddings)
 
     # Check that reference scores were computed
     assert hasattr(knn, "_ref_score")
@@ -105,7 +106,7 @@ def test_knn_predict_validation(reference_embeddings, query_embeddings):
 
     # Test prediction before fitting
     query_array = query_embeddings
-    with pytest.raises(RuntimeError, match="Detector needs to be `fit` before calling predict or score"):
+    with pytest.raises(NotFittedError, match="Detector needs to be `fit` before calling predict or score"):
         knn.predict(query_array)
 
     # Fit the detector

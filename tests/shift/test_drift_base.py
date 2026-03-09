@@ -13,6 +13,7 @@ import polars as pl
 import pytest
 import torch
 
+from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Dataset
 from dataeval.shift._drift._base import (
     ChunkResult,
@@ -25,6 +26,10 @@ from dataeval.shift._drift._chunk import (
     SizeChunker,
     resolve_chunker,
 )
+from dataeval.shift._drift._domain_classifier import DriftDomainClassifier
+from dataeval.shift._drift._kneighbors import DriftKNeighbors
+from dataeval.shift._drift._mmd import DriftMMD
+from dataeval.shift._drift._reconstruction import DriftReconstruction
 from dataeval.shift._drift._univariate import DriftUnivariate
 
 
@@ -79,26 +84,20 @@ class TestBaseDrift:
         with pytest.raises(ValueError, match="Array-like"):
             base.fit("not an array")  # type: ignore
 
-    def test_base_x_ref_before_fit_raises(self):
+    def test_base_reference_data_before_fit_raises(self):
         base = DriftUnivariate()
-        with pytest.raises(RuntimeError, match="Must call fit"):
-            _ = base.x_ref
+        with pytest.raises(NotFittedError, match="Must call fit"):
+            _ = base.reference_data
 
     def test_base_n_features_before_fit_raises(self):
         base = DriftUnivariate()
-        with pytest.raises(RuntimeError, match="Must call fit"):
+        with pytest.raises(NotFittedError, match="Must call fit"):
             _ = base.n_features
 
     def test_base_predict_before_fit_raises(self):
         base = DriftUnivariate()
-        with pytest.raises(RuntimeError, match="Must call fit"):
+        with pytest.raises(NotFittedError, match="Must call fit"):
             base.predict(np.zeros((10, 5)))
-
-    def test_base_predict_no_data_raises(self):
-        base = DriftUnivariate()
-        base.fit(np.random.random((50, 5)).astype(np.float32))
-        with pytest.raises(ValueError, match="data is required"):
-            base.predict(None)
 
 
 @pytest.mark.required
@@ -215,3 +214,58 @@ class TestChunkers:
     def test_resolve_chunker_indices(self):
         result = resolve_chunker(chunk_indices=[[0, 1], [2, 3]])
         assert isinstance(result, IndexChunker)
+
+
+@pytest.mark.required
+class TestDriftConfigRepr:
+    """Tests that constructor params override config defaults and are reflected in repr."""
+
+    def test_univariate_params_override_config(self):
+        det = DriftUnivariate(method="cvm", p_val=0.1, correction="fdr")
+        assert det.config.method == "cvm"
+        assert det.config.p_val == 0.1
+        assert det.config.correction == "fdr"
+        assert "method='cvm'" in repr(det)
+        assert "p_val=0.1" in repr(det)
+
+    def test_univariate_config_object(self):
+        cfg = DriftUnivariate.Config(method="mwu", p_val=0.01)
+        det = DriftUnivariate(config=cfg)
+        assert det.config.method == "mwu"
+        assert det.config.p_val == 0.01
+
+    def test_univariate_param_overrides_config_object(self):
+        cfg = DriftUnivariate.Config(method="ks", p_val=0.05)
+        det = DriftUnivariate(method="cvm", config=cfg)
+        assert det.config.method == "cvm"
+        assert det.config.p_val == 0.05  # not overridden, stays from config
+
+    def test_domain_classifier_tuple_threshold_in_config(self):
+        det = DriftDomainClassifier(threshold=(0.45, 0.65))
+        assert det.config.threshold == (0.45, 0.65)
+        assert "threshold=(0.45, 0.65)" in repr(det)
+
+    def test_domain_classifier_default_config(self):
+        det = DriftDomainClassifier()
+        assert det.config.threshold == 0.55
+        assert det.config.n_folds == 5
+
+    def test_kneighbors_params_override_config(self):
+        det = DriftKNeighbors(k=3, distance_metric="cosine", p_val=0.01)
+        assert det.config.k == 3
+        assert det.config.distance_metric == "cosine"
+        assert det.config.p_val == 0.01
+        assert "k=3" in repr(det)
+        assert "distance_metric='cosine'" in repr(det)
+
+    def test_mmd_params_override_config(self):
+        det = DriftMMD(p_val=0.1, n_permutations=50, device="cpu")
+        assert det.config.p_val == 0.1
+        assert det.config.n_permutations == 50
+        assert "p_val=0.1" in repr(det)
+        assert "n_permutations=50" in repr(det)
+
+    def test_reconstruction_param_override_config(self):
+        det = DriftReconstruction(model=torch.nn.Identity(), p_val=0.01)
+        assert det.config.p_val == 0.01
+        assert "p_val=0.01" in repr(det)

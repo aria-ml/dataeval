@@ -5,6 +5,8 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TypedDict
 
+from dataeval.exceptions import ShapeMismatchError
+
 _logger = logging.getLogger(__name__)
 
 
@@ -140,7 +142,7 @@ def label_stats(
     else:
         item_indices_list = list(item_indices)
         if len(item_indices_list) != total_labels:
-            raise ValueError(
+            raise ShapeMismatchError(
                 f"item_indices length ({len(item_indices_list)}) must match class_labels length ({total_labels})",
             )
         inferred_image_count = max(item_indices_list) + 1 if item_indices_list else 0

@@ -11,11 +11,12 @@ import torch
 
 from dataeval.config import get_device
 from dataeval.protocols import Array, DeviceLike, Transform
+from dataeval.types import ReprMixin
 
 _logger = logging.getLogger(__name__)
 
 
-class TorchExtractor:
+class TorchExtractor(ReprMixin):
     """
     Extracts embeddings from a PyTorch model, with optional intermediate layer hooking.
 
@@ -41,6 +42,9 @@ class TorchExtractor:
     use_output : bool, default True
         If True, captures layer output; if False, captures layer input.
         Only used when layer_name is specified.
+    flatten : bool, default True
+        If True, flattens outputs with more than 2 dimensions to (N, D) shape.
+        If False, preserves the original output shape.
 
     Example
     -------
@@ -72,11 +76,13 @@ class TorchExtractor:
         device: DeviceLike | None = None,
         layer_name: str | None = None,
         use_output: bool = True,
+        flatten: bool = True,
     ) -> None:
         self.device = get_device(device)
         self._transforms = self._normalize_transforms(transforms)
         self._layer_name = layer_name
         self._use_output = use_output
+        self._flatten = flatten
 
         # Setup model
         self._model = model.to(self.device).eval()
@@ -97,6 +103,11 @@ class TorchExtractor:
     def use_output(self) -> bool:
         """Return whether output (True) or input (False) is captured from the layer."""
         return self._use_output
+
+    @property
+    def flatten(self) -> bool:
+        """Return whether outputs are flattened to 2D."""
+        return self._flatten
 
     def _normalize_transforms(
         self,
@@ -160,8 +171,15 @@ class TorchExtractor:
             else:
                 output = self._model(input_tensor)
 
-        return output.cpu().numpy()
+        result = output.cpu().numpy()
+
+        # Flatten spatial dimensions if present (N, C, H, W) -> (N, C*H*W)
+        if self._flatten and result.ndim > 2:
+            result = result.reshape(result.shape[0], -1)
+
+        return result
 
     def __repr__(self) -> str:
         layer_info = f", layer_name={self._layer_name!r}" if self._layer_name else ""
-        return f"TorchExtractor(device={self.device}{layer_info})"
+        flatten_info = "" if self._flatten else ", flatten=False"
+        return f"TorchExtractor(device={self.device}{layer_info}{flatten_info})"

@@ -10,7 +10,6 @@ from typing_extensions import Self
 
 from dataeval import Embeddings
 from dataeval._helpers import _get_index2label, _get_item_indices
-from dataeval.config import EPSILON
 from dataeval.core import (
     ClusterResult,
     ClusterStats,
@@ -21,7 +20,7 @@ from dataeval.core import (
     compute_stats,
 )
 from dataeval.flags import ImageStats
-from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, Metadata, Threshold, ThresholdLike
+from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, MetadataLike, Threshold, ThresholdLike
 from dataeval.quality._shared import add_dataset_index, drop_null_index_columns
 from dataeval.types import (
     ArrayND,
@@ -33,7 +32,7 @@ from dataeval.types import (
     StatsMap,
     set_metadata,
 )
-from dataeval.utils.arrays import flatten_samples, to_numpy
+from dataeval.utils._internal import EPSILON, flatten_samples, to_numpy
 from dataeval.utils.thresholds import AdaptiveThreshold, ZScoreThreshold, resolve_threshold
 
 DEFAULT_OUTLIERS_FLAGS = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
@@ -169,7 +168,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     # Aggregation methods
     # ------------------------------------------------------------------
 
-    def aggregate_by_class(self, metadata: Metadata) -> pl.DataFrame:
+    def aggregate_by_class(self, metadata: MetadataLike) -> pl.DataFrame:
         """
         Return a Polars DataFrame summarizing outliers per class and metric.
 
@@ -180,7 +179,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         Parameters
         ----------
-        metadata : Metadata
+        metadata : MetadataLike
             Metadata object containing class labels and image-to-class mappings for the dataset.
 
         Returns
@@ -479,7 +478,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             dataset_steps=self.dataset_steps,
         )
 
-    def classwise(self, metadata: Metadata) -> Self:
+    def classwise(self, metadata: MetadataLike) -> Self:
         """Re-detect outliers using per-class thresholds.
 
         Computes outlier thresholds within each class separately rather than
@@ -494,7 +493,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         Parameters
         ----------
-        metadata : Metadata
+        metadata : MetadataLike
             Metadata object containing class labels.
 
         Returns
@@ -684,7 +683,7 @@ def _get_outlier_mask(
 
 def _build_class_ids(
     source_index: Sequence[SourceIndex],
-    metadata: Metadata,
+    metadata: MetadataLike,
 ) -> NDArray[np.intp]:
     """Map each source_index entry to a class ID for per-class outlier detection.
 
@@ -698,7 +697,7 @@ def _build_class_ids(
     ----------
     source_index : Sequence[SourceIndex]
         List of source index entries from compute_stats.
-    metadata : Metadata
+    metadata : MetadataLike
         Metadata object with class_labels and optional item_indices.
 
     Returns
@@ -1451,7 +1450,7 @@ class Outliers(Evaluator):
         per_image: bool = True,
         per_target: Literal[False] = ...,
         per_class: bool = False,
-        metadata: Metadata | None = None,
+        metadata: MetadataLike | None = None,
     ) -> SingleOutliersOutput: ...
 
     @overload
@@ -1462,7 +1461,7 @@ class Outliers(Evaluator):
         per_image: bool = True,
         per_target: Literal[True],
         per_class: bool = False,
-        metadata: Metadata | None = None,
+        metadata: MetadataLike | None = None,
     ) -> SingleTargetOutliersOutput: ...
 
     @overload
@@ -1473,7 +1472,7 @@ class Outliers(Evaluator):
         per_image: bool = True,
         per_target: Literal[False] = ...,
         per_class: bool = False,
-        metadata: Metadata | None = None,
+        metadata: MetadataLike | None = None,
     ) -> MultiOutliersOutput: ...
 
     @overload
@@ -1484,7 +1483,7 @@ class Outliers(Evaluator):
         per_image: bool = True,
         per_target: Literal[True],
         per_class: bool = False,
-        metadata: Metadata | None = None,
+        metadata: MetadataLike | None = None,
     ) -> MultiTargetOutliersOutput: ...
 
     @set_metadata(
@@ -1503,7 +1502,7 @@ class Outliers(Evaluator):
         per_image: bool = True,
         per_target: bool = False,
         per_class: bool = False,
-        metadata: Metadata | None = None,
+        metadata: MetadataLike | None = None,
     ) -> SingleOutliersOutput | SingleTargetOutliersOutput | MultiOutliersOutput | MultiTargetOutliersOutput:
         """
         Return indices of Outliers with the issues identified for each.
@@ -1531,7 +1530,7 @@ class Outliers(Evaluator):
             rather than globally across the entire dataset. When True, ``metadata``
             must be provided. Only applies to image statistics-based detection,
             not cluster-based detection.
-        metadata : Metadata or None, default None
+        metadata : MetadataLike or None, default None
             Metadata object containing class labels. Required when ``per_class=True``.
 
         Returns
@@ -1606,7 +1605,7 @@ class Outliers(Evaluator):
         per_image: bool = True,
         per_target: bool = True,
         per_class: bool = False,
-        metadata: Metadata | None = None,
+        metadata: MetadataLike | None = None,
     ) -> SingleOutliersOutput:
         """Single-dataset evaluate implementation."""
         if self.flags == ImageStats.NONE and self.extractor is None:
@@ -1651,7 +1650,7 @@ class Outliers(Evaluator):
         per_image: bool = True,
         per_target: bool = True,
         per_class: bool = False,
-        metadata: Metadata | None = None,
+        metadata: MetadataLike | None = None,
     ) -> MultiOutliersOutput:
         """Multi-dataset evaluate: compute stats per dataset, then combine."""
         if self.flags == ImageStats.NONE and self.extractor is None:

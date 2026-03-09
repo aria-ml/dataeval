@@ -6,14 +6,21 @@ __all__ = [
     "Array3D",
     "Array4D",
     "Array5D",
-    "Array6D",
-    "Array7D",
-    "Array8D",
-    "Array9D",
     "ArrayND",
+    "BaseCollectionMixin",
+    "ClusterConfigMixin",
+    "DataFrameOutput",
+    "DictOutput",
+    "Evaluator",
+    "EvaluatorConfig",
     "ExecutionMetadata",
+    "MappingOutput",
+    "Output",
+    "ReprMixin",
+    "SequenceOutput",
     "SourceIndex",
     "StatsMap",
+    "set_metadata",
 ]
 
 
@@ -35,30 +42,15 @@ from dataeval import __version__
 from dataeval._helpers import apply_config, get_overrides
 from dataeval.protocols import Array, FeatureExtractor, SequenceLike
 
-DType = TypeVar("DType", covariant=True)
+_DType = TypeVar("_DType", covariant=True)
 
 
-Array1D: TypeAlias = Array | SequenceLike[DType]
-Array2D: TypeAlias = Array | SequenceLike[Array1D[DType]]
-Array3D: TypeAlias = Array | SequenceLike[Array2D[DType]]
-Array4D: TypeAlias = Array | SequenceLike[Array3D[DType]]
-Array5D: TypeAlias = Array | SequenceLike[Array4D[DType]]
-Array6D: TypeAlias = Array | SequenceLike[Array5D[DType]]
-Array7D: TypeAlias = Array | SequenceLike[Array6D[DType]]
-Array8D: TypeAlias = Array | SequenceLike[Array7D[DType]]
-Array9D: TypeAlias = Array | SequenceLike[Array8D[DType]]
-ArrayND: TypeAlias = (
-    Array
-    | Array1D[DType]
-    | Array2D[DType]
-    | Array3D[DType]
-    | Array4D[DType]
-    | Array5D[DType]
-    | Array6D[DType]
-    | Array7D[DType]
-    | Array8D[DType]
-    | Array9D[DType]
-)
+Array1D: TypeAlias = Array | SequenceLike[_DType]
+Array2D: TypeAlias = Array | SequenceLike[Array1D[_DType]]
+Array3D: TypeAlias = Array | SequenceLike[Array2D[_DType]]
+Array4D: TypeAlias = Array | SequenceLike[Array3D[_DType]]
+Array5D: TypeAlias = Array | SequenceLike[Array4D[_DType]]
+ArrayND: TypeAlias = Array | Array1D[_DType] | Array2D[_DType] | Array3D[_DType] | Array4D[_DType] | Array5D[_DType]
 
 StatsMap: TypeAlias = Mapping[str, NDArray[Any]]
 """
@@ -67,32 +59,96 @@ Each array should have the same length along the first dimension, representing t
 """
 
 # Default values for ClusterConfigMixin
-DEFAULT_CLUSTER_ALGORITHM: Literal["kmeans", "hdbscan"] = "hdbscan"
-DEFAULT_CLUSTER_N_CLUSTERS: int | None = None
+_DEFAULT_CLUSTER_ALGORITHM: Literal["kmeans", "hdbscan"] = "hdbscan"
+_DEFAULT_CLUSTER_N_CLUSTERS: int | None = None
 
 
 class EvaluatorConfig(BaseModel):
+    """Base configuration class for all evaluators."""
+
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
 
 class ClusterConfigMixin(BaseModel):
+    """Configuration mixin for evaluators that use clustering."""
+
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
     extractor: FeatureExtractor | None = None
     batch_size: int | None = None
-    cluster_algorithm: Literal["kmeans", "hdbscan"] = DEFAULT_CLUSTER_ALGORITHM
-    n_clusters: int | None = DEFAULT_CLUSTER_N_CLUSTERS
+    cluster_algorithm: Literal["kmeans", "hdbscan"] = _DEFAULT_CLUSTER_ALGORITHM
+    n_clusters: int | None = _DEFAULT_CLUSTER_N_CLUSTERS
+
+
+class ReprMixin:
+    """Mixin providing consistent ``__repr__`` via ``__init__`` signature introspection.
+
+    Looks up each ``__init__`` parameter on ``self`` (trying both ``name`` and
+    ``_name``).  Subclasses can override :meth:`_repr_extras` to append
+    additional key-value pairs (e.g. ``fitted=True``).
+    """
+
+    def _repr_extras(self) -> dict[str, Any]:
+        """Override to append extra state to ``__repr__``."""
+        return {}
+
+    def __repr__(self) -> str:
+        """Return a string representation showing init parameters and extras."""
+        sig = inspect.signature(self.__init__)  # type: ignore[misc]
+        params: list[str] = []
+        for name in sig.parameters:
+            if name == "self":
+                continue
+            if hasattr(self, name):
+                params.append(f"{name}={getattr(self, name)!r}")
+            elif hasattr(self, f"_{name}"):
+                params.append(f"{name}={getattr(self, f'_{name}')!r}")
+        for k, v in self._repr_extras().items():
+            params.append(f"{k}={v!r}")
+        return f"{self.__class__.__name__}({', '.join(params)})"
 
 
 class Evaluator:
     """Base class for all evaluators."""
 
-    def __init__(self, kwargs: dict[str, Any], *, exclude: set[str] | None = None) -> None:
+    def __init__(self, kwargs: dict[str, Any] | None = None, *, exclude: set[str] | None = None) -> None:
+        if kwargs is None:
+            return
         config_cls = getattr(self, "Config", None)
         if config_cls is None:
             raise NotImplementedError("Evaluator subclasses must define a Config class.")
         base_config = kwargs.get("config") or config_cls()
         self._config = base_config.model_copy(update=get_overrides(kwargs, exclude))
         apply_config(self, self._config)
+
+    def _repr_extras(self) -> dict[str, Any]:
+        """Override to append extra state to ``__repr__``."""
+        return {}
+
+    def _repr(self, *, extras: bool = True) -> str:
+        """Build repr string, optionally suppressing extras."""
+        config = getattr(self, "_config", None)
+        if config is not None and hasattr(config, "model_fields"):
+            # Pydantic config (bias, performance, quality, scope)
+            fields = config.model_fields
+        elif config is not None and hasattr(config, "__dataclass_fields__"):
+            # Dataclass config (drift, OOD)
+            fields = config.__dataclass_fields__
+        else:
+            # Fallback: try self.config (drift/OOD store config without underscore)
+            config = getattr(self, "config", None)
+            if config is not None and hasattr(config, "__dataclass_fields__"):
+                fields = config.__dataclass_fields__
+            else:
+                fields = {}
+        params = [f"{k}={getattr(config, k)!r}" for k in fields]
+        if extras:
+            for k, v in self._repr_extras().items():
+                params.append(f"{k}={v!r}")
+        return f"{self.__class__.__name__}({', '.join(params)})"
+
+    def __repr__(self) -> str:
+        """Return a string representation showing the evaluator configuration."""
+        return self._repr()
 
 
 class SourceIndex(NamedTuple):
@@ -206,6 +262,19 @@ class ExecutionMetadata:
     state: dict[str, Any]
     version: str
 
+    def __repr__(self) -> str:
+        """Return a detailed string representation of the execution metadata."""
+        return (
+            f"ExecutionMetadata(name={self.name!r}, "
+            f"execution_time={self.execution_time.isoformat()}, "
+            f"execution_duration={self.execution_duration:.4f}s, "
+            f"version={self.version!r})"
+        )
+
+    def __str__(self) -> str:
+        """Return a string representation showing the name and duration."""
+        return f"{self.name} ({self.execution_duration:.4f}s)"
+
     @classmethod
     def _empty(cls) -> Self:
         return cls(
@@ -218,13 +287,18 @@ class ExecutionMetadata:
         )
 
 
-T = TypeVar("T", covariant=True)
+_T = TypeVar("_T", covariant=True)
 
 
-class Output(Generic[T]):
+class Output(Generic[_T]):
+    """Base class for all evaluator output types."""
+
     _meta: ExecutionMetadata | None = None
 
-    def data(self) -> T: ...
+    def data(self) -> _T:
+        """Return the output data."""
+        ...
+
     def meta(self) -> ExecutionMetadata:
         """
         Metadata about the execution of the function or method for the Output class.
@@ -279,21 +353,27 @@ class DataFrameOutput(Output[pl.DataFrame]):
     # so they bypass __getattr__ entirely and must be forwarded explicitly.
 
     def __repr__(self) -> str:
+        """Return the repr of the underlying DataFrame."""
         return repr(self.data())
 
     def __str__(self) -> str:
+        """Return the string representation of the underlying DataFrame."""
         return str(self.data())
 
     def __len__(self) -> int:
+        """Return the number of rows in the underlying DataFrame."""
         return len(self.data())
 
     def __iter__(self) -> Iterator[pl.Series]:
+        """Iterate over the columns of the underlying DataFrame."""
         return iter(self.data())
 
     def __contains__(self, item: str) -> bool:
+        """Check if a column name exists in the underlying DataFrame."""
         return item in self.data()
 
     def __getitem__(self, item: Any) -> Any:
+        """Index into the underlying DataFrame."""
         return self.data()[item]
 
     def __getattr__(self, name: str) -> Any:
@@ -310,6 +390,8 @@ class DataFrameOutput(Output[pl.DataFrame]):
 
 
 class DictOutput(Output[dict[str, Any]]):
+    """An Output that exposes its public instance attributes as a dictionary."""
+
     def data(self) -> dict[str, Any]:
         """
         Return the output data as a dictionary.
@@ -320,11 +402,27 @@ class DictOutput(Output[dict[str, Any]]):
         """
         return {k: v for k, v in self.__dict__.items() if k != "_meta"}
 
+    @staticmethod
+    def _format_value(v: Any) -> str:
+        if isinstance(v, pl.DataFrame):
+            return f"DataFrame(shape={v.shape})"
+        if isinstance(v, np.ndarray):
+            return f"ndarray(shape={v.shape}, dtype={v.dtype})"
+        return repr(v)
+
+    def __repr__(self) -> str:
+        """Return a summary representation with formatted values."""
+        items = ", ".join(f"{k}={self._format_value(v)}" for k, v in self.data().items())
+        return f"{self.__class__.__name__}({items})"
+
     def __str__(self) -> str:
+        """Return the string representation of the data dictionary."""
         return str(self.data())
 
 
 class BaseCollectionMixin(Collection[Any]):
+    """Mixin providing collection interface for Output subclasses."""
+
     __slots__ = ["_data"]
 
     def data(self) -> Any:
@@ -338,57 +436,68 @@ class BaseCollectionMixin(Collection[Any]):
         return self._data
 
     def __len__(self) -> int:
+        """Return the number of items in the collection."""
         return len(self._data)
 
     def __repr__(self) -> str:
+        """Return a detailed string representation of the collection."""
         return f"{self.__class__.__name__}({repr(self._data)})"
 
     def __str__(self) -> str:
+        """Return the string representation of the underlying data."""
         return str(self._data)
 
 
-TKey = TypeVar("TKey", str, int, float, set)
-TValue = TypeVar("TValue")
+_TKey = TypeVar("_TKey", str, int, float, set)
+_TValue = TypeVar("_TValue")
 
 
-class MappingOutput(Mapping[TKey, TValue], BaseCollectionMixin, Output[Mapping[TKey, TValue]]):
-    def __init__(self, data: Mapping[TKey, TValue]) -> None:
+class MappingOutput(Mapping[_TKey, _TValue], BaseCollectionMixin, Output[Mapping[_TKey, _TValue]]):
+    """An Output that wraps a mapping and proxies its interface."""
+
+    def __init__(self, data: Mapping[_TKey, _TValue]) -> None:
         self._data = data
 
-    def __getitem__(self, key: TKey) -> TValue:
+    def __getitem__(self, key: _TKey) -> _TValue:
+        """Return the value for the given key."""
         return self._data[key]
 
-    def __iter__(self) -> Iterator[TKey]:
+    def __iter__(self) -> Iterator[_TKey]:
+        """Iterate over the keys of the mapping."""
         return iter(self._data)
 
 
-class SequenceOutput(Sequence[TValue], BaseCollectionMixin, Output[Sequence[TValue]]):
-    def __init__(self, data: Sequence[TValue]) -> None:
+class SequenceOutput(Sequence[_TValue], BaseCollectionMixin, Output[Sequence[_TValue]]):
+    """An Output that wraps a sequence and proxies its interface."""
+
+    def __init__(self, data: Sequence[_TValue]) -> None:
         self._data = data
 
     @overload
-    def __getitem__(self, index: int) -> TValue: ...
+    def __getitem__(self, index: int) -> _TValue: ...
     @overload
-    def __getitem__(self, index: slice) -> Sequence[TValue]: ...
+    def __getitem__(self, index: slice) -> Sequence[_TValue]: ...
 
-    def __getitem__(self, index: int | slice) -> TValue | Sequence[TValue]:
+    def __getitem__(self, index: int | slice) -> _TValue | Sequence[_TValue]:
+        """Return the item or slice at the given index."""
         return self._data[index]
 
-    def __iter__(self) -> Iterator[TValue]:
+    def __iter__(self) -> Iterator[_TValue]:
+        """Iterate over the items in the sequence."""
         return iter(self._data)
 
 
-P = ParamSpec("P")
-R = TypeVar("R", bound=Output)
+_P = ParamSpec("_P")
+_R = TypeVar("_R", bound=Output)
 
 
-def set_metadata(fn: Callable[P, R] | None = None, *, state: Sequence[str] | None = None) -> Callable[P, R]:
+def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | None = None) -> Callable[_P, _R]:
     """Stamp Output classes with runtime metadata."""
     if fn is None:
         return partial(set_metadata, state=state)  # type: ignore
 
     @wraps(fn)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         def fmt(v: Any) -> Any:
             if np.isscalar(v):
                 return v

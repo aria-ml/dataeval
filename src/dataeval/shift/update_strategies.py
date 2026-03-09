@@ -11,10 +11,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.protocols import UpdateStrategy
-from dataeval.utils.arrays import flatten_samples
+from dataeval.types import ReprMixin
+from dataeval.utils._internal import flatten_samples
 
 
-class LastSeenUpdateStrategy(UpdateStrategy):
+class LastSeenUpdateStrategy(ReprMixin, UpdateStrategy):
     """
     Updates reference dataset for :term:`drift<Drift>` detector using last seen method.
 
@@ -27,12 +28,12 @@ class LastSeenUpdateStrategy(UpdateStrategy):
     def __init__(self, n: int) -> None:
         self.n = n
 
-    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
+    def __call__(self, reference_data: NDArray[np.float32], data: NDArray[np.float32]) -> NDArray[np.float32]:
         """Update reference data using last seen instances."""
-        return np.concatenate([x_ref, flatten_samples(x_new)], axis=0)[-self.n :]
+        return np.concatenate([reference_data, flatten_samples(data)], axis=0)[-self.n :]
 
 
-class ReservoirSamplingUpdateStrategy(UpdateStrategy):
+class ReservoirSamplingUpdateStrategy(ReprMixin, UpdateStrategy):
     """
     Updates reference dataset for :term:`drift<Drift>` detector using reservoir sampling method.
 
@@ -46,21 +47,21 @@ class ReservoirSamplingUpdateStrategy(UpdateStrategy):
         self.n = n
         self._count = 0
 
-    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
+    def __call__(self, reference_data: NDArray[np.float32], data: NDArray[np.float32]) -> NDArray[np.float32]:
         """Update reference data using reservoir sampling."""
-        if x_new.shape[0] + self._count <= self.n:
-            self._count += x_new.shape[0]
-            result = np.concatenate([x_ref, flatten_samples(x_new)], axis=0)
+        if data.shape[0] + self._count <= self.n:
+            self._count += data.shape[0]
+            result = np.concatenate([reference_data, flatten_samples(data)], axis=0)
             return result[: self.n]
 
-        n_ref = x_ref.shape[0]
-        output_size = min(self.n, n_ref + x_new.shape[0])
-        shape = (output_size,) + x_new.shape[1:]
+        n_ref = reference_data.shape[0]
+        output_size = min(self.n, n_ref + data.shape[0])
+        shape = (output_size,) + data.shape[1:]
 
-        x_reservoir = np.zeros(shape, dtype=x_ref.dtype)
-        x_reservoir[:n_ref] = x_ref
+        x_reservoir = np.zeros(shape, dtype=reference_data.dtype)
+        x_reservoir[:n_ref] = reference_data
 
-        for item in x_new:
+        for item in data:
             self._count += 1
             if n_ref < self.n:
                 x_reservoir[n_ref, :] = item

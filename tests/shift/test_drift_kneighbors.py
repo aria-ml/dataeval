@@ -2,6 +2,7 @@ import numpy as np
 import polars as pl
 import pytest
 
+from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.shift._drift._base import DriftOutput
 from dataeval.shift._drift._kneighbors import DriftKNeighbors
 
@@ -59,18 +60,18 @@ class TestDriftKNeighborsInit:
 class TestDriftKNeighborsFit:
     def test_fit_stores_ref(self, ref_data):
         det = DriftKNeighbors(k=5).fit(ref_data)
-        assert det.x_ref.shape == (200, 8)
+        assert det.reference_data.shape == (200, 8)
         assert det._fitted
 
     def test_predict_before_fit_raises(self):
         det = DriftKNeighbors()
-        with pytest.raises(RuntimeError, match="Must call fit"):
+        with pytest.raises(NotFittedError, match="Must call fit"):
             det.predict(np.zeros((10, 8)))
 
     def test_x_ref_before_fit_raises(self):
         det = DriftKNeighbors()
-        with pytest.raises(RuntimeError, match="Must call fit"):
-            _ = det.x_ref
+        with pytest.raises(NotFittedError, match="Must call fit"):
+            _ = det.reference_data
 
 
 @pytest.mark.optional
@@ -100,7 +101,7 @@ class TestDriftKNeighborsNonChunked:
 
     def test_feature_mismatch_raises(self, ref_data):
         det = DriftKNeighbors(k=5).fit(ref_data)
-        with pytest.raises(ValueError, match="different number of features"):
+        with pytest.raises(ShapeMismatchError, match="different number of features"):
             det.predict(np.zeros((10, 4)))
 
     def test_detects_subtle_drift(self):
@@ -113,42 +114,32 @@ class TestDriftKNeighborsNonChunked:
         assert result.drifted is True
         assert result.details["p_val"] < 0.05
 
-    def test_x_required(self, ref_data):
-        det = DriftKNeighbors(k=5).fit(ref_data)
-        with pytest.raises(ValueError, match="x is required"):
-            det.predict(None)
-
 
 @pytest.mark.optional
 class TestDriftKNeighborsChunked:
     def test_chunked_fit_predict(self, ref_data, shifted_data):
-        det = DriftKNeighbors(k=5, distance_metric="euclidean").fit(ref_data, chunk_size=50)
+        det = DriftKNeighbors(k=5, distance_metric="euclidean").chunked(chunk_size=50).fit(ref_data)
         assert det._chunker is not None
         result = det.predict(shifted_data)
+        assert isinstance(result, DriftOutput)
         assert isinstance(result.details, pl.DataFrame)
         assert result.metric_name == "knn_distance"
         assert result.drifted
 
     def test_chunked_count(self, ref_data, shifted_data):
-        det = DriftKNeighbors(k=5, distance_metric="euclidean").fit(ref_data, chunk_count=4)
+        det = DriftKNeighbors(k=5, distance_metric="euclidean").chunked(chunk_count=4).fit(ref_data)
         result = det.predict(shifted_data)
         assert isinstance(result.details, pl.DataFrame)
 
-    def test_prebuilt_chunks_fit(self, ref_data):
-        chunks = [ref_data[:50], ref_data[50:100], ref_data[100:150], ref_data[150:]]
-        det = DriftKNeighbors(k=5, distance_metric="euclidean").fit(ref_data, chunks=chunks)
-        assert det._baseline_values is not None
-        assert len(det._baseline_values) == 4
-
     def test_prebuilt_chunks_predict(self, ref_data, shifted_data):
-        det = DriftKNeighbors(k=5, distance_metric="euclidean").fit(ref_data, chunk_count=4)
+        det = DriftKNeighbors(k=5, distance_metric="euclidean").chunked(chunk_count=4).fit(ref_data)
         test_chunks = [shifted_data[:50], shifted_data[50:]]
         result = det.predict(chunks=test_chunks)
         assert isinstance(result.details, pl.DataFrame)
         assert len(result.details) == 2
 
     def test_chunk_indices_predict(self, ref_data, shifted_data):
-        det = DriftKNeighbors(k=5, distance_metric="euclidean").fit(ref_data, chunk_count=4)
+        det = DriftKNeighbors(k=5, distance_metric="euclidean").chunked(chunk_count=4).fit(ref_data)
         indices = [list(range(0, 50)), list(range(50, 100))]
         result = det.predict(shifted_data, chunk_indices=indices)
         assert isinstance(result.details, pl.DataFrame)

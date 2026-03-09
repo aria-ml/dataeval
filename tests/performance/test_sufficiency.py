@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Literal
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -8,7 +8,7 @@ import torch
 from dataeval.performance import Sufficiency
 from dataeval.performance._output import SufficiencyOutput
 from dataeval.protocols import EvaluationStrategy, TrainingStrategy
-from tests.conftest import DatumType, SimpleDataset
+from tests.conftest import SimpleDataset
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -25,31 +25,34 @@ def mock_ds(length: int | None):
 
 @pytest.mark.required
 class TestSufficiency:
-    def test_mock_run(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
+    def test_mock_run(self, basic_config: Sufficiency.Config, mock_reset, simple_dataset: SimpleDataset) -> None:
         """Verify return value of evaluate is the correct output type."""
         suff = Sufficiency(
             model=MagicMock(),
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
+            reset_strategy=mock_reset,
             config=basic_config,
         )
 
-        results = suff.evaluate()
+        results = suff.evaluate(simple_dataset, simple_dataset)
         assert isinstance(results, SufficiencyOutput)
 
-    def test_mock_run_at_value(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
+    def test_mock_run_at_value(
+        self, basic_config: Sufficiency.Config, mock_reset, simple_dataset: SimpleDataset
+    ) -> None:
         """Verify return value of evaluate is the correct output type when run at a specific substep."""
-        suff = Sufficiency(model=MagicMock(), train_ds=simple_dataset, test_ds=simple_dataset, config=basic_config)
+        suff = Sufficiency(model=MagicMock(), reset_strategy=mock_reset, config=basic_config)
 
-        results = suff.evaluate(schedule=np.array([1]))
+        results = suff.evaluate(simple_dataset, simple_dataset, schedule=np.array([1]))
         assert isinstance(results, SufficiencyOutput)
 
-    def test_run_with_invalid_schedule(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
+    def test_run_with_invalid_schedule(
+        self, basic_config: Sufficiency.Config, mock_reset, simple_dataset: SimpleDataset
+    ) -> None:
         """Verifies an invalid schedule type raises a ValueError due to CustomSchedule auto-numpy conversion."""
-        suff = Sufficiency(model=MagicMock(), train_ds=simple_dataset, test_ds=simple_dataset, config=basic_config)
+        suff = Sufficiency(model=MagicMock(), reset_strategy=mock_reset, config=basic_config)
 
         with pytest.raises(ValueError, match="invalid literal"):
-            suff.evaluate(schedule="hello world")  # type: ignore
+            suff.evaluate(simple_dataset, simple_dataset, schedule="hello world")  # type: ignore
 
     def test_multiple_runs_multiple_metrics(
         self,
@@ -69,18 +72,16 @@ class TestSufficiency:
         multi_metric_config = Sufficiency.Config(
             training_strategy=mock_train,
             evaluation_strategy=mock_eval_mixed_metric_strategy,
-            reset_strategy=mock_reset,
             runs=RUNS,
             substeps=SUBSTEPS,
         )
 
         suff = Sufficiency(
             model=MagicMock(),
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
+            reset_strategy=mock_reset,
             config=multi_metric_config,
         )
-        output = suff.evaluate()
+        output = suff.evaluate(simple_dataset, simple_dataset)
 
         assert isinstance(output, SufficiencyOutput)
         # Exact curve shape not important so can reduce expensive curve fitting
@@ -113,19 +114,17 @@ class TestSufficiency:
         config = Sufficiency.Config(
             training_strategy=mock_train,
             evaluation_strategy=mock_eval_scalar_metrics_strategy,
-            reset_strategy=mock_reset,
             runs=RUNS,
             substeps=SUBSTEPS,
         )
 
         suff = Sufficiency(
             model=MagicMock(),
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
+            reset_strategy=mock_reset,
             config=config,
         )
 
-        output = suff.evaluate()
+        output = suff.evaluate(simple_dataset, simple_dataset)
 
         # Exact curve shape not important so can reduce expensive curve fitting
         assert len(output.get_params(n_iter=10)) == METRIC_COUNT
@@ -156,19 +155,17 @@ class TestSufficiency:
         config = Sufficiency.Config(
             training_strategy=mock_train,
             evaluation_strategy=mock_eval_classwise,
-            reset_strategy=mock_reset,
             runs=RUNS,
             substeps=SUBSTEPS,
         )
 
         suff = Sufficiency(
             model=MagicMock(),
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
+            reset_strategy=mock_reset,
             config=config,
         )
 
-        output = suff.evaluate()
+        output = suff.evaluate(simple_dataset, simple_dataset)
 
         assert isinstance(output, SufficiencyOutput)
         assert len(output.measures) == METRIC_COUNT
@@ -193,73 +190,22 @@ class TestSufficiency:
     def test_dataset_len(
         self,
         basic_config: Sufficiency.Config,
+        mock_reset,
         train_ds_len: Literal[1, 0] | None,
         test_ds_len: Literal[1, 0] | None,
         expected_error: type[TypeError] | type[ValueError] | None,
     ):
-        def call_suff(train_ds_len, test_ds_len):
-            Sufficiency(
+        def call_evaluate(train_ds_len, test_ds_len):
+            suff = Sufficiency(
                 model=MagicMock(),
-                train_ds=mock_ds(train_ds_len),
-                test_ds=mock_ds(test_ds_len),
+                reset_strategy=mock_reset,
                 config=basic_config,
             )
+            suff.evaluate(mock_ds(train_ds_len), mock_ds(test_ds_len))
 
         if expected_error is None:
-            call_suff(train_ds_len, test_ds_len)
+            call_evaluate(train_ds_len, test_ds_len)
             return
 
         with pytest.raises(expected_error):
-            call_suff(train_ds_len, test_ds_len)
-
-
-class TestDatasetImmutability:
-    """Test that datasets are immutable after construction."""
-
-    def test_train_ds_has_no_setter(
-        self,
-        mock_model: MagicMock,
-        simple_dataset: SimpleDataset,
-        basic_config: Sufficiency.Config[DatumType, Any],
-    ):
-        """Verify train_ds property is read-only."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
-
-        # Should not be able to set train_ds
-        with pytest.raises(AttributeError, match="can't set attribute|has no setter"):
-            suff.train_ds = simple_dataset  # pyright: ignore[reportAttributeAccessIssue]
-
-    def test_test_ds_has_no_setter(
-        self,
-        mock_model: MagicMock,
-        simple_dataset: SimpleDataset,
-        basic_config: Sufficiency.Config[DatumType, Any],
-    ):
-        """Verify test_ds property is read-only."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
-
-        # Should not be able to set test_ds
-        with pytest.raises(AttributeError, match="can't set attribute|has no setter"):
-            suff.test_ds = simple_dataset  # pyright: ignore[reportAttributeAccessIssue]
-
-    def test_can_read_train_ds(
-        self,
-        mock_model: MagicMock,
-        simple_dataset: SimpleDataset,
-        basic_config: Sufficiency.Config[DatumType, Any],
-    ):
-        """Verify train_ds is still readable."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
-
-        assert suff.train_ds is simple_dataset
-
-    def test_can_read_test_ds(
-        self,
-        mock_model: MagicMock,
-        simple_dataset: SimpleDataset,
-        basic_config: Sufficiency.Config[DatumType, Any],
-    ):
-        """Verify test_ds is still readable."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
-
-        assert suff.test_ds is simple_dataset
+            call_evaluate(train_ds_len, test_ds_len)

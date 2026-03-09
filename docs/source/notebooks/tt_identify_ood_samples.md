@@ -341,10 +341,10 @@ print(f"Test OOD embeddings shape: {test_ood_emb.shape}")
 
 ```{code-cell} ipython3
 # Create KNN detector with learned embeddings
-ood_knn_cos = OODKNeighbors(k=10, distance_metric="cosine")
+ood_knn_cos = OODKNeighbors(k=10, distance_metric="cosine", threshold_perc=95.0)
 
 print("\nFitting KNN detector with learned embeddings...")
-ood_knn_cos.fit(train_in_emb, threshold_perc=95.0)
+ood_knn_cos.fit(train_in_emb)
 print("Done!")
 ```
 
@@ -372,10 +372,10 @@ better suited for embeddings where the scale of the vectors carries meaningful i
 
 ```{code-cell} ipython3
 # Create KNN detector with Euclidean distance
-ood_knn_euc = OODKNeighbors(k=10, distance_metric="euclidean")
+ood_knn_euc = OODKNeighbors(k=10, distance_metric="euclidean", threshold_perc=95.0)
 
 print("Fitting KNN (Euclidean) detector with learned embeddings...")
-ood_knn_euc.fit(train_in_emb, threshold_perc=95.0)
+ood_knn_euc.fit(train_in_emb)
 print("Done!")
 ```
 
@@ -1096,13 +1096,13 @@ train_emb = Embeddings(train_data, model=embedding_model)
 test_emb = Embeddings(test_data, model=embedding_model)
 
 # Cosine distance — best for normalized/pretrained embeddings
-ood_knn_cos = OODKNeighbors(k=10, distance_metric="cosine")
-ood_knn_cos.fit(train_emb, threshold_perc=95.0)
+ood_knn_cos = OODKNeighbors(k=10, distance_metric="cosine", threshold_perc=95.0)
+ood_knn_cos.fit(train_emb)
 result_cos = ood_knn_cos.predict(test_emb)
 
 # Euclidean distance — best when magnitude is informative
-ood_knn_euc = OODKNeighbors(k=10, distance_metric="euclidean")
-ood_knn_euc.fit(train_emb, threshold_perc=95.0)
+ood_knn_euc = OODKNeighbors(k=10, distance_metric="euclidean", threshold_perc=95.0)
+ood_knn_euc.fit(train_emb)
 result_euc = ood_knn_euc.predict(test_emb)
 ```
 
