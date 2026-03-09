@@ -88,7 +88,7 @@ from torchvision.transforms.v2 import GaussianNoise
 from dataeval import Embeddings, Metadata
 from dataeval.core import label_parity
 from dataeval.extractors import TorchExtractor
-from dataeval.shift import DriftDomainClassifier, DriftKNeighbors, DriftMMD, DriftUnivariate
+from dataeval.shift import ChunkedDrift, DriftDomainClassifier, DriftKNeighbors, DriftMMD, DriftUnivariate
 
 # Set a random seed
 rng = np.random.default_rng(213)
@@ -423,11 +423,11 @@ print(f"Combined shape: {combined_embs.shape} (clean: {split_idx}, noisy: {n_ope
 
 ```{code-cell} ipython3
 # Re-fit detectors with chunking enabled (5 chunks each)
-chunked_detectors: dict[str, DriftDetector] = {
-    "CVM": DriftUnivariate(method="cvm").fit(train_embs, chunk_count=5),
-    "MMD": DriftMMD().fit(train_embs, chunk_count=5),
-    "MVDC": DriftDomainClassifier(threshold=(0.45, 0.65)).fit(train_embs, chunk_count=5),
-    "KNN": DriftKNeighbors().fit(train_embs, chunk_count=5),
+chunked_detectors: dict[str, ChunkedDrift] = {
+    "CVM": DriftUnivariate(method="cvm").chunked(chunk_count=5).fit(train_embs),
+    "MMD": DriftMMD().chunked(chunk_count=5).fit(train_embs),
+    "MVDC": DriftDomainClassifier(threshold=(0.45, 0.65)).chunked(chunk_count=5).fit(train_embs),
+    "KNN": DriftKNeighbors().chunked(chunk_count=5).fit(train_embs),
 }
 ```
 
