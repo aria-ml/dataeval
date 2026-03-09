@@ -11,6 +11,7 @@ docs:
     - $DOCS_RUNNER_TAG
   before_script:
     - apt update && apt install curl git graphviz -y
+    - git fetch --tags  # Ensure version tags are available for setuptools-scm
     - curl -LsSf https://astral.sh/uv/install.sh | sh
     - uv tool install nox --with nox-uv
   script:
