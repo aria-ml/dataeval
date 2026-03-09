@@ -665,3 +665,207 @@ class TestDownstreamCollapsed:
         md = Metadata(ds, exclude=["id"])
         stats = label_stats(md.class_labels, md.item_indices, md.index2label, image_count=md.item_count)
         assert len(stats["label_counts_per_image"]) == len(ds)
+
+
+# ===================================================================
+# Edge cases: empty targets, single class, no index2label, etc.
+# ===================================================================
+
+
+class TestEdgeCases:
+    """Edge cases for label handling: single class, no index2label, empty targets."""
+
+    # --- Single-class datasets ---
+
+    def test_single_class_ic(self):
+        """IC dataset where every image has the same label."""
+        labels = [2] * 10
+        ds = ICDatasetCorrect(10, labels, {2: "only_class"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        assert set(md.class_labels) == {2}
+        assert len(md.class_labels) == 10
+        assert md.index2label == {2: "only_class"}
+
+    def test_single_class_od(self):
+        """OD dataset where every detection is the same class."""
+        labels_per_image = [[3], [3], [3, 3], [3]]
+        ds = ODDatasetWithLabels(4, labels_per_image, {3: "only_class"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        assert set(md.class_labels) == {3}
+        assert md.index2label == {3: "only_class"}
+        assert len(md.class_labels) == 5  # 1+1+2+1 detections
+
+    # --- No index2label provided ---
+
+    def test_no_index2label_ic(self):
+        """IC dataset with no index2label: auto-generated uses str(label_value)."""
+        labels = [1, 3, 5, 1, 3, 5, 1, 3, 5, 1]
+
+        class _ICNoI2L:
+            @property
+            def metadata(self):
+                return {"id": "no_i2l_ic"}
+
+            def __len__(self):
+                return len(labels)
+
+            def __getitem__(self, idx):
+                n_classes = max(labels) + 1
+                one_hot = np.zeros(n_classes, dtype=np.float32)
+                one_hot[labels[idx]] = 1.0
+                img = np.random.rand(3, 32, 32).astype(np.float32)
+                return img, one_hot, {"id": idx, "brightness": float(idx)}
+
+        md = Metadata(_ICNoI2L(), exclude=["id"])  # type: ignore
+        # Auto-generated: keys are label values, names are str(value)
+        assert md.index2label == {1: "1", 3: "3", 5: "5"}
+        for key in md.index2label:
+            assert type(key) is int
+
+    def test_no_index2label_od(self):
+        """OD dataset with no index2label: auto-generated uses str(label_value)."""
+        labels_per_image = [[1, 2], [2, 3], [1, 3]]
+
+        class _ODNoI2L:
+            @property
+            def metadata(self):
+                return {"id": "no_i2l_od"}
+
+            def __len__(self):
+                return len(labels_per_image)
+
+            def __getitem__(self, idx):
+                img_labels = labels_per_image[idx]
+                n_det = len(img_labels)
+                boxes = np.random.rand(n_det, 4).astype(np.float32) * 50
+                scores = np.random.rand(n_det, 4).astype(np.float32)
+                target = SimpleODTarget(boxes=boxes, labels=np.array(img_labels), scores=scores)
+                img = np.random.rand(3, 32, 32).astype(np.float32)
+                return img, target, {"id": idx, "brightness": float(idx)}
+
+        md = Metadata(_ODNoI2L(), exclude=["id"])  # type: ignore
+        assert md.index2label == {1: "1", 2: "2", 3: "3"}
+        for key in md.index2label:
+            assert type(key) is int
+
+    # --- OD with some images having zero detections ---
+
+    def test_od_some_empty_targets(self):
+        """OD dataset where some images have zero detections."""
+        labels_per_image = [[1, 2], [], [1, 3], [], [2, 3]]
+        ds = ODDatasetWithLabels(5, labels_per_image, {1: "a", 2: "b", 3: "c"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        # Only 3 images contribute detections: 2+2+2 = 6
+        assert len(md.class_labels) == 6
+        assert set(md.class_labels) == {1, 2, 3}
+        # item_indices should skip empty images
+        assert 1 not in md.item_indices
+        assert 3 not in md.item_indices
+        assert md.item_count == 5
+
+    def test_od_all_empty_targets(self):
+        """OD dataset where every image has zero detections."""
+        labels_per_image: list[list[int]] = [[], [], []]
+        ds = ODDatasetWithLabels(3, labels_per_image, {0: "a", 1: "b"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        assert len(md.class_labels) == 0
+        assert md.index2label == {}
+        assert md.item_count == 3
+
+    # --- IC with some empty targets ---
+
+    def test_ic_some_empty_targets(self):
+        """IC dataset where some images have empty target arrays."""
+        labels = [1, None, 3, None, 5]
+
+        class _ICPartialEmpty:
+            @property
+            def metadata(self):
+                return {"id": "ic_partial_empty", "index2label": {1: "a", 3: "b", 5: "c"}}
+
+            def __len__(self):
+                return len(labels)
+
+            def __getitem__(self, idx):
+                img = np.random.rand(3, 32, 32).astype(np.float32)
+                lbl = labels[idx]
+                if lbl is None:
+                    return img, np.array([]), {"id": idx}
+                n_classes = 6
+                one_hot = np.zeros(n_classes, dtype=np.float32)
+                one_hot[lbl] = 1.0
+                return img, one_hot, {"id": idx}
+
+        md = Metadata(_ICPartialEmpty(), exclude=["id"])  # type: ignore
+        assert len(md.class_labels) == 3
+        assert set(md.class_labels) == {1, 3, 5}
+        # Items 1 and 3 are skipped
+        assert 1 not in md.item_indices
+        assert 3 not in md.item_indices
+
+    # --- Single-image datasets ---
+
+    def test_single_image_ic(self):
+        """IC dataset with exactly one image."""
+        ds = ICDatasetCorrect(1, [2], {2: "only"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        assert len(md.class_labels) == 1
+        assert md.class_labels[0] == 2
+        assert md.index2label == {2: "only"}
+        assert md.item_count == 1
+
+    def test_single_image_od(self):
+        """OD dataset with exactly one image and one detection."""
+        ds = ODDatasetWithLabels(1, [[5]], {5: "singleton"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        assert len(md.class_labels) == 1
+        assert md.class_labels[0] == 5
+        assert md.index2label == {5: "singleton"}
+        assert md.item_count == 1
+
+    # --- Large label gap ---
+
+    def test_large_label_gap_ic(self):
+        """IC dataset with a large gap in label values (0 and 100)."""
+        labels = [0, 100, 0, 100, 0, 100, 0, 100, 0, 100]
+        ds = ICDatasetCorrect(10, labels, {0: "low", 100: "high"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        assert set(md.class_labels) == {0, 100}
+        assert md.index2label == {0: "low", 100: "high"}
+
+    def test_large_label_gap_od(self):
+        """OD dataset with a large gap in label values."""
+        labels_per_image = [[0, 100], [100, 0], [0, 100], [0, 100], [100, 0]]
+        ds = ODDatasetWithLabels(5, labels_per_image, {0: "low", 100: "high"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        assert set(md.class_labels) == {0, 100}
+        assert md.index2label == {0: "low", 100: "high"}
+
+    # --- Extra index2label keys (more keys than observed labels) ---
+
+    def test_extra_index2label_keys(self):
+        """index2label has keys for classes not present in the data."""
+        labels = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ds = ICDatasetCorrect(10, labels, {0: "unused_0", 1: "used", 2: "unused_2"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        # Only label 1 is observed, so index2label only includes that
+        assert md.index2label == {1: "used"}
+        assert set(md.class_labels) == {1}
+
+    # --- Downstream: single-class with bias evaluators ---
+
+    def test_single_class_diversity(self):
+        """Diversity should not crash on a single-class dataset."""
+        labels = [2] * 10
+        ds = ICDatasetCorrect(10, labels, {2: "only_class"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        result = Diversity().evaluate(md)
+        assert result.factors.shape[0] > 0
+
+    def test_single_class_label_stats(self):
+        """label_stats should work with a single class."""
+        labels = [2] * 10
+        ds = ICDatasetCorrect(10, labels, {2: "only_class"})
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+        stats = label_stats(md.class_labels, md.item_indices, md.index2label, image_count=md.item_count)
+        assert len(stats["label_counts_per_image"]) == 10
