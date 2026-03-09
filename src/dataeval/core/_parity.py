@@ -116,6 +116,7 @@ def parity(
     chi_scores = np.zeros(factor_data_np.shape[1])
     p_values = np.zeros_like(chi_scores)
     insufficient_ddict: defaultdict[int, defaultdict[int, dict[int, int]]] = defaultdict(lambda: defaultdict(dict))
+    unique_class_labels = np.unique(class_labels_np)
 
     for i, col_data in enumerate(factor_data_np.T):
         # Builds a contingency matrix where entry at index (r,c) represents
@@ -132,7 +133,8 @@ def parity(
             if contingency_matrix[int_factor, int_class] > 0:
                 factor_category = unique_factor_values[int_factor].item()
                 class_count = contingency_matrix[int_factor, int_class].item()
-                insufficient_ddict[i][factor_category][int_class] = class_count
+                class_label = int(unique_class_labels[int_class])
+                insufficient_ddict[i][factor_category][class_label] = class_count
 
         # This deletes rows containing only zeros,
         # because scipy.stats.chi2_contingency fails when there are rows containing only zeros.

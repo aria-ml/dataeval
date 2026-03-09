@@ -1311,7 +1311,13 @@ class Metadata(Array, FeatureExtractor):
                 n_classes,
             )
 
-        index2label = self._dataset.metadata.get("index2label", {i: str(i) for i in np.unique(labels)})
+        unique_labels = np.unique(labels) if len(labels) else np.array([], dtype=np.intp)
+        provided_i2l = self._dataset.metadata.get("index2label", None)
+        if provided_i2l is not None:
+            # Ensure every observed label has a name; use fallback for unmapped labels
+            index2label = {int(lbl): provided_i2l.get(int(lbl), f"UNDEFINED_CLASS_{int(lbl)}") for lbl in unique_labels}
+        else:
+            index2label = {int(lbl): str(int(lbl)) for lbl in unique_labels}
         target_idx = self._compute_target_indices(srcidx, datum_count, bool(self._has_targets))
         reserved = ["item_index", "target_index", "class_label", "score", "box"]
         target_factor_dict = {}
