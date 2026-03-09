@@ -12,7 +12,7 @@ from scipy.stats import entropy
 
 from dataeval.config import get_device
 from dataeval.protocols import Array, DeviceLike, Transform
-from dataeval.utils.arrays import as_numpy
+from dataeval.utils._internal import as_numpy
 from dataeval.utils.training import predict
 
 

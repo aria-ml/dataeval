@@ -10,6 +10,7 @@ from dataeval._metadata import FactorInfo, Metadata, _binned
 from dataeval.core import compute_stats
 from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._label_stats import label_stats
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.flags import ImageStats
 from dataeval.utils.data import unzip_dataset
 from tests.embeddings.test_embeddings import MockDataset
@@ -117,7 +118,7 @@ class TestMetadata:
         assert len(ratiostats["source_index"]) == 16
 
     def test_mismatch_factor_length(self, mock_metadata):
-        with pytest.raises(ValueError, match="provided factors have a different length"):
+        with pytest.raises(ShapeMismatchError, match="provided factors have a different length"):
             mock_metadata.add_factors({"a": np.random.random((20,))})
 
     def test_add_empty_factors(self):
@@ -474,10 +475,10 @@ class TestMetadata:
 
         md = Metadata(dataset)
 
-        with pytest.raises(ValueError, match="All factors must have the same length"):
+        with pytest.raises(ShapeMismatchError, match="All factors must have the same length"):
             md._infer_factor_level({"a": [1, 2, 3], "b": [1, 2]}, num_image_rows=5, num_target_rows=10)
 
-        with pytest.raises(ValueError, match="different length"):
+        with pytest.raises(ShapeMismatchError, match="different length"):
             md._infer_factor_level({"a": [1, 2, 3]}, num_image_rows=5, num_target_rows=10)
 
     def test_validate_factor_lengths_invalid_level(self, get_od_dataset):

@@ -201,18 +201,18 @@ class ReconstructionScorer:
         model_type: Literal["ae", "vae"] = "vae" if is_vae else "ae"
         return model_type, use_gmm
 
-    def validate_gmm_output(self, x_ref: NDArray[np.float32]) -> None:
+    def validate_gmm_output(self, reference_data: NDArray[np.float32]) -> None:
         """Validate that model output format is correct for GMM usage.
 
         Parameters
         ----------
-        x_ref : NDArray[np.float32]
+        reference_data : NDArray[np.float32]
             Reference data to validate model output against.
         batch_size : int
             Batch size for model prediction.
         """
-        sample_size = min(len(x_ref), max(10, len(x_ref) // 10))
-        sample_output = predict(x_ref[:sample_size], self.model, batch_size=sample_size)
+        sample_size = min(len(reference_data), max(10, len(reference_data) // 10))
+        sample_output = predict(reference_data[:sample_size], self.model, batch_size=sample_size)
 
         if not isinstance(sample_output, tuple):
             raise ValueError(
@@ -261,7 +261,7 @@ class ReconstructionScorer:
 
     def fit(
         self,
-        x_ref: NDArray[np.float32],
+        reference_data: NDArray[np.float32],
         loss_fn: ReconstructionLossFn | EvidenceLowerBoundLossFn | Callable[..., torch.Tensor] | None = None,
         optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
@@ -271,7 +271,7 @@ class ReconstructionScorer:
 
         Parameters
         ----------
-        x_ref : NDArray[np.float32]
+        reference_data : NDArray[np.float32]
             Training data as numpy array.
         loss_fn : Callable or None
             Loss function for training. If None, auto-selects based on model type.
@@ -284,7 +284,7 @@ class ReconstructionScorer:
         """
         # Validate GMM output format before training
         if self.use_gmm:
-            self.validate_gmm_output(x_ref)
+            self.validate_gmm_output(reference_data)
 
         # Set default loss function if not provided
         if loss_fn is None:
@@ -310,7 +310,7 @@ class ReconstructionScorer:
         # Train the model
         train(
             model=self.model,
-            x_train=x_ref,
+            x_train=reference_data,
             y_train=None,
             loss_fn=loss_fn,
             optimizer=optimizer,
@@ -322,7 +322,7 @@ class ReconstructionScorer:
 
         # Compute GMM parameters after training
         if self.use_gmm:
-            model_output = predict(x_ref, self.model, batch_size=batch_size)
+            model_output = predict(reference_data, self.model, batch_size=batch_size)
 
             z = model_output[1].detach()
             gamma = model_output[2].detach()
@@ -336,7 +336,7 @@ class ReconstructionScorer:
 
             # Reconstruction error statistics on reference data
             x_recon = model_output[0].detach().cpu().numpy()
-            fscore = np.power(x_ref - x_recon, 2)
+            fscore = np.power(reference_data - x_recon, 2)
             fscore_flat = fscore.reshape(fscore.shape[0], -1)
             n_score_features = int(np.ceil(fscore_flat.shape[1]))
             sorted_fscore = np.sort(fscore_flat, axis=1)

@@ -15,7 +15,7 @@ from sklearn.neighbors import NearestNeighbors
 
 from dataeval.config import get_max_processes
 from dataeval.types import ArrayND
-from dataeval.utils.arrays import as_numpy, flatten_samples
+from dataeval.utils._internal import as_numpy, flatten_samples
 
 _logger = logging.getLogger(__name__)
 

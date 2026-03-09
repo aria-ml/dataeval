@@ -41,6 +41,18 @@ class TestTorchExtractorInit:
         with pytest.raises(ValueError, match="Invalid layer"):
             TorchExtractor(model, layer_name="nonexistent")
 
+    def test_init_flatten_default(self):
+        """Test that flatten defaults to True."""
+        model = torch.nn.Flatten()
+        extractor = TorchExtractor(model)
+        assert extractor.flatten is True
+
+    def test_init_flatten_false(self):
+        """Test initialization with flatten=False."""
+        model = torch.nn.Flatten()
+        extractor = TorchExtractor(model, flatten=False)
+        assert extractor.flatten is False
+
     def test_init_with_transforms(self):
         """Test initialization with transforms."""
 
@@ -136,6 +148,41 @@ class TestTorchExtractorLayerExtraction:
 
 
 @pytest.mark.required
+class TestTorchExtractorFlatten:
+    """Test flatten functionality."""
+
+    def test_flatten_true_reduces_dimensions(self):
+        """Test that flatten=True reduces >2D outputs to 2D."""
+        # Conv2d produces (N, C_out, H, W) output — more than 2 dims
+        model = torch.nn.Conv2d(3, 8, kernel_size=3, padding=1)
+        extractor = TorchExtractor(model, device="cpu", flatten=True)
+
+        images = [torch.randn(3, 16, 16) for _ in range(4)]
+        result = extractor(images)
+        assert len(result.shape) == 2
+        assert result.shape == (4, 8 * 16 * 16)
+
+    def test_flatten_false_preserves_dimensions(self):
+        """Test that flatten=False preserves >2D output shape."""
+        model = torch.nn.Conv2d(3, 8, kernel_size=3, padding=1)
+        extractor = TorchExtractor(model, device="cpu", flatten=False)
+
+        images = [torch.randn(3, 16, 16) for _ in range(4)]
+        result = extractor(images)
+        assert len(result.shape) == 4
+        assert result.shape == (4, 8, 16, 16)
+
+    def test_flatten_noop_for_2d_output(self):
+        """Test that flatten has no effect on already-2D outputs."""
+        model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(768, 128))
+        extractor = TorchExtractor(model, device="cpu", flatten=True)
+
+        images = [torch.randn(3, 16, 16) for _ in range(3)]
+        result = extractor(images)
+        assert result.shape == (3, 128)
+
+
+@pytest.mark.required
 class TestTorchExtractorTransforms:
     """Test transform functionality."""
 
@@ -177,6 +224,20 @@ class TestTorchExtractorRepr:
         extractor = TorchExtractor(model, layer_name="0", device="cpu")
         repr_str = repr(extractor)
         assert "layer_name='0'" in repr_str
+
+    def test_repr_with_flatten_false(self):
+        """Test repr includes flatten=False when set."""
+        model = torch.nn.Flatten()
+        extractor = TorchExtractor(model, device="cpu", flatten=False)
+        repr_str = repr(extractor)
+        assert "flatten=False" in repr_str
+
+    def test_repr_without_flatten_when_true(self):
+        """Test repr omits flatten when True (default)."""
+        model = torch.nn.Flatten()
+        extractor = TorchExtractor(model, device="cpu")
+        repr_str = repr(extractor)
+        assert "flatten" not in repr_str
 
 
 @pytest.mark.required

@@ -6,11 +6,11 @@ from typing import Any
 
 import polars as pl
 
-from dataeval import Metadata as _Metadata
+from dataeval import Metadata
 from dataeval._experimental import experimental
 from dataeval._helpers import _get_index2label
 from dataeval.core._parity import parity
-from dataeval.protocols import AnnotatedDataset, Metadata
+from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ DEFAULT_PARITY_P_VALUE_THRESHOLD = 0.05
 
 
 @experimental
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class ParityOutput(DictOutput):
     """
     Output class for the :class:`.Parity` :term:`bias<Bias>` evaluator.
@@ -37,7 +37,7 @@ class ParityOutput(DictOutput):
         - factor_name: str - Name of the metadata factor
         - score: float - Bias-Corrected Cramér's V statistic
         - p_value: float - P-value from G-test (Log-Likelihood Ratio)
-        - is_correlated: bool - True if score >= score_threshold AND p_value <= p_value_threshold
+        - is_significant: bool - True if score >= score_threshold AND p_value <= p_value_threshold
         - has_insufficient_data: bool - True if any cells have < 5 samples
     insufficient_data : dict[str, dict[int, dict[str, int]]]
         Dictionary flagging specific data subsets with low sample counts (< 5).
@@ -77,7 +77,7 @@ class Parity(Evaluator):
 
     Attributes
     ----------
-    metadata : Metadata
+    metadata : MetadataLike
         Preprocessed metadata
     score_threshold : float
         Threshold for identifying highly correlated factors
@@ -137,7 +137,7 @@ class Parity(Evaluator):
         score_threshold: float = DEFAULT_PARITY_SCORE_THRESHOLD
         p_value_threshold: float = DEFAULT_PARITY_P_VALUE_THRESHOLD
 
-    metadata: Metadata
+    metadata: MetadataLike
     score_threshold: float
     p_value_threshold: float
     config: Config
@@ -151,15 +151,15 @@ class Parity(Evaluator):
         super().__init__(locals())
 
     @set_metadata(state=["score_threshold", "p_value_threshold"])
-    def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> ParityOutput:
+    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> ParityOutput:
         """
         Compute chi-square statistics for the dataset.
 
         Parameters
         ----------
-        data : AnnotatedDataset[Any] or Metadata
+        data : AnnotatedDataset[Any] or MetadataLike
             Either an annotated dataset (which will be converted to Metadata) or any object
-            implementing the Metadata protocol.
+            implementing the MetadataLike protocol.
 
         Returns
         -------
@@ -178,23 +178,23 @@ class Parity(Evaluator):
         >>> result = parity.evaluate(metadata)
         >>> result.factors
         shape: (5, 5)
-        ┌─────────────┬──────────┬──────────┬───────────────┬───────────────────────┐
-        │ factor_name ┆ score    ┆ p_value  ┆ is_correlated ┆ has_insufficient_data │
-        │ ---         ┆ ---      ┆ ---      ┆ ---           ┆ ---                   │
-        │ cat         ┆ f64      ┆ f64      ┆ bool          ┆ bool                  │
-        ╞═════════════╪══════════╪══════════╪═══════════════╪═══════════════════════╡
-        │ angle       ┆ 0.0      ┆ 0.43066  ┆ false         ┆ true                  │
-        │ id          ┆ 0.0      ┆ 0.466239 ┆ false         ┆ true                  │
-        │ location    ┆ 0.0      ┆ 0.707677 ┆ false         ┆ true                  │
-        │ time_of_day ┆ 0.157489 ┆ 0.07135  ┆ false         ┆ true                  │
-        │ weather     ┆ 0.0      ┆ 0.567789 ┆ false         ┆ false                 │
-        └─────────────┴──────────┴──────────┴───────────────┴───────────────────────┘
+        ┌─────────────┬──────────┬──────────┬────────────────┬───────────────────────┐
+        │ factor_name ┆ score    ┆ p_value  ┆ is_significant ┆ has_insufficient_data │
+        │ ---         ┆ ---      ┆ ---      ┆ ---            ┆ ---                   │
+        │ cat         ┆ f64      ┆ f64      ┆ bool           ┆ bool                  │
+        ╞═════════════╪══════════╪══════════╪════════════════╪═══════════════════════╡
+        │ angle       ┆ 0.0      ┆ 0.43066  ┆ false          ┆ true                  │
+        │ id          ┆ 0.0      ┆ 0.466239 ┆ false          ┆ true                  │
+        │ location    ┆ 0.0      ┆ 0.707677 ┆ false          ┆ true                  │
+        │ time_of_day ┆ 0.157489 ┆ 0.07135  ┆ false          ┆ true                  │
+        │ weather     ┆ 0.0      ┆ 0.567789 ┆ false          ┆ false                 │
+        └─────────────┴──────────┴──────────┴────────────────┴───────────────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
-        if isinstance(data, Metadata):
+        if isinstance(data, MetadataLike):
             self.metadata = data
         else:
-            self.metadata = _Metadata(data)
+            self.metadata = Metadata(data)
 
         factor_names = self.metadata.factor_names
         class_labels = self.metadata.class_labels
@@ -220,19 +220,19 @@ class Parity(Evaluator):
         factor_name_col: list[str] = []
         score_col: list[float] = []
         p_value_col: list[float] = []
-        is_correlated_col: list[bool] = []
+        is_significant_col: list[bool] = []
         has_insufficient_data_col: list[bool] = []
 
         for i, factor_name in enumerate(factor_names):
             score = float(output["scores"][i])
             p_value = float(output["p_values"][i])
-            is_correlated = bool(score >= self.score_threshold and p_value <= self.p_value_threshold)
+            is_significant = bool(score >= self.score_threshold and p_value <= self.p_value_threshold)
             has_insufficient_data_flag = bool(factor_name in insufficient_data)
 
             factor_name_col.append(factor_name)
             score_col.append(score)
             p_value_col.append(p_value)
-            is_correlated_col.append(is_correlated)
+            is_significant_col.append(is_significant)
             has_insufficient_data_col.append(has_insufficient_data_flag)
 
         factors_df = pl.DataFrame(
@@ -240,14 +240,14 @@ class Parity(Evaluator):
                 "factor_name": factor_name_col,
                 "score": score_col,
                 "p_value": p_value_col,
-                "is_correlated": is_correlated_col,
+                "is_significant": is_significant_col,
                 "has_insufficient_data": has_insufficient_data_col,
             },
             schema={
                 "factor_name": pl.Categorical("lexical"),
                 "score": pl.Float64,
                 "p_value": pl.Float64,
-                "is_correlated": pl.Boolean,
+                "is_significant": pl.Boolean,
                 "has_insufficient_data": pl.Boolean,
             },
         )

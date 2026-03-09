@@ -11,8 +11,9 @@ from sklearn.metrics import pairwise_distances
 
 from dataeval.config import get_seed
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import ArrayND
-from dataeval.utils.arrays import flatten_samples, to_numpy
+from dataeval.utils._internal import flatten_samples, to_numpy
 
 _logger = logging.getLogger(__name__)
 
@@ -381,7 +382,7 @@ class _HDBSCAN:
         _logger.info("Starting HDBSCAN cluster calculation")
 
         if embeddings.ndim != 2:
-            raise ValueError(f"Embeddings should be a 2 dimensional array, got {embeddings.ndim} dimensions")
+            raise ShapeMismatchError(f"Embeddings should be a 2 dimensional array, got {embeddings.ndim} dimensions")
 
         samples, features = embeddings.shape  # Due to flatten_samples(), we know shape has a length of 2
 

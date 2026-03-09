@@ -179,7 +179,7 @@ test_cases:
       - Diversity factors DataFrame includes is_low_diversity flag column
       - Diversity supports shannon method
       - Parity returns ParityOutput with factors DataFrame and insufficient_data dict
-      - Parity factors DataFrame includes is_correlated flag column
+      - Parity factors DataFrame includes is_significant flag column
       - All bias outputs support meta() method
 
   "3-1":
@@ -301,7 +301,7 @@ test_cases:
       - Embeddings with FlattenExtractor produces correct output shape
       - Embeddings supports len() returning sample count
       - Embeddings supports indexing to retrieve individual items
-      - Metadata protocol attributes (factor_names, factor_data, class_labels, is_discrete) are present
+      - MetadataLike protocol attributes (factor_names, factor_data, class_labels, is_discrete) are present
 
   "10-1":
     name: Type Safety Infrastructure

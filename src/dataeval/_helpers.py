@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel
 
-from dataeval.protocols import Metadata
+from dataeval.protocols import MetadataLike
 
 IGNORE_KEYS = {"self", "config", "__class__"}
 
@@ -31,7 +31,7 @@ def apply_config(obj: Any, config: BaseModel, exclude: set[str] | None = None) -
             setattr(obj, key, value)
 
 
-def _get_item_indices(metadata: Metadata) -> Sequence[int]:
+def _get_item_indices(metadata: MetadataLike) -> Sequence[int]:
     """Get item indices from metadata, generating default if not available."""
     item_indices = getattr(metadata, "item_indices", None)
     if item_indices is not None:
@@ -39,7 +39,7 @@ def _get_item_indices(metadata: Metadata) -> Sequence[int]:
     return list(range(len(metadata.class_labels)))
 
 
-def _get_index2label(metadata: Metadata) -> dict[int, str]:
+def _get_index2label(metadata: MetadataLike) -> dict[int, str]:
     """Get index2label mapping, generating default if not available."""
     index2label = getattr(metadata, "index2label", None)
     if index2label:

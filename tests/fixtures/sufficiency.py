@@ -107,45 +107,40 @@ def mock_eval_classwise() -> EvaluationStrategy[DatumType]:
 
 
 @pytest.fixture
-def basic_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[DatumType, Any]:
+def basic_config(mock_train, mock_eval) -> Sufficiency.Config[DatumType, Any]:
     """
     Basic Sufficiency.Config with default parameters.
 
     Uses runs=1, substeps=5 (defaults).
-    Includes a mock reset_strategy for use with non-PyTorch mock models.
     """
     return Sufficiency.Config(
         training_strategy=mock_train,
         evaluation_strategy=mock_eval,
-        reset_strategy=mock_reset,
         runs=1,
         substeps=5,
     )
 
 
 @pytest.fixture
-def multi_run_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[DatumType, Any]:
+def multi_run_config(mock_train, mock_eval) -> Sufficiency.Config[DatumType, Any]:
     """
     Config for multiple runs (faster testing).
 
     Uses runs=3, substeps=2.
-    Includes a mock reset_strategy for use with non-PyTorch mock models.
     """
     return Sufficiency.Config(
         training_strategy=mock_train,
         evaluation_strategy=mock_eval,
-        reset_strategy=mock_reset,
         runs=3,
         substeps=2,
     )
 
 
 @pytest.fixture
-def non_callable_sufficiency_config(mock_reset) -> Sufficiency.Config[DatumType, Any]:
+def non_callable_sufficiency_config() -> Sufficiency.Config[DatumType, Any]:
     return Sufficiency.Config(
         training_strategy=NonCallableMagicMock(),
         evaluation_strategy=NonCallableMagicMock(),
-        reset_strategy=mock_reset,
     )
 
 

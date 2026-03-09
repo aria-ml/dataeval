@@ -1,12 +1,11 @@
 __all__ = []
 
-import inspect
 from collections.abc import Iterator, Sequence
 from enum import IntEnum
 from typing import Generic, TypeVar
 
 from dataeval.protocols import AnnotatedDataset, DatasetMetadata
-from dataeval.types import SourceIndex
+from dataeval.types import ReprMixin, SourceIndex
 
 _TDatum = TypeVar("_TDatum")
 
@@ -17,15 +16,23 @@ class SelectionStage(IntEnum):
     ORDER = 2
 
 
-class Selection(Generic[_TDatum]):
+class Selection(ReprMixin, Generic[_TDatum]):
+    """Base class for all selection criteria used with :class:`Select`.
+
+    Custom selection criteria should subclass this and set :attr:`stage`
+    to control execution order:
+
+    - ``SelectionStage.STATE``  (0) — set size limits (e.g. :class:`Limit`)
+    - ``SelectionStage.FILTER`` (1) — narrow indices (e.g. :class:`ClassFilter`)
+    - ``SelectionStage.ORDER``  (2) — reorder indices (e.g. :class:`Shuffle`)
+
+    Subclasses must implement ``__call__`` which mutates the
+    :class:`Select` wrapper's internal index list in place.
+    """
+
     stage: SelectionStage
 
     def __call__(self, dataset: "Select[_TDatum]") -> None: ...
-
-    def __str__(self) -> str:
-        sig = inspect.signature(self.__init__)
-        params = [f"{n}={getattr(self, n)}" for n in sig.parameters if n != "self" and hasattr(self, n)]
-        return f"{self.__class__.__name__}({', '.join(params)})"
 
 
 class Subselection(Generic[_TDatum]):
@@ -104,6 +111,10 @@ class Select(AnnotatedDataset[_TDatum]):
     def metadata(self) -> DatasetMetadata:
         """Dataset metadata information including identifier and configuration."""
         return self._metadata
+
+    def __repr__(self) -> str:
+        selections = [repr(s) for s in self._selections]
+        return f"Select(dataset={self._dataset!r}, selections=[{', '.join(selections)}], len={len(self)})"
 
     def __str__(self) -> str:
         nt = "\n    "

@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from dataeval._metadata import Metadata
+from dataeval.exceptions import NotFittedError
 from tests.embeddings.test_embeddings import MockDataset
 
 
@@ -50,32 +51,32 @@ class TestMetadataFeatureExtractor:
     def test_len_unbound_raises(self):
         """Test __len__ raises ValueError when no dataset is bound."""
         metadata = Metadata()
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             _ = len(metadata)
 
     def test_iter_unbound_raises(self):
         """Test __iter__ raises ValueError when no dataset is bound."""
         metadata = Metadata()
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             for _ in metadata:
                 pass
 
     def test_getitem_unbound_raises(self):
         """Test __getitem__ raises ValueError when no dataset is bound."""
         metadata = Metadata()
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             _ = metadata[0]
 
     def test_shape_unbound_raises(self):
         """Test shape property raises ValueError when no dataset is bound."""
         metadata = Metadata()
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             _ = metadata.shape
 
     def test_call_unbound_raises(self):
         """Test __call__ raises ValueError when data is None and no dataset is bound."""
         metadata = Metadata()
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             _ = metadata()
 
     def test_call_with_data_unbound(self, mock_ds):
@@ -131,13 +132,13 @@ class TestMetadataErrorCases:
     def test_getitem_slice_unbound_raises(self):
         """Test __getitem__ with slice raises when unbound."""
         metadata = Metadata()
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             _ = metadata[0:5]
 
     def test_getitem_string_unbound_raises(self):
         """Test __getitem__ with string raises when unbound."""
         metadata = Metadata()
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             _ = metadata["some_factor"]
 
     def test_getitem_invalid_factor_raises(self, mock_ds):

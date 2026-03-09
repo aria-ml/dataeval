@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval.config import get_batch_size
+from dataeval.exceptions import NotFittedError
 from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import (
     AnnotatedDataset,
@@ -129,10 +130,14 @@ class Embeddings(Array, FeatureExtractor):
         return self._batch_size
 
     @property
+    def ndim(self) -> int:
+        return len(self.shape)
+
+    @property
     def shape(self) -> tuple[int, ...]:
         if self._shape is None:
             if self._dataset is None:
-                raise ValueError("Cannot determine shape: no dataset bound. Call bind() first.")
+                raise NotFittedError("Cannot determine shape: no dataset bound. Call bind() first.")
             if len(self._dataset) == 0:
                 self._shape = (0,)
             elif self._cached_idx:
@@ -211,7 +216,7 @@ class Embeddings(Array, FeatureExtractor):
 
         Raises
         ------
-        ValueError
+        NotFittedError
             If data is None and no dataset is bound.
 
         Example
@@ -230,7 +235,7 @@ class Embeddings(Array, FeatureExtractor):
         """
         if data is None:
             if self._dataset is None:
-                raise ValueError("No dataset bound. Provide data or call bind() first.")
+                raise NotFittedError("No dataset bound. Provide data or call bind() first.")
             # Return embeddings for bound dataset
             return self[:]
 
@@ -288,6 +293,20 @@ class Embeddings(Array, FeatureExtractor):
         # copy is False or None - return original (preserves memmap)
         return arr
 
+    def __repr__(self) -> str:
+        extractor = self._extractor.__class__.__name__
+        bound = self._dataset is not None
+        parts = [f"extractor={extractor}", f"batch_size={self._batch_size}", f"bound={bound}"]
+        if bound and self._shape is not None:
+            parts.append(f"shape={self._shape}")
+        if self._path is not None:
+            parts.append(f"path={self._path!r}")
+        return f"Embeddings({', '.join(parts)})"
+
+    def __str__(self) -> str:
+        info = "is_bound=False" if self._dataset is None else f"n={len(self._dataset)}, cached={len(self._cached_idx)}"
+        return f"Embeddings({info}, extractor={self._extractor.__class__.__name__})"
+
     def __hash__(self) -> int:
         if self._dataset is None:
             # Unbound instance - hash based on extractor only
@@ -332,7 +351,7 @@ class Embeddings(Array, FeatureExtractor):
             return False
 
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
 
         n_samples = len(self._dataset)
         bytes_per_element = np.dtype(np.float32).itemsize  # Assume float32
@@ -355,7 +374,7 @@ class Embeddings(Array, FeatureExtractor):
     def _initialize_storage(self, sample_embedding: NDArray[Any]) -> None:
         """Initialize storage backend (in-memory or memmap) based on size."""
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
 
         n_samples = len(self._dataset)
         embedding_shape = sample_embedding.shape
@@ -481,7 +500,7 @@ class Embeddings(Array, FeatureExtractor):
     def _fetch_images(self, indices: Sequence[int]) -> list[Any]:
         """Fetch images from the dataset, extracting from tuples if needed."""
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
 
         images: list[Any] = []
         for idx in indices:
@@ -493,7 +512,7 @@ class Embeddings(Array, FeatureExtractor):
     def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:
         """Process indices in batches using the extractor."""
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
 
         # Filter to uncached indices
         uncached = [idx for idx in indices if idx not in self._cached_idx]
@@ -599,9 +618,9 @@ class Embeddings(Array, FeatureExtractor):
 
         Raises
         ------
-        ValueError
+        NotFittedError
             If no dataset is bound and instance is not embeddings-only.
         """
         if self._dataset is None:
-            raise ValueError("Cannot determine length: no dataset bound. Call bind() first.")
+            raise NotFittedError("Cannot determine length: no dataset bound. Call bind() first.")
         return len(self._dataset)

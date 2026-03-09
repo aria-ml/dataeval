@@ -7,7 +7,7 @@ from collections.abc import Iterable
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.utils.arrays import as_numpy
+from dataeval.utils._internal import as_numpy
 
 
 class GeometricSchedule:

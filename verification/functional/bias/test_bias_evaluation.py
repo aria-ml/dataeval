@@ -77,7 +77,7 @@ class TestBiasEvaluation:
         from dataeval.bias import Parity
 
         result = Parity().evaluate(make_metadata())
-        assert "is_correlated" in result.factors.columns
+        assert "is_significant" in result.factors.columns
 
     def test_all_bias_outputs_support_meta(self):
         from dataeval.bias import Balance, Diversity, Parity

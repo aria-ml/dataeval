@@ -56,10 +56,11 @@ class ELBOLoss:
     >>> from dataeval.utils.models import VAE
     >>>
     >>> vae_model = VAE(input_shape=(1, 28, 28))
-    >>> ood = OODReconstruction(vae_model, model_type="vae")
-    >>> custom_loss = ELBOLoss(beta=2.0)
-    >>> ood.fit(x, threshold_perc=95, loss_fn=custom_loss, epochs=20)
-    """
+    >>> config = OODReconstruction.Config(loss_fn=ELBOLoss(beta=2.0), epochs=20)
+    >>> ood = OODReconstruction(vae_model, model_type="vae", threshold_perc=95, config=config)
+    >>> ood.fit(x)
+    OODReconstruction(loss_fn=ELBOLoss(beta=2.0, reduction='mean'), optimizer=None, epochs=20, batch_size=64, threshold_perc=95, gmm_weight=0.5, gmm_score_mode='standardized', fitted=False)
+    """  # noqa: E501
 
     def __init__(self, beta: float = 1.0, reduction: str = "mean") -> None:
         """

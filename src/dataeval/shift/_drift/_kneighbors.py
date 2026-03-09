@@ -3,41 +3,28 @@
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.stats import mannwhitneyu
 from typing_extensions import Self
 
-from dataeval.protocols import Threshold
-from dataeval.shift._drift._base import BaseDrift, DriftChunkerMixin, DriftOutput
-from dataeval.shift._drift._chunk import BaseChunker
+from dataeval.exceptions import NotFittedError, ShapeMismatchError
+from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
 from dataeval.shift._shared._kneighbors import KNeighborsScorer
 from dataeval.types import set_metadata
-from dataeval.utils.arrays import flatten_samples
 from dataeval.utils.thresholds import ZScoreThreshold
 
 
-class DriftKNeighborsStats(TypedDict):
-    """Statistics from K-Nearest Neighbors drift detection.
-
-    Attributes
-    ----------
-    p_val : float
-        P-value from Mann-Whitney U test on k-NN distances, between 0 and 1.
-    mean_ref_distance : float
-        Mean k-NN distance in the reference set (baseline).
-    mean_test_distance : float
-        Mean k-NN distance for the test samples.
-    """
-
+class _DriftKNeighborsStats(TypedDict):
     p_val: float
     mean_ref_distance: float
     mean_test_distance: float
 
 
-class DriftKNeighbors(DriftChunkerMixin, BaseDrift):
+class DriftKNeighbors(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftKNeighborsStats]):
     """K-Nearest Neighbors based drift detector.
 
     Detects drift by comparing k-NN distances of test samples against the
@@ -46,14 +33,16 @@ class DriftKNeighbors(DriftChunkerMixin, BaseDrift):
 
     Uses a fit/predict lifecycle: construct with hyperparameters, call
     :meth:`fit` with reference data, then call :meth:`predict` with test data.
+    Use :meth:`chunked` to create a chunked wrapper for time-series monitoring.
 
     Supports two modes:
 
     - **Non-chunked** (default): Computes per-sample k-NN distances for the
       test set and uses a Mann-Whitney U test against the reference baseline
       to produce a p-value. Drift is flagged when ``p_val < p_val_threshold``.
-    - **Chunked**: Splits data into chunks, computes mean k-NN distance per
-      chunk, and uses threshold bounds to flag drift per chunk.
+    - **Chunked** (via :meth:`chunked`): Splits data into chunks, computes
+      mean k-NN distance per chunk, and uses threshold bounds to flag drift
+      per chunk.
 
     Parameters
     ----------
@@ -63,8 +52,19 @@ class DriftKNeighbors(DriftChunkerMixin, BaseDrift):
         Distance metric for neighbor search.
     p_val : float, default 0.05
         Significance threshold for non-chunked mode.
+    extractor : FeatureExtractor or None, default None
+        Feature extractor for transforming input data before drift detection.
+        When provided, raw data is passed through the extractor before
+        flattening and comparison. When None, data is used as-is.
+    update_strategy : UpdateStrategy or None, default None
+        Strategy for updating reference data when new data arrives.
+        When None, reference data remains fixed throughout detection.
     config : DriftKNeighbors.Config or None, default None
         Optional configuration object.
+
+    See Also
+    --------
+    :class:`DriftKNeighbors.Stats` : Per-prediction statistics returned in :attr:`DriftOutput.details`.
 
     Examples
     --------
@@ -79,9 +79,24 @@ class DriftKNeighbors(DriftChunkerMixin, BaseDrift):
 
     Chunked mode:
 
-    >>> detector = DriftKNeighbors(k=5).fit(ref, chunk_size=50)
-    >>> result = detector.predict(test)
-    """
+    >>> chunked = DriftKNeighbors(k=5).chunked(chunk_size=50)
+    >>> chunked.fit(ref)
+    ChunkedDrift(DriftKNeighbors(k=5, distance_metric='euclidean', p_val=0.05, extractor=None, update_strategy=None), chunker=SizeChunker(chunk_size=50, incomplete='keep'), fitted=True)
+    >>> result = chunked.predict(test)
+    """  # noqa: E501
+
+    class Stats(_DriftKNeighborsStats):
+        """Statistics from K-Nearest Neighbors drift detection.
+
+        Attributes
+        ----------
+        p_val : float
+            P-value from Mann-Whitney U test on k-NN distances, between 0 and 1.
+        mean_ref_distance : float
+            Mean k-NN distance in the reference set (baseline).
+        mean_test_distance : float
+            Mean k-NN distance for the test samples.
+        """
 
     @dataclass
     class Config:
@@ -96,179 +111,138 @@ class DriftKNeighbors(DriftChunkerMixin, BaseDrift):
             Distance metric to use.
         p_val : float, default 0.05
             Significance threshold for non-chunked mode.
+        extractor : FeatureExtractor or None, default None
+            Feature extractor for transforming input data before drift detection.
+        update_strategy : UpdateStrategy or None, default None
+            Strategy for updating reference data over time.
         """
 
         k: int = 10
         distance_metric: Literal["cosine", "euclidean"] = "euclidean"
         p_val: float = 0.05
+        extractor: FeatureExtractor | None = None
+        update_strategy: UpdateStrategy | None = None
 
     def __init__(
         self,
         k: int | None = None,
         distance_metric: Literal["cosine", "euclidean"] | None = None,
         p_val: float | None = None,
+        extractor: FeatureExtractor | None = None,
+        update_strategy: UpdateStrategy | None = None,
         config: Config | None = None,
     ) -> None:
-        super().__init__()
-        self._init_chunking()
+        base_config = config or DriftKNeighbors.Config()
 
-        self.config: DriftKNeighbors.Config = config or DriftKNeighbors.Config()
+        k = k if k is not None else base_config.k
+        distance_metric = distance_metric if distance_metric is not None else base_config.distance_metric
+        self._p_val = p_val if p_val is not None else base_config.p_val
+        extractor = extractor if extractor is not None else base_config.extractor
+        update_strategy = update_strategy if update_strategy is not None else base_config.update_strategy
 
-        k = k if k is not None else self.config.k
-        distance_metric = distance_metric if distance_metric is not None else self.config.distance_metric
-        self._p_val = p_val if p_val is not None else self.config.p_val
+        self.config: DriftKNeighbors.Config = DriftKNeighbors.Config(
+            k=k,
+            distance_metric=distance_metric,
+            p_val=self._p_val,
+            extractor=extractor,
+            update_strategy=update_strategy,
+        )
+
+        # Initialise base + mixins
+        BaseDrift.__init__(self)
+        self._init_adaptive(extractor=extractor, update_strategy=update_strategy)
 
         self._scorer = KNeighborsScorer(k, distance_metric)
         self._metric_name = "knn_distance"
         self._ref_mean: float = 0.0
         self._ref_std: float = 1.0
 
-    def fit(
-        self,
-        x_ref: ArrayLike,
-        chunker: BaseChunker | None = None,
-        chunk_size: int | None = None,
-        chunk_count: int | None = None,
-        chunks: list[ArrayLike] | None = None,
-        chunk_indices: list[list[int]] | None = None,
-        threshold: Threshold | None = None,
-    ) -> Self:
+    def fit(self, reference_data: Any) -> Self:
         """Fit the k-NN drift detector on reference data.
 
         Parameters
         ----------
-        x_ref : ArrayLike
-            Reference data with dim[n_samples, n_features].
-        chunker : BaseChunker or None, default None
-            Explicit chunker instance for chunked mode.
-        chunk_size : int or None, default None
-            Create fixed-size chunks.
-        chunk_count : int or None, default None
-            Split into this many equal chunks.
-        chunks : list[ArrayLike] or None, default None
-            Pre-split reference data for chunked mode.
-        chunk_indices : list[list[int]] or None, default None
-            Index groupings for chunking reference data.
-        threshold : Threshold or None, default None
-            Threshold strategy for chunked mode. Defaults to ZScoreThreshold.
+        reference_data : Any
+            Reference data. When an extractor is configured, this can be
+            any data type accepted by the extractor (e.g., a dataset or
+            raw images). Otherwise, must be array-like with shape
+            ``(n_samples, n_features)``.
 
         Returns
         -------
         Self
         """
-        self._x_ref = flatten_samples(np.atleast_2d(np.asarray(x_ref, dtype=np.float32)))
-        self.n_features: int = self._x_ref.shape[1]
+        self._set_adaptive_data(reference_data)
+        ref = self.reference_data  # lazily encoded + flattened
+        self.n_features: int = ref.shape[1]
 
         # Fit the scorer on the full reference set
-        self._scorer.fit(self._x_ref)
+        self._scorer.fit(ref)
 
         # Store reference distribution stats for z-test
         ref_scores = self._scorer.reference_scores
         self._ref_mean = float(np.mean(ref_scores))
         self._ref_std = float(np.std(ref_scores))
 
-        # Handle chunking (prebuilt chunks are converted here)
-        if chunks is not None:
-            chunks = [flatten_samples(np.atleast_2d(np.asarray(c, dtype=np.float32))) for c in chunks]
-
-        self._resolve_fit_chunks(
-            len(self._x_ref),
-            chunker=chunker,
-            chunk_size=chunk_size,
-            chunk_count=chunk_count,
-            chunks=chunks,
-            chunk_indices=chunk_indices,
-            threshold=threshold,
-            default_threshold=ZScoreThreshold(),
-        )
-
         self._fitted = True
         return self
-
-    def _fit_chunked_baseline(
-        self,
-        chunker: BaseChunker,
-        threshold: Threshold | None,
-        default_threshold: Threshold | None,
-    ) -> None:
-        """Compute per-chunk k-NN distances from reference self-scores.
-
-        Uses the per-sample reference scores (which properly exclude self
-        via leave-one-out) aggregated per chunk.  This avoids the
-        self-inclusion bias of the default implementation (where
-        ``score()`` would count self as a neighbor with distance 0) and
-        keeps the same full-reference index used at prediction time.
-        """
-        ref_scores = self._scorer.reference_scores
-        index_groups = chunker.split(len(ref_scores))
-        baseline = np.array(
-            [float(np.mean(ref_scores[idx])) for idx in index_groups],
-            dtype=np.float32,
-        )
-        self._resolve_baseline_threshold(baseline, threshold, default_threshold)
 
     def _compute_chunk_metric(self, chunk_data: NDArray[np.float32]) -> float:
         """Compute mean k-NN distance for a chunk of data."""
         scores = self._scorer.score(chunk_data)
         return float(np.mean(scores))
 
-    @set_metadata
-    def predict(
+    def _compute_chunk_baselines(
         self,
-        x: ArrayLike | None = None,
-        chunks: list[ArrayLike] | None = None,
-        chunk_indices: list[list[int]] | None = None,
-    ) -> DriftOutput:
+        chunks: list[NDArray[np.float32]],
+    ) -> NDArray[np.float32]:
+        """Compute per-chunk k-NN distances from reference self-scores.
+
+        Uses the per-sample reference scores (which properly exclude self
+        via leave-one-out) aggregated per chunk. This avoids the
+        self-inclusion bias that would occur if chunks were re-scored
+        against the full reference (where each sample is its own
+        nearest neighbor with distance 0).
+
+        Chunks are ordered contiguous slices of reference data, so we
+        split ``reference_scores`` by chunk sizes to get the correct
+        per-sample scores for each chunk.
+        """
+        ref_scores = self._scorer.reference_scores
+        baselines: list[float] = []
+        offset = 0
+        for chunk in chunks:
+            n = len(chunk)
+            baselines.append(float(np.mean(ref_scores[offset : offset + n])))
+            offset += n
+        return np.array(baselines, dtype=np.float32)
+
+    def _default_chunk_threshold(self) -> Threshold:
+        return ZScoreThreshold()
+
+    @set_metadata
+    def predict(self, data: Any) -> DriftOutput["DriftKNeighbors.Stats"]:
         """
         Predict whether test data has drifted from reference data.
 
         Parameters
         ----------
-        x : ArrayLike or None
-            Test data.
-        chunks : list[ArrayLike] or None, default None
-            Pre-built test data chunks.
-        chunk_indices : list[list[int]] or None, default None
-            Index groupings for chunking test data.
+        data : Any
+            Test data. When an extractor is configured, this can be
+            any data type accepted by the extractor. Otherwise, must be
+            array-like.
 
         Returns
         -------
-        DriftOutput
-            Non-chunked mode: ``details`` is a :class:`DriftKNeighborsStats` TypedDict.
-            Chunked mode: ``details`` is a :class:`polars.DataFrame` with per-chunk results.
+        DriftOutput[DriftKNeighbors.Stats]
+            Drift prediction with k-NN statistics.
         """
         if not self._fitted:
-            raise RuntimeError("Must call fit() before predict().")
+            raise NotFittedError("Must call fit() before predict().")
 
-        if self.is_chunked or chunks is not None or chunk_indices is not None:
-            # Prepare data for the mixin's _predict_chunked
-            if chunks is not None:
-                prepared = [flatten_samples(np.atleast_2d(np.asarray(c, dtype=np.float32))) for c in chunks]
-                for c in prepared:
-                    if c.shape[1] != self.n_features:
-                        raise ValueError("Reference and test embeddings have different number of features")
-                return self._predict_chunked(chunks_override=prepared)
-
-            x_test = None
-            if x is not None:
-                x_test = flatten_samples(np.atleast_2d(np.asarray(x, dtype=np.float32)))
-                if x_test.shape[1] != self.n_features:
-                    raise ValueError("Reference and test embeddings have different number of features")
-
-            return self._predict_chunked(
-                x_test=x_test,
-                chunk_indices_override=chunk_indices,
-            )
-
-        if x is None:
-            raise ValueError("x is required for non-chunked prediction.")
-        return self._predict_single(x)
-
-    def _predict_single(self, x: ArrayLike) -> DriftOutput:
-        """Non-chunked prediction: Mann-Whitney U test on k-NN distances."""
-        x_test = flatten_samples(np.atleast_2d(np.asarray(x, dtype=np.float32)))
+        x_test = self._prepare_data(data)
         if x_test.shape[1] != self.n_features:
-            raise ValueError("Reference and test embeddings have different number of features")
+            raise ShapeMismatchError("Reference and test embeddings have different number of features")
 
         test_scores = self._scorer.score(x_test)
         mean_test = float(np.mean(test_scores))
@@ -282,12 +256,14 @@ class DriftKNeighbors(DriftChunkerMixin, BaseDrift):
 
         drifted = p_val < self._p_val
 
+        self._apply_update_strategy(data)
+
         return DriftOutput(
             drifted=drifted,
             threshold=self._p_val,
             distance=mean_test,
             metric_name="knn_distance",
-            details=DriftKNeighborsStats(
+            details=_DriftKNeighborsStats(
                 p_val=p_val,
                 mean_ref_distance=self._ref_mean,
                 mean_test_distance=mean_test,

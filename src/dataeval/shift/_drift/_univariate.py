@@ -18,34 +18,14 @@ import scipy.stats
 from numpy.typing import NDArray
 from typing_extensions import Self
 
+from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
-from dataeval.shift._drift._base import BaseDrift, DriftAdaptiveMixin, DriftChunkerMixin, DriftOutput
-from dataeval.shift._drift._chunk import BaseChunker
+from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
 from dataeval.types import set_metadata
 from dataeval.utils.thresholds import ZScoreThreshold
 
 
-class DriftUnivariateStats(TypedDict):
-    """Per-feature statistics from univariate drift detection.
-
-    Attributes
-    ----------
-    p_val : float
-        Mean p-value across all features, between 0 and 1.
-    feature_drift : NDArray[bool]
-        Boolean array indicating which features show drift.
-        Shape matches the number of features in the input data.
-    feature_threshold : float
-        Uncorrected p-value threshold used for individual feature testing.
-        Typically the original p_val before multivariate correction.
-    p_vals : NDArray[np.float32]
-        P-values for each feature, all values between 0 and 1.
-        Shape matches the number of features in the input data.
-    distances : NDArray[np.float32]
-        Test statistics for each feature, all values >= 0.
-        Shape matches the number of features in the input data.
-    """
-
+class _DriftUnivariateStats(TypedDict):
     p_val: float
     feature_drift: NDArray[np.bool_]
     feature_threshold: float
@@ -53,7 +33,7 @@ class DriftUnivariateStats(TypedDict):
     distances: NDArray[np.float32]
 
 
-class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
+class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivariateStats]):
     """:term:`Drift` detector using univariate statistical tests.
 
     Detects distributional changes by comparing empirical distributions of
@@ -63,7 +43,7 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
 
     Uses a fit/predict lifecycle: construct with hyperparameters, call
     :meth:`fit` with reference data, then call :meth:`predict` with test data.
-    Supports chunked mode when chunking parameters are provided to :meth:`fit`.
+    Use :meth:`chunked` to create a chunked wrapper for time-series monitoring.
 
     Supports five statistical methods with different strengths:
 
@@ -106,7 +86,6 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
     update_strategy : UpdateStrategy or None, default None
         Strategy for updating reference data when new data arrives.
         When None, reference data remains fixed throughout detection.
-        Ignored in chunked mode.
     correction : "bonferroni" or "fdr", default "bonferroni"
         Multiple testing correction method for multivariate drift detection.
         "bonferroni" provides conservative family-wise error control by
@@ -136,6 +115,10 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
         Optional configuration object with default parameters. Parameters
         specified directly in __init__ will override config defaults.
 
+    See Also
+    --------
+    :class:`DriftUnivariate.Stats` : Per-prediction statistics returned in :attr:`DriftOutput.details`.
+
     Example
     -------
     Basic drift detection with Kolmogorov-Smirnov test
@@ -150,8 +133,10 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
 
     Chunked drift detection with z-score thresholds
 
-    >>> drift_detector = DriftUnivariate(method="ks").fit(train_emb, chunk_size=20)
-    >>> result = drift_detector.predict(test_emb)
+    >>> chunked = DriftUnivariate(method="ks").chunked(chunk_size=20)
+    >>> chunked.fit(train_emb)
+    ChunkedDrift(DriftUnivariate(method='ks', p_val=0.05, correction='bonferroni', alternative='two-sided', n_features=None, update_strategy=None, extractor=None), chunker=SizeChunker(chunk_size=20, incomplete='keep'), fitted=True)
+    >>> result = chunked.predict(test_emb)
     >>> print(f"Drift detected: {result.drifted}, chunks: {len(result.details)}")
     Drift detected: True, chunks: 1
 
@@ -159,7 +144,28 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
 
     >>> config = DriftUnivariate.Config(method="cvm", p_val=0.01, correction="fdr")
     >>> drift = DriftUnivariate(config=config).fit(train_emb)
-    """
+    """  # noqa: E501
+
+    class Stats(_DriftUnivariateStats):
+        """Per-feature statistics from univariate drift detection.
+
+        Attributes
+        ----------
+        p_val : float
+            Mean p-value across all features, between 0 and 1.
+        feature_drift : NDArray[bool]
+            Boolean array indicating which features show drift.
+            Shape matches the number of features in the input data.
+        feature_threshold : float
+            Uncorrected p-value threshold used for individual feature testing.
+            Typically the original p_val before multivariate correction.
+        p_vals : NDArray[np.float32]
+            P-values for each feature, all values between 0 and 1.
+            Shape matches the number of features in the input data.
+        distances : NDArray[np.float32]
+            Test statistics for each feature, all values >= 0.
+            Shape matches the number of features in the input data.
+        """
 
     @dataclass
     class Config:
@@ -204,18 +210,27 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
         config: Config | None = None,
     ) -> None:
         # Store config or create default
-        self.config: DriftUnivariate.Config = config or DriftUnivariate.Config()
+        base_config = config or DriftUnivariate.Config()
 
         # Use config defaults if parameters not specified
-        method = method if method is not None else self.config.method
-        p_val = p_val if p_val is not None else self.config.p_val
-        correction = correction if correction is not None else self.config.correction
-        alternative = alternative if alternative is not None else self.config.alternative
-        n_features = n_features if n_features is not None else self.config.n_features
+        method = method if method is not None else base_config.method
+        p_val = p_val if p_val is not None else base_config.p_val
+        correction = correction if correction is not None else base_config.correction
+        alternative = alternative if alternative is not None else base_config.alternative
+        n_features = n_features if n_features is not None else base_config.n_features
+
+        self.config: DriftUnivariate.Config = DriftUnivariate.Config(
+            method=method,
+            p_val=p_val,
+            correction=correction,
+            alternative=alternative,
+            n_features=n_features,
+            update_strategy=update_strategy,
+            extractor=extractor,
+        )
 
         # Initialise base + mixins
         BaseDrift.__init__(self)
-        self._init_chunking()
         self._init_adaptive(
             extractor=extractor,
             update_strategy=update_strategy,
@@ -267,7 +282,7 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
         """
         if self._n_features is None:
             if self._data is None:
-                raise RuntimeError("Must call fit() before accessing n_features.")
+                raise NotFittedError("Must call fit() before accessing n_features.")
             if self.extractor is not None:
                 first_encoded = self._encode(self._data[:1])
                 self._n_features = first_encoded.shape[1]
@@ -276,72 +291,20 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
 
         return self._n_features
 
-    def fit(
-        self,
-        data: Any,
-        chunker: BaseChunker | None = None,
-        chunk_size: int | None = None,
-        chunk_count: int | None = None,
-        chunks: list[Any] | None = None,
-        chunk_indices: list[list[int]] | None = None,
-        threshold: Threshold | None = None,
-    ) -> Self:
-        """Fit detector with reference data, optionally enabling chunked mode.
-
-        When chunking is enabled, the detector computes per-chunk baseline
-        metrics from the reference data and derives threshold bounds. During
-        prediction, the test data is split into chunks of the **same size**
-        used here, so that per-chunk statistics are comparable to the baseline.
-
-        If ``chunk_count`` is provided, the effective chunk size is computed
-        as ``len(data) // chunk_count`` and locked in for prediction.  This
-        means the number of chunks produced by ``predict()`` depends on the
-        test set size, not the original ``chunk_count``.  Use ``chunk_size``
-        directly when you want explicit control over the chunk size used for
-        both fitting and prediction.
+    def fit(self, reference_data: Any) -> Self:
+        """Fit detector with reference data.
 
         Parameters
         ----------
-        data : Any
+        reference_data : Any
             Reference dataset used as baseline for drift detection.
             Can be Array or any type supported by the configured extractor.
-        chunker : ArrayChunker or None, default None
-            Explicit chunker instance for chunked mode.
-        chunk_size : int or None, default None
-            Create fixed-size chunks of this many samples. The same size is
-            used during prediction to keep statistics comparable.
-        chunk_count : int or None, default None
-            Split reference into this many equal chunks. Converted to a
-            fixed ``chunk_size`` based on the reference data length.
-        chunks : list[ArrayLike] or None, default None
-            Pre-split reference data arrays for chunked mode.
-        chunk_indices : list[list[int]] or None, default None
-            Index groupings for chunking reference data.
-        threshold : Threshold or None, default None
-            Threshold strategy for chunked mode. Defaults to
-            StandardDeviationThreshold (mean +/- 3*std).
 
         Returns
         -------
         Self
         """
-        self._set_adaptive_data(data)
-
-        # Prebuilt chunks → convert to numpy
-        if chunks is not None:
-            chunks = [np.atleast_2d(np.asarray(c, dtype=np.float32)) for c in chunks]
-
-        self._resolve_fit_chunks(
-            self.n,
-            chunker=chunker,
-            chunk_size=chunk_size,
-            chunk_count=chunk_count,
-            chunks=chunks,
-            chunk_indices=chunk_indices,
-            threshold=threshold,
-            default_threshold=ZScoreThreshold(lower_limit=0.0),
-        )
-
+        self._set_adaptive_data(reference_data)
         self._fitted = True
         return self
 
@@ -382,15 +345,15 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
         raise ValueError(f"Unknown method: {self.method}")
 
     def _score_against(
-        self, x_ref: NDArray[np.float32], x_test: NDArray[np.float32]
+        self, reference_data: NDArray[np.float32], data: NDArray[np.float32]
     ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Score test data against given reference data (feature-wise).
 
         Parameters
         ----------
-        x_ref : NDArray[np.float32]
+        reference_data : NDArray[np.float32]
             Reference data, shape (n_ref, n_features).
-        x_test : NDArray[np.float32]
+        data : NDArray[np.float32]
             Test data, shape (n_test, n_features).
 
         Returns
@@ -399,11 +362,11 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
             First array contains p-values per feature.
             Second array contains test statistics per feature.
         """
-        n_features = x_ref.shape[1]
+        n_features = reference_data.shape[1]
         p_val = np.zeros(n_features, dtype=np.float32)
         dist = np.zeros_like(p_val)
         for f in range(n_features):
-            dist[f], p_val[f] = self._score_fn(x_ref[:, f], x_test[:, f])
+            dist[f], p_val[f] = self._score_fn(reference_data[:, f], data[:, f])
         return p_val, dist
 
     def score(self, data: Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
@@ -430,7 +393,7 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
         Higher test statistics indicate greater distributional differences.
         """
         x_np = self._encode(data)
-        return self._score_against(self.x_ref, x_np)
+        return self._score_against(self.reference_data, x_np)
 
     def _apply_correction(self, p_vals: NDArray[np.float32]) -> tuple[bool, float]:
         """
@@ -477,97 +440,43 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
 
     def _compute_chunk_metric(self, chunk_data: NDArray[np.float32]) -> float:
         """Compute mean distance: chunk vs full reference."""
-        _, dist = self._score_against(self.x_ref, chunk_data)
+        _, dist = self._score_against(self.reference_data, chunk_data)
         return float(np.mean(dist))
 
-    def _fit_chunked_baseline(
+    def _compute_chunk_baselines(
         self,
-        chunker: BaseChunker,
-        threshold: Threshold | None,
-        default_threshold: Threshold | None,
-    ) -> None:
+        chunks: list[NDArray[np.float32]],
+    ) -> NDArray[np.float32]:
         """Compute per-chunk mean distances on reference (chunk vs rest)."""
-        x_ref = self.x_ref  # trigger lazy encoding
-        n = len(x_ref)
-        index_groups = chunker.split(n)
-
         baseline_values: list[float] = []
-        for indices in index_groups:
-            mask = np.ones(n, dtype=bool)
-            mask[indices] = False
-            _, dist = self._score_against(x_ref[mask], x_ref[indices])
+        for i, chunk in enumerate(chunks):
+            rest = np.concatenate([c for j, c in enumerate(chunks) if j != i], axis=0)
+            _, dist = self._score_against(rest, chunk)
             baseline_values.append(float(np.mean(dist)))
+        return np.array(baseline_values, dtype=np.float32)
 
-        self._resolve_baseline_threshold(np.array(baseline_values, dtype=np.float32), threshold, default_threshold)
-
-    def _fit_prebuilt_baseline(
-        self,
-        chunks: list[Any],
-        threshold: Threshold | None,
-        default_threshold: Threshold | None,
-    ) -> None:
-        """Compute per-chunk mean distances from prebuilt chunks (chunk vs rest)."""
-        _ = self.x_ref  # trigger lazy encoding
-
-        baseline_values: list[float] = []
-        for i, chunk_data in enumerate(chunks):
-            rest_data = np.concatenate([c for j, c in enumerate(chunks) if j != i], axis=0)
-            _, dist = self._score_against(rest_data, chunk_data)
-            baseline_values.append(float(np.mean(dist)))
-
-        self._resolve_baseline_threshold(np.array(baseline_values, dtype=np.float32), threshold, default_threshold)
+    def _default_chunk_threshold(self) -> Threshold:
+        return ZScoreThreshold(lower_limit=0.0)
 
     @set_metadata
-    def predict(
-        self,
-        data: Any = None,
-        chunks: list[Any] | None = None,
-        chunk_indices: list[list[int]] | None = None,
-    ) -> DriftOutput:
+    def predict(self, data: Any) -> DriftOutput["DriftUnivariate.Stats"]:
         """Predict drift and optionally update reference data.
 
-        In non-chunked mode, performs feature-wise drift detection with
-        multiple testing correction. In chunked mode, computes per-chunk
-        metrics and compares against baseline thresholds.
+        Performs feature-wise drift detection with multiple testing correction.
 
         Parameters
         ----------
-        data : Any, optional
-            Test dataset to analyze for drift. Required for non-chunked mode
-            and for chunked mode unless pre-built chunks are provided.
-        chunks : list[ArrayLike] or None, default None
-            Pre-built test data chunks. When provided, each array is treated
-            as a separate chunk and ``data`` is ignored.
-        chunk_indices : list[list[int]] or None, default None
-            Index groupings for chunking ``data``. Each inner list specifies
-            which samples from ``data`` belong to a chunk.
+        data : Any
+            Test dataset to analyze for drift.
 
         Returns
         -------
-        DriftOutput
-            Non-chunked mode: ``details`` is a :class:`DriftUnivariateStats` TypedDict.
-            Chunked mode: ``details`` is a :class:`polars.DataFrame` with per-chunk results.
+        DriftOutput[DriftUnivariate.Stats]
+            Drift prediction with per-feature statistics.
         """
         if not self._fitted:
-            raise RuntimeError("Must call fit() before predict().")
+            raise NotFittedError("Must call fit() before predict().")
 
-        if self.is_chunked or chunks is not None or chunk_indices is not None:
-            if chunks is not None:
-                prepared = [np.atleast_2d(np.asarray(c, dtype=np.float32)) for c in chunks]
-                return self._predict_chunked(chunks_override=prepared)
-
-            x_test = self._encode(data) if data is not None else None
-            return self._predict_chunked(
-                x_test=x_test,
-                chunk_indices_override=chunk_indices,
-            )
-
-        if data is None:
-            raise ValueError("data is required for non-chunked prediction.")
-        return self._predict_single(data)
-
-    def _predict_single(self, data: Array) -> DriftOutput:
-        """Non-chunked prediction with optional reference update."""
         p_vals, dist = self.score(data)
 
         feature_drift = (p_vals < self.p_val).astype(np.bool_)
@@ -578,7 +487,7 @@ class DriftUnivariate(DriftAdaptiveMixin, DriftChunkerMixin, BaseDrift):
             threshold=threshold,
             distance=float(np.mean(dist)),
             metric_name=self._metric_name,
-            details=DriftUnivariateStats(
+            details=_DriftUnivariateStats(
                 p_val=float(np.mean(p_vals)),
                 feature_drift=feature_drift,
                 feature_threshold=self.p_val,

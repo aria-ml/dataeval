@@ -9,7 +9,6 @@ non-PyTorch models (ONNX, TensorFlow, etc.).
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
 import torch.nn as nn
 
 from dataeval.performance import Sufficiency
@@ -19,7 +18,7 @@ from tests.conftest import SimpleDataset
 class TestSufficiencyResetStrategy:
     """Test Sufficiency class with custom reset strategies."""
 
-    def test_uses_custom_reset_strategy(self, mock_train, mock_eval, simple_dataset: SimpleDataset):
+    def test_uses_custom_reset_strategy(self, mock_train, mock_eval):
         """Verify custom reset strategy is used when provided."""
 
         def custom_reset(model: Any) -> Any:
@@ -29,8 +28,6 @@ class TestSufficiencyResetStrategy:
 
         suff = Sufficiency(
             model=model,
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
             training_strategy=mock_train,
             evaluation_strategy=mock_eval,
             reset_strategy=custom_reset,
@@ -38,25 +35,25 @@ class TestSufficiencyResetStrategy:
 
         assert suff.reset_strategy is custom_reset
 
-    def test_raises_error_for_non_torch_model_without_reset_strategy(
-        self,
-        mock_train,
-        mock_eval,
-        simple_dataset: SimpleDataset,
-    ):
-        """Verify error is raised for non-PyTorch model without reset_strategy."""
-        non_torch_model = MagicMock()  # Not an nn.Module
+    def test_default_reset_strategy_uses_deepcopy(self, mock_train, mock_eval, simple_dataset: SimpleDataset):
+        """Verify default reset strategy uses deepcopy when none is provided."""
+        model = nn.Linear(10, 5)
 
-        with pytest.raises(ValueError, match="reset_strategy is required"):
-            Sufficiency(
-                model=non_torch_model,
-                train_ds=simple_dataset,
-                test_ds=simple_dataset,
-                training_strategy=mock_train,
-                evaluation_strategy=mock_eval,
-            )
+        suff = Sufficiency(
+            model=model,
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval,
+        )
 
-    def test_accepts_non_torch_model_with_reset_strategy(self, mock_train, mock_eval, simple_dataset: SimpleDataset):
+        # Default reset_strategy should be set (not None)
+        assert suff.reset_strategy is not None
+
+        # Calling reset should return a different object (deepcopy)
+        reset_model = suff.reset_strategy(model)
+        assert reset_model is not model
+        assert isinstance(reset_model, nn.Linear)
+
+    def test_accepts_non_torch_model_with_reset_strategy(self, mock_train, mock_eval):
         """Verify non-PyTorch model is accepted with custom reset_strategy."""
 
         def custom_reset(model: Any) -> Any:
@@ -67,8 +64,6 @@ class TestSufficiencyResetStrategy:
         # Should not raise
         suff = Sufficiency(
             model=non_torch_model,
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
             training_strategy=mock_train,
             evaluation_strategy=mock_eval,
             reset_strategy=custom_reset,
@@ -92,13 +87,11 @@ class TestSufficiencyResetStrategy:
 
         suff = Sufficiency(
             model=model,
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
             reset_strategy=reset_mock,
             config=config,
         )
 
-        suff.evaluate()
+        suff.evaluate(simple_dataset, simple_dataset)
 
         # Reset should have been called once per run
         assert reset_mock.call_count == 1
@@ -118,13 +111,11 @@ class TestSufficiencyResetStrategy:
 
         suff = Sufficiency(
             model=model,
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
             reset_strategy=reset_mock,
             config=config,
         )
 
-        suff.evaluate()
+        suff.evaluate(simple_dataset, simple_dataset)
 
         # Reset should have been called once per run
         assert reset_mock.call_count == 3
@@ -156,7 +147,7 @@ class TestSufficiencyConfigResetStrategy:
 
         assert config.reset_strategy is None
 
-    def test_sufficiency_uses_config_reset_strategy(self, mock_train, mock_eval, simple_dataset: SimpleDataset):
+    def test_sufficiency_uses_config_reset_strategy(self, mock_train, mock_eval):
         """Verify Sufficiency uses reset_strategy from config."""
 
         def custom_reset(model: Any) -> Any:
@@ -171,14 +162,12 @@ class TestSufficiencyConfigResetStrategy:
         model = nn.Linear(10, 5)
         suff = Sufficiency(
             model=model,
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
             config=config,
         )
 
         assert suff.reset_strategy is custom_reset
 
-    def test_direct_param_overrides_config_reset_strategy(self, mock_train, mock_eval, simple_dataset: SimpleDataset):
+    def test_direct_param_overrides_config_reset_strategy(self, mock_train, mock_eval):
         """Verify direct reset_strategy param overrides config."""
 
         def config_reset(model: Any) -> Any:
@@ -196,8 +185,6 @@ class TestSufficiencyConfigResetStrategy:
         model = nn.Linear(10, 5)
         suff = Sufficiency(
             model=model,
-            train_ds=simple_dataset,
-            test_ds=simple_dataset,
             reset_strategy=direct_reset,  # Direct param should win
             config=config,
         )

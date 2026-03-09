@@ -13,7 +13,7 @@ from scipy.optimize import basinhopping
 
 from dataeval.protocols import ArrayLike
 from dataeval.types import DictOutput
-from dataeval.utils.arrays import as_numpy
+from dataeval.utils._internal import as_numpy
 
 _logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class Constraints:
         return [self.scale, self.negative_exponent, self.asymptote]
 
 
-@dataclass
+@dataclass(repr=False)
 class SufficiencyOutput(DictOutput):
     """
     Output class for :class:`.Sufficiency` workflow.

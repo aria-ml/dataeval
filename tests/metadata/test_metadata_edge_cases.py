@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from dataeval._metadata import Metadata
+from dataeval.exceptions import NotFittedError
 from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
 
 
@@ -133,7 +134,7 @@ class TestMetadataStructureUnbound:
         """Test _structure raises when dataset is None."""
         metadata = Metadata()
         metadata._is_structured = False
-        with pytest.raises(ValueError, match="No dataset bound"):
+        with pytest.raises(NotFittedError, match="No dataset bound"):
             metadata._structure()
 
 

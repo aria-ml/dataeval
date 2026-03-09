@@ -5,10 +5,10 @@ from typing import Any, Literal
 
 import polars as pl
 
-from dataeval import Metadata as _Metadata
+from dataeval import Metadata
 from dataeval._helpers import _get_index2label
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
-from dataeval.protocols import AnnotatedDataset, Metadata
+from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 DEFAULT_BALANCE_NUM_NEIGHBORS = 5
@@ -16,7 +16,7 @@ DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD = 0.3
 DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD = 0.5
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class BalanceOutput(DictOutput):
     """
     Output class for the :class:`.Balance` :term:`bias<Bias>` evaluator.
@@ -75,7 +75,7 @@ class Balance(Evaluator):
 
     Attributes
     ----------
-    metadata : Metadata
+    metadata : MetadataLike
         Preprocessed metadata from the last evaluate() call.
     num_neighbors : int
         Number of points to consider as neighbors
@@ -130,7 +130,7 @@ class Balance(Evaluator):
         class_imbalance_threshold: float = DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD
         factor_correlation_threshold: float = DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD
 
-    metadata: Metadata
+    metadata: MetadataLike
     num_neighbors: int
     class_imbalance_threshold: float
     factor_correlation_threshold: float
@@ -146,15 +146,15 @@ class Balance(Evaluator):
         super().__init__(locals())
 
     @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold"])
-    def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> BalanceOutput:
+    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> BalanceOutput:
         """
         Compute mutual information between factors and identify imbalanced classes.
 
         Parameters
         ----------
-        data : AnnotatedDataset[Any] or Metadata
+        data : AnnotatedDataset[Any] or MetadataLike
             Either an annotated dataset (which will be converted to Metadata)
-            or any object implementing the Metadata protocol.
+            or any object implementing the MetadataLike protocol.
 
         Returns
         -------
@@ -230,10 +230,10 @@ class Balance(Evaluator):
         └────────────┴─────────────┴──────────┴───────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
-        if isinstance(data, Metadata):
+        if isinstance(data, MetadataLike):
             self.metadata = data
         else:
-            self.metadata = _Metadata(data)
+            self.metadata = Metadata(data)
 
         if not self.metadata.factor_names:
             raise ValueError("No factors found in provided metadata.")

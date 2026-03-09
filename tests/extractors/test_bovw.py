@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from dataeval.config import get_seed, set_seed
+from dataeval.exceptions import NotFittedError
 from dataeval.extractors._bovw import BoVWExtractor
 
 
@@ -75,7 +76,7 @@ class TestBoVWExtractor:
     def test_transform_before_fit_raises(self, rgb_images):
         """Test that transform before fit raises RuntimeError."""
         extractor = BoVWExtractor(vocab_size=32)
-        with pytest.raises(RuntimeError, match="Extractor has not been fitted"):
+        with pytest.raises(NotFittedError, match="Extractor has not been fitted"):
             extractor.transform(rgb_images)
 
     def test_fit_transform_separate(self, rgb_images):
@@ -244,6 +245,29 @@ class TestBoVWEdgeCases:
 
         assert embeddings.shape[0] == 5
         assert embeddings.shape[1] == 2
+
+    def test_call_does_not_retrain_fitted(self):
+        """Test that __call__ does not retrain when already fitted."""
+        rng = np.random.default_rng(42)
+        train_images = [rng.integers(0, 256, size=(3, 64, 64), dtype=np.uint8) for _ in range(5)]
+        new_images = [rng.integers(0, 256, size=(3, 64, 64), dtype=np.uint8) for _ in range(3)]
+
+        extractor = BoVWExtractor(vocab_size=32)
+        extractor.fit(train_images)
+        kmeans_after_fit = extractor._kmeans
+
+        # __call__ on new data should NOT retrain
+        extractor(new_images)
+        assert extractor._kmeans is kmeans_after_fit
+
+    def test_fit_returns_self(self):
+        """Test that fit returns self for method chaining."""
+        rng = np.random.default_rng(42)
+        images = [rng.integers(0, 256, size=(3, 64, 64), dtype=np.uint8) for _ in range(5)]
+
+        extractor = BoVWExtractor(vocab_size=32)
+        result = extractor.fit(images)
+        assert result is extractor
 
     def test_refit_replaces_vocabulary(self):
         """Test that calling fit again replaces the vocabulary."""

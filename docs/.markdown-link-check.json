@@ -4,6 +4,15 @@
       "pattern": "^https://doi\\.org"
     },
     {
+      "pattern": "^https://rss\\.onlinelibrary\\.wiley\\.com"
+    },
+    {
+      "pattern": "^https://dl\\.acm\\.org"
+    },
+    {
+      "pattern": "^https://journals\\.aps\\.org"
+    },
+    {
       "pattern": "^#ref\\d+$"
     },
     {

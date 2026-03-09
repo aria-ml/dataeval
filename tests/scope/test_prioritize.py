@@ -306,7 +306,7 @@ class TestPrioritizeEdgeCases:
         assert list(output.keys()) == ["indices", "scores", "method", "order", "policy"]
 
         # Test __repr__
-        assert "PriorityOutput" in repr(output)
+        assert "PrioritizeOutput" in repr(output)
 
         # Test Idempotency (logging check implies coverage of return self)
         easy = output.easy_first()

@@ -7,9 +7,9 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import mode
 
-from dataeval.config import EPSILON
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, ArrayND
-from dataeval.utils.arrays import as_numpy
+from dataeval.utils._internal import EPSILON, as_numpy
 
 _logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def _validate_inputs(
     class_labels = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
 
     if len(embeddings) != len(class_labels):
-        raise ValueError(
+        raise ShapeMismatchError(
             f"Length of embeddings ({len(embeddings)}) does not match length of class_labels ({len(class_labels)}).",
         )
 

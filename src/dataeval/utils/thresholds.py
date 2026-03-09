@@ -14,6 +14,7 @@ __all__ = [
     "IQRThreshold",
     "ModifiedZScoreThreshold",
     "ZScoreThreshold",
+    "resolve_threshold",
 ]
 
 from abc import ABC, abstractmethod
@@ -23,8 +24,8 @@ import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import Self
 
-from dataeval.config import EPSILON
 from dataeval.protocols import Threshold, ThresholdBounds, ThresholdLike, ThresholdLimits
+from dataeval.utils._internal import EPSILON
 
 _UNSET = object()
 

@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
+import torch
 
 from dataeval.shift._ood._base import OODOutput, OODScoreOutput
+from dataeval.shift._ood._domain_classifier import OODDomainClassifier
+from dataeval.shift._ood._kneighbors import OODKNeighbors
+from dataeval.shift._ood._reconstruction import OODReconstruction
 
 
 @pytest.mark.required
@@ -37,3 +41,36 @@ def test_ood_output():
     # Test with None feature_score
     output = OODOutput(is_ood=is_ood, instance_score=instance_score, feature_score=None)
     assert output.feature_score is None
+
+
+@pytest.mark.required
+class TestOODConfigRepr:
+    """Tests that constructor params override config defaults and are reflected in repr."""
+
+    def test_kneighbors_params_override_config(self):
+        det = OODKNeighbors(k=3, distance_metric="euclidean", threshold_perc=90.0)
+        assert det.config.k == 3
+        assert det.config.distance_metric == "euclidean"
+        assert det.config.threshold_perc == 90.0
+        assert "k=3" in repr(det)
+        assert "distance_metric='euclidean'" in repr(det)
+        assert "threshold_perc=90.0" in repr(det)
+
+    def test_kneighbors_default_config(self):
+        det = OODKNeighbors()
+        assert det.config.k == 10
+        assert det.config.distance_metric == "cosine"
+        assert det.config.threshold_perc == 95.0
+
+    def test_domain_classifier_params_override_config(self):
+        det = OODDomainClassifier(n_folds=3, n_std=3.0, threshold_perc=99.0)
+        assert det.config.n_folds == 3
+        assert det.config.n_std == 3.0
+        assert det.config.threshold_perc == 99.0
+        assert "n_folds=3" in repr(det)
+        assert "n_std=3.0" in repr(det)
+
+    def test_reconstruction_param_override_config(self):
+        det = OODReconstruction(model=torch.nn.Identity(), threshold_perc=80.0)
+        assert det.config.threshold_perc == 80.0
+        assert "threshold_perc=80.0" in repr(det)

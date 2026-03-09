@@ -11,19 +11,16 @@ from dataeval.utils.data import (
     DatasetSplits,
     TrainValSplit,
     _build_multilabel_matrix,
+    _calculate_validation_fraction,
     _IterativeStratifiedKFold,
     _multilabel_find_best_split,
     _multilabel_make_splits,
     _multilabel_single_split,
-    _simplify_type,
-    calculate_validation_fraction,
-    flatten_metadata,
-    merge_metadata,
-    single_split,
+    _single_split,
+    _validate_groupable,
+    _validate_labels,
+    _validate_stratifiable,
     split_dataset,
-    validate_groupable,
-    validate_labels,
-    validate_stratifiable,
 )
 
 
@@ -115,11 +112,11 @@ class TestInputValidation:
     def test_not_stratifiable(self):
         """Tests case where lowest label count is less than partitions."""
         with pytest.raises(ValueError, match="Unable to stratify due to label frequency"):
-            assert not validate_stratifiable(np.array([0, 1, 1]), 2)
+            assert not _validate_stratifiable(np.array([0, 1, 1]), 2)
 
     def test_stratifiable(self):
         """Tests that equal lowest label count and partitions is valid."""
-        validate_stratifiable(np.array([0, 0, 1, 1]), 2)
+        _validate_stratifiable(np.array([0, 0, 1, 1]), 2)
         pass
 
     def test_continuous_labels(self, labels):
@@ -127,7 +124,7 @@ class TestInputValidation:
         cont_labels = labels.astype(np.float64) + np.random.uniform(-1, 1, size=labels.shape)
         error_statement = "Detected continuous labels. Labels must be discrete for proper stratification"
         with pytest.raises(ValueError, match=error_statement):
-            validate_labels(cont_labels, total_partitions=2)
+            _validate_labels(cont_labels, total_partitions=2)
 
     def test_too_many_partitions(self):
         """Tests that an error is raised if there are more partitions than number of labels."""
@@ -137,40 +134,40 @@ class TestInputValidation:
         )
 
         with pytest.raises(ValueError, match=error_statement):
-            validate_labels(np.array([0]), total_partitions=1)
+            _validate_labels(np.array([0]), total_partitions=1)
 
     @pytest.mark.parametrize("folds", [-1, 0])
     def test_invalid_folds(self, folds):
         """Tests that negative and 0 folds are invalid."""
         error_msg = f"Number of folds must be greater than or equal to 1, got {folds}"
         with pytest.raises(ValueError, match=error_msg):
-            calculate_validation_fraction(num_folds=folds, test_frac=0.0, val_frac=0.0)
+            _calculate_validation_fraction(num_folds=folds, test_frac=0.0, val_frac=0.0)
 
     @pytest.mark.parametrize("fraction", [-0.001, 1.001])
     def test_invalid_val_frac_values(self, fraction):
         """Tests that 1 fold and val frac is given, but raises error due to val fraction out of bounds [0-1]."""
         error_msg = f"val_frac out of bounds. Must be between 0.0 and 1.0, got {fraction}"
         with pytest.raises(ValueError, match=error_msg):
-            calculate_validation_fraction(num_folds=1, test_frac=0.0, val_frac=fraction)
+            _calculate_validation_fraction(num_folds=1, test_frac=0.0, val_frac=fraction)
 
     @pytest.mark.parametrize("fraction", [-0.001, 1.001])
     def test_invalid_test_frac_values(self, fraction):
         """Tests that an error is raised if test fraction is not between 0.0 and 1.0."""
         error_msg = f"test_frac out of bounds. Must be between 0.0 and 1.0, got {fraction}"
         with pytest.raises(ValueError, match=error_msg):
-            calculate_validation_fraction(num_folds=1, test_frac=fraction, val_frac=0.0)
+            _calculate_validation_fraction(num_folds=1, test_frac=fraction, val_frac=0.0)
 
     def test_invalid_multi_fold_and_val_frac(self):
         """Tests that an error is raised when both >1 fold and val fraction are given."""
         error_msg = "Can only specify val_frac when num_folds equals 1"
         with pytest.raises(ValueError, match=error_msg):
-            calculate_validation_fraction(num_folds=5, test_frac=0.0, val_frac=0.2)
+            _calculate_validation_fraction(num_folds=5, test_frac=0.0, val_frac=0.2)
 
     def test_invalid_one_fold_no_val_frac(self):
         """Tests that 1 fold without specifying val fraction raises error."""
         error_msg = "If num_folds equals 1, must assign a value to val_frac"
         with pytest.raises(ValueError, match=error_msg):
-            calculate_validation_fraction(num_folds=1, test_frac=0.0, val_frac=0.0)
+            _calculate_validation_fraction(num_folds=1, test_frac=0.0, val_frac=0.0)
 
     @pytest.mark.parametrize(
         ("tfrac", "vfrac", "expected"),
@@ -178,7 +175,7 @@ class TestInputValidation:
     )
     def test_one_fold_valid_fractions(self, tfrac, vfrac, expected):
         """Tests that input fractions correctly calculates validation fraction."""
-        validation_fraction = calculate_validation_fraction(
+        validation_fraction = _calculate_validation_fraction(
             1,
             test_frac=tfrac,
             val_frac=vfrac,
@@ -192,7 +189,7 @@ class TestInputValidation:
     def test_multi_fold_valid_fractions(self, folds, tfrac):
         """Tests validation calculation with multiple folds."""
         expected = (1.0 / folds) * (1.0 - tfrac)
-        result = calculate_validation_fraction(folds, test_frac=tfrac, val_frac=0.0)
+        result = _calculate_validation_fraction(folds, test_frac=tfrac, val_frac=0.0)
 
         assert expected == result
 
@@ -206,13 +203,13 @@ class TestGroupData:
 
         error_msg = f"Unique groups ({len(uniques)}) must be greater than num partitions ({len(uniques) + 1})."
         with pytest.raises(ValueError, match=re.escape(error_msg)):
-            validate_groupable(group_ids, len(uniques) + 1)
+            _validate_groupable(group_ids, len(uniques) + 1)
 
     def test_single_unique_group(self):
         """Tests that a single unique group is not groupable."""
         error_msg = "Unique groups (1) must be greater than 1."
         with pytest.raises(ValueError, match=re.escape(error_msg)):
-            validate_groupable(np.ones(shape=(100, 1), dtype=np.intp), 1000)
+            _validate_groupable(np.ones(shape=(100, 1), dtype=np.intp), 1000)
 
     def test_no_valid_groups(self, labels, groups):
         metadata = get_metadata(labels, groups)
@@ -286,410 +283,6 @@ class TestFunctionalSplits:
         check_stratification(labels, splits, tolerance=0.15)
 
 
-@pytest.mark.required
-class TestUtilsMetadata:
-    duplicate_keys = {
-        "a": 1,
-        "b": {
-            "b1": "b1",
-            "b2": "b2",
-        },
-        "c": {
-            "d": [
-                {"e": 1, "f": 2, "g": 3},
-                {"e": 4, "f": 5, "g": 6},
-                {"e": 7, "f": 8, "g": 9, "z": 0},
-            ],
-            "h": [1.1, 1.2, 1.3],
-        },
-        "d": {
-            "d": {"e": 4, "f": 5, "g": 6},
-            "h": 1,
-        },
-    }
-
-    inconsistent_keys = [
-        {"a": 1, "b": [1], "c": [1, 2]},
-        {"a": 2},
-        {"a": 3, "d": [{"e": {"f": [{"g": 1, "h": 2}]}}]},
-    ]
-
-    numpy_value = [{"time": np.array([1.2, 3.4, 5.6]), "altitude": [235, 6789, 101112], "point": 4}]
-
-    voc_test = [
-        {
-            "annotation": {
-                "folder": "VOC2011",
-                "filename": "2008_000009.jpg",
-                "source": {"database": "The VOC2008 Database", "annotation": "PASCAL VOC2008", "image": "flickr"},
-                "size": {"width": "600", "height": "300", "depth": "3"},
-                "segmented": "0",
-                "object": [
-                    {
-                        "name": "cat",
-                        "pose": "Unspecified",
-                        "truncated": "0",
-                        "occluded": "1",
-                        "bndbox": {"xmin": "53", "ymin": "87", "xmax": "471", "ymax": "420"},
-                        "difficult": "0",
-                    },
-                    {
-                        "name": "dog",
-                        "pose": "Unspecified",
-                        "truncated": "1",
-                        "occluded": "0",
-                        "bndbox": {"xmin": "158", "ymin": "44", "xmax": "289", "ymax": "167"},
-                        "difficult": "0",
-                    },
-                    {
-                        "name": "person",
-                        "pose": "Right",
-                        "truncated": "1",
-                        "occluded": "0",
-                        "bndbox": {"xmin": "158", "ymin": "44", "xmax": "289", "ymax": "167"},
-                        "difficult": "0",
-                    },
-                ],
-            },
-        },
-        {
-            "annotation": {
-                "folder": "VOC2011",
-                "filename": "2008_000036.jpg",
-                "source": {"database": "The VOC2008 Database", "annotation": "PASCAL VOC2008", "image": "flickr"},
-                "size": {"width": "500", "height": "375", "depth": "3"},
-                "segmented": "0",
-                "object": [
-                    {
-                        "name": "bicycle",
-                        "pose": "Left",
-                        "truncated": "1",
-                        "occluded": "0",
-                        "bndbox": {"xmin": "120", "ymin": "1", "xmax": "203", "ymax": "35"},
-                        "difficult": "0",
-                    },
-                    {
-                        "name": "bicycle",
-                        "pose": "Left",
-                        "truncated": "1",
-                        "occluded": "1",
-                        "bndbox": {"xmin": "117", "ymin": "38", "xmax": "273", "ymax": "121"},
-                        "difficult": "0",
-                    },
-                    {
-                        "name": "person",
-                        "pose": "Left",
-                        "truncated": "0",
-                        "occluded": "0",
-                        "bndbox": {"xmin": "206", "ymin": "74", "xmax": "395", "ymax": "237"},
-                        "difficult": "0",
-                        "part": [
-                            {"name": "head", "bndbox": {"xmin": "321", "ymin": "75", "xmax": "359", "ymax": "122"}},
-                            {"name": "foot", "bndbox": {"xmin": "205", "ymin": "183", "xmax": "240", "ymax": "222"}},
-                            {"name": "foot", "bndbox": {"xmin": "209", "ymin": "208", "xmax": "250", "ymax": "237"}},
-                            {"name": "hand", "bndbox": {"xmin": "371", "ymin": "204", "xmax": "396", "ymax": "219"}},
-                        ],
-                    },
-                    {
-                        "name": "boat",
-                        "pose": "Left",
-                        "truncated": "1",
-                        "occluded": "1",
-                        "bndbox": {"xmin": "24", "ymin": "2", "xmax": "500", "ymax": "188"},
-                        "difficult": "0",
-                    },
-                    {
-                        "name": "boat",
-                        "pose": "Left",
-                        "truncated": "1",
-                        "occluded": "1",
-                        "bndbox": {"xmin": "1", "ymin": "187", "xmax": "500", "ymax": "282"},
-                        "difficult": "0",
-                    },
-                ],
-            },
-        },
-        {
-            "annotation": {
-                "folder": "VOC2011",
-                "filename": "2008_000128.jpg",
-                "source": {"database": "The VOC2008 Database", "annotation": "PASCAL VOC2008", "image": "flickr"},
-                "size": {"width": "500", "height": "375", "depth": "3"},
-                "segmented": "0",
-                "object": [
-                    {
-                        "name": "sofa",
-                        "pose": "Left",
-                        "truncated": "0",
-                        "occluded": "1",
-                        "bndbox": {"xmin": "11", "ymin": "29", "xmax": "500", "ymax": "375"},
-                        "difficult": "0",
-                    },
-                    {
-                        "name": "person",
-                        "pose": "Unspecified",
-                        "truncated": "1",
-                        "occluded": "1",
-                        "bndbox": {"xmin": "1", "ymin": "85", "xmax": "361", "ymax": "375"},
-                        "difficult": "0",
-                        "part": [
-                            {"name": "head", "bndbox": {"xmin": "243", "ymin": "88", "xmax": "358", "ymax": "225"}},
-                            {"name": "hand", "bndbox": {"xmin": "168", "ymin": "209", "xmax": "216", "ymax": "257"}},
-                            {"name": "hand", "bndbox": {"xmin": "94", "ymin": "252", "xmax": "128", "ymax": "308"}},
-                        ],
-                    },
-                    {
-                        "name": "person",
-                        "pose": "Unspecified",
-                        "truncated": "0",
-                        "occluded": "1",
-                        "bndbox": {"xmin": "92", "ymin": "173", "xmax": "212", "ymax": "357"},
-                        "difficult": "0",
-                    },
-                ],
-            },
-        },
-    ]
-
-    def test_ignore_lists(self):
-        a, d = merge_metadata([self.duplicate_keys], return_dropped=True, ignore_lists=True)
-        assert {k: list(v) for k, v in a.items()} == {
-            "a": [1],
-            "b1": ["b1"],
-            "b2": ["b2"],
-            "e": [4],
-            "f": [5],
-            "g": [6],
-            "h": [1],
-            "_image_index": [0],
-        }
-        assert d == {"c_d": ["nested_list"], "c_h": ["nested_list"]}
-
-    def test_fully_qualified_keys(self):
-        a, d = merge_metadata([self.duplicate_keys], return_dropped=True, fully_qualified=True)
-        assert {k: list(v) for k, v in a.items()} == {
-            "a": [1, 1, 1],
-            "b_b1": ["b1", "b1", "b1"],
-            "b_b2": ["b2", "b2", "b2"],
-            "c_d_e": [1, 4, 7],
-            "c_d_f": [2, 5, 8],
-            "c_d_g": [3, 6, 9],
-            "c_h": [1.1, 1.2, 1.3],
-            "d_d_e": [4, 4, 4],
-            "d_d_f": [5, 5, 5],
-            "d_d_g": [6, 6, 6],
-            "d_h": [1, 1, 1],
-            "_image_index": [0, 0, 0],
-        }
-        assert d == {"c_d_z": ["inconsistent_key"]}
-
-    @pytest.mark.parametrize("return_numpy", [False, True])
-    def test_duplicate_keys(self, return_numpy):
-        a = merge_metadata([self.duplicate_keys], return_numpy=return_numpy)
-        assert {k: list(v) for k, v in a.items()} == {
-            "a": [1, 1, 1],
-            "b1": ["b1", "b1", "b1"],
-            "b2": ["b2", "b2", "b2"],
-            "c_d_e": [1, 4, 7],
-            "c_d_f": [2, 5, 8],
-            "c_d_g": [3, 6, 9],
-            "c_h": [1.1, 1.2, 1.3],
-            "d_d_e": [4, 4, 4],
-            "d_d_f": [5, 5, 5],
-            "d_d_g": [6, 6, 6],
-            "d_h": [1, 1, 1],
-            "_image_index": [0, 0, 0],
-        }
-
-    @pytest.mark.parametrize("return_numpy", [False, True])
-    def test_inconsistent_keys(self, return_numpy):
-        a, d = merge_metadata(self.inconsistent_keys, return_dropped=True, return_numpy=return_numpy)
-        assert {k: list(v) for k, v in a.items()} == {
-            "a": [1, 2, 3],
-            "_image_index": [0, 1, 2],
-        }
-        assert d == {"b": ["inconsistent_key"], "c": ["inconsistent_size"], "d_e_f": ["nested_list"]}
-
-    def test_inconsistent_key(self):
-        list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
-        reorganized_metadata, dropped_keys = merge_metadata(list_metadata, return_dropped=True)
-        assert reorganized_metadata == {
-            "common": [1, 1],
-            "a": [1, 2],
-            "b": [3, 4],
-            "source": ["example", "example"],
-            "_image_index": [0, 0],
-        }
-        assert dropped_keys == {"target_c": ["inconsistent_key"]}
-
-    @pytest.mark.parametrize("return_numpy", [False, True])
-    def test_voc_test(self, return_numpy):
-        a = merge_metadata(self.voc_test, return_numpy=return_numpy)
-        assert {k: list(v) for k, v in a.items()} == {
-            "folder": [
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-                "VOC2011",
-            ],
-            "filename": [
-                "2008_000009.jpg",
-                "2008_000009.jpg",
-                "2008_000009.jpg",
-                "2008_000036.jpg",
-                "2008_000036.jpg",
-                "2008_000036.jpg",
-                "2008_000036.jpg",
-                "2008_000036.jpg",
-                "2008_000128.jpg",
-                "2008_000128.jpg",
-                "2008_000128.jpg",
-            ],
-            "database": [
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-                "The VOC2008 Database",
-            ],
-            "annotation": [
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-                "PASCAL VOC2008",
-            ],
-            "image": [
-                "flickr",
-                "flickr",
-                "flickr",
-                "flickr",
-                "flickr",
-                "flickr",
-                "flickr",
-                "flickr",
-                "flickr",
-                "flickr",
-                "flickr",
-            ],
-            "width": [600, 600, 600, 500, 500, 500, 500, 500, 500, 500, 500],
-            "height": [300, 300, 300, 375, 375, 375, 375, 375, 375, 375, 375],
-            "depth": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-            "segmented": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            "name": [
-                "cat",
-                "dog",
-                "person",
-                "bicycle",
-                "bicycle",
-                "person",
-                "boat",
-                "boat",
-                "sofa",
-                "person",
-                "person",
-            ],
-            "pose": [
-                "Unspecified",
-                "Unspecified",
-                "Right",
-                "Left",
-                "Left",
-                "Left",
-                "Left",
-                "Left",
-                "Left",
-                "Unspecified",
-                "Unspecified",
-            ],
-            "truncated": [0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0],
-            "occluded": [1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1],
-            "xmin": [53, 158, 158, 120, 117, 206, 24, 1, 11, 1, 92],
-            "ymin": [87, 44, 44, 1, 38, 74, 2, 187, 29, 85, 173],
-            "xmax": [471, 289, 289, 203, 273, 395, 500, 500, 500, 361, 212],
-            "ymax": [420, 167, 167, 35, 121, 237, 188, 282, 375, 375, 357],
-            "difficult": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            "_image_index": [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2],
-        }
-
-    @pytest.mark.filterwarnings("error")
-    def test_flatten_metadata_no_dropped_no_warn(self):
-        flatten_metadata({"a": {"b": 1, "c": 2}}, return_dropped=False)
-
-    def test_flatten_metadata_no_dropped_warns(self, caplog):
-        with caplog.at_level(logging.WARNING):
-            flatten_metadata(self.inconsistent_keys[0], return_dropped=False)
-        assert "Metadata entries were dropped" in caplog.text
-
-    @pytest.mark.filterwarnings("error")
-    def test_merge_metadata_no_dropped_no_warn(self):
-        merge_metadata([{"a": {"b": 1, "c": 2}}], return_dropped=False)
-
-    def test_merge_metadata_no_dropped_warns(self, caplog):
-        with caplog.at_level(logging.WARNING):
-            merge_metadata(self.inconsistent_keys, return_dropped=False)
-        assert "Metadata entries were dropped" in caplog.text
-
-    def test_handle_numpy(self):
-        output, dropped = merge_metadata(self.numpy_value, return_dropped=True)
-        assert output == {
-            "time": [1.2, 3.4, 5.6],
-            "altitude": [235, 6789, 101112],
-            "point": [4, 4, 4],
-            "_image_index": [0, 0, 0],
-        }
-        assert dropped == {}
-
-    def test_targets_per_image_mismatch(self):
-        targets_per_image = [1]
-        with pytest.raises(ValueError, match="Number of targets per image must be equal"):
-            merge_metadata([{"a": 1}, {"a": 2}], targets_per_image=targets_per_image)
-
-    def test_image_index_key_exists_in_output(self):
-        merge_metadatad = merge_metadata([{"a": {"b": 1, "c": 2, "foo": 0}}], image_index_key="foo")
-        assert merge_metadatad["foo"] == [0]
-
-    def test_merge_metadata_drop_no_targets(self):
-        merge_metadatad = merge_metadata([{"a": 1}, {"a": 2}, {"a": 3}], targets_per_image=[1, 0, 1])
-        assert merge_metadatad["a"] == [1, 3]
-
-
-@pytest.mark.required
-class TestCastSimplify:
-    @pytest.mark.parametrize(
-        ("value", "output"),
-        [
-            ("123", 123),
-            ("12.3", 12.3),
-            ("foo", "foo"),
-            ([123, "12.3"], [123.0, 12.3]),
-            ([123, "foo"], ["123", "foo"]),
-            (["123", "456"], [123, 456]),
-        ],
-    )
-    def test_convert_type(self, value, output):
-        assert output == _simplify_type(value)
-
-
 ####################################################################################################
 ################################## Regression / OD Split Tests #####################################
 ####################################################################################################
@@ -721,7 +314,7 @@ class TestMaxFoldsRegression:
         """single_split should produce splits close to the requested fraction, not 50/50."""
         labels = np.repeat(np.arange(5, dtype=np.intp), 40)  # 200 labels, 5 classes
         index = np.arange(len(labels))
-        split = single_split(index, labels, split_frac=0.15, stratified=True)
+        split = _single_split(index, labels, split_frac=0.15, stratified=True)
         ratio = len(split.val) / len(index)
         # Should be within 5% of target, NOT the old 50%
         assert abs(ratio - 0.15) < 0.05, f"Split ratio {ratio:.3f} too far from target 0.15"
@@ -730,7 +323,7 @@ class TestMaxFoldsRegression:
         """10% split should not produce 50/50."""
         labels = np.repeat(np.arange(5, dtype=np.intp), 40)
         index = np.arange(len(labels))
-        split = single_split(index, labels, split_frac=0.10, stratified=True)
+        split = _single_split(index, labels, split_frac=0.10, stratified=True)
         ratio = len(split.val) / len(index)
         assert abs(ratio - 0.10) < 0.05
 
@@ -738,7 +331,7 @@ class TestMaxFoldsRegression:
         """30% split should not produce 50/50."""
         labels = np.repeat(np.arange(5, dtype=np.intp), 40)
         index = np.arange(len(labels))
-        split = single_split(index, labels, split_frac=0.30, stratified=True)
+        split = _single_split(index, labels, split_frac=0.30, stratified=True)
         ratio = len(split.val) / len(index)
         assert abs(ratio - 0.30) < 0.05
 

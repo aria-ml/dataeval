@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif
 
 from dataeval.config import get_max_processes, get_seed
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import SequenceLike
 
 _logger = logging.getLogger(__name__)
@@ -145,10 +146,10 @@ def factor_deviation(
         raise ValueError(f"Invalid data dimensions: test={n_test}, indices={indices}")
 
     if not all(len(arr) == n_ref for arr in ref_arrays):
-        raise ValueError("All reference factor arrays must have the same length")
+        raise ShapeMismatchError("All reference factor arrays must have the same length")
 
     if not all(len(arr) == n_test for arr in test_arrays):
-        raise ValueError("All test factor arrays must have the same length")
+        raise ShapeMismatchError("All test factor arrays must have the same length")
 
     if n_ref < 3:
         _logger.warning(f"At least 3 reference metadata samples are needed, got {n_ref}")
@@ -240,7 +241,7 @@ def factor_predictors(
     # Validate all arrays have same length
     n_samples = len(arrays[0])
     if not all(len(arr) == n_samples for arr in arrays):
-        raise ValueError("All factor arrays must have the same length")
+        raise ShapeMismatchError("All factor arrays must have the same length")
 
     # Convert indices to boolean mask
     sample_mask = np.zeros(n_samples, dtype=bool)
@@ -261,7 +262,7 @@ def factor_predictors(
         discrete_features = [False] * len(factor_names)
 
     if len(discrete_features) != len(factor_names):
-        raise ValueError(
+        raise ShapeMismatchError(
             f"discrete_features length ({len(discrete_features)}) must match number of factors ({len(factor_names)})",
         )
 

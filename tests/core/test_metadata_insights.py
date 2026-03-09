@@ -9,6 +9,7 @@ from dataeval.core._metadata_insights import (
     factor_deviation,
     factor_predictors,
 )
+from dataeval.exceptions import ShapeMismatchError
 
 
 @pytest.mark.required
@@ -115,7 +116,7 @@ class TestFindDeviatedFactors:
             "altitude": np.array([120.0]),
         }
 
-        with pytest.raises(ValueError, match="All reference factor arrays must have the same length"):
+        with pytest.raises(ShapeMismatchError, match="All reference factor arrays must have the same length"):
             factor_deviation(reference_factors, test_factors, [0])
 
     def test_mismatched_test_array_lengths_raises(self):
@@ -129,7 +130,7 @@ class TestFindDeviatedFactors:
             "altitude": np.array([120.0, 130.0]),
         }
 
-        with pytest.raises(ValueError, match="All test factor arrays must have the same length"):
+        with pytest.raises(ShapeMismatchError, match="All test factor arrays must have the same length"):
             factor_deviation(reference_factors, test_factors, [0])
 
     @pytest.mark.parametrize("n_ref", [0, 1, 2])
@@ -278,7 +279,7 @@ class TestFindFactorPredictors:
             "altitude": np.array([100.0, 110.0]),
         }
 
-        with pytest.raises(ValueError, match="All factor arrays must have the same length"):
+        with pytest.raises(ShapeMismatchError, match="All factor arrays must have the same length"):
             factor_predictors(factors, [0])
 
     def test_mismatched_discrete_features_length_raises(self):
@@ -288,7 +289,7 @@ class TestFindFactorPredictors:
             "altitude": np.array([100.0, 110.0, 105.0]),
         }
 
-        with pytest.raises(ValueError, match="discrete_features length .* must match number of factors"):
+        with pytest.raises(ShapeMismatchError, match="discrete_features length .* must match number of factors"):
             factor_predictors(factors, [0], discrete_features=[True])
 
     def test_empty_indices_returns_zeros(self):

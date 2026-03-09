@@ -8,10 +8,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.protocols import Array
-from dataeval.utils.arrays import as_numpy, flatten_samples
+from dataeval.types import ReprMixin
+from dataeval.utils._internal import as_numpy, flatten_samples
 
 
-class FlattenExtractor:
+class FlattenExtractor(ReprMixin):
     """
     Simple NumPy-based feature extractor that flattens images to 1D vectors.
 
@@ -50,6 +51,3 @@ class FlattenExtractor:
             return np.empty((0,), dtype=np.float32)
         batch_array = np.stack(batch_images)
         return flatten_samples(batch_array)
-
-    def __repr__(self) -> str:
-        return "FlattenExtractor()"

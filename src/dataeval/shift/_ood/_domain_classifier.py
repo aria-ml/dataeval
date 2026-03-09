@@ -7,14 +7,16 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+from typing_extensions import Self
 
-from dataeval.protocols import ArrayLike
-from dataeval.shift._ood._base import BaseOOD, OODScoreOutput
+from dataeval.exceptions import NotFittedError
+from dataeval.protocols import ArrayLike, FeatureExtractor
+from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODScoreOutput
 from dataeval.shift._shared._domain_classifier import compute_class1_rates
-from dataeval.utils.arrays import flatten_samples
+from dataeval.utils._internal import flatten_samples
 
 
-class OODDomainClassifier(BaseOOD):
+class OODDomainClassifier(ExtractorMixin, BaseOOD):
     """Domain Classifier based Out-of-Distribution detector.
 
     Uses a LightGBM classifier's ability to distinguish test samples from
@@ -40,6 +42,14 @@ class OODDomainClassifier(BaseOOD):
         Number of standard deviations above the null mean for threshold.
     hyperparameters : dict or None, default None
         LightGBM hyperparameters.
+    threshold_perc : float or None, default None
+        Percentage of reference data considered normal (0-100).
+        If None, uses config.threshold_perc (default 95.0).
+    extractor : FeatureExtractor or None, default None
+        Feature extractor for transforming input data before scoring.
+        When provided, raw data is passed through the extractor in both
+        :meth:`fit` and :meth:`score`/:meth:`predict`. When None, data
+        is used as-is (must be array-like embeddings).
     config : OODDomainClassifier.Config or None, default None
         Optional configuration object.
 
@@ -49,8 +59,9 @@ class OODDomainClassifier(BaseOOD):
     >>> test = np.random.randn(50, 8).astype(np.float32) + 3
     >>> detector = OODDomainClassifier(n_folds=3, n_repeats=3)
     >>> detector.fit(ref)
+    OODDomainClassifier(n_folds=3, n_repeats=3, n_std=2.0, threshold_perc=95.0, hyperparameters=None, extractor=None, fitted=True)
     >>> predictions = detector.predict(test)
-    """
+    """  # noqa: E501
 
     @dataclass
     class Config:
@@ -69,6 +80,8 @@ class OODDomainClassifier(BaseOOD):
             Percentile-based threshold (alternative to n_std).
         hyperparameters : dict or None, default None
             LightGBM hyperparameters.
+        extractor : FeatureExtractor or None, default None
+            Feature extractor for transforming input data before scoring.
         """
 
         n_folds: int = 5
@@ -76,6 +89,7 @@ class OODDomainClassifier(BaseOOD):
         n_std: float = 2.0
         threshold_perc: float = 95.0
         hyperparameters: dict[str, Any] | None = None
+        extractor: FeatureExtractor | None = None
 
     def __init__(
         self,
@@ -83,17 +97,30 @@ class OODDomainClassifier(BaseOOD):
         n_repeats: int | None = None,
         n_std: float | None = None,
         hyperparameters: dict[str, Any] | None = None,
+        threshold_perc: float | None = None,
+        extractor: FeatureExtractor | None = None,
         config: Config | None = None,
     ) -> None:
-        super().__init__()
-        self.config: OODDomainClassifier.Config = config or OODDomainClassifier.Config()
+        base_config = config or OODDomainClassifier.Config()
 
-        self._n_folds = n_folds if n_folds is not None else self.config.n_folds
-        self._n_repeats = n_repeats if n_repeats is not None else self.config.n_repeats
-        self._n_std = n_std if n_std is not None else self.config.n_std
-        self._hyperparameters = hyperparameters if hyperparameters is not None else self.config.hyperparameters
+        threshold_perc = threshold_perc if threshold_perc is not None else base_config.threshold_perc
+        super().__init__(threshold_perc)
 
-        self._x_ref: NDArray[np.float32] | None = None
+        self._n_folds = n_folds if n_folds is not None else base_config.n_folds
+        self._n_repeats = n_repeats if n_repeats is not None else base_config.n_repeats
+        self._n_std = n_std if n_std is not None else base_config.n_std
+        self._hyperparameters = hyperparameters if hyperparameters is not None else base_config.hyperparameters
+        self._extractor = extractor if extractor is not None else base_config.extractor
+        self.config: OODDomainClassifier.Config = OODDomainClassifier.Config(
+            n_folds=self._n_folds,
+            n_repeats=self._n_repeats,
+            n_std=self._n_std,
+            threshold_perc=threshold_perc,
+            hyperparameters=self._hyperparameters,
+            extractor=self._extractor,
+        )
+
+        self._reference_data: NDArray[np.float32] | None = None
         self._null_mean: float = 0.0
         self._null_std: float = 1.0
         self._threshold: float = 0.0
@@ -103,7 +130,7 @@ class OODDomainClassifier(BaseOOD):
         x_np = super()._preprocess(x)
         return flatten_samples(np.atleast_2d(x_np))
 
-    def fit(self, x_ref: ArrayLike, threshold_perc: float | None = None) -> None:
+    def fit(self, reference_data: Any) -> Self:
         """Fit the detector using reference (in-distribution) data.
 
         Computes a null distribution of class-1 prediction rates by splitting
@@ -113,23 +140,25 @@ class OODDomainClassifier(BaseOOD):
 
         Parameters
         ----------
-        x_ref : ArrayLike
-            Reference (in-distribution) data.
-        threshold_perc : float or None, default None
-            Percentage of reference data considered normal (0-100).
-            If None, uses config.threshold_perc.
-        """
-        threshold_perc = threshold_perc if threshold_perc is not None else self.config.threshold_perc
+        reference_data : Any
+            Reference (in-distribution) data. When an extractor is
+            configured, this can be any data type accepted by the
+            extractor. Otherwise, must be array-like embeddings.
 
-        self._x_ref = flatten_samples(np.atleast_2d(np.asarray(x_ref, dtype=np.float32)))
-        self._data_info = (self._x_ref.shape[1:], self._x_ref.dtype.type)
+        Returns
+        -------
+        Self
+            The fitted detector (for method chaining).
+        """
+        self._reference_data = self._preprocess(reference_data)
+        self._data_info = (self._reference_data.shape[1:], self._reference_data.dtype.type)
 
         # Build null distribution: split reference into two halves,
         # label them 0/1, and compute class-1 rates.
-        n = len(self._x_ref)
+        n = len(self._reference_data)
         half = n // 2
         indices = np.random.permutation(n)
-        x_null = self._x_ref[indices]
+        x_null = self._reference_data[indices]
         y_null = np.concatenate([np.zeros(half, dtype=np.intp), np.ones(n - half, dtype=np.intp)])
 
         null_rates = compute_class1_rates(
@@ -145,14 +174,14 @@ class OODDomainClassifier(BaseOOD):
         self._threshold = self._null_mean + self._n_std * self._null_std
 
         # Compute reference scores for percentile-based thresholding
-        self._ref_score = self.score(x_ref)
-        self._threshold_perc = threshold_perc
+        self._ref_score = self.score(reference_data)
+        return self
 
-    def _score(self, x: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:  # noqa: ARG002
+    def _score(self, x: NDArray[np.float32], batch_size: int | None = None) -> OODScoreOutput:  # noqa: ARG002
         """Compute per-point class-1 rates for test data vs reference."""
-        x_ref = self._x_ref
+        x_ref = self._reference_data
         if x_ref is None:
-            raise RuntimeError("Detector needs to be `fit` before calling score.")
+            raise NotFittedError("Detector needs to be `fit` before calling score.")
 
         x_combined = np.concatenate([x_ref, x], axis=0)
         y = np.concatenate([np.zeros(len(x_ref), dtype=np.intp), np.ones(len(x), dtype=np.intp)])

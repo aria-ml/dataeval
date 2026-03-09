@@ -17,8 +17,8 @@ class TestOODDetection:
 
         rng = np.random.default_rng(42)
         ref = rng.standard_normal((50, 16)).astype(np.float32)
-        detector = OODKNeighbors(k=5)
-        detector.fit(ref, threshold_perc=95.0)
+        detector = OODKNeighbors(k=5, threshold_perc=95.0)
+        detector.fit(ref)
 
         test = rng.standard_normal((10, 16)).astype(np.float32)
         scores = detector.score(test)
@@ -30,8 +30,8 @@ class TestOODDetection:
 
         rng = np.random.default_rng(42)
         ref = rng.standard_normal((50, 16)).astype(np.float32)
-        detector = OODKNeighbors(k=5)
-        detector.fit(ref, threshold_perc=95.0)
+        detector = OODKNeighbors(k=5, threshold_perc=95.0)
+        detector.fit(ref)
 
         test = rng.standard_normal((10, 16)).astype(np.float32)
         result = detector.predict(test)
@@ -45,8 +45,8 @@ class TestOODDetection:
         rng = np.random.default_rng(42)
         # Tight cluster for reference
         ref = rng.standard_normal((100, 16)).astype(np.float32)
-        detector = OODKNeighbors(k=5, distance_metric="euclidean")
-        detector.fit(ref, threshold_perc=95.0)
+        detector = OODKNeighbors(k=5, distance_metric="euclidean", threshold_perc=95.0)
+        detector.fit(ref)
 
         # Far-away OOD samples (euclidean distance will be very large)
         ood = np.full((10, 16), 100.0, dtype=np.float32)
@@ -58,8 +58,8 @@ class TestOODDetection:
 
         rng = np.random.default_rng(42)
         ref = rng.standard_normal((50, 16)).astype(np.float32)
-        detector = OODKNeighbors(k=5, distance_metric="euclidean")
-        detector.fit(ref, threshold_perc=95.0)
+        detector = OODKNeighbors(k=5, distance_metric="euclidean", threshold_perc=95.0)
+        detector.fit(ref)
 
         test = rng.standard_normal((10, 16)).astype(np.float32)
         result = detector.predict(test)

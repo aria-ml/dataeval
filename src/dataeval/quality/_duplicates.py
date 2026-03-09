@@ -24,7 +24,7 @@ from dataeval.types import (
     StatsMap,
     set_metadata,
 )
-from dataeval.utils.arrays import flatten_samples, to_numpy
+from dataeval.utils._internal import flatten_samples, to_numpy
 
 DEFAULT_DUPLICATES_FLAGS = ImageStats.HASH_DUPLICATES_BASIC
 DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR: float | None = None

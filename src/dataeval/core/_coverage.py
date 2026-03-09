@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 from scipy.spatial.distance import pdist, squareform
 
 from dataeval.types import Array2D
-from dataeval.utils.arrays import as_numpy, ensure_embeddings, flatten_samples
+from dataeval.utils._internal import as_numpy, ensure_embeddings, flatten_samples
 
 _logger = logging.getLogger(__name__)
 

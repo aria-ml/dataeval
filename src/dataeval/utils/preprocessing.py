@@ -1,15 +1,24 @@
 """Utility functions for preprocessing images and bounding boxes."""
 
 __all__ = [
+    "BitDepth",
     "BoundingBox",
     "BoundingBoxFormat",
-    "normalize_image_shape",
-    "to_canonical_grayscale",
-    "resize",
+    "Box",
+    "BoxLike",
+    "FloatBox",
+    "IntBox",
     "clip_and_pad",
-    "rescale",
-    "get_bitdepth",
+    "clip_box",
     "edge_filter",
+    "get_bitdepth",
+    "is_valid_box",
+    "normalize_image_shape",
+    "rescale",
+    "resize",
+    "to_bounding_box",
+    "to_canonical_grayscale",
+    "to_int_box",
 ]
 
 import logging
@@ -24,6 +33,8 @@ from numpy.typing import NDArray
 from scipy.ndimage import zoom
 from scipy.signal import convolve2d
 
+from dataeval.exceptions import ShapeMismatchError
+
 try:
     from PIL import Image
 except ImportError:
@@ -31,8 +42,8 @@ except ImportError:
 
 _logger = logging.getLogger(__name__)
 
-EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
-BIT_DEPTH = (1, 8, 12, 16, 32)
+_EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
+_BIT_DEPTH = (1, 8, 12, 16, 32)
 
 
 # ===========================
@@ -379,7 +390,7 @@ def get_bitdepth(image: NDArray[Any]) -> BitDepth:
     pmin, pmax = np.nanmin(image), np.nanmax(image)
     if pmin < 0:
         return BitDepth(0, pmin, pmax)
-    depth = ([x for x in BIT_DEPTH if 2**x > pmax] or [max(BIT_DEPTH)])[0]
+    depth = ([x for x in _BIT_DEPTH if 2**x > pmax] or [max(_BIT_DEPTH)])[0]
     return BitDepth(depth, 0, 2**depth - 1)
 
 
@@ -433,7 +444,7 @@ def normalize_image_shape(image: NDArray[Any]) -> NDArray[Any]:
     if ndim > 3:
         # Slice all but the last 3 dimensions
         return image[(0,) * (ndim - 3)]
-    raise ValueError("Images must have 2 or more dimensions.")
+    raise ShapeMismatchError("Images must have 2 or more dimensions.")
 
 
 def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
@@ -457,7 +468,7 @@ def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
     NDArray[np.uint8]
         Edge-filtered image
     """
-    edges = convolve2d(image, EDGE_KERNEL, mode="same", boundary="symm") + offset
+    edges = convolve2d(image, _EDGE_KERNEL, mode="same", boundary="symm") + offset
     np.clip(edges, 0, 255, edges)
     return edges
 

@@ -13,6 +13,7 @@ import pytest
 import torch
 from sklearn.datasets import load_digits
 
+from dataeval.exceptions import NotFittedError
 from dataeval.shift._ood._reconstruction import OODReconstruction
 from dataeval.shift._shared._reconstruction import gmm_energy, gmm_params
 from dataeval.utils.losses import ELBOLoss
@@ -38,10 +39,14 @@ def test_ae(ood_type, x_ref):
     threshold_perc = 90.0
 
     # init OutlierAE
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(
+        AE(input_shape=input_shape),
+        threshold_perc=threshold_perc,
+        config=OODReconstruction.Config(epochs=1),
+    )
 
     # fit OutlierAE, infer threshold and compute scores
-    ae.fit(x_ref, threshold_perc=threshold_perc, epochs=1)
+    ae.fit(x_ref)
     iscore = ae._ref_score.instance_score
     perc_score = 100 * (iscore < ae._threshold_score()).sum() / iscore.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
@@ -66,8 +71,8 @@ def test_ae(ood_type, x_ref):
 @patch("dataeval.shift._shared._reconstruction.train")
 def test_custom_loss_fn(mock_train, x_ref):
     mock_loss_fn = MagicMock()
-    ae = OODReconstruction(AE(input_shape=input_shape))
-    ae.fit(x_ref, 0.0, mock_loss_fn)
+    ae = OODReconstruction(AE(input_shape=input_shape), config=OODReconstruction.Config(loss_fn=mock_loss_fn))
+    ae.fit(x_ref)
     # Check that the custom loss function was passed to train
     assert mock_train.called
     # The loss_fn is the 3rd keyword argument (loss_fn) in the train call
@@ -78,8 +83,8 @@ def test_custom_loss_fn(mock_train, x_ref):
 @patch("dataeval.shift._shared._reconstruction.train")
 def test_custom_optimizer(mock_train, x_ref):
     mock_opt = MagicMock()
-    ae = OODReconstruction(AE(input_shape=input_shape))
-    ae.fit(x_ref, 0.0, None, mock_opt)
+    ae = OODReconstruction(AE(input_shape=input_shape), config=OODReconstruction.Config(optimizer=mock_opt))
+    ae.fit(x_ref)
     # Check that the custom optimizer was passed to train
     assert mock_train.called
     assert mock_train.call_args.kwargs["optimizer"] is mock_opt
@@ -93,10 +98,15 @@ def test_vae(ood_type, x_ref):
     threshold_perc = 90.0
 
     # init OutlierVAE with VAE model
-    vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
+    vae = OODReconstruction(
+        VAE(input_shape=input_shape),
+        model_type="vae",
+        threshold_perc=threshold_perc,
+        config=OODReconstruction.Config(epochs=1),
+    )
 
     # fit VAE, infer threshold and compute scores
-    vae.fit(x_ref, threshold_perc=threshold_perc, epochs=1)
+    vae.fit(x_ref)
     iscore = vae._ref_score.instance_score
     perc_score = 100 * (iscore < vae._threshold_score()).sum() / iscore.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
@@ -145,21 +155,25 @@ def test_vae_model_type_validation():
 @pytest.mark.required
 def test_ae_vs_vae_loss():
     """Test that AE and VAE use different default loss functions."""
-    ae = OODReconstruction(AE(input_shape=input_shape), model_type="ae")
-    vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
+    ae = OODReconstruction(
+        AE(input_shape=input_shape), model_type="ae", threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
+    vae = OODReconstruction(
+        VAE(input_shape=input_shape), model_type="vae", threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
 
     # Create small test data
     x_ref = np.random.rand(10, *input_shape).astype(np.float32)
 
     # Check that fit doesn't raise errors and uses appropriate losses
     with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
-        ae.fit(x_ref, threshold_perc=90, epochs=1)
+        ae.fit(x_ref)
         # Check that MSE loss was used for AE
         assert mock_train.called
         assert isinstance(mock_train.call_args.kwargs["loss_fn"], torch.nn.MSELoss)
 
     with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
-        vae.fit(x_ref, threshold_perc=90, epochs=1)
+        vae.fit(x_ref)
         # Check that VAE loss was used
         assert mock_train.called
         # ELBOLoss is a custom class from dataeval
@@ -169,12 +183,22 @@ def test_ae_vs_vae_loss():
 @pytest.mark.optional
 def test_vae_beta_parameter(x_ref):
     """Test that beta parameter affects VAE training using ELBOLoss."""
-    vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
-    vae.fit(x_ref[:20], threshold_perc=90, loss_fn=ELBOLoss(beta=0.5), epochs=1)
+    vae = OODReconstruction(
+        VAE(input_shape=input_shape),
+        model_type="vae",
+        threshold_perc=90,
+        config=OODReconstruction.Config(loss_fn=ELBOLoss(beta=0.5), epochs=1),
+    )
+    vae.fit(x_ref[:20])
     assert hasattr(vae, "_ref_score")
 
-    vae2 = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
-    vae2.fit(x_ref[:20], threshold_perc=90, loss_fn=ELBOLoss(beta=2.0), epochs=1)
+    vae2 = OODReconstruction(
+        VAE(input_shape=input_shape),
+        model_type="vae",
+        threshold_perc=90,
+        config=OODReconstruction.Config(loss_fn=ELBOLoss(beta=2.0), epochs=1),
+    )
+    vae2.fit(x_ref[:20])
     assert hasattr(vae2, "_ref_score")
 
 
@@ -194,12 +218,18 @@ def test_use_gmm_parameter():
 def test_gmm_without_proper_model_output():
     """Test that using GMM with a model that doesn't return proper output raises error."""
     # Standard VAE returns (recon, mu, logvar) which has 3 elements but not the right format
-    vae_with_gmm = OODReconstruction(VAE(input_shape=input_shape), model_type="vae", use_gmm=True)
+    vae_with_gmm = OODReconstruction(
+        VAE(input_shape=input_shape),
+        model_type="vae",
+        use_gmm=True,
+        threshold_perc=90,
+        config=OODReconstruction.Config(epochs=1),
+    )
     x_ref_small = np.random.rand(10, *input_shape).astype(np.float32)
 
     # This should raise an error because VAE doesn't output gamma
     with pytest.raises(ValueError, match="When use_gmm=True"):
-        vae_with_gmm.fit(x_ref_small, threshold_perc=90, epochs=1)
+        vae_with_gmm.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -210,13 +240,18 @@ def test_ELBOLoss_class_with_ood_ae():
     # Create custom loss with specific beta
     custom_loss = ELBOLoss(beta=2.0, reduction="mean")
 
-    vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
+    vae = OODReconstruction(
+        VAE(input_shape=input_shape),
+        model_type="vae",
+        threshold_perc=90,
+        config=OODReconstruction.Config(loss_fn=custom_loss, epochs=1),
+    )
 
     # Small dataset for quick test
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
     # Fit with custom loss
-    vae.fit(x_ref_small, threshold_perc=90, loss_fn=custom_loss, epochs=1)
+    vae.fit(x_ref_small)
 
     # Should have fitted successfully
     assert hasattr(vae, "_ref_score")
@@ -230,13 +265,23 @@ def test_ELBOLoss_different_beta_values(x_ref):
 
     # Test with beta=0.5 (less emphasis on KL divergence)
     loss1 = ELBOLoss(beta=0.5)
-    vae1 = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
-    vae1.fit(x_ref[:20], threshold_perc=90, loss_fn=loss1, epochs=1)
+    vae1 = OODReconstruction(
+        VAE(input_shape=input_shape),
+        model_type="vae",
+        threshold_perc=90,
+        config=OODReconstruction.Config(loss_fn=loss1, epochs=1),
+    )
+    vae1.fit(x_ref[:20])
 
     # Test with beta=4.0 (more emphasis on KL divergence, better disentanglement)
     loss2 = ELBOLoss(beta=4.0)
-    vae2 = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
-    vae2.fit(x_ref[:20], threshold_perc=90, loss_fn=loss2, epochs=1)
+    vae2 = OODReconstruction(
+        VAE(input_shape=input_shape),
+        model_type="vae",
+        threshold_perc=90,
+        config=OODReconstruction.Config(loss_fn=loss2, epochs=1),
+    )
+    vae2.fit(x_ref[:20])
 
     # Both should train successfully
     assert hasattr(vae1, "_ref_score")
@@ -257,11 +302,16 @@ def test_custom_functional_loss():
 
         return recon_loss + kld_loss
 
-    vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
+    vae = OODReconstruction(
+        VAE(input_shape=input_shape),
+        model_type="vae",
+        threshold_perc=90,
+        config=OODReconstruction.Config(loss_fn=custom_vae_loss, epochs=1),
+    )
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
     # Fit with custom functional loss
-    vae.fit(x_ref_small, threshold_perc=90, loss_fn=custom_vae_loss, epochs=1)
+    vae.fit(x_ref_small)
 
     assert hasattr(vae, "_ref_score")
 
@@ -269,33 +319,33 @@ def test_custom_functional_loss():
 @pytest.mark.required
 def test_data_validation_not_ndarray():
     """Test that non-ndarray input raises TypeError."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_list = [[1, 2, 3], [4, 5, 6]]  # Not an ndarray
 
     with pytest.raises((TypeError, RuntimeError)):
-        ae.fit(x_list, threshold_perc=90, epochs=1)
+        ae.fit(x_list)
 
 
 @pytest.mark.required
 def test_data_validation_out_of_range_negative():
     """Test that data with negative values raises ValueError."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
     x_ref_small[0, 0, 0, 0] = -0.1  # Add a negative value
 
     with pytest.raises(ValueError, match="Data must be on the unit interval"):
-        ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ae.fit(x_ref_small)
 
 
 @pytest.mark.required
 def test_data_validation_out_of_range_above_one():
     """Test that data with values > 1 raises ValueError."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
     x_ref_small[0, 0, 0, 0] = 1.5  # Add a value > 1
 
     with pytest.raises(ValueError, match="Data must be on the unit interval"):
-        ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ae.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -304,7 +354,7 @@ def test_predict_before_fit():
     ae = OODReconstruction(AE(input_shape=input_shape))
     x_test = np.random.rand(10, *input_shape).astype(np.float32)
 
-    with pytest.raises(RuntimeError, match="Detector needs to be `fit` before calling predict or score"):
+    with pytest.raises(NotFittedError, match="Detector needs to be `fit` before calling predict or score"):
         ae.predict(x_test)
 
 
@@ -321,9 +371,9 @@ def test_score_before_fit():
 @pytest.mark.required
 def test_shape_mismatch_after_fit():
     """Test that data with different shape after fit raises an error."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     # Try to predict with wrong shape
     wrong_shape = (1, 4, 4)  # Different from input_shape
@@ -337,9 +387,9 @@ def test_shape_mismatch_after_fit():
 @pytest.mark.required
 def test_dtype_mismatch_after_fit():
     """Test that data with different dtype is handled (converted to float32)."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     # Try to predict with wrong dtype - should be converted automatically
     x_test_wrong = np.random.rand(10, *input_shape).astype(np.float64)
@@ -369,23 +419,23 @@ def test_config_initialization():
 
 @pytest.mark.required
 def test_config_usage_with_overrides():
-    """Test that config values are used and can be overridden."""
+    """Test that config values are used when passed at construction time."""
     config = OODReconstruction.Config(epochs=15, batch_size=16, threshold_perc=98.0)
     ae = OODReconstruction(AE(input_shape=input_shape), config=config)
 
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
     with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
-        # Fit without overrides - should use config defaults
+        # Fit should use config values
         ae.fit(x_ref_small)
         assert mock_train.call_args.kwargs["epochs"] == 15
         assert mock_train.call_args.kwargs["batch_size"] == 16
 
-    # Create new instance to override config
-    ae2 = OODReconstruction(AE(input_shape=input_shape), config=config)
+    # Create new instance with different config values
+    config2 = OODReconstruction.Config(epochs=5, batch_size=8, threshold_perc=98.0)
+    ae2 = OODReconstruction(AE(input_shape=input_shape), config=config2)
     with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
-        # Fit with overrides
-        ae2.fit(x_ref_small, epochs=5, batch_size=8)
+        ae2.fit(x_ref_small)
         assert mock_train.call_args.kwargs["epochs"] == 5
         assert mock_train.call_args.kwargs["batch_size"] == 8
 
@@ -438,9 +488,9 @@ def test_device_parameter():
 @pytest.mark.required
 def test_threshold_score_instance():
     """Test _threshold_score method for instance level."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     threshold = ae._threshold_score(ood_type="instance")
     assert isinstance(threshold, float | np.floating)
@@ -453,9 +503,9 @@ def test_threshold_score_instance():
 @pytest.mark.required
 def test_threshold_score_feature():
     """Test _threshold_score method for feature level."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=85, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=85, epochs=1)
+    ae.fit(x_ref_small)
 
     threshold = ae._threshold_score(ood_type="feature")
     assert isinstance(threshold, float | np.floating)
@@ -469,9 +519,9 @@ def test_threshold_score_feature():
 @pytest.mark.required
 def test_score_method_output():
     """Test that score method returns correct output structure."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     x_test = np.random.rand(5, *input_shape).astype(np.float32)
     score = ae.score(x_test)
@@ -486,9 +536,9 @@ def test_score_method_output():
 @pytest.mark.required
 def test_predict_output_structure():
     """Test that predict method returns correct output structure."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     x_test = np.random.rand(5, *input_shape).astype(np.float32)
     output = ae.predict(x_test, ood_type="instance")
@@ -503,9 +553,11 @@ def test_predict_output_structure():
 @pytest.mark.required
 def test_batch_size_parameter():
     """Test that batch_size parameter affects scoring."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(
+        AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1, batch_size=10)
+    )
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1, batch_size=10)
+    ae.fit(x_ref_small)
 
     x_test = np.random.rand(15, *input_shape).astype(np.float32)
 
@@ -521,14 +573,19 @@ def test_batch_size_parameter():
 
 @pytest.mark.required
 def test_fit_with_all_parameters():
-    """Test fit method with all parameters specified."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    """Test fit method with all parameters specified via Config."""
+    ae_model = AE(input_shape=input_shape)
+    custom_loss = torch.nn.MSELoss()
+    custom_optimizer = torch.optim.SGD(ae_model.parameters(), lr=0.01)
+
+    ae = OODReconstruction(
+        ae_model,
+        threshold_perc=92.0,
+        config=OODReconstruction.Config(loss_fn=custom_loss, optimizer=custom_optimizer, epochs=5, batch_size=8),
+    )
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
-    custom_loss = torch.nn.MSELoss()
-    custom_optimizer = torch.optim.SGD(ae.model.parameters(), lr=0.01)
-
-    ae.fit(x_ref_small, threshold_perc=92.0, loss_fn=custom_loss, optimizer=custom_optimizer, epochs=5, batch_size=8)
+    ae.fit(x_ref_small)
 
     assert hasattr(ae, "_ref_score")
     assert ae._threshold_perc == 92.0
@@ -544,11 +601,13 @@ def test_gmm_validation_not_tuple():
             return x  # Returns tensor, not tuple
 
     bad_model = BadModel()
-    ood = OODReconstruction(bad_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        bad_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(10, *input_shape).astype(np.float32)
 
     with pytest.raises(ValueError, match="model must return a tuple"):
-        ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ood.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -561,11 +620,13 @@ def test_gmm_validation_wrong_tuple_length():
             return x, x  # Only 2 elements, need at least 3
 
     short_model = ShortTupleModel()
-    ood = OODReconstruction(short_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        short_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(10, *input_shape).astype(np.float32)
 
     with pytest.raises(ValueError, match="must return tuple of at least 3 elements"):
-        ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ood.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -581,12 +642,14 @@ def test_gmm_validation_z_not_tensor():
             return recon, z, gamma
 
     bad_model = BadZModel()
-    ood = OODReconstruction(bad_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        bad_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(10, *input_shape).astype(np.float32)
 
     # Will raise AttributeError from predict trying to call .cpu() on a list
     with pytest.raises((ValueError, AttributeError)):
-        ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ood.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -602,11 +665,13 @@ def test_gmm_validation_z_wrong_shape():
             return recon, z, gamma
 
     bad_model = WrongZShapeModel()
-    ood = OODReconstruction(bad_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        bad_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(10, *input_shape).astype(np.float32)
 
     with pytest.raises(ValueError, match="second output.*must be 2D"):
-        ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ood.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -622,12 +687,14 @@ def test_gmm_validation_gamma_not_tensor():
             return recon, z, gamma
 
     bad_model = BadGammaModel()
-    ood = OODReconstruction(bad_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        bad_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(10, *input_shape).astype(np.float32)
 
     # Will raise AttributeError from predict trying to call .cpu() on a list
     with pytest.raises((ValueError, AttributeError)):
-        ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ood.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -643,11 +710,13 @@ def test_gmm_validation_gamma_wrong_shape():
             return recon, z, gamma
 
     bad_model = WrongGammaShapeModel()
-    ood = OODReconstruction(bad_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        bad_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(10, *input_shape).astype(np.float32)
 
     with pytest.raises(ValueError, match="third output.*must be 2D"):
-        ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ood.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -663,11 +732,13 @@ def test_gmm_validation_gamma_not_normalized():
             return recon, z, gamma
 
     bad_model = UnnormalizedGammaModel()
-    ood = OODReconstruction(bad_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        bad_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(10, *input_shape).astype(np.float32)
 
     with pytest.raises(ValueError, match="must be a probability distribution"):
-        ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ood.fit(x_ref_small)
 
 
 @pytest.mark.required
@@ -684,13 +755,15 @@ def test_auto_detect_gmm_false():
 @pytest.mark.required
 def test_use_gmm_explicit_false():
     """Test explicitly setting use_gmm=False."""
-    ae = OODReconstruction(AE(input_shape=input_shape), use_gmm=False)
+    ae = OODReconstruction(
+        AE(input_shape=input_shape), use_gmm=False, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     assert ae.use_gmm is False
     assert ae._scorer._gmm_params is None
 
     # Fit and verify no GMM params are computed
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
     assert ae._scorer._gmm_params is None
     assert ae._scorer._gmm_energy_ref_mean is None
 
@@ -698,9 +771,9 @@ def test_use_gmm_explicit_false():
 @pytest.mark.required
 def test_score_with_torch_tensor_input():
     """Test that score method works with torch tensors."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     # Test with torch tensor
     x_test_torch = torch.rand(5, *input_shape).float()
@@ -714,9 +787,9 @@ def test_score_with_torch_tensor_input():
 @pytest.mark.required
 def test_predict_with_torch_tensor_input():
     """Test that predict method works with torch tensors."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     # Test with torch tensor
     x_test_torch = torch.rand(5, *input_shape).float()
@@ -729,11 +802,11 @@ def test_predict_with_torch_tensor_input():
 @pytest.mark.required
 def test_default_optimizer_creation():
     """Test that default optimizer is created when not provided."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
     with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
-        ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ae.fit(x_ref_small)
 
         # Check that an optimizer was passed
         assert mock_train.called
@@ -745,11 +818,13 @@ def test_default_optimizer_creation():
 @pytest.mark.required
 def test_vae_default_loss():
     """Test that VAE uses ELBOLoss by default."""
-    vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
+    vae = OODReconstruction(
+        VAE(input_shape=input_shape), model_type="vae", threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
     with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
-        vae.fit(x_ref_small, threshold_perc=90, epochs=1)
+        vae.fit(x_ref_small)
 
         assert mock_train.called
         loss_fn = mock_train.call_args.kwargs["loss_fn"]
@@ -759,11 +834,13 @@ def test_vae_default_loss():
 @pytest.mark.required
 def test_ae_default_loss():
     """Test that AE uses MSELoss by default."""
-    ae = OODReconstruction(AE(input_shape=input_shape), model_type="ae")
+    ae = OODReconstruction(
+        AE(input_shape=input_shape), model_type="ae", threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
     with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
-        ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ae.fit(x_ref_small)
 
         assert mock_train.called
         loss_fn = mock_train.call_args.kwargs["loss_fn"]
@@ -780,17 +857,17 @@ def test_internal_state_initialization():
     assert ae._scorer._gmm_energy_ref_mean is None
     assert ae._data_info is None
     assert not hasattr(ae, "_ref_score")
-    assert not hasattr(ae, "_threshold_perc")
+    assert ae._threshold_perc == 95.0  # Set at init with default
 
 
 @pytest.mark.required
 def test_ref_score_set_after_fit():
     """Test that _ref_score is set after fit."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
 
     assert not hasattr(ae, "_ref_score")
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     # After fit, _ref_score should be set
     assert hasattr(ae, "_ref_score")
@@ -801,9 +878,9 @@ def test_ref_score_set_after_fit():
 @pytest.mark.required
 def test_validate_data_info_mismatch():
     """Test _validate raises error when data shape changes."""
-    ae = OODReconstruction(AE(input_shape=input_shape))
+    ae = OODReconstruction(AE(input_shape=input_shape), threshold_perc=90, config=OODReconstruction.Config(epochs=1))
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    ae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ae.fit(x_ref_small)
 
     # Manually set _data_info to trigger validation
     ae._data_info = (input_shape, np.float32)
@@ -845,13 +922,15 @@ def test_gmm_reconstruction_loss_path():
             return recon, z, gamma
 
     gmm_model = GMMModel()
-    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        gmm_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
 
     x_ref_small = np.random.rand(30, *input_shape).astype(np.float32)
 
     # Fit with GMM - this should use the custom gmm_reconstruction_loss
     with patch("dataeval.shift._shared._reconstruction.train") as mock_train:
-        ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+        ood.fit(x_ref_small)
 
         # Verify custom loss function was created
         assert mock_train.called
@@ -892,7 +971,9 @@ def test_gmm_params_computed_after_fit():
             return recon, z, gamma
 
     gmm_model = GMMModel()
-    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        gmm_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
 
     x_ref_small = np.random.rand(30, *input_shape).astype(np.float32)
 
@@ -901,7 +982,7 @@ def test_gmm_params_computed_after_fit():
     assert ood._scorer._gmm_energy_ref_mean is None
 
     # Fit with GMM
-    ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ood.fit(x_ref_small)
 
     # After fit, GMM params should be computed
     assert ood._scorer._gmm_params is not None
@@ -937,10 +1018,12 @@ def test_gmm_scoring_with_energy():
             return recon, z, gamma
 
     gmm_model = GMMModel()
-    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        gmm_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
 
     x_ref_small = np.random.rand(30, *input_shape).astype(np.float32)
-    ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ood.fit(x_ref_small)
 
     # Score some test data - should include GMM energy
     x_test = np.random.rand(10, *input_shape).astype(np.float32)
@@ -977,9 +1060,11 @@ def test_gmm_params_energy():
 @pytest.mark.required
 def test_vae_output_extraction():
     """Test VAE model output extraction in _score."""
-    vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
+    vae = OODReconstruction(
+        VAE(input_shape=input_shape), model_type="vae", threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
-    vae.fit(x_ref_small, threshold_perc=90, epochs=1)
+    vae.fit(x_ref_small)
 
     # Score should extract reconstruction from VAE tuple output
     x_test = np.random.rand(5, *input_shape).astype(np.float32)
@@ -1034,14 +1119,16 @@ def test_gmm_z_normalization_prevents_covariance_error():
             return recon, z, gamma
 
     gmm_model = GMMModelWithSmallLatents()
-    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True)
+    ood = OODReconstruction(
+        gmm_model, model_type="ae", use_gmm=True, threshold_perc=90, config=OODReconstruction.Config(epochs=1)
+    )
 
     # Create reference data
     x_ref_small = np.random.rand(50, *input_shape).astype(np.float32)
 
     # This should NOT raise _LinAlgError about non-positive-definite matrix
     # The normalization should prevent the error
-    ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+    ood.fit(x_ref_small)
 
     # Verify that normalization statistics were computed
     assert ood._scorer._gmm_params is not None
@@ -1090,12 +1177,12 @@ def test_combine_gmm_percentile():
     # Test basic functionality of _combine_gmm_percentile
     gmm_model = SimpleGMMModel()
 
-    config = OODReconstruction.Config(gmm_score_mode="percentile")
-    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True, config=config)
+    config = OODReconstruction.Config(gmm_score_mode="percentile", epochs=1)
+    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True, threshold_perc=90, config=config)
 
     # Create synthetic data
     x_ref = np.random.rand(30, *input_shape).astype(np.float32)
-    ood.fit(x_ref, threshold_perc=90, epochs=1)
+    ood.fit(x_ref)
 
     # Check that reference statistics were computed
     assert ood._scorer._recon_ref_mean is not None
@@ -1118,9 +1205,9 @@ def test_combine_gmm_percentile():
     assert np.all(np.isfinite(score.instance_score))
 
     # Test that percentile method produces different results than standardized
-    config_std = OODReconstruction.Config(gmm_score_mode="standardized", gmm_weight=0.5)
-    ood_std = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_std)
-    ood_std.fit(x_ref, threshold_perc=90, epochs=1)
+    config_std = OODReconstruction.Config(gmm_score_mode="standardized", gmm_weight=0.5, epochs=1)
+    ood_std = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, threshold_perc=90, config=config_std)
+    ood_std.fit(x_ref)
     score_std = ood_std.score(x_test)
 
     # The two methods should produce different scores
@@ -1219,23 +1306,23 @@ def test_gmm_score_mode_config_parameter():
             return recon, z, gamma
 
     # Test with standardized mode (default)
-    config_std = OODReconstruction.Config(gmm_score_mode="standardized")
-    ood_std = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_std)
+    config_std = OODReconstruction.Config(gmm_score_mode="standardized", epochs=1)
+    ood_std = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, threshold_perc=90, config=config_std)
     assert ood_std.config.gmm_score_mode == "standardized"
 
     # Test with percentile mode
-    config_pct = OODReconstruction.Config(gmm_score_mode="percentile")
-    ood_pct = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_pct)
+    config_pct = OODReconstruction.Config(gmm_score_mode="percentile", epochs=1)
+    ood_pct = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, threshold_perc=90, config=config_pct)
     assert ood_pct.config.gmm_score_mode == "percentile"
 
     # Verify both modes work end-to-end
     x_ref = np.random.rand(30, *input_shape).astype(np.float32)
     x_test = np.random.rand(10, *input_shape).astype(np.float32)
 
-    ood_std.fit(x_ref, threshold_perc=90, epochs=1)
+    ood_std.fit(x_ref)
     score_std = ood_std.score(x_test)
     assert score_std.instance_score.shape == (10,)
 
-    ood_pct.fit(x_ref, threshold_perc=90, epochs=1)
+    ood_pct.fit(x_ref)
     score_pct = ood_pct.score(x_test)
     assert score_pct.instance_score.shape == (10,)

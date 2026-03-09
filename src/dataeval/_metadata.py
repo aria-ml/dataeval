@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval.core._bin import bin_data, digitize_data, is_continuous
+from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import (
     AnnotatedDataset,
     Array,
@@ -20,8 +21,7 @@ from dataeval.protocols import (
     ProgressCallback,
 )
 from dataeval.types import Array1D
-from dataeval.utils.arrays import as_numpy
-from dataeval.utils.data import merge_metadata
+from dataeval.utils._internal import as_numpy, merge_metadata
 
 _logger = logging.getLogger(__name__)
 
@@ -136,6 +136,26 @@ class Metadata(Array, FeatureExtractor):
         self._include = set(include or ())
         self._target_factors_only = False
 
+    def __repr__(self) -> str:
+        bound = self._dataset is not None
+        parts = [f"bound={bound}"]
+        if self._continuous_factor_bins:
+            parts.append(f"continuous_factor_bins={self._continuous_factor_bins!r}")
+        parts.append(f"auto_bin_method={self._auto_bin_method!r}")
+        if self._exclude:
+            parts.append(f"exclude={self._exclude!r}")
+        if self._include:
+            parts.append(f"include={self._include!r}")
+        if bound:
+            parts.append(f"n={self._count}")
+        return f"Metadata({', '.join(parts)})"
+
+    def __str__(self) -> str:
+        bound = self._dataset is not None
+        factors = list(self._factors.keys()) if hasattr(self, "_factors") and self._is_structured else []
+        factor_str = f", factors={factors}" if factors else ""
+        return f"Metadata(n={self._count}, bound={bound}{factor_str})"
+
     @property
     def is_bound(self) -> bool:
         """Whether this instance is bound to a dataset.
@@ -203,12 +223,28 @@ class Metadata(Array, FeatureExtractor):
 
         Raises
         ------
-        ValueError
+        NotFittedError
             If no dataset is bound.
         """
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
         return self._count
+
+    @property
+    def ndim(self) -> int:
+        """Number of dimensions of the binned metadata array.
+
+        Returns
+        -------
+        int
+            Number of dimensions.
+
+        Raises
+        ------
+        NotFittedError
+            If no dataset is bound.
+        """
+        return len(self.shape)
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -221,11 +257,11 @@ class Metadata(Array, FeatureExtractor):
 
         Raises
         ------
-        ValueError
+        NotFittedError
             If no dataset is bound.
         """
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
         return (len(self._dataset), len(self.factor_names))
 
     def __iter__(self) -> Iterator[NDArray[np.int64]]:
@@ -238,11 +274,11 @@ class Metadata(Array, FeatureExtractor):
 
         Raises
         ------
-        ValueError
+        NotFittedError
             If no dataset is bound.
         """
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
         yield from self.factor_data
 
     def __getitem__(self, index: int | str | slice) -> Array:
@@ -262,13 +298,13 @@ class Metadata(Array, FeatureExtractor):
 
         Raises
         ------
-        ValueError
+        NotFittedError
             If no dataset is bound.
         KeyError
             If a specified factor name is not found in the metadata.
         """
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
 
         data = self.factor_data
 
@@ -325,7 +361,7 @@ class Metadata(Array, FeatureExtractor):
 
         Raises
         ------
-        ValueError
+        NotFittedError
             If data is None and no dataset is bound.
 
         Example
@@ -342,7 +378,7 @@ class Metadata(Array, FeatureExtractor):
         """
         if data is None:
             if self._dataset is None:
-                raise ValueError("No dataset bound. Provide data or call bind() first.")
+                raise NotFittedError("No dataset bound. Provide data or call bind() first.")
             # Return factors for bound dataset
             return self.factor_data
 
@@ -1046,14 +1082,14 @@ class Metadata(Array, FeatureExtractor):
         """Infer factor level based on array lengths."""
         factor_lengths = {len(v) for v in factors.values()}
         if len(factor_lengths) > 1:
-            raise ValueError("All factors must have the same length when using level='auto'")
+            raise ShapeMismatchError("All factors must have the same length when using level='auto'")
         factor_len = factor_lengths.pop()
 
         if factor_len == num_image_rows:
             return "image"
         if factor_len == num_target_rows:
             return "target"
-        raise ValueError(
+        raise ShapeMismatchError(
             "The lists/arrays in the provided factors have a different length "
             f"than the current metadata factors. Expected {num_image_rows} (image count) "
             f"or {num_target_rows} (target count), got {factor_len}.",
@@ -1070,11 +1106,11 @@ class Metadata(Array, FeatureExtractor):
         if level == "image":
             expected_len = num_image_rows
             if not all(len(v) == expected_len for v in factors.values()):
-                raise ValueError(f"All image-level factors must have length {expected_len} (image count)")
+                raise ShapeMismatchError(f"All image-level factors must have length {expected_len} (image count)")
         elif level == "target":
             expected_len = num_target_rows
             if not all(len(v) == expected_len for v in factors.values()):
-                raise ValueError(f"All target-level factors must have length {expected_len} (target count)")
+                raise ShapeMismatchError(f"All target-level factors must have length {expected_len} (target count)")
         else:
             raise ValueError(f"Invalid level: {level}. Must be 'image', 'target', or 'auto'")
 
@@ -1242,7 +1278,7 @@ class Metadata(Array, FeatureExtractor):
             return
 
         if self._dataset is None:
-            raise ValueError("No dataset bound. Call bind() first.")
+            raise NotFittedError("No dataset bound. Call bind() first.")
 
         raw: list[Mapping[str, Any]] = []
         labels = []

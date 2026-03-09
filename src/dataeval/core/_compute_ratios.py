@@ -7,9 +7,9 @@ from typing import Any, TypeAlias
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.config import EPSILON
 from dataeval.core._compute_stats import StatsResult
 from dataeval.types import SourceIndex
+from dataeval.utils._internal import EPSILON
 
 _logger = logging.getLogger(__name__)
 
