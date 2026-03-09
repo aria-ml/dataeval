@@ -244,6 +244,12 @@ DataEval's public API.
 
 The following table shows the input parameters used by each of DataEval's core functionalities.
 
+:::{note}
+DataEval imposes no restrictions on image type. It accepts any image modality
+(RGB, IR, EO, multispectral, greyscale, and others) at any bit depth (8-bit, 16-bit, 32-bit, etc.)
+and channel count (1+).
+:::
+
 `````{tab-set}
 :sync-group: func
 

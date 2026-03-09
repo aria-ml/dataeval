@@ -1,14 +1,21 @@
 # Getting Started
 
-DataEval helps you evaluate datasets for quality, bias, scope, distribution
-shift, and performance limits. It implements Modular AI Trustworthy Engineering
-(MAITE)-compliant metrics that integrate with the broader Joint AI T&E
-Infrastructure Capability (JATIC) suite of tools.
+DataEval helps you evaluate image datasets for quality, bias, scope, distribution
+shift, and performance limits. It implements [Modular AI Trustworthy Engineering
+(MAITE)](https://mit-ll-ai-technology.github.io/maite/)-compliant metrics that
+integrate with the broader [Joint AI T&E Infrastructure Capability (JATIC)](https://cdao.pages.jatic.net/public/)
+suite of tools.
+
+:::{note}
+DataEval imposes no restrictions on image type. It accepts any image modality
+(RGB, IR, EO, multispectral, greyscale, and others) at any bit depth (8-bit, 16-bit, 32-bit, etc.)
+and channel count (1+).
+:::
 
 :::{important}
-{class}`.BER` and {class}`.Sufficiency` apply to **image classification only**.
-They do not apply directly to object detection tasks without additional
-reduction steps. See the [Performance Limits concept page](../concepts/PerformanceLimits.md)
+Some DataEval functions and classes apply only to image classification tasks, while
+others apply only to object detection tasks. For more information regarding when to use
+each function or class see the [Functional Overivew page](../reference/FunctionalOverview.md)
 for details.
 :::
 
@@ -59,11 +66,11 @@ required. Call these functions with arrays and get results back directly. Exampl
 include {func}`.compute_stats`, {func}`.label_errors`, {func}`.divergence_mst`,
 and {func}`.ber_knn`.
 
-**`dataeval.quality`, `dataeval.bias`, `dataeval.shift`, and `dataeval.performance`**
+**`dataeval.quality`, `dataeval.bias`, `dataeval.scope`, `dataeval.shift`, and `dataeval.performance`**
 provide stateful evaluator classes ({class}`.Duplicates`, {class}`.Outliers`,
 {class}`.Prioritize`, {class}`.Balance`, drift detectors, and so on). These
-accept either NumPy arrays or [Modular AI Trustworthy Engineering
-(MAITE)](https://mit-ll-ai-technology.github.io/maite/)-compliant datasets depending on the evaluator.
+accept [MAITE](https://mit-ll-ai-technology.github.io/maite/)-compliant
+datasets, {class}`.Metadata` or {class}`.Embeddings` depending on the evaluator.
 
 If your data is not yet in MAITE format, the sections below show what is
 required and how to wrap a common format, for both image classification and
