@@ -1,8 +1,21 @@
-[//]: # (18cfefe6930385ff69065ad50097d2da066f4ebb)
+[//]: # (1b9cc4e742a2a74634efd9aa14631295728520e1)
 
 # DataEval Change Log
 
-## v1.0.0-rc4
+## v1.0.0
+
+🛠️ **Improvements and Enhancements**
+- `49631303` - Address all flagged issues from API review for v1.0
+- `0886cd36` - [impr] Improve Duplicates and Outliers threshold capabilities
+- `6d1999b2` - Improve multiprocessing implementation and stats performance
+- `a54f286a` - Documentation rework
+- `72e6547b` - [feat] Store duplicate and outlier outputs in dataframes
+- `60e78334` - [misc] Move Prioritize to dataeval.scope
+- `c143c51f` - [impr] Switch to _index suffix for source indexing
+
+📝 **Miscellaneous**
+- `7a7445db` - [docs] Update set_seed and configuration how-to
+- `422108a9` - [misc] Standardize on `compute` as verb
 
 🚧 **Deprecations and Removals**
 - `f17b2270` - Mark parity and uap functions as experimental
@@ -15,20 +28,14 @@
 - `4233ae83` - Rework experimental imports and warn-once on use/instantiation
 - `ee784e18` - Add framework for annotating with experimental and deprecated
 
-## v1.0.0-rc3
-
 👾 **Fixes**
 - `28faf1d5` - Fix split_dataset to work with OD datasets
 
 📝 **Miscellaneous**
 - `8f75bcdf` - Improve logging output
 
-## v1.0.0-rc2
-
 👾 **Fixes**
 - `4607cedc` - Exclude non-numeric values from outlier calculation
-
-## v1.0.0-rc1
 
 👾 **Fixes**
 - `613a3c57` - [fix] Fallback to class label value if not present in index2label
@@ -38,8 +45,6 @@
 - `9a9eb12b` - Expose core function result types and completeness
 - `5de0d7c3` - [docs] Clean up documentation headers and structure and delete redundant how-to
 - `68c7c48e` - Add augmentation duplicate detection notebook
-
-## v1.0.0-rc0
 
 🚀 **Major Release**
 - `ed11b75a` - Add support for python 3.14
