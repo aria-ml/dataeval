@@ -52,8 +52,6 @@ linkchecker:
     name: ghcr.io/tcort/markdown-link-check:stable
     entrypoint: ['/bin/sh', '-c']
   script:
-    - mkdir -p docs/source/reference/autoapi/dataeval
-    - touch docs/source/reference/autoapi/dataeval/index.rst
     - markdown-link-check --config docs/.markdown-link-check.json *.md
     - markdown-link-check --config docs/.markdown-link-check.json ./docs/source
   # Allow failures in link checking to avoid blocking merges due to transient issues

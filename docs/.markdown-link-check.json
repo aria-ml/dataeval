@@ -2,6 +2,12 @@
   "ignorePatterns": [
     {
       "pattern": "^https://doi\\.org"
+    },
+    {
+      "pattern": "^#ref\\d+$"
+    },
+    {
+      "pattern": "autoapi/"
     }
   ]
 }
