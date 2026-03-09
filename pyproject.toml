@@ -5,6 +5,7 @@ description = "DataEval provides a simple interface to characterize image data a
 authors = [
   { name = "Andrew Weng", email = "andrew.weng@ariacoustics.com" },
   { name = "Bill Peria", email = "bill.peria@ariacoustics.com" },
+  { name = "Christina Doty", email = "christina.doty@ariacoustics.com" },
   { name = "Jon Botts", email = "jonathan.botts@ariacoustics.com" },
   { name = "Jonathan Christian", email = "jonathan.christian@ariacoustics.com" },
   { name = "Justin McMillan", email = "justin.mcmillan@ariacoustics.com" },
@@ -18,7 +19,7 @@ maintainers = [
   { name = "ARiA", email = "dataeval@ariacoustics.com" },
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Operating System :: OS Independent",
   "Intended Audience :: Science/Research",
   "Programming Language :: Python :: 3 :: Only",
@@ -111,7 +112,7 @@ docs = [
   "sphinx-immaterial>=0.12.5",
   "sphinx-new-tab-link>=0.8.0",
   "sphinx-tabs>=3.4.7",
-  "Sphinx>=7.2.6,<9.0.0", # sphinx-immaterial <= 0.13.9 is notcompatible with sphinx >=9.0
+  "Sphinx>=7.2.6,<9.0.0", # sphinx-immaterial <= 0.13.9 is not compatible with sphinx >=9.0
   "torchmetrics>=1.0.0",
   "torchvision>=0.17.0",
   "markupsafe>=3,<3.0.2",
@@ -211,11 +212,11 @@ xxhash = { skip = true, packages = "python-xxhash>=3.3" }
 include = ["src", "tests"]
 exclude = [
   "**/__pycache__",
-  ".nox",
-  ".tox",
+  "**/node_modules",
+  "**/.*",
+  ".venv",
   "build",
   "output",
-  "*env*",
 ]
 reportMissingImports = false
 
@@ -231,7 +232,6 @@ markers = [
   "required: marks tests for required features",
   "optional: marks tests for optional features",
   "cuda: marks tests that require cuda",
-  "year: marks tests that need a specified dataset year",
 ]
 
 [tool.coverage.run]
