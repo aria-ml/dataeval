@@ -351,6 +351,11 @@ def compute_stats(
     """
     Compute specified statistics on a set of images, optionally within bounding boxes.
 
+    Mixed-bit-depth datasets can produce misleading statistics when raw pixel values are
+    compared directly. To avoid this, pixel values are normalized to [0, 1] based on each
+    image's bit depth before any statistic is computed, keeping results meaningful and
+    comparable across 8-bit, 16-bit, 32-bit, and other precision images.
+
     Parameters
     ----------
     data : Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]

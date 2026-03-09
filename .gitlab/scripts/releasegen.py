@@ -230,40 +230,81 @@ class ReleaseGen:
 
         return latest, categorized
 
-    def _consolidate_prerelease_sections(self, lines: list[str], base_version: str) -> list[str]:
+    def _extract_prerelease_entries(
+        self, lines: list[str], base_version: str
+    ) -> tuple[dict[_Category, list[str]], list[str]]:
         """
-        Consolidate pre-release sections (e.g., v1.0.0-rc0, v1.0.0-rc1) into the final version section.
+        Extract categorized entries from pre-release sections and return remaining non-RC lines.
 
-        When finalizing a pre-release, this method finds all rc sections for the same base version
-        and merges their content into the final release section, removing the rc headers.
+        Parses all rc sections for the base version, groups their entries by category,
+        and returns the grouped entries along with the non-RC changelog lines.
         """
-        result: list[str] = []
         prerelease_pattern = re.compile(rf"^## {re.escape(base_version)}-rc\d+$")
-        skip_next_empty = False
+
+        # Build a lookup from markdown header to _Category
+        header_to_category: dict[str, _Category] = {}
+        for cat in _Category:
+            if cat in (_Category.UNKNOWN, _Category.TAG):
+                continue
+            header_to_category[_Category.to_markdown(cat)] = cat
+
+        rc_entries: dict[_Category, list[str]] = defaultdict(list)
+        non_rc_lines: list[str] = []
+
+        in_rc_section = False
+        current_category: _Category | None = None
 
         for line in lines:
-            # Check if this is a pre-release header for our base version
-            if prerelease_pattern.match(line.strip()):
-                skip_next_empty = True
-                verbose(f"Consolidating pre-release section: {line.strip()}")
+            stripped = line.strip()
+
+            # RC header - enter RC section
+            if prerelease_pattern.match(stripped):
+                verbose(f"Extracting pre-release section: {stripped}")
+                in_rc_section = True
+                current_category = None
                 continue
 
-            # Check if we've hit a new version section (not a pre-release of our version)
-            if line.strip().startswith("## v") and not prerelease_pattern.match(line.strip()):
-                skip_next_empty = False
-
-            # Skip empty line immediately after pre-release header
-            if skip_next_empty and line.strip() == "":
-                skip_next_empty = False
+            # Non-RC version header - exit RC section
+            if stripped.startswith("## v"):
+                in_rc_section = False
+                current_category = None
+                non_rc_lines.append(line)
                 continue
 
-            skip_next_empty = False
+            if not in_rc_section:
+                non_rc_lines.append(line)
+                continue
 
-            # If in pre-release section, include content (entries) but not the header
-            # If not in pre-release section, include everything
-            result.append(line)
+            # In RC section - check for category header
+            matched = header_to_category.get(stripped)
+            if matched is not None:
+                current_category = matched
+                continue
 
-        return result
+            # Skip blank lines before first category
+            if current_category is None:
+                continue
+
+            # Collect entry lines (items, continuation lines, and blank lines between entries)
+            rc_entries[current_category].append(line)
+
+        # Clean up entries per category: strip trailing blank lines and remove
+        # stray blank lines between entry groups (from different RCs) while
+        # preserving blank lines that are part of multi-line entry details
+        for cat in rc_entries:
+            raw = rc_entries[cat]
+            cleaned: list[str] = []
+            for i, line in enumerate(raw):
+                if line.strip() == "":
+                    # Keep blank line only if it's part of a multi-line entry detail
+                    # (i.e., followed by an indented continuation line)
+                    if i + 1 < len(raw) and raw[i + 1].startswith((" ", "\t")):
+                        cleaned.append(line)
+                else:
+                    cleaned.append(line)
+            rc_entries[cat] = cleaned
+
+        return rc_entries, non_rc_lines
 
     def _generate_version_and_changelog_action(self) -> tuple[str, dict[str, str]]:
         current = self._read_changelog()
@@ -283,40 +324,75 @@ class ReleaseGen:
         if not entries and not is_finalizing_prerelease:
             return "", {}
 
-        lines: list[str] = []
-        next_category = _Category.UNKNOWN
-
-        categories = sorted(entries)
-        for category in categories:
-            # skip unknown categories
-            if category == _Category.UNKNOWN:
-                continue
-            merges = entries[category]
-            lines.append("")
-            lines.append(_Category.to_markdown(category))
-            for merge in merges:
-                if merge.hash == last_hash:
-                    break
-
-                lines.append(merge.to_markdown())
-                verbose(f"Adding - {merge.to_markdown()}")
-                next_category = min(next_category, category)
-
-        next_version = vt.next(_Category.version_type(next_category))
-
         # Get the latest hash - use current if no new entries (finalizing without new MRs)
         latest_hash = latest.hash if entries else last_hash
-
-        header = [f"[//]: # ({latest_hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
-        content = "\n".join(header + lines) + "\n"
 
         # Get remaining changelog content (after the header lines)
         remaining_lines = current[3:]
 
-        # If finalizing a pre-release, consolidate all rc sections into this release
         if is_finalizing_prerelease and base_version:
-            verbose(f"Finalizing pre-release: consolidating {base_version}-rcX sections into {next_version}")
-            remaining_lines = self._consolidate_prerelease_sections(remaining_lines, base_version)
+            verbose(f"Finalizing pre-release: consolidating {base_version}-rcX sections")
+
+            # Extract categorized entries from all RC sections
+            rc_entries, remaining_lines = self._extract_prerelease_entries(remaining_lines, base_version)
+
+            # Merge new entries (since last RC) into the RC entries
+            next_category = _Category.UNKNOWN
+            for category in sorted(entries):
+                if category == _Category.UNKNOWN:
+                    continue
+                for merge in entries[category]:
+                    if merge.hash == last_hash:
+                        break
+                    rc_entries[category].append(merge.to_markdown() + "\n")
+                    verbose(f"Adding - {merge.to_markdown()}")
+                    next_category = min(next_category, category)
+
+            # Include RC categories when determining version type
+            for category in rc_entries:
+                if category != _Category.UNKNOWN:
+                    next_category = min(next_category, category)
+
+            next_version = vt.next(_Category.version_type(next_category))
+
+            # Build merged categorized content in correct category order
+            lines: list[str] = []
+            for category in sorted(rc_entries):
+                cat_entries = rc_entries[category]
+                # Strip trailing blank lines
+                while cat_entries and cat_entries[-1].strip() == "":
+                    cat_entries.pop()
+                if cat_entries:
+                    lines.append("")
+                    lines.append(_Category.to_markdown(category))
+                    lines.append("")
+                    for entry_line in cat_entries:
+                        lines.append(entry_line.rstrip("\n"))
+        else:
+            lines = []
+            next_category = _Category.UNKNOWN
+
+            categories = sorted(entries)
+            for category in categories:
+                # skip unknown categories
+                if category == _Category.UNKNOWN:
+                    continue
+                merges = entries[category]
+                lines.append("")
+                lines.append(_Category.to_markdown(category))
+                lines.append("")
+                for merge in merges:
+                    if merge.hash == last_hash:
+                        break
+
+                    lines.append(merge.to_markdown())
+                    verbose(f"Adding - {merge.to_markdown()}")
+                    next_category = min(next_category, category)
+
+            next_version = vt.next(_Category.version_type(next_category))
+
+        header = [f"[//]: # ({latest_hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
+        content = "\n".join(header + lines) + "\n"
 
         for oldline in remaining_lines:
             content += oldline
@@ -400,6 +476,7 @@ class ReleaseGen:
             merges = entries[category]
             lines.append("")
             lines.append(_Category.to_markdown(category))
+            lines.append("")
             for merge in merges:
                 if merge.hash == last_hash:
                     break
