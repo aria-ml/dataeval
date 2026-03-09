@@ -1,6 +1,11 @@
-[//]: # (1b9cc4e742a2a74634efd9aa14631295728520e1)
+[//]: # (e79d103604248e1bc460e59f2c2bfb88f466d937)
 
 # DataEval Change Log
+
+## v1.0.1
+
+👾 **Fixes**
+- `e79d1036` - [fix] Bump version and update pyproject.toml authors and development status
 
 ## v1.0.0
 
