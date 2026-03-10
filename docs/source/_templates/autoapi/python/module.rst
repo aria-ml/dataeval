@@ -19,12 +19,10 @@
          {% set visible_submodules = obj.submodules|selectattr("display")|list %}
          {% set visible_submodules = (visible_subpackages + visible_submodules)|sort %}
          {% if visible_submodules %}
-Submodules 
+Submodules
 ----------
 
-.. autoapisummary::
-
-            {{ macros.auto_summary(visible_submodules) }}
+{{ macros.auto_summary(visible_submodules) }}
 
 .. toctree::
    :maxdepth: 1
