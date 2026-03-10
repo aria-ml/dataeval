@@ -2,11 +2,11 @@
 
 ## Notebook Architecture
 
-Notebooks live in `docs/source/notebooks/` as paired `.md` and `.ipynb` files managed by
+Notebooks live in `docs/source/notebooks/` as paired `.py` and `.ipynb` files managed by
 [jupytext](https://jupytext.readthedocs.io/). The pairing is configured in
 `docs/source/notebooks/jupytext.toml`.
 
-- **`.md` files** are the committed source of truth (MyST Markdown format)
+- **`.py` files** are the committed source of truth (jupytext percent format)
 - **`.ipynb` files** are gitignored and generated locally for editing in VS Code / Jupyter
 - **Google Colab** links reference `.ipynb` files stored on `docs-artifacts/*` orphan branches
 
@@ -15,43 +15,41 @@ Notebooks live in `docs/source/notebooks/` as paired `.md` and `.ipynb` files ma
 ### Initial Setup (after cloning)
 
 ```bash
-nox -e docsync    # generates .ipynb files from .md source
+nox -e docsync    # generates .ipynb files from .py source
 ```
 
 ### Creating a New Notebook
 
 1. Create `docs/source/notebooks/<name>.ipynb` in VS Code or Jupyter
 2. Edit cells and run them
-3. Run `nox -e docsync` to generate the `.md` pair and format it
-4. Commit only the `.md` file
+3. Run `nox -e docsync` to generate the `.py` pair
+4. Commit only the `.py` file
 
 ### Editing an Existing Notebook
 
 1. Open the `.ipynb` in VS Code or Jupyter
 2. Make changes, save
-3. Run `nox -e docsync` to sync changes back to `.md`
-4. Commit the `.md` changes
+3. Run `nox -e docsync` to sync changes back to `.py`
+4. Commit the `.py` changes
 
-### Editing Markdown Directly
+### Editing Scripts Directly
 
-1. Edit the `.md` file in any editor
+1. Edit the `.py` file in any editor
 2. Run `nox -e docsync` to regenerate the `.ipynb`
 
 ### How `docsync` Works
 
-`nox -e docsync` runs three steps in order:
+`nox -e docsync` runs two steps in order:
 
-1. **Orphan detection** -- generates `.md` for any new `.ipynb` without a markdown pair
+1. **Orphan detection** -- generates `.py` for any new `.ipynb` without a script pair
 2. **Bidirectional sync** -- `jupytext --sync` updates whichever side is stale based on
    file modification timestamps
-3. **Format and regenerate** -- `mdformat` formats the markdown, then `jupytext` regenerates
-   `.ipynb` to match the formatted `.md`
 
 ## Documentation Build
 
 `nox -e docs` builds the full documentation site:
 
-1. Converts `.md` notebooks to `.ipynb` via jupytext
+1. Converts `.py` notebooks to `.ipynb` via jupytext
 2. Fetches cached notebook execution results from `docs-artifacts/<branch>` orphan branches
    (`docs/fetch-docs-cache.sh`)
 3. Runs `sphinx-build` with MyST-NB (executes notebooks on cache miss)
@@ -168,7 +166,6 @@ Every MR targeting `main` must have a release label:
 | Job            | Trigger                                | Purpose                                |
 | -------------- | -------------------------------------- | -------------------------------------- |
 | `docs`         | Main commits, MRs with doc/src changes | Full docs build with GPU, pushes cache |
-| `doclint`      | Main commits, MRs                      | Extracts and lints notebook code       |
 | `doctest`      | Main commits, MRs                      | Runs doctests                          |
 | `linkchecker`  | Main commits, MRs                      | Validates markdown links               |
 | `markdownlint` | Main commits, MRs                      | Lints markdown formatting              |
@@ -188,8 +185,8 @@ Every MR targeting `main` must have a release label:
 
 | File                                               | Purpose                                                                |
 | -------------------------------------------------- | ---------------------------------------------------------------------- |
-| `noxfile.py`                                       | Build orchestration (`docs`, `docsync`, `doclint`, `doctest` sessions) |
-| `docs/source/notebooks/jupytext.toml`              | Configures md/ipynb pairing                                            |
+| `noxfile.py`                                       | Build orchestration (`docs`, `docsync`, `doctest` sessions)            |
+| `docs/source/notebooks/jupytext.toml`              | Configures py/ipynb pairing                                            |
 | `docs/push-docs-cache.sh`                          | Pushes cache + notebooks to artifact branches                          |
 | `docs/fetch-docs-cache.sh`                         | Fetches cached results from artifact branches                          |
 | `docs/check_notebook_cache.py`                     | Validates and cleans jupyter cache state                               |

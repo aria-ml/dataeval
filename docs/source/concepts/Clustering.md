@@ -1,4 +1,5 @@
 <!-- markdownlint-disable MD051 -->
+
 # Clustering
 
 Clustering is not an evaluator in DataEval — it is the infrastructure that
@@ -56,9 +57,9 @@ predetermined number of clusters. The algorithm proceeds in stages:
 **`min_cluster_size`** is the key hyperparameter. DataEval sets it adaptively:
 
 - if `n_clusters` is provided, `min_cluster_size = max(5, n_samples // (n_clusters * 3))`
-— smaller clusters are allowed when more clusters are expected;
+  — smaller clusters are allowed when more clusters are expected;
 - if `n_clusters` is _not_ provided, the default is 5% of the dataset, capped at 100 —
-`min_cluster_size = min(100, max(5, (n_samples * 0.05)))`
+  `min_cluster_size = min(100, max(5, (n_samples * 0.05)))`
 
 HDBSCAN is the default because it handles irregular cluster shapes, varying
 cluster densities, and datasets where the number of clusters is unknown. Its
@@ -88,14 +89,14 @@ assignments unless the seed is fixed. HDBSCAN does not have this property.
 
 ## What the ClusterResult contains
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `clusters` | `NDArray[int64]` | Cluster assignment for each sample (0-indexed, no -1 values) |
-| `mst` | `NDArray[float32]` | MST edge list as (source, target, weight) triples |
-| `linkage_tree` | `NDArray[float32]` | Hierarchical linkage array from the MST |
-| `membership_strengths` | `NDArray[float32]` | Per-sample cluster membership confidence [0, 1] |
-| `k_neighbors` | `NDArray[int64]` | Indices of up to 25 nearest neighbors per sample |
-| `k_distances` | `NDArray[float32]` | Distances to those neighbors |
+| Field                  | Type               | Description                                                  |
+| ---------------------- | ------------------ | ------------------------------------------------------------ |
+| `clusters`             | `NDArray[int64]`   | Cluster assignment for each sample (0-indexed, no -1 values) |
+| `mst`                  | `NDArray[float32]` | MST edge list as (source, target, weight) triples            |
+| `linkage_tree`         | `NDArray[float32]` | Hierarchical linkage array from the MST                      |
+| `membership_strengths` | `NDArray[float32]` | Per-sample cluster membership confidence [0, 1]              |
+| `k_neighbors`          | `NDArray[int64]`   | Indices of up to 25 nearest neighbors per sample             |
+| `k_distances`          | `NDArray[float32]` | Distances to those neighbors                                 |
 
 The `membership_strengths` field is the most useful for downstream use. Samples
 with low membership strength are at the boundary of their cluster — they are
@@ -108,9 +109,9 @@ flag as mislabeled if they are near a different class's cluster.
 **{class}`.Duplicates` cluster mode** runs HDBSCAN on embeddings and groups
 samples that land in the same cluster. Each cluster's mean and standard
 deviation are determined and used to tag samples whose nearest neighbor
-is less than one deviation from the mean (sample_dist < mean - std).
+is less than one deviation from the mean (sample*dist < mean - std).
 Unlike hash-based deduplication (which detects visually similar images),
-cluster-based deduplication detects _semantically_ redundant images — images
+cluster-based deduplication detects \_semantically* redundant images — images
 that are different in appearance but represent the same concept in the embedding space.
 
 **{class}`.Outliers` cluster mode** runs clustering and flags samples whose
@@ -149,7 +150,7 @@ number of classes is a reasonable starting hint.
 cluster assignments matter for your workflow (for example, if you are using
 cluster assignments as input to a downstream analysis), call
 `dataeval.config.set_seed(your_seed)` before running KMeans. See the
-[Configuring the seed](../notebooks/h2_configure_hardware_settings.md#configuring-the-global-seed)
+[Configuring the seed](../notebooks/h2_configure_hardware_settings.py#configuring-the-global-seed)
 how-to for an example.
 
 **Clustering is embedding-dependent.** The clusters discovered by either
@@ -200,12 +201,12 @@ into a test report.
 
 ### How-to guides
 
-- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.md)
-- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.md)
+- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
+- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.py)
 
 ### Tutorials
 
-- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.md) —
+- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.py) —
   coverage gaps and embedding-space decisions
 
 ## References

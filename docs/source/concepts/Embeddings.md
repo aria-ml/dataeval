@@ -15,7 +15,7 @@ typically 128 to 2048 numbers. The dimensionality of these vectors affects
 their capabilities: higher-dimensional embeddings can capture more nuanced
 visual and semantic distinctions, while lower-dimensional embeddings are more
 efficient to compute and visualize but may lose subtle details. These vectors
-encode image content such that similar vectors represent *meaningfully* similar
+encode image content such that similar vectors represent _meaningfully_ similar
 images.
 
 ## Why are they important
@@ -70,16 +70,16 @@ raw pixels.
 Common applications include:
 
 - **Similarity analysis**: Finding images with similar content or visual
-characteristics
+  characteristics
 - **Clustering**: Grouping images by shared semantic or visual properties
 - **Outlier detection**: Identifying unusual or anomalous images in your
-dataset
+  dataset
 - **Distribution comparison**: Measuring how different two sets of images are
-from each other
+  from each other
 - **Duplicate detection**: Finding near-identical images that might indicate
-data leakage
+  data leakage
 - **Drift monitoring**: Detecting when production data differs systematically
-from training data
+  from training data
 
 Although DataEval can work with raw image data, it is inadvisable to do so.
 DataEval treats embeddings geometrically as vectors in a high-dimensional
@@ -111,13 +111,13 @@ the training objective fundamentally shapes what patterns the resulting
 embeddings capture. The table below shows examples of appropriate models for a
 variety of metrics and tasks.
 
-| Model Type | Example Models | Best for These Metrics | Why |
-| ---------- | -------------- | ---------------------- | --- |
-| **Image Classification** | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection | Embeddings emphasize features that distinguish between labeled categories, making class boundaries clear |
-| **Object Detection** | YOLO, R-CNN variants, DETR | Spatial Drift, Localization Quality | Embeddings capture spatial relationships and localized features, ideal when object position matters |
-| **Self-Supervised** | DINO, MAE, SimCLR | Drift, Prioritization, Duplicate Detection | Embeddings capture general visual patterns without class bias, good for broad visual similarity |
-| **Contrastive Learning** | CLIP, SwAV, MoCo | Similarity Search, Nearest Neighbor Analysis | Embeddings optimized for distinguishing similar vs. dissimilar pairs, excellent for comparison tasks |
-| **Segmentation** | U-Net, Mask R-CNN, DeepLab | Fine-grained Analysis, Pixel-level Quality | Embeddings understand detailed spatial structure and boundaries within images |
+| Model Type               | Example Models                           | Best for These Metrics                       | Why                                                                                                      |
+| ------------------------ | ---------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Image Classification** | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection        | Embeddings emphasize features that distinguish between labeled categories, making class boundaries clear |
+| **Object Detection**     | YOLO, R-CNN variants, DETR               | Spatial Drift, Localization Quality          | Embeddings capture spatial relationships and localized features, ideal when object position matters      |
+| **Self-Supervised**      | DINO, MAE, SimCLR                        | Drift, Prioritization, Duplicate Detection   | Embeddings capture general visual patterns without class bias, good for broad visual similarity          |
+| **Contrastive Learning** | CLIP, SwAV, MoCo                         | Similarity Search, Nearest Neighbor Analysis | Embeddings optimized for distinguishing similar vs. dissimilar pairs, excellent for comparison tasks     |
+| **Segmentation**         | U-Net, Mask R-CNN, DeepLab               | Fine-grained Analysis, Pixel-level Quality   | Embeddings understand detailed spatial structure and boundaries within images                            |
 
 ## Related concept pages
 
@@ -132,33 +132,33 @@ variety of metrics and tasks.
 
 ### How-to guides
 
-- [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.md)
-- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.md)
+- [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
+- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
 
 ### Tutorials
 
-- [Identify bias and correlations tutorial](../notebooks/tt_identify_bias.md) —
+- [Identify bias and correlations tutorial](../notebooks/tt_identify_bias.py) —
   acting on balance and diversity findings
-- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.md) —
+- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.py) —
   coverage gaps and embedding-space decisions
-- [Monitoring distribution shift tutorial](../notebooks/tt_monitor_shift.md) —
+- [Monitoring distribution shift tutorial](../notebooks/tt_monitor_shift.py) —
   responding to drift detection
-- [Identifying OOD samples tutorial](../notebooks/tt_identify_ood_samples.md) —
+- [Identifying OOD samples tutorial](../notebooks/tt_identify_ood_samples.py) —
   responding to OOD detection
 
 ## References
 
 1. Bengio, Y., Courville, A., & Vincent, P. (2013). Representation learning:
-A review and new perspectives. *IEEE Transactions on Pattern Analysis
-and Machine Intelligence*, 35(8), 1798–1828. [paper](https://arxiv.org/abs/1206.5538)
+   A review and new perspectives. _IEEE Transactions on Pattern Analysis
+   and Machine Intelligence_, 35(8), 1798–1828. [paper](https://arxiv.org/abs/1206.5538)
 
 2. Chen, T., Kornblith, S., Norouzi, M., & Hinton, G. (2020). A simple framework
-for contrastive learning of visual representations. *Proceedings of the 37th
-International Conference on Machine Learning (ICML)*, 1597–1607. [paper](https://arxiv.org/abs/2002.05709)
+   for contrastive learning of visual representations. _Proceedings of the 37th
+   International Conference on Machine Learning (ICML)_, 1597–1607. [paper](https://arxiv.org/abs/2002.05709)
 
 3. Beyer, K., Goldstein, J., Ramakrishnan, R., & Shaft, U. (1999). When is
-"nearest neighbor" meaningful? *Proceedings of the 7th International Conference
-on Database Theory (ICDT)*, 217–235. [paper](https://link.springer.com/chapter/10.1007/3-540-49257-7_15)
+   "nearest neighbor" meaningful? _Proceedings of the 7th International Conference
+   on Database Theory (ICDT)_, 217–235. [paper](https://link.springer.com/chapter/10.1007/3-540-49257-7_15)
 
-4. Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. *Proceedings
-of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 1521–1528. [paper](https://ieeexplore.ieee.org/document/5995347)
+4. Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. _Proceedings
+   of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)_, 1521–1528. [paper](https://ieeexplore.ieee.org/document/5995347)

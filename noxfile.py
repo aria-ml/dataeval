@@ -2,7 +2,6 @@ import functools
 import glob
 import os
 import re
-import shutil
 from pathlib import Path
 from sys import version_info
 
@@ -241,9 +240,9 @@ def docs(session: nox.Session) -> None:
             session.warn(f"⚠️  Chart generation failed: {e}")
             session.log("Continuing with documentation build...")
 
-    # Convert markdown notebooks to ipynb (md is source of truth, ignores timestamps)
+    # Convert py:percent notebooks to ipynb (py is source of truth, ignores timestamps)
     notebook_dir = "docs/source/notebooks"
-    session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
+    session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.py")
 
     if clean_notebooks:
         # Clear local jupyter cache to force re-execution of all notebooks
@@ -293,188 +292,21 @@ def lock(session: nox.Session) -> None:
     session.run("p2c", "y", "-f", "pyproject.toml", "--python-include", "infer", "-o", "environment.yaml")
 
 
-def _clean_notebook_script(script_path: str) -> None:
-    """Remove IPython magics, cell markers, and markdown from converted notebook script."""
-    script = Path(script_path)
-    if not script.exists():
-        return
-
-    content = script.read_text()
-    lines = content.split("\n")
-    cleaned_lines = []
-    in_markdown_cell = False
-
-    for line in lines:
-        stripped = line.strip()
-        # Skip IPython magic commands
-        if stripped.startswith("%") or stripped.startswith("!"):
-            continue
-        if stripped.startswith("get_ipython()"):
-            continue
-        # Track markdown cell blocks (jupytext percent format)
-        if stripped.startswith("# %% [markdown]"):
-            in_markdown_cell = True
-            continue
-        if stripped.startswith("# %%"):
-            in_markdown_cell = False
-            continue
-        # Skip markdown content lines (commented text inside markdown cells)
-        if in_markdown_cell:
-            continue
-        # Skip jupytext header block (lines starting with "# ---" or "# jupyter:")
-        if stripped.startswith("# ---") or stripped.startswith("# jupyter:"):
-            continue
-        cleaned_lines.append(line)
-
-    script.write_text("\n".join(cleaned_lines))
-
-
-def _run_doclint_tests(session: nox.Session, output_dir: str, scripts: list) -> list:
-    """Run all lint tests and return list of failures."""
-    test_failures = []
-
-    # Run ruff check (lint)
-    session.log("Running ruff check on generated scripts...")
-    try:
-        session.run("ruff", "check", "--ignore=A004,E402,E501,E703,I001,RUF100,SIM105,UP009", output_dir)
-    except Exception as e:
-        test_failures.append(("ruff", str(e)))
-
-    # Run pyright (typecheck)
-    session.log("Running pyright on generated scripts...")
-    try:
-        session.run("pyright", output_dir)
-    except Exception as e:
-        test_failures.append(("pyright", str(e)))
-
-    return test_failures
-
-
-def _protect_colon_fences(md_files: list[str]) -> dict[str, list[str]]:
-    """Save MyST colon fence blocks and replace with placeholders.
-
-    mdformat-myst doesn't support colon fences (``:::{directive}``), causing it
-    to escape braces and collapse directives. This protects them from damage.
-    See: https://github.com/executablebooks/mdformat-myst/issues/13
-    """
-    saved: dict[str, list[str]] = {}
-    for filepath in md_files:
-        text = Path(filepath).read_text()
-        lines = text.splitlines(keepends=True)
-        result: list[str] = []
-        blocks: list[str] = []
-        fence_buf: list[str] = []
-        fence_colons = ""
-
-        for line in lines:
-            stripped = line.strip()
-            if not fence_colons:
-                m = re.match(r"^(:::+)\{", stripped)
-                if m:
-                    fence_colons = m.group(1)
-                    fence_buf = [line]
-                    continue
-                result.append(line)
-            else:
-                fence_buf.append(line)
-                if stripped == fence_colons:
-                    blocks.append("".join(fence_buf))
-                    result.append(f"<!-- COLON_FENCE_{len(blocks) - 1} -->\n")
-                    fence_colons = ""
-                    fence_buf = []
-
-        if fence_colons:
-            result.extend(fence_buf)
-        if blocks:
-            Path(filepath).write_text("".join(result))
-            saved[filepath] = blocks
-    return saved
-
-
-def _restore_colon_fences(saved: dict[str, list[str]]) -> None:
-    """Restore colon fence blocks from placeholders after mdformat."""
-    for filepath, blocks in saved.items():
-        text = Path(filepath).read_text()
-        for i, block in enumerate(blocks):
-            text = text.replace(f"<!-- COLON_FENCE_{i} -->\n", block)
-        Path(filepath).write_text(text)
-
-
 @session(uv_only_groups=["docsync"], uv_no_install_project=True)
 def docsync(session: nox.Session) -> None:
-    """Sync notebook .md/.ipynb pairs and format markdown."""
+    """Sync notebook .py/.ipynb pairs."""
     notebook_dir = "docs/source/notebooks"
 
-    # Generate .md for any new .ipynb files without a markdown pair
+    # Generate .py for any new .ipynb files without a script pair
     ipynb_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.ipynb")}
-    md_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.md")}
-    for stem in sorted(ipynb_stems - md_stems):
-        session.log(f"Generating markdown for new notebook: {stem}.ipynb")
-        session.run("jupytext", "--to", "myst", f"{notebook_dir}/{stem}.ipynb")
+    py_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.py")}
+    for stem in sorted(ipynb_stems - py_stems):
+        session.log(f"Generating script for new notebook: {stem}.ipynb")
+        session.run("jupytext", "--to", "py:percent", f"{notebook_dir}/{stem}.ipynb")
 
     # Bidirectional sync: updates whichever side is stale (uses jupytext.toml pairing)
-    # If ipynb is newer -> updates md; if md is newer -> updates ipynb
-    session.run("jupytext", "--sync", notebook_dir + "/*.md")
-
-    # Format markdown notebooks (fix locally, check in CI)
-    # Protect MyST colon fence blocks from mdformat (mdformat-myst doesn't support them)
-    # See: https://github.com/executablebooks/mdformat-myst/issues/13
-    md_files = glob.glob(f"{notebook_dir}/*.md")
-    saved_fences = _protect_colon_fences(md_files)
-
-    mdformat_args = ["mdformat", "--wrap", "120"]
-    if IS_CI:
-        mdformat_args.append("--check")
-    session.run(*mdformat_args, notebook_dir)
-
-    # Restore colon fence blocks after mdformat
-    _restore_colon_fences(saved_fences)
-
-    # Regenerate ipynb to match formatted md (mdformat may have modified md)
-    session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
-
-
-@session(uv_only_groups=["doclint"])
-def doclint(session: nox.Session) -> None:
-    """Extract scripts from notebooks in docs and run lint, typecheck, and compile tests."""
-    # Setup output directory - clear it first
-    output_dir = Path("output/nb_scripts")
-    if output_dir.exists():
-        session.log(f"Clearing existing output directory: {output_dir}")
-        shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Find all notebooks in docs/source
-    notebooks = glob.glob("docs/source/notebooks/*.md")
-    if not notebooks:
-        session.warn("No notebooks found in docs/source/notebooks/")
-        return
-
-    session.log(f"Found {len(notebooks)} notebooks to process")
-
-    # Convert notebooks to Python scripts using jupytext
-    for notebook in notebooks:
-        nb_path = Path(notebook)
-        output_script = output_dir / f"{nb_path.stem}.py"
-        session.log(f"Converting {nb_path.name} -> {output_script.name}")
-        session.run("jupytext", "--to", "py:percent", "--output", str(output_script), str(nb_path))
-        _clean_notebook_script(str(output_script))
-
-    # Get all generated Python scripts
-    scripts = list(output_dir.glob("*.py"))
-    if not scripts:
-        session.warn("No Python scripts were generated")
-        return
-
-    # Run all tests and collect failures
-    test_failures = _run_doclint_tests(session, str(output_dir), scripts)
-
-    # Report results
-    if test_failures:
-        session.error(
-            f"Doclint failed with {len(test_failures)} test failure(s):\n"
-            + "\n  - ".join(f"{test_name}: {error}" for test_name, error in test_failures),
-        )
+    # If ipynb is newer -> updates py; if py is newer -> updates ipynb
+    session.run("jupytext", "--sync", notebook_dir + "/*.py")
 
 
 @session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"])

@@ -401,13 +401,13 @@ flags remain valid.
 
 ### How-to guides
 
-- [How to detect and remove duplicates](../notebooks/h2_deduplicate.md)
-- [How to visualize data cleaning issues](../notebooks/h2_visualize_cleaning_issues.md)
-- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.md)
+- [How to detect and remove duplicates](../notebooks/h2_deduplicate.py)
+- [How to visualize data cleaning issues](../notebooks/h2_visualize_cleaning_issues.py)
+- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
 
 ### Tutorials
 
-- [Data cleaning tutorial](../notebooks/tt_clean_dataset.md) — end-to-end
+- [Data cleaning tutorial](../notebooks/tt_clean_dataset.py) — end-to-end
   walkthrough of integrity assessment on a realistic dataset
 
 ## References

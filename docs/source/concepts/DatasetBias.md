@@ -1,4 +1,5 @@
 <!-- markdownlint-disable MD051 -->
+
 # Dataset Bias and Coverage
 
 A model is only as good as the data it learned from. Two distinct but related
@@ -46,11 +47,11 @@ the domain context the practitioner brings to interpreting the results.
 
 ### Bias
 
-Dataset bias occurs when a systematic property of *how data was collected or
-labeled* causes the training distribution to diverge from the true operational
+Dataset bias occurs when a systematic property of _how data was collected or
+labeled_ causes the training distribution to diverge from the true operational
 distribution in a way that will predictably harm model performance.
 
-The key word is *systematic*. Random noise in a large dataset averages out.
+The key word is _systematic_. Random noise in a large dataset averages out.
 Bias does not — it pushes the model's decision boundaries in a consistent
 direction, producing a model that performs well on data that resembles the
 training set and fails on data that does not.
@@ -59,7 +60,7 @@ training set and fails on data that does not.
 (inherited from social or institutional practice), technical bias (introduced
 by design choices in the system), and emergent bias (arising from deployment
 in a context the system was not designed for) — a useful framework for understanding
-the origins of bias. However, to better understand *where in the data pipeline*
+the origins of bias. However, to better understand _where in the data pipeline_
 the bias entered, a more actionable distinction is:
 
 **Sampling bias** arises when the mechanism of data collection systematically
@@ -153,8 +154,8 @@ would surface.
 {class}`.Balance` and {class}`.Diversity` both measure bias through the lens
 of metadata — the contextual variables attached to each sample (sensor
 platform, weather, time of day, location, annotator ID, and so on). The
-fundamental question they answer is: *are class labels independent of these
-factors?*
+fundamental question they answer is: _are class labels independent of these
+factors?_
 
 **Balance** measures the statistical dependence between class labels and
 metadata factors using {term}`mutual information (MI) <Mutual Information
@@ -208,7 +209,7 @@ expected under independence. Treat low but nonzero MI values with caution,
 particularly when sample counts per factor category are small.
 ```
 
-**Diversity** measures the *evenness* of sampling across each metadata factor,
+**Diversity** measures the _evenness_ of sampling across each metadata factor,
 independently of class labels. Where Balance asks "is class label correlated
 with this factor?", Diversity asks "are samples spread uniformly across this
 factor's values?"
@@ -284,7 +285,7 @@ observations $k$ per covered region:
 
 $$r = \frac{1}{\sqrt{\pi}} \left(\frac{2k\, \Gamma(d/2 + 1)}{n}\right)^{1/d}$$
 
-A sample is considered *uncovered* if fewer than $k$ other samples fall within
+A sample is considered _uncovered_ if fewer than $k$ other samples fall within
 radius $r$ of it. This radius is derived from the volume of a $d$-dimensional
 ball and assumes uniform distribution across the unit hypercube. It provides
 an absolute criterion: either a region of the space meets the minimum density
@@ -311,8 +312,10 @@ $$\lambda_i = \frac{s_i^2}{n-1}$$
 The entropy of the normalized eigenvalue distribution gives the **effective
 dimensionality** of the data:
 
-$$H = -\sum_i \hat{\lambda}_i \log \hat{\lambda}_i, \qquad
-\hat{\lambda}_i = \frac{\lambda_i}{\sum_j \lambda_j}$$
+$$
+H = -\sum_i \hat{\lambda}_i \log \hat{\lambda}_i, \qquad
+\hat{\lambda}_i = \frac{\lambda_i}{\sum_j \lambda_j}
+$$
 
 $$d_\text{eff} = e^H$$
 
@@ -414,7 +417,7 @@ To better understand what to do after assessing for bias, review the
 Mutual information estimates from {class}`.Balance` depend on a random seed
 and are consistent to $O(10^{-4})$ but not exactly reproducible across runs
 without fixing the seed. See the
-[Configuring the seed](../notebooks/h2_configure_hardware_settings.md#configuring-the-global-seed)
+[Configuring the seed](../notebooks/h2_configure_hardware_settings.py#configuring-the-global-seed)
 how-to for an example of how to set and use seeds in DataEval.
 For continuous metadata factors, KNN-based MI
 estimation introduces additional variance that grows with the number of
@@ -435,7 +438,7 @@ learned through unsupervised pretraining encode human-like social biases,
 which can propagate silently into coverage and completeness assessments
 downstream.
 
-Balance and Diversity measure the *potential* for shortcut learning and
+Balance and Diversity measure the _potential_ for shortcut learning and
 sampling bias. They do not measure whether a trained model has actually learned
 a shortcut. A high MI between a metadata factor and a class label is a signal
 to investigate — not a guarantee that the model will exploit the correlation.
@@ -461,64 +464,64 @@ output flags explicitly.
 
 ### How-to guides
 
-- [How to add intrinsic metadata factors](../notebooks/h2_add_intrinsic_factors.md)
-- [How to measure label independence](../notebooks/h2_measure_label_independence.md)
-- [How to detect undersampling](../notebooks/h2_detect_undersampling.md)
-- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.md)
-- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.md)
+- [How to add intrinsic metadata factors](../notebooks/h2_add_intrinsic_factors.py)
+- [How to measure label independence](../notebooks/h2_measure_label_independence.py)
+- [How to detect undersampling](../notebooks/h2_detect_undersampling.py)
+- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
+- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.py)
 
 ### Tutorials
 
-- [Identifying bias tutorial](../notebooks/tt_identify_bias.md) — end-to-end
+- [Identifying bias tutorial](../notebooks/tt_identify_bias.py) — end-to-end
   walkthrough of balance and diversity analysis on a realistic dataset
-- [Assessing data space tutorial](../notebooks/tt_assess_data_space.md) —
+- [Assessing data space tutorial](../notebooks/tt_assess_data_space.py) —
   coverage and completeness analysis in practice
 
 ## References
 
 1. [Bergsma, W. (2013). A bias-correction for Cramér's V and Tschuprow's T.
-*Journal of the Korean Statistical Society*, 42(3), 323–328. [paper](https://www.sciencedirect.com/science/article/abs/pii/S1226319212001032)]{#ref1}
+   _Journal of the Korean Statistical Society_, 42(3), 323–328. [paper](https://www.sciencedirect.com/science/article/abs/pii/S1226319212001032)]{#ref1}
 
 2. [Fabbrizzi, S., Papadopoulos, S., Ntoutsi, E., & Kompatsiaris, I. (2022).
-A survey on bias in visual datasets. *Computer Vision and Image Understanding*,
-223, 103552. [paper](https://doi.org/10.1016/j.cviu.2022.103552)]{#ref2}
+   A survey on bias in visual datasets. _Computer Vision and Image Understanding_,
+   223, 103552. [paper](https://doi.org/10.1016/j.cviu.2022.103552)]{#ref2}
 
-3. [Friedman, B., & Nissenbaum, H. (1996). Bias in computer systems. *ACM
-Transactions on Information Systems*, 14(3), 330–347.]{#ref3}
+3. [Friedman, B., & Nissenbaum, H. (1996). Bias in computer systems. _ACM
+   Transactions on Information Systems_, 14(3), 330–347.]{#ref3}
 
 4. [Geirhos, R., Jacobsen, J.-H., Michaelis, C., Zemel, R., Brendel, W.,
-Bethge, M., & Wichmann, F. A. (2020). Shortcut learning in deep neural
-networks. *Nature Machine Intelligence*, 2(11), 665–673. [paper](https://arxiv.org/abs/2004.07780)]{#ref4}
+   Bethge, M., & Wichmann, F. A. (2020). Shortcut learning in deep neural
+   networks. _Nature Machine Intelligence_, 2(11), 665–673. [paper](https://arxiv.org/abs/2004.07780)]{#ref4}
 
 5. [Heip, C. H. R., Herman, P. M. J., & Soetaert, K. (1998). Indices of
-diversity and evenness. *Océanis*, 24(4), 61–87.]{#ref5}
+   diversity and evenness. _Océanis_, 24(4), 61–87.]{#ref5}
 
 6. [Hill, M. O. (1973). Diversity and evenness: A unifying notation and its
-consequences. *Ecology*, 54(2), 427–432.]{#ref6}
+   consequences. _Ecology_, 54(2), 427–432.]{#ref6}
 
 7. [Kraskov, A., Stögbauer, H., & Grassberger, P. (2004). Estimating mutual
-information. *Physical Review E*, 69(6), 066138. [paper](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.69.066138)]{#ref7}
+   information. _Physical Review E_, 69(6), 066138. [paper](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.69.066138)]{#ref7}
 
 8. [Merler, M., Ratha, N., Feris, R. S., & Smith, J. R. (2019). Diversity in
-faces. *arXiv preprint arXiv:1901.10436*. [paper](https://arxiv.org/abs/1901.10436)]{#ref8}
+   faces. _arXiv preprint arXiv:1901.10436_. [paper](https://arxiv.org/abs/1901.10436)]{#ref8}
 
 9. [Ross, B. C. (2014). Mutual information between discrete and continuous data
-sets. *PLOS ONE*, 9(2), e87357. [paper](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0087357)]{#ref9}
+   sets. _PLOS ONE_, 9(2), e87357. [paper](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0087357)]{#ref9}
 
 10. [Steed, R., & Caliskan, A. (2021). Image representations learned with
-unsupervised pretraining contain human-like biases. In *Proceedings of the
-2021 ACM Conference on Fairness, Accountability, and Transparency* (pp.
-701–713). ACM. [paper](https://doi.org/10.1145/3442188.3445932)]{#ref10}
+    unsupervised pretraining contain human-like biases. In _Proceedings of the
+    2021 ACM Conference on Fairness, Accountability, and Transparency_ (pp.
+    701–713). ACM. [paper](https://doi.org/10.1145/3442188.3445932)]{#ref10}
 
 11. [Ting, K. M., Wells, J. R., & Washio, T. (2022). Isolation kernel: The X
-factor in efficient and effective large scale online kernel learning.
-*Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and
-Data Mining*, 1775–1784. [paper](https://arxiv.org/abs/1907.01104)]{#ref11}
+    factor in efficient and effective large scale online kernel learning.
+    _Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and
+    Data Mining_, 1775–1784. [paper](https://arxiv.org/abs/1907.01104)]{#ref11}
 
 12. [Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. In
-*Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition*
-(pp. 1521–1528). [paper](https://ieeexplore.ieee.org/document/5995347)]{#ref12}
+    _Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition_
+    (pp. 1521–1528). [paper](https://ieeexplore.ieee.org/document/5995347)]{#ref12}
 
 13. [Vinh, N. X., Epps, J., & Bailey, J. (2010). Information theoretic measures
-for clusterings comparison: Variants, properties, normalization and correction
-for chance. *Journal of Machine Learning Research*, 11, 2837–2854. [paper](https://jmlr.org/papers/v11/vinh10a.html)]{#ref13}
+    for clusterings comparison: Variants, properties, normalization and correction
+    for chance. _Journal of Machine Learning Research_, 11, 2837–2854. [paper](https://jmlr.org/papers/v11/vinh10a.html)]{#ref13}

@@ -73,12 +73,6 @@ lint = [
 ]
 docsync = [
   "jupytext>=1.19.1",
-  "mdformat-myst",
-]
-doclint = [
-  { include-group = "docs"},
-  "ruff>=0.11",
-  "pyright[nodejs]>=1.1.400",
 ]
 test = [
   "coverage[toml]>=7.6",
@@ -209,7 +203,7 @@ torch = { pip = true }  # PyTorch is no longer maintained on conda-forge
 xxhash = { skip = true, packages = "python-xxhash>=3.3" }
 
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src", "tests", "docs/source/notebooks"]
 exclude = [
   "**/__pycache__",
   "**/node_modules",
@@ -279,7 +273,7 @@ ignore = ["ANN401", "COM812", "NPY002", "SLF001"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-per-file-ignores = { "!src/*" = ["ANN", "ARG", "BLE", "S", "SLF", "RET", "C90", "D", "FIX", "N", "PERF"], "docs/*" = ["B904"] }
+per-file-ignores = { "!src/*" = ["ANN", "ARG", "BLE", "S", "SLF", "RET", "C90", "D", "FIX", "N", "PERF"], "docs/*" = ["B904"], "docs/source/notebooks/*" = ["E402", "E501", "E703", "I001", "RUF100", "SIM105", "UP009"] }
 
 [tool.ruff.lint.flake8-builtins]
 builtins-strict-checking = false

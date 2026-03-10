@@ -282,7 +282,7 @@ shape: (3, 5)
 
 A result with many large groups is a signal that your dataset contains
 repeated collection events. Before training, remove all but one sample from
-each group. See the [deduplication how-to guide](../notebooks/h2_deduplicate.md)
+each group. See the [deduplication how-to guide](../notebooks/h2_deduplicate.py)
 for a complete walkthrough, including how to choose which sample to keep.
 
 ---
@@ -296,6 +296,6 @@ Know which tool to use, then check out the [Functional Overview](../reference/Fu
 for a quick-reference table of each algorithm's inputs, outputs, and task applicability.
 
 If you prefer to learn by doing, start with the
-[data cleaning tutorial](../notebooks/tt_clean_dataset.md). It walks through
+[data cleaning tutorial](../notebooks/tt_clean_dataset.py). It walks through
 the most common first-pass analysis tasks — duplicates, outliers, and image
 quality — using a realistic dataset.
