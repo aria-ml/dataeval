@@ -667,22 +667,22 @@ to the established performance bounds.
 
 ### How-to guides
 
-- [How to deduplicate a dataset](../notebooks/h2_deduplicate.md)
-- [How to cluster and analyze embeddings](../notebooks/h2_cluster_analysis.md)
-- [How to measure IC feasibility](../notebooks/h2_measure_ic_feasibility.md)
-- [How to measure IC sufficiency](../notebooks/h2_measure_ic_sufficiency.md)
-- [How to measure divergence](../notebooks/h2_measure_divergence.md)
-- [How to detect undersampling](../notebooks/h2_detect_undersampling.md)
+- [How to deduplicate a dataset](../notebooks/h2_deduplicate.py)
+- [How to cluster and analyze embeddings](../notebooks/h2_cluster_analysis.py)
+- [How to measure IC feasibility](../notebooks/h2_measure_ic_feasibility.py)
+- [How to measure IC sufficiency](../notebooks/h2_measure_ic_sufficiency.py)
+- [How to measure divergence](../notebooks/h2_measure_divergence.py)
+- [How to detect undersampling](../notebooks/h2_detect_undersampling.py)
 
 ### Tutorials
 
-- [Data cleaning tutorial](../notebooks/tt_clean_dataset.md) — finding and
+- [Data cleaning tutorial](../notebooks/tt_clean_dataset.py) — finding and
   handling duplicates and outliers
-- [Identify bias and correlations tutorial](../notebooks/tt_identify_bias.md) —
+- [Identify bias and correlations tutorial](../notebooks/tt_identify_bias.py) —
   acting on balance and diversity findings
-- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.md) —
+- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.py) —
   coverage gaps and embedding-space decisions
-- [Monitoring distribution shift tutorial](../notebooks/tt_monitor_shift.md) —
+- [Monitoring distribution shift tutorial](../notebooks/tt_monitor_shift.py) —
   responding to drift detection
-- [Identifying OOD samples tutorial](../notebooks/tt_identify_ood_samples.md) —
+- [Identifying OOD samples tutorial](../notebooks/tt_identify_ood_samples.py) —
   responding to OOD detection

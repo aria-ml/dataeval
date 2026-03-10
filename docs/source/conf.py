@@ -46,7 +46,7 @@ extensions = [
 coverage_show_missing_items = True
 
 # The suffix of source filenames.
-source_suffix = [".rst", ".md"]
+source_suffix = [".rst", ".md", ".py"]
 
 # List of items that shouldn't be included in the build.
 exclude_patterns = [
@@ -56,8 +56,12 @@ exclude_patterns = [
     # Specific directories -- relative to source directories
     ".jupyter_cache",
     "build",
-    # ipynb files are paired with MyST Markdown via jupytext - md is the source of truth
+    # ipynb files are paired with py:percent scripts via jupytext - py is the source of truth
     "**/*.ipynb",
+    # Utility script, not a notebook
+    "data.py",
+    # Sphinx config file, not a document
+    "conf.py",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -122,6 +126,7 @@ nb_execution_raise_on_error = True
 nb_execution_timeout = -1
 nb_render_plugin = "default"
 nb_html_output = "both"
+nb_custom_formats = {".py": ["jupytext.reads", {"fmt": "py:percent"}]}
 
 myst_enable_extensions = [
     "attrs_inline",
@@ -252,7 +257,7 @@ def setup(app):
             cache_dir = docs_source_dir / ".jupyter_cache" / "executed"
 
             if notebooks_dir.exists() and cache_dir.exists():
-                notebooks = sorted(notebooks_dir.glob("*.md"))
+                notebooks = sorted(notebooks_dir.glob("*.py"))
                 {p.name for p in cache_dir.iterdir() if p.is_dir()}
 
                 for nb_path in notebooks:

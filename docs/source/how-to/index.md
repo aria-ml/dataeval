@@ -22,8 +22,8 @@ environment.
 ```{toctree}
 :hidden:
 
-../notebooks/h2_configure_hardware_settings.md
-../notebooks/h2_configure_logging.md
+../notebooks/h2_configure_hardware_settings.py
+../notebooks/h2_configure_logging.py
 ```
 
 :::{list-table}
@@ -31,10 +31,10 @@ environment.
 :header-rows: 0
 :align: center
 
-- - [](../notebooks/h2_configure_hardware_settings.md)
+- - [](../notebooks/h2_configure_hardware_settings.py)
   - Configure global hardware settings used in DataEval
   - [![Open In Colab][colab-badge]][hdw-colab]
-- - [](../notebooks/h2_configure_logging.md)
+- - [](../notebooks/h2_configure_logging.py)
   - Configure logging with DataEval
   - [![Open In Colab][colab-badge]][log-colab]
 
@@ -51,13 +51,13 @@ datasets for machine learning.
 ```{toctree}
 :hidden:
 
-../notebooks/h2_encode_with_onnx.md
-../notebooks/h2_cluster_analysis.md
-../notebooks/h2_deduplicate.md
-../notebooks/h2_visualize_cleaning_issues.md
-../notebooks/h2_custom_image_stats_object_detection.md
-../notebooks/h2_add_intrinsic_factors.md
-../notebooks/h2_detect_undersampling.md
+../notebooks/h2_encode_with_onnx.py
+../notebooks/h2_cluster_analysis.py
+../notebooks/h2_deduplicate.py
+../notebooks/h2_visualize_cleaning_issues.py
+../notebooks/h2_custom_image_stats_object_detection.py
+../notebooks/h2_add_intrinsic_factors.py
+../notebooks/h2_detect_undersampling.py
 ```
 
 :::{list-table}
@@ -65,26 +65,26 @@ datasets for machine learning.
 :header-rows: 0
 :align: center
 
-- - [](../notebooks/h2_encode_with_onnx.md)
+- - [](../notebooks/h2_encode_with_onnx.py)
   - Encode image embeddings with an ONNX model
   - [![Open In Colab][colab-badge]][onx-colab]
-- - [](../notebooks/h2_cluster_analysis.md)
+- - [](../notebooks/h2_cluster_analysis.py)
   - Identify outliers and anomalies with clustering algorithms
   - [![Open In Colab][colab-badge]][clst-colab]
-- - [](../notebooks/h2_deduplicate.md)
+- - [](../notebooks/h2_deduplicate.py)
   - Identify and remove duplicates from a PyTorch Dataset
   - [![Open In Colab][colab-badge]][dupe-colab]
-- - [](../notebooks/h2_visualize_cleaning_issues.md)
+- - [](../notebooks/h2_visualize_cleaning_issues.py)
   - Find negatively impactful images in multiple backgrounds
   - [![Open In Colab][colab-badge]][clean-colab]
-- - [](../notebooks/h2_custom_image_stats_object_detection.md)
+- - [](../notebooks/h2_custom_image_stats_object_detection.py)
   - Customize calculation of image stats on an object detection dataset
   - [![Open In Colab][colab-badge]][calc-colab]
-- - [](../notebooks/h2_add_intrinsic_factors.md)
+- - [](../notebooks/h2_add_intrinsic_factors.py)
   - Apply DataEval's statistical outputs to
     DataEval's {class}`.Metadata` object for bias analysis
   - [![Open In Colab][colab-badge]][imd-colab]
-- - [](../notebooks/h2_detect_undersampling.md)
+- - [](../notebooks/h2_detect_undersampling.py)
   - Detect undersampled subsets of datasets
   - [![Open In Colab][colab-badge]][cov-colab]
 
@@ -106,8 +106,8 @@ for model training.
 ```{toctree}
 :hidden:
 
-../notebooks/h2_measure_ic_feasibility.md
-../notebooks/h2_measure_ic_sufficiency.md
+../notebooks/h2_measure_ic_feasibility.py
+../notebooks/h2_measure_ic_sufficiency.py
 ```
 
 :::{list-table}
@@ -115,11 +115,11 @@ for model training.
 :header-rows: 0
 :align: center
 
-- - [](../notebooks/h2_measure_ic_feasibility.md)
+- - [](../notebooks/h2_measure_ic_feasibility.py)
   - Calculate feasibility of performance requirements on
     different datasets using {term}`Bayes Error Rate (BER)`
   - [![Open In Colab][colab-badge]][ber-colab]
-- - [](../notebooks/h2_measure_ic_sufficiency.md)
+- - [](../notebooks/h2_measure_ic_sufficiency.py)
   - Determine the amount of data needed to meet
     image classification performance requirements
   - [![Open In Colab][colab-badge]][suff-colab]
@@ -137,8 +137,8 @@ shifts in deployed systems.
 ```{toctree}
 :hidden:
 
-../notebooks/h2_measure_divergence.md
-../notebooks/h2_measure_label_independence.md
+../notebooks/h2_measure_divergence.py
+../notebooks/h2_measure_label_independence.py
 ```
 
 :::{list-table}
@@ -146,10 +146,10 @@ shifts in deployed systems.
 :header-rows: 0
 :align: center
 
-- - [](../notebooks/h2_measure_divergence.md)
+- - [](../notebooks/h2_measure_divergence.py)
   - Display data distributions between 2 datasets
   - [![Open In Colab][colab-badge]][div-colab]
-- - [](../notebooks/h2_measure_label_independence.md)
+- - [](../notebooks/h2_measure_label_independence.py)
   - Compare label distributions between 2 datasets
   - [![Open In Colab][colab-badge]][lbl-colab]
 

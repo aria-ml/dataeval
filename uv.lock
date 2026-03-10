@@ -1105,39 +1105,6 @@ dev = [
     { name = "torchvision", version = "0.25.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra != 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128') or (extra != 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
     { name = "uv" },
 ]
-doclint = [
-    { name = "certifi" },
-    { name = "dataeval-plots", extra = ["plotly"] },
-    { name = "ipykernel" },
-    { name = "ipywidgets" },
-    { name = "jinja2" },
-    { name = "jupyter-cache" },
-    { name = "jupyter-client" },
-    { name = "jupytext" },
-    { name = "maite-datasets" },
-    { name = "markupsafe" },
-    { name = "myst-nb" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "opencv-python-headless" },
-    { name = "plotly" },
-    { name = "pyright", extra = ["nodejs"] },
-    { name = "ruff" },
-    { name = "sphinx" },
-    { name = "sphinx-autoapi" },
-    { name = "sphinx-design", version = "0.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "sphinx-design", version = "0.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "sphinx-immaterial" },
-    { name = "sphinx-new-tab-link" },
-    { name = "sphinx-tabs" },
-    { name = "torchmetrics" },
-    { name = "torchvision", version = "0.21.0+cu118", source = { registry = "https://download.pytorch.org/whl/cu118" }, marker = "extra == 'extra-8-dataeval-cu118' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "torchvision", version = "0.21.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "extra == 'extra-8-dataeval-cu124' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "torchvision", version = "0.25.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-8-dataeval-cpu') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "torchvision", version = "0.25.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128') or (extra != 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu118' and extra != 'extra-8-dataeval-cu124' and extra != 'extra-8-dataeval-cu128')" },
-    { name = "torchvision", version = "0.25.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-8-dataeval-cpu') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "torchvision", version = "0.25.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "(extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra != 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128') or (extra != 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
-]
 docs = [
     { name = "certifi" },
     { name = "dataeval-plots", extra = ["plotly"] },
@@ -1171,7 +1138,6 @@ docs = [
 ]
 docsync = [
     { name = "jupytext" },
-    { name = "mdformat-myst" },
 ]
 lint = [
     { name = "codespell", extra = ["toml"] },
@@ -1265,32 +1231,6 @@ dev = [
     { name = "torchvision", specifier = ">=0.17.0" },
     { name = "uv", specifier = ">=0.8.0" },
 ]
-doclint = [
-    { name = "certifi", specifier = ">=2024.7.4" },
-    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.6" },
-    { name = "ipykernel", specifier = ">=6.26.0" },
-    { name = "ipywidgets", specifier = ">=8.1.1" },
-    { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "jupyter-cache", specifier = ">=1.0" },
-    { name = "jupyter-client", specifier = ">=8.6.0" },
-    { name = "jupytext", specifier = ">=1.19.1" },
-    { name = "maite-datasets", specifier = ">=0.0.12" },
-    { name = "markupsafe", specifier = ">=3,<3.0.2" },
-    { name = "myst-nb", specifier = ">=1.0" },
-    { name = "numpy", specifier = ">=2.0.2" },
-    { name = "opencv-python-headless", specifier = ">=4.8.0" },
-    { name = "plotly", specifier = ">=6.2.0" },
-    { name = "pyright", extras = ["nodejs"], specifier = ">=1.1.400" },
-    { name = "ruff", specifier = ">=0.11" },
-    { name = "sphinx", specifier = ">=7.2.6,<9.0.0" },
-    { name = "sphinx-autoapi", specifier = ">=3.6.0" },
-    { name = "sphinx-design", specifier = ">=0.6.1" },
-    { name = "sphinx-immaterial", specifier = ">=0.12.5" },
-    { name = "sphinx-new-tab-link", specifier = ">=0.8.0" },
-    { name = "sphinx-tabs", specifier = ">=3.4.7" },
-    { name = "torchmetrics", specifier = ">=1.0.0" },
-    { name = "torchvision", specifier = ">=0.17.0" },
-]
 docs = [
     { name = "certifi", specifier = ">=2024.7.4" },
     { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.6" },
@@ -1315,10 +1255,7 @@ docs = [
     { name = "torchmetrics", specifier = ">=1.0.0" },
     { name = "torchvision", specifier = ">=0.17.0" },
 ]
-docsync = [
-    { name = "jupytext", specifier = ">=1.19.1" },
-    { name = "mdformat-myst" },
-]
+docsync = [{ name = "jupytext", specifier = ">=1.19.1" }]
 lint = [
     { name = "codespell", extras = ["toml"], specifier = ">=2.3" },
     { name = "ruff", specifier = ">=0.11" },
@@ -2763,81 +2700,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c7/74/97e72a36efd4ae2bccb3463284300f8953f199b5ffbc04cbbb0ec78f74b1/matplotlib_inline-0.2.1.tar.gz", hash = "sha256:e1ee949c340d771fc39e241ea75683deb94762c8fa5f2927ec57c83c4dffa9fe", size = 8110, upload-time = "2025-10-23T09:00:22.126Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/af/33/ee4519fa02ed11a94aef9559552f3b17bb863f2ecfe1a35dc7f548cde231/matplotlib_inline-0.2.1-py3-none-any.whl", hash = "sha256:d56ce5156ba6085e00a9d54fead6ed29a9c47e215cd1bba2e976ef39f5710a76", size = 9516, upload-time = "2025-10-23T09:00:20.675Z" },
-]
-
-[[package]]
-name = "mdformat"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markdown-it-py", version = "3.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "markdown-it-py", version = "4.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3f/05/32b5e14b192b0a8a309f32232c580aefedd9d06017cb8fe8fce34bec654c/mdformat-1.0.0.tar.gz", hash = "sha256:4954045fcae797c29f86d4ad879e43bb151fa55dbaf74ac6eaeacf1d45bb3928", size = 56953, upload-time = "2025-10-16T12:05:03.695Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/9a/8fe71b95985ca7a4001effbcc58e5a07a1f2a2884203f74dcf48a3b08315/mdformat-1.0.0-py3-none-any.whl", hash = "sha256:bca015d65a1d063a02e885a91daee303057bc7829c2cd37b2075a50dbb65944b", size = 53288, upload-time = "2025-10-16T12:05:02.607Z" },
-]
-
-[[package]]
-name = "mdformat-footnote"
-version = "0.1.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mdformat" },
-    { name = "mdit-py-plugins" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3f/c0/0fe461e3c53eb72b35b642add6c3eaf1f90e43a574a18633955f9e89791d/mdformat_footnote-0.1.3.tar.gz", hash = "sha256:70617e61af87f59d7dea93a392c5093089a6d4551126fa18025c6fddb18bf742", size = 6430, upload-time = "2026-01-30T14:13:05.983Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/ac/60d47237a0e37fe991cbf311f10f096a28cfdbbe25d1932dadf8e9abdac8/mdformat_footnote-0.1.3-py3-none-any.whl", hash = "sha256:3033184237cbaf2a71cc02a4c37f043a97c1f16d3ed6939bc104964e77aad0b3", size = 7767, upload-time = "2026-01-30T14:13:04.944Z" },
-]
-
-[[package]]
-name = "mdformat-front-matters"
-version = "2.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mdformat" },
-    { name = "mdit-py-plugins" },
-    { name = "ruamel-yaml" },
-    { name = "toml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2c/53/008805510d3006d9aec6c602fa40305750cb96daba8ea9abae477149909b/mdformat_front_matters-2.0.0.tar.gz", hash = "sha256:46efabe93707699120c67d4b33b51fdb4cfe0e040acfb0f8212eb33c9a3e8a9a", size = 12576, upload-time = "2025-12-04T11:44:52.265Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/05/4c197c000dab41f1f58290221a4c02bd57804ff42e9374d3dd0f5408aa40/mdformat_front_matters-2.0.0-py3-none-any.whl", hash = "sha256:8ea92d23d1e9427fe6548b9044e5fbf7bcf6c217941f1a9442e0efd8b0a76e61", size = 13411, upload-time = "2025-12-04T11:44:51.209Z" },
-]
-
-[[package]]
-name = "mdformat-gfm"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markdown-it-py", version = "3.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "markdown-it-py", version = "4.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
-    { name = "mdformat" },
-    { name = "mdit-py-plugins" },
-    { name = "wcwidth" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/56/6f/a626ebb142a290474401b67e2d61e73ce096bf7798ee22dfe6270f924b3f/mdformat_gfm-1.0.0.tar.gz", hash = "sha256:d1d49a409a6acb774ce7635c72d69178df7dce1dc8cdd10e19f78e8e57b72623", size = 10112, upload-time = "2025-10-16T09:12:22.402Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/18/6bc2189b744dd383cad03764f41f30352b1278d2205096f77a29c0b327ad/mdformat_gfm-1.0.0-py3-none-any.whl", hash = "sha256:7305a50efd2a140d7c83505b58e3ac5df2b09e293f9bbe72f6c7bee8c678b005", size = 10970, upload-time = "2025-10-16T09:12:21.276Z" },
-]
-
-[[package]]
-name = "mdformat-myst"
-version = "0.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mdformat" },
-    { name = "mdformat-footnote" },
-    { name = "mdformat-front-matters" },
-    { name = "mdformat-gfm" },
-    { name = "mdit-py-plugins" },
-    { name = "ruamel-yaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/e1/e41d0a8acb2485c9da0fb194545c9827ce1399534110a5e45c465221318f/mdformat_myst-0.3.0.tar.gz", hash = "sha256:8195dec075683cac689c5586a5e4c6700ec8d6df0f9bc34a1e2f3514d5e745b0", size = 30032, upload-time = "2025-11-27T18:52:26.466Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/7b/2e8b6fa15fc47f5a512ebbe4bba4e2d5dfc988092269fc1cd3d22c9dad45/mdformat_myst-0.3.0-py3-none-any.whl", hash = "sha256:45e305cb1e742e712c0a8410315c351f3ab43e702d979d4f0eea9d9831245adc", size = 7088, upload-time = "2025-11-27T18:52:25.618Z" },
 ]
 
 [[package]]
@@ -5486,15 +5348,6 @@ wheels = [
 ]
 
 [[package]]
-name = "ruamel-yaml"
-version = "0.19.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/3b/ebda527b56beb90cb7652cb1c7e4f91f48649fbcd8d2eb2fb6e77cd3329b/ruamel_yaml-0.19.1.tar.gz", hash = "sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993", size = 142709, upload-time = "2026-01-02T16:50:31.84Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/0c/51f6841f1d84f404f92463fc2b1ba0da357ca1e3db6b7fbda26956c3b82a/ruamel_yaml-0.19.1-py3-none-any.whl", hash = "sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93", size = 118102, upload-time = "2026-01-02T16:50:29.201Z" },
-]
-
-[[package]]
 name = "ruff"
 version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -6449,15 +6302,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7a/fd/7a5ee21fd08ff70d3d33a5781c255cbe779659bd03278feb98b19ee550f4/tinycss2-1.4.0.tar.gz", hash = "sha256:10c0972f6fc0fbee87c3edb76549357415e94548c1ae10ebccdea16fb404a9b7", size = 87085, upload-time = "2024-10-24T14:58:29.895Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e6/34/ebdc18bae6aa14fbee1a08b63c015c72b64868ff7dae68808ab500c492e2/tinycss2-1.4.0-py3-none-any.whl", hash = "sha256:3a49cf47b7675da0b15d0c6e1df8df4ebd96e9394bb905a5775adb0d884c5289", size = 26610, upload-time = "2024-10-24T14:58:28.029Z" },
-]
-
-[[package]]
-name = "toml"
-version = "0.10.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/be/ba/1f744cdc819428fc6b5084ec34d9b30660f6f9daaf70eead706e3203ec3c/toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f", size = 22253, upload-time = "2020-11-01T01:40:22.204Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/6f/7120676b6d73228c96e17f1f794d8ab046fc910d781c8d151120c3f1569e/toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b", size = 16588, upload-time = "2020-11-01T01:40:20.672Z" },
 ]
 
 [[package]]

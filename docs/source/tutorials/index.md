@@ -24,29 +24,29 @@ To run the tutorial interactively in Google Colab, click the
 ```{toctree}
 :hidden:
 
-../notebooks/tt_clean_dataset.md
-../notebooks/tt_assess_data_space.md
-../notebooks/tt_identify_bias.md
-../notebooks/tt_augmentation_duplicates.md
+../notebooks/tt_clean_dataset.py
+../notebooks/tt_assess_data_space.py
+../notebooks/tt_identify_bias.py
+../notebooks/tt_augmentation_duplicates.py
 ```
 
 ```{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* - [](../notebooks/tt_clean_dataset.md)
+* - [](../notebooks/tt_clean_dataset.py)
   - Learn about the impacts of unstructured, raw data and how to transform it
     into a reliable, robust dataset.
   - [![Open In Colab][colab-badge]][eda-colab]
-* - [](../notebooks/tt_assess_data_space.md)
+* - [](../notebooks/tt_assess_data_space.py)
   - Learn how to fix and prevent gaps in data to develop more reliable and
     robust models.
   - [![Open In Colab][colab-badge]][dataspace-colab]
-* - [](../notebooks/tt_identify_bias.md)
+* - [](../notebooks/tt_identify_bias.py)
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
   - [![Open In Colab][colab-badge]][bias-colab]
-* - [](../notebooks/tt_augmentation_duplicates.md)
+* - [](../notebooks/tt_augmentation_duplicates.py)
   - Learn how common torchvision augmentations like rotations, flips, and color
     jitter can be detected as near duplicates using D4 hashes and BoVW embeddings.
   - [![Open In Colab][colab-badge]][augs-colab]
@@ -71,19 +71,19 @@ To run the tutorial interactively in Google Colab, click the
 :hidden:
 :caption: Monitoring
 
-../notebooks/tt_monitor_shift.md
-../notebooks/tt_identify_ood_samples.md
+../notebooks/tt_monitor_shift.py
+../notebooks/tt_identify_ood_samples.py
 ```
 
 ```{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* - [](../notebooks/tt_monitor_shift.md)
+* - [](../notebooks/tt_monitor_shift.py)
   - Learn how to analyze incoming data against training data to ensure deployed
     models stay reliable and robust.
   - [![Open In Colab][colab-badge]][monitoring-colab]
-* - [](../notebooks/tt_identify_ood_samples.md)
+* - [](../notebooks/tt_identify_ood_samples.py)
   - Identify out-of-distribution samples in incoming data
   - [![Open In Colab][colab-badge]][iood-colab]
 ```

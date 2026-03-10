@@ -1,9 +1,10 @@
 <!-- markdownlint-disable MD051 -->
+
 # Performance Limits
 
 Before investing in model architecture, hyperparameter tuning, or additional
 data collection, a T&E engineer needs to answer a more fundamental question:
-*what is this dataset capable of producing?* Performance Limits analysis
+_what is this dataset capable of producing?_ Performance Limits analysis
 addresses two distinct ceilings that constrain any model trained on a given
 dataset — the irreducible error imposed by the data itself, and the saturation
 point beyond which additional samples stop producing meaningful improvement.
@@ -29,7 +30,7 @@ box crops. See the UAP section below for details.
 ### Bayes Error Rate — the irreducible floor
 
 The {term}`Bayes Error Rate (BER)` is the lowest possible error rate
-achievable by *any* classifier on a given probability distribution. It is not
+achievable by _any_ classifier on a given probability distribution. It is not
 a property of any particular model — it is a property of the data. No matter
 how large the model, how long it trains, or how well it is tuned, it cannot
 achieve error below the BER on that distribution.
@@ -80,8 +81,8 @@ UAP is marked experimental and may change in future releases.
 ### Sufficiency — the diminishing returns curve
 
 While BER and UAP identify the performance ceiling, {class}`.Sufficiency`
-characterizes the path to that ceiling. It answers the question: *given the
-data we have, how much of our budget should go toward collecting more?*
+characterizes the path to that ceiling. It answers the question: _given the
+data we have, how much of our budget should go toward collecting more?_
 
 Sufficiency trains a model on progressively larger subsets of the training
 data — at 10%, 25%, 50%, 75%, and 100% of available samples, for example —
@@ -170,7 +171,7 @@ This is scikit-learn's [`average_precision_score`](https://scikit-learn.org/stab
 with `average="weighted"`.
 
 The reduction from object detection to classification is what makes this an
-*upper* bound. A real detector must predict bounding box coordinates as well
+_upper_ bound. A real detector must predict bounding box coordinates as well
 as class labels; any localization error reduces its mAP below the UAP. A
 program whose UAP is 0.6 cannot achieve a mAP of 0.7 from any detector
 trained on that data, because UAP already removes the localization burden.
@@ -184,8 +185,8 @@ $$f(n) = c \cdot n^{-m} + c_0$$
 
 where $n$ is the training set size, $c$ is the scale coefficient, $m > 0$ is
 the decay exponent, and $c_0$ is the asymptote. DataEval works internally with
-the *error* form of this curve (higher is worse), then converts to the
-*performance* form for output:
+the _error_ form of this curve (higher is worse), then converts to the
+_performance_ form for output:
 
 $$\text{performance}(n) = 1 - f(n) = 1 - c \cdot n^{-m} - c_0$$
 
@@ -212,15 +213,15 @@ is constrained to $[0, 1]$. For unbounded metrics (loss), no constraint is
 applied. The `unit_interval` parameter controls this.
 
 **Forward projection** evaluates $\text{performance}(n)$ at arbitrary $n$
-values using the fitted parameters. This answers: *if we had $N$ samples, what
-accuracy would we expect?*
+values using the fitted parameters. This answers: _if we had $N$ samples, what
+accuracy would we expect?_
 
 **Inverse projection** solves $\text{performance}(n) = t$ for $n$ given a
 target $t$:
 
 $$n = \left(\frac{t - (1 - c_0)}{-c}\right)^{-1/m}$$
 
-This answers: *how many samples do we need to reach accuracy $t$?* When the
+This answers: _how many samples do we need to reach accuracy $t$?_ When the
 target exceeds $1 - c_0$ (the asymptotic ceiling), the inverse projection
 returns $-1$, indicating the target is unachievable with more data of the same
 type. This is the sufficiency equivalent of the BER bound — the learning
@@ -327,27 +328,27 @@ mismatch between train and test — the projection will be optimistic.
 
 ### How-to guides
 
-- [How to measure classification feasibility (BER)](../notebooks/h2_measure_ic_feasibility.md)
-- [How to measure data sufficiency](../notebooks/h2_measure_ic_sufficiency.md)
-- [How to encode with ONNX](../notebooks/h2_encode_with_onnx.md)
+- [How to measure classification feasibility (BER)](../notebooks/h2_measure_ic_feasibility.py)
+- [How to measure data sufficiency](../notebooks/h2_measure_ic_sufficiency.py)
+- [How to encode with ONNX](../notebooks/h2_encode_with_onnx.py)
 
 ## References
 
 1. Devroye, L. (1981). On the inequality of Cover and Hart in nearest neighbor
-discrimination. *IEEE Transactions on Information Theory*, 27(1), 68–70. [paper](https://ieeexplore.ieee.org/document/4767052)
+   discrimination. _IEEE Transactions on Information Theory_, 27(1), 68–70. [paper](https://ieeexplore.ieee.org/document/4767052)
 
 2. Noshad, M., Xu, L., & Hero, A. O. (2019). Learning to bound the multi-class
-Bayes error. *IEEE Transactions on Signal Processing*, 67(14), 3657–3669. [paper](https://arxiv.org/abs/1811.06419)  
-(Theorems 3 and 4 provide the MST and KNN bound derivations used in DataEval.)
+   Bayes error. _IEEE Transactions on Signal Processing_, 67(14), 3657–3669. [paper](https://arxiv.org/abs/1811.06419)  
+   (Theorems 3 and 4 provide the MST and KNN bound derivations used in DataEval.)
 
 3. Borji, A., & Iranmanesh, S. M. (2019). Empirical upper bound in object
-detection and more. *arXiv preprint arXiv:1911.12451.* [paper](https://arxiv.org/abs/1911.12451)
+   detection and more. _arXiv preprint arXiv:1911.12451._ [paper](https://arxiv.org/abs/1911.12451)
 
 4. Hestness, J., Narang, S., Ardalani, N., Diamos, G., Jun, H., Kianinejad,
-H., Patwary, M. A., Yang, Y., & Zhou, Y. (2017). Deep learning scaling is
-predictable, empirically. *arXiv preprint arXiv:1712.00409.* [paper](https://arxiv.org/abs/1712.00409)
+   H., Patwary, M. A., Yang, Y., & Zhou, Y. (2017). Deep learning scaling is
+   predictable, empirically. _arXiv preprint arXiv:1712.00409._ [paper](https://arxiv.org/abs/1712.00409)
 
 5. Wales, D. J., & Doye, J. P. K. (1997). Global optimization by basin-hopping
-and the lowest energy structures of Lennard-Jones clusters containing up to
-110 atoms. *Journal of Physical Chemistry A*, 101(28), 5111–5116. [paper](https://arxiv.org/abs/cond-mat/9803344)  
-(Basin-hopping algorithm used for power law curve fitting.)
+   and the lowest energy structures of Lennard-Jones clusters containing up to
+   110 atoms. _Journal of Physical Chemistry A_, 101(28), 5111–5116. [paper](https://arxiv.org/abs/cond-mat/9803344)  
+   (Basin-hopping algorithm used for power law curve fitting.)

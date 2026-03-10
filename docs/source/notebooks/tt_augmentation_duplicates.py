@@ -1,90 +1,87 @@
----
-jupytext:
-  text_representation:
-    extension: .md
-    format_name: myst
-    format_version: 0.13
-    jupytext_version: 1.19.1
-kernelspec:
-  display_name: dataeval
-  language: python
-  name: python3
----
+# ---
+# jupyter:
+#   jupytext:
+#     default_lexer: ipython3
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.1
+#   kernelspec:
+#     display_name: dataeval
+#     language: python
+#     name: python3
+# ---
 
-# Detecting common augmentations as duplicates
+# %% [markdown]
+# # Detecting common augmentations as duplicates
+#
+# This tutorial demonstrates how DataEval's duplicate detection methods handle common torchvision augmentations.
+#
+# Estimated time to complete: 10 minutes
+#
+# Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
+#
+# Relevant personas: Data Engineer, ML Engineer
+#
+# ## What you'll do
+#
+# - Create synthetic test images and apply 30+ torchvision transformations
+# - Run both D4 hash-based and BoVW embedding-based duplicate detection
+# - Compare which transformations each method catches or misses
+# - Tune detection sensitivity with the `cluster_sensitivity` parameter
+#
+# ## What you'll learn
+#
+# - Which augmentation types are detectable as near-duplicates (and which aren't)
+# - When to use D4 hashes vs BoVW embeddings for duplicate detection
+# - How D4 and BoVW have complementary strengths that improve coverage when combined
+#
+# ### Quick reference: detection methods
+#
+# | Method                             | Best For                                  | Speed   | Rotation Invariant      |
+# | ---------------------------------- | ----------------------------------------- | ------- | ----------------------- |
+# | **D4 Hashes** (phash_d4, dhash_d4) | Detecting rotated/flipped copies          | Fast    | **Only 90° increments** |
+# | **BoVWExtractor**                  | Semantic similarity, different viewpoints | Slower  | **Any angle**           |
+# | **Basic Hashes** (phash, dhash)    | Same-orientation near-duplicates          | Fastest | No                      |
+#
+# **Key insight:** D4 hashes only handle the 8 symmetries of a square (0°, 90°, 180°, 270° + flips). BoVW using SIFT
+# features is invariant to **any** rotation angle, making it better for detecting arbitrarily rotated duplicates.
+#
+# ## What you'll need
+#
+# - A Python environment with the following packages installed:
+#   - `dataeval`
+#   - `opencv-python` or `opencv-python-headless`
+#   - `torchvision`
+#   - `matplotlib`
 
-This tutorial demonstrates how DataEval's duplicate detection methods handle common torchvision augmentations.
+# %% [markdown]
+# ## Introduction
+#
+# Data augmentation is a common technique in deep learning, but augmented images can inadvertently appear in both training
+# and test sets, or be saved as "new" images when they're really transformations of existing ones. Understanding which
+# augmentations are detectable as near-duplicates helps you:
+#
+# 1. **Identify data leakage** - Find augmented copies that leaked between train/test splits
+# 1. **Clean datasets** - Remove redundant transformed images
+# 1. **Validate augmentation pipelines** - Ensure augmentations create sufficiently distinct images
 
-Estimated time to complete: 10 minutes
+# %% [markdown]
+# ## Getting started
+#
+# Let's import the required libraries.
 
-Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
-
-Relevant personas: Data Engineer, ML Engineer
-
-## What you'll do
-
-- Create synthetic test images and apply 30+ torchvision transformations
-- Run both D4 hash-based and BoVW embedding-based duplicate detection
-- Compare which transformations each method catches or misses
-- Tune detection sensitivity with the `cluster_sensitivity` parameter
-
-## What you'll learn
-
-- Which augmentation types are detectable as near-duplicates (and which aren't)
-- When to use D4 hashes vs BoVW embeddings for duplicate detection
-- How D4 and BoVW have complementary strengths that improve coverage when combined
-
-### Quick reference: detection methods
-
-| Method                             | Best For                                  | Speed   | Rotation Invariant      |
-| ---------------------------------- | ----------------------------------------- | ------- | ----------------------- |
-| **D4 Hashes** (phash_d4, dhash_d4) | Detecting rotated/flipped copies          | Fast    | **Only 90° increments** |
-| **BoVWExtractor**                  | Semantic similarity, different viewpoints | Slower  | **Any angle**           |
-| **Basic Hashes** (phash, dhash)    | Same-orientation near-duplicates          | Fastest | No                      |
-
-**Key insight:** D4 hashes only handle the 8 symmetries of a square (0°, 90°, 180°, 270° + flips). BoVW using SIFT
-features is invariant to **any** rotation angle, making it better for detecting arbitrarily rotated duplicates.
-
-## What you'll need
-
-- A Python environment with the following packages installed:
-  - `dataeval`
-  - `opencv-python` or `opencv-python-headless`
-  - `torchvision`
-  - `matplotlib`
-
-+++
-
-## Introduction
-
-Data augmentation is a common technique in deep learning, but augmented images can inadvertently appear in both training
-and test sets, or be saved as "new" images when they're really transformations of existing ones. Understanding which
-augmentations are detectable as near-duplicates helps you:
-
-1. **Identify data leakage** - Find augmented copies that leaked between train/test splits
-1. **Clean datasets** - Remove redundant transformed images
-1. **Validate augmentation pipelines** - Ensure augmentations create sufficiently distinct images
-
-+++
-
-## Getting started
-
-Let's import the required libraries.
-
-```{code-cell} ipython3
----
-tags: [remove_cell]
----
+# %% tags=["remove_cell"]
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
 
-    %pip install -q dataeval opencv-python-headless torchvision
+    # %pip install -q dataeval opencv-python-headless torchvision
 except Exception:
     pass
-```
 
-```{code-cell} ipython3
+# %%
 from numbers import Number
 from typing import cast
 
@@ -102,14 +99,16 @@ from dataeval.quality import Duplicates, DuplicatesOutput
 config.set_batch_size(64)
 config.set_max_processes(4)
 config.set_seed(42)
-```
 
-## Creating test data
 
-We'll create a synthetic image with rich texture patterns that SIFT can detect. Then we'll apply various torchvision
-transformations to test detection capabilities.
+# %% [markdown]
+# ## Creating test data
+#
+# We'll create a synthetic image with rich texture patterns that SIFT can detect. Then we'll apply various torchvision
+# transformations to test detection capabilities.
 
-```{code-cell} ipython3
+
+# %%
 def create_textured_image(seed: int, size: int) -> np.ndarray:
     """Create an image with texture patterns that SIFT can detect.
 
@@ -166,9 +165,9 @@ def tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
     if tensor.dtype == torch.float32:
         tensor = (tensor * 255).to(torch.uint8)
     return tensor.numpy()
-```
 
-```{code-cell} ipython3
+
+# %%
 IMG_SIZE = 224
 
 # Create base images
@@ -190,28 +189,28 @@ for i, (img, title) in enumerate(
     axes[i].axis("off")
 plt.tight_layout()
 plt.show()
-```
 
-## Defining Torchvision transformations
+# %% [markdown]
+# ## Defining Torchvision transformations
+#
+# We'll test a comprehensive set of common torchvision transformations, organized by category:
+#
+# | Category        | Transformations                     | Expected Detection                |
+# | --------------- | ----------------------------------- | --------------------------------- |
+# | **Geometric**   | Rotation, Flip, Affine, Perspective | High (SIFT is geometry-invariant) |
+# | **Color**       | ColorJitter, Grayscale, Invert      | Medium (depends on intensity)     |
+# | **Blur/Noise**  | GaussianBlur, Noise                 | Medium to Low                     |
+# | **Crop/Resize** | RandomCrop, Resize, CenterCrop      | Medium (depends on overlap)       |
+# | **Severe**      | RandomErasing, Heavy distortion     | Low (features destroyed)          |
+#
+# **Important setup notes:**
+#
+# - We use `expand=True` with a resize-back step for rotation transforms so that the full rotated content is preserved (no
+#   black corners or clipped content).
+# - We use `fill=128` (gray) instead of the default `fill=0` (black) where fill is unavoidable. Black fill creates strong
+#   artificial edges that SIFT detects, corrupting the BoVW histogram.
 
-We'll test a comprehensive set of common torchvision transformations, organized by category:
-
-| Category        | Transformations                     | Expected Detection                |
-| --------------- | ----------------------------------- | --------------------------------- |
-| **Geometric**   | Rotation, Flip, Affine, Perspective | High (SIFT is geometry-invariant) |
-| **Color**       | ColorJitter, Grayscale, Invert      | Medium (depends on intensity)     |
-| **Blur/Noise**  | GaussianBlur, Noise                 | Medium to Low                     |
-| **Crop/Resize** | RandomCrop, Resize, CenterCrop      | Medium (depends on overlap)       |
-| **Severe**      | RandomErasing, Heavy distortion     | Low (features destroyed)          |
-
-**Important setup notes:**
-
-- We use `expand=True` with a resize-back step for rotation transforms so that the full rotated content is preserved (no
-  black corners or clipped content).
-- We use `fill=128` (gray) instead of the default `fill=0` (black) where fill is unavoidable. Black fill creates strong
-  artificial edges that SIFT detects, corrupting the BoVW histogram.
-
-```{code-cell} ipython3
+# %%
 FILL = 128  # Gray fill avoids artificial SIFT edges that black (0) would create
 
 
@@ -283,9 +282,8 @@ transformations = {
         ]
     ),
 }
-```
 
-```{code-cell} ipython3
+# %%
 # Apply all transformations to base image 1
 images = []
 labels = []
@@ -313,9 +311,8 @@ print(f"Created {len(images)} test images:")
 print(f"  - {1} original")
 print(f"  - {len(transformations)} transformations")
 print(f"  - {2} unique (different base images)")
-```
 
-```{code-cell} ipython3
+# %%
 # Visualize a sample of transformations
 sample_indices = [0, 1, 2, 5, 6, 10, 15, 17, 20, 25, 28, 30]
 sample_indices = [i for i in sample_indices if i < len(images)]
@@ -337,14 +334,14 @@ for i in range(len(sample_indices), len(axes)):
 plt.tight_layout()
 plt.suptitle("Sample of Torchvision Transformations Applied to Base Image", y=1.02, fontsize=12)
 plt.show()
-```
 
-## Running near-duplicate detection
+# %% [markdown]
+# ## Running near-duplicate detection
+#
+# We'll use both hash-based detection (D4 hashes) and BoVWExtractor to compare their effectiveness on different
+# transformations.
 
-We'll use both hash-based detection (D4 hashes) and BoVWExtractor to compare their effectiveness on different
-transformations.
-
-```{code-cell} ipython3
+# %%
 # Method 1: D4 Hash-based detection (rotation/flip invariant at 90° increments)
 d4_detector = Duplicates(flags=ImageStats.HASH_DUPLICATES_D4)
 d4_results = d4_detector.evaluate(images)
@@ -359,9 +356,8 @@ if d4_results.near:
         print()
 else:
     print("  None found")
-```
 
-```{code-cell} ipython3
+# %%
 # Method 2: BoVW-based detection (rotation invariant at any angle)
 # Use a smaller vocab_size for this small dataset (~32 images).
 # Large vocabularies create sparse histograms that cluster poorly.
@@ -386,9 +382,8 @@ if bovw_results.near:
         print()
 else:
     print("  None found")
-```
 
-```{code-cell} ipython3
+# %%
 # Method 3: Combined detection (both hashes and BoVW)
 combined_detector = Duplicates(
     flags=ImageStats.HASH_DUPLICATES_D4,
@@ -407,13 +402,15 @@ if combined_results.near:
         print()
 else:
     print("  None found")
-```
 
-## Analyzing detection results by transformation type
 
-Let's analyze which transformations were detected as near-duplicates.
+# %% [markdown]
+# ## Analyzing detection results by transformation type
+#
+# Let's analyze which transformations were detected as near-duplicates.
 
-```{code-cell} ipython3
+
+# %%
 def get_detected_indices(results: DuplicatesOutput):
     """Extract all indices detected as duplicates of index 0 (original)."""
     detected = set()
@@ -433,9 +430,8 @@ print("Detection Summary:")
 print(f"  D4 Hashes detected: {len(d4_detected)} transformations")
 print(f"  BoVW detected: {len(bovw_detected)} transformations")
 print(f"  Combined detected: {len(combined_detected)} transformations")
-```
 
-```{code-cell} ipython3
+# %%
 # Create a detailed comparison table
 print("\nDetailed Detection Results:")
 print("=" * 70)
@@ -458,11 +454,11 @@ for i in range(len(images) - 2, len(images)):
     bovw_status = "DETECTED" if i in bovw_detected else "OK"
     combined_status = "DETECTED" if i in combined_detected else "OK"
     print(f"  {labels[i]}: D4={d4_status}, BoVW={bovw_status}, Combined={combined_status}")
-```
 
-## Visualizing detected vs missed transformations
+# %% [markdown]
+# ## Visualizing detected vs missed transformations
 
-```{code-cell} ipython3
+# %%
 # Categorize results
 detected_by_both = bovw_detected & d4_detected
 detected_by_bovw_only = bovw_detected - d4_detected
@@ -485,9 +481,9 @@ for i in sorted(detected_by_d4_only):
 print(f"\nMissed by BOTH ({len(missed_by_both)}):")
 for i in sorted(missed_by_both):
     print(f"  [{i}] {labels[i]}")
-```
 
-```{code-cell} ipython3
+
+# %%
 # Visualize some of the detected and missed transformations
 def visualize_category(indices, title, max_display=6):
     """Visualize images in a category."""
@@ -526,14 +522,14 @@ plt.show()
 visualize_category(detected_by_both, "Detected by BOTH D4 Hash and BoVW")
 visualize_category(detected_by_bovw_only, "Detected by BoVW ONLY (D4 missed these)")
 visualize_category(missed_by_both, "MISSED by Both Methods")
-```
 
-## Adjusting detection sensitivity
+# %% [markdown]
+# ## Adjusting detection sensitivity
+#
+# The `cluster_sensitivity` parameter controls how strict the near-duplicate detection is. Let's see how different
+# thresholds affect detection.
 
-The `cluster_sensitivity` parameter controls how strict the near-duplicate detection is. Let's see how different
-thresholds affect detection.
-
-```{code-cell} ipython3
+# %%
 # Test different cluster thresholds
 thresholds = [0.75, 1.0, 1.5, 2.0, 2.5]
 threshold_results = {}
@@ -548,9 +544,8 @@ for threshold in thresholds:
     detected = get_detected_indices(results)
     threshold_results[threshold] = detected
     print(f"Threshold {threshold}: {len(detected)} transformations detected")
-```
 
-```{code-cell} ipython3
+# %%
 # Show how detection changes with threshold
 print("\nTransformations detected at each threshold:")
 print("=" * 90)
@@ -568,59 +563,56 @@ for i in range(1, len(images) - 2):
     print(row)
 
 print("=" * 90)
-```
 
-## Key findings and recommendations
+# %% [markdown]
+# ## Key findings and recommendations
+#
+# ### Transformations detected as near-duplicates
+#
+# | Transformation Type                    | D4 Hash | BoVW    | Notes                                                                     |
+# | -------------------------------------- | ------- | ------- | ------------------------------------------------------------------------- |
+# | **Rotation (90° increments)**          | Yes     | Yes     | Both methods detect 90° and 180° reliably                                 |
+# | **Rotation (arbitrary angles)**        | No      | Yes     | BoVW's SIFT features are rotation-invariant at any angle                  |
+# | **Horizontal/Vertical Flip**           | Yes     | No      | BoVW clusters flips separately from the original; D4 is designed for this |
+# | **Perspective**                        | No      | Yes     | BoVW detects both mild and strong perspective distortion                  |
+# | **Affine (rotate+translate)**          | No      | Yes     | BoVW handles combined rotation and translation                            |
+# | **Brightness / Contrast / Saturation** | Partial | Partial | Both detect some color shifts; depends on which channel is affected       |
+# | **Grayscale**                          | No      | Yes     | SIFT operates on luminance, so grayscale conversion preserves features    |
+# | **Color Inversion**                    | Yes     | Yes     | Both methods detect inversion                                             |
+# | **Gaussian Blur (mild)**               | Yes     | Yes     | Both methods tolerate mild blur                                           |
+# | **Gaussian Blur (strong)**             | Yes     | No      | D4 hashes are more resilient to strong blur than SIFT                     |
+# | **Resize Down+Up**                     | No      | Yes     | BoVW detects mild resolution loss; both miss severe downsampling          |
+#
+# ### Transformations missed by both methods
+#
+# | Transformation Type              | Why Missed                                                                        |
+# | -------------------------------- | --------------------------------------------------------------------------------- |
+# | **Hue shift / Full ColorJitter** | Changes pixel values enough to alter both hashes and SIFT descriptors             |
+# | **All crops (center, random)**   | Removes too much content; remaining features don't match the full-image histogram |
+# | **Severe downsampling**          | Destroys fine-grained SIFT keypoints and alters hash signatures                   |
+# | **Random erasing**               | Destroys local features in erased regions                                         |
+# | **Affine (rotate+scale)**        | Combined scaling with rotation changes SIFT descriptor distributions              |
+#
+# ### Complementary strengths
+#
+# A key finding is that D4 hashes and BoVW have **complementary** detection strengths:
+#
+# - **D4 detects but BoVW misses**: Flips, brightness reduction, strong blur
+# - **BoVW detects but D4 misses**: Arbitrary rotations, perspective, affine, grayscale, mild resize, contrast shifts
+#
+# The combined method detected **22 out of 30** transformations (73%) by merging groups across both methods.
+#
+# ### Recommendations
+#
+# 1. **Use both methods together** for best coverage — they complement each other well
+# 1. **For detecting rotated copies**: D4 hashes handle 90° increments and flips; add BoVW for arbitrary angles
+# 1. **For data augmentation validation**: Use BoVW with a higher `cluster_sensitivity` (1.5–2.0) to catch subtle
+#    duplicates
+# 1. **For large datasets**: Start with fast D4 hashes, then run BoVW on remaining candidates
+# 1. **Adjust `cluster_sensitivity`**: Lower (1.0–1.25) for strict matching, higher (1.5–2.0) for permissive — note that
+#    no transformations are detected at 0.75
 
-### Transformations detected as near-duplicates
-
-| Transformation Type                    | D4 Hash | BoVW    | Notes                                                                     |
-| -------------------------------------- | ------- | ------- | ------------------------------------------------------------------------- |
-| **Rotation (90° increments)**          | Yes     | Yes     | Both methods detect 90° and 180° reliably                                 |
-| **Rotation (arbitrary angles)**        | No      | Yes     | BoVW's SIFT features are rotation-invariant at any angle                  |
-| **Horizontal/Vertical Flip**           | Yes     | No      | BoVW clusters flips separately from the original; D4 is designed for this |
-| **Perspective**                        | No      | Yes     | BoVW detects both mild and strong perspective distortion                  |
-| **Affine (rotate+translate)**          | No      | Yes     | BoVW handles combined rotation and translation                            |
-| **Brightness / Contrast / Saturation** | Partial | Partial | Both detect some color shifts; depends on which channel is affected       |
-| **Grayscale**                          | No      | Yes     | SIFT operates on luminance, so grayscale conversion preserves features    |
-| **Color Inversion**                    | Yes     | Yes     | Both methods detect inversion                                             |
-| **Gaussian Blur (mild)**               | Yes     | Yes     | Both methods tolerate mild blur                                           |
-| **Gaussian Blur (strong)**             | Yes     | No      | D4 hashes are more resilient to strong blur than SIFT                     |
-| **Resize Down+Up**                     | No      | Yes     | BoVW detects mild resolution loss; both miss severe downsampling          |
-
-### Transformations missed by both methods
-
-| Transformation Type              | Why Missed                                                                        |
-| -------------------------------- | --------------------------------------------------------------------------------- |
-| **Hue shift / Full ColorJitter** | Changes pixel values enough to alter both hashes and SIFT descriptors             |
-| **All crops (center, random)**   | Removes too much content; remaining features don't match the full-image histogram |
-| **Severe downsampling**          | Destroys fine-grained SIFT keypoints and alters hash signatures                   |
-| **Random erasing**               | Destroys local features in erased regions                                         |
-| **Affine (rotate+scale)**        | Combined scaling with rotation changes SIFT descriptor distributions              |
-
-### Complementary strengths
-
-A key finding is that D4 hashes and BoVW have **complementary** detection strengths:
-
-- **D4 detects but BoVW misses**: Flips, brightness reduction, strong blur
-- **BoVW detects but D4 misses**: Arbitrary rotations, perspective, affine, grayscale, mild resize, contrast shifts
-
-The combined method detected **22 out of 30** transformations (73%) by merging groups across both methods.
-
-### Recommendations
-
-1. **Use both methods together** for best coverage — they complement each other well
-1. **For detecting rotated copies**: D4 hashes handle 90° increments and flips; add BoVW for arbitrary angles
-1. **For data augmentation validation**: Use BoVW with a higher `cluster_sensitivity` (1.5–2.0) to catch subtle
-   duplicates
-1. **For large datasets**: Start with fast D4 hashes, then run BoVW on remaining candidates
-1. **Adjust `cluster_sensitivity`**: Lower (1.0–1.25) for strict matching, higher (1.5–2.0) for permissive — note that
-   no transformations are detected at 0.75
-
-```{code-cell} ipython3
----
-tags: [remove_cell]
----
+# %% tags=["remove_cell"]
 ### TEST ASSERTION CELL ###
 # Verify that unique images are NOT detected as duplicates
 unique_indices = {len(images) - 2, len(images) - 1}
@@ -642,28 +634,27 @@ print("\nFinal Summary:")
 print(f"  Total transformations tested: {n_transforms}")
 print(f"  Detected by combined method: {len(combined_detected)}")
 print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
-```
 
-## What's next
+# %% [markdown]
+# ## What's next
+#
+# In addition to exploring the duplicates in a dataset, DataEval offers additional tutorials on exploratory data analysis:
+#
+# - Clean a dataset with the labels in the [Data Cleaning Guide](./tt_clean_dataset.py)
+# - [Identify Bias and Correlations](./tt_identify_bias.py) in your metadata
+# - Determine how the data groups by [assessing the data space](./tt_assess_data_space.py)
+#
+# Explore deeper explanations on topics such as
+# [duplicates](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering),
+# [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings), and
+# [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) in the
+# [Concept pages](../concepts/index.md).
+#
+# To learn more about setting a global seed in DataEval, see the
+# [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.py).
 
-In addition to exploring the duplicates in a dataset, DataEval offers additional tutorials on exploratory data analysis:
-
-- Clean a dataset with the labels in the [Data Cleaning Guide](./tt_clean_dataset.md)
-- [Identify Bias and Correlations](./tt_identify_bias.md) in your metadata
-- Determine how the data groups by [assessing the data space](./tt_assess_data_space.md)
-
-Explore deeper explanations on topics such as
-[duplicates](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering),
-[outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings), and
-[coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) in the
-[Concept pages](../concepts/index.md).
-
-To learn more about setting a global seed in DataEval, see the
-[hardware configuration how-to](../notebooks/h2_configure_hardware_settings.md).
-
-+++
-
-## On your own
-
-Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. When you do, make sure
-that you analyze all of your data and not just the training set.
+# %% [markdown]
+# ## On your own
+#
+# Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. When you do, make sure
+# that you analyze all of your data and not just the training set.

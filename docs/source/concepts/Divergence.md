@@ -1,4 +1,5 @@
 <!-- markdownlint-disable MD051 -->
+
 # Divergence
 
 {term}`Drift` detectors answer a binary question: has the [distribution shifted](DistributionShift.md)
@@ -112,12 +113,12 @@ estimators on practical datasets.
 HP divergence and the drift detectors are complementary, not redundant. They
 operate at different levels of the same question:
 
-| Tool | Question | Output | When to use |
-| --- | --- | --- | --- |
-| HP divergence | How far apart are these distributions? | Score in [0, 1] | Quantification, tracking, comparison |
-| `DriftUnivariate` | Which features have shifted significantly? | Per-feature p-values | Monitoring, diagnosing which features drifted |
-| `DriftMMD` | Has the joint distribution shifted significantly? | Single p-value | Monitoring, sensitive to complex multivariate shifts |
-| `DriftDomainClassifier` | Can a classifier distinguish the datasets? | AUROC | Monitoring, feature importance for diagnosed shift |
+| Tool                    | Question                                          | Output               | When to use                                          |
+| ----------------------- | ------------------------------------------------- | -------------------- | ---------------------------------------------------- |
+| HP divergence           | How far apart are these distributions?            | Score in [0, 1]      | Quantification, tracking, comparison                 |
+| `DriftUnivariate`       | Which features have shifted significantly?        | Per-feature p-values | Monitoring, diagnosing which features drifted        |
+| `DriftMMD`              | Has the joint distribution shifted significantly? | Single p-value       | Monitoring, sensitive to complex multivariate shifts |
+| `DriftDomainClassifier` | Can a classifier distinguish the datasets?        | AUROC                | Monitoring, feature importance for diagnosed shift   |
 
 HP divergence is also closely related to {func}`.ber` — both the MST and KNN
 estimators for HP divergence are derived from the same foundational papers as
@@ -159,18 +160,18 @@ samples are sparse relative to the dimensionality of the embedding space.
 
 ### How-to guides
 
-- [How to measure distributional divergence](../notebooks/h2_measure_divergence.md)
+- [How to measure distributional divergence](../notebooks/h2_measure_divergence.py)
 
 ## References
 
 1. [Cover, T. & Hart, P. (1967). Nearest neighbor pattern classification.
-_IEEE Transactions on Information Theory_, 13(1), 21–27.
-doi: 10.1109/TIT.1967.1053964 [paper](https://ieeexplore.ieee.org/document/1053964)]{#ref1}
+   _IEEE Transactions on Information Theory_, 13(1), 21–27.
+   doi: 10.1109/TIT.1967.1053964 [paper](https://ieeexplore.ieee.org/document/1053964)]{#ref1}
 
 2. [Sekeh, S. Y., Oselio, B., & Hero, A. O. (2020). Learning to bound the
-multi-class Bayes error. _IEEE Transactions on Signal Processing_, 68, 3793–3807.
-doi: 10.1109/TSP.2020.2994807 [paper](https://arxiv.org/abs/1811.06419)]{#ref2}
+   multi-class Bayes error. _IEEE Transactions on Signal Processing_, 68, 3793–3807.
+   doi: 10.1109/TSP.2020.2994807 [paper](https://arxiv.org/abs/1811.06419)]{#ref2}
 
 3. [Renggli, C., Rimanic, L., Hollenstein, N., & Zhang, C. (2021). Evaluating Bayes
-Error Estimators on real-world datasets with FeeBee. _arXiv preprint arXiv:2108.13034_.
-[paper](https://arxiv.org/abs/2108.13034)]{#ref3}
+   Error Estimators on real-world datasets with FeeBee. _arXiv preprint arXiv:2108.13034_.
+   [paper](https://arxiv.org/abs/2108.13034)]{#ref3}

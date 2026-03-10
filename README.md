@@ -1,4 +1,5 @@
 <!-- markdownlint-disable MD041 -->
+
 ![dataeval-logo](docs/source/_static/images/DataEval_ImageText.png)
 
 <!-- :auto badges: -->
@@ -346,7 +347,7 @@ shape: (3, 5)
 
 A result with many large groups is a signal that your dataset contains
 repeated collection events. Before training, remove all but one sample from
-each group. See the [deduplication how-to guide](./docs/source/notebooks/h2_deduplicate.md)
+each group. See the [deduplication how-to guide](./docs/source/notebooks/h2_deduplicate.py)
 for a complete walkthrough, including how to choose which sample to keep.
 
 ### Where to go next

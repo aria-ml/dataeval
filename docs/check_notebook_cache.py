@@ -97,7 +97,7 @@ def check_cache_status(docs_source_dir: Path = Path("docs/source")):
         print(f"Error: {notebooks_dir} does not exist", file=sys.stderr)
         return False
 
-    notebooks = sorted(notebooks_dir.glob("*.md"))
+    notebooks = sorted(notebooks_dir.glob("*.py"))
 
     if not notebooks:
         print(f"Warning: No notebooks found in {notebooks_dir}", file=sys.stderr)
@@ -183,7 +183,7 @@ def clean_stale_cache(docs_source_dir: Path = Path("docs/source"), dry_run: bool
         print(f"Cache directory does not exist: {cache_dir}")
         return 0
 
-    notebooks = sorted(notebooks_dir.glob("*.md"))
+    notebooks = sorted(notebooks_dir.glob("*.py"))
 
     if not notebooks:
         print(f"Warning: No notebooks found in {notebooks_dir}", file=sys.stderr)

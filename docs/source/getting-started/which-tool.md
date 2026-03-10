@@ -31,14 +31,14 @@ of each failure mode and its training impact.
 
 Use {class}`.Duplicates`. Exact duplicates are found via hash comparison;
 near-duplicates via image statistics or embedding-based clustering.
-See the [deduplication how-to guide](../notebooks/h2_deduplicate.md).
+See the [deduplication how-to guide](../notebooks/h2_deduplicate.py).
 
 ### Are there images that look visually corrupted, blurry, or otherwise anomalous?
 
 Use {func}`.compute_stats` to compute per-image statistics (brightness,
 contrast, sharpness, aspect ratio, entropy), then {class}`.Outliers` to flag
 images at the extremes of those distributions.
-See the [visualizing cleaning issues how-to guide](../notebooks/h2_visualize_cleaning_issues.md).
+See the [visualizing cleaning issues how-to guide](../notebooks/h2_visualize_cleaning_issues.py).
 
 ### Are there samples that are statistical outliers in embedding space?
 
@@ -63,7 +63,7 @@ before any bias analysis.
 
 Use {class}`.Balance` to measure class frequency imbalance.
 See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md) and the
-[detecting undersampling how-to guide](../notebooks/h2_detect_undersampling.md).
+[detecting undersampling how-to guide](../notebooks/h2_detect_undersampling.py).
 
 ### Are certain attribute groups underrepresented in my dataset?
 
@@ -75,7 +75,7 @@ See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md).
 
 Use {class}`.Parity` or {class}`.LabelParity` to test for statistical
 disparities in labeling across groups.
-See the [identify bias tutorial](../notebooks/tt_identify_bias.md).
+See the [identify bias tutorial](../notebooks/tt_identify_bias.py).
 
 ### Does my dataset cover the range of conditions the model will encounter in deployment?
 
@@ -166,7 +166,7 @@ to choose the right detector for your data characteristics:
 | Uses pre-computed embeddings; needs lightweight detection | {class}`.DriftKNeighbors` (K-nearest neighbor)   |
 | Needs reconstruction-based detection or streaming support | {class}`.DriftReconstruction`                    |
 
-See the [monitor shift tutorial](../notebooks/tt_monitor_shift.md).
+See the [monitor shift tutorial](../notebooks/tt_monitor_shift.py).
 
 ### How far has my operational data shifted from training, quantitatively?
 
@@ -176,7 +176,7 @@ you _how much_. Tracking divergence over time reveals gradual drift that may
 never trigger a single-batch test but is nonetheless eroding the relevance of
 the training distribution.
 See the [Divergence concept page](../concepts/Divergence.md) and the
-[measure divergence how-to guide](../notebooks/h2_measure_divergence.md).
+[measure divergence how-to guide](../notebooks/h2_measure_divergence.py).
 
 ### Are there individual samples in my operational data that fall outside the training distribution?
 
@@ -191,7 +191,7 @@ available:
 | {class}`.OODDomainClassifier` | Semantic anomalies; complex feature interactions              |
 
 See the [Distribution Shift concept page](../concepts/DistributionShift.md) and
-the [identify OOD samples tutorial](../notebooks/tt_identify_ood_samples.md).
+the [identify OOD samples tutorial](../notebooks/tt_identify_ood_samples.py).
 
 ### Are sensor inputs degrading in quality during operation?
 
@@ -205,7 +205,7 @@ performance drops.
 ## I'm not sure where to start
 
 If you are new to DataEval, start with the
-[data cleaning tutorial](../notebooks/tt_clean_dataset.md). It walks through
+[data cleaning tutorial](../notebooks/tt_clean_dataset.py). It walks through
 the most common first-pass analysis tasks — duplicates, outliers, and image
 quality — and gives you a working foundation before moving on to bias analysis,
 performance limits, or drift detection.

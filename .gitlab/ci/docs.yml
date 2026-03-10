@@ -29,14 +29,6 @@ docs:
     DATAEVAL_NOX_UV_EXTRAS_OVERRIDE: cu124
     GIT_STRATEGY: clone  # Full clone needed for artifact branch operations
 
-doclint:
-  stage: docs
-  extends:
-    - .nox
-    - .rules_main_mr_docs
-  script:
-    - uvx nox -e doclint
-
 doctest:
   stage: docs
   extends:

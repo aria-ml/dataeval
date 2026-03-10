@@ -45,14 +45,14 @@ _Example Questions_:
 - "Is our initial dataset good enough to build on?"
 - "Are there hidden biases or correlations in the data?"
 - "Does our test data truly represent the operational environment,
-including rare edge cases and adverse conditions?"
+  including rare edge cases and adverse conditions?"
 - "Is our target performance achievable?"
 - "Does the existing model meet performance requirements?"
 - "Since this will be deployed in a resource-constrained system, how small can my
-model be and still achieve the target performance?"
+  model be and still achieve the target performance?"
 - "Is the model's performance equitable across all classes in all relevant environments?"
 - "Which specific data points are the most difficult for the model to learn,
-and what makes them unique?"
+  and what makes them unique?"
 - "How can we increase the model's performance?"
 - "Why did the model give this result? What was the key driver?"
 - "How robust is the model to operational conditions?"
@@ -72,12 +72,12 @@ model to determine if the provided data and model are satisfactory.
 
 #### DataEval in Planning
 
-The Data Scientist begins with [data cleaning](../../notebooks/tt_clean_dataset.md)
+The Data Scientist begins with [data cleaning](../../notebooks/tt_clean_dataset.py)
 to ensure that the dataset is free of duplicates and errors. They follow this up
-with an analysis of the dataset for [bias or correlations](../../notebooks/tt_identify_bias.md).
-They then [assess the data space](../../notebooks/tt_assess_data_space.md)
+with an analysis of the dataset for [bias or correlations](../../notebooks/tt_identify_bias.py).
+They then [assess the data space](../../notebooks/tt_assess_data_space.py)
 for coverage and completeness. Next they assess whether the required performance
-as currently constituted for the project is [feasible](../../notebooks/h2_measure_ic_feasibility.md).
+as currently constituted for the project is [feasible](../../notebooks/h2_measure_ic_feasibility.py).
 After running this final assessment, they generate a report for the manager which
 shows that the required performance is feasible, but the dataset has severe
 class imbalance and there is a lack of data in a nighttime environment.
@@ -85,7 +85,7 @@ class imbalance and there is a lack of data in a nighttime environment.
 The ML Engineer begins by generating a set of dataset splits
 with the cleaned dataset from the Data Scientist. Then they test the model by finetuning
 on the new data train split and test against the test split. They also assess
-the [dataset's sufficiency](../../notebooks/h2_measure_ic_sufficiency.md)
+the [dataset's sufficiency](../../notebooks/h2_measure_ic_sufficiency.py)
 given this specific model. After performing these assessments, they generate a
 report for the manager which shows that the existing model does not meet performance
 with the provided dataset, but could potentially reach the target performance
@@ -104,9 +104,9 @@ can now begin data analysis on the full dataset and model development.
 #### DataEval in Development
 
 To begin phase 2, the Data Scientist curates the dataset by repeating the process
-from phase 1. They [clean the data](../../notebooks/tt_clean_dataset.md),
-analyze the dataset for [bias or correlations](../../notebooks/tt_identify_bias.md),
-and [assess the data space](../../notebooks/tt_assess_data_space.md).
+from phase 1. They [clean the data](../../notebooks/tt_clean_dataset.py),
+analyze the dataset for [bias or correlations](../../notebooks/tt_identify_bias.py),
+and [assess the data space](../../notebooks/tt_assess_data_space.py).
 After curating the dataset, they split the dataset
 into a training, validation and a hold out test set. Again, they generate a report
 for the manager, this time showing the images removed and the potential lack of
@@ -114,7 +114,7 @@ coverage for a specific type of truck.
 
 To begin phase 2, the ML Engineer selects a couple of additional models to test
 in addition to the provided model. Once they receive the data splits, they train
-each model and test against the validation set. They even perform a [data sufficiency](../../notebooks/h2_measure_ic_sufficiency.md)
+each model and test against the validation set. They even perform a [data sufficiency](../../notebooks/h2_measure_ic_sufficiency.py)
 test with each model to get a better idea of how quickly each model is nearing
 its maximum performance. They then perform an error analysis
 to determine what objects each model is struggling with. After performing the analysis,
@@ -138,11 +138,11 @@ for final testing.
 #### DataEval in T&E
 
 The T&E Engineer receives the held out test set from the Data Scientist for testing
-the two candidate models. They begin by analyzing the [divergence](../../notebooks/h2_measure_divergence.md)
+the two candidate models. They begin by analyzing the [divergence](../../notebooks/h2_measure_divergence.py)
 of the data distributions between the test set and the train and validation sets.
 After the test set is adequately divergent from both the train and validation sets,
 the T&E Engineer focuses on identifying the edge cases in the dataset. They use
-a combination of [imagestats](../../notebooks/h2_visualize_cleaning_issues.md),
+a combination of [imagestats](../../notebooks/h2_visualize_cleaning_issues.py),
 {func}`.labelstats`, [coverage](../../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) and the
 [out-of-distribution (OOD) detectors](../../concepts/DistributionShift.md#out-of-distribution-detection).
 After identifying the edge cases, they test both models on the entire test set, noting the performance of each model
@@ -164,7 +164,7 @@ that the model be used only in close detection scenarios.
 Now that a model is being deployed, the ML Engineer is tasked with monitoring the
 model to ensure that the model continues to meet the performance requirements.
 To do this, the ML Engineer collects periodic batches of operational data.
-Testing it using both [data drift detection](../../notebooks/tt_monitor_shift.md)
+Testing it using both [data drift detection](../../notebooks/tt_monitor_shift.py)
 methods and [OOD detectors](../../concepts/DistributionShift.md#out-of-distribution-detection).
 Having established specific drift and OOD thresholds, the ML Engineer is ready to initiate
 a retrain should the data begin to shift from the training distribution.
