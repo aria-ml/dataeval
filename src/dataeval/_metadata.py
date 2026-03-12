@@ -1314,8 +1314,12 @@ class Metadata(Array, FeatureExtractor):
         unique_labels = np.unique(labels) if len(labels) else np.array([], dtype=np.intp)
         provided_i2l = self._dataset.metadata.get("index2label", None)
         if provided_i2l is not None:
-            # Ensure every observed label has a name; use fallback for unmapped labels
-            index2label = {int(lbl): provided_i2l.get(int(lbl), f"UNDEFINED_CLASS_{int(lbl)}") for lbl in unique_labels}
+            # Use the full provided mapping as the source of truth
+            index2label = {int(k): str(v) for k, v in provided_i2l.items()}
+            # Add fallback entries for any observed labels not in the provided mapping
+            for lbl in unique_labels:
+                if int(lbl) not in index2label:
+                    index2label[int(lbl)] = f"UNDEFINED_CLASS_{int(lbl)}"
         else:
             index2label = {int(lbl): str(int(lbl)) for lbl in unique_labels}
         target_idx = self._compute_target_indices(srcidx, datum_count, bool(self._has_targets))
