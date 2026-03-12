@@ -769,7 +769,7 @@ class TestEdgeCases:
         ds = ODDatasetWithLabels(3, labels_per_image, {0: "a", 1: "b"})
         md = Metadata(ds, exclude=["id"])  # type: ignore
         assert len(md.class_labels) == 0
-        assert md.index2label == {}
+        assert md.index2label == {0: "a", 1: "b"}  # provided mapping preserved even with no observations
         assert md.item_count == 3
 
     # --- IC with some empty targets ---
@@ -848,8 +848,8 @@ class TestEdgeCases:
         labels = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ds = ICDatasetCorrect(10, labels, {0: "unused_0", 1: "used", 2: "unused_2"})
         md = Metadata(ds, exclude=["id"])  # type: ignore
-        # Only label 1 is observed, so index2label only includes that
-        assert md.index2label == {1: "used"}
+        # Full provided mapping is preserved even for unobserved classes
+        assert md.index2label == {0: "unused_0", 1: "used", 2: "unused_2"}
         assert set(md.class_labels) == {1}
 
     # --- Downstream: single-class with bias evaluators ---
@@ -869,3 +869,77 @@ class TestEdgeCases:
         md = Metadata(ds, exclude=["id"])  # type: ignore
         stats = label_stats(md.class_labels, md.item_indices, md.index2label, image_count=md.item_count)
         assert len(stats["label_counts_per_image"]) == 10
+
+
+# ===================================================================
+# Regression: provided index2label mapping must be the source of truth
+# ===================================================================
+
+
+class TestIndex2LabelSourceOfTruth:
+    """Regression tests ensuring the dataset's index2label mapping is fully
+    preserved, even when not all classes appear in the observed data.
+
+    Previously, Metadata only kept index2label entries for observed labels,
+    which meant a dataset declaring 10 classes but only containing 7 in the
+    data would report only 7 classes.
+    """
+
+    def test_ic_10_classes_7_observed(self):
+        """IC dataset with 10-class mapping but only 7 classes observed."""
+        full_mapping = {i: f"class_{i}" for i in range(10)}
+        # Only classes 0-6 appear in the data; classes 7, 8, 9 are absent
+        observed_labels = [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1]
+        ds = ICDatasetCorrect(len(observed_labels), observed_labels, full_mapping)
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+
+        # All 10 classes from the provided mapping must be in index2label
+        assert len(md.index2label) == 10
+        assert md.index2label == full_mapping
+        # Only 7 classes are actually observed in class_labels
+        assert set(md.class_labels) == set(range(7))
+
+    def test_od_10_classes_7_observed(self):
+        """OD dataset with 10-class mapping but only 7 classes observed."""
+        full_mapping = {i: f"class_{i}" for i in range(10)}
+        labels_per_image = [
+            [0, 1, 2],
+            [3, 4],
+            [5, 6],
+            [0, 3, 6],
+            [1, 4, 5],
+        ]
+        ds = ODDatasetWithLabels(5, labels_per_image, full_mapping)
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+
+        assert len(md.index2label) == 10
+        assert md.index2label == full_mapping
+        assert set(md.class_labels) == set(range(7))
+
+    def test_ic_unobserved_classes_with_noncontiguous_keys(self):
+        """Non-contiguous index2label with unobserved classes preserved."""
+        mapping = {1: "cat", 3: "dog", 5: "bird", 7: "fish", 9: "frog"}
+        # Only classes 1 and 3 observed
+        observed_labels = [1, 3, 1, 3, 1]
+        ds = ICDatasetCorrect(len(observed_labels), observed_labels, mapping)
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+
+        assert len(md.index2label) == 5
+        assert md.index2label == mapping
+        assert set(md.class_labels) == {1, 3}
+
+    def test_od_unobserved_plus_undefined_labels(self):
+        """OD: some labels in data don't appear in mapping, and some mapping
+        entries don't appear in data — both should be handled."""
+        mapping = {0: "cat", 1: "dog", 2: "bird"}
+        # Label 99 is observed but not in mapping; class 2 is in mapping but not observed
+        labels_per_image = [[0, 1], [0, 99], [1, 0]]
+        ds = ODDatasetWithLabels(3, labels_per_image, mapping)
+        md = Metadata(ds, exclude=["id"])  # type: ignore
+
+        # All provided mapping entries preserved + fallback for 99
+        assert md.index2label[0] == "cat"
+        assert md.index2label[1] == "dog"
+        assert md.index2label[2] == "bird"  # unobserved but in mapping
+        assert md.index2label[99] == "UNDEFINED_CLASS_99"  # observed but not in mapping
+        assert len(md.index2label) == 4
