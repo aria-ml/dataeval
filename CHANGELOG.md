@@ -1,6 +1,11 @@
-[//]: # (ced0ba7936c9ff6449eada0fd84a590b31d374f8)
+[//]: # (b7d3c6e6e54847a1b9f3f2c47b594ccc70fb06fb)
 
 # DataEval Change Log
+
+## v1.0.3
+
+👾 **Fixes**
+- `b7d3c6e6` - [fix] Metadata index2label regression in datasets with unobserved classes
 
 ## v1.0.2
 
