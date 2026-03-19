@@ -79,11 +79,11 @@ pip install dataeval
 ### **Installing with conda**
 
 DataEval can be installed in a Conda/Mamba environment using the provided
-`environment.yaml` file. As some dependencies are installed from the `pytorch`
+`environment.yml` file. As some dependencies are installed from the `pytorch`
 channel, the channel is specified in the below example.
 
 ```bash
-micromamba create -f environment\environment.yaml -c pytorch
+micromamba create -f environment\environment.yml -c pytorch
 ```
 
 ### **Installing from GitHub**

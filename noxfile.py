@@ -289,7 +289,18 @@ def lock(session: nox.Session) -> None:
     session.run("uv", "lock", *upgrade_args)
     session.run("uv", "export", "--no-emit-project", "-o", "requirements.txt")
     session.run("poetry", "lock")
-    session.run("p2c", "y", "-f", "pyproject.toml", "--python-include", "infer", "-o", "environment.yaml")
+    session.run(
+        "p2c",
+        "yaml",
+        "-f",
+        "pyproject.toml",
+        "--python-include",
+        "infer",
+        "-n",
+        "dataeval",
+        "-o",
+        "environment.yml",
+    )
 
 
 @session(uv_only_groups=["docsync"], uv_no_install_project=True)

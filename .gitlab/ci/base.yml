@@ -64,6 +64,8 @@ stages:
   - docs
   - release
   - security
+  - compliance
+
 
 ### SHARED JOB TEMPLATES ###
 
@@ -102,7 +104,7 @@ stages:
   image: mambaorg/micromamba:2-cuda12.4.1-ubuntu22.04
   before_script:
     - eval "$(micromamba shell hook --shell bash)"
-    - micromamba create -f environment.yaml -n dataeval python=$PYTHON_VERSION
+    - micromamba create -f environment.yml -n dataeval python=$PYTHON_VERSION
     - micromamba activate dataeval
     - micromamba install pytest pytest-xdist requests
     - pip install -e . --no-deps
@@ -208,3 +210,21 @@ stages:
 .rules_release_branch_only:
   rules:
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+
+###############################################################################
+# Stage -- Trigger the DevSecOps components
+###############################################################################
+.trigger_compliance:
+  stage: compliance
+  trigger:
+    include: ".gitlab/ci/compliance.yml"
+    strategy: depend
+  allow_failure: true
+
+trigger_compliance:
+  extends: .trigger_compliance
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  variables:
+    PACKAGE_NAME: "dataeval"
