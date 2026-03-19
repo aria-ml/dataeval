@@ -65,7 +65,7 @@ base = [
 lock = [
   { include-group = "base" },
   "pyproject2conda>=0.22",
-  "poetry>=2; python_version<'3.14'",
+  "poetry==2.0.0; python_version<'3.14'",
 ]
 lint = [
   "ruff>=0.11",
@@ -176,6 +176,15 @@ torchvision = [
 
 [tool.uv.extra-build-dependencies]
 numba = ["tbb>=2021.6"]
+
+[[tool.poetry.source]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "supplemental"
+
+[tool.poetry.dependencies]
+torch = { version = ">=2.2.0", source = "pytorch-cpu" }
+torchvision = { version = ">=0.17.0", source = "pytorch-cpu" }
 
 [tool.hatch.build.targets.sdist]
 include = ["src/dataeval"]
