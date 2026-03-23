@@ -22,7 +22,13 @@ class CalculatorCache:
     This class adapts based on the data type passed in.
     """
 
-    def __init__(self, datum: Any, box: BoundingBox | None = None, per_channel: bool = False) -> None:
+    def __init__(
+        self,
+        datum: Any,
+        box: BoundingBox | None = None,
+        per_channel: bool = False,
+        normalize_pixel_values: bool = False,
+    ) -> None:
         is_spatial = len(datum.shape) >= 2
         self.raw = datum
         # Assume image data for now (will be generic in future)
@@ -30,6 +36,7 @@ class CalculatorCache:
         self.height: int = datum.shape[-2] if is_spatial else 0
         self.shape: tuple[int, ...] = datum.shape
         self.per_channel_mode = per_channel
+        self.normalize_pixel_values = normalize_pixel_values
         self.has_box = box is not None
 
         # Ensure bounding box
@@ -54,7 +61,9 @@ class CalculatorCache:
 
     @cached_property
     def scaled(self) -> NDArray[Any]:
-        return rescale(self.image)
+        if self.normalize_pixel_values:
+            return rescale(self.image)
+        return self.image
 
     @cached_property
     def per_channel(self) -> NDArray[Any]:

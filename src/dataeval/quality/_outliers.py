@@ -1623,7 +1623,9 @@ class Outliers(Evaluator):
         stored_cluster_stats: ClusterStats | None = None
 
         if self.flags != ImageStats.NONE:
-            self.stats = compute_stats(data, stats=self.flags, per_image=per_image, per_target=per_target)
+            self.stats = compute_stats(
+                data, stats=self.flags, per_image=per_image, per_target=per_target, normalize_pixel_values=True
+            )
             stats_result = self.stats
 
             class_ids: NDArray[np.intp] | None = None
@@ -1674,7 +1676,10 @@ class Outliers(Evaluator):
         stats_results: list[StatsResult] = []
         if self.flags != ImageStats.NONE:
             stats_results = [
-                compute_stats(ds, stats=self.flags, per_image=per_image, per_target=per_target) for ds in datasets
+                compute_stats(
+                    ds, stats=self.flags, per_image=per_image, per_target=per_target, normalize_pixel_values=True
+                )
+                for ds in datasets
             ]
             self.stats = stats_results[-1]
 

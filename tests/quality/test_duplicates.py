@@ -121,8 +121,8 @@ class TestDuplicates:
         dupes = Duplicates()
         results = dupes.from_stats([dupes1, dupes2, dupes3])
 
-        # Check items structure - multi-dataset has dataset_index column
-        assert "dataset_index" in results.data().columns
+        # Check items structure - multi-dataset has dataset_indices column
+        assert "dataset_indices" in results.data().columns
 
         exact_items = _get_exact_groups(results, "item")
         assert exact_items.shape[0] == 2  # 2 exact duplicate groups
@@ -415,8 +415,8 @@ class TestDuplicates:
         detector = Duplicates()
         result = detector.from_stats([stats1, stats2], per_target=True)
 
-        # Multi-dataset should have dataset_index column
-        assert "dataset_index" in result.data().columns
+        # Multi-dataset should have dataset_indices column
+        assert "dataset_indices" in result.data().columns
 
         # Check item-level duplicates
         exact_items = _get_exact_groups(result, "item")
@@ -440,14 +440,14 @@ class TestDuplicatesMultiDataset:
         result = dupes.evaluate(data1, data2)
 
         assert isinstance(result, DuplicatesOutput)
-        assert "dataset_index" in result.data().columns
+        assert "dataset_indices" in result.data().columns
 
         exact_items = _get_exact_groups(result, "item")
         assert exact_items.shape[0] >= 5  # at least 5 cross-dataset exact groups
 
-        # dataset_index lists should be present and align with item_indices
+        # dataset_indices lists should be present and align with item_indices
         for row in exact_items.iter_rows(named=True):
-            assert len(row["dataset_index"]) == len(row["item_indices"])
+            assert len(row["dataset_indices"]) == len(row["item_indices"])
 
     def test_evaluate_multi_dataset_near(self):
         """Evaluate with two datasets sharing near duplicates."""
@@ -457,7 +457,7 @@ class TestDuplicatesMultiDataset:
         dupes = Duplicates()
         result = dupes.evaluate(data1, data2)
 
-        assert "dataset_index" in result.data().columns
+        assert "dataset_indices" in result.data().columns
         near_items = _get_near_groups(result, "item")
         assert near_items.shape[0] > 0
 
@@ -470,7 +470,7 @@ class TestDuplicatesMultiDataset:
         dupes = Duplicates()
         result = dupes.evaluate(ones, zeros, mixed)
 
-        assert "dataset_index" in result.data().columns
+        assert "dataset_indices" in result.data().columns
         exact_items = _get_exact_groups(result, "item")
         assert exact_items.shape[0] >= 2  # ones-group and zeros-group
 
@@ -496,7 +496,7 @@ class TestDuplicatesMultiDataset:
         result = dupes.evaluate(data1, data2)
 
         exact = result.exact
-        # Multi-dataset exact returns dict keyed by dataset_index
+        # Multi-dataset exact returns dict keyed by dataset_indices
         assert isinstance(exact, dict)
         for ds_idx, groups in exact.items():
             assert isinstance(ds_idx, int)
@@ -514,7 +514,7 @@ class TestDuplicatesMultiDataset:
         result = dupes.evaluate(data1, data2)
 
         near = result.near
-        # Multi-dataset near returns dict keyed by dataset_index
+        # Multi-dataset near returns dict keyed by dataset_indices
         assert isinstance(near, dict)
         for ds_idx, groups in near.items():
             assert isinstance(ds_idx, int)
@@ -540,7 +540,7 @@ class TestDuplicatesMultiDataset:
         dupes = Duplicates()
         result = dupes.evaluate(dataset1, dataset2, per_image=True, per_target=True)
 
-        assert "dataset_index" in result.data().columns
+        assert "dataset_indices" in result.data().columns
         # Both images are identical, so should have exact item-level duplicates
         exact_items = _get_exact_groups(result, "item")
         assert exact_items.shape[0] >= 1
@@ -556,11 +556,28 @@ class TestDuplicatesMultiDataset:
         dupes = Duplicates(extractor=FlattenExtractor(), cluster_sensitivity=1.0)
         result = dupes.evaluate(data1, data2)
 
-        assert "dataset_index" in result.data().columns
+        assert "dataset_indices" in result.data().columns
         # Re-detect with tighter threshold
         strict = result.with_sensitivity(0.5)
         assert isinstance(strict, DuplicatesOutput)
-        assert "dataset_index" in strict.data().columns
+        assert "dataset_indices" in strict.data().columns
+
+
+@pytest.mark.required
+class TestDuplicatesBackwardsCompat:
+    def test_dataset_index_alias_warns_and_redirects(self):
+        """Accessing 'dataset_index' should warn and return 'dataset_indices' column."""
+        data1 = np.zeros((3, 1, 16, 16))
+        data2 = np.zeros((2, 1, 16, 16))
+
+        result = Duplicates(ImageStats.HASH_XXHASH).evaluate(data1, data2)
+        assert "dataset_indices" in result.data().columns
+
+        with pytest.warns(DeprecationWarning, match="renamed to 'dataset_indices'.*removed in v1.1"):
+            old_col = result["dataset_index"]
+
+        new_col = result["dataset_indices"]
+        assert old_col.to_list() == new_col.to_list()
 
 
 @pytest.mark.required
