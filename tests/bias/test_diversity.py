@@ -117,6 +117,24 @@ class TestDiversityUnit:
         low_div_2 = result2.factors.filter(pl.col("is_low_diversity")).height
         assert low_div_1 >= low_div_2
 
+    def test_classwise_labels_with_missing_classes(self):
+        """Regression: classwise labels should match actual class values, not positional indices."""
+        # Classes 2 and 3 are present, but 0 and 1 are not
+        # index2label maps: {0: 'cat', 1: 'dog', 2: 'bird', 3: 'fish'}
+        mock_metadata = MockMetadata(
+            class_labels=np.array([2, 2, 2, 3, 3, 3], dtype=np.intp),
+            factor_data=np.array([[0, 0, 0, 1, 1, 1]], dtype=np.int64).T,
+            factor_names=["factor1"],
+            is_discrete=[True],
+            index2label={0: "cat", 1: "dog", 2: "bird", 3: "fish"},
+        )
+        result = Diversity().evaluate(mock_metadata)
+        class_names = set(result.classwise["class_name"].to_list())
+        assert "bird" in class_names, f"Expected 'bird' in classwise labels, got {class_names}"
+        assert "fish" in class_names, f"Expected 'fish' in classwise labels, got {class_names}"
+        assert "cat" not in class_names, f"'cat' should not appear (no data), got {class_names}"
+        assert "dog" not in class_names, f"'dog' should not appear (no data), got {class_names}"
+
 
 @pytest.mark.optional
 class TestDiversityFunctional:

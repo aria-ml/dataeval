@@ -3,6 +3,7 @@ __all__ = []
 from dataclasses import dataclass
 from typing import Any, Literal
 
+import numpy as np
 import polars as pl
 
 from dataeval import Metadata
@@ -269,8 +270,9 @@ class Balance(Evaluator):
         # Include class_label as the first factor (index 0), then all metadata factors
         all_factor_names = ["class_label"] + factor_names
 
+        u_classes = np.unique(self.metadata.class_labels)
         for class_idx in range(classwise.shape[0]):
-            class_name = index2label.get(class_idx, str(class_idx))
+            class_name = index2label.get(int(u_classes[class_idx]), str(u_classes[class_idx]))
             for factor_idx in range(classwise.shape[1]):
                 mi_value = classwise[class_idx, factor_idx]
                 class_name_col.append(class_name)
