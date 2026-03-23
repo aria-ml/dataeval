@@ -2,6 +2,7 @@
 
 __all__ = []
 
+import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Generic, Literal, TypeVar, overload
 
@@ -246,10 +247,10 @@ def _group_by_dataset(row: Mapping[str, Any], has_targets: bool) -> dict[int, li
     """Group a row's members by dataset index."""
     by_ds: dict[int, list[Any]] = {}
     if has_targets:
-        for item, target, ds in zip(row["item_indices"], row["target_indices"], row["dataset_index"], strict=True):
+        for item, target, ds in zip(row["item_indices"], row["target_indices"], row["dataset_indices"], strict=True):
             by_ds.setdefault(ds, []).append(SourceIndex(item=item, target=target))
     else:
-        for item, ds in zip(row["item_indices"], row["dataset_index"], strict=True):
+        for item, ds in zip(row["item_indices"], row["dataset_indices"], strict=True):
             by_ds.setdefault(ds, []).append(item)
     return by_ds
 
@@ -323,11 +324,11 @@ def _make_row(
         "dup_type": dup_type,
         "item_indices": item_ids,
         "target_indices": target_ids,
-        "methods": methods,
-        "orientation": orientation,
     }
     if ds_ids is not None:
-        row["dataset_index"] = ds_ids
+        row["dataset_indices"] = ds_ids
+    row["methods"] = methods
+    row["orientation"] = orientation
     return row
 
 
@@ -492,7 +493,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     - methods: list[str] - Detection method names (e.g., ``["phash", "dhash"]``)
     - orientation: str | None - ``"same"``, ``"rotated"``, or None (only present
       when both basic and D4 hashes were computed)
-    - dataset_index: list[int] - Dataset indices for cross-dataset results (only
+    - dataset_indices: list[int] - Dataset indices for cross-dataset results (only
       present for multi-dataset output, positionally aligned with item_indices)
 
     Attributes
@@ -528,6 +529,19 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         self.cluster_sensitivity = cluster_sensitivity
         self.merge_near_duplicates = merge_near_duplicates
         self.flags = flags
+
+    _COLUMN_ALIASES = {"dataset_index": "dataset_indices"}
+
+    def __getitem__(self, item: Any) -> Any:
+        if isinstance(item, str) and item in self._COLUMN_ALIASES:
+            new_name = self._COLUMN_ALIASES[item]
+            warnings.warn(
+                f"Column '{item}' was renamed to '{new_name}'. Access via '{item}' will be removed in v1.1.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            item = new_name
+        return self.data()[item]
 
     def __len__(self) -> int:
         """Return the number of duplicate groups."""
@@ -569,7 +583,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
           - Single-dataset with targets: ``list[tuple[list[SourceIndex], list[str]]]``
           - Cross-dataset: wraps the above in a ``dict`` keyed by dataset index.
         """
-        is_cross = "dataset_index" in self.data().columns
+        is_cross = "dataset_indices" in self.data().columns
         has_targets = "target_indices" in self.data().columns
         is_near = dup_type == "near"
 
@@ -654,7 +668,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             - dup_types: list[str] - Unique duplicate types for this image
             - methods: list[str] - All unique methods that detected this image
         """
-        if "dataset_index" in self.data().columns:
+        if "dataset_indices" in self.data().columns:
             raise ValueError("aggregate_by_image only works with output from a single dataset.")
 
         schema: Any = {
@@ -1074,7 +1088,7 @@ class Duplicates(Evaluator):
         -------
         DuplicatesOutput
             Duplicate detection results as a DataFrame of duplicate groups.
-            For cross-dataset detection, includes a dataset_index column.
+            For cross-dataset detection, includes a dataset_indices column.
 
         See Also
         --------
@@ -1232,7 +1246,7 @@ class Duplicates(Evaluator):
         -------
         SingleDuplicatesOutput or MultiDuplicatesOutput
             Duplicate detection results as a DataFrame of duplicate groups.
-            For multi-dataset input, includes a ``dataset_index`` column.
+            For multi-dataset input, includes a ``dataset_indices`` column.
 
         Raises
         ------
@@ -1244,24 +1258,32 @@ class Duplicates(Evaluator):
         Hash-based duplicates with merged near duplicates (default):
 
         >>> detector = Duplicates()
-        >>> result = detector.evaluate(images)
-        >>> result
-        shape: (4, 5)
-        ┌──────────┬───────┬──────────┬───────────────┬────────────────────┐
-        │ group_id ┆ level ┆ dup_type ┆ item_indices  ┆ methods            │
-        │ ---      ┆ ---   ┆ ---      ┆ ---           ┆ ---                │
-        │ i64      ┆ str   ┆ str      ┆ list[i64]     ┆ list[str]          │
-        ╞══════════╪═══════╪══════════╪═══════════════╪════════════════════╡
-        │ 0        ┆ item  ┆ exact    ┆ [3, 20]       ┆ ["xxhash"]         │
-        │ 1        ┆ item  ┆ exact    ┆ [7, 11, … 25] ┆ ["xxhash"]         │
-        │ 2        ┆ item  ┆ exact    ┆ [16, 37]      ┆ ["xxhash"]         │
-        │ 3        ┆ item  ┆ near     ┆ [0, 1, … 49]  ┆ ["dhash", "phash"] │
-        └──────────┴───────┴──────────┴───────────────┴────────────────────┘
+        >>> detector.evaluate(images)
+        shape: (3, 5)
+        ┌──────────┬───────┬──────────┬───────────────┬────────────┐
+        │ group_id ┆ level ┆ dup_type ┆ item_indices  ┆ methods    │
+        │ ---      ┆ ---   ┆ ---      ┆ ---           ┆ ---        │
+        │ i64      ┆ str   ┆ str      ┆ list[i64]     ┆ list[str]  │
+        ╞══════════╪═══════╪══════════╪═══════════════╪════════════╡
+        │ 0        ┆ item  ┆ exact    ┆ [3, 20]       ┆ ["xxhash"] │
+        │ 1        ┆ item  ┆ exact    ┆ [7, 11, … 25] ┆ ["xxhash"] │
+        │ 2        ┆ item  ┆ exact    ┆ [16, 37]      ┆ ["xxhash"] │
+        └──────────┴───────┴──────────┴───────────────┴────────────┘
 
         Cross-dataset detection:
 
         >>> detector = Duplicates()
-        >>> result = detector.evaluate(train_ds, test_ds)
+        >>> detector.evaluate(train_ds, test_ds)
+        shape: (3, 6)
+        ┌──────────┬───────┬──────────┬───────────────┬─────────────────┬────────────┐
+        │ group_id ┆ level ┆ dup_type ┆ item_indices  ┆ dataset_indices ┆ methods    │
+        │ ---      ┆ ---   ┆ ---      ┆ ---           ┆ ---             ┆ ---        │
+        │ i64      ┆ str   ┆ str      ┆ list[i64]     ┆ list[i64]       ┆ list[str]  │
+        ╞══════════╪═══════╪══════════╪═══════════════╪═════════════════╪════════════╡
+        │ 0        ┆ item  ┆ exact    ┆ [3, 20]       ┆ [0, 0]          ┆ ["xxhash"] │
+        │ 1        ┆ item  ┆ exact    ┆ [7, 11, … 25] ┆ [0, 0, … 0]     ┆ ["xxhash"] │
+        │ 2        ┆ item  ┆ exact    ┆ [16, 37]      ┆ [0, 0]          ┆ ["xxhash"] │
+        └──────────┴───────┴──────────┴───────────────┴─────────────────┴────────────┘
         """
         if other:
             return self._evaluate_multi([data, *other], per_image=per_image, per_target=per_target)
@@ -1296,7 +1318,11 @@ class Duplicates(Evaluator):
         # Hash-based duplicate detection
         if self.flags & ImageStats.HASH:
             self.stats = compute_stats(
-                data, stats=self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target
+                data,
+                stats=self.flags & ImageStats.HASH,
+                per_image=per_image,
+                per_target=per_target,
+                normalize_pixel_values=False,
             )
             (item_exact, item_near), (target_exact, target_near) = _detect_hash_duplicates(
                 self.stats["stats"], self.stats["source_index"]
@@ -1358,7 +1384,13 @@ class Duplicates(Evaluator):
         calc_results: list[StatsResult] = []
         if has_hash_detection:
             calc_results = [
-                compute_stats(ds, stats=self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target)
+                compute_stats(
+                    ds,
+                    stats=self.flags & ImageStats.HASH,
+                    per_image=per_image,
+                    per_target=per_target,
+                    normalize_pixel_values=False,
+                )
                 for ds in datasets
             ]
             self.stats = calc_results[-1]

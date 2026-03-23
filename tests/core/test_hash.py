@@ -22,6 +22,28 @@ class TestXxHash:
 
 
 @pytest.mark.required
+class TestNormalizedFloatImages:
+    """Regression tests: normalized [0,1] float images must not be treated as identical."""
+
+    def test_phash_normalized_float_matches_uint8(self):
+        img_uint8 = np.random.RandomState(42).randint(0, 256, (3, 28, 28)).astype(np.uint8)
+        img_float = img_uint8.astype(np.float64) / 255.0
+        assert phash(img_uint8) == phash(img_float)
+
+    def test_phash_different_normalized_images_differ(self):
+        rng = np.random.RandomState(42)
+        img1 = rng.rand(3, 28, 28).astype(np.float32)
+        img2 = rng.rand(3, 28, 28).astype(np.float32)
+        assert phash(img1) != phash(img2)
+
+    def test_dhash_different_normalized_images_differ(self):
+        rng = np.random.RandomState(42)
+        img1 = rng.rand(3, 28, 28).astype(np.float32)
+        img2 = rng.rand(3, 28, 28).astype(np.float32)
+        assert dhash(img1) != dhash(img2)
+
+
+@pytest.mark.required
 class TestPHash:
     def test_phash(self):
         result = phash(np.full((28, 28), 20))

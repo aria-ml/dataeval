@@ -360,6 +360,26 @@ class TestToCanonicalGrayscale:
         assert result.shape == (28, 28)
         assert result.dtype == np.uint8
 
+    def test_normalized_float_image_rescaled(self):
+        """Regression test: float images in [0,1] must be rescaled to [0,255] before uint8 conversion."""
+        # Create a uint8 image and its normalized float equivalent
+        image_uint8 = np.random.RandomState(42).randint(0, 256, (3, 28, 28)).astype(np.uint8)
+        image_float = image_uint8.astype(np.float32) / 255.0
+
+        result_uint8 = to_canonical_grayscale(image_uint8)
+        result_float = to_canonical_grayscale(image_float)
+
+        # Results should be nearly identical (small rounding differences are acceptable)
+        assert result_float.dtype == np.uint8
+        np.testing.assert_allclose(result_float, result_uint8, atol=1)
+
+    def test_normalized_float_not_all_zero(self):
+        """Regression test: normalized float images should not collapse to all zeros."""
+        image_float = np.random.RandomState(42).rand(3, 28, 28).astype(np.float32)
+        result = to_canonical_grayscale(image_float)
+        assert result.dtype == np.uint8
+        assert result.max() > 1, "Normalized float image should not collapse to near-zero values"
+
 
 @pytest.mark.required
 class TestResize:
