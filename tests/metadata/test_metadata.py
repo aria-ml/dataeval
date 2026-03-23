@@ -117,6 +117,32 @@ class TestMetadata:
         assert len(boxstats["source_index"]) == 16
         assert len(ratiostats["source_index"]) == 16
 
+    def test_add_factors_preserves_existing_factor_info(self):
+        """Regression: add_factors after factor_info should not drop existing factors."""
+        from tests.conftest import to_metadata
+
+        md = to_metadata(
+            {"brightness": np.random.rand(50).tolist()},
+            list(range(50)),
+            {"brightness": 5},
+        )
+
+        # Step 1: Access factor_info to trigger binning
+        info1 = md.factor_info
+        original_factors = set(info1.keys())
+        assert "brightness" in original_factors
+
+        # Step 2: Add a new factor
+        md.add_factors({"contrast": np.random.rand(50)})
+
+        # Step 3: Access factor_info again - all original factors should still be present
+        info2 = md.factor_info
+        assert original_factors.issubset(set(info2.keys())), (
+            f"Original factors {original_factors} were dropped after add_factors. "
+            f"Remaining factors: {set(info2.keys())}"
+        )
+        assert "contrast" in info2
+
     def test_mismatch_factor_length(self, mock_metadata):
         with pytest.raises(ShapeMismatchError, match="provided factors have a different length"):
             mock_metadata.add_factors({"a": np.random.random((20,))})
@@ -200,6 +226,22 @@ class TestMetadata:
         assert md._include == {"b"}
         assert not md._exclude
         assert not md._is_binned
+
+    def test_include_single_string(self):
+        """Regression: setting include to a bare string should treat it as one factor name."""
+        md = Metadata(None, include="height")  # type: ignore
+        assert md._include == {"height"}
+
+        md.include = "width"
+        assert md._include == {"width"}
+
+    def test_exclude_single_string(self):
+        """Regression: setting exclude to a bare string should treat it as one factor name."""
+        md = Metadata(None, exclude="height")  # type: ignore
+        assert md._exclude == {"height"}
+
+        md.exclude = "width"
+        assert md._exclude == {"width"}
 
     def test_dropped_factors(self):
         md = Metadata(None)  # type: ignore
