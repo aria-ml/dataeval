@@ -39,6 +39,7 @@ class FactorInfo:
     factor_type: Literal["categorical", "continuous", "discrete"]
     is_binned: bool = False
     is_digitized: bool = False
+    level: Literal["image", "target"] = "image"
 
 
 def _to_col(name: str, info: FactorInfo, binned: bool = True) -> str:
@@ -110,8 +111,8 @@ class Metadata(Array, FeatureExtractor):
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
-        exclude: Sequence[str] | None = None,
-        include: Sequence[str] | None = None,
+        exclude: str | Sequence[str] | None = None,
+        include: str | Sequence[str] | None = None,
     ) -> None:
         self._class_labels: NDArray[np.intp]
         self._item_indices: NDArray[np.intp]
@@ -132,8 +133,8 @@ class Metadata(Array, FeatureExtractor):
         if exclude is not None and include is not None:
             raise ValueError("Filters for `exclude` and `include` are mutually exclusive.")
 
-        self._exclude = set(exclude or ())
-        self._include = set(include or ())
+        self._exclude = {exclude} if isinstance(exclude, str) else set(exclude or ())
+        self._include = {include} if isinstance(include, str) else set(include or ())
         self._target_factors_only = False
 
     def __repr__(self) -> str:
@@ -423,17 +424,17 @@ class Metadata(Array, FeatureExtractor):
         return self._exclude
 
     @exclude.setter
-    def exclude(self, value: Sequence[str]) -> None:
+    def exclude(self, value: str | Sequence[str]) -> None:
         """Set factor names to exclude from processing.
 
         Automatically clears include filter and resets binning state when exclusion list changes.
 
         Parameters
         ----------
-        value : Sequence[str]
-            Factor names to exclude from metadata analysis.
+        value : str | Sequence[str]
+            Factor name or names to exclude from metadata analysis.
         """
-        exclude = set(value)
+        exclude = {value} if isinstance(value, str) else set(value)
         if self._exclude != exclude:
             self._exclude = exclude
             self._include = set()
@@ -451,7 +452,7 @@ class Metadata(Array, FeatureExtractor):
         return self._include
 
     @include.setter
-    def include(self, value: Sequence[str]) -> None:
+    def include(self, value: str | Sequence[str]) -> None:
         """Set factor names to include in processing.
 
         Automatically clears exclude filter and resets binning state when
@@ -459,10 +460,10 @@ class Metadata(Array, FeatureExtractor):
 
         Parameters
         ----------
-        value : Sequence[str]
-            Factor names to include in metadata analysis.
+        value : str | Sequence[str]
+            Factor name or names to include in metadata analysis.
         """
-        include = set(value)
+        include = {value} if isinstance(value, str) else set(value)
         if self._include != include:
             self._include = include
             self._exclude = set()
@@ -1115,13 +1116,26 @@ class Metadata(Array, FeatureExtractor):
             raise ValueError(f"Invalid level: {level}. Must be 'image', 'target', or 'auto'")
 
     def _create_factor_column(self, data_array: NDArray, level: str, num_image_rows: int) -> list:
-        """Create a factor column with values at the appropriate level."""
+        """Create a factor column with values at the appropriate level.
+
+        For OD datasets with image-level factors, values are stored in image rows
+        and replicated to target rows using item_index mapping, so that bias
+        evaluators can access them via target_data.
+        """
         if level == "image":
-            # Create column: image-level values in image rows, None in target rows
-            full_data = [None] * len(self.dataframe)
-            for idx, val in enumerate(data_array):
-                full_data[idx] = val  # Image rows come first in our structure
-            return full_data
+            # Image rows get the values directly
+            image_values: list = data_array.tolist()
+
+            if self.has_targets():
+                # For OD datasets, replicate image-level values to target rows
+                # using the item_index column which maps each target to its source image
+                target_df = self._dataframe.filter(pl.col("target_index").is_not_null())
+                target_image_indices = target_df["item_index"].to_numpy()
+                target_values = data_array[target_image_indices].tolist()
+            else:
+                target_values = []
+
+            return image_values + target_values
         # level == "target"
         # Create column: None in image rows, target-level values in target rows
         return [None] * num_image_rows + list(data_array)
@@ -1267,7 +1281,8 @@ class Metadata(Array, FeatureExtractor):
             k for k in factors if not isinstance(self._dataframe.schema.get(k), pl.List | pl.Struct | pl.Array)
         }
 
-        self._factors = dict.fromkeys(usable_factors, None)
+        existing = self._factors if hasattr(self, "_factors") else {}
+        self._factors = {k: existing.get(k) for k in usable_factors}
 
     def _structure(
         self,
@@ -1492,9 +1507,12 @@ class Metadata(Array, FeatureExtractor):
         factors_to_process = [col for col in self.factor_names if not {_binned(col), _digitized(col)} & column_set]
         total_factors = len(factors_to_process)
 
+        target_only = self._target_factors - self._image_factors if is_od else set()
         for i, col in enumerate(factors_to_process):
             data = data_df[col].to_numpy()
             df, info = self._process_factor(df, col, data, factor_bins, is_od)
+            if is_od and col in target_only:
+                info.level = "target"
             factor_info[col] = info
 
             if progress_callback:

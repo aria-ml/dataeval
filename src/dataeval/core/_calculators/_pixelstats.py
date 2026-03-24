@@ -40,10 +40,22 @@ class PixelStatCalculator(Calculator[ImageStats]):
         return np.nanvar(data, **kw) if self._has_nan else np.var(data, **kw)
 
     @cached_property
+    def _histogram_range(self) -> tuple[float, float]:
+        if self.cache.normalize_pixel_values:
+            return (0.0, 1.0)
+        from dataeval.utils.preprocessing import get_bitdepth
+
+        bitdepth = get_bitdepth(self.cache.scaled)
+        if bitdepth.depth == 0:
+            return (0.0, 1.0)
+        return (0.0, float(bitdepth.pmax))
+
+    @cached_property
     def histogram(self) -> NDArray[np.float64]:
+        r = self._histogram_range
         if self.per_channel_mode:
-            return np.apply_along_axis(lambda y: np.histogram(y, bins=256, range=(0, 1))[0], 1, self.cache.per_channel)
-        return np.histogram(self.cache.scaled, bins=256, range=(0, 1))[0]
+            return np.apply_along_axis(lambda y: np.histogram(y, bins=256, range=r)[0], 1, self.cache.per_channel)
+        return np.histogram(self.cache.scaled, bins=256, range=r)[0]
 
     def get_applicable_flags(self) -> ImageStats:
         """Return which flags this calculator handles."""

@@ -8,6 +8,7 @@ dual-key indexing.
 """
 
 import numpy as np
+import polars as pl
 import pytest
 
 from dataeval import Metadata
@@ -280,6 +281,44 @@ class TestBiasFunctionsWithOD:
         assert diversity_result.factors.height == len(md.factor_names) + 1
         # Parity: factors includes one row per metadata factor
         assert parity_result.factors.height == len(md.factor_names)
+
+
+class TestAddedImageFactorsWithODBias:
+    """Regression: image-level factors added via add_factors should produce valid bias results on OD datasets."""
+
+    def test_added_image_factors_nonzero_diversity(self, od_dataset_for_bias):
+        """Image-level factors added to OD metadata should not produce all-zero diversity."""
+        md = Metadata(od_dataset_for_bias)
+
+        # Add image-level factor with variation across images
+        rng = np.random.default_rng(42)
+        md.add_factors({"brightness": rng.choice(["low", "high"], size=5)}, level="image")
+
+        result = Diversity().evaluate(md)
+        brightness_rows = result.classwise.filter(pl.col("factor_name") == "brightness")
+        assert brightness_rows.height > 0, "brightness factor missing from classwise results"
+        assert any(v > 0 for v in brightness_rows["diversity_value"]), (
+            "Image-level factor 'brightness' produced all-zero diversity on OD dataset"
+        )
+
+    def test_added_image_factors_nonzero_balance(self, od_dataset_for_bias):
+        """Image-level factors added to OD metadata should not produce all-zero balance."""
+        md = Metadata(od_dataset_for_bias)
+
+        # Add image-level factor with variation across images
+        rng = np.random.default_rng(42)
+        md.add_factors({"brightness": rng.choice(["low", "high"], size=5)}, level="image")
+
+        result = Balance().evaluate(md)
+        brightness_rows = result.classwise.filter(pl.col("factor_name") == "brightness")
+        assert brightness_rows.height > 0, "brightness factor missing from classwise results"
+
+    def test_added_image_factor_data_aligned_with_class_labels(self, od_dataset_for_bias):
+        """factor_data length should match class_labels after adding image-level factors."""
+        md = Metadata(od_dataset_for_bias)
+        md.add_factors({"brightness": np.random.rand(5)}, level="image")
+
+        assert md.factor_data.shape[0] == len(md.class_labels)
 
 
 class TestMetadataLikeConsistency:

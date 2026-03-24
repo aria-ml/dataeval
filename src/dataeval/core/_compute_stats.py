@@ -1,6 +1,7 @@
 __all__ = []
 
 import logging
+import warnings
 from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
@@ -103,6 +104,7 @@ def _collect_calculator_stats(
     datum: NDArray[Any],
     box: BoundingBox | None,
     per_channel: bool,
+    normalize_pixel_values: bool = False,
 ) -> tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
@@ -118,7 +120,7 @@ def _collect_calculator_stats(
     stats_list = []
     empty_values_map: dict[str, Any] = {}
     warnings: list[str] = []
-    processor = CalculatorCache(datum, box, per_channel)
+    processor = CalculatorCache(datum, box, per_channel, normalize_pixel_values=normalize_pixel_values)
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor, per_channel)
         stats_list.append(calculator.compute(flags))
@@ -224,6 +226,7 @@ def _compute_batch(
     per_image: bool,
     per_target: bool,
     per_channel: bool,
+    normalize_pixel_values: bool = False,
 ) -> DatumBatchResult:
     i, datum, boxes = args
     results: list[DatumResult] = []
@@ -248,7 +251,7 @@ def _compute_batch(
 
         # Collect stats from all calculators
         calculator_stats, empty_values_map, calc_warnings = _collect_calculator_stats(
-            calculators, datum, box, per_channel
+            calculators, datum, box, per_channel, normalize_pixel_values=normalize_pixel_values
         )
 
         # Thread calculator warnings with index context
@@ -338,6 +341,9 @@ def _aggregate_batch(
     warning_list.extend(result.warnings_list)
 
 
+_UNSET = object()
+
+
 def compute_stats(
     data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
@@ -346,15 +352,11 @@ def compute_stats(
     per_image: bool = True,
     per_target: bool = True,
     per_channel: bool = False,
+    normalize_pixel_values: bool = _UNSET,  # type: ignore
     progress_callback: ProgressCallback | None = None,
 ) -> StatsResult:
     """
     Compute specified statistics on a set of images, optionally within bounding boxes.
-
-    Mixed-bit-depth datasets can produce misleading statistics when raw pixel values are
-    compared directly. To avoid this, pixel values are normalized to [0, 1] based on each
-    image's bit depth before any statistic is computed, keeping results meaningful and
-    comparable across 8-bit, 16-bit, 32-bit, and other precision images.
 
     Parameters
     ----------
@@ -376,6 +378,15 @@ def compute_stats(
     per_channel : bool, default False
         If True, compute per-channel statistics. If False, statistics are
         aggregated across all channels.
+    normalize_pixel_values : bool, default True
+        If True, pixel values are normalized to [0, 1] based on each image's
+        inferred bit depth before any statistic is computed. This makes results
+        comparable across images with different bit depths (8-bit, 16-bit, etc.).
+        If False, statistics are computed on raw pixel values.
+
+        .. deprecated::
+            The default will change to False in v1.1. Pass explicitly to silence
+            the deprecation warning.
     progress_callback : ProgressCallback or None, default None
         Callback to report progress during calculation. Called after each image is processed
         with the current image count and total number of images (if known).
@@ -422,6 +433,15 @@ def compute_stats(
 
     >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=True, per_channel=True)
     """
+    if normalize_pixel_values is _UNSET:
+        warnings.warn(
+            "The default value of normalize_pixel_values will change from True to False in v1.1. "
+            "Pass normalize_pixel_values explicitly to silence this warning.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        normalize_pixel_values = True
+
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
     object_count: dict[int, int] = {}
@@ -484,6 +504,7 @@ def compute_stats(
                 per_image=per_image,
                 per_target=per_target,
                 per_channel=per_channel,
+                normalize_pixel_values=normalize_pixel_values,
             ),
             _enumerate_datum(images, boxes),
         ):
