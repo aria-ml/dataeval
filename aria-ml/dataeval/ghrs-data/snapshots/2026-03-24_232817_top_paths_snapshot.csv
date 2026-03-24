@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,94,45
+/aria-ml/dataeval/tree/main,21,7
+/aria-ml/dataeval/tree/main/src/dataeval,17,7
+/aria-ml/dataeval/tree/main/src,10,5
+/aria-ml/dataeval/tree/main/.gitlab,10,4
+/aria-ml/dataeval/blob/main/pyproject.toml,9,4
+/aria-ml/dataeval/tree/main/.gitlab/ci,9,4
+/aria-ml/dataeval/tree/main/docs,8,4
+/aria-ml/dataeval/blob/main/.gitlab/ci/docs.yml,8,3
+/aria-ml/dataeval/blob/release/v1.0/CHANGELOG.md,7,3
