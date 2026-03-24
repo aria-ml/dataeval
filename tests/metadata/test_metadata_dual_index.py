@@ -162,9 +162,11 @@ class TestDualKeyIndexing:
         image_rows = md.image_data
         assert image_rows["brightness"].to_list() == brightness
 
-        # Check that brightness is None in target rows
+        # Check that brightness is replicated to target rows via item_index mapping
         target_rows = md.target_data
-        assert all(target_rows["brightness"].is_null())
+        target_item_indices = target_rows["item_index"].to_list()
+        expected_target_brightness = [brightness[i] for i in target_item_indices]
+        assert target_rows["brightness"].to_list() == expected_target_brightness
 
     def test_add_target_level_factors(self, od_dataset_with_metadata):
         """Test adding target-level factors."""
@@ -214,6 +216,34 @@ class TestDualKeyIndexing:
 
         with pytest.raises(ValueError, match="target count"):
             md.add_factors({"bad_factor": [1, 2]}, level="target")
+
+    def test_factor_info_level_od_dataset(self, od_dataset_with_metadata):
+        """Test that factor_info.level distinguishes image vs target factors on OD datasets."""
+        md = Metadata(od_dataset_with_metadata)
+
+        # Built-in factors from metadata: weather and time are image-level
+        info = md.factor_info
+        assert info["weather"].level == "image"
+        assert info["time"].level == "image"
+
+    def test_factor_info_level_added_factors(self, od_dataset_with_metadata):
+        """Test that added factors get the correct level in factor_info."""
+        md = Metadata(od_dataset_with_metadata)
+
+        md.add_factors({"brightness": [0.5, 0.7, 0.3]}, level="image")
+        md.add_factors({"iou": [0.9, 0.8, 0.95, 0.85, 0.75, 0.92]}, level="target")
+
+        info = md.factor_info
+        assert info["brightness"].level == "image"
+        assert info["iou"].level == "target"
+
+    def test_factor_info_level_ic_dataset(self):
+        """Test that IC dataset factors default to image level."""
+        from tests.conftest import to_metadata
+
+        md = to_metadata({"weather": ["sunny", "rainy"] * 25}, list(range(50)))
+        info = md.factor_info
+        assert info["weather"].level == "image"
 
     def test_backward_compatibility_image_indices(self, od_dataset_with_metadata):
         """Test that item_indices maps targets back to source items."""

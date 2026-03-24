@@ -1580,3 +1580,92 @@ class TestProgressCallback:
 
         with pytest.raises(ValueError, match="Processor produced"):
             _determine_channel_indices(calculator_output, num_channels)
+
+
+@pytest.mark.required
+class TestNormalizePixelValues:
+    """Tests for the normalize_pixel_values parameter of compute_stats."""
+
+    @pytest.fixture
+    def uint8_images(self):
+        rng = np.random.RandomState(42)
+        return [rng.randint(0, 256, (3, 32, 32)).astype(np.uint8) for _ in range(5)]
+
+    @pytest.fixture
+    def mixed_bitdepth_images(self):
+        """Two images: one 8-bit, one 16-bit, with similar visual content."""
+        rng = np.random.RandomState(42)
+        img_8bit = rng.randint(0, 256, (3, 32, 32)).astype(np.uint8)
+        img_16bit = (img_8bit.astype(np.uint16)) * 257  # scale 0-255 to 0-65535
+        return [img_8bit, img_16bit]
+
+    def test_normalized_mean_is_between_0_and_1(self, uint8_images):
+        """When normalized, pixel mean should be in [0, 1] range."""
+        result = compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=True)
+        means = result["stats"]["mean"]
+        assert np.all(means >= 0.0)
+        assert np.all(means <= 1.0)
+
+    def test_raw_mean_reflects_original_scale(self, uint8_images):
+        """When not normalized, pixel mean should reflect original uint8 scale."""
+        result = compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        means = result["stats"]["mean"]
+        # uint8 images with random data should have means around 127, not near 0-1
+        assert np.all(means > 1.0), "Raw means for uint8 images should be well above 1.0"
+        assert np.all(means < 256.0)
+
+    def test_normalized_and_raw_are_proportional(self, uint8_images):
+        """Normalized mean * 255 should approximate the raw mean for uint8 data."""
+        norm = compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=True)
+        raw = compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        np.testing.assert_allclose(norm["stats"]["mean"] * 255.0, raw["stats"]["mean"], rtol=1e-4)
+
+    def test_normalization_makes_mixed_bitdepth_comparable(self, mixed_bitdepth_images):
+        """Normalized stats of equivalent 8-bit and 16-bit images should be nearly identical."""
+        result = compute_stats(mixed_bitdepth_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=True)
+        means = result["stats"]["mean"]
+        # Both images have the same visual content, so normalized means should match closely
+        np.testing.assert_allclose(means[0], means[1], rtol=1e-3)
+
+    def test_raw_stats_differ_across_bitdepths(self, mixed_bitdepth_images):
+        """Without normalization, 8-bit and 16-bit images produce very different raw stats."""
+        result = compute_stats(mixed_bitdepth_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        means = result["stats"]["mean"]
+        # 16-bit mean should be ~257x larger than 8-bit mean
+        assert means[1] / means[0] > 200.0
+
+    def test_std_raw_vs_normalized(self, uint8_images):
+        """Standard deviation should also scale with normalization."""
+        norm = compute_stats(uint8_images, stats=ImageStats.PIXEL_STD, normalize_pixel_values=True)
+        raw = compute_stats(uint8_images, stats=ImageStats.PIXEL_STD, normalize_pixel_values=False)
+        np.testing.assert_allclose(norm["stats"]["std"] * 255.0, raw["stats"]["std"], rtol=1e-4)
+
+    def test_histogram_bins_cover_correct_range(self, uint8_images):
+        """Histogram should distribute values properly in both modes."""
+        norm = compute_stats(uint8_images, stats=ImageStats.PIXEL_HISTOGRAM, normalize_pixel_values=True)
+        raw = compute_stats(uint8_images, stats=ImageStats.PIXEL_HISTOGRAM, normalize_pixel_values=False)
+        # Both histograms should have 256 bins and non-trivial spread
+        for hist in [norm["stats"]["histogram"][0], raw["stats"]["histogram"][0]]:
+            assert len(hist) == 256
+            assert np.sum(hist > 0) > 10, "Histogram should use many bins, not collapse"
+
+    def test_entropy_consistent_across_modes(self, uint8_images):
+        """Entropy should be similar regardless of normalization for uniform-ish data."""
+        norm = compute_stats(uint8_images, stats=ImageStats.PIXEL_ENTROPY, normalize_pixel_values=True)
+        raw = compute_stats(uint8_images, stats=ImageStats.PIXEL_ENTROPY, normalize_pixel_values=False)
+        # Entropy depends on bin distribution, not absolute scale, so should be close
+        np.testing.assert_allclose(norm["stats"]["entropy"], raw["stats"]["entropy"], rtol=0.05)
+
+    def test_default_emits_deprecation_warning(self, uint8_images):
+        """Calling compute_stats without explicit normalize_pixel_values warns."""
+        with pytest.warns(FutureWarning, match="normalize_pixel_values"):
+            compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN)
+
+    def test_explicit_value_no_warning(self, uint8_images):
+        """Explicit normalize_pixel_values should not warn."""
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", FutureWarning)
+            compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=True)
+            compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)

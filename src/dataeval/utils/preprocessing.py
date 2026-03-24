@@ -413,7 +413,7 @@ def rescale(image: NDArray[Any], depth: int = 1) -> NDArray[Any]:
     bitdepth = get_bitdepth(image)
     if bitdepth.depth == depth:
         return image
-    normalized = (image + bitdepth.pmin) / (bitdepth.pmax - bitdepth.pmin)
+    normalized = (image - bitdepth.pmin) / (bitdepth.pmax - bitdepth.pmin)
     return normalized * (2**depth - 1)
 
 
@@ -554,6 +554,12 @@ def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:
     NDArray[np.uint8]
         2D grayscale array (HW) of type np.uint8
     """
+    # Rescale normalized [0, 1] float images to [0, 255] range
+    if np.issubdtype(image.dtype, np.floating) and image.size > 0:
+        pmin, pmax = np.nanmin(image), np.nanmax(image)
+        if pmax <= 1.0 and pmin >= 0.0:
+            image = image * 255.0
+
     channels = image.shape[0]
 
     # --- Case 1: Single Channel (Already Grayscale) ---

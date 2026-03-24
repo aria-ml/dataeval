@@ -251,7 +251,7 @@ class Diversity(Evaluator):
         is_low_diversity_col: list[bool] = []
 
         for class_idx in range(classwise_div.shape[0]):
-            class_name = index2label.get(class_idx, str(class_idx))
+            class_name = index2label.get(int(u_classes[class_idx]), str(u_classes[class_idx]))
             for factor_idx in range(num_factors):
                 div_value = classwise_div[class_idx, factor_idx]
                 if not np.isnan(div_value):
