@@ -1,6 +1,20 @@
-[//]: # (b7d3c6e6e54847a1b9f3f2c47b594ccc70fb06fb)
+[//]: # (241406a2150837995abede310966b9fd69ae1831)
 
 # DataEval Change Log
+
+## v1.0.4
+
+👾 **Fixes**
+- `241406a2` - Fix image stats and metadata issues
+
+    - fixed `Metadata.include` with a string interpreted as a sequence of chars
+    - fixed `Metadata.add_factors` improperly dropping previous factors
+    - fixed support for image vs target level factors in `Metadata`
+    - fixed bias (`balance`, `diversity`) functions indexing into `index2label` incorrectly
+    - fixed image hashing for images normalized to 0-1 pixel values
+    - fixed `get_bitdepth `numerator sign bug
+    - added parameter to `compute_stats` to skip normalizing images for stats
+    - rename `dataset_index` column to `dataset_indices` column for `MultiDuplicatesOutput`
 
 ## v1.0.3
 
