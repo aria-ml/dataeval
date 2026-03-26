@@ -16,12 +16,6 @@ from dataeval.protocols import SequenceLike
 
 _logger = logging.getLogger(__name__)
 
-_NATS2BITS = 1.442695
-"""
-_NATS2BITS is the reciprocal of natural log of 2. If you have an information/entropy-type quantity measured in nats,
-which is what many library functions return, multiply it by _NATS2BITS to get it in bits.
-"""
-
 
 def _calc_median_deviations(reference: NDArray[Any], test: NDArray[Any]) -> NDArray[Any]:
     """
@@ -189,12 +183,14 @@ def factor_predictors(
     discrete_features: list[bool] | None = None,
 ) -> Mapping[str, float]:
     """
-    Compute mutual information between metadata factors and flagged sample indices.
+    Compute a measure of mutual information between metadata factors and flagged sample indices.
 
     Given a set of metadata factors per sample and indices of flagged samples, this function
     calculates the mutual information between each factor and the flagged status.
     In other words, it finds which metadata factors most likely correlate to a
-    flagged sample (e.g., outliers, OOD samples, or other anomalies).
+    flagged sample (e.g., outliers, OOD samples, or other anomalies). The maximum possible MI
+    is equal to the entropy of the flagged indices, so we normalize by that entropy in order
+    to return a measure of association on a scale from 0 to 1.
 
     Parameters
     ----------
@@ -220,7 +216,8 @@ def factor_predictors(
     -----
     A high mutual information between a factor and flagged samples is an indication of correlation,
     but not causation. Additional analysis should be done to determine how to handle factors
-    with a high mutual information.
+    with a high mutual information. And note that "high" is always relative to the information
+    or entropy represented by the flagged indices, which is why we use that entropy to normalize.
 
     Examples
     --------
@@ -230,7 +227,7 @@ def factor_predictors(
     ... }
     >>> indices = [2, 3, 4]  # Flag last three samples
     >>> factor_predictors(factors, indices)
-    {'time': 0.8415720833333329, 'altitude': 0.0}
+    {'time': 0.866750699769533, 'altitude': 0.0}
     """
     if not factors:
         raise ValueError("factors dictionary cannot be empty")
@@ -266,15 +263,22 @@ def factor_predictors(
             f"discrete_features length ({len(discrete_features)}) must match number of factors ({len(factor_names)})",
         )
 
-    mutual_info_values = (
-        mutual_info_classif(
-            X=scaled_data,
-            y=sample_mask,
-            discrete_features=discrete_features,  # type: ignore - sklearn function not typed
-            random_state=get_seed(),
-            n_jobs=get_max_processes(),  # type: ignore
-        )
-        * _NATS2BITS
+    mutual_info_values = mutual_info_classif(
+        X=scaled_data,
+        y=sample_mask,
+        discrete_features=discrete_features,  # type: ignore - sklearn function not typed
+        random_state=get_seed(),
+        n_jobs=get_max_processes(),  # type: ignore
     )
+
+    # We normalize the mutual info by the entropy of the flag, i.e. by its maximal
+    #   information content. This yields a true measure of the strength of
+    #   association between metadata factors and the flag, from 0 to 1.
+    if 0 < (frac_flagged := len(indices) / n_samples) < 1:
+        flagged_entropy = -(frac_flagged * np.log(frac_flagged) + (1 - frac_flagged) * np.log(1 - frac_flagged))
+        mutual_info_values = np.clip(mutual_info_values / flagged_entropy, 0, 1)
+    else:
+        # all or none are flagged, no MI possible.
+        mutual_info_values = np.zeros_like(mutual_info_values)
 
     return {k: mutual_info_values[i] for i, k in enumerate(factor_names)}
