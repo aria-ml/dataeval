@@ -69,14 +69,6 @@ stages:
 
 ### SHARED JOB TEMPLATES ###
 
-.harbor:
-  image: docker:25.0.5-git
-  before_script:
-    - apk add --no-cache bash util-linux
-    - echo ${DATAEVAL_HARBOR_TOKEN} | docker login harbor.jatic.net -u "robot$dataeval+dataeval-build" --password-stdin || echo "Failed to login to Harbor..."
-  after_script:
-    - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
-
 .nox:
   needs: []
   image: $UV_IMAGE:python$PYTHON_VERSION-$UV_BASE_LAYER

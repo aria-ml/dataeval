@@ -67,18 +67,6 @@ tag release candidate:
   script:
     - .gitlab/scripts/update_latest_known_good.py
 
-# This job cleans up the image tags from the harbor registry
-# associated with the last merged branch.
-remove image tags:
-  stage: release
-  extends: .rules_main_only
-  needs: []
-  before_script:
-    - uv pip install requests --system
-  script:
-    - .gitlab/scripts/remove_image_tags.py
-  allow_failure: true
-
 # This job cleans up orphan docs-artifacts/* branches
 # associated with merged branches.
 remove docs artifact branches:

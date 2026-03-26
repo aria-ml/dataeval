@@ -3,4 +3,3 @@
 **/.nox
 **/*.pyc
 **/__pycache__
-docs/docker_build

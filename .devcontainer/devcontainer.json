@@ -1,8 +1,8 @@
 // For format details, see https://aka.ms/devcontainer.json.
 {
   "build": {
-    "dockerfile": "../Dockerfile",
-    "target": "devcontainer"
+    "dockerfile": "Dockerfile",
+    "context": ".."
   },
 
   "hostRequirements": {
