@@ -137,7 +137,7 @@ class TorchExtractor(ReprMixin):
 
         return modules_dict[layer_name]
 
-    def __call__(self, data: Any) -> Array:
+    def __call__(self, data: Any) -> Array:  # noqa: C901
         """
         Extract features from a batch of images.
 

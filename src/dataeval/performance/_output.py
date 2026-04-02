@@ -167,7 +167,7 @@ class SufficiencyOutput(DictOutput):
 
         return self._build_dataframe(proj_array, output)
 
-    def inv_project(self, targets: Mapping[str, ArrayLike] | ArrayLike, n_iter: int = 1000) -> pl.DataFrame:
+    def inv_project(self, targets: Mapping[str, ArrayLike] | ArrayLike, n_iter: int = 1000) -> pl.DataFrame:  # noqa: C901
         """
         Compute training samples needed to achieve target metric values.
 
@@ -214,7 +214,7 @@ class SufficiencyOutput(DictOutput):
         return self._build_inv_project_dataframe(results)
 
     @staticmethod
-    def _build_inv_project_dataframe(
+    def _build_inv_project_dataframe(  # noqa: C901
         results: Mapping[str, tuple[NDArray[Any], NDArray[np.int64]]],
     ) -> pl.DataFrame:
         """Build wide-format DataFrame from inverse projection results."""
@@ -405,7 +405,7 @@ def linear_initialization(metric: NDArray[Any], sizes: NDArray[Any], bounds: Con
     return np.array([scale, -negative_exponent, asymptote], dtype=np.float64)
 
 
-def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int, unit_interval: bool) -> NDArray[np.float64]:
+def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int, unit_interval: bool) -> NDArray[np.float64]:  # noqa: C901
     """
     Retrieve the inverse power curve coefficients for the line of best fit.
 

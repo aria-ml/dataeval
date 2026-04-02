@@ -22,7 +22,7 @@ def _get_onnx() -> ModuleType:
         raise ImportError("onnx is required for ONNX model utilities. Install it with: pip install onnx") from e
 
 
-def find_embedding_layer(model_path: str | Path) -> str:
+def find_embedding_layer(model_path: str | Path) -> str:  # noqa: C901
     """
     Find the embedding layer name in an ONNX classification model.
 

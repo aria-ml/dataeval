@@ -138,7 +138,7 @@ def as_numpy(
     return to_numpy(array, dtype=dtype, required_ndim=required_ndim, required_shape=required_shape, copy=False)
 
 
-def to_numpy(
+def to_numpy(  # noqa: C901
     array: ArrayLike | SequenceLike[Any] | None,
     *,
     dtype: type[np_dtype] | None = None,
@@ -282,7 +282,7 @@ def ensure_embeddings(
 ) -> TArray: ...
 
 
-def ensure_embeddings(
+def ensure_embeddings(  # noqa: C901
     embeddings: TArray,
     dtype: type[np_dtype] | torch.dtype | None = None,
     unit_interval: Literal[True, False, "force"] = False,
@@ -445,7 +445,7 @@ def simplify_type(data: list[str] | str) -> list[int] | list[float] | list[str] 
     return converted
 
 
-def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], int]:
+def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], int]:  # noqa: C901
     """
     Find indices to minimize unique tuple keys.
 
@@ -484,7 +484,7 @@ def sorted_drop_reasons(d: dict[str, set[DropReason]]) -> dict[str, list[str]]:
     return {k: sorted({vv.value for vv in v}) for k, v in sorted(d.items(), key=lambda item: item[1])}
 
 
-def flatten_dict_inner(
+def flatten_dict_inner(  # noqa: C901
     d: Mapping[str, Any],
     dropped: dict[tuple[str, ...], set[DropReason]],
     parent_keys: tuple[str, ...],
@@ -561,7 +561,7 @@ def flatten_metadata(
 ) -> tuple[dict[str, Any], int]: ...
 
 
-def flatten_metadata(
+def flatten_metadata(  # noqa: C901
     d: Mapping[str, Any],
     return_dropped: bool = False,
     sep: str = "_",
@@ -651,7 +651,7 @@ def _flatten_for_merge(
     return flattened, image_repeats, dropped_inner
 
 
-def _merge(
+def _merge(  # noqa: C901
     dicts: list[Mapping[str, Any]],
     ignore_lists: bool,
     fully_qualified: bool,

@@ -129,7 +129,7 @@ class _IterativeStratifiedKFold:
                 np.where(test_mask)[0].astype(np.intp),
             )
 
-    def _assign_folds(self, y: NDArray[Any]) -> NDArray[np.intp]:
+    def _assign_folds(self, y: NDArray[Any]) -> NDArray[np.intp]:  # noqa: C901
         n_samples = y.shape[0]
         assignment = np.full(n_samples, -1, dtype=np.intp)
         desired = np.ones(self.n_splits) / self.n_splits
@@ -231,7 +231,7 @@ def _multilabel_single_split(
     return _multilabel_find_best_split(multilabel, split_candidates, split_frac)
 
 
-def _calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: float) -> float:
+def _calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: float) -> float:  # noqa: C901
     """
     Compute possible validation fraction based on the number of folds and test fraction.
 
@@ -464,7 +464,7 @@ def _make_splits(
     return split_defs
 
 
-def _find_best_split(
+def _find_best_split(  # noqa: C901
     labels: NDArray[np.intp],
     split_defs: list[TrainValSplit],
     stratified: bool,
@@ -567,7 +567,7 @@ def _single_split(
     return _find_best_split(labels, split_candidates, stratified, split_frac)
 
 
-def _split_od(
+def _split_od(  # noqa: C901
     multilabel: NDArray[np.int8],
     num_folds: int,
     stratify: bool,

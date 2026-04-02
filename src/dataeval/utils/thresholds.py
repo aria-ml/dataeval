@@ -501,7 +501,7 @@ class AdaptiveThreshold(_Threshold, threshold_type="adaptive"):
         ratio = (p90 / mad) / AdaptiveThreshold._NORMAL_P90_MAD
         return 1.0 + np.log1p(max(0.0, ratio - 1.0))
 
-    def _derive(self, data: NDArray[Any]) -> tuple[float | None, float | None]:
+    def _derive(self, data: NDArray[Any]) -> tuple[float | None, float | None]:  # noqa: C901
         """Compute asymmetric, tail-weighted thresholds using Double-MAD.
 
         Splits the data at the median and computes a separate MAD for each
@@ -593,7 +593,7 @@ class AdaptiveThreshold(_Threshold, threshold_type="adaptive"):
 
         return lower, upper
 
-    def _zero_mad_fallback(
+    def _zero_mad_fallback(  # noqa: C901
         self,
         clean: NDArray[Any],
         median_val: float,
@@ -703,7 +703,7 @@ def _make_threshold(
 _DEFAULT_THRESHOLD_TYPE = "adaptive"
 
 
-def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:
+def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:  # noqa: C901
     """Convert a :data:`ThresholdLike` value to a :class:`Threshold` instance.
 
     Parameters

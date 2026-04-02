@@ -42,7 +42,7 @@ class ParityResult(TypedDict):
 
 
 @experimental
-def parity(
+def parity(  # noqa: C901
     factor_data: Array2D[int],
     class_labels: Array1D[int],
 ) -> ParityResult:

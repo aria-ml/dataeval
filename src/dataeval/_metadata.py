@@ -282,7 +282,7 @@ class Metadata(Array, FeatureExtractor):
             raise NotFittedError("No dataset bound. Call bind() first.")
         yield from self.factor_data
 
-    def __getitem__(self, index: int | str | slice) -> Array:
+    def __getitem__(self, index: int | str | slice) -> Array:  # noqa: C901
         """Get binned metadata for specific indices or factors.
 
         Parameters
@@ -934,7 +934,7 @@ class Metadata(Array, FeatureExtractor):
         factor = factor[0] if isinstance(factor, tuple) else factor
         return factor in self.include if self.include else factor not in self.exclude
 
-    def _reset_bins(self, cols: Iterable[str] | None = None) -> None:
+    def _reset_bins(self, cols: Iterable[str] | None = None) -> None:  # noqa: C901
         if self._is_binned:
             columns = self._dataframe.columns
             for col in cols or columns:
@@ -1006,7 +1006,7 @@ class Metadata(Array, FeatureExtractor):
             )
         return target_rows
 
-    def _get_target_factor_values(
+    def _get_target_factor_values(  # noqa: C901
         self,
         factor_name: str,
         factor_values: Any,
@@ -1152,7 +1152,7 @@ class Metadata(Array, FeatureExtractor):
             self._structure()
         return bool(self._has_targets)
 
-    def _process_targets(
+    def _process_targets(  # noqa: C901
         self,
         raw: list,
         labels: list,
@@ -1284,7 +1284,7 @@ class Metadata(Array, FeatureExtractor):
         existing = self._factors if hasattr(self, "_factors") else {}
         self._factors = {k: existing.get(k) for k in usable_factors}
 
-    def _structure(
+    def _structure(  # noqa: C901
         self,
         *,
         progress_callback: ProgressCallback | None = None,
@@ -1478,7 +1478,7 @@ class Metadata(Array, FeatureExtractor):
         df = self._add_column_with_padding(df, col_dg, ordinal.astype(np.int64), is_od)
         return df, FactorInfo("discrete", is_digitized=True)
 
-    def _bin(
+    def _bin(  # noqa: C901
         self,
         *,
         progress_callback: ProgressCallback | None = None,
@@ -1523,7 +1523,7 @@ class Metadata(Array, FeatureExtractor):
         self._factors.update(factor_info)
         self._is_binned = True
 
-    def add_factors(
+    def add_factors(  # noqa: C901
         self,
         factors: Mapping[str, Array1D[Any]],
         level: Literal["image", "target", "auto"] = "auto",

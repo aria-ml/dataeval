@@ -315,9 +315,9 @@ def cluster_tree_from_condensed_tree_bcubed(condensed_tree, cluster_tree, label_
     mask1 = condensed_tree.child_size > 1
     mask2 = condensed_tree.child_size == 1
     mask3 = np.array([child in label_indices_list for child in condensed_tree.child])
-    mask4 = np.array(
-        [parent in cluster_tree_parents for parent in condensed_tree.parent]
-    )  # check that it's not a leaf cluster
+    mask4 = np.array([
+        parent in cluster_tree_parents for parent in condensed_tree.parent
+    ])  # check that it's not a leaf cluster
 
     mask = mask1 | (mask2 & mask3 & mask4)
 
@@ -501,9 +501,9 @@ def extract_clusters_bcubed(
                 unselected_nodes,
             )
 
-    return np.asarray(
-        [node for node, selected in selected_clusters.items() if (selected and (node not in virtual_nodes))]
-    )
+    return np.asarray([
+        node for node, selected in selected_clusters.items() if (selected and (node not in virtual_nodes))
+    ])
 
 
 @numba.njit(cache=True)

@@ -99,7 +99,7 @@ class _Clusters:
         prob: NDArray[np.float64] = exp / np.sum(exp)
         return prob
 
-    def _sort_by_weights(self, embeddings: NDArray[np.float64]) -> NDArray[np.intp]:
+    def _sort_by_weights(self, embeddings: NDArray[np.float64]) -> NDArray[np.intp]:  # noqa: C901
         """Sort samples using complexity-based weighted sampling."""
         labels = self._get_labels(embeddings)
         pr = self._complexity(embeddings)
@@ -356,7 +356,7 @@ class _HDBSCAN:
         self.cluster_selection_epsilon = 0.0
         self.cluster_selection_method = "eom"
 
-    def fit(self, embeddings: NDArray[np.floating]) -> "_HDBSCAN":
+    def fit(self, embeddings: NDArray[np.floating]) -> "_HDBSCAN":  # noqa: C901
         """
         Find clusters based on hierarchical density-based clustering.
 
@@ -541,7 +541,7 @@ class ClusterStats(TypedDict):
     nearest_cluster_idx: NDArray[np.int64]
 
 
-def compute_cluster_stats(
+def compute_cluster_stats(  # noqa: C901
     embeddings: NDArray[np.floating],
     cluster_labels: _Clusters | NDArray[np.int64],
 ) -> ClusterStats:
@@ -642,7 +642,7 @@ def compute_cluster_stats(
     )
 
 
-def cluster(
+def cluster(  # noqa: C901
     embeddings: ArrayND[float],
     algorithm: Literal["kmeans", "hdbscan"] = "hdbscan",
     n_clusters: int | None = None,

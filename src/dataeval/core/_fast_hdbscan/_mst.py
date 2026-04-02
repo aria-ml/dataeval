@@ -80,7 +80,7 @@ def _expand_tree(
 
 
 @numba.njit(locals={"i": numba.types.intp, "nbr": numba.types.intp, "dist": numba.types.float32}, cache=True)
-def _update_tree(
+def _update_tree(  # noqa: C901
     tree: NDArray[np.float32],
     total_edge: int,
     disjoint_set: tuple[NDArray[np.int64], NDArray[np.int64]],

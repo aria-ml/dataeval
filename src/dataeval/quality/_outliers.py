@@ -119,7 +119,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     # ------------------------------------------------------------------
 
     @property
-    def outliers(self) -> TOutliers:
+    def outliers(self) -> TOutliers:  # noqa: C901
         """Outlier items as a mapping of index to flagged metric names.
 
         When ``per_target=False``:
@@ -242,7 +242,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         # Create the Summary Pivot (classes as rows, metrics as columns)
         summary_df = (
-            joined_df.group_by(["class_name", "metric_name"])
+            joined_df
+            .group_by(["class_name", "metric_name"])
             .len()  # Count occurrences
             .pivot(on="metric_name", index="class_name", values="len")
             .fill_null(0)
@@ -264,7 +265,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         # Create a Total row (sum across all classes for each metric)
         total_row = (
-            summary_df.select(pl.col(metric_cols + ["Total"]).sum())
+            summary_df
+            .select(pl.col(metric_cols + ["Total"]).sum())
             .with_columns(pl.lit("Total").alias("class_name"))
             .select(column_order)
         )
@@ -311,13 +313,14 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         # Group by metric_name and count unique images
         return (
-            self.data()
+            self
+            .data()
             .group_by("metric_name")
             .agg(pl.col("item_index").n_unique().alias("Total"))
             .sort(["Total", "metric_name"], descending=[True, False])
         )
 
-    def aggregate_by_item(self) -> pl.DataFrame:
+    def aggregate_by_item(self) -> pl.DataFrame:  # noqa: C901
         """
         Return a Polars DataFrame summarizing outliers per item (item_index, target_index pair) and metric.
 
@@ -382,7 +385,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         # Group by item_index, [target_index,] and metric_name, then pivot
 
         grouped = (
-            self.data()
+            self
+            .data()
             .group_by(index_cols + ["metric_name"])
             .agg(pl.len().alias("Total"))  # Count occurrences (should be 1 per combination)
             .with_columns(pl.lit(1, dtype=pl.UInt32).alias("flagged"))  # Create binary indicator
@@ -404,7 +408,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         expressions = []
         if has_target_id:
             expressions.append(
-                pl.when(pl.col("target_index") == temp_null_placeholder)
+                pl
+                .when(pl.col("target_index") == temp_null_placeholder)
                 .then(None)
                 .otherwise(pl.col("target_index"))
                 .alias("target_index"),
@@ -421,7 +426,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
     _UNSET = object()  # sentinel for distinguishing "not provided" from None
 
-    def _redetect(
+    def _redetect(  # noqa: C901
         self,
         class_ids: NDArray[np.intp] | None = None,
         outlier_threshold: Any = _UNSET,
@@ -638,7 +643,7 @@ MultiOutliersOutput = OutliersOutput[MultiOutliersMap]
 MultiTargetOutliersOutput = OutliersOutput[MultiTargetOutliersMap]
 
 
-def _get_outlier_mask(
+def _get_outlier_mask(  # noqa: C901
     values: NDArray[Any],
     threshold: Threshold,
 ) -> NDArray[np.bool_]:
@@ -681,7 +686,7 @@ def _get_outlier_mask(
     return outlier_mask & ~nan_mask
 
 
-def _build_class_ids(
+def _build_class_ids(  # noqa: C901
     source_index: Sequence[SourceIndex],
     metadata: MetadataLike,
 ) -> NDArray[np.intp]:
@@ -812,7 +817,7 @@ def _compute_outlier_mask(
     return outlier_mask
 
 
-def _detect_outliers(
+def _detect_outliers(  # noqa: C901
     stats: StatsMap,
     source_index: Sequence[SourceIndex],
     outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None,
@@ -1206,12 +1211,10 @@ class Outliers(Evaluator):
 
         # Filter source_index based on per_image/per_target flags
         if not (per_image and per_target):
-            mask = np.array(
-                [
-                    (per_image and si.target is None) or (per_target and si.target is not None)
-                    for si in combined_source_index
-                ]
-            )
+            mask = np.array([
+                (per_image and si.target is None) or (per_target and si.target is not None)
+                for si in combined_source_index
+            ])
             indices = np.flatnonzero(mask)
             combined_source_index = [combined_source_index[i] for i in indices]
             combined_stats = {k: v[indices] for k, v in combined_stats.items()}
@@ -1299,7 +1302,7 @@ class Outliers(Evaluator):
         return OutliersOutput(outlier_issues, cluster_stats=cs, cluster_threshold=ct)
 
     @staticmethod
-    def _merge_outlier_dfs(outliers_dfs: Sequence[pl.DataFrame]) -> pl.DataFrame:
+    def _merge_outlier_dfs(outliers_dfs: Sequence[pl.DataFrame]) -> pl.DataFrame:  # noqa: C901
         """Merge a list of outlier DataFrames into one, normalizing columns."""
         if len(outliers_dfs) == 0:
             return pl.DataFrame(
@@ -1599,6 +1602,17 @@ class Outliers(Evaluator):
             metadata=metadata,
         )
 
+    def _validate_evaluate_inputs(
+        self, per_image: bool, per_target: bool, per_class: bool, metadata: MetadataLike | None
+    ) -> None:
+        """Validate common inputs for single and multi-dataset evaluation."""
+        if self.flags == ImageStats.NONE and self.extractor is None:
+            raise ValueError("Either flags must not be ImageStats.NONE or extractor must be provided.")
+        if not (per_image or per_target):
+            raise ValueError("At least one of per_image or per_target must be True.")
+        if per_class and metadata is None:
+            raise ValueError("metadata must be provided when per_class=True.")
+
     def _evaluate_single(
         self,
         data: _DatasetInput,
@@ -1609,14 +1623,7 @@ class Outliers(Evaluator):
         metadata: MetadataLike | None = None,
     ) -> SingleOutliersOutput:
         """Single-dataset evaluate implementation."""
-        if self.flags == ImageStats.NONE and self.extractor is None:
-            raise ValueError("Either flags must not be ImageStats.NONE or extractor must be provided.")
-
-        if not (per_image or per_target):
-            raise ValueError("At least one of per_image or per_target must be True.")
-
-        if per_class and metadata is None:
-            raise ValueError("metadata must be provided when per_class=True.")
+        self._validate_evaluate_inputs(per_image, per_target, per_class, metadata)
 
         outliers_dfs: list[pl.DataFrame] = []
         stats_result: StatsResult | None = None
@@ -1646,7 +1653,7 @@ class Outliers(Evaluator):
             cluster_threshold=self.cluster_threshold,
         )
 
-    def _evaluate_multi(
+    def _evaluate_multi(  # noqa: C901
         self,
         datasets: Sequence[_DatasetInput],
         *,
@@ -1656,14 +1663,7 @@ class Outliers(Evaluator):
         metadata: MetadataLike | None = None,
     ) -> MultiOutliersOutput:
         """Multi-dataset evaluate: compute stats per dataset, then combine."""
-        if self.flags == ImageStats.NONE and self.extractor is None:
-            raise ValueError("Either flags must not be ImageStats.NONE or extractor must be provided.")
-
-        if not (per_image or per_target):
-            raise ValueError("At least one of per_image or per_target must be True.")
-
-        if per_class and metadata is None:
-            raise ValueError("metadata must be provided when per_class=True.")
+        self._validate_evaluate_inputs(per_image, per_target, per_class, metadata)
 
         # Compute dataset_steps from dataset lengths (needed for index remapping)
         dataset_steps: list[int] = []

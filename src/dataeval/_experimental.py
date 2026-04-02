@@ -13,7 +13,7 @@ from dataeval.exceptions import DeprecatedWarning, ExperimentalWarning
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def _make_warning_message(
+def _make_warning_message(  # noqa: C901
     name: str,
     kind: str,
     *,
@@ -51,7 +51,7 @@ def _prepend_doc_note(doc: str | None, note: str) -> str:
 def experimental(_target: F) -> F: ...
 @overload
 def experimental(*, alternative: str | None = None, details: str | None = None) -> Callable[[F], F]: ...
-def experimental(
+def experimental(  # noqa: C901
     _target: F | None = None,
     *,
     alternative: str | None = None,
@@ -72,7 +72,7 @@ def experimental(
         def my_func(): ...
     """
 
-    def decorator(target: F) -> F:
+    def decorator(target: F) -> F:  # noqa: C901
         name = getattr(target, "__qualname__", getattr(target, "__name__", str(target)))
         msg = _make_warning_message(name, "experimental", alternative=alternative, details=details)
         warned = False
@@ -118,7 +118,7 @@ def deprecated(
     alternative: str | None = None,
     details: str | None = None,
 ) -> Callable[[F], F]: ...
-def deprecated(
+def deprecated(  # noqa: C901
     _target: F | None = None,
     *,
     since: str | None = None,
@@ -141,7 +141,7 @@ def deprecated(
         def old_func(): ...
     """
 
-    def decorator(target: F) -> F:
+    def decorator(target: F) -> F:  # noqa: C901
         name = getattr(target, "__qualname__", getattr(target, "__name__", str(target)))
         msg = _make_warning_message(
             name,

@@ -64,6 +64,7 @@ stages:
   - docs
   - release
   - security
+  - compliance
 
 ### SHARED JOB TEMPLATES ###
 
@@ -208,3 +209,21 @@ stages:
 .rules_release_branch_only:
   rules:
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+
+###############################################################################
+# Stage -- Trigger the DevSecOps components
+###############################################################################
+.trigger_compliance:
+  stage: compliance
+  trigger:
+    include: ".gitlab/ci/compliance.yml"
+    strategy: depend
+  allow_failure: true
+
+trigger_compliance:
+  extends: .trigger_compliance
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+  variables:
+    PACKAGE_NAME: "dataeval"

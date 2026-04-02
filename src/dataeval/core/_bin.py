@@ -92,7 +92,7 @@ def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.intp]:
     return np.digitize(data, bin_edges)
 
 
-def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.number[Any]] | None = None) -> bool:
+def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.number[Any]] | None = None) -> bool:  # noqa: C901
     """
     Determine whether the data is continuous or discrete using the Wasserstein distance.
 
@@ -144,7 +144,7 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
     return bool(shift < DISCRETE_MIN_WD)  # if NNN is close enough to uniform, consider the sample continuous.
 
 
-def _bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
+def _bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:  # noqa: C901
     """
     Bin continuous data by using the Clusterer to identify clusters.
 

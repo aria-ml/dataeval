@@ -91,7 +91,7 @@ class ReprMixin:
         """Override to append extra state to ``__repr__``."""
         return {}
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # noqa: C901
         """Return a string representation showing init parameters and extras."""
         sig = inspect.signature(self.__init__)  # type: ignore[misc]
         params: list[str] = []
@@ -124,7 +124,7 @@ class Evaluator:
         """Override to append extra state to ``__repr__``."""
         return {}
 
-    def _repr(self, *, extras: bool = True) -> str:
+    def _repr(self, *, extras: bool = True) -> str:  # noqa: C901
         """Build repr string, optionally suppressing extras."""
         config = getattr(self, "_config", None)
         if config is not None and hasattr(config, "model_fields"):
@@ -491,7 +491,7 @@ _P = ParamSpec("_P")
 _R = TypeVar("_R", bound=Output)
 
 
-def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | None = None) -> Callable[_P, _R]:
+def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | None = None) -> Callable[_P, _R]:  # noqa: C901
     """Stamp Output classes with runtime metadata."""
     if fn is None:
         return partial(set_metadata, state=state)  # type: ignore
@@ -525,7 +525,7 @@ def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | N
         time = datetime.now(timezone.utc)
         _logger.log(logging.INFO, f">>> Executing '{name}': args={arguments} state={state} <<<")
 
-        ##### EXECUTE FUNCTION #####
+        # EXECUTE FUNCTION #####
         result = fn(*args, **kwargs)
         ############################
 

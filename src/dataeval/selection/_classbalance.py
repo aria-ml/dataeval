@@ -76,7 +76,7 @@ class ClassBalance(Selection[Any]):
         self._images_per_class: Mapping[int, Sequence[int]]
         self._classes: Sequence[int]
 
-    def _yield_labels(self, dataset: Select[Any]) -> Iterator[tuple[int, int]]:
+    def _yield_labels(self, dataset: Select[Any]) -> Iterator[tuple[int, int]]:  # noqa: C901
         """
         Yield (label, image_index) pairs from dataset targets.
 
