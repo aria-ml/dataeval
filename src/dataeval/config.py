@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from dataeval.protocols import DeviceLike
 
-### GLOBAL CONFIG ###
+# GLOBAL CONFIG ###
 
 
 class GlobalConfig(BaseModel):
@@ -77,7 +77,7 @@ class GlobalConfig(BaseModel):
 _config = GlobalConfig()
 
 
-### CONTEXT MANAGER ###
+# CONTEXT MANAGER ###
 
 
 class _ConfigContextManager:
@@ -96,7 +96,7 @@ class _ConfigContextManager:
         setattr(_config, self._attr_name, self._old)
 
 
-### FUNCS ###
+# FUNCS ###
 
 
 def _todevice(device: DeviceLike) -> torch.device:

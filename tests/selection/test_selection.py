@@ -1,3 +1,4 @@
+from typing import NamedTuple
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -11,6 +12,10 @@ from dataeval.selection._reverse import Reverse
 from dataeval.selection._select import Select
 from dataeval.selection._shuffle import Shuffle
 from dataeval.types import SourceIndex
+
+
+class MockTarget(NamedTuple):
+    label: int
 
 
 def one_hot(label: int):
@@ -74,10 +79,6 @@ class TestSelectionClasses:
         assert "ClassBalance(" in str(select)
 
     def test_classfilter_with_unsupported_target(self):
-        class MockTarget:
-            def __init__(self, label: int):
-                self.label = label
-
         mock_dataset = MagicMock()
         mock_dataset.__len__.return_value = 10
         mock_dataset.__getitem__.side_effect = lambda idx: (f"data_{idx}", MockTarget(idx), {"id": idx})
@@ -87,10 +88,6 @@ class TestSelectionClasses:
             Select(mock_dataset, selections=[class_filter])
 
     def test_classbalance_with_unsupported_target(self):
-        class MockTarget:
-            def __init__(self, label: int):
-                self.label = label
-
         mock_dataset = MagicMock()
         mock_dataset.__len__.return_value = 10
         mock_dataset.__getitem__.side_effect = lambda idx: (f"data_{idx}", MockTarget(idx), {"id": idx})

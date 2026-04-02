@@ -74,7 +74,7 @@ def _merge_labels_and_factors(
     return data, discrete_features
 
 
-def mutual_info(
+def mutual_info(  # noqa: C901
     class_labels: Array1D[int],
     factor_data: Array2D[int | float],
     discrete_features: Array1D[bool] | None = None,
@@ -124,13 +124,11 @@ def mutual_info(
 
     >>> rng = np.random.default_rng(175)
     >>> class_labels = rng.choice([0, 1, 2], size=100)
-    >>> factor_data = np.column_stack(
-    ...     [
-    ...         rng.choice([25, 35, 45, 55], size=100),  # age
-    ...         rng.choice([50000, 65000, 80000], size=100),  # income
-    ...         rng.choice([0, 1], size=100),  # gender
-    ...     ]
-    ... )
+    >>> factor_data = np.column_stack([
+    ...     rng.choice([25, 35, 45, 55], size=100),  # age
+    ...     rng.choice([50000, 65000, 80000], size=100),  # income
+    ...     rng.choice([0, 1], size=100),  # gender
+    ... ])
     >>> result = mutual_info(class_labels=class_labels, factor_data=factor_data)
     >>> result["class_to_factor"]
     array([1.   , 0.034, 0.026, 0.004])
@@ -250,13 +248,11 @@ def mutual_info_classwise(
 
     >>> rng = np.random.default_rng(175)
     >>> class_labels = rng.choice([0, 1, 2], size=100)
-    >>> factor_data = np.column_stack(
-    ...     [
-    ...         rng.choice([25, 35, 45, 55], size=100),  # age
-    ...         rng.choice([50000, 65000, 80000], size=100),  # income
-    ...         rng.choice([0, 1], size=100),  # gender
-    ...     ]
-    ... )
+    >>> factor_data = np.column_stack([
+    ...     rng.choice([25, 35, 45, 55], size=100),  # age
+    ...     rng.choice([50000, 65000, 80000], size=100),  # income
+    ...     rng.choice([0, 1], size=100),  # gender
+    ... ])
     >>> mutual_info_classwise(class_labels=class_labels, factor_data=factor_data)
     array([[1.000e+00, 2.077e-02, 2.296e-03, 7.317e-04],
            [1.000e+00, 4.893e-02, 2.451e-02, 4.362e-03],

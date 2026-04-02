@@ -135,6 +135,41 @@ def gmm_energy(
     return sample_energy, cov_diag
 
 
+def _validate_gmm_z(z: Any) -> None:
+    """Validate the z (latent) output of a GMM model."""
+    if not isinstance(z, torch.Tensor):
+        raise ValueError(
+            f"When use_gmm=True, model's second output (z) must be a torch.Tensor, got {type(z).__name__}",
+        )
+    if z.ndim != 2:
+        raise ValueError(
+            f"When use_gmm=True, model's second output (z) must be 2D with shape (batch_size, latent_dim), "
+            f"got shape {z.shape}",
+        )
+
+
+def _validate_gmm_gamma(gamma: Any) -> None:
+    """Validate the gamma (mixture weights) output of a GMM model."""
+    if not isinstance(gamma, torch.Tensor):
+        raise ValueError(
+            f"When use_gmm=True, model's third output (gamma) must be a torch.Tensor, got {type(gamma).__name__}",
+        )
+    if gamma.ndim != 2:
+        raise ValueError(
+            f"When use_gmm=True, model's third output (gamma) must be 2D with shape (batch_size, n_gmm), "
+            f"got shape {gamma.shape}",
+        )
+    gamma_sums = gamma.sum(dim=-1)
+    if not torch.allclose(gamma_sums, torch.ones_like(gamma_sums), atol=1e-5):
+        min_sum = gamma_sums.min()
+        max_sum = gamma_sums.max()
+        raise ValueError(
+            "When use_gmm=True, model's third output (gamma) must be a probability distribution "
+            f"(sum to 1 along last dimension). Got sums with min={min_sum:.6f}, max={max_sum:.6f}. "
+            "Consider using nn.Softmax(dim=-1) as the final layer of your GMM density network.",
+        )
+
+
 class ReconstructionScorer:
     """Pure reconstruction math: model training, scoring, GMM fusion.
 
@@ -225,41 +260,10 @@ class ReconstructionScorer:
                 f"but got {len(sample_output)} elements",
             )
 
-        z_test = sample_output[1]
-        gamma_test = sample_output[2]
+        _validate_gmm_z(sample_output[1])
+        _validate_gmm_gamma(sample_output[2])
 
-        if not isinstance(z_test, torch.Tensor):
-            raise ValueError(
-                f"When use_gmm=True, model's second output (z) must be a torch.Tensor, got {type(z_test).__name__}",
-            )
-        if z_test.ndim != 2:
-            raise ValueError(
-                f"When use_gmm=True, model's second output (z) must be 2D with shape (batch_size, latent_dim), "
-                f"got shape {z_test.shape}",
-            )
-
-        if not isinstance(gamma_test, torch.Tensor):
-            raise ValueError(
-                f"When use_gmm=True, model's third output (gamma) must be a torch.Tensor, "
-                f"got {type(gamma_test).__name__}",
-            )
-        if gamma_test.ndim != 2:
-            raise ValueError(
-                f"When use_gmm=True, model's third output (gamma) must be 2D with shape (batch_size, n_gmm), "
-                f"got shape {gamma_test.shape}",
-            )
-
-        gamma_sums = gamma_test.sum(dim=-1)
-        if not torch.allclose(gamma_sums, torch.ones_like(gamma_sums), atol=1e-5):
-            min_sum = gamma_sums.min()
-            max_sum = gamma_sums.max()
-            raise ValueError(
-                "When use_gmm=True, model's third output (gamma) must be a probability distribution "
-                f"(sum to 1 along last dimension). Got sums with min={min_sum:.6f}, max={max_sum:.6f}. "
-                "Consider using nn.Softmax(dim=-1) as the final layer of your GMM density network.",
-            )
-
-    def fit(
+    def fit(  # noqa: C901
         self,
         reference_data: NDArray[np.float32],
         loss_fn: ReconstructionLossFn | EvidenceLowerBoundLossFn | Callable[..., torch.Tensor] | None = None,
@@ -345,7 +349,7 @@ class ReconstructionScorer:
             self._recon_ref_mean = float(recon_scores.mean())
             self._recon_ref_std = float(recon_scores.std())
 
-    def score(
+    def score(  # noqa: C901
         self,
         x: NDArray[np.float32],
         batch_size: int = int(1e10),

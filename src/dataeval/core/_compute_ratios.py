@@ -101,7 +101,7 @@ def _build_image_lookup(source_indices: Sequence[SourceIndex]) -> dict[tuple[int
     return lookup
 
 
-def _calculate_ratio_for_stat(
+def _calculate_ratio_for_stat(  # noqa: C901
     stat_name: str,
     box_value: Any,
     img_value: Any,
@@ -160,7 +160,7 @@ def _calculate_ratio_for_stat(
         return box_value
 
 
-def _validate_separate_inputs(
+def _validate_separate_inputs(  # noqa: C901
     stats_output: StatsResult,
     box_stats_output: StatsResult,
 ) -> tuple[Sequence[SourceIndex], Sequence[SourceIndex]]:
@@ -241,7 +241,7 @@ def _validate_unified_input(source_indices: Sequence[SourceIndex]) -> None:
         )
 
 
-def compute_ratios(
+def compute_ratios(  # noqa: C901
     stats_output: StatsResult,
     *,
     target_stats_output: StatsResult | None = None,

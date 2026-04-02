@@ -194,8 +194,8 @@ def deps(session: nox.Session) -> None:
 @session(uv_only_groups=["lint"], uv_no_install_project=True)
 def lint(session: nox.Session) -> None:
     """Perform linting and spellcheck."""
-    session.run("ruff", "check", "--show-fixes", "--exit-non-zero-on-fix", "--fix")
-    session.run("ruff", "format", "--check" if IS_CI else ".")
+    session.run("ruff", "check", "--preview", "--show-fixes", "--exit-non-zero-on-fix", "--fix")
+    session.run("ruff", "format", "--preview", "--check" if IS_CI else ".")
     session.run("codespell")
 
 

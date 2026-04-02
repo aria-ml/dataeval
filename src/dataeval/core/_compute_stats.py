@@ -158,7 +158,7 @@ def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], nu
     return sorted(channel_indices_needed, key=lambda x: -1 if x is None else x)
 
 
-def _reconcile_stats(
+def _reconcile_stats(  # noqa: C901
     calculator_output: list[dict[str, list[Any]]],
     sorted_channels: list[int | None],
     empty_values_map: dict[str, Any],
@@ -344,7 +344,7 @@ def _aggregate_batch(
 _UNSET = object()
 
 
-def compute_stats(
+def compute_stats(  # noqa: C901
     data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
@@ -544,7 +544,7 @@ def compute_stats(
     )
 
 
-def combine_stats_results(
+def combine_stats_results(  # noqa: C901
     results: StatsResult | Sequence[StatsResult],
 ) -> tuple[StatsMap, list[SourceIndex], list[int]]:
     """Combine one or more StatsResults into unified stats, source_index, and dataset_steps.

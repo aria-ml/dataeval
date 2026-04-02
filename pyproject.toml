@@ -118,6 +118,14 @@ docs = [
   "markupsafe>=3,<3.0.2",
   "jupytext>=1.19.1",
 ]
+security = [  # keep in sync with [tool.uv.constraint-dependencies]
+  "cryptography>=46.0.5",    # CVE-2026-26007: Missing Subgroup Validation for SECT Curves
+  "filelock>=3.20.3",        # GHSA-w853-jp5j-5j7f, GHSA-qmgc-5h2g-mvrw
+  "pillow>=12.1.1",          # CVE-2026-25990: OOB write via PSD image
+  "protobuf>=6.33.5",        # GHSA-7gcm-g887-7qv7
+  "setuptools>=82.0.0",      # CVE-2026-23949: (jaraco_context) path traversal in tarball()
+                             # CVE-2026-24049: (wheel) privilege escalation via unpack
+]
 dev = [
   { include-group = "base" },
   { include-group = "lint" },
@@ -141,7 +149,9 @@ conflicts = [
 ]
 constraint-dependencies = [
     "cryptography>=46.0.5",    # CVE-2026-26007: Missing Subgroup Validation for SECT Curves
+    "filelock>=3.20.3",        # GHSA-w853-jp5j-5j7f, GHSA-qmgc-5h2g-mvrw
     "pillow>=12.1.1",          # CVE-2026-25990: OOB write via PSD image
+    "protobuf>=6.33.5",        # GHSA-7gcm-g887-7qv7
     "setuptools>=82.0.0",      # CVE-2026-23949: (jaraco_context) path traversal in tarball()
                                # CVE-2026-24049: (wheel) privilege escalation via unpack
 ]
@@ -262,20 +272,23 @@ exclude = [
   ".jupyter_cache",
   "*env*",
   "output",
+  "_build",
   "build",
   ".nox",
   ".tox",
+  "prototype",
   "src/dataeval/_version.py",
 ]
 line-length = 120
 indent-width = 4
 target-version = "py310"
+extend-include = ["*.ipynb"]
 
 [tool.ruff.lint]
 select = ["F", "E", "W", "C90", "I", "N", "D", "UP", "YTT", "ANN", "S", "BLE", "B", "A",
           "COM", "C4", "T10", "ISC", "ICN", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SIM",
-          "TID252", "ARG", "FIX", "PD", "FLY", "NPY", "RUF100", "PERF"]
-ignore = ["ANN401", "COM812", "NPY002", "SLF001"]
+          "TID252", "ARG", "FIX", "PD", "FLY", "NPY", "RUF027", "RUF100", "PERF"]
+ignore = ["ANN101", "ANN102", "ANN401", "C408", "C416", "COM812", "NPY002", "SLF001"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
@@ -286,6 +299,9 @@ builtins-strict-checking = false
 
 [tool.ruff.lint.isort]
 known-first-party = ["dataeval"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 5
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"

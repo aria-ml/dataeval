@@ -31,7 +31,7 @@ def get_dataset_step_from_idx(idx: int, dataset_steps: Sequence[int]) -> tuple[i
     return -1, idx
 
 
-def add_dataset_index(
+def add_dataset_index(  # noqa: C901
     df: pl.DataFrame,
     dataset_steps: Sequence[int],
 ) -> pl.DataFrame:
@@ -71,7 +71,8 @@ def add_dataset_index(
         sort_cols.append("metric_name")
 
     return (
-        df.with_columns(
+        df
+        .with_columns(
             pl.Series("dataset_index", dataset_indices, dtype=pl.Int64),
             pl.Series("item_index", local_item_indices, dtype=pl.Int64),
         )

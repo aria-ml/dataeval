@@ -334,12 +334,10 @@ class TestOutliersOutput:
         assert len(output) == 3
 
     def test_multi_dataset_len(self):
-        combined = pl.concat(
-            [
-                self.outlier.with_columns(pl.lit(0).alias("dataset_index")),
-                self.outlier2.with_columns(pl.lit(1).alias("dataset_index")),
-            ]
-        ).select(["dataset_index"] + self.outlier.columns)
+        combined = pl.concat([
+            self.outlier.with_columns(pl.lit(0).alias("dataset_index")),
+            self.outlier2.with_columns(pl.lit(1).alias("dataset_index")),
+        ]).select(["dataset_index"] + self.outlier.columns)
         output = OutliersOutput(combined)
         assert len(output) == 6
 
@@ -382,12 +380,10 @@ class TestOutliersOutput:
 
     def test_aggregate_by_metric_raises_on_multi_dataset(self):
         """Test aggregate_by_metric raises error for multiple datasets."""
-        combined = pl.concat(
-            [
-                self.outlier.with_columns(pl.lit(0).alias("dataset_index")),
-                self.outlier2.with_columns(pl.lit(1).alias("dataset_index")),
-            ]
-        )
+        combined = pl.concat([
+            self.outlier.with_columns(pl.lit(0).alias("dataset_index")),
+            self.outlier2.with_columns(pl.lit(1).alias("dataset_index")),
+        ])
         output = OutliersOutput(combined)
         with pytest.raises(ValueError, match="only works with output from a single dataset"):
             output.aggregate_by_metric()
@@ -434,12 +430,10 @@ class TestOutliersOutput:
         """Test aggregate_by_class raises error for multiple datasets."""
         metadata = make_mock_metadata(self.lstat)
 
-        combined = pl.concat(
-            [
-                self.outlier.with_columns(pl.lit(0).alias("dataset_index")),
-                self.outlier2.with_columns(pl.lit(1).alias("dataset_index")),
-            ]
-        )
+        combined = pl.concat([
+            self.outlier.with_columns(pl.lit(0).alias("dataset_index")),
+            self.outlier2.with_columns(pl.lit(1).alias("dataset_index")),
+        ])
         output = OutliersOutput(combined)
         with pytest.raises(ValueError, match="only works with output from a single dataset"):
             output.aggregate_by_class(metadata)
@@ -545,12 +539,10 @@ class TestOutliersOutput:
 
     def test_aggregate_by_item_raises_on_multi_dataset(self):
         """Test aggregate_by_item raises error for multiple datasets."""
-        combined = pl.concat(
-            [
-                self.outlier.with_columns(pl.lit(0).alias("dataset_index")),
-                self.outlier2.with_columns(pl.lit(1).alias("dataset_index")),
-            ]
-        )
+        combined = pl.concat([
+            self.outlier.with_columns(pl.lit(0).alias("dataset_index")),
+            self.outlier2.with_columns(pl.lit(1).alias("dataset_index")),
+        ])
         output = OutliersOutput(combined)
         with pytest.raises(ValueError, match="only works with output from a single dataset"):
             output.aggregate_by_item()

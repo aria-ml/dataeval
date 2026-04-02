@@ -156,7 +156,7 @@ class OnnxExtractor(ReprMixin):
             return [transforms]
         return list(transforms)
 
-    def _load_model(self) -> None:
+    def _load_model(self) -> None:  # noqa: C901
         """Load the ONNX model and validate configuration."""
         session_cls = _get_inference_session()
         providers = _get_execution_providers()
@@ -220,7 +220,7 @@ class OnnxExtractor(ReprMixin):
         # Ensure float32 for ONNX
         return result.astype(np.float32)
 
-    def __call__(self, data: Any) -> Array:
+    def __call__(self, data: Any) -> Array:  # noqa: C901
         """
         Extract features from a batch of images.
 

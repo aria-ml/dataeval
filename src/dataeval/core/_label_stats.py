@@ -54,7 +54,7 @@ class LabelStatsResult(TypedDict):
     empty_image_count: int
 
 
-def label_stats(
+def label_stats(  # noqa: C901
     class_labels: Iterable[int],
     item_indices: Iterable[int] | None = None,
     index2label: Mapping[int, str] | None = None,

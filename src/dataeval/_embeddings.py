@@ -509,7 +509,7 @@ class Embeddings(Array, FeatureExtractor):
             images.append(image)
         return images
 
-    def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:
+    def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:  # noqa: C901
         """Process indices in batches using the extractor."""
         if self._dataset is None:
             raise NotFittedError("No dataset bound. Call bind() first.")
@@ -559,7 +559,7 @@ class Embeddings(Array, FeatureExtractor):
             batch_indices = list(indices[batch_start : batch_start + self._batch_size])
             yield self._embeddings[batch_indices]
 
-    def __getitem__(self, key: int | Iterable[int] | slice, /) -> NDArray[Any]:
+    def __getitem__(self, key: int | Iterable[int] | slice, /) -> NDArray[Any]:  # noqa: C901
         """
         Access embeddings by index, indices or slice.
 

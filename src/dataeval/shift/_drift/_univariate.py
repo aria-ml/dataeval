@@ -308,7 +308,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
         self._fitted = True
         return self
 
-    def _score_fn(self, x: NDArray[np.float32], y: NDArray[np.float32]) -> tuple[np.float32, np.float32]:
+    def _score_fn(self, x: NDArray[np.float32], y: NDArray[np.float32]) -> tuple[np.float32, np.float32]:  # noqa: C901
         """Compute test statistic and p-value for the selected method.
 
         Parameters
