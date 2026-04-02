@@ -174,7 +174,7 @@ print(f"Embeddings shape: {embeddings.shape}")
 # - `D` is the embedding dimension (2048 for ResNet50)
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 assert embeddings.shape[0] == 100
 assert embeddings.shape[1] == 2048
 

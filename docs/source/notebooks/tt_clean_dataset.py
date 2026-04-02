@@ -139,7 +139,8 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_result, metric, layout
 
     # Compute distance from median and sort by most extreme first
     ranked = (
-        metric_outliers.unique(subset=["item_index"])
+        metric_outliers
+        .unique(subset=["item_index"])
         .with_columns((pl.col("metric_value") - median).abs().alias("_distance"))
         .sort("_distance", descending=True)
         .drop("_distance")
@@ -245,13 +246,11 @@ md = Metadata(ds)
 lstats = label_stats(md.class_labels, md.item_indices, ds.index2label, image_count=len(ds))
 
 # View per_class data as a DataFrame
-pl.DataFrame(
-    {
-        "class_name": list(ds.index2label.values()),
-        "label_count": [lstats["label_counts_per_class"][k] for k in ds.index2label],
-        "image_count": [lstats["image_counts_per_class"][k] for k in ds.index2label],
-    }
-)
+pl.DataFrame({
+    "class_name": list(ds.index2label.values()),
+    "label_count": [lstats["label_counts_per_class"][k] for k in ds.index2label],
+    "image_count": [lstats["image_counts_per_class"][k] for k in ds.index2label],
+})
 
 # %% [markdown]
 # The above table shows that this dataset has a total of 20 classes.

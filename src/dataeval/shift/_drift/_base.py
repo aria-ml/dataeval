@@ -392,7 +392,7 @@ class ChunkedDrift(Generic[TDetails]):
         return self
 
     @set_metadata
-    def predict(
+    def predict(  # noqa: C901
         self,
         data: Any = None,
         chunks: list[Any] | None = None,

@@ -62,7 +62,7 @@ def _calc_median_deviations(reference: NDArray[Any], test: NDArray[Any]) -> NDAr
     return np.abs(np.where(test_dev >= 0, test_dev / pscale, test_dev / nscale))  # (S_t, F)
 
 
-def factor_deviation(
+def factor_deviation(  # noqa: C901
     reference_factors: Mapping[str, NDArray[Any]],
     test_factors: Mapping[str, NDArray[Any]],
     indices: SequenceLike[int],
@@ -177,7 +177,7 @@ def factor_deviation(
     return results
 
 
-def factor_predictors(
+def factor_predictors(  # noqa: C901
     factors: Mapping[str, NDArray[Any]],
     indices: SequenceLike[int],
     discrete_features: list[bool] | None = None,

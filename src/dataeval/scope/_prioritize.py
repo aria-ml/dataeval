@@ -737,7 +737,7 @@ class Prioritize(Evaluator):
         )
 
     @set_metadata(state=["method", "k", "c", "n_init", "policy", "num_bins"])
-    def evaluate(
+    def evaluate(  # noqa: C901
         self,
         dataset: AnnotatedDataset[Any] | Array,
         class_labels: NDArray[np.integer[Any]] | None = None,
@@ -839,7 +839,7 @@ class Prioritize(Evaluator):
             class_labels=class_labels,
         )
 
-    def _perform_ranking(
+    def _perform_ranking(  # noqa: C901
         self,
         embeddings_array: NDArray[np.floating[Any]],
         reference_array: NDArray[np.floating[Any]] | None,

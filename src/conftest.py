@@ -50,7 +50,7 @@ METADATA_FACTORS = {
 # =============================================================================
 
 
-def _generate_images(
+def _generate_images(  # noqa: C901
     n_images: int = 50,
     shape: tuple[int, int, int] = (3, 64, 64),
     seed: int = 42,
@@ -337,7 +337,7 @@ def reset_config() -> Any:
 
 
 @pytest.fixture(autouse=True, scope="session")
-def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
+def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa: C901
     """Create all unified fixtures for doctests."""
     # -------------------------------------------------------------------------
     # Generate base data

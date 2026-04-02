@@ -131,7 +131,7 @@ results.aggregate_by_class(metadata)
 results_classwise.aggregate_by_class(metadata)
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 print(results.shape[0])
 assert results.shape[0] == 404
 

@@ -135,7 +135,7 @@ class Diversity(Evaluator):
         super().__init__(locals())
 
     @set_metadata(state=["method", "threshold"])
-    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> DiversityOutput:
+    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> DiversityOutput:  # noqa: C901
         """
         Compute diversity and classwise diversity for the dataset.
 

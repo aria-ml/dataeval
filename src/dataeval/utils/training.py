@@ -17,7 +17,7 @@ from dataeval.protocols import Array, ProgressCallback
 _logger = logging.getLogger(__name__)
 
 
-def train(
+def train(  # noqa: C901
     model: torch.nn.Module,
     x_train: NDArray[Any],
     y_train: NDArray[Any] | None,

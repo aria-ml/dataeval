@@ -123,7 +123,7 @@ div = divergence_fnn(data_a, corrupted_emb)
 print(div)
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 assert div["divergence"] > 0.95
 
 # %% [markdown]

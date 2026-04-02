@@ -29,7 +29,7 @@ class ClassFilter(Selection[Any]):
         self.classes = classes
         self.filter_detections = filter_detections
 
-    def __call__(self, dataset: Select[Any]) -> None:
+    def __call__(self, dataset: Select[Any]) -> None:  # noqa: C901
         if not self.classes:
             return
 

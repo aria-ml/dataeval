@@ -129,7 +129,7 @@ ber_result = ber_mst(embeddings, labels)
 print("The bayes error rate estimation:", ber_result["upper_bound"])
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 assert 0.93 < 1 - ber_result["upper_bound"] < 0.96
 
 # %% [markdown]
@@ -163,7 +163,7 @@ new_result = ber_mst(embeddings, labels_merged)
 print("The bayes error rate estimation:", new_result["upper_bound"])
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 assert 0.99 < 1 - new_result["upper_bound"] < 0.995
 
 # %% [markdown]

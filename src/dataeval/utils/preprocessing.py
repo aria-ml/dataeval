@@ -101,7 +101,7 @@ class BoundingBox:
     (89.6, 78.4, 134.4, 145.6)
     """
 
-    def __init__(
+    def __init__(  # noqa: C901
         self,
         v1: float,
         v2: float,
@@ -254,7 +254,7 @@ Box = IntBox | FloatBox
 BoxLike = BoundingBox | Box | Iterable[int | float] | None
 
 
-def to_bounding_box(boxlike: BoxLike, image_shape: tuple[int, ...] | None = None) -> BoundingBox:
+def to_bounding_box(boxlike: BoxLike, image_shape: tuple[int, ...] | None = None) -> BoundingBox:  # noqa: C901
     """
     Convert a box-like input to a BoundingBox instance.
 
@@ -538,7 +538,7 @@ def resize(image: NDArray[np.uint8], resize_dim: int, use_pil: bool = True) -> N
     return np.clip(np.asarray(zoom(image, zoom_factors, order=5, mode="reflect")), 0, 255, dtype=np.uint8)
 
 
-def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:
+def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:  # noqa: C901
     """
     Convert an image of arbitrary channels (CHW) to a single-channel uint8 grayscale image (HW).
 

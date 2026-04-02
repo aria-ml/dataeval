@@ -240,7 +240,7 @@ for count, i in enumerate(axs):
 # -->
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 wonky = sum(labels[i] == 2 or labels[i] == 7 for idx, i in enumerate(cvrg["uncovered_indices"]) if idx < 20)
 print(wonky)
 assert (wonky / 20) > 0.4

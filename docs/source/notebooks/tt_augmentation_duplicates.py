@@ -177,13 +177,11 @@ base_img3 = create_textured_image(seed=789, size=IMG_SIZE)
 
 # Display base images
 fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-for i, (img, title) in enumerate(
-    [
-        (base_img1, "Base Image 1 (seed=67)"),
-        (base_img2, "Base Image 2 (seed=123)"),
-        (base_img3, "Base Image 3 (seed=789)"),
-    ]
-):
+for i, (img, title) in enumerate([
+    (base_img1, "Base Image 1 (seed=67)"),
+    (base_img2, "Base Image 2 (seed=123)"),
+    (base_img3, "Base Image 3 (seed=789)"),
+]):
     axes[i].imshow(np.transpose(img, (1, 2, 0)))
     axes[i].set_title(title)
     axes[i].axis("off")
@@ -259,28 +257,22 @@ transformations = {
     "Random Erasing (10%)": T.RandomErasing(p=1.0, scale=(0.02, 0.1)),
     "Random Erasing (33%)": T.RandomErasing(p=1.0, scale=(0.2, 0.33)),
     # Combinations (common augmentation pipelines)
-    "Augment: Flip+Rotate": T.Compose(
-        [
-            T.RandomHorizontalFlip(p=1.0),
-            T.RandomRotation(degrees=_n(15), expand=True, fill=FILL),
-            T.Resize(IMG_SIZE),
-        ]
-    ),
-    "Augment: Flip+Color": T.Compose(
-        [
-            T.RandomHorizontalFlip(p=1.0),
-            T.ColorJitter(brightness=0.2, contrast=0.2),
-        ]
-    ),
-    "Augment: Full Pipeline": T.Compose(
-        [
-            T.RandomHorizontalFlip(p=0.5),
-            T.RandomRotation(degrees=_n(10), expand=True, fill=FILL),
-            T.Resize(IMG_SIZE),
-            T.ColorJitter(brightness=0.1, contrast=0.1),
-            T.GaussianBlur(kernel_size=3, sigma=(0.5, 0.5)),
-        ]
-    ),
+    "Augment: Flip+Rotate": T.Compose([
+        T.RandomHorizontalFlip(p=1.0),
+        T.RandomRotation(degrees=_n(15), expand=True, fill=FILL),
+        T.Resize(IMG_SIZE),
+    ]),
+    "Augment: Flip+Color": T.Compose([
+        T.RandomHorizontalFlip(p=1.0),
+        T.ColorJitter(brightness=0.2, contrast=0.2),
+    ]),
+    "Augment: Full Pipeline": T.Compose([
+        T.RandomHorizontalFlip(p=0.5),
+        T.RandomRotation(degrees=_n(10), expand=True, fill=FILL),
+        T.Resize(IMG_SIZE),
+        T.ColorJitter(brightness=0.1, contrast=0.1),
+        T.GaussianBlur(kernel_size=3, sigma=(0.5, 0.5)),
+    ]),
 }
 
 # %%
@@ -613,7 +605,7 @@ print("=" * 90)
 #    no transformations are detected at 0.75
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 # Verify that unique images are NOT detected as duplicates
 unique_indices = {len(images) - 2, len(images) - 1}
 assert unique_indices.isdisjoint(combined_detected), "Unique images should not be detected as duplicates"

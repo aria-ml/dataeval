@@ -140,7 +140,7 @@ clusters = cluster(test_data, algorithm="hdbscan", n_clusters=5)
 clusters["clusters"]
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 assert clusters["clusters"].max() == 4
 assert clusters["clusters"].min() == -1
 
@@ -181,7 +181,7 @@ print("outliers: ", outliers_result.outliers)
 # points).
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 assert len(outliers_result.outliers) == 1
 assert len(duplicates_result.near) == 2
 

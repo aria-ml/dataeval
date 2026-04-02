@@ -103,7 +103,7 @@ def _get_orientation(methods: frozenset[str]) -> Literal["rotated", "same"]:
     return "same"
 
 
-def _merge_near_groups(
+def _merge_near_groups(  # noqa: C901
     method_groups: Sequence[tuple[Sequence[Any], str]],
     available_stats: set[str],
     merge: bool,
@@ -332,7 +332,7 @@ def _make_row(
     return row
 
 
-def _build_duplicates_dataframe(
+def _build_duplicates_dataframe(  # noqa: C901
     item_exact: Sequence[Sequence[int]] | None,
     item_near_method_groups: Sequence[tuple[Sequence[Any], str]],
     target_exact: Sequence[Sequence[SourceIndex]] | None,
@@ -403,6 +403,42 @@ def _find_hash_groups(
     return [sorted(v) for v in near_dict.values() if len(v) > 1 and not any(set(v).issubset(x) for x in exact_groups)]
 
 
+def _find_exact_groups(
+    stats: StatsMap,
+    indices: list[int],
+    key_fn: Any,
+) -> list[list[Any]]:
+    """Group indices by xxhash and return groups with more than one member."""
+    if "xxhash" not in stats:
+        return []
+    d: dict[str, list[Any]] = {}
+    for i in indices:
+        d.setdefault(stats["xxhash"][i], []).append(key_fn(i))
+    return [sorted(v) for v in d.values() if len(v) > 1]
+
+
+def _find_near_group_pairs(
+    stats: StatsMap,
+    source_index: Sequence[SourceIndex],
+    indices: list[int],
+    exact_groups: list[list[Any]],
+    hash_methods: list[str],
+    *,
+    use_source_index: bool = False,
+) -> MethodGroups:
+    """Find near-duplicate groups across all hash methods."""
+    near: MethodGroups = []
+    for method in hash_methods:
+        if method in stats:
+            near.extend(
+                (g, method)
+                for g in _find_hash_groups(
+                    stats, method, source_index, indices, exact_groups, use_source_index=use_source_index
+                )
+            )
+    return near
+
+
 def _detect_hash_duplicates(
     stats: StatsMap,
     source_index: Sequence[SourceIndex],
@@ -424,38 +460,13 @@ def _detect_hash_duplicates(
 
     hash_methods = ["phash", "dhash", "phash_d4", "dhash_d4"]
 
-    # Item-level detection
-    item_exact: list[list[int]] = []
-    if "xxhash" in stats:
-        d: dict[str, list[int]] = {}
-        for i in item_indices:
-            d.setdefault(stats["xxhash"][i], []).append(source_index[i].item)
-        item_exact = [sorted(v) for v in d.values() if len(v) > 1]
+    item_exact = _find_exact_groups(stats, item_indices, lambda i: source_index[i].item)
+    item_near = _find_near_group_pairs(stats, source_index, item_indices, item_exact, hash_methods)
 
-    item_near: MethodGroups = []
-    for method in hash_methods:
-        if method in stats:
-            item_near.extend(
-                (g, method) for g in _find_hash_groups(stats, method, source_index, item_indices, item_exact)
-            )
-
-    # Target-level detection
-    target_exact: list[list[SourceIndex]] = []
-    if "xxhash" in stats:
-        td: dict[str, list[SourceIndex]] = {}
-        for i in target_indices:
-            td.setdefault(stats["xxhash"][i], []).append(source_index[i])
-        target_exact = [sorted(v) for v in td.values() if len(v) > 1]
-
-    target_near: MethodGroups = []
-    for method in hash_methods:
-        if method in stats:
-            target_near.extend(
-                (g, method)
-                for g in _find_hash_groups(
-                    stats, method, source_index, target_indices, target_exact, use_source_index=True
-                )
-            )
+    target_exact = _find_exact_groups(stats, target_indices, lambda i: source_index[i])
+    target_near = _find_near_group_pairs(
+        stats, source_index, target_indices, target_exact, hash_methods, use_source_index=True
+    )
 
     return (sorted(item_exact) or [], item_near), (sorted(target_exact) or [], target_near)
 
@@ -684,7 +695,8 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         exploded = self.data().explode("item_indices").rename({"item_indices": "item_index"})
 
         return (
-            exploded.group_by("item_index")
+            exploded
+            .group_by("item_index")
             .agg(
                 pl.len().cast(pl.UInt32).alias("group_count"),
                 pl.col("dup_type").unique().sort().alias("dup_types"),
@@ -766,7 +778,8 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         )
 
         return (
-            with_count.explode("methods")
+            with_count
+            .explode("methods")
             .rename({"methods": "method"})
             .group_by("method")
             .agg(

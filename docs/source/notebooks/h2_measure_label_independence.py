@@ -92,7 +92,7 @@ print(
 )
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 assert 0 <= results["chi_squared"] < 4
 assert 0.9 < results["p_value"] <= 1.0
 

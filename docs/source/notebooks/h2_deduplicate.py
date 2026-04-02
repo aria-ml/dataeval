@@ -122,7 +122,7 @@ display(results)
 # digits we would expect it to find some images that were nearly identical.
 
 # %% tags=["remove_cell"]
-### TEST ASSERTION CELL ###
+# TEST ASSERTION CELL ###
 assert results.exact
 assert len(results.exact) == len(duplicates)
 for k, v in duplicates.items():

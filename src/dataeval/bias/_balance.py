@@ -147,7 +147,7 @@ class Balance(Evaluator):
         super().__init__(locals())
 
     @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold"])
-    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> BalanceOutput:
+    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> BalanceOutput:  # noqa: C901
         """
         Compute mutual information between factors and identify imbalanced classes.
 
