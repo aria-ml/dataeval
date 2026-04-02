@@ -67,7 +67,7 @@ include:
   - component: gitlab.jatic.net/jatic/devsecops/components/dsor-compliance@1.0.0
     inputs:
       full_execution_on_commit: true
-      sast_excluded_paths: tests, docs, verification, README.md
+      sast_excluded_paths: "docs,output,tests,verification,.github,.gitlab,.nox,.venv"
       sast_search_max_depth: "2"
       allow_failure: true
 

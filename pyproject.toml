@@ -114,7 +114,6 @@ docs = [
   "sphinx-tabs>=3.4.7",
   "Sphinx>=7.2.6,<9.0.0", # sphinx-immaterial <= 0.13.9 is not compatible with sphinx >=9.0
   "torchmetrics>=1.0.0",
-  "torchvision>=0.17.0",
   "markupsafe>=3,<3.0.2",
   "jupytext>=1.19.1",
 ]
@@ -210,6 +209,9 @@ version-file = "src/dataeval/_version.py"
 
 [tool.poetry]
 version = "0.0.0"  # unused
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.15"
 
 [tool.pyproject2conda.dependencies]
 numpy = { skip = true, packages = "numpy>=1.24.2" }
@@ -307,6 +309,7 @@ max-complexity = 5
 convention = "numpy"
 
 [tool.ruff.format]
+preview = true
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false

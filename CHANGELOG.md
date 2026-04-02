@@ -1,6 +1,15 @@
-[//]: # (241406a2150837995abede310966b9fd69ae1831)
+[//]: # (3ba42852080a7dcac814efb08ce1c52278c8178c)
 
 # DataEval Change Log
+
+## v1.0.5
+
+👾 **Fixes**
+- `3ba42852` - [devsecops] Update ruff rules and bump poetry dependencies
+
+    - Address ruff rule differences in PDG
+    - Bump dependencies specifically for poetry.lock
+    - Enable compliance pipelines in release branches
 
 ## v1.0.4
 

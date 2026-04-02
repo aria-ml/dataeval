@@ -1432,7 +1432,6 @@ numpy==2.2.6 ; python_full_version < '3.11' \
     #   scipy
     #   tifffile
     #   torchmetrics
-    #   torchvision
 numpy==2.3.5 ; python_full_version >= '3.11' \
     --hash=sha256:00dc4e846108a382c5869e77c6ed514394bdeb3403461d25a829711041217d5b \
     --hash=sha256:0472f11f6ec23a74a906a00b48a4dcf3849209696dff7c189714511268d103ae \
@@ -1526,7 +1525,6 @@ numpy==2.3.5 ; python_full_version >= '3.11' \
     #   scipy
     #   tifffile
     #   torchmetrics
-    #   torchvision
 onnx==1.20.1 \
     --hash=sha256:0104bb2d4394c179bcea3df7599a45a2932b80f4633840896fcf0d7d8daecea2 \
     --hash=sha256:0903e6088ed5e8f59ebd381ab2a6e9b2a60b4c898f79aa2fe76bb79cf38a5031 \
@@ -1694,7 +1692,6 @@ pillow==12.1.1 \
     #   maite-datasets
     #   matplotlib
     #   scikit-image
-    #   torchvision
 pip==26.0.1 \
     --hash=sha256:bdb1b08f4274833d62c1aa29e20907365a2ceb950410df15fc9521bad440122b \
     --hash=sha256:c4037d8a277c89b320abe636d59f91e6d0922d08a05b60e85e53b296613346d8
@@ -2806,39 +2803,9 @@ torch==2.10.0 \
     # via
     #   dataeval
     #   torchmetrics
-    #   torchvision
 torchmetrics==1.8.2 \
     --hash=sha256:08382fd96b923e39e904c4d570f3d49e2cc71ccabd2a94e0f895d1f0dac86242 \
     --hash=sha256:cf64a901036bf107f17a524009eea7781c9c5315d130713aeca5747a686fe7a5
-torchvision==0.25.0 \
-    --hash=sha256:0b5e7f50002a8145a98c5694a018e738c50e2972608310c7e88e1bd4c058f6ce \
-    --hash=sha256:0d9a3f925a081dd2ebb0b791249b687c2ef2c2717d027946654607494b9b64b6 \
-    --hash=sha256:146d02c9876858420adf41f3189fe90e3d6a409cbfa65454c09f25fb33bf7266 \
-    --hash=sha256:153c0d2cbc34b7cf2da19d73450f24ba36d2b75ec9211b9962b5022fb9e4ecee \
-    --hash=sha256:24e11199e4d84ba9c5ee7825ebdf1cd37ce8deec225117f10243cae984ced3ec \
-    --hash=sha256:40a122c3cf4d14b651f095e0f672b688dde78632783fc5cd3d4d5e4f6a828563 \
-    --hash=sha256:5e6b449e9fa7d642142c0e27c41e5a43b508d57ed8e79b7c0a0c28652da8678c \
-    --hash=sha256:5f271136d2d2c0b7a24c5671795c6e4fd8da4e0ea98aeb1041f62bc04c4370ef \
-    --hash=sha256:620a236288d594dcec7634c754484542dc0a5c1b0e0b83a34bda5e91e9b7c3a1 \
-    --hash=sha256:632db02300e83793812eee4f61ae6a2686dab10b4cfd628b620dc47747aa9d03 \
-    --hash=sha256:846890161b825b38aa85fc37fb3ba5eea74e7091ff28bab378287111483b6443 \
-    --hash=sha256:855c0dc6d37f462482da7531c6788518baedca1e0847f3df42a911713acdfe52 \
-    --hash=sha256:a8f8061284395ce31bcd460f2169013382ccf411148ceb2ee38e718e9860f5a7 \
-    --hash=sha256:a95c47abb817d4e90ea1a8e57bd0d728e3e6b533b3495ae77d84d883c4d11f56 \
-    --hash=sha256:acc339aba4a858192998c2b91f635827e40d9c469d9cf1455bafdda6e4c28ea4 \
-    --hash=sha256:ad9a8a5877782944d99186e4502a614770fe906626d76e9cd32446a0ac3075f2 \
-    --hash=sha256:b57430fbe9e9b697418a395041bb615124d9c007710a2712fda6e35fb310f264 \
-    --hash=sha256:b75deafa2dfea3e2c2a525559b04783515e3463f6e830cb71de0fb7ea36fe233 \
-    --hash=sha256:c2abe430c90b1d5e552680037d68da4eb80a5852ebb1c811b2b89d299b10573b \
-    --hash=sha256:c4d395cb2c4a2712f6eb93a34476cdf7aae74bb6ea2ea1917f858e96344b00aa \
-    --hash=sha256:cef0196be31be421f6f462d1e9da1101be7332d91984caa6f8022e6c78a5877f \
-    --hash=sha256:d1abd5ed030c708f5dbf4812ad5f6fbe9384b63c40d6bd79f8df41a4a759a917 \
-    --hash=sha256:db74a551946b75d19f9996c419a799ffdf6a223ecf17c656f90da011f1d75b20 \
-    --hash=sha256:ea580ffd6094cc01914ad32f8c8118174f18974629af905cea08cb6d5d48c7b7 \
-    --hash=sha256:f07f01d27375ad89d72aa2b3f2180f07da95dd9d2e4c758e015c0acb2da72977 \
-    --hash=sha256:f25aa9e380865b11ea6e9d99d84df86b9cc959f1a007cd966fc6f1ab2ed0e248 \
-    --hash=sha256:f49964f96644dbac2506dffe1a0a7ec0f2bf8cf7a588c3319fed26e6329ffdf3 \
-    --hash=sha256:f9c55ae8d673ab493325d1267cbd285bb94d56f99626c00ac4644de32a59ede3
 tornado==6.5.4 \
     --hash=sha256:053e6e16701eb6cbe641f308f4c1a9541f91b6261991160391bfc342e8a551a1 \
     --hash=sha256:1768110f2411d5cd281bac0a090f707223ce77fd110424361092859e089b38d1 \
