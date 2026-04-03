@@ -65,7 +65,7 @@ base = [
 lock = [
   { include-group = "base" },
   "pyproject2conda>=0.22",
-  "poetry==2.0.0; python_version<'3.14'",
+  "poetry==2.2.0; python_version<'3.14'",
 ]
 lint = [
   "ruff>=0.11",
@@ -108,7 +108,6 @@ docs = [
   "sphinx-tabs>=3.4.7",
   "Sphinx>=7.2.6,<9.0.0", # sphinx-immaterial <= 0.13.9 is not compatible with sphinx >=9.0
   "torchmetrics>=1.0.0",
-  "torchvision>=0.17.0",
   "markupsafe>=3,<3.0.2",
   "jupytext>=1.19.1",
 ]
