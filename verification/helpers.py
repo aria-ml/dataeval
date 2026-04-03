@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.protocols import DatasetMetadata
+
 
 @dataclass
 class SimpleMetadata:
@@ -48,9 +50,14 @@ def make_metadata(
 
 @dataclass
 class SimpleImageDataset:
-    """Minimal dataset satisfying the Dataset protocol for image data."""
+    """Minimal dataset satisfying the AnnotatedDataset protocol for image data."""
 
     images: NDArray[np.floating]
+    _metadata: DatasetMetadata = field(default_factory=lambda: DatasetMetadata(id="verification-test"))
+
+    @property
+    def metadata(self) -> DatasetMetadata:
+        return self._metadata
 
     def __getitem__(self, idx: int):
         return self.images[idx]
@@ -65,10 +72,10 @@ class SimpleAnnotatedDataset:
 
     images: NDArray[np.floating]
     labels: NDArray[np.integer]
-    _metadata: dict = field(default_factory=lambda: {"id": "verification-test"})
+    _metadata: DatasetMetadata = field(default_factory=lambda: DatasetMetadata(id="verification-test"))
 
     @property
-    def metadata(self) -> dict:
+    def metadata(self) -> DatasetMetadata:
         return self._metadata
 
     def __getitem__(self, idx: int):

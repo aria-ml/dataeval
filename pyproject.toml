@@ -221,7 +221,7 @@ torch = { pip = true }  # PyTorch is no longer maintained on conda-forge
 xxhash = { skip = true, packages = "python-xxhash>=3.3" }
 
 [tool.pyright]
-include = ["src", "tests", "docs/source/notebooks"]
+include = ["src", "tests", "verification", "docs/source/notebooks"]
 exclude = [
   "**/__pycache__",
   "**/node_modules",

@@ -4,7 +4,7 @@ Maps to meta repo test cases:
   - TC-10.1: Type safety (PEP 561, type annotations)
 """
 
-import importlib
+import importlib.resources
 
 import pytest
 

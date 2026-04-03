@@ -30,7 +30,7 @@ class TestVersionMetadata:
     def test_license_set(self):
         meta = metadata("dataeval")
         # PEP 639 uses License-Expression; older packaging uses License
-        license_val = meta.get("License-Expression") or meta.get("License")
+        license_val = meta["License-Expression"] or meta["License"]
         assert license_val is not None, "Neither License-Expression nor License found in metadata"
 
     def test_project_urls_set(self):

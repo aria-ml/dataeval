@@ -4,7 +4,8 @@ Maps to meta repo test cases:
   - TC-1.7: Package manager installation (wheel integrity)
 """
 
-import importlib
+import importlib.resources
+import importlib.util
 
 import pytest
 

@@ -5,7 +5,7 @@ Maps to meta repo test cases:
   - TC-1.7: Package manager installation
 """
 
-import importlib
+import importlib.util
 
 import pytest
 
