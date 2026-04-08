@@ -571,8 +571,7 @@ predictors = factor_predictors(operational_metadata.factors, flagged)
 
 # For the top flagged samples, what specifically is different?
 top_flagged = flagged[:20]
-deviations = factor_deviation(reference_metadata.factors,
-                               operational_metadata.factors, top_flagged)
+deviations = factor_deviation(reference_metadata.factors, operational_metadata.factors, top_flagged)
 # deviations[0] → {'time_of_day': 4.2, 'sensor_id': 1.8, 'altitude': 0.3}
 # → first flagged sample is 4.2 scaled deviations from reference in time_of_day
 ```

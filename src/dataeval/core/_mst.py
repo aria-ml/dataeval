@@ -195,15 +195,15 @@ def minimum_spanning_tree_edges(
         If k-nearest neighbors are exhausted before achieving full connectivity.
         Falls back to inter-cluster connection heuristics in this case.
 
+    See Also
+    --------
+    minimum_spanning_tree : Higher-level interface that also computes k-NN
+
     Notes
     -----
     The algorithm proceeds in two phases:
     1. Build MST from k-NN graph using sorted edge distances
     2. If disconnected clusters remain, connect them using cluster edge points
-
-    See Also
-    --------
-    minimum_spanning_tree : Higher-level interface that also computes k-NN
     """
     # Delay load numba compiled functions
     from dataeval.core._fast_hdbscan._disjoint_set import ds_rank_create
@@ -289,6 +289,11 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
         - source : NDArray[np.int64] - Source node indices for each edge in the MST with shape (n_samples - 1,)
         - target : NDArray[np.int64] - Target node indices for each edge in the MST with shape (n_samples - 1,)
 
+    See Also
+    --------
+    minimum_spanning_tree_edges : Lower-level function that returns edge weights
+    compute_neighbor_distances : Computes the k-NN graph
+
     Notes
     -----
     The MST is represented as two arrays (source, target) defining edges.
@@ -303,11 +308,6 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
     >>> mst = minimum_spanning_tree(data, k=15)
     >>> len(mst["source"])  # Should be n_samples - 1
     99
-
-    See Also
-    --------
-    minimum_spanning_tree_edges : Lower-level function that returns edge weights
-    compute_neighbor_distances : Computes the k-NN graph
     """
     _logger.info("Starting minimum_spanning_tree calculation with k=%d", k)
 
@@ -394,6 +394,11 @@ def compute_neighbors(
     ValueError
         If k < 1 or if algorithm is not "auto", "ball_tree", or "kd_tree"
 
+    See Also
+    --------
+    sklearn.neighbors.NearestNeighbors : Similar sklearn interface
+    compute_neighbor_distances : For self-query (single dataset)
+
     Notes
     -----
     Do not use kd_tree if n_features > 20
@@ -408,11 +413,6 @@ def compute_neighbors(
     >>> neighbors = compute_neighbors(reference_data, query_data, k=3)
     >>> neighbors.shape
     (10, 3)
-
-    See Also
-    --------
-    sklearn.neighbors.NearestNeighbors : Similar sklearn interface
-    compute_neighbor_distances : For self-query (single dataset)
     """
     if k < 1:
         raise ValueError("k must be >= 1")

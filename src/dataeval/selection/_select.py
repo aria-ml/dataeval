@@ -57,6 +57,12 @@ class Select(AnnotatedDataset[_TDatum]):
         returns all items from the source dataset. Default None creates
         unfiltered view for consistent interface.
 
+    Notes
+    -----
+    Selection criteria are applied in the order provided, allowing for
+    efficient sequential filtering. The wrapper maintains all metadata
+    and interface compatibility with the original dataset.
+
     Examples
     --------
     >>> from dataeval.selection import ClassFilter, Limit
@@ -73,12 +79,6 @@ class Select(AnnotatedDataset[_TDatum]):
         Selected Size: 5
     <BLANKLINE>
     ObjectDetectionDataset(n_images=50, classes=['person', 'car', 'boat', 'plane'])
-
-    Notes
-    -----
-    Selection criteria are applied in the order provided, allowing for
-    efficient sequential filtering. The wrapper maintains all metadata
-    and interface compatibility with the original dataset.
     """
 
     _dataset: AnnotatedDataset[_TDatum]

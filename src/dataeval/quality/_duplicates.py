@@ -1153,18 +1153,18 @@ class Duplicates(Evaluator):
             Duplicate detection results with item-level duplicate groups.
             Cluster-based detection operates on items only (no target separation).
 
+        See Also
+        --------
+        dataeval.core.cluster : Function to compute clusters from embeddings
+        from_stats : Find duplicates from pre-computed hash statistics
+        evaluate : Find duplicates by computing hashes from images
+
         Notes
         -----
         This method identifies duplicates in embedding space. All cluster-based
         duplicates are returned as **near duplicates** because embeddings are
         approximate representations - identical embeddings don't guarantee
         pixel-identical images.
-
-        See Also
-        --------
-        dataeval.core.cluster : Function to compute clusters from embeddings
-        from_stats : Find duplicates from pre-computed hash statistics
-        evaluate : Find duplicates by computing hashes from images
         """
         threshold = self.cluster_sensitivity if self.cluster_sensitivity is not None else 1.0
         cluster_dupes = _find_cluster_duplicates(

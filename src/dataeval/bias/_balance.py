@@ -85,6 +85,12 @@ class Balance(Evaluator):
     factor_correlation_threshold : float
         Threshold for identifying highly correlated metadata factors
 
+    See Also
+    --------
+    sklearn.feature_selection.mutual_info_classif
+    sklearn.feature_selection.mutual_info_regression
+    sklearn.metrics.mutual_info_score
+
     Notes
     -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
@@ -105,12 +111,6 @@ class Balance(Evaluator):
 
     >>> config = Balance.Config(num_neighbors=10, class_imbalance_threshold=0.2)
     >>> balance = Balance(config=config)
-
-    See Also
-    --------
-    sklearn.feature_selection.mutual_info_classif
-    sklearn.feature_selection.mutual_info_regression
-    sklearn.metrics.mutual_info_score
     """
 
     class Config(EvaluatorConfig):

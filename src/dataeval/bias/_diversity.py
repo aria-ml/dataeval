@@ -80,6 +80,10 @@ class Diversity(Evaluator):
     threshold : float
         Threshold for identifying low diversity factors
 
+    See Also
+    --------
+    scipy.stats.entropy
+
     Notes
     -----
     - The expression is undefined for q=1, but it approaches the Shannon entropy in the limit.
@@ -100,10 +104,6 @@ class Diversity(Evaluator):
 
     >>> config = Diversity.Config(method="shannon", threshold=0.6)
     >>> diversity = Diversity(config=config)
-
-    See Also
-    --------
-    scipy.stats.entropy
     """
 
     class Config(EvaluatorConfig):

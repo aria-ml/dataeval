@@ -410,11 +410,6 @@ def nullmodel_metrics(test_labels: ArrayLike, train_labels: ArrayLike | None = N
         e.g. [0, 1, 1, 2, 3]. When None, skips calculating class frequencies and does not report metrics for the
         dominant class and proportional random models.
 
-    Raises
-    ------
-    ValueError
-        If test_labels is None or empty
-
     Returns
     -------
     NullModelMetricsResult
@@ -423,6 +418,11 @@ def nullmodel_metrics(test_labels: ArrayLike, train_labels: ArrayLike | None = N
         - uniform_random: `NullModelMetrics` for uniform random classifier
         - dominant_class: `NullModelMetrics` for dominant class classifier (if train_labels provided)
         - proportional_random: `NullModelMetrics` for proportional random classifier (if train_labels provided)
+
+    Raises
+    ------
+    ValueError
+        If test_labels is None or empty
 
     Notes
     -----

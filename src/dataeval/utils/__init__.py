@@ -6,10 +6,9 @@ in setting up data and architectures that are guaranteed to work with applicable
 DataEval metrics.
 """
 
-from dataeval.utils import _internal, data, losses, models, onnx, preprocessing, thresholds, training
+from dataeval.utils import data, losses, models, onnx, preprocessing, thresholds, training
 
 __all__ = [
-    "_internal",
     "data",
     "losses",
     "models",

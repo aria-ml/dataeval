@@ -577,6 +577,10 @@ class ModelResetStrategy(Protocol[_M]):
     that calls reset_parameters() on each layer. For other backends,
     users must provide their own reset strategy.
 
+    See Also
+    --------
+    :class:`.Sufficiency` : Uses this protocol for model reset between runs
+
     Examples
     --------
     Custom reset for PyTorch with specific initialization:
@@ -616,10 +620,6 @@ class ModelResetStrategy(Protocol[_M]):
     ...
     ...         model.load_state_dict(torch.load(self.checkpoint_path))
     ...         return model
-
-    See Also
-    --------
-    :class:`.Sufficiency` : Uses this protocol for model reset between runs
     """
 
     def __call__(self, model: _M) -> _M:
@@ -828,6 +828,20 @@ class UpdateStrategy(Protocol):
     as new data arrives. Implementations must provide a `__call__` method that
     updates the reference data based on new observations.
 
+    See Also
+    --------
+    LastSeenUpdate : Built-in strategy keeping the last n samples
+    ReservoirSamplingUpdate : Built-in strategy using reservoir sampling
+
+    Notes
+    -----
+    Implementations should:
+    - Accept current reference data and new observations
+    - Return updated reference data with consistent shape
+    - Handle edge cases (empty arrays, size mismatches)
+    - Maintain internal state if needed (e.g., sample counts)
+    - Ensure output size doesn't exceed configured limits
+
     Examples
     --------
     Creating a custom update strategy that keeps a moving average:
@@ -892,20 +906,6 @@ class UpdateStrategy(Protocol):
     >>> # Detect drift on new data - reference will be updated automatically
     >>> new_data = np.random.normal(0.5, 1, (50, 10))
     >>> result = detector.predict(new_data)
-
-    Notes
-    -----
-    Implementations should:
-    - Accept current reference data and new observations
-    - Return updated reference data with consistent shape
-    - Handle edge cases (empty arrays, size mismatches)
-    - Maintain internal state if needed (e.g., sample counts)
-    - Ensure output size doesn't exceed configured limits
-
-    See Also
-    --------
-    LastSeenUpdate : Built-in strategy keeping the last n samples
-    ReservoirSamplingUpdate : Built-in strategy using reservoir sampling
     """
 
     def __call__(self, reference_data: NDArray[np.float32], data: NDArray[np.float32]) -> NDArray[np.float32]:

@@ -5,6 +5,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+onnx = pytest.importorskip("onnx")
+ort = pytest.importorskip("onnxruntime")
+
 
 def _create_simple_onnx_model(model_path: Path) -> Path:
     """Create a simple ONNX classification model for testing."""

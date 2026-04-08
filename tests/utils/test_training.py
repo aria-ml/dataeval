@@ -39,6 +39,8 @@ class TestTorchTrainerCPU:
 @pytest.mark.parametrize("batch_size", [1, 3])
 class TestTorchTrainerCUDA:
     def test_torch_trainer(self, y_train, loss_fn, optimizer, preprocess_fn, batch_size):
+        if not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
         train(
             model=AE((1, 16, 16)),
             x_train=np.ones((3, 1, 16, 16)),

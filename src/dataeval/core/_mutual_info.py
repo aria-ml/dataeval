@@ -104,6 +104,12 @@ def mutual_info(  # noqa: C901
         - class_to_factor: NDArray[np.float64] - 1D array of MI between class labels and each factor
         - interfactor: NDArray[np.float64] - (num_factors) x (num_factors) matrix of MI between factors only
 
+    See Also
+    --------
+    sklearn.feature_selection.mutual_info_classif
+    sklearn.feature_selection.mutual_info_regression
+    sklearn.metrics.mutual_info_score
+
     Notes
     -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
@@ -136,12 +142,6 @@ def mutual_info(  # noqa: C901
     array([[1.   , 0.017, 0.056],
            [0.017, 1.   , 0.01 ],
            [0.056, 0.01 , 1.   ]])
-
-    See Also
-    --------
-    sklearn.feature_selection.mutual_info_classif
-    sklearn.feature_selection.mutual_info_regression
-    sklearn.metrics.mutual_info_score
     """
     _logger.info("Starting mutual_info calculation with num_neighbors=%d", num_neighbors)
 
@@ -235,6 +235,12 @@ def mutual_info_classwise(
         (num_factors+1) x (num_factors+1) estimate of mutual information
         between num_factors metadata factors and class label. Symmetry is enforced.
 
+    See Also
+    --------
+    sklearn.feature_selection.mutual_info_classif
+    sklearn.feature_selection.mutual_info_regression
+    sklearn.metrics.mutual_info_score
+
     Notes
     -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
@@ -257,12 +263,6 @@ def mutual_info_classwise(
     array([[1.000e+00, 2.077e-02, 2.296e-03, 7.317e-04],
            [1.000e+00, 4.893e-02, 2.451e-02, 4.362e-03],
            [1.000e+00, 1.868e-02, 3.820e-02, 1.006e-03]])
-
-    See Also
-    --------
-    sklearn.feature_selection.mutual_info_classif
-    sklearn.feature_selection.mutual_info_regression
-    sklearn.metrics.mutual_info_score
     """
     _logger.info("Starting mutual_info_classwise calculation with num_neighbors=%d", num_neighbors)
 

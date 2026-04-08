@@ -80,6 +80,11 @@ class ImageStats(Flag):
     - `HASH` : All hash statistics
     - `ALL` : All available statistics
 
+    Notes
+    -----
+    Some statistics have dependencies on others, the dependencies will be added
+    automatically during processing.
+
     Examples
     --------
     Select specific statistics:
@@ -91,11 +96,6 @@ class ImageStats(Flag):
 
     >>> stats = ImageStats.PIXEL  # All pixel stats
     >>> stats = ImageStats.PIXEL_BASIC | ImageStats.VISUAL  # Basic pixel & all visual
-
-    Notes
-    -----
-    Some statistics have dependencies on others, the dependencies will be added
-    automatically during processing.
     """
 
     # ===== NONE (no stats) =====

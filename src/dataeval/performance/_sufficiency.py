@@ -69,17 +69,17 @@ class Sufficiency(Evaluator, Generic[T, M]):
     -------
     Since each run is trained sequentially, increasing the parameter `runs` can significantly increase runtime.
 
-    Notes
-    -----
-    Multiple runs average results to reduce variance.
-
-    Parameters passed directly to __init__ override config defaults.
-
     See Also
     --------
     :class:`.Sufficiency.Config` : Configuration object
     :class:`.SufficiencyOutput` : Results with measures and projections
     :class:`.ModelResetStrategy` : Protocol for reset strategies
+
+    Notes
+    -----
+    Multiple runs average results to reduce variance.
+
+    Parameters passed directly to __init__ override config defaults.
     """
 
     class Config(EvaluatorConfig, Generic[_T, _M]):
@@ -114,6 +114,13 @@ class Sufficiency(Evaluator, Generic[T, M]):
         ValueError
             If runs or substeps is not greater than 1
 
+
+        See Also
+        --------
+        - :class:`.TrainingStrategy`
+        - :class:`.EvaluationStrategy`
+        - :class:`.ModelResetStrategy`
+
         Examples
         --------
         Basic configuration:
@@ -147,12 +154,6 @@ class Sufficiency(Evaluator, Generic[T, M]):
         ...     evaluation_strategy=evaluation,
         ...     reset_strategy=custom_reset,
         ... )
-
-        See Also
-        --------
-        - :class:`.TrainingStrategy`
-        - :class:`.EvaluationStrategy`
-        - :class:`.ModelResetStrategy`
         """
 
         training_strategy: TrainingStrategy[_T] | None = None

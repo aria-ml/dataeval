@@ -320,6 +320,11 @@ def phash_d4(image: Array3D[Any]) -> str:
         Canonical hex string hash invariant to rotation and mirroring,
         or empty string if image is too small or not spatial data.
 
+    See Also
+    --------
+    phash : Standard orientation-sensitive perceptual hash
+    dhash_d4 : Orientation-invariant difference hash
+
     Notes
     -----
     This hash is invariant to:
@@ -332,11 +337,6 @@ def phash_d4(image: Array3D[Any]) -> str:
     produces the identical hash.
 
     Computation cost is ~8x that of regular phash.
-
-    See Also
-    --------
-    phash : Standard orientation-sensitive perceptual hash
-    dhash_d4 : Orientation-invariant difference hash
     """
     return _log_and_return(_phash_d4(image))
 
@@ -360,6 +360,12 @@ def dhash_d4(image: Array3D[Any]) -> str:
         Canonical hex string hash invariant to rotation and mirroring,
         or empty string if image is too small or not spatial data.
 
+
+    See Also
+    --------
+    dhash : Standard orientation-sensitive difference hash
+    phash_d4 : Orientation-invariant perceptual hash
+
     Notes
     -----
     This hash is invariant to:
@@ -372,11 +378,6 @@ def dhash_d4(image: Array3D[Any]) -> str:
     produces the identical hash.
 
     Computation cost is ~8x that of regular dhash.
-
-    See Also
-    --------
-    dhash : Standard orientation-sensitive difference hash
-    phash_d4 : Orientation-invariant perceptual hash
     """
     return _log_and_return(_dhash_d4(image))
 

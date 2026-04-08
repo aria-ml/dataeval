@@ -113,6 +113,24 @@ class ClassifierUncertaintyExtractor:
     device : torch.device
         Hardware device for computation.
 
+    See Also
+    --------
+    dataeval.shift.DriftUnivariate : Univariate drift detection with multiple statistical tests
+
+    Notes
+    -----
+    The uncertainty extractor computes Shannon entropy: -sum(p * log(p)) where p
+    are the predicted class probabilities. Higher entropy indicates greater model
+    uncertainty.
+
+    This approach works best with well-calibrated models trained on representative
+    data. Poorly calibrated models may produce misleading uncertainty estimates
+    that don't reliably indicate data quality issues.
+
+    Uncertainty-based drift detection is complementary to feature-based methods
+    and can detect semantic drift (changes in data meaning) that may not be
+    apparent in raw feature statistics.
+
     Example
     -------
     Basic usage with DriftUnivariate
@@ -175,24 +193,6 @@ class ClassifierUncertaintyExtractor:
     ...     method="mwu",  # Robust to outliers
     ...     extractor=uncertainty_extractor,
     ... ).fit(train_dataset)
-
-    Notes
-    -----
-    The uncertainty extractor computes Shannon entropy: -sum(p * log(p)) where p
-    are the predicted class probabilities. Higher entropy indicates greater model
-    uncertainty.
-
-    This approach works best with well-calibrated models trained on representative
-    data. Poorly calibrated models may produce misleading uncertainty estimates
-    that don't reliably indicate data quality issues.
-
-    Uncertainty-based drift detection is complementary to feature-based methods
-    and can detect semantic drift (changes in data meaning) that may not be
-    apparent in raw feature statistics.
-
-    See Also
-    --------
-    dataeval.shift.DriftUnivariate : Univariate drift detection with multiple statistical tests
     """
 
     def __init__(

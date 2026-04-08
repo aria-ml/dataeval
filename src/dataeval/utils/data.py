@@ -245,6 +245,11 @@ def _calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: f
         The validation split will contain (val_frac * 100)% of any data not already allocated to the test set.
         Only required if requesting a single [train, val] split.
 
+    Returns
+    -------
+    float
+        The updated validation fraction of the remaining data after the testing fraction is removed
+
     Raises
     ------
     ValueError
@@ -257,11 +262,6 @@ def _calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: f
         When number of folds equals one but the validation fraction is 0.0
     ValueError
         When the validation fraction is not within 0.0 and 1.0 inclusively
-
-    Returns
-    -------
-    float
-        The updated validation fraction of the remaining data after the testing fraction is removed
     """
     if num_folds < 1:
         raise ValueError(f"Number of folds must be greater than or equal to 1, got {num_folds}")

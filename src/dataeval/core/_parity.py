@@ -82,6 +82,10 @@ def parity(  # noqa: C901
 
           Sample structure: `{factor_index: {factor_category: {class_label: count}}}`.
 
+    See Also
+    --------
+    balance
+
     Notes
     -----
     **Interpretation:**
@@ -101,10 +105,6 @@ def parity(  # noqa: C901
     ----------
     Bergsma, W. (2013). A bias-correction for Cramér's V and Tschuprow's T.
     Journal of the Korean Statistical Society, 42(3), 323-328.
-
-    See Also
-    --------
-    balance
     """
     _logger.info("Starting parity calculation")
 

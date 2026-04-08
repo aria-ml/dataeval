@@ -130,6 +130,11 @@ class BoVWExtractor:
     >>> embeddings.shape
     (10, 64)
 
+    See Also
+    --------
+    dataeval.quality.Duplicates : Duplicate detection using embeddings
+    dataeval.extractors.ClassifierUncertaintyExtractor : Uncertainty-based feature extraction
+
     Notes
     -----
     **Vocabulary Training**: The vocabulary should be trained on a representative
@@ -148,11 +153,6 @@ class BoVWExtractor:
     **Reproducibility**: The k-means clustering uses a random seed from
     DataEval's global configuration via :func:`~dataeval.config.get_seed`.
     Set a seed with :func:`~dataeval.config.set_seed` for reproducible results.
-
-    See Also
-    --------
-    dataeval.quality.Duplicates : Duplicate detection using embeddings
-    dataeval.extractors.ClassifierUncertaintyExtractor : Uncertainty-based feature extraction
     """
 
     def __init__(self, vocab_size: int = 2048) -> None:

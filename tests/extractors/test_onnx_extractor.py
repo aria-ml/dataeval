@@ -6,6 +6,9 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
+pytest.importorskip("onnx")
+pytest.importorskip("onnxruntime")
+
 from dataeval.extractors import OnnxExtractor
 from dataeval.protocols import FeatureExtractor
 

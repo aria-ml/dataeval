@@ -1,4 +1,5 @@
 import contextlib
+import os
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, TypeVar, cast
@@ -6,12 +7,15 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
+import torch
 from numpy.random import randint, random
 from numpy.typing import NDArray
 
 from dataeval import Metadata
 from dataeval.config import set_batch_size, set_seed
 from dataeval.protocols import ObjectDetectionTarget
+
+DEVICE = torch.device(os.environ.get("DATAEVAL_TEST_DEVICE", "cpu"))
 
 
 @dataclass
@@ -71,6 +75,13 @@ pytest_plugins = ["tests.fixtures.metadata", "tests.fixtures.models", "tests.fix
 set_seed(0, all_generators=True)
 
 set_batch_size(16)
+
+
+@pytest.fixture(scope="session")
+def device() -> torch.device:
+    """Test device, defaults to CPU. Set DATAEVAL_TEST_DEVICE=cuda to override."""
+    return DEVICE
+
 
 DatumType = tuple[NDArray[np.float32], int, dict[str, Any]]
 

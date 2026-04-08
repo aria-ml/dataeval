@@ -573,6 +573,11 @@ class Metadata(Array, FeatureExtractor):
             Rows where target_index is None contain datum-level data.
             Rows where target_index is an integer contain target/detection-level data.
 
+        See Also
+        --------
+        image_data : Filter to image-level rows only
+        target_data : Filter to target-level rows only
+
         Notes
         -----
         This property triggers dataset structure analysis on first access.
@@ -581,11 +586,6 @@ class Metadata(Array, FeatureExtractor):
         For Object Detection datasets, the dataframe now contains:
         - Image-level rows (target_index=None): One per image with image-level factors
         - Target-level rows (target_index=0,1,2...): One per detection with detection data
-
-        See Also
-        --------
-        image_data : Filter to image-level rows only
-        target_data : Filter to target-level rows only
         """
         self._structure()
         return self._dataframe

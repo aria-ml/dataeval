@@ -12,23 +12,27 @@ We currently support Python versions >= `3.10`
 
 ## PyTorch Dependency
 
-DataEval requires PyTorch to be installed. When installing from PyPI with `pip install dataeval`,
-PyTorch will be automatically installed from PyPI as a dependency.
+DataEval requires PyTorch to be installed. By default, `pip install dataeval`
+pulls PyTorch from PyPI, which includes CUDA support on Linux.
 
-If you need a specific PyTorch version or CUDA configuration, install PyTorch first:
+To install a specific PyTorch variant, use `--extra-index-url` to point pip
+at the appropriate PyTorch wheel index:
 
 ```bash
-# Example: Install PyTorch with CUDA 11.8 support
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# CPU only
+pip install dataeval --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Then install DataEval (will use your pre-installed PyTorch)
-pip install dataeval
+# CUDA 11.8
+pip install dataeval --extra-index-url https://download.pytorch.org/whl/cu118
+
+# CUDA 12.8
+pip install dataeval --extra-index-url https://download.pytorch.org/whl/cu128
 ```
 
 See the [PyTorch installation guide](https://pytorch.org/get-started/locally/) for all available PyTorch installation options.
 
 **Note:** When installing from source using `uv`, you can use extras to specify PyTorch versions
-(e.g., `--extra cpu`, `--extra cu118`, `--extra cu124`, `--extra cu128`). See the source installation
+(e.g., `--extra cpu`, `--extra cu118`, `--extra cu128`). See the source installation
 instructions below for details.
 
 ## Installing DataEval
@@ -108,7 +112,7 @@ Install DataEval with development dependencies.
 ```
 
 Optionally, you can specify the version of Python and PyTorch CPU/CUDA
-support (cpu, cu118, cu124, cu128) using -p and --extra respectively.
+support (cpu, cu118, cu128) using -p and --extra respectively.
 
 For example, the following command installs DataEval in a Python 3.11
 environment using only PyTorch with CPU support, and no development

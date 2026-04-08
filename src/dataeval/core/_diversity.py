@@ -67,14 +67,14 @@ def diversity_simpson(
     num_bins : NDArray[np.intp]
         Number of bins with values for each factor
 
-    Notes
-    -----
-    If there is only one category, the diversity index takes a value of 0.
-
     Returns
     -------
     NDArray[np.double]
         Diversity index per column of X
+
+    Notes
+    -----
+    If there is only one category, the diversity index takes a value of 0.
     """
     _logger.debug("Computing Simpson diversity for %d factors", counts.shape[1])
     ev_index = np.empty(counts.shape[1])

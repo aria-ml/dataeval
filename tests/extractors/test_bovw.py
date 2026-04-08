@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 
+pytest.importorskip("cv2", reason="opencv-python not installed")
+
 from dataeval.config import get_seed, set_seed
 from dataeval.exceptions import NotFittedError
 from dataeval.extractors._bovw import BoVWExtractor

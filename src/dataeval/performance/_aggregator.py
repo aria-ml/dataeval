@@ -20,14 +20,6 @@ class ResultAggregator:
     substeps : int
         Number of evaluation steps per run
 
-    Examples
-    --------
-    >>> aggregator = ResultAggregator(runs=3, substeps=5)
-    >>> aggregator.add_result(run=0, step=0, metric_name="accuracy", value=0.95)
-    >>> results = aggregator.get_results()
-    >>> results["accuracy"].shape
-    (3, 5)
-
     Notes
     -----
     The aggregator automatically detects metric types:
@@ -36,6 +28,14 @@ class ResultAggregator:
 
     Metric names and types are determined dynamically from the evaluation
     strategy's output, allowing complete flexibility in what metrics are tracked.
+
+    Examples
+    --------
+    >>> aggregator = ResultAggregator(runs=3, substeps=5)
+    >>> aggregator.add_result(run=0, step=0, metric_name="accuracy", value=0.95)
+    >>> results = aggregator.get_results()
+    >>> results["accuracy"].shape
+    (3, 5)
     """
 
     def __init__(self, runs: int, substeps: int) -> None:
