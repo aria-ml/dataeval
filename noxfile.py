@@ -75,7 +75,7 @@ if not DATAEVAL_NOX_UV_EXTRAS_OVERRIDE:
     if os.path.exists(".cuda-version"):
         with open(".cuda-version") as f:
             DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = f.read().strip()
-    if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE not in ["cpu", "cu118", "cu124", "cu128"]:
+    if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE not in ["cpu", "cu118", "cu128"]:
         DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = "cu118"
 
 UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE]

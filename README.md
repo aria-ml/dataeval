@@ -76,6 +76,20 @@ You can install DataEval directly from pypi.org using the following command.
 pip install dataeval
 ```
 
+By default, PyTorch is installed from PyPI which includes CUDA support on Linux.
+To install a specific PyTorch variant, use `--extra-index-url`:
+
+```bash
+# CPU only
+pip install dataeval --extra-index-url https://download.pytorch.org/whl/cpu
+
+# CUDA 11.8
+pip install dataeval --extra-index-url https://download.pytorch.org/whl/cu118
+
+# CUDA 12.8
+pip install dataeval --extra-index-url https://download.pytorch.org/whl/cu128
+```
+
 ### **Installing with conda**
 
 DataEval can be installed in a Conda/Mamba environment using the provided

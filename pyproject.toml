@@ -47,11 +47,18 @@ dependencies = [
 [project.optional-dependencies]
 cpu = ["torch>=2.2.0", "torchvision>=0.17.0"]
 cu118 = ["torch>=2.2.0", "torchvision>=0.17.0"]
-cu124 = ["torch>=2.2.0", "torchvision>=0.17.0"]
 cu128 = ["torch>=2.2.0", "torchvision>=0.17.0"]
 opencv = ["opencv-python-headless>=4.8.0"]
-onnx = ["onnx", "onnxruntime>=1.14.0"]
-onnx-gpu = ["onnx", "onnxruntime-gpu>=1.14.0"]
+onnx = [
+  "onnx>=1.14.0",
+  "onnxruntime>=1.14.0,<1.24; python_version == '3.10'",
+  "onnxruntime>=1.14.0; python_version >= '3.11'",
+]
+onnx-gpu = [
+  "onnx>=1.14.0",
+  "onnxruntime-gpu>=1.14.0,<1.24; python_version == '3.10'",
+  "onnxruntime-gpu>=1.14.0; python_version >= '3.11'",
+]
 
 [project.urls]
 Homepage = "https://dataeval.ai/"
@@ -136,7 +143,6 @@ conflicts = [
   [
     { extra = "cpu" },
     { extra = "cu118" },
-    { extra = "cu124" },
     { extra = "cu128" },
   ],
 ]
@@ -160,11 +166,6 @@ url = "https://download.pytorch.org/whl/cu118"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cu124"
-url = "https://download.pytorch.org/whl/cu124"
-explicit = true
-
-[[tool.uv.index]]
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
@@ -173,18 +174,19 @@ explicit = true
 torch = [
   { index = "pytorch-cpu", extra = "cpu" },
   { index = "pytorch-cu118", extra = "cu118" },
-  { index = "pytorch-cu124", extra = "cu124" },
   { index = "pytorch-cu128", extra = "cu128" },
 ]
 torchvision = [
   { index = "pytorch-cpu", extra = "cpu" },
   { index = "pytorch-cu118", extra = "cu118" },
-  { index = "pytorch-cu124", extra = "cu124" },
   { index = "pytorch-cu128", extra = "cu128" },
 ]
 
 [tool.uv.extra-build-dependencies]
 numba = ["tbb>=2021.6"]
+
+[tool.poetry]
+version = "0.0.0"  # overwritten by poetry-dynamic-versioning
 
 [[tool.poetry.source]]
 name = "pytorch-cpu"
@@ -193,7 +195,6 @@ priority = "supplemental"
 
 [tool.poetry.dependencies]
 torch = { version = ">=2.2.0", source = "pytorch-cpu" }
-torchvision = { version = ">=0.17.0", source = "pytorch-cpu" }
 
 [tool.hatch.build.targets.sdist]
 include = ["src/dataeval"]
@@ -210,8 +211,11 @@ source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "src/dataeval/_version.py"
 
-[tool.poetry]
-version = "0.0.0"  # unused
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "pep440"
+pattern = "^v?(?P<base>\\d+\\.\\d+\\.\\d+)"
 
 [tool.pyproject2conda.dependencies]
 numpy = { skip = true, packages = "numpy>=1.24.2" }
