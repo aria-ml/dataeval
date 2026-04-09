@@ -26,8 +26,9 @@ distributed. A divergence of 1 means the two datasets are completely separable.
 
 ### When to use
 
-The `Divergence` class should be used when you would like to know how far two datasets are diverged for one another. For
-example, if you would like to measure [operational drift](../concepts/DistributionShift.md#drift-detection).
+The `divergence_fnn` or `divergence_mst` functions should be used when you would like to know how far two datasets are
+diverged for one another. For example, if you would like to measure
+[operational drift](../concepts/DistributionShift.md#drift-detection).
 
 +++
 
@@ -45,9 +46,8 @@ example, if you would like to measure [operational drift](../concepts/Distributi
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -125,7 +125,7 @@ print("Corrupted image shape:", corrupted_emb[0].shape)
 
 ## Calculate corrupted divergence
 
-Now lets calculate the Divergence between this corrupted dataset and the original images
+Now lets calculate the divergence between this corrupted dataset and the original images
 
 ```{code-cell} ipython3
 div = divergence_fnn(data_a, corrupted_emb)
@@ -133,9 +133,8 @@ print(div)
 ```
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 ### TEST ASSERTION CELL ###
 assert div["divergence"] > 0.95
 ```

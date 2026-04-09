@@ -78,6 +78,8 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult
     """
     Estimate Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` using a minimum spanning tree.
 
+    BER bounds the irreducible classification error given the current feature
+    representation — the error attributable to class overlap in embedding space.
     Uses FR with a minimum spanning tree (MST) test statistic basis.
 
     Parameters
@@ -137,7 +139,13 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
     """
     Estimate Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` using KNN.
 
-    Uses KNN test statistic basis.
+    BER bounds the irreducible classification error given the current feature
+    representation — the error attributable to class overlap in embedding space.
+    Uses KNN test statistic basis. The estimator's behavior depends on the value of k:
+    - k=1: Uses 1-NN for the lower bound and 2-NN for the upper bound.
+    - k=2: Uses 2-NN for the lower bound and 3-NN for the upper bound.
+    - 2<k<=5: Uses k-NN for the lower bound and (k+1)-NN for the upper bound.
+    - k>5: Only available for binary classification; uses k-NN for both bounds with specialized asymptotic weights.
 
     Parameters
     ----------
@@ -146,7 +154,7 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
     class_labels : Array1D[int]
         Array of class labels for each image. Can be a 1D list, or array-like object.
     k : int
-        Number of nearest neighbors for KNN estimator
+        Number of nearest neighbors for KNN estimator. Should be between 1 and the number of samples.
 
     Returns
     -------

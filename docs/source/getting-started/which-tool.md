@@ -73,13 +73,13 @@ See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md).
 
 ### Are label distributions inconsistent across subgroups?
 
-Use {class}`.Parity` or {class}`.LabelParity` to test for statistical
+Use {class}`.Parity` or {func}`.label_parity` to test for statistical
 disparities in labeling across groups.
 See the [identify bias tutorial](../notebooks/tt_identify_bias.md).
 
 ### Does my dataset cover the range of conditions the model will encounter in deployment?
 
-Use {func}`.coverage` to identify gaps in the feature space and
+Use {func}`.coverage_naive` or {func}`.coverage_adaptive` to identify gaps in the feature space and
 {func}`.completeness` to measure how effectively the dataset spans available
 embedding dimensions.
 See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md).
@@ -100,8 +100,8 @@ is capable of producing. See the
 [Performance Limits concept page](../concepts/PerformanceLimits.md).
 
 ```{important}
-{class}`.BER` applies to **image classification only**.
-For object detection tasks, use {term}`Upper-bound Average Precision (UAP)`,
+{func}`.ber_knn` and {func}`.ber_mst` apply to **image classification only**.
+For object detection tasks, use {func}`.uap`,
 which extends feasibility analysis by treating ground-truth bounding box crops
 as a classification problem. See the
 [Performance Limits concept page](../concepts/PerformanceLimits.md) for details.
@@ -109,13 +109,13 @@ as a classification problem. See the
 
 ### Can a model plausibly learn to classify this dataset at all?
 
-Use {class}`.BER` to estimate the Bayes Error Rate (BER) — the theoretical
+Use {func}`.ber_knn` or {func}`.ber_mst` to estimate the Bayes Error Rate (BER) — the theoretical
 lower bound on classification error given the data as it is. A high BER means
 the dataset is the limiting factor, not the model architecture.
 
 ### Can a detector plausibly achieve my mAP requirement on this dataset?
 
-Use {term}`Upper-bound Average Precision (UAP)` to estimate the classification
+Use {func}`.uap` to estimate the classification
 ceiling on bounding box crops. If UAP falls below your program's mAP requirement,
 no object detector trained on the current data can meet it.
 
@@ -134,9 +134,9 @@ improve coverage and generalization.
 ### Should I collect more data, or is my current dataset already saturated?
 
 Run {class}`.Sufficiency` first to assess the learning curve trajectory. If
-the curve has flattened, also run {func}`.coverage` and {func}`.completeness`
-to determine whether gaps in the feature space — rather than total sample count
-— are the binding constraint.
+the curve has flattened, also run {func}`.coverage_naive` or {func}`.coverage_adaptive` and
+{func}`.completeness` to determine whether gaps in the feature space — rather than
+total sample count — are the binding constraint.
 
 ---
 
@@ -156,25 +156,25 @@ operates at the per-sample level. Both are necessary; neither is sufficient alon
 Start with the [Distribution Shift concept page](../concepts/DistributionShift.md)
 to choose the right detector for your data characteristics:
 
-| If your data...                                           | Use                                              |
-| --------------------------------------------------------- | ------------------------------------------------ |
-| Has continuous, well-behaved distributions                | {class}`.DriftKS` (Kolmogorov-Smirnov)           |
-| Has small sample sizes                                    | {class}`.DriftMMD` (Maximum Mean Discrepancy)    |
-| Has heavy tails or is non-parametric                      | {class}`.DriftBWS` (Baumgartner-Weiss-Schindler) |
-| Has labeled outputs you can evaluate against              | {class}`.DriftUncertainty`                       |
-| Needs a flexible, model-based test                        | {class}`.DriftDomainClassifier`                  |
-| Uses pre-computed embeddings; needs lightweight detection | {class}`.DriftKNeighbors` (K-nearest neighbor)   |
-| Needs reconstruction-based detection or streaming support | {class}`.DriftReconstruction`                    |
+| If your data...                                           | Use                                                     |
+| --------------------------------------------------------- | ------------------------------------------------------- |
+| Has continuous, well-behaved distributions                | {class}`.DriftUnivariate` (method="ks")                 |
+| Has small sample sizes                                    | {class}`.DriftMMD` (Maximum Mean Discrepancy)           |
+| Has heavy tails or is non-parametric                      | {class}`.DriftUnivariate` (method="bws")                |
+| Has labeled outputs you can evaluate against              | {class}`.DriftUnivariate` with an uncertainty extractor |
+| Needs a flexible, model-based test                        | {class}`.DriftDomainClassifier`                         |
+| Uses pre-computed embeddings; needs lightweight detection | {class}`.DriftKNeighbors` (K-nearest neighbor)          |
+| Needs reconstruction-based detection or streaming support | {class}`.DriftReconstruction`                           |
 
 See the [monitor shift tutorial](../notebooks/tt_monitor_shift.md).
 
 ### How far has my operational data shifted from training, quantitatively?
 
-Use {func}`.divergence` to compute HP divergence — a continuous score between
-0 and 1. Drift detectors tell you _whether_ a shift occurred; divergence tells
-you _how much_. Tracking divergence over time reveals gradual drift that may
-never trigger a single-batch test but is nonetheless eroding the relevance of
-the training distribution.
+Use {func}`.divergence_fnn` or {func}`.divergence_mst` to compute HP divergence —
+a continuous score between 0 and 1. Drift detectors tell you _whether_ a shift
+occurred; divergence tells you _how much_. Tracking divergence over time reveals
+gradual drift that may never trigger a single-batch test but is nonetheless eroding
+the relevance of the training distribution.
 See the [Divergence concept page](../concepts/Divergence.md) and the
 [measure divergence how-to guide](../notebooks/h2_measure_divergence.md).
 

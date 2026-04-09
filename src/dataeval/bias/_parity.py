@@ -118,8 +118,6 @@ class Parity(Evaluator):
 
     >>> config = Parity.Config(score_threshold=0.4, p_value_threshold=0.01)
     >>> parity = Parity(config=config)
-
-    output = parity(metadata.binned_data, metadata.class_labels.tolist())
     """
 
     class Config(EvaluatorConfig):

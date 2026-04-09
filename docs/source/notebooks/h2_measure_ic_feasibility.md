@@ -28,11 +28,11 @@ DataEval has introduced a method of calculating this error rate that uses image 
 
 ### When to use
 
-The `BER` metric should be used when you would like to measure the feasibility of a machine learning task. For example,
-if you have an operational accuracy requirement of 80%, and would like to know if this is feasibly achievable given the
-imagery. A low feasibility score will tell you that the problem you are trying to score cannot be solved with the
-existing data at the accuracy you desire. This in turn implies that your question does not follow a learnable pattern or
-that your data is noisy.
+The `ber_mst` or `ber_knn` functions should be used when you would like to measure the feasibility of a machine learning
+task. For example, if you have an operational accuracy requirement of 80%, and would like to know if this is feasibly
+achievable given the imagery. A low feasibility score will tell you that the problem you are trying to score cannot be
+solved with the existing data at the accuracy you desire. This in turn implies that your question does not follow a
+learnable pattern or that your data is noisy.
 
 +++
 
@@ -50,9 +50,8 @@ that your data is noisy.
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -138,9 +137,8 @@ print("The bayes error rate estimation:", ber_result["upper_bound"])
 ```
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 ### TEST ASSERTION CELL ###
 assert 0.93 < 1 - ber_result["upper_bound"] < 0.96
 ```
@@ -179,9 +177,8 @@ print("The bayes error rate estimation:", new_result["upper_bound"])
 ```
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 ### TEST ASSERTION CELL ###
 assert 0.99 < 1 - new_result["upper_bound"] < 0.995
 ```

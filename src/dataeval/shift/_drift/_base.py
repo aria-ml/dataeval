@@ -43,7 +43,8 @@ class DriftOutput(DictOutput, Generic[TDetails]):
         For multivariate methods, this is the corrected threshold after
         Bonferroni or FDR correction.
     distance : float
-        Instance-level test statistic or distance metric, always >= 0.
+        Instance-level test statistic or distance metric. Typically >= 0, but can be
+        slightly negative for metrics like unbiased MMD².
         For univariate methods, this is the mean distance across all features.
         Higher values indicate greater deviation from reference distribution.
     metric_name : str

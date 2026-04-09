@@ -39,7 +39,7 @@ DataEval's public API.
   - ✔
   - 
 * - {func}`Completeness <.completeness>`
-  - Measures the degree to which images span the learned embedding space
+  - Measures the dimensional utilization of the embedding space via eigenvalue entropy
   - ✔
   - ✔
   - ✔
@@ -85,7 +85,7 @@ DataEval's public API.
   - ✔
   - ✔
   - 
-* - {func}`Parity <.parity>`
+* - {class}`.Parity`
   - Detects if there is a significant relationship between the factor values and class labels
   - ✔
   - ✔
@@ -113,7 +113,7 @@ DataEval's public API.
   - Object Detection  
   - Unsupervised
 * - {class}`.Balance`
-  - Assesses the mutual information between factors
+  - Assesses the normalized mutual information between factors
   - ✔
   - ✔
   - 
