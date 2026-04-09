@@ -209,7 +209,7 @@ def factor_predictors(  # noqa: C901
     -------
     Mapping[str, float]
         A map with keys corresponding to factor names, and values indicating the strength of association
-        between each named factor and the flagged status, as mutual information measured in bits.
+        between each named factor and the flagged status, as normalized mutual information.
         Returns dict with 0.0 values for all factors if no indices are provided.
 
     Notes

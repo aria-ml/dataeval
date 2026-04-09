@@ -1,9 +1,9 @@
 # Acting on Results
 
 DataEval produces diagnostic outputs, not decisions. Every evaluator returns
-scores, indices, flags, or p-values — but none of them tell you what to do
-next. That judgment requires understanding what the result means in the context
-of your program, your data collection constraints, and your performance
+scores, indices, flags, or p-values — but none of them tell you what to do next.
+That judgment requires understanding what the result means in the context of
+your program, your data collection constraints, and your performance
 requirements.
 
 This page maps each category of DataEval output to the decisions it informs and
@@ -13,9 +13,9 @@ interact with another. Use this page as a reference: when a diagnostic produces
 a result you need to act on, find the relevant section and understand your
 options before committing to a course of action.
 
-One framing applies across all of it: DataEval finds _evidence_ of problems.
-The interpretation is always yours. A high BER upper bound is evidence that
-class overlap may be irreducible — it is not proof that your requirement is
+One framing applies across all of it: DataEval finds _evidence_ of problems. The
+interpretation is always yours. A high BER upper bound is evidence that class
+overlap may be irreducible — it is not proof that your requirement is
 unachievable. A detected duplicate is evidence of potential redundancy — it is
 not an instruction to delete. Every DataEval output is a prompt to investigate,
 not a verdict.
@@ -34,8 +34,8 @@ nothing new to either training or evaluation. In training data, exact duplicates
 artificially inflate the effective weight of those samples during gradient
 updates. In test data, they introduce data leakage if the duplicate also appears
 in training. Remove all but one instance per exact-match group. The exception is
-when exact duplicates appear with _different labels_ — that is a label error, not
-a redundancy issue, and requires human review before any removal.
+when exact duplicates appear with _different labels_ — that is a label error,
+not a redundancy issue, and requires human review before any removal.
 
 **Near-duplicates** require judgment. A perceptual hash match means two images
 are visually similar but not pixel-identical — typically the same image with
@@ -44,22 +44,23 @@ Whether to remove one depends on whether the variation is meaningful for your
 task. A slightly brighter version of the same image adds little; the same scene
 from a marginally different angle may add enough viewpoint diversity to keep. In
 evaluation datasets, near-duplicates between train and test are the primary
-concern — they degrade the validity of held-out metrics. Check the near-duplicate
-groups for cross-split contamination before deciding on removals.
+concern — they degrade the validity of held-out metrics. Check the
+near-duplicate groups for cross-split contamination before deciding on removals.
 
 **Semantic clusters** (from cluster-based detection) identify images that are
-different in appearance but close in embedding space — similar scene composition,
-same background type, or same target in very similar configurations. These
-represent redundancy at a higher level of abstraction. High semantic redundancy
-in a region of the feature space means training examples are concentrated there
-at the expense of underrepresented regions. This is where {class}`.Prioritize`
-becomes relevant: rather than deciding which images to delete, use prioritization
-to select a subset that preserves coverage while reducing redundancy.
+different in appearance but close in embedding space — similar scene
+composition, same background type, or same target in very similar
+configurations. These represent redundancy at a higher level of abstraction.
+High semantic redundancy in a region of the feature space means training
+examples are concentrated there at the expense of underrepresented regions. This
+is where {class}`.Prioritize` becomes relevant: rather than deciding which
+images to delete, use prioritization to select a subset that preserves coverage
+while reducing redundancy.
 
 For large datasets with known high redundancy — full motion video, overhead
-imagery with abundant background, repeated collection passes over the same
-area — systematic deduplication before any other analysis is worth doing first.
-It reduces the size of the problem that all subsequent evaluators have to process
+imagery with abundant background, repeated collection passes over the same area
+— systematic deduplication before any other analysis is worth doing first. It
+reduces the size of the problem that all subsequent evaluators have to process
 and removes the noise that redundant samples introduce into coverage and bias
 metrics. It also helps prevent leakage between dataset splits.
 
@@ -70,10 +71,10 @@ contrast, size) relative to the distribution of the dataset. The output includes
 per-metric z-scores and which threshold each flagged image exceeded.
 
 The first question with any outlier is: is this a data quality problem or a
-legitimate but unusual sample? Low brightness outliers might be genuinely
-dark operational images (keep) or corrupted/miscalibrated sensor captures
-(remove). High blur might be motion blur in a class where motion blur matters
-for the task (keep) or a focus failure (remove).
+legitimate but unusual sample? Low brightness outliers might be genuinely dark
+operational images (keep) or corrupted/miscalibrated sensor captures (remove).
+High blur might be motion blur in a class where motion blur matters for the task
+(keep) or a focus failure (remove).
 
 **Systematic outliers** — where many images from a particular collection event,
 location, or sensor appear as outliers together — indicate a collection
@@ -84,9 +85,9 @@ condition normal) or to exclude the collection event (if it was a known
 calibration or setup error).
 
 **Isolated outliers** — individual unusual images not associated with a pattern
-— are candidates for manual review. If the image is valid and represents a
-real scenario, it may be worth keeping but worth flagging as a hard case. If it
-is a processing artifact or error, remove it.
+— are candidates for manual review. If the image is valid and represents a real
+scenario, it may be worth keeping but worth flagging as a hard case. If it is a
+processing artifact or error, remove it.
 
 Outliers in evaluation data deserve extra scrutiny. An outlier in the test set
 that is unlike anything in the training set will produce a confident wrong
@@ -117,8 +118,8 @@ correlation structure that Balance measures.
 
 **Label error detection** ({func}`.label_errors`) flags samples whose embedding
 geometry is inconsistent with their assigned label — specifically, samples that
-are closer to a different class than to their own. The `error_rank` output is
-a triage list: the highest-ranked samples are the strongest candidates for
+are closer to a different class than to their own. The `error_rank` output is a
+triage list: the highest-ranked samples are the strongest candidates for
 mislabeling and should be reviewed first.
 
 The output includes suggested replacement labels derived from rank-weighted
@@ -128,8 +129,8 @@ are possible for each flagged sample: a single confident suggestion (vote share
 each other), or no suggestion (neighborhood too noisy to recommend). No
 suggestion does not mean the label is correct — it means the neighborhood is
 mixed enough that a single replacement cannot be recommended with confidence.
-Human review is required in all cases; the suggestion is a starting point, not
-a verdict.
+Human review is required in all cases; the suggestion is a starting point, not a
+verdict.
 
 The `scores` array provides the raw intra/extra class distance ratio for every
 sample, not just those above the threshold. Plotting the score distribution
@@ -153,20 +154,21 @@ and are the prerequisite for {class}`.ClassBalance`.
 
 ### Balance and diversity
 
-{class}`.Balance` measures mutual information between metadata factors and class
-labels, and between metadata factors themselves. A high correlation between a
-metadata factor and class means the model can use that factor as a shortcut to
-predict class without learning the actual signal of interest.
+{class}`.Balance` measures mutual information (normalized to [0,1]) between
+metadata factors and class labels, and between metadata factors themselves. A
+high correlation between a metadata factor and class means the model can use
+that factor as a shortcut to predict class without learning the actual signal of
+interest.
 
 The action depends on whether the correlation is _removable_. Some correlations
 are collection artifacts — if all images of class A were collected in summer and
 all images of class B in winter, the seasonal metadata factor is spuriously
-correlated with class. The fix is to collect more data that breaks the
-confound: class A images in winter, class B images in summer. Other correlations
-are intrinsic to the task — targets of a certain class genuinely tend to appear
-at certain sizes or in certain contexts. Those correlations cannot be removed;
-they can only be acknowledged and accounted for when interpreting model
-performance on operational data.
+correlated with class. The fix is to collect more data that breaks the confound:
+class A images in winter, class B images in summer. Other correlations are
+intrinsic to the task — targets of a certain class genuinely tend to appear at
+certain sizes or in certain contexts. Those correlations cannot be removed; they
+can only be acknowledged and accounted for when interpreting model performance
+on operational data.
 
 High inter-factor correlation (factor-to-factor rather than factor-to-class)
 indicates redundancy in the metadata itself — two factors are measuring the same
@@ -183,8 +185,8 @@ possible, the low diversity should be documented as a known limitation and
 matched against expected operational conditions. If the operational data will
 also have low diversity in that factor (it always will be daylight, the terrain
 is always desert), the training imbalance may not matter. If the operational
-distribution is more diverse than the training distribution, the imbalance is
-a real risk.
+distribution is more diverse than the training distribution, the imbalance is a
+real risk.
 
 ### Parity
 
@@ -198,8 +200,7 @@ The `insufficient_data` flag in the output identifies factor-label combinations
 where the sample count requirement was not met. These combinations cannot be
 assessed for parity — the absence of a flag does not mean parity exists, it
 means the data was too sparse to test. This is itself actionable: it identifies
-collection targets where the current dataset has gaps too large to
-characterize.
+collection targets where the current dataset has gaps too large to characterize.
 
 Where Parity flags significant dependence, the interpretation is the same as for
 Balance: determine whether the dependence is a collection artifact (addressable
@@ -215,11 +216,11 @@ the effective dimensionality utilization of the embedding space: whether the
 dataset spans the available dimensions or is concentrated in a low-dimensional
 subspace.
 
-**Coverage gaps** indicate specific underrepresented regions. The `uncovered_indices`
-output identifies existing samples nearest to the gaps — the samples at the
-frontier of current coverage. These are the samples most valuable to use as seeds
-for targeted collection: find more images that look like them, or find images that
-would be neighbors to them in embedding space.
+**Coverage gaps** indicate specific underrepresented regions. The
+`uncovered_indices` output identifies existing samples nearest to the gaps — the
+samples at the frontier of current coverage. These are the samples most valuable
+to use as seeds for targeted collection: find more images that look like them,
+or find images that would be neighbors to them in embedding space.
 
 Low **completeness** (effective dimensionality well below the total embedding
 dimensions) means the dataset is not exploring the full representational space.
@@ -246,21 +247,24 @@ samples to collect and annotate next.
 
 ### What Prioritize ranks
 
-Prioritize ranks samples by their position in embedding space, from
-prototypical (dense, central, low distance to neighbors) to atypical (sparse,
-peripheral, high distance to neighbors). Five ranking methods are available,
-all operating on embeddings:
+Prioritize ranks samples by their position in embedding space, from prototypical
+(dense, central, low distance to neighbors) to atypical (sparse, peripheral,
+high distance to neighbors). Five ranking methods are available, all operating
+on embeddings:
 
-- **`knn`**: each sample's score is its mean distance to its $k$ nearest neighbors.
-  Simple, fast, no hyperparameters beyond $k$. Default $k = \sqrt{n}$.
-- **`kmeans_distance`**: distance to assigned k-means cluster centroid. Prototypical
-  samples are close to their centroid; challenging or boundary samples are far.
+- **`knn`**: each sample's score is its mean distance to its $k$ nearest
+  neighbors. Simple, fast, no hyperparameters beyond $k$. Default
+  $k = \sqrt{n}$.
+- **`kmeans_distance`**: distance to assigned k-means cluster centroid.
+  Prototypical samples are close to their centroid; challenging or boundary
+  samples are far.
 - **`kmeans_complexity`**: uses the product of intra-cluster and inter-cluster
   distances to score clusters, then samples from each cluster proportionally.
   Designed to mitigate class imbalance without requiring labels.
 - **`hdbscan_distance`**: distance to assigned HDBSCAN cluster centroid. HDBSCAN
-  discovers cluster structure without requiring a predetermined cluster count, making
-  it more appropriate for datasets with irregular or variable-density clusters.
+  discovers cluster structure without requiring a predetermined cluster count,
+  making it more appropriate for datasets with irregular or variable-density
+  clusters.
 - **`hdbscan_complexity`**: analogous to `kmeans_complexity` but using HDBSCAN
   clustering.
 
@@ -273,18 +277,18 @@ ranking. Three policies are available:
 
 **`difficulty`** returns samples in direct order of their difficulty score
 (`easy_first` or `hard_first`). Easy-first (prototypical samples first) is
-appropriate when the dataset is small and the model needs to learn basic concepts
-before seeing hard cases. Hard-first (atypical samples first) tends to produce
-better models than easy-first for moderate-sized datasets because hard samples
-sample the decision boundary rather than the cluster core. Neither policy
-consistently outperforms random decimation on clean, well-balanced image
+appropriate when the dataset is small and the model needs to learn basic
+concepts before seeing hard cases. Hard-first (atypical samples first) tends to
+produce better models than easy-first for moderate-sized datasets because hard
+samples sample the decision boundary rather than the cluster core. Neither
+policy consistently outperforms random decimation on clean, well-balanced image
 datasets, however.
 
-**`stratified`** bins the score range and draws samples uniformly from each
-bin, producing a mixture of easy and hard samples rather than concentrating on
-one end. Across DataEval's testing this was the most consistent policy for
-downstream model improvement — it avoids oversampling the dense, redundant
-core while not ignoring prototypical samples entirely.
+**`stratified`** bins the score range and draws samples uniformly from each bin,
+producing a mixture of easy and hard samples rather than concentrating on one
+end. Across DataEval's testing this was the most consistent policy for
+downstream model improvement — it avoids oversampling the dense, redundant core
+while not ignoring prototypical samples entirely.
 
 **`class_balanced`** reorders to ensure equal representation across classes
 while maintaining priority order within each class. This requires class labels
@@ -297,9 +301,9 @@ across datasets; both outperformed random decimation on several datasets.
 
 ### Reference-based prioritization for new data
 
-A distinct and important use case is evaluating _new, unlabeled data_ against
-an _existing labeled dataset_. Pass the existing labeled dataset as the
-`reference` argument:
+A distinct and important use case is evaluating _new, unlabeled data_ against an
+_existing labeled dataset_. Pass the existing labeled dataset as the `reference`
+argument:
 
 ```python
 prioritizer = Prioritize.knn(extractor, k=10, reference=labeled_data)
@@ -308,8 +312,8 @@ most_novel = result.hard_first().indices
 ```
 
 In hard-first order, the top-ranked samples are those most unlike the reference
-— the candidates that would add the most new information to the dataset. This
-is the labeling budget allocation problem: given limited annotation resources,
+— the candidates that would add the most new information to the dataset. This is
+the labeling budget allocation problem: given limited annotation resources,
 which unlabeled samples are worth labeling? Prioritize with a reference answers
 that question directly.
 
@@ -332,11 +336,11 @@ clean the pool being prioritized.
 ## Class balance remediation
 
 {class}`.ClassBalance` is a _selection_ tool, not a diagnostic. It takes a
-dataset with class frequency information and returns indices for a class-balanced
-subset, using one of two strategies:
+dataset with class frequency information and returns indices for a
+class-balanced subset, using one of two strategies:
 
-**`global`** samples with probability proportional to the inverse square root
-of class frequency: $w_c = \max(1, \sqrt{\alpha / f_c})$, where $f_c$ is the
+**`global`** samples with probability proportional to the inverse square root of
+class frequency: $w_c = \max(1, \sqrt{\alpha / f_c})$, where $f_c$ is the
 frequency of class $c$ and $\alpha$ is a scaling factor. This upweights rare
 classes without completely equalizing them — it produces a gradient from common
 to rare rather than forcing uniform counts.
@@ -346,8 +350,8 @@ class frequency. Background class is excluded from the count and not drawn from.
 
 Use `global` when you want to reduce imbalance while preserving some of the
 original frequency information. Use `interclass` when you need strict balance
-for evaluation purposes or when extreme imbalance is creating a known performance
-problem.
+for evaluation purposes or when extreme imbalance is creating a known
+performance problem.
 
 `ClassBalance` addresses _sampling_ imbalance — it helps you select a balanced
 subset from what you have. If the imbalance exists because certain classes are
@@ -361,19 +365,19 @@ collection: acquiring more data for the underrepresented classes.
 
 ### BER upper and lower bounds
 
-{func}`.ber_mst` and {func}`.ber_knn` returns upper and lower bounds on the Bayes
-Error Rate — the irreducible classification error given the current feature
-representation. The upper bound is the actionable number: if the BER upper bound
-exceeds your operational accuracy requirement, no classifier trained on this data
-in this feature space will meet the requirement.
+{func}`.ber_mst` and {func}`.ber_knn` returns upper and lower bounds on the
+Bayes Error Rate — the irreducible classification error given the current
+feature representation. The upper bound is the actionable number: if the BER
+upper bound exceeds your operational accuracy requirement, no classifier trained
+on this data in this feature space will meet the requirement.
 
 **The BER upper bound exceeds the requirement.** This does not mean the task is
 impossible — it means it is impossible with the current data and feature
 representation. Three levers are available:
 
-1. **Better embeddings**: if the current feature representation conflates classes
-   that should be separable, a better embedding model may achieve lower BER.
-   BER is always contingent on the embedding; recomputing with different
+1. **Better embeddings**: if the current feature representation conflates
+   classes that should be separable, a better embedding model may achieve lower
+   BER. BER is always contingent on the embedding; recomputing with different
    embeddings is a cheap way to check whether the representation is the
    bottleneck.
 
@@ -393,8 +397,8 @@ irreducible error. Collect more data, especially in regions of the feature space
 where class overlap appears high (near decision boundaries), and recompute.
 
 **BER applies to classification only.** Object detection users: BER and
-{func}`.uap` measure classification feasibility without localization error.
-A favorable BER result does not guarantee that a detection model will meet its
+{func}`.uap` measure classification feasibility without localization error. A
+favorable BER result does not guarantee that a detection model will meet its
 requirements — localization error is an additional, separate constraint.
 
 ### UAP
@@ -422,15 +426,15 @@ has hit its ceiling under the current data distribution and architecture. The
 appropriate response is a change in the data (different conditions, different
 sensors, different label taxonomy) or a change in the model.
 
-**$m$ (exponent)** governs how quickly performance improves with additional data.
-A steep curve (large $m$) means you are currently on the steep part of the
-learning curve and modest data additions will produce measurable gains. A shallow
-curve (small $m$) means you are in the diminishing returns regime.
+**$m$ (exponent)** governs how quickly performance improves with additional
+data. A steep curve (large $m$) means you are currently on the steep part of the
+learning curve and modest data additions will produce measurable gains. A
+shallow curve (small $m$) means you are in the diminishing returns regime.
 
 **`inv_project(target_performance)`** returns the number of samples estimated to
-be required to reach a target performance level. When this returns -1, the target
-exceeds $c_0$ and is unachievable under the current conditions regardless of
-data volume. When it returns a finite number, the result is an estimate with
+be required to reach a target performance level. When this returns -1, the
+target exceeds $c_0$ and is unachievable under the current conditions regardless
+of data volume. When it returns a finite number, the result is an estimate with
 confidence intervals based on how well the power law fits the observed data. The
 estimate assumes the learning curve continues along the same trajectory —
 distribution shift, label errors, or changes in model architecture will all
@@ -447,19 +451,21 @@ the domain classifier). A drift detection is a signal to investigate, not a
 signal to immediately retrain.
 
 **First response to drift detection**: characterize the drift before acting.
-{class}`.DriftUnivariate` identifies _which_ features drifted. {class}`.DriftDomainClassifier`
-provides feature importances indicating _which_ features most distinguish the
-operational batch from the reference. Use this information to understand what
-changed: a seasonal shift in lighting, a sensor hardware change, a change in the
-operational scenario, or a change in the target population.
+{class}`.DriftUnivariate` identifies _which_ features drifted.
+{class}`.DriftDomainClassifier` provides feature importances indicating _which_
+features most distinguish the operational batch from the reference. Use this
+information to understand what changed: a seasonal shift in lighting, a sensor
+hardware change, a change in the operational scenario, or a change in the target
+population.
 
 **Drift that affects model performance** (visible in uncertainty-based drift
 detection or in ground-truth performance metrics when labels are available)
 warrants retraining or fine-tuning on operational data. If operational data with
 ground truth is available, it should be incorporated into the training set.
-Prioritize the most novel operational samples for labeling using {class}`.Prioritize`
-with the current training set as reference — the hard-first ranking identifies
-the operational samples most unlike the training distribution.
+Prioritize the most novel operational samples for labeling using
+{class}`.Prioritize` with the current training set as reference — the hard-first
+ranking identifies the operational samples most unlike the training
+distribution.
 
 **Drift that does not affect model performance** (feature distribution changed
 but uncertainty-based detection shows no confidence degradation) may not require
@@ -534,7 +540,8 @@ A practical use: after {class}`.Outliers` flags a set of images, run
 `factor_deviation` on the flagged indices against the reference metadata from
 the full dataset. If the top factor for most flagged samples is `altitude`, that
 suggests the outliers were collected at unusual altitudes — actionable
-information for both data collection planning and model limitation documentation.
+information for both data collection planning and model limitation
+documentation.
 
 At least three reference samples are required for a meaningful deviation
 calculation. The function returns empty dictionaries if fewer reference samples
@@ -545,17 +552,17 @@ are available.
 {func}`.factor_predictors` answers the question: _which metadata factors are
 most associated with being flagged?_
 
-It treats the flagged/not-flagged binary as a target variable and computes
-the mutual information between each metadata factor and that target, using
-scikit-learn's `mutual_info_classif`. The result is a dictionary mapping each
-factor name to its mutual information score in bits. A score of 0 means the
-factor carries no information about which samples were flagged; a higher score
+It treats the flagged/not-flagged binary as a target variable and computes the
+normalized mutual information between each metadata factor and that target,
+using scikit-learn's `mutual_info_classif`. The result is a dictionary mapping
+each factor name to its normalized mutual information. A score of 0 means the
+factor carries no information about which samples were flagged; a score near 1
 means the factor is predictive of flagging status.
 
 Unlike `factor_deviation`, which characterizes individual flagged samples,
-`factor_predictors` characterizes the flagged set as a whole. It answers:
-"Is there a systematic metadata reason why these samples were flagged?" This is
-most useful when there are many flagged samples and you want to understand the
+`factor_predictors` characterizes the flagged set as a whole. It answers: "Is
+there a systematic metadata reason why these samples were flagged?" This is most
+useful when there are many flagged samples and you want to understand the
 population-level pattern rather than inspect each sample individually.
 
 **Example workflow after drift detection:**
@@ -576,11 +583,11 @@ deviations = factor_deviation(reference_metadata.factors, operational_metadata.f
 # → first flagged sample is 4.2 scaled deviations from reference in time_of_day
 ```
 
-**Mutual information is association, not causation.** A high MI score means the
-factor correlates with being flagged. It does not mean the factor caused the
-problem, nor does it mean other factors with lower scores are irrelevant.
-Always interpret MI scores alongside domain knowledge about what the factors
-represent and how data was collected.
+**Mutual information is association, not causation.** A high normalized MI (NMI)
+score means the factor correlates with being flagged. It does not mean the
+factor caused the problem, nor does it mean other factors with lower scores are
+irrelevant. Always interpret NMI scores alongside domain knowledge about what
+the factors represent and how data was collected.
 
 Both functions require factors to be provided as dictionaries mapping factor
 names to arrays. If your metadata is stored in DataEval's {class}`.Metadata`
@@ -590,9 +597,9 @@ class, the `.factors` attribute provides this format directly.
 
 Where drift detectors return a binary signal — drifted or not — HP divergence
 ({func}`.divergence`) returns a continuous score between 0 and 1. The two are
-complementary: drift detection tells you when to act; divergence tells you
-_how much_ the situation has changed, which is the information needed to
-calibrate the urgency and scale of the response.
+complementary: drift detection tells you when to act; divergence tells you _how
+much_ the situation has changed, which is the information needed to calibrate
+the urgency and scale of the response.
 
 **A divergence score near 0** between training and operational data confirms
 that the model is operating close to its training envelope. Formal drift
@@ -602,57 +609,58 @@ worth documenting and monitoring, but unlikely to require immediate retraining.
 
 **A divergence score approaching 1** means the two distributions are nearly
 separable — the operational data looks fundamentally different from anything in
-training. Any model performance measurements from training are likely to be
-poor predictors of operational performance. This is a strong signal for
-immediate data collection, retraining, or escalation depending on the
-operational stakes.
+training. Any model performance measurements from training are likely to be poor
+predictors of operational performance. This is a strong signal for immediate
+data collection, retraining, or escalation depending on the operational stakes.
 
-**Tracking divergence over time** is more informative than any single score.
-A slowly rising trend — each operational batch slightly more diverged from the
+**Tracking divergence over time** is more informative than any single score. A
+slowly rising trend — each operational batch slightly more diverged from the
 reference than the last — identifies gradual drift that may never trigger a
 single-batch hypothesis test but is nonetheless eroding the relevance of the
 training distribution. If you are running drift monitoring in production,
-logging divergence scores alongside p-values gives you the trend visibility
-that p-values alone cannot provide.
+logging divergence scores alongside p-values gives you the trend visibility that
+p-values alone cannot provide.
 
 **Using divergence to localize drift.** When a drift detector fires on a large
 batch, run divergence on subsets — by collection date, sensor, geographic
 region, or operational condition — to identify which subpopulation is driving
-the shift. The subset with the highest divergence against the reference is
-where to focus investigation and targeted data collection. This avoids the
+the shift. The subset with the highest divergence against the reference is where
+to focus investigation and targeted data collection. This avoids the
 multiple-testing penalty of running separate drift tests on each subset.
 
-**Pre-deployment gap assessment.** Before a model enters service, run
-divergence between the training set and a sample of expected operational data.
-A high divergence at this stage — before any monitoring has begun — is evidence
-that the training distribution was not representative of the deployment
-environment. This is the point at which the gap is cheapest to close: collect
-more data from the operational distribution, or document the limitation
-explicitly in the test report.
+**Pre-deployment gap assessment.** Before a model enters service, run divergence
+between the training set and a sample of expected operational data. A high
+divergence at this stage — before any monitoring has begun — is evidence that
+the training distribution was not representative of the deployment environment.
+This is the point at which the gap is cheapest to close: collect more data from
+the operational distribution, or document the limitation explicitly in the test
+report.
 
 ## Keeping results in context
 
 DataEval's diagnostics are snapshots. They characterize the dataset at the time
 of analysis. Datasets change — new data is collected, labels are corrected,
 splits are revised — and monitoring data changes continuously. Any diagnostic
-result that drives a significant decision should be recomputed after the relevant
-changes have been made to verify that the action had the expected effect.
+result that drives a significant decision should be recomputed after the
+relevant changes have been made to verify that the action had the expected
+effect.
 
 The most important integration is the connection between pre-deployment and
 operational findings. BER and UAP results from pre-deployment data evaluation
 establish expected performance bounds. Sufficiency curves establish expected
 trajectories. When operational monitoring detects drift or OOD conditions, those
 pre-deployment baselines provide the context for interpreting whether the
-operational change is within the expected envelope or represents a genuine threat
-to the established performance bounds.
+operational change is within the expected envelope or represents a genuine
+threat to the established performance bounds.
 
 ## Related concept pages
 
 - [Data Integrity](DataIntegrity.md) — what the cleaning, label error, and label
   statistics diagnostics measure
-- [Clustering](Clustering.md) — the algorithm underlying cluster-based Duplicates,
-  Outliers, label_errors, and Prioritize
-- [Dataset Bias and Coverage](DatasetBias.md) — what the bias diagnostics measure
+- [Clustering](Clustering.md) — the algorithm underlying cluster-based
+  Duplicates, Outliers, label_errors, and Prioritize
+- [Dataset Bias and Coverage](DatasetBias.md) — what the bias diagnostics
+  measure
 - [Performance Limits](PerformanceLimits.md) — what BER, UAP, and Sufficiency
   tell you about achievability
 - [Distribution Shift](DistributionShift.md) — what drift and OOD detection

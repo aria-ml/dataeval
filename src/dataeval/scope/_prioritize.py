@@ -364,6 +364,9 @@ class Prioritize(Evaluator):
     ----------
     extractor : FeatureExtractor
         Feature extractor instance to use for extracting embeddings from data.
+    batch_size : int or None, default None
+        Batch size for embedding computation. When None, uses the global
+        batch size from :func:`~dataeval.config.get_batch_size`.
     method : {"knn", "kmeans_distance", "kmeans_complexity", "hdbscan_distance", \
 "hdbscan_complexity"}, default "knn"
         Ranking method to use:
@@ -470,6 +473,9 @@ class Prioritize(Evaluator):
         extractor : FeatureExtractor or None
             Feature extractor instance to use for extracting embeddings
             from data.
+        batch_size : int or None, default None
+            Batch size for embedding computation. When None, uses the global
+            batch size from :func:`~dataeval.config.get_batch_size`.
         method : {"knn", "kmeans_distance", "kmeans_complexity", "hdbscan_distance", \
 "hdbscan_complexity"}, default "knn"
             Ranking method to use.
@@ -481,9 +487,6 @@ class Prioritize(Evaluator):
             Number of K-means initializations (kmeans methods only).
         max_cluster_size : int or None, default None
             Maximum cluster size for HDBSCAN methods.
-        batch_size : int or None, default None
-            Batch size for embedding computation. When None, uses the global
-            batch size from :func:`~dataeval.config.get_batch_size`.
         order : {"easy_first", "hard_first"}, default "easy_first"
             Sort direction for output indices.
         policy : {"difficulty", "stratified", "class_balanced"}, default "difficulty"

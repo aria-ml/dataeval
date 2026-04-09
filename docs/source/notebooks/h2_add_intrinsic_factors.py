@@ -19,12 +19,14 @@
 # %% [markdown]
 # ## Problem statement
 #
-# When performing analysis on datasets, [metadata](../concepts/DatasetBias.md#measuring-bias-mutual-information) may
-# sometimes be sparse or unavailable. Adding metadata to a dataset for analysis may be necessary at times, and can come in
-# the forms of calculated intrinsic values or additional information originally unavailable on the source dataset.
+# When performing analysis on datasets,
+# [metadata](../concepts/DatasetBias.md#measuring-bias-normalized-mutual-information) may
+# sometimes be sparse or unavailable. Adding metadata to a dataset for analysis
+# may be necessary at times, and can come in the forms of calculated intrinsic
+# values or additional information originally unavailable on the source dataset.
 #
-# This guide will show you how to add in the calculated statistics from DataEval's {func}`.compute_stats` function to the
-# metadata for bias analysis.
+# This guide will show you how to add in the calculated statistics from DataEval's
+# {func}`.compute_stats` function to the metadata for bias analysis.
 
 # %% [markdown]
 # ### When to use
