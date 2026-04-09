@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,74,41
+/aria-ml/dataeval/tree/main/src/dataeval,19,4
+/aria-ml/dataeval/tree/main,8,4
+/aria-ml/dataeval/tree/main/src/dataeval/core,8,3
+/aria-ml/dataeval/blob/main/src/dataeval/core/_clusterer.py,7,3
+/aria-ml/dataeval/tree/main/src,6,5
+/aria-ml/dataeval/blob/main/src/dataeval/core/_coverage.py,6,2
+/aria-ml/dataeval/releases,6,2
+/aria-ml/dataeval/blob/main/src/dataeval/core/_mutual_info.py,4,2
+/aria-ml/dataeval/blob/main/src/dataeval/shift/_drift/_univariate.py,4,2
