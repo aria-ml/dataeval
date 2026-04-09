@@ -120,10 +120,17 @@ docs = [
 security = [  # keep in sync with [tool.uv.constraint-dependencies]
   "cryptography>=46.0.5",    # CVE-2026-26007: Missing Subgroup Validation for SECT Curves
   "filelock>=3.20.3",        # GHSA-w853-jp5j-5j7f, GHSA-qmgc-5h2g-mvrw
+  "onnx>=1.21.0",            # CVE-2026-28500: Untrusted Model Repository Warnings Suppressed by silent=True
+                             # CVE-2026-34445: Malicious ONNX models can crash servers by exploiting unprotected object settings
+                             # CVE-2026-27489: Vulnerable to Path Traversal via Symlink
+                             # GHSA-q56x-g2fj-4rj6: TOCTOU arbitrary file read/write in save_external_dat
   "pillow>=12.1.1",          # CVE-2026-25990: OOB write via PSD image
+  "poetry>=2.3.3",           # CVE-2026-34591: Poetry Has Wheel Path Traversal Which Can Lead to Arbitrary File Write
   "protobuf>=6.33.5",        # GHSA-7gcm-g887-7qv7
   "setuptools>=82.0.0",      # CVE-2026-23949: (jaraco_context) path traversal in tarball()
                              # CVE-2026-24049: (wheel) privilege escalation via unpack
+  "tornado>=6.5.5",          # CVE-2026-31958: Tornado is vulnerable to DoS due to too many multipart parts
+                             # CVE-2026-35536: Tornado has cookie attribute injection via .RequestHandler.set_cookie
 ]
 dev = [
   { include-group = "base" },
@@ -149,10 +156,17 @@ conflicts = [
 constraint-dependencies = [
     "cryptography>=46.0.5",    # CVE-2026-26007: Missing Subgroup Validation for SECT Curves
     "filelock>=3.20.3",        # GHSA-w853-jp5j-5j7f, GHSA-qmgc-5h2g-mvrw
+    "onnx>=1.21.0",            # CVE-2026-28500: Untrusted Model Repository Warnings Suppressed by silent=True
+                               # CVE-2026-34445: Malicious ONNX models can crash servers by exploiting unprotected object settings
+                               # CVE-2026-27489: Vulnerable to Path Traversal via Symlink
+                               # GHSA-q56x-g2fj-4rj6: TOCTOU arbitrary file read/write in save_external_dat
     "pillow>=12.1.1",          # CVE-2026-25990: OOB write via PSD image
+    "poetry>=2.3.3",           # CVE-2026-34591: Poetry Has Wheel Path Traversal Which Can Lead to Arbitrary File Write
     "protobuf>=6.33.5",        # GHSA-7gcm-g887-7qv7
     "setuptools>=82.0.0",      # CVE-2026-23949: (jaraco_context) path traversal in tarball()
                                # CVE-2026-24049: (wheel) privilege escalation via unpack
+    "tornado>=6.5.5",          # CVE-2026-31958: Tornado is vulnerable to DoS due to too many multipart parts
+                               # CVE-2026-35536: Tornado has cookie attribute injection via .RequestHandler.set_cookie
 ]
 
 [[tool.uv.index]]
