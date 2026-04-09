@@ -110,7 +110,9 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
     ) -> None:
         base_config = config or OODDomainClassifier.Config()
 
-        self._threshold_perc_set = threshold_perc is not None or (config is not None and config.threshold_perc is not None)
+        self._threshold_perc_set = threshold_perc is not None or (
+            config is not None and config.threshold_perc is not None
+        )
         perc = threshold_perc if threshold_perc is not None else (base_config.threshold_perc or 95.0)
         super().__init__(perc)
 

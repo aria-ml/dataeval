@@ -33,7 +33,8 @@ class FeatureDistanceResult(TypedDict):
     location : float
         The normalized location where the KS statistic was achieved
     dist : float
-        The Wasserstein distance between distributions, scaled by the Interquartile Range (IQR) of the reference distribution.
+        The Wasserstein distance between distributions, scaled by the
+        Interquartile Range (IQR) of the reference distribution.
     p_value : float
         The p-value from the KS test
     """
