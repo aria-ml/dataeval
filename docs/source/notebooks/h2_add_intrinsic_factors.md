@@ -17,19 +17,22 @@ kernelspec:
 
 ## Problem statement
 
-When performing analysis on datasets, [metadata](../concepts/DatasetBias.md#measuring-bias-mutual-information) may
-sometimes be sparse or unavailable. Adding metadata to a dataset for analysis may be necessary at times, and can come in
-the forms of calculated intrinsic values or additional information originally unavailable on the source dataset.
+When performing analysis on datasets,
+[metadata](../concepts/DatasetBias.md#measuring-bias-normalized-mutual-information) may
+sometimes be sparse or unavailable. Adding metadata to a dataset for analysis
+may be necessary at times, and can come in the forms of calculated intrinsic
+values or additional information originally unavailable on the source dataset.
 
-This guide will show you how to add in the calculated statistics from DataEval's {func}`.compute_stats` function to the
-metadata for bias analysis.
+This guide will show you how to add in the calculated statistics from DataEval's
+{func}`.compute_stats` function to the metadata for bias analysis.
 
 +++
 
 ### When to use
 
-Adding metadata factors should be done when little or no metadata is available on the dataset, or to gain insights
-specific to metadata of interest that is not present natively in the dataset metadata.
+Adding metadata factors should be done when little or no metadata is available
+on the dataset, or to gain insights specific to metadata of interest that is not
+present natively in the dataset metadata.
 
 +++
 
@@ -48,9 +51,8 @@ specific to metadata of interest that is not present natively in the dataset met
 First import the required libraries needed to set up the example.
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 try:
     import google.colab  # noqa: F401
 
@@ -85,8 +87,8 @@ pio.renderers.default = "notebook"
 
 Begin by loading in the CIFAR-10 dataset.
 
-The CIFAR-10 dataset contains 60,000 images - 50,000 in the train set and 10,000 in the test set. We will use a shuffled
-sample of 20,000 images from both sets.
+The CIFAR-10 dataset contains 60,000 images - 50,000 in the train set and 10,000
+in the test set. We will use a shuffled sample of 20,000 images from both sets.
 
 ```{code-cell} ipython3
 # Load in the CIFAR10 dataset and limit to 20,000 images with random shuffling
@@ -103,8 +105,9 @@ metadata = Metadata(cifar10)
 print(f"Factor names: {metadata.factor_names}")
 ```
 
-A quick check of the {func}`.balance` of the single factor will show no mutual information between the classes and the
-`batch_num` which indicates the on-disk binary file the image was extracted from.
+A quick check of the {func}`.balance` of the single factor will show no mutual
+information between the classes and the `batch_num` which indicates the on-disk
+binary file the image was extracted from.
 
 ```{code-cell} ipython3
 # Balance at index 0 is always class
@@ -113,11 +116,12 @@ Balance().evaluate(metadata).balance[2]
 
 ## Add image statistics to the metadata
 
-In order to perform additional bias analysis on the dataset when no meaningful metadata are provided, you will augment
-the metadata with statistics of the images using the {func}`.compute_stats` function.
+In order to perform additional bias analysis on the dataset when no meaningful
+metadata are provided, you will augment the metadata with statistics of the
+images using the {func}`.compute_stats` function.
 
-Begin by running `compute_stats` for the `PIXEL` and `VISUAL` image stats for the dataset and adding the stats factors
-to the `Metadata`.
+Begin by running `compute_stats` for the `PIXEL` and `VISUAL` image stats for
+the dataset and adding the stats factors to the `Metadata`.
 
 ```{code-cell} ipython3
 # Calculate pixel and visual statistics
@@ -127,11 +131,12 @@ calc_results = compute_stats(cifar10, stats=ImageStats.PIXEL | ImageStats.VISUAL
 metadata.add_factors(calc_results["stats"])
 ```
 
-Next you will add the `compute_stats` output to the metadata as factors, and exclude factors that are uniform or without
-significance.
+Next you will add the `compute_stats` output to the metadata as factors, and
+exclude factors that are uniform or without significance.
 
-Additionally, you will specify a binning strategy for continuous statistical factors, which are, for our purposes,
-continuous. For this example, bin everything into 10 uniform-width bins.
+Additionally, you will specify a binning strategy for continuous statistical
+factors, which are, for our purposes, continuous. For this example, bin
+everything into 10 uniform-width bins.
 
 ```{code-cell} ipython3
 # Exclude the id and batch_num as it is not a relevant factor for bias analysis
@@ -144,8 +149,9 @@ metadata.continuous_factor_bins = dict.fromkeys(keys, 5)
 
 ## Perform bias analysis
 
-Now you can run the bias analysis evaluators {class}`.Balance` and {class}`.Diversity` on the dataset metadata augmented
-with intrinsic statistical factors.
+Now you can run the bias analysis evaluators {class}`.Balance` and
+{class}`.Diversity` on the dataset metadata augmented with intrinsic statistical
+factors.
 
 ```{code-cell} ipython3
 balance_output = Balance().evaluate(metadata)
@@ -155,16 +161,18 @@ balance_output = Balance().evaluate(metadata)
 dep.plot(balance_output)
 ```
 
-Notice the very high mutual information between the variance and standard deviation of image intensities, which is
-expected. Mean image intensity correlates with brightness, darkness, and contrast. However, none of the intrinsic
-factors correlate strongly with class label.
+Notice the very high normalized mutual information between the variance and
+standard deviation of image intensities, which is expected. Mean image intensity
+correlates with brightness, darkness, and contrast. However, none of the
+intrinsic factors correlate strongly with class label.
 
 ```{code-cell} ipython3
 dep.plot(balance_output, plot_classwise=True)
 ```
 
-Classwise balance also indicates minimal correlation of image statistics and individual classes. Uniform mutual
-information between individual classes and all class labels indicates balanced class representation in the subsampled
+Classwise balance also indicates minimal correlation of image statistics and
+individual classes. Uniform mutual information between individual classes and
+all class labels indicates balanced class representation in the subsampled
 dataset.
 
 ```{code-cell} ipython3
@@ -172,13 +180,16 @@ diversity_output = Diversity().evaluate(metadata)
 dep.plot(diversity_output)
 ```
 
-The diversity index also indicates uniform sampling of classes within the dataset. The apparently low diversity of
-kurtosis across the dataset may indicate an inadequate binning strategy (for metric computation) given that the other
-statistical moments appear to be more evenly distributed. Further investigation and iteration could be done to assess
-sensitivity to binning strategy.
+The diversity index also indicates uniform sampling of classes within the
+dataset. The apparently low diversity of kurtosis across the dataset may
+indicate an inadequate binning strategy (for metric computation) given that the
+other statistical moments appear to be more evenly distributed. Further
+investigation and iteration could be done to assess sensitivity to binning
+strategy.
 
-You can now augment your datasets with additional metadata information, either from additional sources or using
-`dataeval` statistical functions for insights into your data.
+You can now augment your datasets with additional metadata information, either
+from additional sources or using `dataeval` statistical functions for insights
+into your data.
 
 +++
 

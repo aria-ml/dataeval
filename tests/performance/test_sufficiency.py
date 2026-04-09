@@ -17,7 +17,7 @@ torch.manual_seed(0)
 def mock_ds(length: int | None):
     ds = MagicMock()
     if length is None:
-        delattr(ds, "__len__")
+        del ds.__len__
     else:
         ds.__len__.return_value = length
     return ds

@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 
 class MutualInfoResult(TypedDict):
     """
-    Type definition for mutual information output.
+    Type definition for normalized mutual information output.
 
     Attributes
     ----------
@@ -155,7 +155,7 @@ def mutual_info(  # noqa: C901
     data, discrete_list = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_feat_np)
     num_factors = len(discrete_list)
 
-    _logger.debug("Computing MI for %d factors (%d discrete)", num_factors, sum(discrete_list))
+    _logger.debug("Computing NMI for %d factors (%d discrete)", num_factors, sum(discrete_list))
 
     # initialize output matrix
     mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
@@ -195,7 +195,7 @@ def mutual_info(  # noqa: C901
     full_matrix = 0.5 * (mi + mi.T).astype(np.float64)
 
     _logger.info(
-        "Mutual info calculation complete: %d factors, mean class_to_factor MI=%.4f",
+        "Mutual info calculation complete: %d factors, mean class_to_factor NMI=%.4f",
         num_factors - 1,
         np.mean(full_matrix[0, 1:]),
     )
@@ -213,7 +213,7 @@ def mutual_info_classwise(
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
-    Compute normalized mutual information (MI) between factors, transformed to lie in [0, 1].
+    Compute normalized mutual information (NMI) between factors.
 
     Factors include class label, metadata, and label/image properties.
 
@@ -239,8 +239,8 @@ def mutual_info_classwise(
     -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
-    seed. MI is computed differently for categorical and continuous variables. We
-    return a transformation of MI onto the interval [0, 1].
+    seed. MI is computed differently for categorical and continuous variables. In all cases,
+    we return either a normalization or transformation of MI onto the interval [0, 1].
 
     Example
     -------
@@ -276,7 +276,7 @@ def mutual_info_classwise(
     u_classes = np.unique(class_labels_np)
     num_classes = len(u_classes)
 
-    _logger.debug("Computing classwise MI for %d classes and %d factors", num_classes, num_factors)
+    _logger.debug("Computing classwise NMI for %d classes and %d factors", num_classes, num_factors)
 
     # classwise targets (binary indicators)
     tgt_bin = data[:, 0][:, None] == u_classes
