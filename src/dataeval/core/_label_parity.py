@@ -194,9 +194,9 @@ def label_parity(
             f"Found {len(observed_dist)} unique classes in observed label distribution, "
             f"but found {len(expected_dist)} unique classes in expected label distribution. "
             "This can happen when some class ids have zero instances in one dataset but "
-            "not in the other. When initializing Parity, try setting the num_classes "
-            "parameter to the known number of unique class ids, so that classes with "
-            "zero instances are still included in the distributions.",
+            "not in the other. Try setting the num_classes parameter to the known number "
+            "of unique class ids, so that classes with zero instances are still included "
+            "in the distributions.",
         )
 
     cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)

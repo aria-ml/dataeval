@@ -75,7 +75,7 @@
 #
 # ### DataEval metrics
 #
-# DataEval has three dedicated classes for identifying and understanding the bias or correlations that may be present in a
+# DataEval has two dedicated classes for identifying and understanding the bias or correlations that may be present in a
 # dataset: {class}`.Balance` and {class}`.Diversity`.
 #
 # The `Balance` evaluator measures correlational relationships between metadata factors and classes by calculating the

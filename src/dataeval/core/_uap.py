@@ -11,14 +11,14 @@ import logging
 from sklearn.metrics import average_precision_score
 
 from dataeval._experimental import experimental
-from dataeval.types import Array2D
+from dataeval.protocols import ArrayLike
 from dataeval.utils._internal import as_numpy
 
 _logger = logging.getLogger(__name__)
 
 
 @experimental
-def uap(labels: Array2D[int], scores: Array2D[float]) -> float:
+def uap(labels: ArrayLike, scores: ArrayLike) -> float:
     """
     Estimate the empirical mean precision for the upperbound average precision.
 

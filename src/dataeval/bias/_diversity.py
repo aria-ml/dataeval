@@ -56,7 +56,7 @@ class Diversity(Evaluator):
     Through standard histogram binning, for continuous variables.
 
     The method specified defines diversity as the inverse Simpson diversity index linearly rescaled to
-    the unit interval, or the normalized form of the Shannon entropy.
+    the unit interval [0, 1], or the normalized form of the Shannon entropy.
 
     diversity = 1 implies that samples are evenly distributed across a particular factor
     diversity = 0 implies that all samples belong to one category/bin
@@ -66,7 +66,9 @@ class Diversity(Evaluator):
     Parameters
     ----------
     method : "simpson" or "shannon", default "simpson"
-        The methodology used for defining diversity
+        The methodology used for defining diversity. When "simpson" is used,
+        the index is linearly rescaled so that 1.0 represents maximum diversity
+        (even distribution) and 0.0 represents minimum diversity (all samples in one bin).
     threshold : float, default 0.5
         Threshold for identifying low diversity. Factors with diversity values
         at or below this threshold are flagged as having low diversity.

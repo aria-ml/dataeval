@@ -22,28 +22,30 @@ class BalanceOutput(DictOutput):
     """
     Output class for the :class:`.Balance` :term:`bias<Bias>` evaluator.
 
-    Contains three polars DataFrames with mutual information scores and threshold flags.
+    Contains three polars DataFrames with normalized mutual information scores and threshold flags.
 
     Attributes
     ----------
     balance : pl.DataFrame
-        DataFrame with global class-to-factor mutual information:
+        DataFrame with global class-to-factor normalized mutual information:
 
-        - factor_name: str - Name of the metadata factor
-        - mi_value: float - Mutual information value between this factor and class labels
+        - factor_name: str - Name of the metadata factor. Includes "class_label"
+          which represents the self-information (always 1.0).
+        - mi_value: float - Normalized mutual information value between this
+          factor and class labels
     factors : pl.DataFrame
-        DataFrame with inter-factor mutual information correlations:
+        DataFrame with inter-factor normalized mutual information correlations:
 
         - factor1: str - Name of the first factor
         - factor2: str - Name of the second factor
-        - mi_value: float - Mutual information value
+        - mi_value: float - Normalized mutual information value
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
     classwise : pl.DataFrame
-        DataFrame with per-class-to-factor mutual information:
+        DataFrame with per-class-to-factor normalized mutual information:
 
         - class_name: str - Name of the class
         - factor_name: str - Name of the metadata factor
-        - mi_value: float - Mutual information value
+        - mi_value: float - Normalized mutual information value
         - is_imbalanced: bool - True if mi_value > class_imbalance_threshold
     """
 

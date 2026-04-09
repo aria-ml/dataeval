@@ -27,8 +27,9 @@
 # %% [markdown]
 # ### When to use
 #
-# The `Divergence` class should be used when you would like to know how far two datasets are diverged for one another. For
-# example, if you would like to measure [operational drift](../concepts/DistributionShift.md#drift-detection).
+# The `divergence_fnn` or `divergence_mst` functions should be used when you would like to know how far two datasets are
+# diverged for one another. For example, if you would like to measure
+# [operational drift](../concepts/DistributionShift.md#drift-detection).
 
 # %% [markdown]
 # ### What you will need
@@ -116,7 +117,7 @@ print("Corrupted image shape:", corrupted_emb[0].shape)
 # %% [markdown]
 # ## Calculate corrupted divergence
 #
-# Now lets calculate the Divergence between this corrupted dataset and the original images
+# Now lets calculate the divergence between this corrupted dataset and the original images
 
 # %%
 div = divergence_fnn(data_a, corrupted_emb)

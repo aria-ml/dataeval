@@ -112,7 +112,7 @@ class Sufficiency(Evaluator, Generic[T, M]):
         Raises
         ------
         ValueError
-            If runs or substeps is not greater than 1
+            If runs or substeps is not at least 1
 
 
         See Also

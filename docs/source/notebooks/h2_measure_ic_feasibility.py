@@ -29,11 +29,11 @@
 # %% [markdown]
 # ### When to use
 #
-# The `BER` metric should be used when you would like to measure the feasibility of a machine learning task. For example,
-# if you have an operational accuracy requirement of 80%, and would like to know if this is feasibly achievable given the
-# imagery. A low feasibility score will tell you that the problem you are trying to score cannot be solved with the
-# existing data at the accuracy you desire. This in turn implies that your question does not follow a learnable pattern or
-# that your data is noisy.
+# The `ber_mst` or `ber_knn` functions should be used when you would like to measure the feasibility of a machine learning
+# task. For example, if you have an operational accuracy requirement of 80%, and would like to know if this is feasibly
+# achievable given the imagery. A low feasibility score will tell you that the problem you are trying to score cannot be
+# solved with the existing data at the accuracy you desire. This in turn implies that your question does not follow a
+# learnable pattern or that your data is noisy.
 
 # %% [markdown]
 # ### What you will need

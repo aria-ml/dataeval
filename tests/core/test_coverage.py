@@ -36,6 +36,15 @@ class TestCoverageUnit:
         with pytest.raises(ValueError, match="must be unit"):
             coverage_naive(embs, 20)
 
+    def test_force_unit_interval(self):
+        embs = np.random.random(size=(100, 16)) * 10
+        # Should not raise ValueError with force_unit_interval=True
+        result_naive = coverage_naive(embs, 20, force_unit_interval=True)
+        assert len(result_naive["uncovered_indices"]) >= 0
+        
+        result_adaptive = coverage_adaptive(embs, 20, 0.1, force_unit_interval=True)
+        assert len(result_adaptive["uncovered_indices"]) == 10
+
 
 @pytest.mark.optional
 class TestCoverageFunctional:

@@ -60,18 +60,18 @@ def _merge_labels_and_factors(
     factor_data: NDArray[np.intp],
     discrete_features: Iterable[bool] | None,
 ) -> tuple[NDArray[np.intp], list[bool]]:
-    discrete_features = [True] + (
+    discrete_list = [True] + (
         [not is_continuous(d) for d in factor_data.T] if discrete_features is None else list(discrete_features)
     )
 
     # Use numeric data for MI
     data = np.hstack((class_labels[:, np.newaxis], factor_data))
     # Present discrete features composed of distinct values as continuous for `mutual_info_classif`
-    for i in range(len(discrete_features)):
+    for i in range(len(discrete_list)):
         if len(data) == len(np.unique(data[:, i])):
-            discrete_features[i] = False
+            discrete_list[i] = False
 
-    return data, discrete_features
+    return data, discrete_list
 
 
 def mutual_info(  # noqa: C901
@@ -81,7 +81,7 @@ def mutual_info(  # noqa: C901
     num_neighbors: int = 5,
 ) -> MutualInfoResult:
     """
-    Compute mutual information between factors, transformed to lie in [0, 1].
+    Compute normalized mutual information between factors, transformed to lie in [0, 1].
 
     Factors include class label, metadata, and label/image properties.
 
@@ -101,8 +101,8 @@ def mutual_info(  # noqa: C901
     MutualInfoResult
         TypedDict containing:
 
-        - class_to_factor: NDArray[np.float64] - 1D array of MI between class labels and each factor
-        - interfactor: NDArray[np.float64] - (num_factors) x (num_factors) matrix of MI between factors only
+        - class_to_factor: NDArray[np.float64] - 1D array of normalized MI between class labels and each factor
+        - interfactor: NDArray[np.float64] - (num_factors) x (num_factors) matrix of normalized MI between factors only
 
     See Also
     --------
@@ -126,7 +126,7 @@ def mutual_info(  # noqa: C901
 
     Example
     -------
-    Return balance (mutual information) of factors with class_labels
+    Return balance (normalized mutual information) of factors with class_labels
 
     >>> rng = np.random.default_rng(175)
     >>> class_labels = rng.choice([0, 1, 2], size=100)
@@ -208,12 +208,12 @@ def mutual_info(  # noqa: C901
 
 def mutual_info_classwise(
     class_labels: Array1D[int],
-    factor_data: Array2D[int],
+    factor_data: Array2D[int | float],
     discrete_features: Array1D[bool] | None = None,
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
-    Compute mutual information (MI) between factors, transformed to lie in [0, 1].
+    Compute normalized mutual information (MI) between factors, transformed to lie in [0, 1].
 
     Factors include class label, metadata, and label/image properties.
 
@@ -221,7 +221,7 @@ def mutual_info_classwise(
     ----------
     class_labels : Array1D[int]
         Target class labels as integer indices. Can be a 1D list, or array-like object.
-    factor_data : Array2D[int]
+    factor_data : Array2D[int | float]
         Factor values after binning or digitization. Can be a 1D list, or array-like object.
     discrete_features : Array1D[bool] | None = None
         Boolean array or iterable defining whether or not the feature set is discretized.
@@ -232,7 +232,7 @@ def mutual_info_classwise(
     Returns
     -------
     NDArray[np.float64]
-        (num_factors+1) x (num_factors+1) estimate of mutual information
+        (num_classes) x (num_factors+1) estimate of normalized mutual information
         between num_factors metadata factors and class label. Symmetry is enforced.
 
     See Also
@@ -250,7 +250,7 @@ def mutual_info_classwise(
 
     Example
     -------
-    Return classwise balance (mutual information) of factors with individual class_labels
+    Return classwise balance (normalized mutual information) of factors with individual class_labels
 
     >>> rng = np.random.default_rng(175)
     >>> class_labels = rng.choice([0, 1, 2], size=100)
@@ -267,7 +267,7 @@ def mutual_info_classwise(
     _logger.info("Starting mutual_info_classwise calculation with num_neighbors=%d", num_neighbors)
 
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
-    factor_data_np = as_numpy(factor_data, dtype=np.intp, required_ndim=2)
+    factor_data_np = as_numpy(factor_data, required_ndim=2)
     discrete_feat_np = opt_as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
 
     num_neighbors = _validate_num_neighbors(num_neighbors)

@@ -650,7 +650,7 @@ class Metadata(Array, FeatureExtractor):
         -------
         Sequence[str]
             List of factor names that passed filtering and preprocessing steps.
-            Order matches columns in factor_data and binned_data.
+            Order matches columns in factor_data.
 
         Notes
         -----

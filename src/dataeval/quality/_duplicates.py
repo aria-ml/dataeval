@@ -988,7 +988,7 @@ class Duplicates(Evaluator):
 
         Attributes
         ----------
-        flags : ImageStats, default ImageStats.HASH
+        flags : ImageStats, default ImageStats.HASH_DUPLICATES_BASIC
             Statistics to compute for hash-based duplicate detection.
         cluster_sensitivity : float or None, default None
             Distance factor for cluster-based near duplicate detection. Scales

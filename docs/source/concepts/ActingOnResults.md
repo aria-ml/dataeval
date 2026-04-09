@@ -361,11 +361,11 @@ collection: acquiring more data for the underrepresented classes.
 
 ### BER upper and lower bounds
 
-{class}`.BER` returns upper and lower bounds on the Bayes Error Rate — the
-irreducible classification error given the current feature representation. The
-upper bound is the actionable number: if the BER upper bound exceeds your
-operational accuracy requirement, no classifier trained on this data in this
-feature space will meet the requirement.
+{func}`.ber_mst` and {func}`.ber_knn` returns upper and lower bounds on the Bayes
+Error Rate — the irreducible classification error given the current feature
+representation. The upper bound is the actionable number: if the BER upper bound
+exceeds your operational accuracy requirement, no classifier trained on this data
+in this feature space will meet the requirement.
 
 **The BER upper bound exceeds the requirement.** This does not mean the task is
 impossible — it means it is impossible with the current data and feature

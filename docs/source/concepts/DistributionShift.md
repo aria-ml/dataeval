@@ -272,7 +272,7 @@ scoring train two instances on the same reference data.
 
 The detectors above operate on input features and are blind to whether detected
 shift affects model predictions. **Uncertainty-based drift detection**
-(`DriftUncertainty`, via `ClassifierUncertaintyExtractor`) takes a
+(`DriftUnivariate`, via `ClassifierUncertaintyExtractor`) takes a
 model-aware approach: it monitors changes in the model's prediction confidence
 rather than the inputs directly.
 
@@ -301,7 +301,7 @@ confidence scores. A separate but complementary question is whether the
 _class frequency distribution_ has changed between two datasets — training vs.
 operational, or one collection period vs. another. This is label shift in its
 simplest measurable form, and it is the specific question that
-{class}`.LabelParity` addresses.
+{func}`.label_parity` addresses.
 
 Label parity compares label frequency distributions between two datasets using
 a chi-squared test. When the test returns a significant result, the class prior
