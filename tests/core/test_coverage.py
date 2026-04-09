@@ -41,7 +41,7 @@ class TestCoverageUnit:
         # Should not raise ValueError with force_unit_interval=True
         result_naive = coverage_naive(embs, 20, force_unit_interval=True)
         assert len(result_naive["uncovered_indices"]) >= 0
-        
+
         result_adaptive = coverage_adaptive(embs, 20, 0.1, force_unit_interval=True)
         assert len(result_adaptive["uncovered_indices"]) == 10
 

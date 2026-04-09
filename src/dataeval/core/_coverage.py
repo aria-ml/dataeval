@@ -6,8 +6,8 @@ from typing import TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.spatial.distance import pdist, squareform
 
+from dataeval.core._mst import _compute_nearest_neighbors
 from dataeval.types import Array2D
 from dataeval.utils._internal import as_numpy, ensure_embeddings, flatten_samples
 
@@ -22,14 +22,14 @@ class CoverageResult(TypedDict):
     ----------
     uncovered_indices : NDArray[np.intp]
         Array of indices for uncovered observations
-    critical_value_radii : NDArray[np.float64]
+    critical_value_radii : NDArray[np.float32]
         Array of critical value radii for each observation
     coverage_radius : float
         The radius threshold for coverage
     """
 
     uncovered_indices: NDArray[np.intp]
-    critical_value_radii: NDArray[np.float64]
+    critical_value_radii: NDArray[np.float32]
     coverage_radius: float
 
 
@@ -48,10 +48,11 @@ def _validate_inputs(
     return embeddings
 
 
-def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float64]:
-    embeddings_matrix = squareform(pdist(flatten_samples(embeddings))).astype(np.float64)
-    sorted_dists = np.sort(embeddings_matrix, axis=1)
-    return sorted_dists[:, num_observations]
+def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float32]:
+    _, embeddings_matrix = _compute_nearest_neighbors(
+        flatten_samples(embeddings), None, num_observations, return_distances=True
+    )
+    return embeddings_matrix[:, -1]
 
 
 def coverage_naive(
