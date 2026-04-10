@@ -1,6 +1,16 @@
-[//]: # (3ba42852080a7dcac814efb08ce1c52278c8178c)
+[//]: # (02a7b1c796eb4edb2d4e6978880bbdb8d8122fff)
 
 # DataEval Change Log
+
+## v1.0.6
+
+👾 **Fixes**
+- `02a7b1c7` - [patch] Small perf fix and documentation updates
+
+    - [deps] Bump onnx and tornado deps for security
+    - [perf] Switch to internal nearest neighbor computation for critical value radii
+    - [docs] Address documentation inconsistencies
+    - [devsecops] Ensure security jobs run on protected refs
 
 ## v1.0.5
 
