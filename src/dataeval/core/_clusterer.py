@@ -241,7 +241,7 @@ class _HDBSCANSorter:
         n_samples_per_cluster = np.bincount(labels)
         _logger.debug(
             "HDBSCAN clustering complete: %d clusters, samples per cluster: min=%d, max=%d, mean=%.1f",
-            clst.unique_clusters,
+            len(clst.unique_clusters),
             np.min(n_samples_per_cluster),
             np.max(n_samples_per_cluster),
             np.mean(n_samples_per_cluster),

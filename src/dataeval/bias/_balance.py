@@ -22,28 +22,30 @@ class BalanceOutput(DictOutput):
     """
     Output class for the :class:`.Balance` :term:`bias<Bias>` evaluator.
 
-    Contains three polars DataFrames with mutual information scores and threshold flags.
+    Contains three polars DataFrames with normalized mutual information scores and threshold flags.
 
     Attributes
     ----------
     balance : pl.DataFrame
-        DataFrame with global class-to-factor mutual information:
+        DataFrame with global class-to-factor normalized mutual information:
 
-        - factor_name: str - Name of the metadata factor
-        - mi_value: float - Mutual information value between this factor and class labels
+        - factor_name: str - Name of the metadata factor. Includes "class_label"
+          which represents the self-information (always 1.0).
+        - mi_value: float - Normalized mutual information value between this
+          factor and class labels
     factors : pl.DataFrame
-        DataFrame with inter-factor mutual information correlations:
+        DataFrame with inter-factor normalized mutual information correlations:
 
         - factor1: str - Name of the first factor
         - factor2: str - Name of the second factor
-        - mi_value: float - Mutual information value
+        - mi_value: float - Normalized mutual information value
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
     classwise : pl.DataFrame
-        DataFrame with per-class-to-factor mutual information:
+        DataFrame with per-class-to-factor normalized mutual information:
 
         - class_name: str - Name of the class
         - factor_name: str - Name of the metadata factor
-        - mi_value: float - Mutual information value
+        - mi_value: float - Normalized mutual information value
         - is_imbalanced: bool - True if mi_value > class_imbalance_threshold
     """
 
@@ -58,21 +60,21 @@ class BalanceOutput(DictOutput):
 
 class Balance(Evaluator):
     """
-    Computes mutual information (MI) between factors (class label, metadata, label/image properties).
+    Computes normalized mutual information (NMI) between factors (class label, metadata, label/image properties).
 
     Identifies imbalanced classes and highly correlated metadata factors based on
-    mutual information thresholds.
+    NMI thresholds.
 
     Parameters
     ----------
     num_neighbors : int, default 5
         Number of points to consider as neighbors
     class_imbalance_threshold : float, default 0.3
-        Threshold for identifying imbalanced classes. Classes with MI above this
+        Threshold for identifying imbalanced classes. Classes with NMI above this
         threshold with any metadata factor are considered imbalanced.
     factor_correlation_threshold : float, default 0.5
         Threshold for identifying highly correlated metadata factors. Factor pairs
-        with MI above this threshold are considered highly correlated.
+        with NMI above this threshold are considered highly correlated.
 
     Attributes
     ----------
@@ -89,7 +91,8 @@ class Balance(Evaluator):
     -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
-    seed. MI is computed differently for categorical and continuous variables.
+    seed. MI is computed differently for categorical and continuous variables, and
+    in all cases normalized or transformed to [0, 1] prior to being returned.
 
     Examples
     --------
@@ -149,7 +152,7 @@ class Balance(Evaluator):
     @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold"])
     def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> BalanceOutput:  # noqa: C901
         """
-        Compute mutual information between factors and identify imbalanced classes.
+        Compute normalized mutual information between factors and identify imbalanced classes.
 
         Parameters
         ----------
@@ -160,7 +163,7 @@ class Balance(Evaluator):
         Returns
         -------
         BalanceOutput
-            Three DataFrames containing MI scores and threshold flags:
+            Three DataFrames containing NMI scores and threshold flags:
 
             - balance: Global class-to-factor mutual information
             - factors: Inter-factor mutual information
@@ -168,7 +171,7 @@ class Balance(Evaluator):
 
         Example
         -------
-        Return balance (mutual information) of factors with class_labels
+        Return balance (NMI) of factors with class_labels
 
         >>> from dataeval import Metadata
         >>> metadata = Metadata(dataset)

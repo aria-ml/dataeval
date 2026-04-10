@@ -978,10 +978,10 @@ class Outliers(Evaluator):
 
     - ``AdaptiveThreshold`` (default): Uses tail-weighted Double-MAD (separate MAD for
       data below and above the median) with automatic multiplier scaling for heavy
-      tails to produce asymmetric bounds. Default multiplier: 3.0.
+      tails to produce asymmetric bounds. Default multiplier: 3.5.
     - ``ModifiedZScoreThreshold``: Based on median absolute deviation. Default multiplier: 3.5.
       Modified z score = :math:`0.6745 * |x_i - x̃| / MAD`
-    - ``ZScoreThreshold``: Based on standard deviation from mean. Default multiplier: 3.
+    - ``ZScoreThreshold``: Based on standard deviation from mean. Default multiplier: 3.0.
       Z score = :math:`|x_i - \mu| / \sigma`
     - ``IQRThreshold``: Based on interquartile range. Default multiplier: 1.5.
       Outliers are outside :math:`[Q_1 - 1.5 \cdot IQR, Q_3 + 1.5 \cdot IQR]`

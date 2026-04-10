@@ -33,7 +33,8 @@ class FeatureDistanceResult(TypedDict):
     location : float
         The normalized location where the KS statistic was achieved
     dist : float
-        The Earth Mover's Distance (Wasserstein distance) between distributions
+        The Wasserstein distance between distributions, scaled by the
+        Interquartile Range (IQR) of the reference distribution.
     p_value : float
         The p-value from the KS test
     """
@@ -67,7 +68,7 @@ def feature_distance(
     Measure the feature-wise distance between two continuous distributions.
 
     Computes a p-value to evaluate its significance.
-    Uses the Earth Mover's Distance and the Kolmogorov-Smirnov two-sample test, featurewise.
+    Uses the Kolmogorov-Smirnov two-sample test and an IQR-scaled Wasserstein distance, featurewise.
 
     Parameters
     ----------
@@ -83,7 +84,7 @@ def feature_distance(
 
         - statistic: float - The Kolmogorov-Smirnov test statistic
         - location: float - The normalized location where the KS statistic was achieved
-        - dist: float - The Earth Mover's Distance between distributions
+        - dist: float - The IQR-scaled Wasserstein distance between distributions
         - p_value: float - The p-value from the KS test
 
     See Also

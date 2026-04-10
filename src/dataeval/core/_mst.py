@@ -100,7 +100,7 @@ def _compute_nearest_neighbors(
     distances, neighbors = nbrs.kneighbors(data_query, return_distance=True)
 
     if return_distances:
-        return neighbors, distances
+        return neighbors, distances.astype(np.float32)
     return neighbors
 
 

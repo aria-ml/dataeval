@@ -5,22 +5,23 @@ include:
   - template: Security/Dependency-Scanning.gitlab-ci.yml
   - template: Security/SAST.gitlab-ci.yml
 
-.mr_only: &mr_only
+.security_rules: &security_rules
   - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  - if: $CI_COMMIT_REF_PROTECTED == "true"
 
 secret_detection:
   stage: security
   needs: []
-  rules: *mr_only
+  rules: *security_rules
 
 gemnasium-python-dependency_scanning:
   stage: security
   needs: []
-  rules: *mr_only
+  rules: *security_rules
 
 semgrep-sast:
   stage: security
   needs: []
-  rules: *mr_only
+  rules: *security_rules

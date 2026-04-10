@@ -6,8 +6,8 @@ from typing import TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.spatial.distance import pdist, squareform
 
+from dataeval.core._mst import _compute_nearest_neighbors
 from dataeval.types import Array2D
 from dataeval.utils._internal import as_numpy, ensure_embeddings, flatten_samples
 
@@ -22,19 +22,24 @@ class CoverageResult(TypedDict):
     ----------
     uncovered_indices : NDArray[np.intp]
         Array of indices for uncovered observations
-    critical_value_radii : NDArray[np.float64]
+    critical_value_radii : NDArray[np.float32]
         Array of critical value radii for each observation
     coverage_radius : float
         The radius threshold for coverage
     """
 
     uncovered_indices: NDArray[np.intp]
-    critical_value_radii: NDArray[np.float64]
+    critical_value_radii: NDArray[np.float32]
     coverage_radius: float
 
 
-def _validate_inputs(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float64]:
-    embeddings = ensure_embeddings(embeddings, dtype=np.float64, unit_interval=True)
+def _validate_inputs(
+    embeddings: NDArray[np.float64],
+    num_observations: int,
+    force_unit_interval: bool = False,
+) -> NDArray[np.float64]:
+    unit_interval = "force" if force_unit_interval else True
+    embeddings = ensure_embeddings(embeddings, dtype=np.float64, unit_interval=unit_interval)
     if len(embeddings) <= num_observations:
         raise ValueError(
             f"Length of embeddings ({len(embeddings)}) is less than or equal to the specified number of \
@@ -43,15 +48,17 @@ def _validate_inputs(embeddings: NDArray[np.float64], num_observations: int) -> 
     return embeddings
 
 
-def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float64]:
-    embeddings_matrix = squareform(pdist(flatten_samples(embeddings))).astype(np.float64)
-    sorted_dists = np.sort(embeddings_matrix, axis=1)
-    return sorted_dists[:, num_observations]
+def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float32]:
+    _, embeddings_matrix = _compute_nearest_neighbors(
+        flatten_samples(embeddings), None, num_observations, return_distances=True
+    )
+    return embeddings_matrix[:, -1]
 
 
 def coverage_naive(
     embeddings: Array2D[float],
     num_observations: int,
+    force_unit_interval: bool = False,
 ) -> CoverageResult:
     """
     Evaluate :term:`coverage<Coverage>` using a naive radius calculation method.
@@ -68,6 +75,9 @@ def coverage_naive(
     num_observations : int
         Number of observations required in order to be covered.
         [1] suggests that a minimum of 20-50 samples is necessary.
+    force_unit_interval : bool, default False
+        If True, embeddings will be automatically rescaled to the unit interval [0, 1].
+        If False, a ValueError is raised if embeddings are outside [0, 1].
 
     Returns
     -------
@@ -81,7 +91,7 @@ def coverage_naive(
     Raises
     ------
     ValueError
-        If embeddings are not unit interval [0-1]
+        If embeddings are not unit interval [0-1] and force_unit_interval is False
     ValueError
         If length of :term:`embeddings<Embeddings>` is less than or equal to num_observations
 
@@ -101,7 +111,9 @@ def coverage_naive(
     """
     _logger.info("Starting coverage_naive calculation with num_observations=%d", num_observations)
 
-    embeddings_np = _validate_inputs(as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations)
+    embeddings_np = _validate_inputs(
+        as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations, force_unit_interval
+    )
     _logger.debug("Embeddings shape: %s", embeddings_np.shape)
 
     critical_value_radii = _calculate_critical_value_radii(embeddings_np, num_observations)
@@ -132,6 +144,7 @@ def coverage_adaptive(
     embeddings: Array2D[float],
     num_observations: int,
     percent: float,
+    force_unit_interval: bool = False,
 ) -> CoverageResult:
     """
     Evaluate :term:`coverage<Coverage>` using an adaptive radius calculation method.
@@ -150,6 +163,9 @@ def coverage_adaptive(
         [1] suggests that a minimum of 20-50 samples is necessary.
     percent : float
         Percent of observations to be considered uncovered. Should be between 0 and 1.
+    force_unit_interval : bool, default False
+        If True, embeddings will be automatically rescaled to the unit interval [0, 1].
+        If False, a ValueError is raised if embeddings are outside [0, 1].
 
     Returns
     -------
@@ -163,7 +179,7 @@ def coverage_adaptive(
     Raises
     ------
     ValueError
-        If embeddings are not unit interval [0-1]
+        If embeddings are not unit interval [0-1] and force_unit_interval is False
     ValueError
         If length of :term:`embeddings<Embeddings>` is less than or equal to num_observations
 
@@ -188,7 +204,9 @@ def coverage_adaptive(
         percent,
     )
 
-    embeddings = _validate_inputs(as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations)
+    embeddings = _validate_inputs(
+        as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations, force_unit_interval
+    )
     _logger.debug("Embeddings shape: %s", embeddings.shape)
 
     critical_value_radii = _calculate_critical_value_radii(embeddings, num_observations)

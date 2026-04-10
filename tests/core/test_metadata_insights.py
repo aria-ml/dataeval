@@ -337,7 +337,7 @@ class TestFindFactorPredictors:
 
         result = factor_predictors(factors, [2, 3, 4])
 
-        # Perfect correlation should have higher MI than random
+        # Perfect correlation should have higher NMI than random
         assert result["perfect"] > result["random"]
 
     def test_discrete_features_parameter(self):
@@ -365,16 +365,16 @@ class TestFindFactorPredictors:
         # All flagged means no variance in the target
         assert result["time"] == 0.0
 
-    def test_mutual_information_in_bits(self):
-        """Tests that mutual information is returned in bits (not nats)."""
+    def test_nmi_in_range(self):
+        """Tests that normalzied mutual information is in range."""
         factors = {
             "time": np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
         }
 
         result = factor_predictors(factors, [3, 4])
 
-        # MI should be reasonable (typically < 2 bits for this simple case)
-        assert result["time"] < 10.0
+        # NMI should be in [0 ,1] always.
+        assert 0.0 <= result["time"] <= 1.0
 
     def test_return_type_is_mapping(self):
         """Tests that return type is a mapping (dict)."""

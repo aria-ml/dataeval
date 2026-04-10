@@ -3,7 +3,7 @@
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -32,6 +32,11 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
     reference as class 0, runs repeated k-fold CV, and returns per-point
     class-1 rates. Points with rates exceeding the threshold are flagged OOD.
 
+    Note: By default, this detector uses the ``n_std`` based threshold for
+    predictions. If a value for ``threshold_perc`` is provided (either directly
+    or via config), it will use percentile-based thresholding from reference
+    scores instead.
+
     Parameters
     ----------
     n_folds : int, default 5
@@ -40,11 +45,12 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
         Number of times to repeat the k-fold split.
     n_std : float, default 2.0
         Number of standard deviations above the null mean for threshold.
+        Used when threshold_perc is not explicitly set.
     hyperparameters : dict or None, default None
         LightGBM hyperparameters.
     threshold_perc : float or None, default None
         Percentage of reference data considered normal (0-100).
-        If None, uses config.threshold_perc (default 95.0).
+        If provided, overrides ``n_std`` for percentile-based thresholding.
     extractor : FeatureExtractor or None, default None
         Feature extractor for transforming input data before scoring.
         When provided, raw data is passed through the extractor in both
@@ -59,7 +65,7 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
     >>> test = np.random.randn(50, 8).astype(np.float32) + 3
     >>> detector = OODDomainClassifier(n_folds=3, n_repeats=3)
     >>> detector.fit(ref)
-    OODDomainClassifier(n_folds=3, n_repeats=3, n_std=2.0, threshold_perc=95.0, hyperparameters=None, extractor=None, fitted=True)
+    OODDomainClassifier(n_folds=3, n_repeats=3, n_std=2.0, threshold_perc=None, hyperparameters=None, extractor=None, fitted=True)
     >>> predictions = detector.predict(test)
     """  # noqa: E501
 
@@ -76,8 +82,9 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
             Number of k-fold repeats.
         n_std : float, default 2.0
             Threshold multiplier for standard deviations above null mean.
-        threshold_perc : float, default 95.0
-            Percentile-based threshold (alternative to n_std).
+            Used when threshold_perc is None.
+        threshold_perc : float or None, default None
+            Percentile-based threshold. If provided, overrides n_std.
         hyperparameters : dict or None, default None
             LightGBM hyperparameters.
         extractor : FeatureExtractor or None, default None
@@ -87,7 +94,7 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
         n_folds: int = 5
         n_repeats: int = 5
         n_std: float = 2.0
-        threshold_perc: float = 95.0
+        threshold_perc: float | None = None
         hyperparameters: dict[str, Any] | None = None
         extractor: FeatureExtractor | None = None
 
@@ -103,8 +110,11 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
     ) -> None:
         base_config = config or OODDomainClassifier.Config()
 
-        threshold_perc = threshold_perc if threshold_perc is not None else base_config.threshold_perc
-        super().__init__(threshold_perc)
+        self._threshold_perc_set = threshold_perc is not None or (
+            config is not None and config.threshold_perc is not None
+        )
+        perc = threshold_perc if threshold_perc is not None else (base_config.threshold_perc or 95.0)
+        super().__init__(perc)
 
         self._n_folds = n_folds if n_folds is not None else base_config.n_folds
         self._n_repeats = n_repeats if n_repeats is not None else base_config.n_repeats
@@ -115,7 +125,7 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
             n_folds=self._n_folds,
             n_repeats=self._n_repeats,
             n_std=self._n_std,
-            threshold_perc=threshold_perc,
+            threshold_perc=threshold_perc if threshold_perc is not None else base_config.threshold_perc,
             hyperparameters=self._hyperparameters,
             extractor=self._extractor,
         )
@@ -176,6 +186,12 @@ class OODDomainClassifier(ExtractorMixin, BaseOOD):
         # Compute reference scores for percentile-based thresholding
         self._ref_score = self.score(reference_data)
         return self
+
+    def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
+        """Get the threshold score. Prefers n_std threshold unless threshold_perc was explicitly set."""
+        if not self._threshold_perc_set and ood_type == "instance":
+            return np.float64(self._threshold)
+        return super()._threshold_score(ood_type)
 
     def _score(self, x: NDArray[np.float32], batch_size: int | None = None) -> OODScoreOutput:  # noqa: ARG002
         """Compute per-point class-1 rates for test data vs reference."""
