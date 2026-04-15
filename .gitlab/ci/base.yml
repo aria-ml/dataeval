@@ -19,6 +19,8 @@ workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
+    # Publish Verification Workflow (standalone, via web or schedule)
+    - if: $PUBLISH_VERIFICATION
     # Release Workflow
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
     # Pre-release Workflow
@@ -123,14 +125,14 @@ stages:
 
 .rules_main_mr:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 .rules_main_mr_code:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -142,7 +144,7 @@ stages:
 
 .rules_main_mr_deps:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -153,7 +155,7 @@ stages:
 
 .rules_main_mr_docs:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
@@ -169,7 +171,7 @@ stages:
 
 .rules_mr_docs:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $CI_COMMIT_BRANCH == 'main'
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
@@ -181,13 +183,13 @@ stages:
 
 .rules_mr_only:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $CI_COMMIT_BRANCH == 'main'
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 .rules_main_only:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
 
@@ -203,6 +205,10 @@ stages:
   rules:
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
 
+.rules_verification_only:
+  rules:
+    - if: $CREATE_NEW_RELEASE || $PUBLISH_VERIFICATION
+
 ###############################################################################
 # Stage -- Trigger the DevSecOps components
 ###############################################################################
@@ -216,6 +222,8 @@ stages:
 trigger_compliance:
   extends: .trigger_compliance
   rules:
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION
+      when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
   variables:
     PACKAGE_NAME: "dataeval"

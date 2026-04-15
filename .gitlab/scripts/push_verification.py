@@ -18,16 +18,25 @@ import os
 import sys
 from pathlib import Path
 
+import yaml
 from requests import get, post
 from rest import RestWrapper
 
-METAREPO_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/409/"
-OUTPUT_DIR = Path(__file__).resolve().parents[2] / "verification" / "reports" / "metarepo"
+REGISTRY_PATH = Path(__file__).resolve().parents[2] / "verification" / "registry.yaml"
+OUTPUT_DIR = Path(__file__).resolve().parents[2] / "output" / "metarepo"
+
+
+def load_project_id() -> int:
+    with open(REGISTRY_PATH) as f:
+        registry = yaml.safe_load(f)
+    return registry["metarepo"]["project_id"]
 
 
 class MetaRepo(RestWrapper):
     def __init__(self) -> None:
-        super().__init__(METAREPO_PROJECT_URL, "DATAEVAL_BUILD_PAT", verbose=True)
+        project_id = load_project_id()
+        project_url = f"https://gitlab.jatic.net/api/v4/projects/{project_id}/"
+        super().__init__(project_url, "DATAEVAL_BUILD_PAT", verbose=True)
         self.headers = {"PRIVATE-TOKEN": self.token}
 
     def list_tree(self, path: str = "", ref: str = "main") -> list[dict]:
@@ -53,7 +62,7 @@ def main() -> None:
 
     # Discover existing files in the meta repo so we know create vs update
     existing_paths: set[str] = set()
-    for tree_path in ("", "test-cases"):
+    for tree_path in ("DataEval", "DataEval/test-cases"):
         try:
             tree = repo.list_tree(tree_path)
             for item in tree:
@@ -68,15 +77,16 @@ def main() -> None:
     tc_dir = OUTPUT_DIR / "test-cases"
     if tc_dir.exists():
         for f in sorted(tc_dir.glob("*.md")):
-            file_path = f"test-cases/{f.name}"
+            file_path = f"DataEval/test-cases/{f.name}"
             action = "update" if file_path in existing_paths else "create"
             actions.append({"action": action, "file_path": file_path, "content": f.read_text()})
 
     # VCRM
     vcrm_path = OUTPUT_DIR / "vcrm.md"
     if vcrm_path.exists():
-        action = "update" if "vcrm.md" in existing_paths else "create"
-        actions.append({"action": action, "file_path": "vcrm.md", "content": vcrm_path.read_text()})
+        file_path = "DataEval/vcrm.md"
+        action = "update" if file_path in existing_paths else "create"
+        actions.append({"action": action, "file_path": file_path, "content": vcrm_path.read_text()})
 
     if not actions:
         print("No files to push.")

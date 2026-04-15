@@ -36,6 +36,7 @@ class TestPrioritization:
 
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 50
+        assert result.scores is not None
         assert len(result.scores) == 50
 
     def test_prioritize_output_lazy_evaluation(self):

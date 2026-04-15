@@ -108,13 +108,13 @@ publish verification:
   stage: release
   extends:
     - .nox
-    - .rules_release_only
+    - .rules_verification_only
   needs: []
   variables:
     GIT_DEPTH: 0
   before_script:
     - uv tool install nox --with nox-uv
-    - uv pip install requests --system
+    - uv pip install requests pyyaml --system
   script:
     - uvx nox -e verify
     - .gitlab/scripts/push_verification.py
