@@ -224,8 +224,8 @@ def generate_vcrm(registry: dict, report: dict | None) -> str:
     req_links = []
     for req_id, req_data in requirements.items():
         ref_key = req_id.lower().replace("-", "")
-        epic = req_data.get("epic_link", "#")
-        req_links.append(f"[{ref_key}]:{epic}")
+        filename = req_data.get("file", "#")
+        req_links.append(f"[{ref_key}]:requirements/{filename}")
 
     # Origin links (deduplicated)
     origin_links: dict[str, str] = {}

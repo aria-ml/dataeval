@@ -5,7 +5,7 @@
 #
 # Structure:
 #   metarepo     - GitLab project ID for the meta repo
-#   requirements - FR/NFR definitions with epic links and test case mappings
+#   requirements - FR/NFR definitions with file links and test case mappings
 #   test_cases   - Test case definitions with descriptive metadata
 
 metarepo:
@@ -19,91 +19,112 @@ requirements:
     name: Installation & Cross-Environment Compatibility
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    file: FR-1-installation-compatibility.md
     test_cases: ["1-1", "1-2", "1-7"]
 
   FR-2:
     name: Bias Analysis Suite
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/94
+    file: FR-2-bias-analysis.md
     test_cases: ["2-1"]
 
   FR-3:
     name: Data Quality Analysis
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/95
+    file: FR-3-data-quality.md
     test_cases: ["3-1"]
 
   FR-4:
     name: Distribution Shift Detection
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/96
+    file: FR-4-drift-detection.md
     test_cases: ["4-1"]
 
   FR-5:
     name: Out-of-Distribution Detection
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/97
+    file: FR-5-ood-detection.md
     test_cases: ["5-1"]
 
   FR-6:
     name: Dataset Selection & Filtering
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/98
+    file: FR-6-dataset-selection.md
     test_cases: ["6-1"]
 
   FR-7:
     name: Feature Extraction
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/99
+    file: FR-7-feature-extraction.md
     test_cases: ["7-1"]
 
   FR-8:
     name: Data Sufficiency Analysis
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/100
+    file: FR-8-sufficiency-analysis.md
     test_cases: ["8-1"]
 
   FR-9:
     name: Metadata & Embeddings Management
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/101
+    file: FR-9-metadata-embeddings.md
     test_cases: ["9-1"]
+
+  FR-10:
+    name: Core Functional Interface
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    file: FR-10-core-functionality.md
+    test_cases: ["10-2"]
+
+  FR-11:
+    name: Dataset Prioritization
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    file: FR-11-dataset-prioritization.md
+    test_cases: ["11-2"]
+
+  FR-12:
+    name: Utility Components
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    file: FR-12-utility-components.md
+    test_cases: ["12-1"]
 
   NFR-1:
     name: Python Version Compatibility
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    file: NFR-1-python-compatibility.md
     test_cases: ["1-1"]
 
   NFR-2:
     name: Packaging & Distribution
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    file: NFR-2-packaging-distribution.md
     test_cases: ["1-7"]
 
   NFR-3:
     name: Type Safety
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    file: NFR-3-type-safety.md
     test_cases: ["10-1"]
 
   NFR-4:
     name: Configuration & Reproducibility
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    file: NFR-4-configuration-reproducibility.md
     test_cases: ["11-1"]
 
 # ---------------------------------------------------------------------------
@@ -302,6 +323,50 @@ test_cases:
       - Embeddings supports len() returning sample count
       - Embeddings supports indexing to retrieve individual items
       - MetadataLike protocol attributes (factor_names, factor_data, class_labels, is_discrete) are present
+
+  "10-2":
+    name: Core Functional Interface
+    test_type: Core Functionality
+    business_case: >-
+      Verify that the dataeval.core module provides stateless functional
+      components for core operations like hashing, clustering, and mutual information.
+    initial_conditions:
+      - DataEval installed
+    expected_results:
+      - core.xxhash produces consistent image hashes
+      - core.cluster performs KMeans and HDBSCAN clustering
+      - core.mutual_info calculates mutual information between factors
+      - core.label_stats computes label distribution statistics
+      - All core functions return structured result objects
+
+  "11-2":
+    name: Dataset Prioritization
+    test_type: Core Functionality
+    business_case: >-
+      Verify that the Prioritize evaluator correctly ranks dataset samples
+      using multiple policies and provides lazy index evaluation.
+    initial_conditions:
+      - DataEval installed
+      - Image dataset and feature extractor
+    expected_results:
+      - Prioritize ranks samples by difficulty using KNN method
+      - PrioritizeOutput provides ranked indices lazily
+      - PrioritizeOutput supports reorder and resample methods
+      - Prioritize supports stratified selection policy
+
+  "12-1":
+    name: Utility Components
+    test_type: Core Functionality
+    business_case: >-
+      Verify that DataEval utilities for data loading, model management,
+      and thresholding are available and functional.
+    initial_conditions:
+      - DataEval installed
+    expected_results:
+      - utils.data provides working dataset wrappers
+      - utils.thresholds provides ZScore and IQR threshold calculators
+      - utils.preprocessing provides image tensor conversion
+      - utils.onnx is available for model management
 
   "10-1":
     name: Type Safety Infrastructure
