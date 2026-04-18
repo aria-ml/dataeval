@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,81,55
+/aria-ml/dataeval/pulse,12,1
+/aria-ml/dataeval/graphs/traffic,10,1
+/aria-ml/dataeval/tree/main/src/dataeval,9,5
+/aria-ml/dataeval/tree/main,9,2
+/aria-ml/dataeval/tree/main/src,8,6
+/aria-ml/dataeval/blob/main/src/dataeval/core/_clusterer.py,7,3
+/aria-ml/dataeval/actions/metrics/usage,7,1
+/aria-ml/dataeval/tree/github-repo-stats/aria-ml/dataeval,6,1
+/aria-ml/dataeval/actions/workflows/github-repo-stats.yml,5,1
