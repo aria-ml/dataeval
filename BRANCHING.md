@@ -1,7 +1,6 @@
 # DataEval Branching and Release Strategy
 
-DataEval follows **GitLab Flow with Release Branches**, enhanced with automated cherry-picking and label-driven
-semantic versioning.
+DataEval follows **GitLab Flow with Release Branches**, enhanced with label-driven semantic versioning.
 
 ## Table of Contents
 
@@ -23,7 +22,7 @@ branches enable ongoing patch support for deployed versions.
 
 - **Single source of truth**: All features and fixes merge to `main` first
 - **Semantic versioning**: Clear version increments based on change type
-- **Automated maintenance**: Hotfixes automatically propagate to release branches
+- **Manual hotfix propagation**: Maintainers cherry-pick fixes from `main` into release branches via MR
 - **Label-driven releases**: MR labels determine release type and changelog categorization
 
 ## Branch Structure
@@ -37,10 +36,10 @@ branches enable ongoing patch support for deployed versions.
 
 ### Temporary Branches
 
-| Branch Pattern             | Purpose                               | Lifetime    | Creator       |
-| -------------------------- | ------------------------------------- | ----------- | ------------- |
-| `feature/*`, `fix/*`, etc. | Feature/fix development branches      | Short-lived | Developers    |
-| `cherry-pick/fix-to-X-X`   | Automated hotfix cherry-pick branches | Short-lived | CI automation |
+| Branch Pattern             | Purpose                            | Lifetime    | Creator    |
+| -------------------------- | ---------------------------------- | ----------- | ---------- |
+| `feature/*`, `fix/*`, etc. | Feature/fix development branches   | Short-lived | Developers |
+| `cherry-pick/fix-to-X-X`   | Manual hotfix cherry-pick branches | Short-lived | Maintainer |
 
 ### Branch Naming Conventions
 
@@ -114,28 +113,38 @@ graph LR
 
 #### 3. Hotfix Cherry-Pick (from `main` to releases)
 
-**Purpose**: Automatically distribute critical fixes to all active release branches
+**Purpose**: Distribute critical fixes to active release branches
 
-**Trigger**: Automatic when commit with `release::fix` label merges to `main`
+**Trigger**: Manual. After a `release::fix` MR merges to `main`, a maintainer decides which release branches need the
+fix.
 
 **Process**:
 
 ```mermaid
 graph LR
-    A[Fix merged to main] --> B{Has release::fix label?}
-    B -->|Yes| C[Find all release/v* branches]
-    B -->|No| D[Stop]
-    C --> E[For each release branch]
-    E --> F[Create cherry-pick branch]
-    F --> G[Cherry-pick commit]
-    G --> H[Create/Update MR]
-    H --> I[Manual review & merge]
-    I --> J[Automatic patch release]
+    A[Fix merged to main] --> B[Maintainer identifies target release branches]
+    B --> C[For each target release branch]
+    C --> D[Create cherry-pick/fix-to-X-X branch from release/vX.X]
+    D --> E[git cherry-pick commit]
+    E --> F[Resolve conflicts if any]
+    F --> G[Push branch & open MR to release/vX.X]
+    G --> H[Review & merge]
+    H --> I[Automatic patch release]
 ```
 
-**Script**: [`.gitlab/scripts/cherry_pick_fixes_to_releases.py`](.gitlab/scripts/cherry_pick_fixes_to_releases.py)
+**Example commands**:
 
-**Manual Step**: Maintainers must review and merge the auto-generated cherry-pick MRs
+```bash
+git fetch origin
+git checkout -b cherry-pick/fix-to-v0-74 origin/release/v0.74
+git cherry-pick <commit-sha>
+# resolve conflicts if needed, then:
+git push -u origin cherry-pick/fix-to-v0-74
+# open MR targeting release/v0.74 with release::fix label
+```
+
+**Manual Step**: Maintainers create the cherry-pick branch, open the MR, and merge it. The resulting commit on
+`release/vX.X` triggers the automatic patch release.
 
 ## Release Labels
 
@@ -149,7 +158,7 @@ Every merge request to `main` **must** have exactly one `release::*` label. This
 | `release::feature`     | MINOR (0.X.0) | New features, new capabilities       | Features          |
 | `release::improvement` | MINOR (0.X.0) | Enhancements to existing features    | Improvements      |
 | `release::deprecation` | MINOR (0.X.0) | Deprecating functionality            | Deprecations      |
-| `release::fix`         | PATCH (0.0.X) | Bug fixes (triggers cherry-picks)    | Bug Fixes         |
+| `release::fix`         | PATCH (0.0.X) | Bug fixes, minor improvements        | Bug Fixes         |
 | `release::misc`        | None          | Documentation, CI, refactoring       | Miscellaneous     |
 
 ### Label Selection Guide
@@ -159,7 +168,7 @@ Every merge request to `main` **must** have exactly one `release::*` label. This
 - Fixing a bug that affects existing releases
 - Correcting incorrect behavior
 - Patching security vulnerabilities
-- The fix should propagate to all active release branches
+- The fix is a candidate for manual cherry-pick into active release branches
 
 **Choose `release::feature` when**:
 
@@ -231,10 +240,10 @@ flowchart TD
     J --> K[Review & approval]
     K --> L[Merge to main]
     L --> M{Has release::fix<br/>label?}
-    M -->|Yes| N[Automation creates<br/>cherry-pick MRs]
+    M -->|Yes| N[Maintainer manually creates<br/>cherry-pick MR per target release branch]
     M -->|No| O[Done]
-    N --> P[Maintainer reviews<br/>cherry-pick MRs]
-    P --> Q[Merge cherry-picks]
+    N --> P[Review cherry-pick MRs]
+    P --> Q[Merge cherry-picks into release/vX.X]
     Q --> R[Automatic patch releases]
     R --> O
 ```
@@ -272,14 +281,13 @@ Our release process is highly automated through GitLab CI/CD pipelines.
 
 All automation scripts are located in [`.gitlab/scripts/`](.gitlab/scripts/):
 
-| Script                                                                                 | Purpose                        | Trigger                            |
-| -------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------------- |
-| [`create_release.py`](.gitlab/scripts/create_release.py)                               | Create major/minor releases    | Manual: `CREATE_NEW_RELEASE=true`  |
-| [`create_patch_release.py`](.gitlab/scripts/create_patch_release.py)                   | Create patch releases          | Auto: Commit to `release/v*`       |
-| [`cherry_pick_fixes_to_releases.py`](.gitlab/scripts/cherry_pick_fixes_to_releases.py) | Cherry-pick fixes to releases  | Auto: `release::fix` merge to main |
-| [`validate_release_label.py`](.gitlab/scripts/validate_release_label.py)               | Ensure MRs have release labels | Auto: All MRs to main              |
-| [`releasegen.py`](.gitlab/scripts/releasegen.py)                                       | Core release logic & changelog | Called by release scripts          |
-| [`versiontag.py`](.gitlab/scripts/versiontag.py)                                       | Version parsing & increment    | Called by release scripts          |
+| Script                                                                   | Purpose                        | Trigger                           |
+| ------------------------------------------------------------------------ | ------------------------------ | --------------------------------- |
+| [`create_release.py`](.gitlab/scripts/create_release.py)                 | Create major/minor releases    | Manual: `CREATE_NEW_RELEASE=true` |
+| [`create_patch_release.py`](.gitlab/scripts/create_patch_release.py)     | Create patch releases          | Auto: Commit to `release/v*`      |
+| [`validate_release_label.py`](.gitlab/scripts/validate_release_label.py) | Ensure MRs have release labels | Auto: All MRs to main             |
+| [`releasegen.py`](.gitlab/scripts/releasegen.py)                         | Core release logic & changelog | Called by release scripts         |
+| [`versiontag.py`](.gitlab/scripts/versiontag.py)                         | Version parsing & increment    | Called by release scripts         |
 
 ### CI/CD Pipeline
 
@@ -292,15 +300,11 @@ graph TD
     C --> D{Branch Type?}
     D -->|main + CREATE_NEW_RELEASE| E[Create Release Job]
     D -->|release/v*| F[Create Patch Release Job]
-    D -->|main + release::fix commit| G[Cherry-pick Fixes Job]
     E --> H[Tag Release]
     F --> I[Tag Patch]
-    G --> J[Create Cherry-pick MRs]
     H --> K[Build & Publish]
     I --> K
-    J --> L[Manual MR Review]
-    L --> M[Merge to Release Branch]
-    M --> F
+    M[Maintainer opens manual<br/>cherry-pick MR to release/vX.X] --> F
 ```
 
 ### What Gets Automated
@@ -312,13 +316,13 @@ graph TD
 - Changelog generation from MR labels
 - Git tag creation
 - Release branch creation
-- Cherry-pick branch creation and MR generation
-- Patch release creation when fixes are merged
+- Patch release creation when fixes are merged to `release/v*`
 
 **Requires Manual Action**:
 
 - Triggering major/minor releases (set `CREATE_NEW_RELEASE=true`)
-- Reviewing and merging cherry-pick MRs to release branches
+- Creating cherry-pick branches and MRs to backport fixes into release branches
+- Reviewing and merging cherry-pick MRs
 - Approving MRs to main
 
 ## Version Management
@@ -386,14 +390,14 @@ git push origin --delete release/v0.70
 ### For Developers
 
 1. **Always add a `release::*` label** to your MR before requesting review
-2. **Choose `release::fix` carefully** - it triggers automatic cherry-picks to all release branches
+2. **Flag fixes that may need backport** - `release::fix` MRs are candidates for manual cherry-pick into releases
 3. **Keep changes focused** - One MR should have one primary purpose
 4. **Write clear MR descriptions** - They become part of the changelog
-5. **Test thoroughly** - Fixes with `release::fix` will propagate to production releases
+5. **Test thoroughly** - Fixes cherry-picked to release branches land in production patch releases
 
 ### For Maintainers
 
-1. **Review cherry-pick MRs promptly** - They may contain critical fixes
+1. **Cherry-pick fixes promptly** - When a `release::fix` lands on `main`, decide quickly whether it needs backport
 2. **Monitor release branch health** - Ensure patches are being applied successfully
 3. **Coordinate major/minor releases** - Communicate with team before triggering
 4. **Verify changelog accuracy** - Auto-generated but should be reviewed
@@ -411,21 +415,21 @@ git push origin --delete release/v0.70
 
 Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 
-| Feature                     | Our Strategy    | GitLab Flow | Git Flow       | GitHub Flow |
-| --------------------------- | --------------- | ----------- | -------------- | ----------- |
-| Main development branch     | `main`          | ✓           | `develop`      | `main`      |
-| Long-lived release branches | `release/vX.X`  | ✓           | `release/vX.X` | ✗           |
-| Automated cherry-picks      | ✓               | ✗           | ✗              | ✗           |
-| Label-driven versioning     | ✓               | ✗           | ✗              | ✗           |
-| Hotfix branches             | ✗ (cherry-pick) | Manual      | `hotfix/`      | ✗           |
-| CI/CD integrated            | ✓               | ✓           | Optional       | ✓           |
+| Feature                     | Our Strategy          | GitLab Flow | Git Flow       | GitHub Flow |
+| --------------------------- | --------------------- | ----------- | -------------- | ----------- |
+| Main development branch     | `main`                | ✓           | `develop`      | `main`      |
+| Long-lived release branches | `release/vX.X`        | ✓           | `release/vX.X` | ✗           |
+| Cherry-pick into releases   | Manual                | Manual      | ✗              | ✗           |
+| Label-driven versioning     | ✓                     | ✗           | ✗              | ✗           |
+| Hotfix branches             | Manual cherry-pick MR | Manual      | `hotfix/`      | ✗           |
+| CI/CD integrated            | ✓                     | ✓           | Optional       | ✓           |
 
 **What makes our strategy unique**:
 
-- Automated hotfix distribution to all active releases
 - Label-driven semantic versioning
 - Validation enforced at merge time
 - Full changelog automation
+- Automatic patch releases once a cherry-pick is merged into a release branch
 
 ## Troubleshooting
 
@@ -435,17 +439,19 @@ Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 
 - **Solution**: Add the appropriate label based on the change type
 
-**Issue**: Cherry-pick MR has conflicts
+**Issue**: Cherry-pick has conflicts
 
-- **Solution**: Manually resolve conflicts in the cherry-pick branch, or create a new fix MR directly on the release branch
+- **Solution**: Resolve conflicts locally on the `cherry-pick/fix-to-X-X` branch before pushing, or skip the cherry-pick
+  and open a new fix MR directly against the release branch
 
 **Issue**: Wrong version number generated
 
 - **Solution**: Check that MRs have correct labels; re-run release with corrections if needed
 
-**Issue**: Release branch not receiving cherry-picks
+**Issue**: Fix on `main` didn't reach a release branch
 
-- **Solution**: Verify the branch follows `release/vX.X` naming pattern and exists in the repository
+- **Solution**: Cherry-picks are manual. Open a cherry-pick MR targeting `release/vX.X` yourself — nothing will do it
+  automatically.
 
 **Issue**: Patch release fails validation
 
