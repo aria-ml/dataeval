@@ -10,7 +10,6 @@ from scipy.stats import wasserstein_distance
 
 _logger = logging.getLogger(__name__)
 
-DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
 
 
@@ -92,6 +91,34 @@ def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.intp]:
     return np.digitize(data, bin_edges)
 
 
+def _gcd_ratio(data: NDArray[np.number[Any]], tol: float = 1e-9) -> float:
+    """
+    Measure how lattice-like the gaps between unique sorted values are.
+
+    For discrete data on an integer or regular grid, the gaps between unique values are
+    near-integer multiples of some base unit (the grid spacing). For continuous data, the
+    gaps have no such structure. We estimate the smallest positive gap, then check what
+    fraction of all gaps are near-integer multiples of it.
+
+    Returns the fraction of gaps that are near-integer multiples of the smallest gap.
+    Discrete-on-lattice data scores close to 1.0; continuous data scores around 0.1.
+    """
+    xu = np.sort(np.unique(data))
+    if xu.size < 3:
+        return 0.0
+
+    gaps = np.diff(xu)
+    positive = gaps[gaps > tol]
+    if positive.size == 0:
+        return 0.0
+
+    min_gap = np.min(positive)
+    ratios = positive / min_gap
+    near_integer = np.abs(ratios - np.round(ratios)) < 0.05
+
+    return float(np.mean(near_integer))
+
+
 def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.number[Any]] | None = None) -> bool:  # noqa: C901
     """
     Determine whether the data is continuous or discrete using the Wasserstein distance.
@@ -105,10 +132,23 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
     Normalized Near Neighbor distribution (NNN), defined on the interval [0,1].
 
     The Wasserstein distance is available in scipy.stats.wasserstein_distance. We can use it to measure
-    how close the NNN is to a uniform distribution over [0,1]. We found that as long as a sample has at
-    least 20 points, and furthermore at least half as many points as there are discrete values, we can
-    reliably distinguish discrete from continuous samples by testing that the Wasserstein distance
-    measured from a uniform distribution is greater or less than 0.054, respectively.
+    how close the NNN is to a uniform distribution over [0,1].
+
+    Three signals are combined to make the decision:
+
+    1. Adaptive WD threshold: the Wasserstein distance of the NNN from uniform shrinks as O(1/sqrt(n))
+       for truly continuous data. We use 0.5 / sqrt(n) as the primary threshold, which is equivalent
+       to the previously used  fixed threshold of 0.054 at n = 86.
+
+    2. Duplicate fraction: truly continuous data drawn from a floating-point representation has
+       probability zero of producing exact duplicates. The presence of duplicates is a strong signal
+       of discrete support, and we use it to catch discrete distributions with large support that
+       would otherwise produce uniform-looking NNN values.
+
+    3. GCD lattice test: discrete data on an integer or regular grid has gaps between unique values
+       that are near-integer multiples of a base unit. Continuous data does not. This catches
+       lattice-structured discrete distributions (Poisson, Binomial, integer-valued) even before
+       enough collisions accumulate for the duplicate test to trigger.
     """
     # Check if the metadata is image specific
     if image_indices is not None:
@@ -141,7 +181,27 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
 
     shift = wasserstein_distance(dx, np.linspace(0, 1, dx.size))  # how far is dx from uniform, for this feature?
 
-    return bool(shift < DISCRETE_MIN_WD)  # if NNN is close enough to uniform, consider the sample continuous.
+    # Adaptive threshold: continuous WD shrinks as O(1/sqrt(n))
+    wd_thresh = 0.5 / np.sqrt(n_examples)
+
+    if shift >= wd_thresh:
+        return False  # NNN is too far from uniform, even accounting for sample size
+
+    # WD says continuous. Check for contradicting evidence from duplicates and lattice structure.
+    dup_frac = 1.0 - xu.size / n_examples
+    has_dups = dup_frac > 0.005  # tiny tolerance for floating-point artifacts
+
+    on_lattice = _gcd_ratio(data) > 0.85
+
+    if has_dups and on_lattice:
+        return False  # two independent signals say discrete
+
+    # If only one secondary signal fires, use a stricter WD threshold as tiebreaker
+    if has_dups or on_lattice:
+        strict_thresh = 0.3 / np.sqrt(n_examples)
+        return bool(shift < strict_thresh)
+
+    return True  # low WD, no dups, no lattice → continuous
 
 
 def _bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:  # noqa: C901

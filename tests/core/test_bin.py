@@ -4,7 +4,14 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from dataeval.core._bin import CONTINUOUS_MIN_SAMPLE_SIZE, _bin_by_clusters, bin_data, digitize_data, is_continuous
+from dataeval.core._bin import (
+    CONTINUOUS_MIN_SAMPLE_SIZE,
+    _bin_by_clusters,
+    _gcd_ratio,
+    bin_data,
+    digitize_data,
+    is_continuous,
+)
 
 
 @pytest.mark.required
@@ -327,3 +334,168 @@ class TestBinByClustersUnit:
         assert isinstance(result, np.ndarray)
         assert np.all(result[:-1] <= result[1:])  # Should be sorted
         mock_cluster.assert_called_once_with(data)
+
+
+"""Unit tests for _gcd_ratio."""
+
+
+class TestGcdRatioEdgeCases:
+    """Edge cases and degenerate inputs."""
+
+    def test_fewer_than_three_unique_values_returns_zero(self) -> None:
+        assert _gcd_ratio(np.array([1.0, 1.0, 1.0])) == 0.0
+        assert _gcd_ratio(np.array([1.0, 2.0])) == 0.0
+        assert _gcd_ratio(np.array([5.0])) == 0.0
+
+    def test_empty_array_returns_zero(self) -> None:
+        assert _gcd_ratio(np.array([], dtype=np.float64)) == 0.0
+
+    def test_all_identical_values_returns_zero(self) -> None:
+        assert _gcd_ratio(np.full(100, 42.0)) == 0.0
+
+    def test_two_unique_among_many_returns_zero(self) -> None:
+        data = np.array([1.0, 1.0, 1.0, 2.0, 2.0, 2.0])
+        assert _gcd_ratio(data) == 0.0
+
+    def test_all_gaps_below_tolerance_returns_zero(self) -> None:
+        # Three "unique" values within 1e-12 of each other
+        data = np.array([0.0, 1e-12, 2e-12])
+        assert _gcd_ratio(data, tol=1e-9) == 0.0
+
+
+class TestGcdRatioPerfectLattice:
+    """Data on a perfect integer or regular grid should score 1.0."""
+
+    def test_consecutive_integers(self) -> None:
+        data = np.arange(10, dtype=np.float64)
+        assert _gcd_ratio(data) == 1.0
+
+    def test_even_integers(self) -> None:
+        data = np.arange(0, 20, 2, dtype=np.float64)
+        assert _gcd_ratio(data) == 1.0
+
+    def test_half_integer_grid(self) -> None:
+        data = np.arange(0, 5, 0.5)
+        assert _gcd_ratio(data) == 1.0
+
+    def test_sparse_subset_of_integer_grid(self) -> None:
+        # {0, 3, 7, 10} — gaps are 3, 4, 3; min gap is 3; 4/3 ≈ 1.33 is not near-integer
+        # so only 2 of 3 gaps qualify → ratio should be 2/3
+        data = np.array([0.0, 3.0, 7.0, 10.0])
+        result = _gcd_ratio(data)
+        assert 0.6 < result < 0.7
+
+    def test_sparse_multiples_of_base(self) -> None:
+        # {0, 3, 6, 12} — gaps are 3, 3, 6; min gap is 3; all ratios (1, 1, 2) are integer
+        data = np.array([0.0, 3.0, 6.0, 12.0])
+        assert _gcd_ratio(data) == 1.0
+
+    def test_large_integer_lattice(self) -> None:
+        data = np.arange(0, 10000, 7, dtype=np.float64)
+        assert _gcd_ratio(data) == 1.0
+
+    def test_negative_integers(self) -> None:
+        data = np.array([-10.0, -7.0, -4.0, -1.0, 2.0, 5.0])
+        assert _gcd_ratio(data) == 1.0
+
+    def test_duplicates_on_lattice_still_score_one(self) -> None:
+        data = np.array([1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 5.0])
+        assert _gcd_ratio(data) == 1.0
+
+
+class TestGcdRatioContinuousData:
+    """Continuous data should score well below 1.0."""
+
+    def test_uniform_random_scores_low(self) -> None:
+        rng = np.random.default_rng(42)
+        data = rng.uniform(0, 1, 200)
+        assert _gcd_ratio(data) < 0.25
+
+    def test_normal_random_scores_low(self) -> None:
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 1, 200)
+        assert _gcd_ratio(data) < 0.25
+
+    def test_exponential_random_scores_low(self) -> None:
+        rng = np.random.default_rng(42)
+        data = rng.exponential(1, 200)
+        assert _gcd_ratio(data) < 0.25
+
+    def test_continuous_scores_consistently_low_across_seeds(self) -> None:
+        for seed in range(10):
+            rng = np.random.default_rng(seed)
+            data = rng.uniform(0, 100, 200)
+            assert _gcd_ratio(data) < 0.30, f"Failed on seed {seed}"
+
+
+class TestGcdRatioDiscreteNonInteger:
+    """Discrete data on non-integer but regular grids."""
+
+    def test_multiples_of_pi(self) -> None:
+        data = np.array([np.pi * k for k in range(10)])
+        assert _gcd_ratio(data) == 1.0
+
+    def test_multiples_of_third(self) -> None:
+        # Gaps are all 1/3, but floating-point repr means we test tolerance
+        data = np.arange(0, 5, 1 / 3)
+        assert _gcd_ratio(data) > 0.90
+
+    def test_irregular_discrete_support(self) -> None:
+        # {0, 1, 3} — gaps are 1 and 2, ratio 2.0 is near-integer → scores 1.0
+        data = np.array([0.0, 1.0, 3.0])
+        assert _gcd_ratio(data) == 1.0
+
+    def test_irregular_support_non_lattice(self) -> None:
+        # {0, 1, sqrt(2)} — gap ratio ≈ 1.414, not near any integer
+        data = np.array([0.0, 1.0, np.sqrt(2)])
+        assert _gcd_ratio(data) < 0.85
+
+
+class TestGcdRatioReturnType:
+    """Return value properties."""
+
+    def test_returns_float(self) -> None:
+        data = np.arange(5, dtype=np.float64)
+        result = _gcd_ratio(data)
+        assert isinstance(result, float)
+
+    def test_return_bounded_zero_one(self) -> None:
+        rng = np.random.default_rng(42)
+        for _ in range(20):
+            data = rng.uniform(0, 100, 50)
+            result = _gcd_ratio(data)
+            assert 0.0 <= result <= 1.0
+
+
+class TestGcdRatioInputOrdering:
+    """Function should be invariant to input ordering."""
+
+    def test_shuffled_lattice_same_as_sorted(self) -> None:
+        rng = np.random.default_rng(42)
+        data_sorted = np.arange(20, dtype=np.float64)
+        data_shuffled = data_sorted.copy()
+        rng.shuffle(data_shuffled)
+        assert _gcd_ratio(data_sorted) == _gcd_ratio(data_shuffled)
+
+    def test_shuffled_continuous_same_as_sorted(self) -> None:
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 1, 100)
+        data_shuffled = data.copy()
+        rng.shuffle(data_shuffled)
+        assert _gcd_ratio(data) == _gcd_ratio(data_shuffled)
+
+
+class TestGcdRatioTolerance:
+    """The tol parameter controls what counts as a zero gap."""
+
+    def test_custom_tolerance_excludes_small_gaps(self) -> None:
+        # Values: 0, 3e-7, 0.5, 1.0
+        # Default tol (1e-9): gaps are [3e-7, ~0.5, 0.5]; min_gap = 3e-7;
+        #   ratios ≈ [1, 1666666.7, 1666666.7] — the large ratios are NOT near-integer → low score
+        # Large tol (1e-3): 3e-7 gap excluded; remaining gaps ≈ [0.5, 0.5]; min=0.5;
+        #   ratio = [1, 1] — both near-integer → score = 1.0
+        data = np.array([0.0, 3e-7, 0.5, 1.0])
+        result_default = _gcd_ratio(data, tol=1e-9)
+        result_large_tol = _gcd_ratio(data, tol=1e-3)
+        assert result_default < 0.5
+        assert result_large_tol == 1.0
