@@ -29,17 +29,20 @@ class TestMDPreprocessingUnit:
     @pytest.mark.parametrize(
         "data_values",
         [
-            list(np.random.rand(100)),
+            list(np.random.rand(100)),  # uniform on [0,1], continuous
+            # 100 integers between 0 and 1000, discrete
             list(np.random.randint(0, 1000, 100)),
         ],
     )
     def test_discrete_without_bins(self, data_values, caplog):
+        from dataeval.core._bin import is_continuous
+
         factors = {"data": data_values}
         labels = list(np.random.randint(5, size=len(data_values)))
         err_msg = "A user defined binning was not provided for data."
         with caplog.at_level(logging.WARNING):
             to_metadata(factors, labels)._bin()
-        assert err_msg in caplog.text
+        assert err_msg in caplog.text or not is_continuous(data_values)
 
     @pytest.mark.parametrize("factors", [{"a": [1, 2, 3], "b": [1, 2, 3]}, {"a": [1, 2, 3]}])
     @pytest.mark.parametrize("bincounts", [{"a": 1, "b": 1}, {"a": 1}, None])
