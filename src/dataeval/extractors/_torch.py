@@ -12,6 +12,7 @@ import torch
 from dataeval.config import get_device
 from dataeval.protocols import Array, DeviceLike, Transform
 from dataeval.types import ReprMixin
+from dataeval.utils._internal import iter_images
 
 _logger = logging.getLogger(__name__)
 
@@ -153,7 +154,7 @@ class TorchExtractor(ReprMixin):
             Embeddings array of shape (n_images, embedding_dim).
         """
         images: list[torch.Tensor] = []
-        for img in data:
+        for img in iter_images(data):
             tensor = torch.as_tensor(img)
             for transform in self._transforms:
                 tensor = transform(tensor)

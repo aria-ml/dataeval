@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 
 from dataeval.protocols import Array
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import as_numpy, flatten_samples
+from dataeval.utils._internal import as_numpy, flatten_samples, iter_images
 
 
 class FlattenExtractor(ReprMixin):
@@ -46,7 +46,7 @@ class FlattenExtractor(ReprMixin):
         Array
             Flattened embeddings array of shape (n_images, flattened_dim).
         """
-        batch_images: list[NDArray[Any]] = [as_numpy(img) for img in data]
+        batch_images: list[NDArray[Any]] = [as_numpy(img) for img in iter_images(data)]
         if not batch_images:
             return np.empty((0,), dtype=np.float32)
         batch_array = np.stack(batch_images)

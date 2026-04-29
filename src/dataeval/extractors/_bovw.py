@@ -12,7 +12,7 @@ from sklearn.cluster import MiniBatchKMeans
 from dataeval.config import get_max_processes, get_seed
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array
-from dataeval.utils._internal import PoolWrapper, as_numpy
+from dataeval.utils._internal import PoolWrapper, as_numpy, unwrap_image
 from dataeval.utils.preprocessing import rescale, to_canonical_grayscale
 
 
@@ -21,7 +21,7 @@ def _extract_single(args: tuple[int, Any]) -> tuple[int, NDArray[np.float32]]:
     import cv2
 
     idx, img = args
-    img = as_numpy(img[0] if isinstance(img, tuple) else img)
+    img = as_numpy(unwrap_image(img))
     if img.dtype != np.uint8:
         img = rescale(img, depth=8)
     gray = to_canonical_grayscale(img)

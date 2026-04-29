@@ -25,6 +25,7 @@ from dataeval.protocols import (
     FeatureExtractor,
     ProgressCallback,
 )
+from dataeval.utils._internal import unwrap_image
 
 _logger = logging.getLogger(__name__)
 
@@ -502,12 +503,7 @@ class Embeddings(Array, FeatureExtractor):
         if self._dataset is None:
             raise NotFittedError("No dataset bound. Call bind() first.")
 
-        images: list[Any] = []
-        for idx in indices:
-            item = self._dataset[idx]
-            image = item[0] if isinstance(item, tuple) else item
-            images.append(image)
-        return images
+        return [unwrap_image(self._dataset[idx]) for idx in indices]
 
     def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:  # noqa: C901
         """Process indices in batches using the extractor."""

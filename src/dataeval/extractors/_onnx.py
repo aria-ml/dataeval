@@ -13,7 +13,7 @@ from numpy.typing import NDArray
 
 from dataeval.protocols import Array, Transform
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._internal import as_numpy, iter_images
 
 if TYPE_CHECKING:
     from onnxruntime import InferenceSession
@@ -246,7 +246,7 @@ class OnnxExtractor(ReprMixin):
 
         # Collect and preprocess images
         batch_images: list[NDArray[Any]] = []
-        for img in data:
+        for img in iter_images(data):
             image_array = as_numpy(img)
             processed = self._preprocess(image_array)
             batch_images.append(processed)

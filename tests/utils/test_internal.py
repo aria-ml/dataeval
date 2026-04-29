@@ -11,11 +11,13 @@ from dataeval.utils._internal import (
     ensure_embeddings,
     flatten_metadata,
     flatten_samples,
+    iter_images,
     merge_metadata,
     rescale_array,
     simplify_type,
     to_numpy,
     to_numpy_iter,
+    unwrap_image,
 )
 
 
@@ -40,6 +42,62 @@ class TestInterop:
             assert len(n) == count
             assert isinstance(n, np.ndarray)
         assert count == 3
+
+
+@pytest.mark.required
+class TestUnwrapImage:
+    def test_passthrough_non_tuple(self):
+        img = np.zeros((3, 4, 4))
+        assert unwrap_image(img) is img
+
+    def test_strips_maite_tuple(self):
+        img = np.zeros((3, 4, 4))
+        target = {"label": 1}
+        metadata = {"id": "x"}
+        assert unwrap_image((img, target, metadata)) is img
+
+    def test_strips_two_tuple(self):
+        img = np.zeros((3, 4, 4))
+        assert unwrap_image((img, 1)) is img
+
+    def test_passthrough_list(self):
+        # Lists are not tuples; treat as a single (list-shaped) image.
+        item = [[0, 1], [2, 3]]
+        assert unwrap_image(item) is item
+
+
+@pytest.mark.required
+class TestIterImages:
+    def test_yields_bare_images(self):
+        imgs = [np.zeros((3, 4, 4)), np.ones((3, 4, 4))]
+        assert list(iter_images(imgs)) == imgs
+
+    def test_unwraps_maite_dataset(self):
+        imgs = [np.zeros((3, 4, 4)), np.ones((3, 4, 4))]
+        dataset = [(img, i, {"id": i}) for i, img in enumerate(imgs)]
+        assert list(iter_images(dataset)) == imgs
+
+    def test_unwraps_two_tuple(self):
+        imgs = [np.zeros((3, 4, 4)), np.ones((3, 4, 4))]
+        dataset = list(zip(imgs, [0, 1], strict=True))
+        assert list(iter_images(dataset)) == imgs
+
+    def test_mixed_iterable(self):
+        bare = np.zeros((3, 4, 4))
+        wrapped = np.ones((3, 4, 4))
+        result = list(iter_images([bare, (wrapped, 1, {})]))
+        assert result == [bare, wrapped]
+
+    def test_empty_iterable(self):
+        assert list(iter_images([])) == []
+
+    def test_consumes_generator(self):
+        imgs = [np.zeros((3, 4, 4)), np.ones((3, 4, 4))]
+
+        def gen():
+            yield from imgs
+
+        assert list(iter_images(gen())) == imgs
 
 
 @pytest.mark.required

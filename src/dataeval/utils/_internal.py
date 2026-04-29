@@ -109,6 +109,21 @@ def opt_to_numpy(
     )
 
 
+def unwrap_image(item: Any) -> Any:
+    """Return ``item[0]`` if ``item`` is a MAITE-style ``(image, target, metadata)`` tuple, else ``item``."""
+    return item[0] if isinstance(item, tuple) else item
+
+
+def iter_images(data: Iterable[Any]) -> Iterator[Any]:
+    """Yield images from an iterable, unwrapping MAITE-style ``(image, target, metadata)`` tuples.
+
+    MAITE datasets return tuples per index; iterables of bare images are passed through.
+    Use in feature extractors so they accept both shapes uniformly.
+    """
+    for item in data:
+        yield unwrap_image(item)
+
+
 def as_numpy(
     array: ArrayLike | SequenceLike[Any] | None,
     *,

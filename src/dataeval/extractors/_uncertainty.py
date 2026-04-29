@@ -12,7 +12,7 @@ from scipy.stats import entropy
 
 from dataeval.config import get_device
 from dataeval.protocols import Array, DeviceLike, Transform
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._internal import as_numpy, iter_images
 from dataeval.utils.training import predict
 
 
@@ -223,14 +223,20 @@ class ClassifierUncertaintyExtractor:
         Parameters
         ----------
         data : Any
-            Raw input data to compute uncertainties for.
+            Iterable of images, or a MAITE-style dataset whose items are
+            ``(image, target, metadata)`` tuples. The image is extracted from
+            position 0 of the tuple when present.
 
         Returns
         -------
         Array
             Uncertainty scores as numpy array of shape (n_samples, 1).
         """
-        preds = predict(data, self.model, self.device, self.batch_size, self._apply_transforms)
+        batch_images: list[np.ndarray] = [as_numpy(image) for image in iter_images(data)]
+        if not batch_images:
+            return np.empty((0, 1), dtype=np.float32)
+        batch_array = np.stack(batch_images)
+        preds = predict(batch_array, self.model, self.device, self.batch_size, self._apply_transforms)
         uncertainties = _classifier_uncertainty(preds[0] if isinstance(preds, tuple) else preds, self.preds_type)
         return uncertainties.cpu().numpy()
 
