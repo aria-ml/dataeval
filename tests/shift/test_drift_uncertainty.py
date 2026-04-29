@@ -115,6 +115,53 @@ class TestFunctionalClassifierUncertainty:
         assert preds_0.details["distances"] < preds_1.details["distances"]
 
 
+class _MaiteIntOnlyDataset:
+    """Dataset that yields ``(image, target, metadata)`` tuples and rejects slice access.
+
+    Mirrors the MAITE protocol minimum: ``__getitem__(int)`` and ``__len__``. Used to
+    exercise the predict path without inadvertently relying on slice support.
+    """
+
+    def __init__(self, images: torch.Tensor) -> None:
+        self._images = images
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, int, dict[str, int]]:
+        if not isinstance(index, int):
+            raise TypeError("MAITE dataset only supports integer indexing")
+        return self._images[index], 0, {"id": index}
+
+    def __len__(self) -> int:
+        return len(self._images)
+
+
+@pytest.mark.required
+class TestDriftUnivariateMaiteDataset:
+    """Regression: DriftUnivariate.predict must not slice the raw dataset to compute n_features."""
+
+    def test_predict_works_with_int_only_dataset(self):
+        np.random.seed(0)
+        n_features, n_labels = 16, 3
+        model = gen_model(n_features, n_labels, softmax=True)
+
+        x_ref = torch.from_numpy(np.random.randn(50, n_features).astype(np.float32))
+        x_test = torch.from_numpy(np.random.randn(20, n_features).astype(np.float32))
+
+        ref_dataset = _MaiteIntOnlyDataset(x_ref)
+        test_dataset = _MaiteIntOnlyDataset(x_test)
+
+        extractor = ClassifierUncertaintyExtractor(
+            model=model,  # type: ignore
+            preds_type="probs",
+            batch_size=10,
+            device="cpu",
+        )
+
+        cd = DriftUnivariate(method="ks", extractor=extractor).fit(ref_dataset)
+        result = cd.predict(test_dataset)
+        assert isinstance(result, DriftOutput)
+        assert cd.n_features == 1
+
+
 @pytest.mark.required
 class TestClassifierUncertainty:
     n, n_features = 100, 10

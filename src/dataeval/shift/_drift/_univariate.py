@@ -284,8 +284,9 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             if self._data is None:
                 raise NotFittedError("Must call fit() before accessing n_features.")
             if self.extractor is not None:
-                first_encoded = self._encode(self._data[:1])
-                self._n_features = first_encoded.shape[1]
+                # Derive from already-encoded reference (avoids slicing self._data,
+                # which fails for MAITE datasets that only support int indexing).
+                self._n_features = self.reference_data.shape[1]
             else:
                 self._n_features = int(math.prod(self._data[0].shape))
 
