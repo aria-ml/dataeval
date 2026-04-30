@@ -19,7 +19,9 @@ from typing_extensions import Self
 
 from dataeval._log import LogMessage
 from dataeval.exceptions import ShapeMismatchError
-from dataeval.protocols import Array, SequenceLike
+from dataeval.protocols import Array, Dataset, SequenceLike
+
+ImageOrItem = ArrayLike | tuple[ArrayLike, Any, Any]
 
 _logger = logging.getLogger(__name__)
 
@@ -109,16 +111,21 @@ def opt_to_numpy(
     )
 
 
-def unwrap_image(item: Any) -> Any:
-    """Return ``item[0]`` if ``item`` is a MAITE-style ``(image, target, metadata)`` tuple, else ``item``."""
+def unwrap_image(item: ImageOrItem) -> ArrayLike:
+    """Return ``item[0]`` if ``item`` is a MAITE-style ``(image, target, metadata)`` tuple, else ``item``.
+
+    The first element of a MAITE tuple is the image by convention; remaining elements
+    (target, metadata) are not type-checked here.
+    """
     return item[0] if isinstance(item, tuple) else item
 
 
-def iter_images(data: Iterable[Any]) -> Iterator[Any]:
-    """Yield images from an iterable, unwrapping MAITE-style ``(image, target, metadata)`` tuples.
+def iter_images(data: Iterable[ImageOrItem] | Dataset[ImageOrItem]) -> Iterator[ArrayLike]:
+    """Yield images from an iterable or :class:`Dataset`, unwrapping MAITE-style tuples.
 
-    MAITE datasets return tuples per index; iterables of bare images are passed through.
-    Use in feature extractors so they accept both shapes uniformly.
+    MAITE datasets return ``(image, target, metadata)`` tuples per index; iterables of
+    bare images pass through. Use in feature extractors so they accept both shapes
+    uniformly.
     """
     for item in data:
         yield unwrap_image(item)

@@ -19,7 +19,7 @@ from dataeval.protocols import (
     MetadataLike,
     ObjectDetectionTarget,
 )
-from dataeval.utils._internal import EPSILON, as_numpy
+from dataeval.utils._internal import EPSILON, as_numpy, unwrap_image
 from dataeval.utils.preprocessing import BoundingBox
 
 _logger = logging.getLogger(__name__)
@@ -804,7 +804,7 @@ def unzip_dataset(
     def _generate_pairs() -> Iterator[tuple[NDArray[Any], list[BoundingBox] | None]]:
         for i in range(len(dataset)):
             d = dataset[i]
-            image = np.asarray(d[0] if isinstance(d, tuple) else d)
+            image = np.asarray(unwrap_image(d))
             if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
                 try:
                     boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)

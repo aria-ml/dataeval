@@ -25,7 +25,7 @@ from dataeval.types import (
     StatsMap,
     set_metadata,
 )
-from dataeval.utils._internal import flatten_samples, to_numpy
+from dataeval.utils._internal import flatten_samples, iter_images, to_numpy
 
 DEFAULT_DUPLICATES_FLAGS = ImageStats.HASH_DUPLICATES_BASIC
 DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR: float | None = None
@@ -1430,7 +1430,7 @@ class Duplicates(Evaluator):
 
         # Cluster-based: combine all images, extract, cluster together
         if has_cluster_detection:
-            all_images = [item[0] if isinstance(item, tuple) else item for ds in datasets for item in ds]
+            all_images = [img for ds in datasets for img in iter_images(ds)]
             embeddings = self.extractor(all_images)  # type: ignore[union-attr]
             embeddings_array = flatten_samples(to_numpy(embeddings))
 

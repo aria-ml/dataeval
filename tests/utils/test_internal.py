@@ -58,11 +58,11 @@ class TestUnwrapImage:
 
     def test_strips_two_tuple(self):
         img = np.zeros((3, 4, 4))
-        assert unwrap_image((img, 1)) is img
+        assert unwrap_image((img, 1)) is img  # type: ignore
 
-    def test_passthrough_list(self):
-        # Lists are not tuples; treat as a single (list-shaped) image.
-        item = [[0, 1], [2, 3]]
+    def test_passthrough_ndarray(self):
+        # ndarrays are Arrays, not tuples; passed through.
+        item = np.asarray([[0, 1], [2, 3]])
         assert unwrap_image(item) is item
 
 
@@ -80,7 +80,7 @@ class TestIterImages:
     def test_unwraps_two_tuple(self):
         imgs = [np.zeros((3, 4, 4)), np.ones((3, 4, 4))]
         dataset = list(zip(imgs, [0, 1], strict=True))
-        assert list(iter_images(dataset)) == imgs
+        assert list(iter_images(dataset)) == imgs  # type: ignore
 
     def test_mixed_iterable(self):
         bare = np.zeros((3, 4, 4))
