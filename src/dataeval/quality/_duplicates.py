@@ -368,15 +368,22 @@ def _build_duplicates_dataframe(  # noqa: C901
     has_d4_stats = bool(available_stats & _D4_HASH_METHODS)
     include_orientation = has_basic_stats and has_d4_stats
 
+    # Build schema explicitly so polars does not infer dtypes from a 100-row sample.
+    # Without this, ≥100 exact rows (orientation=None) followed by a near row with a
+    # string orientation trigger a ComputeError when polars appends the string to a
+    # Null-typed column.
+    schema: dict[str, pl.DataType | type] = {}
+    for key, dtype in _EMPTY_DUPS_SCHEMA.items():
+        if key == "methods" and dataset_steps is not None:
+            schema["dataset_indices"] = pl.List(pl.Int64)
+        if key == "orientation" and not include_orientation:
+            continue
+        schema[key] = dtype
+
     if not rows:
-        schema = {k: v for k, v in _EMPTY_DUPS_SCHEMA.items() if k != "orientation" or include_orientation}
         return pl.DataFrame(schema=schema)
 
-    df = pl.DataFrame(rows)
-
-    # Omit orientation when it cannot be determined
-    if not include_orientation and "orientation" in df.columns:
-        df = df.drop("orientation")
+    df = pl.DataFrame(rows, schema=schema)
 
     return drop_null_index_columns(df, ["target_indices"])
 

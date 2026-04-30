@@ -9,6 +9,7 @@ from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, DuplicatesOutput
 from dataeval.quality._duplicates import (
     SourceIndex,
+    _build_duplicates_dataframe,
     _find_hash_groups,
     _merge_near_groups,
 )
@@ -588,6 +589,24 @@ class TestDuplicatesEdgeCases:
         data = np.zeros((1, 10, 10, 3))
         with pytest.raises(ValueError, match="Either flags must contain hash stats"):
             detector.evaluate(data)
+
+    def test_build_dataframe_orientation_with_many_exact_rows(self):
+        """Regression: ≥100 exact rows then a near row with string orientation must not
+        trigger a polars schema-inference ComputeError."""
+        item_exact = [[2 * i, 2 * i + 1] for i in range(101)]
+        item_near = [((1000, 1001), "phash")]
+        df = _build_duplicates_dataframe(
+            item_exact=item_exact,
+            item_near_method_groups=item_near,
+            target_exact=None,
+            target_near_method_groups=[],
+            available_stats={"phash", "dhash", "phash_d4", "dhash_d4"},
+            merge=True,
+        )
+        assert df.shape[0] == 102
+        assert df.schema["orientation"] == pl.Utf8
+        near = df.filter(pl.col("dup_type") == "near")
+        assert near["orientation"].to_list() == ["same"]
 
     def test_merge_near_groups_logic(self):
         """Covers _merge_near_groups merging logic."""
