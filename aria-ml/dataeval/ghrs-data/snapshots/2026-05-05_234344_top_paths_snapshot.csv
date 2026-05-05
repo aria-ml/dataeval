@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,57,47
+/aria-ml/dataeval/tree/main/src/dataeval,20,6
+/aria-ml/dataeval/tree/main/src,8,7
+/aria-ml/dataeval/tree/main/docs/source/tutorials,6,3
+/aria-ml/dataeval/blob/main/docs/source/tutorials/index.md,5,2
+/aria-ml/dataeval/blob/main/docs/source/reference/glossary.md,5,1
+/aria-ml/dataeval/blob/main/docs/source/getting-started/which-tool.md,4,4
+/aria-ml/dataeval/blob/main/docs/source/notebooks/h2_deduplicate.py,4,3
+/aria-ml/dataeval/tree/main/src/dataeval/quality,4,2
+/aria-ml/dataeval/tree/main/src/dataeval/extractors,4,1
