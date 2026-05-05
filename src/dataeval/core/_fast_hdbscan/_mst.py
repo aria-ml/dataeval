@@ -306,8 +306,13 @@ def compare_links_to_cluster_std(
     Duplicates are found per-cluster by comparing edge distances to
     ``cluster_sensitivity * cluster_std``.
     """
-    cluster_ids = np.unique(clusters)
-    cluster_grouping = np.full(mst.shape[0], -1, dtype=np.int16)
+    # Skip noise upfront: HDBSCAN labels unclustered points -1; they are not duplicates.
+    all_ids = np.unique(clusters)
+    cluster_ids = all_ids[all_ids != -1]
+    # Sentinel -2 distinguishes "not an intra-cluster edge" from cluster id -1
+    # (HDBSCAN noise), which would otherwise be treated as a real cluster and
+    # cause noise-noise edges to be flagged as duplicates.
+    cluster_grouping = np.full(mst.shape[0], -2, dtype=np.int16)
 
     # Identify which edges connect points within the same cluster
     # Note: Using regular range instead of prange - serial is faster for this workload

@@ -85,6 +85,40 @@ class TestMst:
         with pytest.raises(ValueError, match="Algorithm must be"):
             compute_neighbors(MagicMock(), MagicMock(), algorithm="brute")  # type: ignore #
 
+    def test_compare_links_skips_noise(self):
+        """Noise points (cluster id -1) must not be flagged as duplicates.
+
+        Regression: prior implementation initialized cluster_grouping with -1,
+        colliding with the HDBSCAN noise label. Noise-noise edges were grouped
+        with inter-cluster edges and flagged when their distance was below the
+        sensitivity-scaled std of that mixed bag.
+        """
+        from dataeval.core._fast_hdbscan._mst import compare_links_to_cluster_std
+
+        # MST over 7 points: 5 in cluster 0 with one tight pair so std > 0
+        # and one short edge below cluster_sensitivity * std, plus 2 noise
+        # points close to each other but far from the cluster.
+        mst = np.array(
+            [
+                [0, 1, 0.10],  # intra-cluster 0 (tight — should be flagged)
+                [1, 2, 1.00],  # intra-cluster 0
+                [2, 3, 1.00],  # intra-cluster 0
+                [3, 4, 1.00],  # intra-cluster 0
+                [4, 5, 5.00],  # cluster 0 -> noise (inter)
+                [5, 6, 0.05],  # noise <-> noise (must NOT be flagged)
+            ],
+            dtype=np.float32,
+        )
+        clusters = np.array([0, 0, 0, 0, 0, -1, -1], dtype=np.int64)
+
+        pairs = compare_links_to_cluster_std(mst, clusters, cluster_sensitivity=2.0)
+
+        # No flagged pair may involve a noise point.
+        assert pairs.size > 0, "expected intra-cluster duplicates to still be flagged"
+        for p, q in pairs:
+            assert clusters[p] != -1
+            assert clusters[q] != -1, f"noise pair flagged: ({p}, {q})"
+
     def test_knn_exhaustion_warning(self, caplog):
         """Test that algorithm warns when k-nearest neighbor graph is exhausted."""
         import logging
