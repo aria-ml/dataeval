@@ -9,11 +9,109 @@ from dataeval.core._nullmodel import (
     _calculate_multiclass_accuracy,
     _calculate_precision,
     _calculate_recall,
+    _estimate_hit_probabilities,
+    _generate_modal_boxes,
+    _generate_proportional_random_boxes,
+    _generate_uniform_random_boxes,
     _reduce_macro,
     _reduce_micro,
     _to_confusion_matrix,
     nullmodel_metrics,
 )
+
+
+@pytest.mark.required
+class TestHitProbabilityEstimation:
+    def test_estimate_hit_probabilities_empty(self):
+        gt_boxes = np.array([])
+        img_size = (100, 100)
+
+        def mock_gen(n, size):
+            return np.zeros((n, 4))
+
+        probs = _estimate_hit_probabilities(gt_boxes, img_size, mock_gen)
+        assert len(probs) == 0
+        assert isinstance(probs, np.ndarray)
+
+    def test_estimate_hit_probabilities_guaranteed_hit(self):
+        gt_boxes = np.array([[10, 10, 20, 20]])
+        img_size = (100, 100)
+
+        # Generator always returns the GT box exactly
+        def mock_gen(n, size):
+            return np.tile([10, 10, 20, 20], (n, 1))
+
+        probs = _estimate_hit_probabilities(gt_boxes, img_size, mock_gen, n_samples=10)
+        assert probs[0] == 1.0
+
+    def test_estimate_hit_probabilities_guaranteed_miss(self):
+        gt_boxes = np.array([[10, 10, 20, 20]])
+        img_size = (100, 100)
+
+        # Generator returns disjoint boxes
+        def mock_gen(n, size):
+            return np.tile([50, 50, 60, 60], (n, 1))
+
+        probs = _estimate_hit_probabilities(gt_boxes, img_size, mock_gen, n_samples=10)
+        assert probs[0] == 0.0
+
+
+@pytest.mark.required
+class TestBoxGenerators:
+    def test_generate_uniform_random_boxes(self):
+        n = 100
+        size = (200, 400)  # H, W
+        boxes = _generate_uniform_random_boxes(n, size)
+
+        assert boxes.shape == (n, 4)
+        assert np.all(boxes[:, 0] >= 0)
+        assert np.all(boxes[:, 1] >= 0)
+        assert np.all(boxes[:, 2] <= size[1])
+        assert np.all(boxes[:, 3] <= size[0])
+        assert np.all(boxes[:, 0] <= boxes[:, 2])
+        assert np.all(boxes[:, 1] <= boxes[:, 3])
+
+    def test_generate_proportional_random_boxes(self):
+        # Mock training boxes strictly in bottom-right quadrant [50, 50, 100, 100]
+        # (normalized to 100x100)
+        n_train = 50
+        train_boxes = np.array([[60, 60, 90, 90]] * n_train)
+        train_sizes = np.array([[100, 100]] * n_train)
+
+        n_gen = 100
+        target_size = (200, 200)
+        gen_boxes = _generate_proportional_random_boxes(n_gen, target_size, train_boxes, train_sizes)
+
+        # Since training centers are at (75, 75) in 100x100,
+        # in 200x200 they should be at (150, 150)
+        centers_x = (gen_boxes[:, 0] + gen_boxes[:, 2]) / 2
+        centers_y = (gen_boxes[:, 1] + gen_boxes[:, 3]) / 2
+
+        assert np.all(centers_x == pytest.approx(150))
+        assert np.all(centers_y == pytest.approx(150))
+
+    def test_generate_modal_boxes(self):
+        # Training set with a clear mode: size 10x10 (normalized 0.1, 0.1)
+        # and some noise that doesn't win
+        train_boxes = np.array([[0, 0, 10, 10]] * 10 + [[0, 0, 50, 50]] * 2)
+        train_sizes = np.array([[100, 100]] * 12)
+
+        n_gen = 4
+        target_size = (100, 100)
+        gen_boxes = _generate_modal_boxes(n_gen, target_size, train_boxes, train_sizes)
+
+        # Verify width and height match the mode
+        widths = gen_boxes[:, 2] - gen_boxes[:, 0]
+        heights = gen_boxes[:, 3] - gen_boxes[:, 1]
+
+        assert np.all(widths == pytest.approx(10))
+        assert np.all(heights == pytest.approx(10))
+
+        # Verify it spans image bounds (at least one box starts at 0, one reaches edge)
+        # With n=4, it should be a 2x2 grid.
+        # x_coords should be [0, 90] (since 100-10=90)
+        assert np.min(gen_boxes[:, 0]) == pytest.approx(0)
+        assert np.max(gen_boxes[:, 0]) == pytest.approx(90)
 
 
 @pytest.mark.required

@@ -10,6 +10,7 @@ __all__ = [
     "IntBox",
     "clip_and_pad",
     "clip_box",
+    "compute_iou",
     "edge_filter",
     "get_bitdepth",
     "is_valid_box",
@@ -344,6 +345,50 @@ def is_valid_box(box: Box) -> bool:
         True if box is valid, False otherwise
     """
     return box[2] > box[0] and box[3] > box[1]
+
+
+def compute_iou(boxes1: NDArray[Any], boxes2: NDArray[Any]) -> NDArray[np.float64]:
+    """
+    Compute Intersection over Union (IoU) between two sets of boxes.
+
+    Parameters
+    ----------
+    boxes1 : NDArray[Any]
+        Boxes of shape (N, 4) in XYXY format.
+    boxes2 : NDArray[Any]
+        Boxes of shape (M, 4) in XYXY format.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        IoU matrix of shape (N, M).
+    """
+    # Ensure 2D arrays
+    if boxes1.ndim == 1:
+        boxes1 = boxes1[np.newaxis, :]
+    if boxes2.ndim == 1:
+        boxes2 = boxes2[np.newaxis, :]
+
+    # Extract coordinates
+    x11, y11, x12, y12 = np.split(boxes1, 4, axis=1)
+    x21, y21, x22, y22 = np.split(boxes2, 4, axis=1)
+
+    # Compute intersection coordinates
+    x_a = np.maximum(x11, np.transpose(x21))
+    y_a = np.maximum(y11, np.transpose(y21))
+    x_b = np.minimum(x12, np.transpose(x22))
+    y_b = np.minimum(y12, np.transpose(y22))
+
+    # Compute intersection area
+    inter_area = np.maximum(0, x_b - x_a) * np.maximum(0, y_b - y_a)
+
+    # Compute individual areas
+    box1_area = (x12 - x11) * (y12 - y11)
+    box2_area = (x22 - x21) * (y22 - y21)
+
+    # Compute IoU
+    union_area = box1_area + np.transpose(box2_area) - inter_area
+    return np.divide(inter_area, union_area, out=np.zeros_like(inter_area, dtype=np.float64), where=union_area > 0)
 
 
 # ===========================
