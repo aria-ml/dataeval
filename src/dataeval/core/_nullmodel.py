@@ -11,6 +11,117 @@ from typing_extensions import NotRequired
 from dataeval.protocols import ArrayLike
 from dataeval.types import Array1D
 from dataeval.utils._internal import as_numpy
+from dataeval.utils.preprocessing import compute_iou
+
+
+def _estimate_hit_probabilities(
+    gt_boxes: NDArray[np.float64],
+    image_size: tuple[int, int],
+    generator_func: Callable[[int, tuple[int, int]], NDArray[np.float64]],
+    n_samples: int = 5000,
+) -> NDArray[np.float64]:
+    """
+    Estimate the probability that a single random box hits each ground truth box.
+
+    Parameters
+    ----------
+    gt_boxes : NDArray[np.float64]
+        Ground truth boxes for a single image in XYXY format
+    image_size : tuple[int, int]
+        Image size as (height, width)
+    generator_func : Callable
+        Function that generates n random boxes for the given image size
+    n_samples : int, default 5000
+        Number of samples to use for estimation
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Array of probabilities, one per ground truth box
+    """
+    if len(gt_boxes) == 0:
+        return np.array([], dtype=np.float64)
+
+    # Generate samples
+    pred_boxes = generator_func(n_samples, image_size)
+
+    # Compute IoU matrix (n_samples, n_gt)
+    ious = compute_iou(pred_boxes, gt_boxes)
+
+    # Hit probability is fraction of samples with IoU > 0.5
+    return np.mean(ious > 0.5, axis=0)
+
+
+def _calculate_localization_ap(
+    hit_probs: NDArray[np.float64],
+    class_probabilities: NDArray[np.float64],
+    gt_labels: NDArray[np.intp],
+) -> float:
+    """
+    Calculate Average Precision for localization given hit probabilities.
+
+    Sweeps a curve by varying the number of predicted boxes K.
+
+    Parameters
+    ----------
+    hit_probs : NDArray[np.float64]
+        Probability of localization hit for each GT box in the test set
+    class_probabilities : NDArray[np.float64]
+        Probability distribution over classes for the null model
+    gt_labels : NDArray[np.intp]
+        Ground truth labels for each box in the test set
+
+    Returns
+    -------
+    float
+        Computed Average Precision
+    """
+    if len(hit_probs) == 0:
+        return 0.0
+
+    # K values to sweep (number of boxes predicted per image)
+    # Using a logarithmic-ish scale to cover 1 to 5000
+    k_values = np.array([1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000])
+
+    precisions = []
+    recalls = []
+
+    total_gt = len(hit_probs)
+
+    for k in k_values:
+        # For each GT box j, probability of hit at least once among K predictions
+        # P(hit_j) = 1 - (1 - p_j * P(class_j))^K
+        # where p_j is localization hit prob and P(class_j) is null model class prob for GT class
+        p_match = hit_probs * class_probabilities[gt_labels]
+        prob_recalled = 1 - (1 - p_match) ** k
+
+        expected_recall = np.sum(prob_recalled) / total_gt
+        # Expected Precision: TP / K.
+        # Since each prediction matches at most one GT, and assuming hits are rare
+        # TP is effectively the number of recalled GTs (as long as TP <= K)
+        expected_tp = np.sum(prob_recalled)
+        expected_precision = expected_tp / k
+
+        recalls.append(expected_recall)
+        precisions.append(min(1.0, expected_precision))
+
+    # Add endpoints for AP calculation
+    recalls = np.array([0.0] + recalls + [1.0])
+    precisions = np.array([1.0] + precisions + [0.0])
+
+    # Ensure recall is monotonic
+    # (Expected recall IS monotonic with K, but precision might not be strictly decreasing)
+    # Use standard VOC-style AP (area under PR curve)
+    # Sort by recall
+    idx = np.argsort(recalls)
+    recalls = recalls[idx]
+    precisions = precisions[idx]
+
+    # Compute AP using trapezoidal rule or step integration
+    # Standard AP is typically the area under the precision-recall curve
+    # Use np.trapezoid (modern replacement for np.trapz in NumPy 2.0+)
+    return float(np.trapezoid(precisions, recalls))
+
 
 _logger = logging.getLogger(__name__)
 
@@ -53,6 +164,7 @@ class NullModelMetrics(TypedDict):
     accuracy_macro: NotRequired[float]
     accuracy_micro: NotRequired[float]
     multiclass_accuracy: NotRequired[float]
+    localization_ap: NotRequired[float]
 
 
 class NullModelMetricsResult(TypedDict):
@@ -114,6 +226,177 @@ def _calculate_multiclass_accuracy(class_prob: Array1D[float], model_prob: Array
         as_numpy(model_prob, dtype=np.float64, required_ndim=1),
         as_numpy(class_prob, dtype=np.float64, required_ndim=1),
     )
+
+
+def _generate_uniform_random_boxes(n: int, image_size: tuple[int, int]) -> NDArray[np.float64]:
+    """
+    Generate n uniform random boxes within the given image size.
+
+    Parameters
+    ----------
+    n : int
+        Number of boxes to generate
+    image_size : tuple[int, int]
+        Image size as (height, width)
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Generated boxes in XYXY format with shape (n, 4)
+    """
+    h, w = image_size
+    # Generate random coordinates
+    x = np.random.uniform(0, w, size=(n, 2))
+    y = np.random.uniform(0, h, size=(n, 2))
+
+    # Ensure x0 < x1 and y0 < y1
+    x0 = np.min(x, axis=1)
+    x1 = np.max(x, axis=1)
+    y0 = np.min(y, axis=1)
+    y1 = np.max(y, axis=1)
+
+    return np.stack([x0, y0, x1, y1], axis=1)
+
+
+def _generate_proportional_random_boxes(
+    n: int,
+    image_size: tuple[int, int],
+    train_boxes: NDArray[np.float64],
+    train_image_sizes: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """
+    Generate n random boxes sampled from the training set box distribution.
+
+    Samples center_x, center_y, width, and height independently from the training set.
+
+    Parameters
+    ----------
+    n : int
+        Number of boxes to generate
+    image_size : tuple[int, int]
+        Target image size as (height, width)
+    train_boxes : NDArray[np.float64]
+        Training set boxes in XYXY format
+    train_image_sizes : NDArray[np.float64]
+        Training set image sizes as (height, width) for each box
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Generated boxes in XYXY format
+    """
+    h_target, w_target = image_size
+
+    # 1. Convert training boxes to CXCYWH normalized to [0, 1]
+    train_w = train_boxes[:, 2] - train_boxes[:, 0]
+    train_h = train_boxes[:, 3] - train_boxes[:, 1]
+    train_cx = train_boxes[:, 0] + train_w / 2
+    train_cy = train_boxes[:, 1] + train_h / 2
+
+    norm_cx = train_cx / train_image_sizes[:, 1]
+    norm_cy = train_cy / train_image_sizes[:, 0]
+    norm_w = train_w / train_image_sizes[:, 1]
+    norm_h = train_h / train_image_sizes[:, 0]
+
+    # 2. Sample components independently
+    gen_cx_norm = np.random.choice(norm_cx, size=n, replace=True)
+    gen_cy_norm = np.random.choice(norm_cy, size=n, replace=True)
+    gen_w_norm = np.random.choice(norm_w, size=n, replace=True)
+    gen_h_norm = np.random.choice(norm_h, size=n, replace=True)
+
+    # 3. Scale to target image size
+    gen_cx = gen_cx_norm * w_target
+    gen_cy = gen_cy_norm * h_target
+    gen_w = gen_w_norm * w_target
+    gen_h = gen_h_norm * h_target
+
+    # 4. Convert back to XYXY
+    gen_x0 = gen_cx - gen_w / 2
+    gen_y0 = gen_cy - gen_h / 2
+    gen_x1 = gen_cx + gen_w / 2
+    gen_y1 = gen_cy + gen_h / 2
+
+    return np.stack([gen_x0, gen_y0, gen_x1, gen_y1], axis=1)
+
+
+def _generate_modal_boxes(
+    n: int,
+    image_size: tuple[int, int],
+    train_boxes: NDArray[np.float64],
+    train_image_sizes: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """
+    Generate n boxes using the modal dimensions from the training set.
+
+    Parameters
+    ----------
+    n : int
+        Number of boxes to generate
+    image_size : tuple[int, int]
+        Target image size as (height, width)
+    train_boxes : NDArray[np.float64]
+        Training set boxes in XYXY format
+    train_image_sizes : NDArray[np.float64]
+        Training set image sizes as (height, width)
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Generated boxes in XYXY format
+    """
+    h_target, w_target = image_size
+
+    # Calculate widths and heights in training set
+    train_widths = train_boxes[:, 2] - train_boxes[:, 0]
+    train_heights = train_boxes[:, 3] - train_boxes[:, 1]
+
+    # Normalize by training image sizes
+    norm_widths = train_widths / train_image_sizes[:, 1]
+    norm_heights = train_heights / train_image_sizes[:, 0]
+
+    # Find "mode" - since these are floats, we can use a histogram or just round them
+    # For now, let's just take the median as a robust "representative" size
+    # or we could bin them.
+    # The requirement said "modal boxes (?)".
+    # Let's use a simple binning to find the mode of (width, height) pairs.
+    # Binning to 1% resolution
+    bins_w = np.round(norm_widths * 100)
+    bins_h = np.round(norm_heights * 100)
+    bins = np.stack([bins_w, bins_h], axis=1)
+
+    unique_bins, counts = np.unique(bins, axis=0, return_counts=True)
+    modal_bin = unique_bins[np.argmax(counts)]
+
+    mode_w_norm = modal_bin[0] / 100.0
+    mode_h_norm = modal_bin[1] / 100.0
+
+    mode_w = mode_w_norm * w_target
+    mode_h = mode_h_norm * h_target
+
+    # Place boxes distributed over a grid that spans the image bounds
+    # Determine nx, ny such that nx * ny >= n and nx/ny roughly matches image aspect ratio
+    aspect = w_target / h_target
+    nx = max(1, int(np.round(np.sqrt(n * aspect))))
+    ny = max(1, int(np.ceil(n / nx)))
+
+    x_coords = np.linspace(0, max(0, w_target - mode_w), nx)
+    y_coords = np.linspace(0, max(0, h_target - mode_h), ny)
+
+    xv, yv = np.meshgrid(x_coords, y_coords)
+    gen_x0 = xv.flatten()
+    gen_y0 = yv.flatten()
+
+    # Shuffle the grid indices to ensure any subset (first n) spans the image
+    indices = np.arange(len(gen_x0))
+    np.random.shuffle(indices)
+
+    indices = indices[:n]
+    gen_x0 = gen_x0[indices]
+    gen_y0 = gen_y0[indices]
+    gen_x1 = gen_x0 + mode_w
+    gen_y1 = gen_y0 + mode_h
+
+    return np.stack([gen_x0, gen_y0, gen_x1, gen_y1], axis=1)
 
 
 def nullmodel_precision(class_prob: Array1D[float], model_prob: Array1D[float]) -> np.float64:

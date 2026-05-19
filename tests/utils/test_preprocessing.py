@@ -10,6 +10,7 @@ from dataeval.utils.preprocessing import (
     BoundingBoxFormat,
     clip_and_pad,
     clip_box,
+    compute_iou,
     edge_filter,
     get_bitdepth,
     is_valid_box,
@@ -20,6 +21,69 @@ from dataeval.utils.preprocessing import (
     to_canonical_grayscale,
     to_int_box,
 )
+
+
+@pytest.mark.required
+class TestComputeIoU:
+    def test_compute_iou_identity(self):
+        box = np.array([[10, 10, 50, 50]])
+        result = compute_iou(box, box)
+        assert result[0, 0] == pytest.approx(1.0)
+
+    def test_compute_iou_disjoint(self):
+        box1 = np.array([[0, 0, 10, 10]])
+        box2 = np.array([[20, 20, 30, 30]])
+        result = compute_iou(box1, box2)
+        assert result[0, 0] == 0.0
+
+    def test_compute_iou_partial(self):
+        # 50% overlap: intersection is 10x20, box1 is 20x20, box2 is 20x20
+        # Wait, let's do simple math:
+        # Box 1: [0, 0, 20, 20], Area = 400
+        # Box 2: [10, 0, 30, 20], Area = 400
+        # Inter: [10, 0, 20, 20], Area = 200
+        # Union: 400 + 400 - 200 = 600
+        # IoU: 200 / 600 = 1/3
+        box1 = np.array([[0, 0, 20, 20]])
+        box2 = np.array([[10, 0, 30, 20]])
+        result = compute_iou(box1, box2)
+        assert result[0, 0] == pytest.approx(1 / 3)
+
+    def test_compute_iou_containment(self):
+        # Box 1: [0, 0, 20, 20], Area = 400
+        # Box 2: [5, 5, 15, 15], Area = 100 (inside Box 1)
+        # Inter: 100, Union: 400
+        # IoU: 100 / 400 = 0.25
+        box1 = np.array([[0, 0, 20, 20]])
+        box2 = np.array([[5, 5, 15, 15]])
+        result = compute_iou(box1, box2)
+        assert result[0, 0] == pytest.approx(0.25)
+
+    def test_compute_iou_broadcasting(self):
+        # 2 boxes vs 3 boxes -> 2x3 matrix
+        boxes1 = np.array([[0, 0, 10, 10], [10, 10, 20, 20]])
+        boxes2 = np.array([[0, 0, 10, 10], [10, 10, 20, 20], [20, 20, 30, 30]])
+        result = compute_iou(boxes1, boxes2)
+        assert result.shape == (2, 3)
+        assert result[0, 0] == pytest.approx(1.0)
+        assert result[1, 1] == pytest.approx(1.0)
+        assert result[0, 1] == 0.0
+        assert result[0, 2] == 0.0
+
+    def test_compute_iou_zero_area(self):
+        # One box is a point
+        box1 = np.array([[10, 10, 10, 10]])
+        box2 = np.array([[0, 0, 20, 20]])
+        result = compute_iou(box1, box2)
+        assert result[0, 0] == 0.0
+
+    def test_compute_iou_1d_input(self):
+        # Verify it handles 1D arrays by promoting to 2D
+        box1 = np.array([0, 0, 10, 10])
+        box2 = np.array([0, 0, 10, 10])
+        result = compute_iou(box1, box2)
+        assert result.shape == (1, 1)
+        assert result[0, 0] == pytest.approx(1.0)
 
 
 @pytest.mark.required
