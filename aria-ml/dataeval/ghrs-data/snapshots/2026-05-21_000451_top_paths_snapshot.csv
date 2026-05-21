@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,42,32
+/aria-ml/dataeval/tree/main/src/dataeval,17,5
+/aria-ml/dataeval/tree/main/src,7,6
+/aria-ml/dataeval/tree/main/src/dataeval/core,4,2
+/aria-ml/dataeval/blob/main/src/dataeval/core/_coverage.py,3,1
+/aria-ml/dataeval/tree/main/src/dataeval/extractors,3,1
+/aria-ml/dataeval/tree/main/src/dataeval/quality,3,1
+/aria-ml/dataeval/blob/main/src/dataeval/extractors/_torch.py,2,2
+/aria-ml/dataeval/tree/main/src/dataeval/selection,2,2
+/aria-ml/dataeval/compare/v1.0.4...v1.0.6,2,1
