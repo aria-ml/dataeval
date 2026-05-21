@@ -309,11 +309,15 @@ data, rather than against a theoretical uniform baseline.
 Both methods are based on [Ting et al. (2022)](#ref11).
 
 **Completeness** measures dimensional utilization of the embedding space using
-eigenvalue entropy. The embedding matrix is decomposed via singular value
-decomposition (SVD), and the eigenvalues of the covariance matrix are computed
-from the singular values:
+eigenvalue entropy. The embedding matrix is rank-normalized before
+decomposition: each column is replaced by its within-column rank, scaled to the
+interval $(-\frac{1}{2}, \frac{1}{2})$. This makes the metric invariant to
+monotonic transformations of individual embedding dimensions. The
+rank-normalized matrix is then decomposed via singular value decomposition
+(SVD), and the eigenvalues of the covariance matrix are computed from the
+singular values:
 
-$$\lambda_i = \frac{s_i^2}{n-1}$$
+$\lambda_i = \frac{s_i^2}{n-1}$
 
 The entropy of the normalized eigenvalue distribution gives the **effective
 dimensionality** of the data:
@@ -323,17 +327,38 @@ H = -\sum_i \hat{\lambda}_i \log \hat{\lambda}_i, \qquad
 \hat{\lambda}_i = \frac{\lambda_i}{\sum_j \lambda_j}
 $$
 
-$$d_\text{eff} = e^H$$
+$d_\text{eff} = e^H$
 
-Completeness is then the ratio of effective to total dimensions:
+**Completeness** is the ratio of effective to total dimensions:
 
-$$\text{completeness} = \frac{d_\text{eff}}{d}$$
+$\text{completeness} = \frac{d_\text{eff}}{d}$
 
 A completeness score of 1.0 means the dataset uses all available embedding
 dimensions equally. A low completeness score means the dataset is effectively
 collapsed into a lower-dimensional subspace — the samples are too similar to
 each other in high-level structure to provide diverse training signal across the
 full capacity of the embedding model.
+
+**Isotropy** measures how evenly the data spans the dimensions it actually
+occupies. Rather than comparing effective dimensionality to the full ambient
+space, isotropy compares it to the rank of the data — the number of dimensions
+the data truly reaches:
+
+$\text{isotropy} = \frac{d_\text{eff}}{r}$
+
+where $r = \text{rank}(X)$ is computed from the raw (non-rank-normalized) SVD
+using a numerically stable threshold. Isotropy is always in $[0, 1]$: a value of
+1.0 means variance is distributed evenly across all occupied dimensions; a low
+value means a few directions dominate and the occupied subspace is
+underutilized.
+
+Completeness and isotropy are complementary. Completeness is penalized by both
+unused ambient dimensions and uneven variance within the occupied subspace.
+Isotropy is penalized only by uneven variance within the occupied subspace,
+independent of how many ambient dimensions are unused. A dataset can have low
+completeness with high isotropy (data confined to a low-dimensional subspace but
+evenly spread within it), or high completeness with low isotropy (data reaching
+many dimensions but with variance concentrated in a few).
 
 Completeness also returns **nearest neighbor pairs** sorted by decreasing
 distance, identifying the samples that are most isolated from any neighbor.

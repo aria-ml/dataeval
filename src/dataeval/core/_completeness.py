@@ -20,14 +20,49 @@ class CompletenessResult(TypedDict):
     Attributes
     ----------
     completeness : float
-        Completeness score between 0 and 1, measuring dimensional utilization
+        Completeness score between 0 and 1, measuring dimensional utilization relative
+        to full space.
+    isotropy : float
+        Isotropy score between 0 and 1, measuring dimensional utilization relative to
+        space actually spanned by embeddings.
     nearest_neighbor_pairs : Sequence[tuple[int, int]]
         Sequence of tuples (i, j) representing point indices and their nearest neighbors,
         sorted by decreasing nearest neighbor distance. Each pair appears only once.
     """
 
     completeness: float
+    isotropy: float
     nearest_neighbor_pairs: Sequence[tuple[int, int]]
+
+
+def _get_effective_dim(x: Array, do_ranks: bool = True) -> float:
+    n, d = x.shape
+
+    # Get singular values, either with ranks or with raw data.
+    if do_ranks:
+        # Get normed ranks from 1/2n to (1-1/2n), then center them
+        ranks = np.argsort(np.argsort(x, axis=0), axis=0)
+        centered_normed_ranks = (ranks + 0.5) / n - 0.5
+
+        # Use SVD directly on the centered normalized ranks
+        # We only need singular values, not the full U and V matrices
+        _, s, _ = np.linalg.svd(centered_normed_ranks, full_matrices=False)
+    else:
+        _, s, _ = np.linalg.svd(x - np.mean(x, axis=0, keepdims=True), full_matrices=False)
+
+    # Convert singular values to eigenvalues of the covariance matrix
+    # The eigenvalues of the covariance matrix are related to singular values by: eigenvalues = s^2/(n-1)
+    eigenvalues = (s**2) / (n - 1)
+
+    # Filter negligible eigenvalues
+    eigenvalues = np.sort(eigenvalues)[::-1]
+
+    # Calculate entropy of normalized eigenvalues
+    normalized_eigs = eigenvalues / np.sum(eigenvalues)
+    entropy = -np.sum(normalized_eigs * np.log(normalized_eigs))
+
+    # return effective dimensionality
+    return np.exp(entropy)
 
 
 def completeness(embeddings: Array) -> CompletenessResult:
@@ -37,7 +72,10 @@ def completeness(embeddings: Array) -> CompletenessResult:
     Completeness measures how effectively the data explores all available dimensions in
     its embedding space. This implementation uses a directional diversity approach based
     on eigenvalue entropy, which is more robust for high-dimensional data than traditional
-    box-counting or neighbor-distance-based methods.
+    box-counting or neighbor-distance-based methods. The isotropy measure is similar, but
+    measures directional diversity relative to the actual space spanned by the embeddings,
+    rather than to the entire ambient space.
+
 
     Parameters
     ----------
@@ -51,6 +89,7 @@ def completeness(embeddings: Array) -> CompletenessResult:
         Mapping with keys:
 
         - completeness: float - Completeness score between 0 and 1
+        - isotropy: float - Isotropy score between 0 and 1
         - nearest_neighbor_pairs: Sequence[tuple[int, int]] - Pairs of point indices
           and their nearest neighbors, sorted by decreasing distance
 
@@ -70,6 +109,8 @@ def completeness(embeddings: Array) -> CompletenessResult:
     >>> result = completeness(embeddings)
     >>> result["completeness"]
     0.9963684026790749
+    >>> result["isotropy"]
+    0.9865994134108708
 
     Single plane data across 3 dimensions:
 
@@ -80,6 +121,19 @@ def completeness(embeddings: Array) -> CompletenessResult:
     >>> result = completeness(embeddings)
     >>> result["completeness"]
     0.6001089325287554
+    >>> result["isotropy"]
+    0.40470070513943307
+
+    Completeness can be less than isotropy:
+
+    >>> X_low = rng.normal(size=(50, 2))
+    >>> Q, _ = np.linalg.qr(rng.normal(size=(3, 2)))
+    >>> embeddings = X_low @ Q.T
+    >>> result = completeness(embeddings)
+    >>> result["completeness"]  # penalized by unused ambient dimension
+    0.6844547029590969
+    >>> result["isotropy"]  # close to 1, isotropic within 2D subspace
+    0.9869106459012913
     """
     _logger.info("Starting completeness calculation")
 
@@ -90,39 +144,28 @@ def completeness(embeddings: Array) -> CompletenessResult:
     n, d = embeddings.shape
     _logger.debug("Embeddings shape: (%d samples, %d dimensions)", n, d)
 
-    # Get normed ranks from 1/2n to (1-1/2n), then center them
-    centered_normed_ranks = (np.argsort(np.argsort(embeddings, axis=0), axis=0) + 0.5) / n - 0.5
+    rank_effective_dim = _get_effective_dim(embeddings)
+    raw_effective_dim = _get_effective_dim(embeddings, do_ranks=False)
 
-    # Use SVD directly on the centered normalized ranks
-    # We only need singular values, not the full U and V matrices
-    _, s, _ = np.linalg.svd(centered_normed_ranks, full_matrices=False)
-
-    # Convert singular values to eigenvalues of the covariance matrix
-    # The eigenvalues of the covariance matrix are related to singular values by: eigenvalues = s^2/(n-1)
-    eigenvalues = (s**2) / (n - 1)
-
-    # Filter negligible eigenvalues
-    eigenvalues = eigenvalues[eigenvalues > 1e-10]
-    eigenvalues = np.sort(eigenvalues)[::-1]
-
-    # Calculate entropy of normalized eigenvalues
-    normalized_eigs = eigenvalues / np.sum(eigenvalues)
-    entropy = -np.sum(normalized_eigs * np.log(normalized_eigs))
-
-    # Calculate effective dimensionality
-    effective_dim = np.exp(entropy)
+    manifold_dim = np.linalg.matrix_rank(embeddings)
 
     # Calculate completeness as ratio of effective to total dimensions
     # This is equivalent to the Nth root of the "occupied fraction" in traditional approaches
-    completeness_score = effective_dim / d
+    completeness_score = rank_effective_dim / d
 
-    _logger.debug("Effective dimensionality: %.2f, Completeness score: %.4f", effective_dim, completeness_score)
+    isotropy_score = raw_effective_dim / manifold_dim
+
+    _logger.debug(
+        "Rank effective dimensionality: %.2f, Completeness score: %.4f", rank_effective_dim, completeness_score
+    )
+    _logger.debug("Raw effective dimensionality: %.2f, Isotropy score: %.4f", rank_effective_dim, isotropy_score)
 
     # Compute nearest neighbor pairs using sklearn
     if n <= 1:
         _logger.warning("Only %d sample(s) provided, skipping nearest neighbor calculation", n)
         return CompletenessResult(
             completeness=float(completeness_score),
+            isotropy=float(isotropy_score),
             nearest_neighbor_pairs=[],
         )
 
@@ -164,5 +207,6 @@ def completeness(embeddings: Array) -> CompletenessResult:
 
     return CompletenessResult(
         completeness=float(completeness_score),
+        isotropy=float(isotropy_score),
         nearest_neighbor_pairs=nearest_neighbor_pairs,
     )

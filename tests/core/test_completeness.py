@@ -80,3 +80,105 @@ class TestCompletenessUnit:
         result2 = completeness(embs2)
         # Results should be very close
         np.testing.assert_almost_equal(result1["completeness"], result2["completeness"], decimal=4)
+
+
+@pytest.mark.required
+class TestIsotropyUnit:
+    def test_isotropic_gaussian_isotropy(self):
+        """Test that an isotropic Gaussian has isotropy close to 1."""
+        n, d = 1000, 10
+        embs = np.random.randn(n, d)
+        result = completeness(embs)
+        assert result["isotropy"] > 0.95
+
+    def test_near_perfect_correlation_isotropy(self):
+        """Test that nearly perfectly correlated data has low isotropy."""
+        n, d = 1000, 5
+        embs = np.random.random(size=(n, d))
+        for i in range(1, d):
+            embs[:, i] = embs[:, 0]
+
+        _, _, Vt = np.linalg.svd(embs - np.mean(embs, axis=0), full_matrices=True)
+        null_direction = Vt[1]
+        noise_amplitude = 1e-4
+        noise = np.random.randn(n, 1) * noise_amplitude
+        embs += noise @ null_direction[np.newaxis, :]
+
+        result = completeness(embs)
+        assert result["isotropy"] < 0.5 + noise_amplitude
+
+    def test_anisotropic_gaussian_isotropy(self):
+        n, ambient, intrinsic = 1000, 10, 4
+        Q, _ = np.linalg.qr(np.random.randn(ambient, intrinsic))
+        scales = np.exp(np.linspace(0, 3, intrinsic))
+        embs = (np.random.randn(n, intrinsic) * scales) @ Q.T
+        result = completeness(embs)
+        assert result["isotropy"] < 0.5
+
+    def test_isotropy_invariant_to_rotation(self):
+        """Test that rotating the data does not affect isotropy."""
+        n, d = 1000, 10
+        embs = np.random.randn(n, d)
+        # Random rotation via QR
+        Q, _ = np.linalg.qr(np.random.randn(d, d))
+        embs_rotated = embs @ Q
+        result1 = completeness(embs)
+        result2 = completeness(embs_rotated)
+        np.testing.assert_almost_equal(result1["isotropy"], result2["isotropy"], decimal=2)
+
+    def test_isotropy_invariant_to_scaling(self):
+        """Test that uniformly scaling all dimensions does not affect isotropy."""
+        n, d = 1000, 10
+        embs = np.random.randn(n, d)
+        result1 = completeness(embs)
+        result2 = completeness(embs * 100)
+        np.testing.assert_almost_equal(result1["isotropy"], result2["isotropy"], decimal=2)
+
+    def test_low_rank_isotropy(self):
+        """Test that a low-rank embedding has isotropy reflecting variance distribution within that rank."""
+        n, ambient = 1000, 20
+        intrinsic = 5
+        # Embed isotropic Gaussian in higher-dimensional space
+        X_low = np.random.randn(n, intrinsic)
+        Q, _ = np.linalg.qr(np.random.randn(ambient, intrinsic))
+        embs = X_low @ Q.T
+        result = completeness(embs)
+        # Isotropic within its subspace, so isotropy should be high
+        assert result["isotropy"] > 0.95
+
+    def test_anisotropic_low_rank_isotropy(self):
+        """Test that an anisotropic low-rank embedding has lower isotropy than an isotropic one."""
+        n, ambient, intrinsic = 1000, 20, 5
+        Q, _ = np.linalg.qr(np.random.randn(ambient, intrinsic))
+
+        # Isotropic
+        X_iso = np.random.randn(n, intrinsic) @ Q.T
+        result_iso = completeness(X_iso)
+
+        # Anisotropic — vary scales within the intrinsic subspace
+        scales = np.exp(np.linspace(0, 4, intrinsic))
+        X_aniso = (np.random.randn(n, intrinsic) * scales) @ Q.T
+        result_aniso = completeness(X_aniso)
+
+        assert result_aniso["isotropy"] < result_iso["isotropy"]
+
+    def test_span_and_isotropy_independent(self):
+        """Test that span and isotropy can vary independently."""
+        n = 1000
+
+        # High span, low isotropy: many dimensions but very uneven variance
+        scales = np.exp(np.linspace(0, 4, 10))
+        embs_high_span = np.random.randn(n, 10) * scales
+        # Now introduce correlations by mixing dimensions
+        Q, _ = np.linalg.qr(np.random.randn(10, 10))
+        embs_high_span = embs_high_span @ Q.T
+        result_high_span = completeness(embs_high_span)
+
+        # Low span, high isotropy: few dimensions but evenly used
+        X_low = np.random.randn(n, 3)
+        Q, _ = np.linalg.qr(np.random.randn(10, 3))
+        embs_low_span = X_low @ Q.T
+        result_low_span = completeness(embs_low_span)
+
+        assert result_high_span["completeness"] > result_low_span["completeness"]
+        assert result_high_span["isotropy"] < result_low_span["isotropy"]
