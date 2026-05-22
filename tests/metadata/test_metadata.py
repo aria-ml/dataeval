@@ -250,9 +250,10 @@ class TestMetadata:
         assert md.dropped_factors == {"b": ["foo"], "c": ["bar"]}
 
     def test_unknown_target(self):
-        md = Metadata([(np.zeros((3, 16, 16)), "THIS IS NOT A TARGET", {"id": 0})])  # type: ignore
-        with pytest.raises(TypeError, match="Encountered unsupported target type in dataset"):
-            md._structure()
+        # MAITE-shape validation now rejects unsupported target types at construction
+        # rather than waiting for _structure(); the error is a MaiteShapeError (TypeError).
+        with pytest.raises(TypeError, match=r"dataset\[0\]\[1\]"):
+            Metadata([(np.zeros((3, 16, 16)), "THIS IS NOT A TARGET", {"id": 0})])  # type: ignore
 
     def test_mixed_target(self):
         md = Metadata(

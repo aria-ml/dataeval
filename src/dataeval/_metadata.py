@@ -22,6 +22,7 @@ from dataeval.protocols import (
 )
 from dataeval.types import Array1D
 from dataeval.utils._internal import as_numpy, merge_metadata
+from dataeval.utils._validate import requires_maite_dataset
 
 _logger = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ class Metadata(Array, FeatureExtractor):
     >>> test_factors = metadata(test_dataset)  # Extract from new dataset
     """
 
+    @requires_maite_dataset("dataset", expected="any_target")
     def __init__(
         self,
         dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]] | None = None,
@@ -168,6 +170,7 @@ class Metadata(Array, FeatureExtractor):
         """
         return self._dataset is not None
 
+    @requires_maite_dataset("dataset", expected="any_target")
     def bind(self, dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> Self:
         """Bind this instance to a dataset.
 

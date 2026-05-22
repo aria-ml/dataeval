@@ -26,6 +26,7 @@ from dataeval.protocols import (
     ProgressCallback,
 )
 from dataeval.utils._internal import unwrap_image
+from dataeval.utils._validate import requires_maite_dataset
 
 _logger = logging.getLogger(__name__)
 
@@ -94,6 +95,7 @@ class Embeddings(Array, FeatureExtractor):
 
     memory_threshold: float
 
+    @requires_maite_dataset("dataset", expected="image_only")
     def __init__(
         self,
         # Technically more permissive than ImageClassificationDataset or ObjectDetectionDataset
@@ -160,6 +162,7 @@ class Embeddings(Array, FeatureExtractor):
         """
         return self._dataset is not None
 
+    @requires_maite_dataset("dataset", expected="image_only")
     def bind(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Self:
         """Bind this instance to a dataset.
 

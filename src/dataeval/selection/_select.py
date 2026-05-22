@@ -2,10 +2,11 @@ __all__ = []
 
 from collections.abc import Iterator, Sequence
 from enum import IntEnum
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, cast
 
-from dataeval.protocols import AnnotatedDataset, DatasetMetadata
+from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
+from dataeval.utils._validate import DatasetKind, validate_dataset
 
 _TDatum = TypeVar("_TDatum")
 
@@ -28,9 +29,16 @@ class Selection(ReprMixin, Generic[_TDatum]):
 
     Subclasses must implement ``__call__`` which mutates the
     :class:`Select` wrapper's internal index list in place.
+
+    Subclasses that read the *target* of each datum (e.g. ``dataset[i][1]``)
+    should set :attr:`requires` to declare the MAITE datum shape they need.
+    :class:`Select` aggregates these and validates the source dataset once,
+    upfront, raising :class:`~dataeval.exceptions.MaiteShapeError` before any
+    selection runs.
     """
 
     stage: SelectionStage
+    requires: DatasetKind | None = None
 
     def __call__(self, dataset: "Select[_TDatum]") -> None: ...
 
@@ -81,7 +89,7 @@ class Select(AnnotatedDataset[_TDatum]):
     ObjectDetectionDataset(n_images=50, classes=['person', 'car', 'boat', 'plane'])
     """
 
-    _dataset: AnnotatedDataset[_TDatum]
+    _dataset: Dataset[_TDatum]
     _selection: list[int]
     _selections: Sequence[Selection[_TDatum]]
     _size_limit: int
@@ -89,7 +97,7 @@ class Select(AnnotatedDataset[_TDatum]):
 
     def __init__(
         self,
-        dataset: AnnotatedDataset[_TDatum],
+        dataset: Dataset[_TDatum],
         selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None = None,
     ) -> None:
         self.__dict__.update(dataset.__dict__)
@@ -98,6 +106,11 @@ class Select(AnnotatedDataset[_TDatum]):
         self._selection = list(range(self._size_limit))
         self._selections = self._sort_selections(selections)
         self._subselections = []
+
+        # Fail fast if any selection requires a target the source dataset cannot provide.
+        required_kind = self._aggregate_required_kind(self._selections)
+        if required_kind is not None and self._size_limit > 0:
+            validate_dataset(dataset, expected=required_kind, caller="Select")
 
         # Ensure metadata is populated correctly as DatasetMetadata TypedDict
         _metadata = getattr(dataset, "metadata", {})
@@ -122,6 +135,21 @@ class Select(AnnotatedDataset[_TDatum]):
         sep = "-" * len(title)
         selections = f"Selections: [{', '.join([str(s) for s in self._selections])}]"
         return f"{title}\n{sep}{nt}{selections}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
+
+    @staticmethod
+    def _aggregate_required_kind(selections: Sequence["Selection[_TDatum]"]) -> DatasetKind | None:
+        """Return the strictest MAITE kind declared across ``selections``.
+
+        ``None`` means no selection inspects targets (e.g. only :class:`Limit`,
+        :class:`Shuffle`) — validation is skipped to keep image-only datasets
+        usable. A specific kind (``classification`` / ``object_detection``)
+        wins over the generic ``any_target``.
+        """
+        kinds: list[DatasetKind] = [cast(DatasetKind, s.requires) for s in selections if s.requires is not None]
+        if not kinds:
+            return None
+        specific: list[DatasetKind] = [k for k in kinds if k != "any_target"]
+        return specific[0] if specific else "any_target"
 
     def _sort_selections(
         self,

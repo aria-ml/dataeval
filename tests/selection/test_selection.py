@@ -93,9 +93,10 @@ class TestSelectionClasses:
         mock_dataset.__getitem__.side_effect = lambda idx: (f"data_{idx}", MockTarget(idx), {"id": idx})
 
         class_balance = ClassBalance(method="interclass")
-        # Unsupported target types are treated as empty images (no error)
-        select = Select(mock_dataset, selections=[class_balance])
-        assert len(select) == 0  # All images are treated as empty, no classes to balance
+        # MAITE-shape validation now fails fast on unsupported targets rather
+        # than silently producing an empty selection (see MaiteShapeError).
+        with pytest.raises(TypeError):
+            Select(mock_dataset, selections=[class_balance])
 
     def test_classfilter_with_nothing(self, mock_dataset):
         # Test ClassFilter with no params

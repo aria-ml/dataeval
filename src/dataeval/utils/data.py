@@ -1,6 +1,14 @@
 """Utility functions for dataset splitting and data and metadata manipulation."""
 
-__all__ = ["split_dataset", "unzip_dataset", "TrainValSplit", "DatasetSplits"]
+__all__ = [
+    "DatasetKind",
+    "DatasetSplits",
+    "TrainValSplit",
+    "requires_maite_dataset",
+    "split_dataset",
+    "unzip_dataset",
+    "validate_dataset",
+]
 
 import logging
 from collections.abc import Iterator, Sequence
@@ -20,6 +28,7 @@ from dataeval.protocols import (
     ObjectDetectionTarget,
 )
 from dataeval.utils._internal import EPSILON, as_numpy, unwrap_image
+from dataeval.utils._validate import DatasetKind, requires_maite_dataset, validate_dataset
 from dataeval.utils.preprocessing import BoundingBox
 
 _logger = logging.getLogger(__name__)
@@ -722,6 +731,9 @@ def split_dataset(
     # Import Metadata at runtime to avoid circular import
     from dataeval._metadata import Metadata
 
+    # MetadataLike instances are pre-extracted; raw datasets must satisfy the MAITE shape.
+    if not isinstance(dataset, MetadataLike):
+        validate_dataset(dataset, expected="any_target", caller="split_dataset")
     metadata = dataset if isinstance(dataset, MetadataLike) else Metadata(dataset)
     class_labels = metadata.class_labels
 
@@ -800,6 +812,14 @@ def unzip_dataset(
         Two iterators, one for images and one for targets.
     """
     from itertools import tee
+
+    # Per-target extraction reads d[1].boxes, so the dataset must be an OD-shaped MAITE
+    # dataset. Image-only callers can still pass a bare image dataset.
+    validate_dataset(
+        dataset,
+        expected="object_detection" if per_target else "image_only",
+        caller="unzip_dataset",
+    )
 
     def _generate_pairs() -> Iterator[tuple[NDArray[Any], list[BoundingBox] | None]]:
         for i in range(len(dataset)):
