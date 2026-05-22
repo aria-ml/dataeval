@@ -11,6 +11,7 @@ from dataeval.core._label_stats import label_stats
 from dataeval.protocols import AnnotatedDataset, Array, ObjectDetectionTarget, SegmentationTarget
 from dataeval.selection._select import Select, Selection, SelectionStage
 from dataeval.utils._internal import as_numpy
+from dataeval.utils._validate import DatasetKind
 
 
 class ClassBalance(Selection[Any]):
@@ -54,6 +55,7 @@ class ClassBalance(Selection[Any]):
     """
 
     stage = SelectionStage.FILTER
+    requires: DatasetKind | None = "any_target"
 
     def __init__(
         self,

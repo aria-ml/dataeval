@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 from dataeval.protocols import Array, ObjectDetectionDatum, ObjectDetectionTarget, SegmentationDatum, SegmentationTarget
 from dataeval.selection._select import Select, Selection, SelectionStage, Subselection
 from dataeval.utils._internal import as_numpy
+from dataeval.utils._validate import DatasetKind
 
 
 class ClassFilter(Selection[Any]):
@@ -24,6 +25,7 @@ class ClassFilter(Selection[Any]):
     """
 
     stage = SelectionStage.FILTER
+    requires: DatasetKind | None = "any_target"
 
     def __init__(self, classes: Sequence[int], filter_detections: bool = True) -> None:
         self.classes = classes
