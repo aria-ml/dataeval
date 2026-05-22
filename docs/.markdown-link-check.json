@@ -13,6 +13,9 @@
       "pattern": "^https://journals\\.aps\\.org"
     },
     {
+      "pattern": "^https://www\\.sciencedirect\\.com"
+    },
+    {
       "pattern": "^#ref\\d+$"
     },
     {
