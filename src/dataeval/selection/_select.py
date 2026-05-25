@@ -121,6 +121,32 @@ class Select(AnnotatedDataset[_TDatum]):
         self._apply_selections()
 
     @property
+    def root_dataset(self) -> Dataset[_TDatum]:
+        """The original dataset at the bottom of any :class:`Select` wrapping chain."""
+        current: Dataset[_TDatum] = self
+        while isinstance(current, Select):
+            current = current._dataset
+        return current
+
+    @property
+    def selection_groups(self) -> list[list[Selection[_TDatum]]]:
+        """Selection lists from each construction call, innermost (oldest) first.
+
+        ``Select(Select(base, [A, B]), [C])`` returns ``[[A, B], [C]]``. Empty
+        wrappers contribute nothing — a chain with no selectors anywhere
+        returns ``[]``. The grouping matches the user's nesting intent and is
+        the natural shape for sidecar metadata (see :mod:`dataeval.io`).
+        """
+        groups: list[list[Selection[_TDatum]]] = []
+        current: Dataset[_TDatum] = self
+        while isinstance(current, Select):
+            if current._selections:
+                groups.append(list(current._selections))
+            current = current._dataset
+        groups.reverse()
+        return groups
+
+    @property
     def metadata(self) -> DatasetMetadata:
         """Dataset metadata information including identifier and configuration."""
         return self._metadata

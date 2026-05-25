@@ -128,3 +128,53 @@ class TestSelect:
 
         s = Select(MockDataset(), selections=[FilterEven()])  # type: ignore
         assert s.resolve_indices() == [0, 2, 4]
+
+
+class TestRootDatasetAndSelectionGroups:
+    """``root_dataset`` and ``selection_groups`` walk a nested Select chain for metadata."""
+
+    @staticmethod
+    def _noop(stage: SelectionStage = SelectionStage.FILTER) -> Selection:
+        return type("_Noop", (Selection,), {"stage": stage, "__call__": lambda self_, ds: None})()
+
+    def test_root_dataset_on_unwrapped_select(self):
+        base = MockDataset()
+        s = Select(base)  # type: ignore
+        assert s.root_dataset is base
+
+    def test_root_dataset_walks_through_nesting(self):
+        base = MockDataset()
+        chain = Select(Select(Select(base)))  # type: ignore
+        assert chain.root_dataset is base
+
+    def test_selection_groups_empty_when_no_selectors_anywhere(self):
+        base = MockDataset()
+        assert Select(base).selection_groups == []  # type: ignore
+        assert Select(Select(base)).selection_groups == []  # type: ignore
+
+    def test_selection_groups_single_construction(self):
+        base = MockDataset()
+        a, b = self._noop(), self._noop()
+        s = Select(base, [a, b])  # type: ignore
+        assert s.selection_groups == [[a, b]]
+
+    def test_selection_groups_preserves_nesting_innermost_first(self):
+        base = MockDataset()
+        a = self._noop(SelectionStage.STATE)
+        b = self._noop(SelectionStage.FILTER)
+        c = self._noop(SelectionStage.ORDER)
+        outer = Select(Select(base, [a, b]), [c])  # type: ignore
+        assert outer.selection_groups == [[a, b], [c]]
+
+    def test_selection_groups_skips_empty_wrappers(self):
+        base = MockDataset()
+        a = self._noop()
+        # Inner wrap has no selections; outer adds [a]. Empty wrapper contributes no group.
+        outer = Select(Select(base), [a])  # type: ignore
+        assert outer.selection_groups == [[a]]
+
+    def test_nested_metadata_propagates_from_base(self):
+        base = MockDataset()
+        base.metadata = {"id": "RealBase"}
+        outer = Select(Select(base))  # type: ignore
+        assert outer._metadata["id"] == "RealBase"
