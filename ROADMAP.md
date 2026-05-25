@@ -30,6 +30,19 @@ App (containerized)
 
 ```
 
+## Features under development
+
+Active work items in flight across the current and next release windows.
+See per-release sections below for full context and downstream phases.
+
+- **Library v1.1 (May 2026)** — Scope module: coverage, completeness; incorporate additional capabilities as developed.
+- **Video adaptation, Phase 1 — Foundation** — video dataset classes, key-frame selection,
+  frame-level embeddings, clipping/framerate normalization, metadata extraction,
+  video-aware train/test splitting.
+- **Video adaptation, Phase 2 — Video statistics** — FMV statistics module
+  (time/motion/quality/aggregated-frame stats), optical-flow maps.
+- **App (DataEval-Flow), Phase 1** — Data Cleaning Workflow (raw → clean via cached rules and DataEval utilities).
+
 ## Library
 
 ### DataEval v1.0

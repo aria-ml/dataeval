@@ -2,11 +2,18 @@
 
 These tests verify the output type contracts hold, not that individual results
 are numerically correct (which is covered by unit tests under tests/).
+
+Maps to meta repo test cases:
+  - TC-3.1: Data Quality Analysis (Duplicates output contracts)
+  - TC-12.1: Utility Components (label_stats output contracts)
 """
 
 import numpy as np
+import pytest
 
 
+@pytest.mark.test_case("3-1")
+@pytest.mark.test_case("12-1")
 class TestOutputContracts:
     """Verify outputs conform to documented return types and structures."""
 
