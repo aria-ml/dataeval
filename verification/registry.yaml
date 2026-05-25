@@ -99,6 +99,13 @@ requirements:
     file: FR-12-utility-components.md
     test_cases: ["12-1"]
 
+  FR-13:
+    name: Dataset & Model Metadata Export
+    origin: IR-3-S-12
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/software/interoperability/#ir-3-model-and-data-interoperability
+    file: FR-13-metadata-export.md
+    test_cases: ["13-1"]
+
   NFR-1:
     name: Python Version Compatibility
     origin: DR-1.5
@@ -399,3 +406,21 @@ test_cases:
       - set_max_processes/get_max_processes correctly store and retrieve values
       - use_max_processes context manager restores original value on exit
       - Setting the same seed produces identical results across runs
+
+  "13-1":
+    name: Dataset & Model Metadata Export
+    test_type: Core Functionality
+    business_case: >-
+      Verify that DataEval produces a validated metadata.json sidecar for
+      datasets and models, supporting cross-tool interoperability per
+      IR-3-S-12.
+    initial_conditions:
+      - DataEval installed
+      - Writable temporary directory available
+    expected_results:
+      - DatasetInfo round-trips through write/read with all fields preserved
+      - ModelInfo round-trips through write/read with framework and IO specs preserved
+      - A single metadata.json may carry both dataset and model blocks
+      - The written file is indented, valid JSON containing schema_version and a provenance block
+      - The provenance block reuses ExecutionMetadata directly so an Output.meta() record can be passed straight to write_metadata_json
+      - The producer raises a clear error when neither dataset nor model is provided

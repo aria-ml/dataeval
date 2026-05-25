@@ -7,6 +7,7 @@ depending on the unit test suite or heavyweight dependencies.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
@@ -64,6 +65,40 @@ class SimpleImageDataset:
 
     def __len__(self) -> int:
         return len(self.images)
+
+
+def build_simple_onnx_model(model_path: Path, output_dim: int = 64) -> Path:
+    """Build a small ONNX encoder: ``(batch, 3, 16, 16) -> (batch, output_dim)``.
+
+    Uses a Flatten + MatMul + Add (linear layer) graph. Sufficient for
+    end-to-end interoperability tests that need a real ONNX file without
+    pulling a heavyweight pretrained model.
+    """
+    from onnx import TensorProto, helper, numpy_helper, save
+
+    input_dim = 3 * 16 * 16
+    x = helper.make_tensor_value_info("input", TensorProto.FLOAT, ["batch", 3, 16, 16])
+    y = helper.make_tensor_value_info("output", TensorProto.FLOAT, ["batch", output_dim])
+
+    rng = np.random.default_rng(0)
+    w = rng.standard_normal((input_dim, output_dim)).astype(np.float32)
+    b = rng.standard_normal((output_dim,)).astype(np.float32)
+
+    graph = helper.make_graph(
+        nodes=[
+            helper.make_node("Flatten", inputs=["input"], outputs=["flat"], axis=1),
+            helper.make_node("MatMul", inputs=["flat", "W"], outputs=["matmul_out"]),
+            helper.make_node("Add", inputs=["matmul_out", "b"], outputs=["output"]),
+        ],
+        name="simple_encoder",
+        inputs=[x],
+        outputs=[y],
+        initializer=[numpy_helper.from_array(w, "W"), numpy_helper.from_array(b, "b")],
+    )
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
+    model.ir_version = 8
+    save(model, str(model_path))
+    return model_path
 
 
 @dataclass
