@@ -1174,6 +1174,14 @@ plt.show()
 # [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.py).
 
 # %% [markdown]
+# ## Related how-to guides
+#
+# Apply OOD detection to your own data with these focused, task-oriented guides:
+#
+# - [Encode image embeddings with an ONNX model](../notebooks/h2_encode_with_onnx.py)
+# - [Configure global hardware settings](../notebooks/h2_configure_hardware_settings.py)
+
+# %% [markdown]
 # ## On your own
 #
 # Once you are familiar with DataEval and data monitoring, run this analysis using your own reference and operational

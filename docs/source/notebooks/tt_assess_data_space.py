@@ -422,6 +422,17 @@ print(f"Number of outliers found as uncovered images: {len(uncovered_outliers)}"
 # [Concept pages](../concepts/index.md).
 
 # %% [markdown]
+# ## Related how-to guides
+#
+# Apply data space assessment to your own data with these focused, task-oriented guides:
+#
+# - [Encode image embeddings with an ONNX model](../notebooks/h2_encode_with_onnx.py)
+# - [Identify outliers and anomalies with clustering](../notebooks/h2_cluster_analysis.py)
+# - [Detect undersampled subsets of datasets](../notebooks/h2_detect_undersampling.py)
+# - [Display data distributions between two datasets](../notebooks/h2_measure_divergence.py)
+# - [Apply statistical outputs as intrinsic metadata factors](../notebooks/h2_add_intrinsic_factors.py)
+
+# %% [markdown]
 # ## On your own
 #
 # Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. When you do, make sure

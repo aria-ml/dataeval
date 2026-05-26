@@ -258,3 +258,9 @@ print(f"After context: {dataeval.config.get_max_processes()}")
 # ### How-to guides
 #
 # - [How to configuring logging with DataEval](./h2_configure_logging.py)
+#
+# ### Tutorials
+#
+# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py)
+# - [Monitor shifts in operational data](./tt_monitor_shift.py)
+# - [Identify out-of-distribution samples](./tt_identify_ood_samples.py)

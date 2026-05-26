@@ -282,12 +282,45 @@ def docs(session: nox.Session) -> None:
         session.run("python", "../../docs/check_notebook_cache.py", "--clean")
 
 
+EXTRA_VARIANTS = ("cpu", "cu118", "cu128")
+
+
 @session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"], uv_sync_locked=False)
 def lock(session: nox.Session) -> None:
     """Lock dependencies in "uv.lock". Update dependencies by calling `nox -e lock -- upgrade`."""
     upgrade_args = ["--upgrade"] if "upgrade" in session.posargs else []
     session.run("uv", "lock", *upgrade_args)
-    session.run("uv", "export", "--no-emit-project", "-o", "requirements.txt")
+
+    for variant in EXTRA_VARIANTS:
+        out = Path(f"requirements.{variant}.txt")
+        session.run(
+            "uv",
+            "export",
+            "--no-emit-project",
+            "--no-dev",
+            "--extra",
+            variant,
+            "--extra",
+            "onnx" if variant == "cpu" else "onnx-gpu",
+            "--extra",
+            "opencv",
+            "-o",
+            str(out),
+        )
+        # uv export does not emit index directives; prepend the matching PyTorch index.
+        out.write_text(f"--extra-index-url https://download.pytorch.org/whl/{variant}\n{out.read_text()}")
+
+    session.run(
+        "uv",
+        "export",
+        "--no-emit-project",
+        "--extra",
+        "onnx",
+        "--extra",
+        "opencv",
+        "-o",
+        "requirements.dev.txt",
+    )
     session.run("poetry", "lock")
     session.run(
         "p2c",

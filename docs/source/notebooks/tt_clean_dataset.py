@@ -622,6 +622,19 @@ display(duplicates)
 # section. To learn more about data cleaning, see the [Data Integrity](../concepts/DataIntegrity.md) explanation page.
 
 # %% [markdown]
+# ## Related how-to guides
+#
+# Apply the cleaning workflow to your own data with these focused, task-oriented guides:
+#
+# - [Identify and remove duplicates from a PyTorch Dataset](../notebooks/h2_deduplicate.py)
+# - [Find negatively impactful images](../notebooks/h2_visualize_cleaning_issues.py)
+# - [Identify outliers and anomalies with clustering](../notebooks/h2_cluster_analysis.py)
+# - [Customize image stats for object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py)
+# - [Configure logging](../notebooks/h2_configure_logging.py) while running the pipeline
+# - [Calculate feasibility of performance requirements (BER)](../notebooks/h2_measure_ic_feasibility.py)
+# - [Determine how much data you need (sufficiency)](../notebooks/h2_measure_ic_sufficiency.py)
+
+# %% [markdown]
 # ## On your own
 #
 # Now that you've gone through a tutorial on exploring a dataset, try going through the tutorial again with the test set,
