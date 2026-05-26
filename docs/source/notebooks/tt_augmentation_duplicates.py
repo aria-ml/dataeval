@@ -646,6 +646,15 @@ print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 # [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.py).
 
 # %% [markdown]
+# ## Related how-to guides
+#
+# Apply duplicate detection to your own data with these focused, task-oriented guides:
+#
+# - [Identify and remove duplicates from a PyTorch Dataset](../notebooks/h2_deduplicate.py)
+# - [Find negatively impactful images](../notebooks/h2_visualize_cleaning_issues.py)
+# - [Configure global hardware settings](../notebooks/h2_configure_hardware_settings.py)
+
+# %% [markdown]
 # ## On your own
 #
 # Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. When you do, make sure

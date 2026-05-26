@@ -19,6 +19,10 @@ To view the tutorial directly in the browser, click the title.
 To run the tutorial interactively in Google Colab, click the
 ![Open In Colab][colab-badge] icon.
 
+See [Running notebooks locally](#running-notebooks-locally) at the
+bottom of this page for how to generate runnable `.ipynb` files in your
+local checkout.
+
 ## **Data engineering**
 
 ```{toctree}
@@ -100,3 +104,16 @@ To run the tutorial interactively in Google Colab, click the
 <!-- END MONITORING -->
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
+
+## Running notebooks locally
+
+The notebook sources live as `py:percent` scripts in
+`docs/source/notebooks/`. To get runnable `.ipynb` files for local
+editing, choose one of:
+
+- **With nox (recommended):** `nox -s docsync` — bidirectional sync of
+  the `.py`/`.ipynb` pairs.
+- **With jupytext directly:** `jupytext --to notebook docs/source/notebooks/*.py`
+
+The generated `.ipynb` files are gitignored, so edits stay local to
+your checkout.

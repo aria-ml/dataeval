@@ -490,6 +490,15 @@ label_parity(train_md.class_labels, operational_md.class_labels, num_classes=20)
 # [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.py).
 
 # %% [markdown]
+# ## Related how-to guides
+#
+# Apply drift monitoring to your own data with these focused, task-oriented guides:
+#
+# - [Display data distributions between two datasets](../notebooks/h2_measure_divergence.py)
+# - [Compare label distributions between two datasets](../notebooks/h2_measure_label_independence.py)
+# - [Configure global hardware settings](../notebooks/h2_configure_hardware_settings.py)
+
+# %% [markdown]
 # ## On your own
 #
 # Once you are familiar with DataEval and data monitoring, run this analysis using your own reference and operational

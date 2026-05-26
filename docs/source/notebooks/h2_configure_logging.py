@@ -254,3 +254,7 @@ print("\nCleanup complete!")
 # ### How-to guides
 #
 # - [How to configure global hardware configuration defaults in DataEval](./h2_configure_hardware_settings.py)
+#
+# ### Tutorials
+#
+# - [Introduction to data cleaning](./tt_clean_dataset.py)

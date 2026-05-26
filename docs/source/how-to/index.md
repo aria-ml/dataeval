@@ -14,6 +14,10 @@ The guides are organized by where they fall in the
 3. [Model development](#model-development)
 4. [Monitoring](#monitoring)
 
+See [Running notebooks locally](#running-notebooks-locally) at the bottom
+of this page for how to generate runnable `.ipynb` files in your local
+checkout.
+
 ## Configuration
 
 These guides will provide quick examples of how to configure DataEval for your
@@ -161,3 +165,16 @@ shifts in deployed systems.
 <!-- Google collab badge icon for all collab links -->
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
+
+## Running notebooks locally
+
+The notebook sources live as `py:percent` scripts in
+`docs/source/notebooks/`. To get runnable `.ipynb` files for local
+editing, choose one of:
+
+- **With nox (recommended):** `nox -s docsync` — bidirectional sync of
+  the `.py`/`.ipynb` pairs.
+- **With jupytext directly:** `jupytext --to notebook docs/source/notebooks/*.py`
+
+The generated `.ipynb` files are gitignored, so edits stay local to
+your checkout.

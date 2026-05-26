@@ -340,6 +340,15 @@ dep.plot(div, plot_classwise=True)
 # [Diversity](../concepts/DatasetBias.md) concept pages.
 
 # %% [markdown]
+# ## Related how-to guides
+#
+# Apply bias analysis to your own data with these focused, task-oriented guides:
+#
+# - [Apply statistical outputs as intrinsic metadata factors](../notebooks/h2_add_intrinsic_factors.py)
+# - [Compare label distributions between two datasets](../notebooks/h2_measure_label_independence.py)
+# - [Detect undersampled subsets of datasets](../notebooks/h2_detect_undersampling.py)
+
+# %% [markdown]
 # ## On your own
 #
 # Once you are familiar with DataEval and dataset analysis, you will want to run this analysis on your own dataset. When

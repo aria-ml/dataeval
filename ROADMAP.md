@@ -1,181 +1,138 @@
 # DataEval Roadmap
 
-**Last updated:** February 2026
+**Last updated:** May 2026
+
+This roadmap captures the long-term vision and rough quarter-level timing for
+DataEval through the end of 2026. Detailed schedules live in PI planning;
+this document is intentionally coarser so it stays meaningful longer.
 
 ---
 
-## Timeline overview
+## Vision
 
-```text
-                    Q1 2026  |    Q2 2026    |    Q3 2026     |   Q4 2026
-                    Feb  Mar   Apr  May  Jun   Jul  Aug   Sep  Oct  Nov   Dec
-                   |----|----|-----|----|----|-----|----|-----|----|----|-----|
+DataEval is the evaluation library for image and video datasets used in
+operational ML systems. Through the end of 2026 the focus is on four
+strategic shifts:
 
-Library
-  v1.0 stable      [####]
-  v1.1                  [###############]
-  v2.0rc (video)                                                         [#####]
+1. **Full-motion video (FMV) parity.** Every evaluator that exists for still
+   images becomes available for video, with FMV-native metrics added where
+   they have no still-image analogue.
+2. **Ontology and label validation as first-class capabilities.** Label
+   taxonomies become a core input to the library, with validation, alignment,
+   and taxonomy-aware analyses available to every downstream evaluator.
+3. **Operational adoption.** Demos and reference workflows take the library
+   from research-grade to production-usable on operational datasets.
+4. **Program standards maturity.** SDP v1.2 and v1.3 compliance at ML1
+   establishes the foundation for higher maturity levels in 2027.
 
-Video adaptation
-  Phase 1          [######]
-  Phase 2                 [########]
-  Phase 3                          [####################]
-  Phase 4                                   [############################]
-  Phase 5                  [################################################]
+---
 
-App (containerized)
-  Phase 1          [########]
-  Phase 2                   [#####################]
-  Phase 3                                         [#############################]
+## Library release targets
 
-```
+| Release | Target           | Theme                                                    |
+|---------|------------------|----------------------------------------------------------|
+| v1.0    | Feb 2026 ✓       | Quality, performance, bias, shifts modules; API freeze   |
+| v1.1    | Q2 2026          | Scope module; ontology validation and alignment          |
+| v1.2    | Q3 2026          | Initial FMV evaluators; coverage/completeness            |
+| v2.0    | Q4 2026          | Full video support across every evaluator module         |
 
-## Features under development
+---
 
-Active work items in flight across the current and next release windows.
-See per-release sections below for full context and downstream phases.
+## Q2 2026 — current quarter
 
-- **Library v1.1 (May 2026)** — Scope module: coverage, completeness; incorporate additional capabilities as developed.
-- **Video adaptation, Phase 1 — Foundation** — video dataset classes, key-frame selection,
-  frame-level embeddings, clipping/framerate normalization, metadata extraction,
-  video-aware train/test splitting.
-- **Video adaptation, Phase 2 — Video statistics** — FMV statistics module
-  (time/motion/quality/aggregated-frame stats), optical-flow maps.
-- **App (DataEval-Flow), Phase 1** — Data Cleaning Workflow (raw → clean via cached rules and DataEval utilities).
+**Library v1.1 (May 2026).** Scope module (coverage and completeness) and
+the first-class ontology stack: label-taxonomy validation (flat and
+hierarchical, with reporting on unknown, ambiguous, and deprecated labels),
+ontology alignment (normalizing labels across datasets that share a
+taxonomy but use different surface forms), and integration points so
+taxonomy-aware groupings flow into bias and balance evaluators.
 
-## Library
+**FMV foundation.** Video dataset classes, key-frame and key-clip selection,
+clipping and framerate normalization, video-aware splitting. Initial FMV
+statistics: time, motion, quality, and aggregated frame stats.
 
-### DataEval v1.0
+**SDP v1.2 @ ML1.** Repository structure, build/test/release procedures,
+dependency and SBOM tracking, test coverage thresholds, static analysis and
+vulnerability scanning in CI, release notes and version traceability.
 
-**Target:** end of February 2026
+---
 
-- [x] Quality module: outlier detection, duplicate detection, core set selection
-- [x] Performance module: Bayes Error Rate (BER), Upper-bound Average Precision (UAP), performance projection
-- [x] Bias module: parity, diversity, balance, leakage detection
-- [x] Shifts module: out-of-distribution (OOD) detection, drift analysis
-- [x] API freeze mid-February to support app development without breaking changes
-- [x] v1.0 stable release
+## Q3 2026 — broaden FMV, advance SDP
 
-### DataEval v1.1
+**FMV evaluator coverage (library v1.2).** Each existing evaluator gets a
+validated FMV path on benchmark datasets:
 
-**Target:** May 2026
+- Quality on video: outlier detection, duplicate detection, core set
+  selection on video embeddings and motion signatures.
+- Bias on video: parity, diversity, balance, and leakage detection with
+  video-aware groupings.
+- Shifts on video: OOD detection, divergence, and drift detection on video
+  inputs (drift will likely require modification).
+- Scope on video: coverage and completeness, including temporal coverage of
+  concepts.
+- Performance research: BER, UAP, and performance projection adapted to
+  video tasks.
 
-- [ ] Scope module: coverage, completeness
-- [ ] Incorporate additional capabilities as developed
+**FMV-native metrics.** New metrics with no direct still-image analogue:
 
-### DataEval v2.0 — full video support
+- Temporal drift within a clip and across videos collected over time.
+- Scene complexity from entity counts, motion vectors, and scene transitions.
+- Action diversity across action classes and action-pair transitions.
+- Camera motion characterization (pan/tilt/zoom, ego-motion).
+- Temporal consistency of labels and embeddings for tracking datasets.
+- Occlusion and visibility profiles for object-tracking datasets.
 
-**Target:** December 2026
+**SDP v1.3 @ ML1.** Signed releases and verifiable build provenance, threat
+model documentation, data/model cards for shipped artifacts, automated test
+evidence packages, and CI gates aligned to ML1 under v1.3.
 
-- [ ] API freeze mid-December to support app development without breaking changes
-- [ ] v2.0 stable release
+**AIRCC prioritization workflow on FMV.** Target September 2026.
 
-## Video adaptation
+**Ontology depth.** Hierarchical-taxonomy support in bias and balance
+evaluators; ontology drift detection across dataset versions.
 
-Extending DataEval to full motion video (FMV).
-Most evaluators run on embeddings, metadata, and statistics — the strategy focuses on video-appropriate inputs
-and thorough interpretation documentation rather than rewriting tool algorithms.
+**Operational demos.** Deploy and validate DataEval against operational
+data, with improvements to dataset exploration and curation ergonomics
+informed by real workflows.
 
-**Success criteria:**
+---
 
-- All five evaluation modules operational for video data, validated on benchmark datasets
-- Support for classification, object detection, and object tracking task types
-- FMV-supported AIRCC prioritization workflow by September 2026 🔥
-- DataEval 2.0 production release with comprehensive documentation
+## Q4 2026 — DataEval v2.0
 
-### Phase 1 — Foundation and infrastructure
+**v2.0 stable.** Full video support across every evaluator module, validated
+on benchmark datasets for classification, object detection, and object
+tracking. API freeze mid-December to support downstream app development.
 
-**Target:** mid-March 2026
+**Video-specific evaluators.** Near-duplicate detection across videos,
+clips, and frames; leakage detector for video datasets integrated into the
+bias module.
 
-- [ ] `VideoClassificationDataset`, `VideoObjectDetectionDataset`, `VideoObjectTrackingDataset` classes
-- [ ] Key frame selection algorithm (temporally independent frames)
-- [ ] Frame-level embeddings using existing image encoders
-- [x] Video-level embeddings — new `VideoEmbeddings` class (VideoMAE or similar)
-- [ ] Clipping and variable framerate normalization
-- [ ] Metadata extraction: compression, resolution, frame rate, color space
-- [ ] Video-aware train/test splitting (assigns whole videos to prevent frame-level leakage)
+**Documentation and interpretation.** Tutorials, how-to guides, and
+interpretation guidance for video-specific results across every module.
 
-### Phase 2 — Video statistics
+**SDP posture.** Maintain v1.3 ML1 compliance; begin gap assessment for ML2
+to inform 2027 planning.
 
-**Target:** April 2026
+---
 
-- [ ] FMV statistics module
-  - [ ] Time stats: clip duration, frame count, frame rate
-  - [ ] Motion stats: optical flow magnitude, variation, object motion
-  - [ ] Quality stats: compression level, motion blur, occlusion metrics
-  - [ ] Aggregated frame stats: brightness, contrast, color entropy
-- [ ] Optical flow maps for motion analysis and embedding
+## Beyond 2026 (directional)
 
-### Phase 3 — Module adaptation
+- **SDP v1.3 ML2 compliance** — formal review records, defect density
+  tracking, independent verification of release artifacts.
+- **FMV depth and scale** — long-video support with streaming embeddings,
+  multi-camera and multi-view datasets, real-time evaluation hooks.
+- **Synthetic and augmented video** — detection and characterization of
+  synthetic content in operational datasets.
+- **DataEval v2.1** — FMV evaluator improvements informed by v2.0 field
+  feedback.
 
-**Target:** August 2026
+---
 
-- [ ] Quality module: outlier detection, duplicate detection, core set selection for video
-- [ ] Shifts module: OOD detection, divergence, drift detection for video *(drift will likely require modification)*
-- [ ] Bias module validation: parity, diversity, balance with video data
-- [ ] Scope module validation: concept coverage and completeness with video data
-- [ ] Performance module research: BER, UAP, performance projection for video
+## Success criteria
 
-### Phase 4 — New video-specific evaluators
-
-**Target:** November 2026
-
-- [ ] Leakage detector for video datasets
-- [ ] Near-duplicate detector: near-duplicate videos, clips, and frames within a dataset
-- [ ] Integrate leakage detector into bias module
-- [ ] Integrate near-duplicate detector into quality module
-- [ ] AIRCC prioritization workflow adapted for FMV — target: September 2026 🔥
-
-### Phase 5 — Documentation and deployment
-
-**Target:** Decemember 2026
-
-- [ ] Update all current documentation to include video data information
-- [ ] How-to guides and tutorials for each evaluation module with video examples
-- [ ] Interpretation guidance for video-specific results and metrics
-- [ ] Additional video-specific workflow examples
-
-## App: containerized workflows
-
-The containerized application exposes DataEval capabilities as automated, non-interactive workflows.
-Users provide dataset paths and a configuration file; the container produces data reports, visualizations,
-and go/no-go recommendations.
-
-**Supported input formats:** HuggingFace, COCO, YOLO
-
-### Phase 1 — Alpha prototype and initial workflow
-
-**Target:** March 2026
-
-- [x] DataEval App V0.0alpha
-  - [x] Docker/Podman container definitions for local deployment
-  - [x] Local data ingestion
-- [x] Data Validation Workflow
-  - The container pulls the reference dataset, uses DataEval to compute embeddings, extract metadata,
-  run duplicate/outlier/leakage checks, and generates a "Data Card".
-- [ ] Data Cleaning Workflow
-  - The container reads raw data and references the data card/cached rules. It utilizes DataEval's core utility
-  functions to drop erroneous images and generates a clean dataset.
-
-### Phase 2 — Additional workflows
-
-**Target:** July 2026
-
-- [ ] Monitoring Workflow
-  - The app streams incoming data, passes it through the model (if checking prediction drift) or
-  DataEval (if checking data drift/OOD). Crucially, it fetches the baseline distributions from the Cache Store
-  (seeded by the Validator) to do lightning-fast comparative analysis without needing the whole reference dataset in memory.
-  Triggers an alert or pushes data to a dashboard (e.g. Prometheus/Grafana)
-- [ ] Prioritization Workflow
-  - This container ingests unlabeled incoming data, the current model, and cached metadata stats.
-  It uses DataEval to find images that represent high uncertainty (model is confused), high diversity
-  (furthest from reference dataset clusters), or underrepresented metadata factors.
-- [ ] Integration and testing with real-world field operational datasets
-- [ ] Full Motion Video (FMV) feasibility assessment — informs Phase 3 and video roadmap
-
-### Phase 3 — FMV expansion
-
-**Target:** February 2027
-
-- [ ] FMV integration (contingent on Phase 2 feasibility findings)
-- [ ] Integration and testing with real-world field operational FMV datasets
+- All five evaluation modules operational for image and video data,
+  validated on benchmark datasets.
+- Support for classification, object detection, and object tracking.
+- FMV-supported AIRCC prioritization workflow by September 2026.
+- DataEval v2.0 production release with comprehensive documentation.
+- SDP v1.2 and v1.3 ML1 compliance achieved by end of Q3 2026.
