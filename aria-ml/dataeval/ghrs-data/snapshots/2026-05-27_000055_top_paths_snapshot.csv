@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,39,30
+/aria-ml/dataeval/tree/main/src/dataeval,3,2
+/aria-ml/dataeval/tree/main/src,2,2
+/aria-ml/dataeval/blob/main/src/dataeval/_metadata.py,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/performance/_sufficiency.py,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/selection/_select.py,1,1
+/aria-ml/dataeval/blob/v0.65.0/docs/tutorials/index.md,1,1
+/aria-ml/dataeval/tree/main,1,1
+/aria-ml/dataeval/tree/main/src/dataeval/performance,1,1
+/aria-ml/dataeval/tree/main/src/dataeval/selection,1,1
