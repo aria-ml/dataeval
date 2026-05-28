@@ -12,14 +12,14 @@ stages:
   - summary
 
 include:
-  - component: gitlab.jatic.net/jatic/devsecops/components/sr-compliance@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/sr-compliance@1.1.0
     inputs:
       package_name: "${PACKAGE_NAME}"
       tools_used: [pyproject, poetry, ruff]
       full_execution_on_commit: true
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.1.0
     inputs:
       stage: unit-test
       full_execution_on_commit: true
@@ -29,7 +29,7 @@ include:
       poetry_install_options: --only dev
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.1.0
     inputs:
       stage: unit-test
       full_execution_on_commit: true
@@ -39,7 +39,7 @@ include:
       poetry_install_options: --extras=onnx
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.1.0
     inputs:
       stage: unit-test
       full_execution_on_commit: true
@@ -49,7 +49,7 @@ include:
       poetry_install_options: --only dev
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.1.0
     inputs:
       stage: unit-test
       full_execution_on_commit: true
@@ -59,29 +59,29 @@ include:
       poetry_install_options: --extras=onnx
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/tr-compliance@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/tr-compliance@1.1.0
     inputs:
       package_name: "${PACKAGE_NAME}"
       full_execution_on_commit: true
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/dsor-compliance@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/dsor-compliance@1.1.0
     inputs:
       full_execution_on_commit: true
       sast_excluded_paths: tests, docs, verification, README.md
       sast_search_max_depth: "2"
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/advana-compliance@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/advana-compliance@1.1.0
     inputs:
       full_execution_on_commit: true
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/validate-pipeline@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/validate-pipeline@1.1.0
     inputs:
       full_execution_on_commit: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/pipeline-report@1.0.1
+  - component: gitlab.jatic.net/jatic/devsecops/components/pipeline-report@1.1.0
     inputs:
       full_execution_on_commit: true
-      components_branch: 1.0.1
+      components_branch: 1.1.0
