@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,35,30
+/aria-ml/dataeval/tree/main/src/dataeval,4,3
+/aria-ml/dataeval/tree/main/src,3,3
+/aria-ml/dataeval/blob/main/.gitattributes,1,1
+/aria-ml/dataeval/blob/main/.github/workflows/docs.yml,1,1
+/aria-ml/dataeval/blob/main/.github/workflows/github-repo-stats.yml,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/_metadata.py,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/performance/_sufficiency.py,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/protocols.py,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/selection/_select.py,1,1
