@@ -12,6 +12,7 @@ Each page may cover several evaluators that work together to answer questions ab
 - [Performance Limits](PerformanceLimits.md)
 - [Distribution Shift](DistributionShift.md)
 - [Divergence](Divergence.md)
+- [Data Leakage](Leakage.md)
 - [Acting on Results](ActingOnResults.md)
 
 :::{toctree}
@@ -24,5 +25,6 @@ DatasetBias
 PerformanceLimits
 DistributionShift
 Divergence
+Leakage
 ActingOnResults
 :::

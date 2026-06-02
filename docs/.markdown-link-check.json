@@ -16,6 +16,9 @@
       "pattern": "^https://www\\.sciencedirect\\.com"
     },
     {
+      "pattern": "^https://www\\.science\\.org"
+    },
+    {
       "pattern": "^#ref\\d+$"
     },
     {
