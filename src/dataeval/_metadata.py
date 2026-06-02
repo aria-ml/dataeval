@@ -1,4 +1,4 @@
-__all__ = []
+__all__ = ["Metadata"]
 
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized

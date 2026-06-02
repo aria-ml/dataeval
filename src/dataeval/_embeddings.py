@@ -1,6 +1,6 @@
 """Embeddings class for extracting and managing image embeddings."""
 
-__all__ = []
+__all__ = ["Embeddings"]
 
 import logging
 import os
