@@ -33,7 +33,6 @@ environment.
 :::{list-table}
 :widths: 30 50 20
 :header-rows: 0
-:align: center
 
 - - [](../notebooks/h2_configure_hardware_settings.py)
   - Configure global hardware settings used in DataEval
@@ -67,7 +66,6 @@ datasets for machine learning.
 :::{list-table}
 :widths: 30 50 20
 :header-rows: 0
-:align: center
 
 - - [](../notebooks/h2_encode_with_onnx.py)
   - Encode image embeddings with an ONNX model
@@ -117,7 +115,6 @@ for model training.
 :::{list-table}
 :widths: 30 50 20
 :header-rows: 0
-:align: center
 
 - - [](../notebooks/h2_measure_ic_feasibility.py)
   - Calculate feasibility of performance requirements on
@@ -148,7 +145,6 @@ shifts in deployed systems.
 :::{list-table}
 :widths: 30 50 20
 :header-rows: 0
-:align: center
 
 - - [](../notebooks/h2_measure_divergence.py)
   - Display data distributions between 2 datasets

@@ -6,7 +6,8 @@
 }
 
 .md-typeset table.data:not(.plain) {
-    width: 90%;
+    width: max-content;
+    max-width: 100%;
 }
 
 /* Change font for inline code in docstrings - optimized for box-drawing characters */
