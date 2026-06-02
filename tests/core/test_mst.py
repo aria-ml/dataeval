@@ -9,10 +9,33 @@ class TestMst:
     def test_mst(self):
         from dataeval.core._mst import minimum_spanning_tree
 
-        images = np.ones((10, 3, 3))
+        n = 10
+        images = np.ones((n, 3, 3))
         mst = minimum_spanning_tree(images)
-        assert (mst["source"] == [7, 7, 7, 6, 6, 6, 6, 6, 7]).all()
-        assert (mst["target"] == [6, 3, 2, 0, 5, 9, 4, 8, 1]).all()
+        source, target = mst["source"], mst["target"]
+
+        # All points are identical, so every edge weight is 0 and the MST is
+        # non-unique: the exact node ordering depends on how the neighbor backend
+        # breaks ties (changed in sklearn 1.9.0, PR #33252). Assert the invariant
+        # spanning-tree properties instead of a specific permutation.
+
+        # A spanning tree over n nodes has exactly n - 1 edges...
+        assert len(source) == n - 1
+        assert len(target) == n - 1
+        # ...covers every node...
+        assert set(source.tolist()) | set(target.tolist()) == set(range(n))
+        # ...and is fully connected (single component via union-find).
+        parent = list(range(n))
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        for s, t in zip(source.tolist(), target.tolist(), strict=False):
+            parent[find(s)] = find(t)
+        assert len({find(i) for i in range(n)}) == 1
 
     def test_simple_nodes(self):
         from dataeval.core._mst import minimum_spanning_tree
