@@ -1041,6 +1041,7 @@ name = "dataeval"
 source = { editable = "." }
 dependencies = [
     { name = "lightgbm" },
+    { name = "maite" },
     { name = "numba" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
@@ -1195,6 +1196,7 @@ verify = [
 [package.metadata]
 requires-dist = [
     { name = "lightgbm", specifier = ">=4" },
+    { name = "maite", specifier = ">=0.8.2" },
     { name = "numba", specifier = ">=0.61.0" },
     { name = "numpy", specifier = ">=1.24.2" },
     { name = "onnx", marker = "extra == 'onnx'", specifier = ">=1.14.0" },

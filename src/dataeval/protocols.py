@@ -44,7 +44,6 @@ from typing import (
     Any,
     Protocol,
     TypeAlias,
-    TypedDict,
     TypeVar,
     overload,
     runtime_checkable,
@@ -52,8 +51,17 @@ from typing import (
 
 import numpy as np
 import torch
+from maite.protocols import (
+    DatasetMetadata,
+    DatumMetadata,
+    ModelMetadata,
+)
+from maite.protocols import (
+    Model as AnnotatedModel,
+)
+from maite.protocols.object_detection import ObjectDetectionTarget
 from numpy.typing import NDArray
-from typing_extensions import NotRequired, ReadOnly, Required, Self
+from typing_extensions import Self
 
 ArrayLike: TypeAlias = np.typing.ArrayLike
 """
@@ -152,52 +160,27 @@ class SequenceLike(Protocol[_T_co]):
         ...
 
 
+@runtime_checkable
+class SegmentationTarget(Protocol):
+    """Protocol for targets in a Segmentation dataset."""
+
+    @property
+    def mask(self) -> ArrayLike:
+        """:class:`ArrayLike` segmentation mask."""
+        ...
+
+    @property
+    def labels(self) -> ArrayLike:
+        """:class:`ArrayLike` class labels."""
+        ...
+
+    @property
+    def scores(self) -> ArrayLike:
+        """:class:`ArrayLike` prediction scores."""
+        ...
+
+
 # ========== METADATA ==========
-
-
-class DatasetMetadata(TypedDict, total=False):
-    """
-    Dataset level metadata required for all `AnnotatedDataset` classes.
-
-    Attributes
-    ----------
-    id : Required[int | str]
-        A unique identifier for the dataset
-    index2label : NotRequired[dict[int, str]]
-        A lookup table converting label value to class name
-    """
-
-    id: Required[ReadOnly[int | str]]
-    index2label: NotRequired[ReadOnly[dict[int, str]]]
-
-
-class ModelMetadata(TypedDict, total=False):
-    """
-    Model metadata required for all `AnnotatedModel` classes.
-
-    Attributes
-    ----------
-    id : Required[str]
-        A unique identifier for the model
-    index2label : NotRequired[dict[int, str]]
-        A lookup table converting label value to class name
-    """
-
-    id: Required[ReadOnly[str]]
-    index2label: NotRequired[ReadOnly[dict[int, str]]]
-
-
-class DatumMetadata(TypedDict, total=False):
-    """
-    Datum level metadata required for all `AnnotatedDataset` classes.
-
-    Attributes
-    ----------
-    id : Required[int | str]
-        A unique identifier for the datum
-    """
-
-    id: Required[ReadOnly[int | str]]
 
 
 @runtime_checkable
@@ -332,7 +315,7 @@ class AnnotatedDataset(Dataset[_T_co], Protocol[_T_co]):
 
     Notes
     -----
-    Inherits from :class:`.Dataset`.
+    Inherits from :class:`.Dataset`. Matches :class:`maite.protocols.Dataset` structurally.
     """
 
     @property
@@ -362,26 +345,6 @@ Type alias for an :class:`AnnotatedDataset` of :class:`ImageClassificationDatum`
 # ========== OBJECT DETECTION DATASETS ==========
 
 
-@runtime_checkable
-class ObjectDetectionTarget(Protocol):
-    """Protocol for targets in an Object Detection dataset."""
-
-    @property
-    def boxes(self) -> ArrayLike:
-        """:class:`ArrayLike` of shape (N, 4) bounding boxes."""
-        ...
-
-    @property
-    def labels(self) -> ArrayLike:
-        """:class:`ArrayLike` of shape (N,) class labels."""
-        ...
-
-    @property
-    def scores(self) -> ArrayLike:
-        """:class:`ArrayLike` of shape (N, M) prediction scores."""
-        ...
-
-
 ObjectDetectionDatum: TypeAlias = tuple[ArrayLike, ObjectDetectionTarget, DatumMetadata]
 """
 Type alias for an object detection datum tuple.
@@ -399,26 +362,6 @@ Type alias for an :class:`AnnotatedDataset` of :class:`ObjectDetectionDatum` ele
 
 
 # ========== SEGMENTATION DATASETS ==========
-
-
-@runtime_checkable
-class SegmentationTarget(Protocol):
-    """Protocol for targets in a Segmentation dataset."""
-
-    @property
-    def mask(self) -> ArrayLike:
-        """:class:`ArrayLike` segmentation mask."""
-        ...
-
-    @property
-    def labels(self) -> ArrayLike:
-        """:class:`ArrayLike` class labels."""
-        ...
-
-    @property
-    def scores(self) -> ArrayLike:
-        """:class:`ArrayLike` prediction scores."""
-        ...
 
 
 SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, DatumMetadata]
@@ -546,20 +489,8 @@ class FeatureExtractor(Protocol):
         ...
 
 
-# ========== MODEL ==========
-
-
-@runtime_checkable
-class AnnotatedModel(Protocol):
-    """Protocol for an annotated model."""
-
-    @property
-    def metadata(self) -> ModelMetadata:
-        """:class:`.ModelMetadata` or derivatives."""
-        ...
-
-
 # ========== SUFFICIENCY STRATEGIES ==========
+
 
 _M = TypeVar("_M")
 

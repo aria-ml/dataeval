@@ -2860,7 +2860,7 @@ version = "0.8.2"
 description = "Library of common types, protocols (a.k.a. structural subtypes), and utilities to support AI test and evaluation"
 optional = false
 python-versions = ">=3.9"
-groups = ["dev", "docs"]
+groups = ["main", "dev", "docs"]
 files = [
     {file = "maite-0.8.2-py3-none-any.whl", hash = "sha256:aed312e5e0cd04eac7042d4367ed26882562e37ad21fa21ec11af65e993d9ed1"},
     {file = "maite-0.8.2.tar.gz", hash = "sha256:eefe1cbb86de96de4bbccbddd74f11daf8b61f5033b198ba1fb67b57878ad5ac"},
@@ -7598,4 +7598,4 @@ opencv = ["opencv-python-headless"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "121ee821a00b8a6b96e22c0e1294723f877d1f027edf0024f00625194ac6e955"
+content-hash = "ee52b7e69730a8d236f5858f743661a1c445c3842ae4e8ae71f045beb08e1be6"

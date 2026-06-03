@@ -93,6 +93,10 @@ llvmlite==0.47.0 \
     --hash=sha256:f9d118bc1dd7623e0e65ca9ac485ec6dd543c3b77bc9928ddc45ebd34e1e30a7 \
     --hash=sha256:fa1cbd800edd3b20bc141521f7fd45a6185a5b84109aa6855134e81397ffe72b
     # via numba
+maite==0.8.2 \
+    --hash=sha256:aed312e5e0cd04eac7042d4367ed26882562e37ad21fa21ec11af65e993d9ed1 \
+    --hash=sha256:eefe1cbb86de96de4bbccbddd74f11daf8b61f5033b198ba1fb67b57878ad5ac
+    # via dataeval
 markupsafe==3.0.1 \
     --hash=sha256:0778de17cff1acaeccc3ff30cd99a3fd5c50fc58ad3d6c0e0c4c58092b859396 \
     --hash=sha256:0f84af7e813784feb4d5e4ff7db633aba6c8ca64a833f61d8e4eade234ef0c38 \
@@ -281,6 +285,7 @@ numpy==2.2.6 ; python_full_version < '3.11' \
     # via
     #   dataeval
     #   lightgbm
+    #   maite
     #   ml-dtypes
     #   numba
     #   onnx
@@ -365,6 +370,7 @@ numpy==2.4.4 ; python_full_version >= '3.11' \
     # via
     #   dataeval
     #   lightgbm
+    #   maite
     #   ml-dtypes
     #   numba
     #   onnx
@@ -1056,6 +1062,7 @@ typing-extensions==4.15.0 \
     --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548
     # via
     #   dataeval
+    #   maite
     #   onnx
     #   pydantic
     #   pydantic-core

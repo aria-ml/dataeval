@@ -22,4 +22,5 @@ dependencies:
   - typing-extensions>=4.12
   - pip
   - pip:
+      - maite>=0.8.2
       - torch>=2.2.0
