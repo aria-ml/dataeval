@@ -1123,7 +1123,9 @@ llvmlite==0.47.0 \
 maite==0.8.2 \
     --hash=sha256:aed312e5e0cd04eac7042d4367ed26882562e37ad21fa21ec11af65e993d9ed1 \
     --hash=sha256:eefe1cbb86de96de4bbccbddd74f11daf8b61f5033b198ba1fb67b57878ad5ac
-    # via maite-datasets
+    # via
+    #   dataeval
+    #   maite-datasets
 maite-datasets==0.0.12 \
     --hash=sha256:3801ae8e91a13bba745cb57f58c297363eb154a87b30634dc9b952ed85bd1ede \
     --hash=sha256:b84132be6213586dd1bae3680d9781b1f9f59ca3431c0980fa163e40b0d8dcd0
