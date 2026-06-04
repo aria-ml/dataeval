@@ -285,6 +285,7 @@ exclude = [
   ".tox",
   "prototype",
   "src/dataeval/_version.py",
+  "*.ipynb",
 ]
 line-length = 120
 indent-width = 4
