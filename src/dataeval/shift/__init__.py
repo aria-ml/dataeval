@@ -9,6 +9,7 @@ __all__ = [
     "DriftOutput",
     "DriftReconstruction",
     "DriftUnivariate",
+    "DriftWasserstein",
     "OODDomainClassifier",
     "OODKNeighbors",
     "OODOutput",
@@ -24,6 +25,7 @@ from dataeval.shift._drift._kneighbors import DriftKNeighbors
 from dataeval.shift._drift._mmd import DriftMMD
 from dataeval.shift._drift._reconstruction import DriftReconstruction
 from dataeval.shift._drift._univariate import DriftUnivariate
+from dataeval.shift._drift._wasserstein import DriftWasserstein
 from dataeval.shift._ood._base import OODOutput, OODScoreOutput
 from dataeval.shift._ood._domain_classifier import OODDomainClassifier
 from dataeval.shift._ood._kneighbors import OODKNeighbors

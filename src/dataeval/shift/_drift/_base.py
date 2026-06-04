@@ -353,7 +353,7 @@ class ChunkedDrift(Generic[TDetails]):
         detector_repr = self._detector._repr(extras=False)
         return f"ChunkedDrift({detector_repr}, chunker={self._init_chunker!r}, fitted={fitted})"
 
-    def fit(self, reference_data: Any, /) -> Self:
+    def fit(self, *reference_data: Any) -> Self:
         """Fit the underlying detector and compute chunked baseline.
 
         Delegates to the underlying detector's ``fit()`` method, then
@@ -362,15 +362,18 @@ class ChunkedDrift(Generic[TDetails]):
 
         Parameters
         ----------
-        reference_data : Any
-            Reference dataset. Passed to the underlying detector's fit().
+        *reference_data : Any
+            Reference dataset(s), forwarded verbatim to the underlying detector's
+            ``fit()``. Most detectors take a single reference; detectors with a
+            calibrated baseline (e.g. :class:`DriftWasserstein`) take both a
+            training and a validation reference.
 
         Returns
         -------
         Self
         """
         # Fit underlying detector
-        self._detector.fit(reference_data)
+        self._detector.fit(*reference_data)
 
         # Get reference data and split into chunks
         x_ref = self._detector.reference_data
