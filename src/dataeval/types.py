@@ -98,14 +98,25 @@ class ReprMixin:
         """Override to append extra state to ``__repr__``."""
         return {}
 
+    def _repr_overrides(self) -> dict[str, str]:
+        """Override to replace an init parameter's rendered value with a custom string.
+
+        Keys are ``__init__`` parameter names; values are inserted verbatim (no
+        ``repr``) in place of the looked-up attribute (e.g. ``{"model": "ResNet"}``).
+        """
+        return {}
+
     def __repr__(self) -> str:  # noqa: C901
         """Return a string representation showing init parameters and extras."""
         sig = inspect.signature(self.__init__)  # type: ignore[misc]
+        overrides = self._repr_overrides()
         params: list[str] = []
         for name in sig.parameters:
             if name == "self":
                 continue
-            if hasattr(self, name):
+            if name in overrides:
+                params.append(f"{name}={overrides[name]}")
+            elif hasattr(self, name):
                 params.append(f"{name}={getattr(self, name)!r}")
             elif hasattr(self, f"_{name}"):
                 params.append(f"{name}={getattr(self, f'_{name}')!r}")

@@ -133,7 +133,7 @@ class BoVWExtractor:
     See Also
     --------
     dataeval.quality.Duplicates : Duplicate detection using embeddings
-    dataeval.extractors.ClassifierUncertaintyExtractor : Uncertainty-based feature extraction
+    dataeval.extractors.UncertaintyExtractor : Uncertainty-based feature extraction
 
     Notes
     -----

@@ -14,7 +14,8 @@ import torch
 import torch.nn as nn
 from sklearn.linear_model import LogisticRegression
 
-from dataeval.extractors._uncertainty import ClassifierUncertaintyExtractor, _classifier_uncertainty
+from dataeval.extractors import TorchExtractor, UncertaintyExtractor
+from dataeval.extractors._uncertainty import _prediction_uncertainty
 from dataeval.shift import DriftUnivariate
 from dataeval.shift._drift._base import DriftOutput
 from dataeval.shift.update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
@@ -82,13 +83,15 @@ class TestFunctionalClassifierUncertainty:
         x_test0 = x_ref.clone()
         x_test1 = torch.ones_like(x_ref)
 
-        # Create uncertainty feature extractor using the class directly
-        uncertainty_extractor = ClassifierUncertaintyExtractor(
-            model=model,  # type: ignore
+        # Create uncertainty feature extractor over a TorchExtractor
+        uncertainty_extractor = UncertaintyExtractor(
+            TorchExtractor(
+                model,  # type: ignore
+                transforms=transforms,
+                device="cpu",
+                batch_size=10,
+            ),
             preds_type=preds_type,
-            batch_size=10,
-            transforms=transforms,
-            device="cpu",
         )
 
         # Create drift detector with uncertainty feature extractor
@@ -149,11 +152,13 @@ class TestDriftUnivariateMaiteDataset:
         ref_dataset = _MaiteIntOnlyDataset(x_ref)
         test_dataset = _MaiteIntOnlyDataset(x_test)
 
-        extractor = ClassifierUncertaintyExtractor(
-            model=model,  # type: ignore
+        extractor = UncertaintyExtractor(
+            TorchExtractor(
+                model,  # type: ignore
+                device="cpu",
+                batch_size=10,
+            ),
             preds_type="probs",
-            batch_size=10,
-            device="cpu",
         )
 
         cd = DriftUnivariate(method="ks", extractor=extractor).fit(ref_dataset)
@@ -179,18 +184,18 @@ class TestClassifierUncertainty:
         return self.tests_cu[request.param]
 
     @pytest.mark.parametrize("cu_params", list(range(n_tests_cu)), indirect=True)
-    def test_classifier_uncertainty(self, cu_params):
+    def test_prediction_uncertainty(self, cu_params):
         preds_type = cu_params
         clf = LogisticRegression().fit(self.X_train, self.y_train_clf)
         model_fn = clf.predict_log_proba if preds_type == "logits" else clf.predict_proba
         x_test = model_fn(self.X_test)
-        uncertainties = _classifier_uncertainty(x_test, preds_type=preds_type)  # type: ignore
+        uncertainties = _prediction_uncertainty(x_test, preds_type=preds_type)  # type: ignore
         assert uncertainties.shape == (x_test.shape[0], 1)
 
-    def test_classifier_uncertainty_notimplementederror(self):
+    def test_prediction_uncertainty_notimplementederror(self):
         with pytest.raises(NotImplementedError):
-            _classifier_uncertainty(torch.empty([]), "invalid")  # type: ignore
+            _prediction_uncertainty(torch.empty([]), "invalid")  # type: ignore
 
-    def test_classifier_uncertainty_valueerror(self):
+    def test_prediction_uncertainty_valueerror(self):
         with pytest.raises(ValueError, match="Probabilities across labels should sum to 1"):
-            _classifier_uncertainty(torch.empty([]), "probs")
+            _prediction_uncertainty(torch.empty([]), "probs")
