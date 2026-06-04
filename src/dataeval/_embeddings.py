@@ -14,7 +14,7 @@ import xxhash as xxh
 from numpy.typing import NDArray
 from typing_extensions import Self
 
-from dataeval.config import get_batch_size
+from dataeval.config import resolve_batch_size
 from dataeval.exceptions import NotFittedError
 from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import (
@@ -55,8 +55,14 @@ class Embeddings(Array, FeatureExtractor):
         :class:`~dataeval.extractors.FlattenExtractor` for simple baseline
         compatibility with all DataEval tools.
     batch_size : int or None, default None
-        Number of samples to process per batch. When None, uses DataEval's
-        configured batch size via :func:`~dataeval.config.get_batch_size`.
+        I/O chunk size: how many images are loaded from the dataset, encoded, and
+        written to storage per step. Resolved via
+        :func:`~dataeval.config.resolve_batch_size` as the first set of
+        ``batch_size`` (this argument), the extractor's own ``batch_size``, then
+        the global default. This is distinct from an extractor's own forward-pass
+        (compute) batch size: an extractor with its own ``batch_size`` sub-batches
+        each chunk for the model, so the smaller of the two bounds the forward
+        pass. Batching never changes the resulting embeddings.
     path : Path, str, or None, default None
         File path for memory-mapped storage. When None, caches embeddings in memory only.
         When Path or string is provided, uses memory-mapped storage for large embeddings
@@ -107,7 +113,7 @@ class Embeddings(Array, FeatureExtractor):
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         self._extractor = extractor if extractor is not None else FlattenExtractor()
-        self._batch_size = get_batch_size(batch_size)
+        self._batch_size = resolve_batch_size(batch_size, getattr(self._extractor, "batch_size", None))
         self.memory_threshold = max(0.0, min(1.0, memory_threshold))
         self._progress_callback = progress_callback
 
