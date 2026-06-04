@@ -37,8 +37,9 @@ class TestExperimentalDecorator:
 
         assert documented_func.__name__ == "documented_func"
         assert documented_func.__doc__ is not None
-        assert "My docstring." in documented_func.__doc__
-        assert ".. warning::" in documented_func.__doc__
+        # docstring is left untouched; the marker carries the status (no runtime injection)
+        assert documented_func.__doc__.strip() == "My docstring."
+        assert hasattr(documented_func, "__experimental__")
 
     def test_function_with_alternative(self):
         @experimental(alternative="stable_func")
@@ -72,6 +73,7 @@ class TestExperimentalDecorator:
             pass
 
         assert MyClass.__name__ == "MyClass"
+        assert "__experimental__" in MyClass.__dict__
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", ExperimentalWarning)
             obj = MyClass()
@@ -161,8 +163,9 @@ class TestDeprecatedDecorator:
 
         assert documented_func.__name__ == "documented_func"
         assert documented_func.__doc__ is not None
-        assert "My docstring." in documented_func.__doc__
-        assert ".. warning::" in documented_func.__doc__
+        # docstring is left untouched; the marker carries the status (no runtime injection)
+        assert documented_func.__doc__.strip() == "My docstring."
+        assert hasattr(documented_func, "__deprecated__")
 
     def test_class_warns_on_init(self):
         @deprecated(since="0.9")
@@ -178,6 +181,7 @@ class TestDeprecatedDecorator:
             pass
 
         assert OldClass.__name__ == "OldClass"
+        assert hasattr(OldClass, "__deprecated__")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecatedWarning)
             obj = OldClass()

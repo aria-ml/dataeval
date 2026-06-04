@@ -104,11 +104,7 @@ Classes
                      {% endfor %}
 
                   {% endif %}
-.. autoapisummary::
-
-                  {% for klass in not_output_classes %}
-   {{ klass.id }}
-                  {% endfor %}
+{{ macros.auto_summary(not_output_classes) }}
                {% endif %}
 
 
@@ -127,11 +123,7 @@ Output Classes
                      {% endfor %}
 
                   {% endif %}
-.. autoapisummary::
-
-                  {% for klass in output_classes %}
-   {{ klass.id }}
-                  {% endfor %}
+{{ macros.auto_summary(output_classes) }}
                {% endif %}
 
 
@@ -151,11 +143,7 @@ Functions
                      {% endfor %}
 
                   {% endif %}
-.. autoapisummary::
-
-                  {% for function in visible_functions %}
-   {{ function.id }}
-                  {% endfor %}
+{{ macros.auto_summary(visible_functions) }}
                {% endif %}
 
 

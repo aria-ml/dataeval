@@ -105,7 +105,7 @@ docs = [
   "jinja2>=3.1.6",
   "jupyter-client>=8.6.0",
   "jupyter-cache>=1.0",
-  "maite-datasets>=0.0.12",
+  "maite-datasets>=0.0.13",
   "myst-nb>=1.0",
   "opencv-python-headless>=4.8.0",
   "plotly>=6.2.0",
@@ -118,6 +118,7 @@ docs = [
   "torchmetrics>=1.0.0",
   "markupsafe>=3,<3.0.2",
   "jupytext>=1.19.1",
+  "ultralytics>=8.0.0",
 ]
 security = [  # keep in sync with [tool.uv.constraint-dependencies]
   "cryptography>=46.0.5",    # CVE-2026-26007: Missing Subgroup Validation for SECT Curves

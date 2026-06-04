@@ -11,6 +11,7 @@ name: dataeval
 dependencies:
   - python>=3.10
   - lightgbm>=4
+  - maite>=0.8.2
   - numba>=0.61.0
   - numpy>=1.24.2
   - polars>=1.0.0
@@ -22,5 +23,4 @@ dependencies:
   - typing-extensions>=4.12
   - pip
   - pip:
-      - maite>=0.8.2
       - torch>=2.2.0

@@ -25,4 +25,5 @@ def download():
         CIFAR10(root="./data", download=True, image_set="test")
         MNIST(root="./data", download=True, image_set="train", corruption="translate")
         SeaDrone(root="./data", download=True, image_set="val")
-        VOCDetection("./data", download=True, image_set="train", year="2012")
+        VOCDetection(root="./data", download=True, image_set="train", year="2012")
+        VOCDetection(root="./data", download=True, image_set="val", year="2012")

@@ -271,21 +271,29 @@ scoring train two instances on the same reference data.
 ### Uncertainty-based drift detection
 
 The detectors above operate on input features and are blind to whether detected
-shift affects model predictions. **Uncertainty-based drift detection**
-(`DriftUnivariate`, via `ClassifierUncertaintyExtractor`) takes a
+shift affects model predictions. **Uncertainty-based drift detection** takes a
 model-aware approach: it monitors changes in the model's prediction confidence
-rather than the inputs directly.
+rather than the inputs directly. The {class}`.UncertaintyExtractor` turns any
+classifier — or the classification head of a detector — into an uncertainty
+feature, which a downstream drift detector then monitors.
 
-For each image, a trained classifier produces class probabilities. The entropy
-of those probabilities measures how uncertain the model is:
+For each prediction, the model produces class probabilities. The
+{term}`Shannon entropy<Shannon Entropy>` of those probabilities measures how
+uncertain the model is:
 
 $$H(p) = -\sum_{i=1}^k p_i \log p_i$$
 
 Low entropy means the model is confident; high entropy means it is not. If the
 entropy distribution of incoming data is significantly higher than that of the
-reference set — detected by applying a univariate test (typically KS) to the
-entropy scores — the model is encountering data in its uncertainty regions,
-which directly predicts performance degradation.
+reference set — detected by applying a univariate test (such as KS) or a
+{term}`Wasserstein-distance<Wasserstein Distance>` test (see
+[below](#wasserstein-based-drift-detection-driftwasserstein)) to the entropy
+scores — the model is encountering data in its uncertainty regions, which
+directly predicts performance degradation.
+
+For object detectors, {class}`.ClasswiseUncertaintyExtractor` groups detections
+by their predicted class so uncertainty can be tracked per class rather than
+only in aggregate, revealing _which_ classes a shift most affects.
 
 This approach has a specific, important advantage: it is **insensitive to
 irrelevant shift**. A lighting change that modifies pixel values but does not
@@ -293,6 +301,30 @@ move the model's predictions into uncertain territory will not trigger an alert.
 Feature-based detectors would flag it. The trade-off is that uncertainty-based
 detection requires a trained classifier and will miss shift that the model
 confidently misclassifies — the model remains certain, but wrong.
+
+### Wasserstein-based drift detection (`DriftWasserstein`)
+
+{class}`.DriftWasserstein` detects drift by measuring the per-feature
+{term}`Wasserstein distance<Wasserstein Distance>` (earth mover's distance)
+between the reference distribution and incoming data. Unlike a hypothesis test
+that returns a p-value, it compares this distance against a **calibrated
+baseline** to decide whether a shift is meaningful.
+
+That calibration is what sets it apart: `fit()` takes _two_ same-distribution
+references — a training set and a validation set — and records the per-feature
+Wasserstein distance between them as the expected, benign amount of variation. At
+prediction time, the distance from training to the incoming data is divided by
+this baseline, and drift is flagged when the ratio exceeds `ratio_threshold`
+(default 1.4) for any feature:
+
+$$\text{drift} \iff \max_j \frac{W_j(\text{train}, \text{test})}{W_j(\text{train}, \text{val})} > \tau$$
+
+Anchoring the decision to train-vs-validation variation makes the detector robust
+to benign sampling noise: it alarms only when incoming data is meaningfully more
+different from training than validation already was. Because the Wasserstein
+distance is sensitive to _how far_ probability mass moves (not just whether
+distributions differ), it is well suited to low-dimensional features such as the
+{term}`prediction uncertainty<Prediction Uncertainty>` scores described above.
 
 ### Label parity
 
@@ -550,6 +582,8 @@ high-dimensional embeddings.
 
 - [Monitoring distribution shift tutorial](../notebooks/tt_monitor_shift.py) —
   end-to-end walkthrough of drift detection on operational data
+- [Detecting drift with prediction uncertainty tutorial](../notebooks/tt_detect_drift_with_uncertainty.py) —
+  monitoring a deployed detector's own uncertainty with `DriftWasserstein`
 - [Identifying out-of-distribution samples tutorial](../notebooks/tt_identify_ood_samples.py) —
   comparison of reconstruction and distance-based OOD detection methods
 

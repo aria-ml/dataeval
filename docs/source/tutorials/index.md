@@ -76,6 +76,7 @@ local checkout.
 :caption: Monitoring
 
 ../notebooks/tt_monitor_shift.py
+../notebooks/tt_detect_drift_with_uncertainty.py
 ../notebooks/tt_identify_ood_samples.py
 ```
 
@@ -87,6 +88,10 @@ local checkout.
   - Learn how to analyze incoming data against training data to ensure deployed
     models stay reliable and robust.
   - [![Open In Colab][colab-badge]][monitoring-colab]
+* - [](../notebooks/tt_detect_drift_with_uncertainty.py)
+  - Learn how to monitor a deployed detector for drift using its own prediction
+    uncertainty as a label-free signal.
+  - [![Open In Colab][colab-badge]][uncertainty-drift-colab]
 * - [](../notebooks/tt_identify_ood_samples.py)
   - Identify out-of-distribution samples in incoming data
   - [![Open In Colab][colab-badge]][iood-colab]
@@ -97,6 +102,7 @@ local checkout.
 <!-- markdownlint-disable MD053 -->
 
 [monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_monitor_shift.ipynb
+[uncertainty-drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_detect_drift_with_uncertainty.ipynb
 [iood-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_identify_ood_samples.ipynb
 
 <!-- markdownlint-enable MD053 -->

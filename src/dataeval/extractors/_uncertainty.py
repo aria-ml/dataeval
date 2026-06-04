@@ -327,6 +327,8 @@ def _classifier_uncertainty(
 
 
 @deprecated(
+    since="1.1",
+    removal="2.0",
     alternative="UncertaintyExtractor or ClasswiseUncertaintyExtractor",
     details=(
         "Wrap a TorchExtractor (or any FeatureExtractor) in UncertaintyExtractor for per-instance "
@@ -336,6 +338,12 @@ def _classifier_uncertainty(
 class ClassifierUncertaintyExtractor:
     """
     Computes prediction entropy from a classification model for drift detection.
+
+    .. deprecated:: 1.1
+        Wrap a ``TorchExtractor`` (or any ``FeatureExtractor``) in
+        :class:`UncertaintyExtractor` for per-instance uncertainty, or
+        :class:`ClasswiseUncertaintyExtractor` for per-class uncertainty.
+        ``ClassifierUncertaintyExtractor`` will be removed in version 2.0.
 
     This class implements the :class:`~dataeval.protocols.FeatureExtractor` protocol
     for use with drift detectors (e.g., :class:`~dataeval.shift.DriftUnivariate`).

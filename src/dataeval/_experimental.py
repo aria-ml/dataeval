@@ -39,14 +39,6 @@ def _make_warning_message(  # noqa: C901
     return msg
 
 
-def _prepend_doc_note(doc: str | None, note: str) -> str:
-    """Prepend a status note to a docstring."""
-    header = f".. warning::\n    {note}"
-    if doc:
-        return f"{header}\n\n{doc}"
-    return header
-
-
 @overload
 def experimental(_target: F) -> F: ...
 @overload
@@ -89,7 +81,7 @@ def experimental(  # noqa: C901
                 original_init(self, *args, **kwargs)
 
             target.__init__ = new_init  # type: ignore[attr-defined]
-            target.__doc__ = _prepend_doc_note(target.__doc__, msg)
+            target.__experimental__ = msg  # type: ignore[attr-defined]
             return target  # type: ignore[return-value]
 
         @functools.wraps(target)
@@ -100,7 +92,7 @@ def experimental(  # noqa: C901
                 warned = True
             return target(*args, **kwargs)
 
-        wrapper.__doc__ = _prepend_doc_note(target.__doc__, msg)
+        wrapper.__experimental__ = msg  # type: ignore[attr-defined]
         return wrapper  # type: ignore[return-value]
 
     if _target is not None:
@@ -165,7 +157,7 @@ def deprecated(  # noqa: C901
                 original_init(self, *args, **kwargs)
 
             target.__init__ = new_init  # type: ignore[attr-defined]
-            target.__doc__ = _prepend_doc_note(target.__doc__, msg)
+            target.__deprecated__ = msg  # type: ignore[attr-defined]
             return target  # type: ignore[return-value]
 
         @functools.wraps(target)
@@ -176,7 +168,7 @@ def deprecated(  # noqa: C901
                 warned = True
             return target(*args, **kwargs)
 
-        wrapper.__doc__ = _prepend_doc_note(target.__doc__, msg)
+        wrapper.__deprecated__ = msg  # type: ignore[attr-defined]
         return wrapper  # type: ignore[return-value]
 
     if _target is not None:

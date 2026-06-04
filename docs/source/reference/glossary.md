@@ -755,6 +755,12 @@ Precision Recall Curve
 
     ![Example Precision Recall Curve](../_static/images/reference/precision_recall_curve.png)
 
+Prediction Uncertainty
+    A measure of how unsure a model is about its prediction for a given input, typically computed as
+    the {term}`Shannon entropy<Shannon Entropy>` of its predicted class probabilities. Because it is
+    derived from the model's own output, it requires no ground-truth labels, which makes a shift in the
+    distribution of prediction uncertainty a label-free signal of {term}`operational drift<Operational Drift>`.
+
 Principal Component Analysis (PCA)
     Principal component analysis (PCA) is a linear {term}`dimensionality reduction<Dimensionality Reduction>`
     technique with applications in exploratory data analysis, visualization and data preprocessing.
@@ -806,6 +812,13 @@ ROC Curve
 ## S
 
 ```{glossary}
+Shannon Entropy
+    The {term}`entropy<Entropy>` of a {term}`probability distribution<Probability Distribution>`,
+    $H(p) = -\sum_i p_i \log p_i$. For a model's predicted class probabilities it quantifies
+    {term}`prediction uncertainty<Prediction Uncertainty>`: it is zero for a confident, single-class
+    prediction and maximal for a uniform distribution. Often normalized by $\log k$ (for $k$ classes)
+    so that scores fall in $[0, 1]$ and are comparable across differing numbers of classes.
+
 Sparse Autoencoder (SAE)
     A type of {term}`autoencoder<Autoencoder>` inspired by the sparse coding hypothesis in neuroscience
     with the idea that more relevant information will be encoded in a machine learning network if
@@ -897,6 +910,17 @@ Variational Autoencoder: (VAE)
 ```
 
 ## W
+
+```{glossary}
+Wasserstein Distance
+    A measure of the distance between two {term}`probability distributions<Probability Distribution>`,
+    intuitively the minimum "cost" of transforming one distribution into the other (also called the
+    *earth mover's distance*). Unlike pointwise comparisons, it accounts for how far probability mass
+    must move, making it well suited to detecting {term}`drift<Drift>` in a one-dimensional feature such
+    as {term}`prediction uncertainty<Prediction Uncertainty>`.
+
+    See {term}`Drift`
+```
 
 ## X
 
