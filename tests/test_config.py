@@ -2,6 +2,7 @@ import pytest
 import torch
 
 import dataeval.config as config
+from dataeval.config import resolve_batch_size
 
 
 class TestSeed:
@@ -133,3 +134,32 @@ class TestSetSeedAllGenerators:
             assert config.get_seed() == 42
         finally:
             config.set_seed(original_seed, all_generators=True)
+
+
+@pytest.mark.required
+class TestResolveBatchSize:
+    def test_first_non_none_wins(self):
+        assert resolve_batch_size(8, 32) == 8
+        assert resolve_batch_size(None, 32) == 32
+        assert resolve_batch_size(None, None, 5) == 5
+
+    def test_falls_back_to_global(self):
+        original = config._config.batch_size
+        config.set_batch_size(64)
+        try:
+            assert resolve_batch_size(None, None) == 64
+        finally:
+            config.set_batch_size(original)
+
+    def test_raises_when_nothing_set(self):
+        original = config._config.batch_size
+        config.set_batch_size(None)
+        try:
+            with pytest.raises(ValueError, match="No batch_size provided"):
+                resolve_batch_size(None, None)
+        finally:
+            config.set_batch_size(original)
+
+    def test_rejects_non_positive(self):
+        with pytest.raises(ValueError, match="greater than 0"):
+            resolve_batch_size(0, 32)

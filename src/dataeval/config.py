@@ -5,6 +5,7 @@ __all__ = [
     "set_device",
     "use_device",
     "get_batch_size",
+    "resolve_batch_size",
     "set_batch_size",
     "use_batch_size",
     "get_max_processes",
@@ -217,6 +218,38 @@ def get_batch_size(override: int | None = None) -> int:
             "or set a global batch_size using dataeval.config.set_batch_size().",
         )
     return _config.batch_size
+
+
+def resolve_batch_size(*candidates: int | None) -> int:
+    """
+    Resolve a batch size from an ordered list of candidates.
+
+    Returns the first non-None candidate (validated > 0). If every candidate is
+    None, falls back to the global batch size via :func:`get_batch_size`, which
+    raises if no global is set. Precedence is caller order: the earliest
+    non-None candidate wins (outer/override before inner/default).
+
+    Parameters
+    ----------
+    *candidates : int or None
+        Candidate batch sizes in priority order (highest priority first).
+
+    Returns
+    -------
+    int
+        The resolved batch size.
+
+    Raises
+    ------
+    ValueError
+        If no candidate is non-None and no global batch size is set.
+    ValueError
+        If a non-None candidate is less than 1.
+    """
+    for candidate in candidates:
+        if candidate is not None:
+            return get_batch_size(candidate)
+    return get_batch_size()
 
 
 def use_batch_size(batch_size: int) -> _ConfigContextManager:
