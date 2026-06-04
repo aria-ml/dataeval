@@ -95,6 +95,12 @@ class OnnxExtractor(ReprMixin):
     flatten : bool, default True
         If True, flattens outputs with more than 2 dimensions to (N, D) shape.
         If False, preserves the original output shape.
+    batch_size : int or None, default None
+        Forward-pass (compute) batch size: how many images go through the model
+        at once. ``None`` runs a single inference pass over all inputs. When
+        wrapped by ``Embeddings``, ``Embeddings`` loads images in its own (I/O)
+        chunks and this extractor sub-batches each chunk by this value, so the
+        smaller of the two bounds the forward pass.
 
     Example
     -------
@@ -121,6 +127,7 @@ class OnnxExtractor(ReprMixin):
         transforms: Transform[NDArray[Any]] | Sequence[Transform[NDArray[Any]]] | None = None,
         output_name: str | None = None,
         flatten: bool = True,
+        batch_size: int | None = None,
     ) -> None:
         if isinstance(model, bytes):
             self._model_bytes: bytes | None = model
@@ -134,6 +141,7 @@ class OnnxExtractor(ReprMixin):
         self._transforms = self._normalize_transforms(transforms)
         self._output_name = output_name
         self._flatten = flatten
+        self._batch_size = batch_size
 
         # Lazy-loaded session
         self._session: InferenceSession | None = None
@@ -144,6 +152,11 @@ class OnnxExtractor(ReprMixin):
     def output_name(self) -> str | None:
         """Return the output name for extraction, if set."""
         return self._output_name
+
+    @property
+    def batch_size(self) -> int | None:
+        """Return the default batch size for inference, if set."""
+        return self._batch_size
 
     def _normalize_transforms(
         self,
@@ -254,23 +267,20 @@ class OnnxExtractor(ReprMixin):
         if not batch_images:
             return np.empty((0,), dtype=np.float32)
 
-        # Stack into batch: (N, C, H, W)
-        batch_array = np.stack(batch_images)
-
-        # Run inference
         if self._input_name is None:
             raise RuntimeError("Model input name not set")
 
-        outputs = session.run(self._output_names, {self._input_name: batch_array})
+        # batch_size is None -> a single inference pass over all images.
+        bs = self._batch_size if self._batch_size is not None else len(batch_images)
+        out_idx = self._output_names.index(self._output_name) if self._output_name is not None else 0
 
-        # Select the appropriate output
-        if self._output_name is not None:
-            idx = self._output_names.index(self._output_name)
-            result = outputs[idx]
-        else:
-            result = outputs[0]
+        chunks: list[NDArray[Any]] = []
+        for start in range(0, len(batch_images), bs):
+            batch_array = np.stack(batch_images[start : start + bs])
+            outputs = session.run(self._output_names, {self._input_name: batch_array})
+            chunks.append(np.asarray(outputs[out_idx]))
 
-        result = np.asarray(result)
+        result = np.concatenate(chunks)
 
         # Flatten spatial dimensions if present (N, C, H, W) -> (N, C*H*W) or (N, D) -> (N, D)
         if self._flatten and result.ndim > 2:

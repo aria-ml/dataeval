@@ -201,6 +201,17 @@ class TestOnnxExtractorCall:
         result = extractor([])
         assert result.shape[0] == 0
 
+    def test_minibatch_matches_single_batch(self, simple_onnx_model: Path) -> None:
+        """Minibatching must produce the same embeddings as a single forward pass."""
+        rng = np.random.default_rng(0)
+        images = [rng.standard_normal((3, 16, 16)).astype(np.float32) for _ in range(6)]
+
+        chunked = OnnxExtractor(simple_onnx_model, batch_size=2)(images)
+        whole = OnnxExtractor(simple_onnx_model)(images)  # batch_size=None -> one pass
+
+        assert chunked.shape == whole.shape
+        np.testing.assert_allclose(chunked, whole, rtol=1e-5, atol=1e-5)
+
 
 @pytest.mark.optional
 class TestOnnxExtractorModelLoading:
