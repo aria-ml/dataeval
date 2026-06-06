@@ -25,7 +25,7 @@ from dataeval.shift._shared._domain_classifier import compute_auroc
 from dataeval.types import set_metadata
 from dataeval.utils.thresholds import ConstantThreshold
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class _DriftDomainClassifierStats(TypedDict):
