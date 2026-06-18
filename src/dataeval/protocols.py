@@ -20,6 +20,9 @@ __all__ = [
     "MetadataLike",
     "ModelMetadata",
     "ModelResetStrategy",
+    "MultiobjectTrackingDatum",
+    "MultiobjectTrackingDataset",
+    "MultiobjectTrackingTarget",
     "ObjectDetectionDatum",
     "ObjectDetectionDataset",
     "ObjectDetectionTarget",
@@ -29,6 +32,7 @@ __all__ = [
     "SegmentationDataset",
     "SegmentationTarget",
     "SequenceLike",
+    "SingleFrameObjectTrackingTarget",
     "Threshold",
     "ThresholdBounds",
     "ThresholdLike",
@@ -36,6 +40,8 @@ __all__ = [
     "TrainingStrategy",
     "Transform",
     "UpdateStrategy",
+    "VideoFrame",
+    "VideoStream",
 ]
 
 
@@ -58,6 +64,12 @@ from maite.protocols import (
 )
 from maite.protocols import (
     Model as AnnotatedModel,
+)
+from maite.protocols.multiobject_tracking import (
+    MultiobjectTrackingTarget,
+    SingleFrameObjectTrackingTarget,
+    VideoFrame,
+    VideoStream,
 )
 from maite.protocols.object_detection import ObjectDetectionTarget
 from numpy.typing import NDArray
@@ -376,6 +388,25 @@ Type alias for a segmentation datum tuple.
 SegmentationDataset: TypeAlias = AnnotatedDataset[SegmentationDatum]
 """
 Type alias for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elements.
+"""
+
+
+# ========== MULTI-OBJECT TRACKING DATASETS ==========
+
+
+MultiobjectTrackingDatum: TypeAlias = tuple[VideoStream, MultiobjectTrackingTarget, DatumMetadata]
+"""
+Type alias for a multi-object tracking datum tuple.
+
+- :class:`VideoStream` - An iterable of :class:`VideoFrame` for a single video.
+- :class:`MultiobjectTrackingTarget` - Tracked objects across the sequence of frames.
+- dict[str, Any] - Datum level metadata.
+"""
+
+
+MultiobjectTrackingDataset: TypeAlias = AnnotatedDataset[MultiobjectTrackingDatum]
+"""
+Type alias for an :class:`AnnotatedDataset` of :class:`MultiobjectTrackingDatum` elements.
 """
 
 
