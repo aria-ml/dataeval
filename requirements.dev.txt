@@ -1146,15 +1146,15 @@ llvmlite==0.47.0 \
     --hash=sha256:f9d118bc1dd7623e0e65ca9ac485ec6dd543c3b77bc9928ddc45ebd34e1e30a7 \
     --hash=sha256:fa1cbd800edd3b20bc141521f7fd45a6185a5b84109aa6855134e81397ffe72b
     # via numba
-maite==0.8.2 \
-    --hash=sha256:aed312e5e0cd04eac7042d4367ed26882562e37ad21fa21ec11af65e993d9ed1 \
-    --hash=sha256:eefe1cbb86de96de4bbccbddd74f11daf8b61f5033b198ba1fb67b57878ad5ac
+maite==0.9.5 \
+    --hash=sha256:a710ec5e3ffa93541a3dffb69ca9cc7002452d73aca744f911383e886ce7e233 \
+    --hash=sha256:abf14ecc6ed8cedb91aa7b1dc9c790409d0c954652731fb6f3cdd617bd8c42b8
     # via
     #   dataeval
     #   maite-datasets
-maite-datasets==0.0.13 \
-    --hash=sha256:400c0ba087c80f36faed6f96a1c4d2837cbad6e55689b6c2bcf8c60a7bc0bb75 \
-    --hash=sha256:ca168504a7bae655446a72f3e131e9204bb0c5af3dddac35f9595f3982cf592d
+maite-datasets==0.0.15 \
+    --hash=sha256:21b27ac1d77229337426fcb875d2f128ce606fd336877debd2b1c266d4787136 \
+    --hash=sha256:457801ce34bc21572b8c4f53b60188399c5808e759c29fd5076546e82a1c3e5f
 markdown-it-py==3.0.0 ; python_full_version < '3.11' \
     --hash=sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1 \
     --hash=sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb

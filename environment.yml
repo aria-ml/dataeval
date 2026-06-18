@@ -11,7 +11,7 @@ name: dataeval
 dependencies:
   - python>=3.10
   - lightgbm>=4
-  - maite>=0.8.2
+  - maite>=0.9.4
   - numba>=0.61.0
   - numpy>=1.24.2
   - polars>=1.0.0

@@ -1278,7 +1278,7 @@ verify = [
 [package.metadata]
 requires-dist = [
     { name = "lightgbm", specifier = ">=4" },
-    { name = "maite", specifier = ">=0.8.2" },
+    { name = "maite", specifier = ">=0.9.4" },
     { name = "numba", specifier = ">=0.61.0" },
     { name = "numpy", specifier = ">=1.24.2" },
     { name = "onnx", marker = "extra == 'onnx'", specifier = ">=1.14.0" },
@@ -1319,7 +1319,7 @@ dev = [
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "jupytext", specifier = ">=1.19.1" },
-    { name = "maite-datasets", specifier = ">=0.0.13" },
+    { name = "maite-datasets", specifier = ">=0.0.15" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "nox", specifier = ">=2025.5.1" },
@@ -1353,7 +1353,7 @@ docs = [
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "jupytext", specifier = ">=1.19.1" },
-    { name = "maite-datasets", specifier = ">=0.0.13" },
+    { name = "maite-datasets", specifier = ">=0.0.15" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "numpy", specifier = ">=2.0.2" },
@@ -2690,21 +2690,21 @@ wheels = [
 
 [[package]]
 name = "maite"
-version = "0.8.2"
+version = "0.9.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/23/83/65fece91c7ac59e5e1120f0a3fc04ef814ae1ed382804eef146f372a1454/maite-0.8.2.tar.gz", hash = "sha256:eefe1cbb86de96de4bbccbddd74f11daf8b61f5033b198ba1fb67b57878ad5ac", size = 82439, upload-time = "2025-07-31T15:47:35.854Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/68/e6/02fefc59ce5c179df5f629d636c8451efc5d0ad1301ebfc17d50bb1a7a7b/maite-0.9.5.tar.gz", hash = "sha256:abf14ecc6ed8cedb91aa7b1dc9c790409d0c954652731fb6f3cdd617bd8c42b8", size = 94952, upload-time = "2026-03-30T14:52:19.121Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/18/f5/e8c1dee1d30ce22a037ce7fc5659f3c77ef3d3790bc2cc91ddb1a6397947/maite-0.8.2-py3-none-any.whl", hash = "sha256:aed312e5e0cd04eac7042d4367ed26882562e37ad21fa21ec11af65e993d9ed1", size = 81572, upload-time = "2025-07-31T15:47:34.341Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/a6/9ace69f9ddfb4f9af0438e07c98e3a9dea3f44cc1dc11cd39a0c85b138e8/maite-0.9.5-py3-none-any.whl", hash = "sha256:a710ec5e3ffa93541a3dffb69ca9cc7002452d73aca744f911383e886ce7e233", size = 90861, upload-time = "2026-03-30T14:52:17.772Z" },
 ]
 
 [[package]]
 name = "maite-datasets"
-version = "0.0.13"
+version = "0.0.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "defusedxml" },
@@ -2719,9 +2719,9 @@ dependencies = [
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/48/f0/2dc06dabc8845033431d11d365517f91cbbcca83da58721b64a27b0866ad/maite_datasets-0.0.13.tar.gz", hash = "sha256:400c0ba087c80f36faed6f96a1c4d2837cbad6e55689b6c2bcf8c60a7bc0bb75", size = 95956, upload-time = "2026-06-03T08:23:24.082Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/2a/85ef4f093c973521f0140a1fca25e57617b020dd3a7ece7f5ff5272ac78c/maite_datasets-0.0.15.tar.gz", hash = "sha256:21b27ac1d77229337426fcb875d2f128ce606fd336877debd2b1c266d4787136", size = 101670, upload-time = "2026-06-17T22:54:44.967Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/28/a242eb93ca4181157b3ed5aa528f3f524e6875526256a5c42a389ecf1055/maite_datasets-0.0.13-py3-none-any.whl", hash = "sha256:ca168504a7bae655446a72f3e131e9204bb0c5af3dddac35f9595f3982cf592d", size = 112201, upload-time = "2026-06-03T08:23:24.981Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/c8/92af204f0015a2db0d00ed730dad5825a2926452d864fe985a2145b3c6c0/maite_datasets-0.0.15-py3-none-any.whl", hash = "sha256:457801ce34bc21572b8c4f53b60188399c5808e759c29fd5076546e82a1c3e5f", size = 118131, upload-time = "2026-06-17T22:54:43.898Z" },
 ]
 
 [[package]]

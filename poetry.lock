@@ -2856,14 +2856,14 @@ files = [
 
 [[package]]
 name = "maite"
-version = "0.8.2"
+version = "0.9.5"
 description = "Library of common types, protocols (a.k.a. structural subtypes), and utilities to support AI test and evaluation"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["main", "dev", "docs"]
 files = [
-    {file = "maite-0.8.2-py3-none-any.whl", hash = "sha256:aed312e5e0cd04eac7042d4367ed26882562e37ad21fa21ec11af65e993d9ed1"},
-    {file = "maite-0.8.2.tar.gz", hash = "sha256:eefe1cbb86de96de4bbccbddd74f11daf8b61f5033b198ba1fb67b57878ad5ac"},
+    {file = "maite-0.9.5-py3-none-any.whl", hash = "sha256:a710ec5e3ffa93541a3dffb69ca9cc7002452d73aca744f911383e886ce7e233"},
+    {file = "maite-0.9.5.tar.gz", hash = "sha256:abf14ecc6ed8cedb91aa7b1dc9c790409d0c954652731fb6f3cdd617bd8c42b8"},
 ]
 
 [package.dependencies]
@@ -2871,27 +2871,28 @@ numpy = ">=1.24.2"
 typing-extensions = ">=4.5,<4.6 || >4.6"
 
 [package.extras]
-builddocs = ["datasets (>=3)", "jupyter", "kornia", "matplotlib", "nbconvert", "pycocotools", "pytest (>=7.0.0)", "torch (>=1.7,!=1.12.0)", "torchmetrics[detection]", "torchvision", "tox (>=4.24.2,<5.0.0)", "transformers", "ultralytics", "watermark"]
+builddocs = ["datasets (>=3)", "ipykernel (==6.30.1)", "jupyter", "kornia", "matplotlib", "nbconvert", "pycocotools", "pytest (>=7.0.0)", "torch (>=1.7,!=1.12.0)", "torchmetrics[detection] (>=1.7.0,<2.0.0)", "torchvision", "tox (>=4.24.2,<5.0.0)", "transformers", "ultralytics", "watermark"]
 dev = ["pre-commit", "tox"]
-test = ["hypothesis (>=6.61.0,<=6.113)", "jupytext (>=1.14.0)", "numpydoc (>=1.5.0)", "pip", "pyright (>=1.1.280,!=1.1.401)", "pytest (>=7.0.0)", "pytest-mock (>=3.10.0)", "torch (>=1.7,!=1.12.0)"]
+mot-utils = ["av (>=16.0.1)"]
+test = ["hypothesis (>=6.61.0,<=6.113)", "jupytext (>=1.14.0)", "numpydoc (>=1.9.0,!=1.10.0)", "pip", "pyright[nodejs] (>=1.1.280,!=1.1.401)", "pytest (>=7.0.0)", "pytest-mock (>=3.10.0)", "torch (>=1.7,!=1.12.0)"]
 torchmetrics = ["torchmetrics[detection] (>=1.7.0,<2.0.0)"]
-yolo-models = ["boto3 (>=1.35)", "botocore (>=1.35)", "matplotlib (>=3.7.1)", "opencv-python-headless (>=4.6.0)", "pandas (>=2.0)", "roboflow (>=1.1.30)", "torch (>=2.2.0)", "ultralytics (>=8.2.78)", "yolov5 (>=7.0.13)"]
+yolo-models = ["boto3 (>=1.35)", "botocore (>=1.35)", "matplotlib (>=3.7.1)", "opencv-python-headless (>=4.6.0)", "pandas (>=2.0)", "roboflow (>=1.1.30)", "setuptools (>=70.0.0,<81)", "torch (>=2.2.0)", "ultralytics (>=8.2.78)", "yolov5 (<7.0.14)"]
 
 [[package]]
 name = "maite-datasets"
-version = "0.0.13"
+version = "0.0.15"
 description = "A collection of Image Classification and Object Detection task datasets conforming to the MAITE protocol."
 optional = false
 python-versions = ">=3.10"
 groups = ["dev", "docs"]
 files = [
-    {file = "maite_datasets-0.0.13-py3-none-any.whl", hash = "sha256:ca168504a7bae655446a72f3e131e9204bb0c5af3dddac35f9595f3982cf592d"},
-    {file = "maite_datasets-0.0.13.tar.gz", hash = "sha256:400c0ba087c80f36faed6f96a1c4d2837cbad6e55689b6c2bcf8c60a7bc0bb75"},
+    {file = "maite_datasets-0.0.15-py3-none-any.whl", hash = "sha256:457801ce34bc21572b8c4f53b60188399c5808e759c29fd5076546e82a1c3e5f"},
+    {file = "maite_datasets-0.0.15.tar.gz", hash = "sha256:21b27ac1d77229337426fcb875d2f128ce606fd336877debd2b1c266d4787136"},
 ]
 
 [package.dependencies]
 defusedxml = ">=0.7.1"
-maite = ">=0.7,<0.9"
+maite = ">=0.9.4"
 numpy = ">=1.24.2"
 pillow = ">=10.3.0"
 requests = ">=2.32.3"
@@ -2900,6 +2901,7 @@ scipy = ">=1.15.3"
 typing-extensions = ">=4.12"
 
 [package.extras]
+av = ["av (>=12.0.0)"]
 opencv = ["opencv-python-headless (>=4.10.0)"]
 tqdm = ["tqdm (>=4.66)"]
 
@@ -7678,4 +7680,4 @@ opencv = ["opencv-python-headless"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "ee52b7e69730a8d236f5858f743661a1c445c3842ae4e8ae71f045beb08e1be6"
+content-hash = "59ce328c0aad3837c3cc8cfce52cc61ab4e652e431baf56c177811f6da592855"
