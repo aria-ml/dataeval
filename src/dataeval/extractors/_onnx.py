@@ -101,6 +101,12 @@ class OnnxExtractor(ReprMixin):
         wrapped by ``Embeddings``, ``Embeddings`` loads images in its own (I/O)
         chunks and this extractor sub-batches each chunk by this value, so the
         smaller of the two bounds the forward pass.
+    image_size : tuple[int, int] or None, default None
+        Optional user-imposed model input size as ``(height, width)``. When set,
+        each CHW image is bilinearly resized to this size before inference,
+        overriding the model's native expected input size. The configured size
+        is preferred over any size declared in a model metadata file. ``None``
+        leaves images at their incoming size.
 
     Example
     -------
@@ -128,6 +134,7 @@ class OnnxExtractor(ReprMixin):
         output_name: str | None = None,
         flatten: bool = True,
         batch_size: int | None = None,
+        image_size: tuple[int, int] | None = None,
     ) -> None:
         if isinstance(model, bytes):
             self._model_bytes: bytes | None = model
@@ -142,6 +149,11 @@ class OnnxExtractor(ReprMixin):
         self._output_name = output_name
         self._flatten = flatten
         self._batch_size = batch_size
+        if image_size is not None:
+            height, width = image_size
+            if height <= 0 or width <= 0:
+                raise ValueError(f"image_size must be positive (height, width); got {image_size!r}")
+        self._image_size = image_size
 
         # Lazy-loaded session
         self._session: InferenceSession | None = None
@@ -225,13 +237,34 @@ class OnnxExtractor(ReprMixin):
         return self._session
 
     def _preprocess(self, image: NDArray[Any]) -> NDArray[np.floating[Any]]:
-        """Apply preprocessing transforms to an image."""
+        """Apply preprocessing transforms to an image, with optional resize."""
         result = image
         for transform in self._transforms:
             result = transform(result)
 
+        # Resize the CHW image to the configured user-imposed model input size (height, width),
+        # preferred over the model's native size.
+        if self._image_size is not None:
+            result = self._resize_chw(as_numpy(result), self._image_size)
+
         # Ensure float32 for ONNX
         return result.astype(np.float32)
+
+    @staticmethod
+    def _resize_chw(image: NDArray[Any], size: tuple[int, int]) -> NDArray[np.floating[Any]]:
+        """Bilinearly resize a CHW image to ``(height, width)``."""
+        import torch
+
+        height, width = size
+        tensor = torch.as_tensor(np.asarray(image)).float()
+        if tensor.ndim != 3:
+            raise ValueError(
+                f"OnnxExtractor image_size resize expects CHW images; got shape {tuple(tensor.shape)}",
+            )
+        resized = torch.nn.functional.interpolate(
+            tensor.unsqueeze(0), size=(height, width), mode="bilinear", align_corners=False
+        )
+        return resized.squeeze(0).numpy()
 
     def __call__(self, data: Any) -> Array:  # noqa: C901
         """
@@ -291,8 +324,9 @@ class OnnxExtractor(ReprMixin):
     def __repr__(self) -> str:
         output_info = f", output_name={self._output_name!r}" if self._output_name else ""
         flatten_info = "" if self._flatten else ", flatten=False"
+        size_info = f", image_size={self._image_size!r}" if self._image_size is not None else ""
         if self._model_bytes is not None:
             model_info = f"model=<{len(self._model_bytes)} bytes>"
         else:
             model_info = f"model={self._model_path!r}"
-        return f"OnnxExtractor({model_info}{output_info}{flatten_info})"
+        return f"OnnxExtractor({model_info}{output_info}{flatten_info}{size_info})"

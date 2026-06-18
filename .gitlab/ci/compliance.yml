@@ -6,6 +6,7 @@ stages:
   - sr-compliance
   - unit-test
   - tr-compliance
+  - ir-compliance
   - dsor-compliance
   - advana-compliance
   - validate
@@ -16,6 +17,13 @@ include:
     inputs:
       package_name: "${PACKAGE_NAME}"
       tools_used: [pyproject, poetry, ruff]
+      full_execution_on_commit: true
+      allow_failure: true
+
+  - component: gitlab.jatic.net/jatic/devsecops/components/ir-compliance@1.1.0
+    inputs:
+      stage: ir-compliance
+      maite_interop_scope: provider
       full_execution_on_commit: true
       allow_failure: true
 

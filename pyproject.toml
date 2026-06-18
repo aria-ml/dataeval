@@ -66,6 +66,15 @@ Homepage = "https://dataeval.ai/"
 Repository = "https://github.com/aria-ml/dataeval/"
 Documentation = "https://dataeval.readthedocs.io/"
 
+# MAITE interoperability entry-points.
+[project.entry-points."maite.tasks"]
+dataeval_balance = "dataeval.bias:Balance"
+dataeval_diversity = "dataeval.bias:Diversity"
+dataeval_parity = "dataeval.bias:Parity"
+dataeval_outliers = "dataeval.quality:Outliers"
+dataeval_duplicates = "dataeval.quality:Duplicates"
+dataeval_sufficiency = "dataeval.performance:Sufficiency"
+
 [dependency-groups]
 base = [
   "uv>=0.8.0",
