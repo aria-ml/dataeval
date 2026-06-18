@@ -61,6 +61,10 @@ datasets for machine learning.
 ../notebooks/h2_custom_image_stats_object_detection.py
 ../notebooks/h2_add_intrinsic_factors.py
 ../notebooks/h2_detect_undersampling.py
+../notebooks/h2_wrap_dataframe_ic_dataset.py
+../notebooks/h2_wrap_dataframe_od_dataset.py
+../notebooks/h2_metadata_from_dataframe.py
+../notebooks/h2_lazy_load_images.py
 ```
 
 :::{list-table}
@@ -89,6 +93,20 @@ datasets for machine learning.
 - - [](../notebooks/h2_detect_undersampling.py)
   - Detect undersampled subsets of datasets
   - [![Open In Colab][colab-badge]][cov-colab]
+- - [](../notebooks/h2_wrap_dataframe_ic_dataset.py)
+  - Wrap a pandas DataFrame catalog as a DataEval dataset
+  - [![Open In Colab][colab-badge]][wdf-colab]
+- - [](../notebooks/h2_wrap_dataframe_od_dataset.py)
+  - Wrap a long-format DataFrame of bounding boxes as an
+    object detection dataset
+  - [![Open In Colab][colab-badge]][wdfod-colab]
+- - [](../notebooks/h2_metadata_from_dataframe.py)
+  - Build a MetadataLike object from a DataFrame for bias
+    analysis without loading images
+  - [![Open In Colab][colab-badge]][mdf-colab]
+- - [](../notebooks/h2_lazy_load_images.py)
+  - Defer image decoding to speed up metadata-only analysis
+  - [![Open In Colab][colab-badge]][lazy-colab]
 
 :::
 
@@ -99,6 +117,10 @@ datasets for machine learning.
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_custom_image_stats_object_detection.ipynb
 [imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_add_intrinsic_factors.ipynb
 [cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_detect_undersampling.ipynb
+[wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_wrap_dataframe_ic_dataset.ipynb
+[wdfod-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_wrap_dataframe_od_dataset.ipynb
+[mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_metadata_from_dataframe.ipynb
+[lazy-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_lazy_load_images.ipynb
 
 ## Model Development
 

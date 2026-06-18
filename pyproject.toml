@@ -117,6 +117,7 @@ docs = [
   "maite-datasets>=0.0.15",
   "myst-nb>=1.0",
   "opencv-python-headless>=4.8.0",
+  "pandas>=2.0.0",
   "plotly>=6.2.0",
   "sphinx-autoapi>=3.6.0",
   "sphinx-design>=0.6.1",
