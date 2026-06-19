@@ -2,7 +2,7 @@
 
 __all__ = [
     "AnnotatedDataset",
-    "AnnotatedModel",
+    "Model",
     "Array",
     "ArrayLike",
     "Chunker",
@@ -55,25 +55,103 @@ from typing import (
     runtime_checkable,
 )
 
+import maite.protocols
+import maite.protocols.multiobject_tracking
+import maite.protocols.object_detection
 import numpy as np
 import torch
-from maite.protocols import (
-    DatasetMetadata,
-    DatumMetadata,
-    ModelMetadata,
-)
-from maite.protocols import (
-    Model as AnnotatedModel,
-)
-from maite.protocols.multiobject_tracking import (
-    MultiobjectTrackingTarget,
-    SingleFrameObjectTrackingTarget,
-    VideoFrame,
-    VideoStream,
-)
-from maite.protocols.object_detection import ObjectDetectionTarget
 from numpy.typing import NDArray
 from typing_extensions import Self
+
+# ========== MAITE RE-EXPORTS ==========
+#
+# DataEval re-exports these MAITE protocols/types under ``dataeval.protocols`` so
+# downstream code imports a single, stable namespace. They are aliased (not
+# subclassed) to preserve object identity: ``isinstance`` checks, ``TypeVar``
+# constraints, and TypedDict construction behave exactly as the MAITE originals.
+# The docstrings below give a short DataEval-facing summary and link to the
+# canonical MAITE reference via intersphinx.
+
+ObjectDetectionTarget: TypeAlias = maite.protocols.object_detection.ObjectDetectionTarget
+"""
+Object-detection target for a single image.
+
+- ``boxes`` : :obj:`ArrayLike` of shape (N, 4) - Bounding boxes in (x0, y0, x1, y1) format
+- ``labels`` : :obj:`ArrayLike` of shape (N,) - Class labels for each bounding box
+- ``scores`` : :obj:`ArrayLike` of shape (N,) - Confidence scores for each bounding box
+"""
+
+MultiobjectTrackingTarget: TypeAlias = maite.protocols.multiobject_tracking.MultiobjectTrackingTarget
+"""
+Set of tracked objects over a sequence of video frames.
+"""
+
+SingleFrameObjectTrackingTarget: TypeAlias = maite.protocols.multiobject_tracking.SingleFrameObjectTrackingTarget
+"""
+Single-frame object-tracking target (tracked objects within one frame).
+"""
+
+VideoFrame: TypeAlias = maite.protocols.multiobject_tracking.VideoFrame
+"""
+Contents of a single decoded video frame.
+"""
+
+VideoStream: TypeAlias = maite.protocols.multiobject_tracking.VideoStream
+"""
+Iterable of :obj:`VideoFrame` representing a single video.
+"""
+
+DatumMetadata: TypeAlias = maite.protocols.DatumMetadata
+"""
+Metadata associated with a single datum (item-level).
+
+A :class:`~typing.TypedDict` with the following keys:
+
+- ``id`` : ``int | str`` (required, read-only) - Unique identifier for the datum.
+
+Implementations may add further string-keyed entries; only ``id`` is required by
+the protocol. Extra keys are passed through unchanged.
+"""
+
+DatasetMetadata: TypeAlias = maite.protocols.DatasetMetadata
+"""
+Metadata associated with a dataset (collection-level).
+
+A :class:`~typing.TypedDict` with the following keys:
+
+- ``id`` : ``str`` (required, read-only) - Unique identifier for the dataset.
+- ``index2label`` : ``dict[int, str]`` (optional, read-only) - Mapping from integer
+  class index to the corresponding human-readable label name.
+
+Implementations may add further string-keyed entries; only ``id`` is required by
+the protocol. Extra keys are passed through unchanged.
+"""
+
+ModelMetadata: TypeAlias = maite.protocols.ModelMetadata
+"""
+Metadata associated with a model.
+
+A :class:`~typing.TypedDict` with the following keys:
+
+- ``id`` : ``str`` (required, read-only) - Unique identifier for the model.
+- ``index2label`` : ``dict[int, str]`` (optional, read-only) - Mapping from integer
+  class index to the corresponding human-readable label name the model predicts.
+
+Implementations may add further string-keyed entries; only ``id`` is required by
+the protocol. Extra keys are passed through unchanged.
+"""
+
+_InputType = TypeVar("_InputType", contravariant=True)
+_TargetType = TypeVar("_TargetType", covariant=True)
+
+Model: TypeAlias = maite.protocols.Model[_InputType, _TargetType]
+"""
+Model protocol specifying batch inference behavior over data.
+
+Re-export of the generic MAITE ``Model`` protocol. Use bare for any model, or
+specialize the input/target types for a concrete task — e.g.
+``Model[ArrayLike, ObjectDetectionTarget]``.
+"""
 
 ArrayLike: TypeAlias = np.typing.ArrayLike
 """
@@ -178,17 +256,17 @@ class SegmentationTarget(Protocol):
 
     @property
     def mask(self) -> ArrayLike:
-        """:class:`ArrayLike` segmentation mask."""
+        """:obj:`ArrayLike` segmentation mask."""
         ...
 
     @property
     def labels(self) -> ArrayLike:
-        """:class:`ArrayLike` class labels."""
+        """:obj:`ArrayLike` class labels."""
         ...
 
     @property
     def scores(self) -> ArrayLike:
-        """:class:`ArrayLike` prediction scores."""
+        """:obj:`ArrayLike` prediction scores."""
         ...
 
 
@@ -332,7 +410,7 @@ class AnnotatedDataset(Dataset[_T_co], Protocol[_T_co]):
 
     @property
     def metadata(self) -> DatasetMetadata:
-        """:class:`.DatasetMetadata` or derivatives."""
+        """:obj:`.DatasetMetadata` or derivatives."""
         ...
 
 
@@ -343,15 +421,15 @@ ImageClassificationDatum: TypeAlias = tuple[ArrayLike, ArrayLike, DatumMetadata]
 """
 Type alias for an image classification datum tuple.
 
-- :class:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
-- :class:`ArrayLike` of shape (N,) - Class label as one-hot encoded ground-truth or prediction confidences.
-- dict[str, Any] - Datum level metadata.
+- :obj:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
+- :obj:`ArrayLike` of shape (N,) - Class label as one-hot encoded ground-truth or prediction confidences.
+- :obj:`DatumMetadata` - Datum level metadata.
 """
 
 
 ImageClassificationDataset: TypeAlias = AnnotatedDataset[ImageClassificationDatum]
 """
-Type alias for an :class:`AnnotatedDataset` of :class:`ImageClassificationDatum` elements.
+Type alias for an :class:`AnnotatedDataset` of :obj:`ImageClassificationDatum` elements.
 """
 
 # ========== OBJECT DETECTION DATASETS ==========
@@ -361,15 +439,15 @@ ObjectDetectionDatum: TypeAlias = tuple[ArrayLike, ObjectDetectionTarget, DatumM
 """
 Type alias for an object detection datum tuple.
 
-- :class:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
-- :class:`ObjectDetectionTarget` - Object detection target information for the image.
-- dict[str, Any] - Datum level metadata.
+- :obj:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
+- :obj:`ObjectDetectionTarget` - Object detection target information for the image.
+- :obj:`DatumMetadata` - Datum level metadata.
 """
 
 
 ObjectDetectionDataset: TypeAlias = AnnotatedDataset[ObjectDetectionDatum]
 """
-Type alias for an :class:`AnnotatedDataset` of :class:`ObjectDetectionDatum` elements.
+Type alias for an :class:`AnnotatedDataset` of :obj:`ObjectDetectionDatum` elements.
 """
 
 
@@ -380,14 +458,14 @@ SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, DatumMetadat
 """
 Type alias for a segmentation datum tuple.
 
-- :class:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
+- :obj:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
 - :class:`SegmentationTarget` - Segmentation target information for the image.
-- dict[str, Any] - Datum level metadata.
+- :obj:`DatumMetadata` - Datum level metadata.
 """
 
 SegmentationDataset: TypeAlias = AnnotatedDataset[SegmentationDatum]
 """
-Type alias for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elements.
+Type alias for an :class:`AnnotatedDataset` of :obj:`SegmentationDatum` elements.
 """
 
 
@@ -398,15 +476,15 @@ MultiobjectTrackingDatum: TypeAlias = tuple[VideoStream, MultiobjectTrackingTarg
 """
 Type alias for a multi-object tracking datum tuple.
 
-- :class:`VideoStream` - An iterable of :class:`VideoFrame` for a single video.
-- :class:`MultiobjectTrackingTarget` - Tracked objects across the sequence of frames.
-- dict[str, Any] - Datum level metadata.
+- :obj:`VideoStream` - An iterable of :obj:`VideoFrame` for a single video.
+- :obj:`MultiobjectTrackingTarget` - Tracked objects across the sequence of frames.
+- :obj:`DatumMetadata` - Datum level metadata.
 """
 
 
 MultiobjectTrackingDataset: TypeAlias = AnnotatedDataset[MultiobjectTrackingDatum]
 """
-Type alias for an :class:`AnnotatedDataset` of :class:`MultiobjectTrackingDatum` elements.
+Type alias for an :class:`AnnotatedDataset` of :obj:`MultiobjectTrackingDatum` elements.
 """
 
 
@@ -1208,9 +1286,9 @@ class Threshold(Protocol):
         ...
 
 
-ThresholdBounds = float | tuple[float | None, float | None] | None
-ThresholdLimits = tuple[float | None, float | None]
-ThresholdLike = (
+ThresholdBounds: TypeAlias = float | tuple[float | None, float | None] | None
+ThresholdLimits: TypeAlias = tuple[float | None, float | None]
+ThresholdLike: TypeAlias = (
     str
     | ThresholdBounds
     | tuple[str, ThresholdBounds]
@@ -1221,14 +1299,15 @@ ThresholdLike = (
 """Type alias for threshold specifications.
 
 Values default to modified z-score thresholds if not provided.
+
 - ``float``: symmetric multiplier (same for lower and upper)
 - ``str``: named threshold (e.g., "modzscore") with default bounds
 - ``tuple[float | None, float | None]``: ``(lower, upper)`` for asymmetric bounds
 - ``tuple[str, float | tuple[float | None, float | None]]``: named threshold with optional lower and upper bounds
 - ``tuple[str, bounds, (lower_limit, upper_limit)]``: named threshold with bounds and limit clamping,
-e.g. ``("zscore", (1.0, 3.5), (0.0, 1.0))``. Pass ``None`` for bounds to use defaults:
-``("zscore", None, (0.0, 1.0))``
+  e.g. ``("zscore", (1.0, 3.5), (0.0, 1.0))``. Pass ``None`` for bounds to use defaults:
+  ``("zscore", None, (0.0, 1.0))``
 - ``tuple[bounds | None, (lower_limit, upper_limit)]``: default threshold with bounds and limit clamping,
-e.g. ``(2.5, (0.0, 1.0))`` or ``(None, (0.0, 1.0))`` for default multiplier
+  e.g. ``(2.5, (0.0, 1.0))`` or ``(None, (0.0, 1.0))`` for default multiplier
 - ``Threshold``: a fully configured Threshold instance
 """

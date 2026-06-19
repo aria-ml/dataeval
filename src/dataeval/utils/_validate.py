@@ -17,7 +17,7 @@ dataset) and checks:
 3. For target-consuming kinds: the datum is a length-3 tuple AND
    ``datum[1]`` satisfies the protocol the consumer requires
    (:class:`~dataeval.protocols.Array` for classification,
-   :class:`~dataeval.protocols.ObjectDetectionTarget` for OD,
+   :obj:`~dataeval.protocols.ObjectDetectionTarget` for OD,
    :class:`~dataeval.protocols.SegmentationTarget` for segmentation,
    any of the three for ``"any_target"``).
 
@@ -52,7 +52,7 @@ DatasetKind = Literal[
 
 - ``"image_only"`` — only the image (``datum[0]``) is read; tuple or bare image both OK.
 - ``"classification"`` — full 3-tuple; ``datum[1]`` is an :class:`Array` of class scores/logits.
-- ``"object_detection"`` — full 3-tuple; ``datum[1]`` is an :class:`ObjectDetectionTarget`.
+- ``"object_detection"`` — full 3-tuple; ``datum[1]`` is an :obj:`ObjectDetectionTarget`.
 - ``"segmentation"`` — full 3-tuple; ``datum[1]`` is a :class:`SegmentationTarget`.
 - ``"any_target"`` — full 3-tuple; ``datum[1]`` matches *any* of the above.
 """

@@ -29,6 +29,7 @@ language = "en"
 extensions = [
     # Internal Sphinx extensions
     "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx.ext.mathjax",
@@ -69,6 +70,15 @@ exclude_patterns = [
 templates_path = ["_templates", "_templates/autoapi"]
 
 suppress_warnings = ["ref.python", "autoapi.python_import_resolution"]
+
+# ---------------------------------------------------------------------------------
+# Intersphinx — cross-reference external libraries (e.g. MAITE protocols)
+# ---------------------------------------------------------------------------------
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3/", None),
+    "maite": ("https://mit-ll-ai-technology.github.io/maite/", None),
+}
 
 # ---------------------------------------------------------------------------------
 # Autoapi settings including templates

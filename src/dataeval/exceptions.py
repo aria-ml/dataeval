@@ -16,7 +16,7 @@ class MaiteShapeError(TypeError):
     ``dataset[0]`` and raise this error when the datum does not have the
     expected ``(image, target, metadata)`` 3-tuple shape, or when the
     target does not match the protocol the consumer requires (e.g.
-    :class:`~dataeval.protocols.ObjectDetectionTarget` for an object
+    :obj:`~dataeval.protocols.ObjectDetectionTarget` for an object
     detection consumer).
 
     Inherits from :class:`TypeError` so callers that previously caught the
