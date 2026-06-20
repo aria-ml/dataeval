@@ -12,7 +12,7 @@ from numpy.random import randint, random
 from numpy.typing import NDArray
 
 from dataeval import Metadata
-from dataeval.config import set_batch_size, set_seed
+from dataeval.config import set_batch_size, set_max_processes, set_seed
 from dataeval.protocols import ObjectDetectionTarget
 
 DEVICE = torch.device(os.environ.get("DATAEVAL_TEST_DEVICE", "cpu"))
@@ -75,6 +75,14 @@ pytest_plugins = ["tests.fixtures.metadata", "tests.fixtures.models", "tests.fix
 set_seed(0, all_generators=True)
 
 set_batch_size(16)
+
+# Cap per-process thread pools to avoid oversubscription under xdist. Tests run with
+# `pytest -n4`, and the CPU-heavy detectors (LightGBM domain classifier, torch AE/VAE)
+# otherwise each grab every core, so N workers contend for the same cores and wall-clock
+# balloons (e.g. test_ae goes from ~4s to ~35s). Single-threaded per worker keeps the
+# tiny test workloads fast and avoids the thrash.
+set_max_processes(1)  # LightGBM n_jobs via get_max_processes()
+torch.set_num_threads(1)
 
 
 @pytest.fixture(scope="session")
