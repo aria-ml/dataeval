@@ -84,6 +84,32 @@ class _Category(IntEnum):
         return _Category.UNKNOWN
 
     @classmethod
+    def from_commit_message(cls, title: str) -> "_Category":
+        """
+        Categorize a direct (non-merge) commit by its bracketed message prefix.
+
+        Direct pushes never carry ``release::*`` labels, so we infer the category
+        from the conventional ``[tag]`` prefix used in commit titles. Anything
+        unrecognized falls back to MISCELLANEOUS so the commit is still recorded
+        rather than silently dropped (as UNKNOWN entries are).
+        """
+        match = re.match(r"\s*\[(?P<tag>[a-zA-Z]+)\]", title)
+        tag = match.group("tag").lower() if match else ""
+        mapping = {
+            "major": _Category.MAJOR,
+            "feat": _Category.FEATURE,
+            "feature": _Category.FEATURE,
+            "impr": _Category.IMPROVEMENT,
+            "improvement": _Category.IMPROVEMENT,
+            "enh": _Category.IMPROVEMENT,
+            "fix": _Category.FIX,
+            "bugfix": _Category.FIX,
+            "deprecate": _Category.DEPRECATION,
+            "deprecation": _Category.DEPRECATION,
+        }
+        return mapping.get(tag, _Category.MISCELLANEOUS)
+
+    @classmethod
     def to_markdown(cls, value: "_Category") -> str:
         if value == _Category.FEATURE:
             return "🌟 **Feature Release**"
@@ -170,6 +196,34 @@ class _Merge:
         return f"Entry({entry_type}, {self.time}, {self.hash}, {self.description})"
 
 
+class _Commit:
+    """Extracts elements of a direct (non-merge) commit pushed to a branch.
+
+    Direct pushes bypass the merge-request flow, so they have no ``release::*``
+    label; the category is inferred from the commit message prefix instead.
+    Mirrors the ``_Merge`` interface so categorized entries can be rendered by
+    the same changelog generation code.
+    """
+
+    def __init__(self, response: dict[str, Any]) -> None:
+        self.time: datetime = datetime.fromisoformat(response["committed_date"]).astimezone(UTC)
+        self.hash: str = response["id"]
+        self.shorthash: str = response["id"][0:8]
+        self.description: str = response["title"].strip()
+        self.category: _Category = _Category.from_commit_message(self.description)
+        self.details: str = ""
+
+    def to_markdown(self) -> str:
+        return f"- `{self.shorthash}` - {self.description}"
+
+    def __lt__(self, other: "_Commit") -> bool:
+        return self.time < other.time
+
+    def __repr__(self) -> str:
+        entry_type = _Category(self.category).name
+        return f"Entry({entry_type}, {self.time}, {self.hash}, {self.description}, direct)"
+
+
 class ReleaseGen:
     """Generates commit payload for changelog and documentation link updates."""
 
@@ -210,25 +264,80 @@ class ReleaseGen:
         end = line.find(")")
         return line[start:end]
 
-    def _get_entries(self, last_hash: str) -> tuple[_Merge, dict[_Category, list[_Merge]]]:
+    def _get_entries(
+        self, last_hash: str, existing_lines: list[str] | None = None
+    ) -> tuple[_Merge, dict[_Category, list[_Merge | _Commit]]]:
         # get merges in to develop and main and sort
         merges: list[_Merge] = [_Merge(m) for m in self.gl.list_merge_requests(state="merged", target_branch="main")]
         merges.sort(reverse=True)
         latest = merges[0]
 
         # populate the categorized merge issues
-        categorized: dict[_Category, list[_Merge]] = defaultdict(lambda: [])
+        categorized: dict[_Category, list[_Merge | _Commit]] = defaultdict(lambda: [])
+        merge_hashes: set[str] = set()
 
         for merge in merges:
-            # return early if hash is already present
+            # stop once the last recorded hash is reached
             if merge.hash == last_hash:
-                return latest, categorized
+                break
 
             merge_log = f"COMMITGEN: {merge.description} @ {merge.hash}"
             verbose(merge_log + f" - ADDED as {_Category(merge.category).name}")
             categorized[merge.category].append(merge)
+            merge_hashes.add(merge.hash)
+
+        # capture direct (non-merge) pushes to main that bypassed the MR flow
+        if existing_lines is not None:
+            for commit in self._get_direct_commits(last_hash, existing_lines, merge_hashes):
+                categorized[commit.category].append(commit)
+            # keep each category in reverse-chronological order across both sources
+            for category in categorized:
+                categorized[category].sort(key=lambda entry: entry.time, reverse=True)
 
         return latest, categorized
+
+    def _get_direct_commits(self, last_hash: str, existing_lines: list[str], merge_hashes: set[str]) -> list[_Commit]:
+        """
+        Collect direct (non-merge) commits pushed to main since the last release.
+
+        Direct pushes never go through a merge request, so they are invisible to
+        ``_get_entries``. This walks the first-parent history of main since the
+        previous changelog boundary, keeps the single-parent (non-merge) commits,
+        and drops any that are release commits, already recorded in the changelog,
+        or correspond to a captured merge commit.
+        """
+        if not last_hash:
+            return []
+
+        # Use the boundary commit's date to bound the commit listing window
+        try:
+            since = self.gl.get_commit(last_hash)["committed_date"]
+        except Exception:
+            verbose(f"Could not resolve boundary commit {last_hash}; skipping direct-commit capture")
+            return []
+
+        existing_text = "".join(existing_lines)
+
+        commits: list[_Commit] = []
+        for response in self.gl.list_commits(ref_name="main", since=since, first_parent=True):
+            # merge commits (2+ parents) are already captured via merge requests
+            if len(response.get("parent_ids", [])) >= 2:
+                continue
+
+            commit = _Commit(response)
+
+            # skip the boundary commit itself and release commits made by this pipeline
+            if commit.hash == last_hash or commit.description.startswith("Release "):
+                continue
+
+            # skip commits already recorded in the changelog or captured as a merge
+            if commit.hash in merge_hashes or f"`{commit.shorthash}`" in existing_text:
+                continue
+
+            verbose(f"COMMITGEN: {commit.description} @ {commit.hash} - ADDED as {commit.category.name} (direct)")
+            commits.append(commit)
+
+        return commits
 
     def _extract_prerelease_entries(
         self, lines: list[str], base_version: str
@@ -317,7 +426,7 @@ class ReleaseGen:
         base_version = vt.current_base if is_finalizing_prerelease else None
 
         # Return empty dict if nothing to update
-        latest, entries = self._get_entries(last_hash)
+        latest, entries = self._get_entries(last_hash, current)
 
         # When finalizing a pre-release, we may not have new entries but still need to
         # consolidate the changelog sections
@@ -441,7 +550,7 @@ class ReleaseGen:
         """
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
-        _, entries = self._get_entries(last_hash)
+        _, entries = self._get_entries(last_hash, current)
 
         if not entries:
             return "MINOR"  # Default to MINOR if no entries
@@ -463,7 +572,7 @@ class ReleaseGen:
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
 
-        latest, entries = self._get_entries(last_hash)
+        latest, entries = self._get_entries(last_hash, current)
         if not entries:
             return "", []
 

@@ -370,6 +370,65 @@ class Gitlab(RestWrapper):
             },
         )
 
+    def list_commits(
+        self,
+        ref_name: str = "main",
+        since: str | None = None,
+        until: str | None = None,
+        first_parent: bool = False,
+    ) -> list[dict[str, Any]]:
+        """
+        List repository commits.
+
+        Parameters
+        ----------
+        ref_name : str, default "main"
+            The name of a repository branch, tag or revision range
+        since : str | None, default None
+            Only commits after or on this date (ISO 8601 format)
+        until : str | None, default None
+            Only commits before or on this date (ISO 8601 format)
+        first_parent : bool, default False
+            Follow only the first parent commit upon seeing a merge commit
+
+        Returns
+        -------
+        List[Dict[str, Any]]
+            List of commits found using criteria
+
+        Note
+        ----
+        https://docs.gitlab.com/ee/api/commits.html#list-repository-commits
+        """
+        params: dict[str, str] = {"per_page": "100", "ref_name": ref_name}
+        if since is not None:
+            params["since"] = quote(since, safe="")
+        if until is not None:
+            params["until"] = quote(until, safe="")
+        if first_parent:
+            params["first_parent"] = "true"
+        return self._request(get, COMMITS, params)
+
+    def get_commit(self, sha: str) -> dict[str, Any]:
+        """
+        Get a single commit.
+
+        Parameters
+        ----------
+        sha : str
+            The commit hash or name of a repository branch or tag
+
+        Returns
+        -------
+        Dict[str, Any]:
+            The commit information for the specified sha
+
+        Note
+        ----
+        https://docs.gitlab.com/ee/api/commits.html#get-a-single-commit
+        """
+        return self._request(get, [COMMITS, sha])
+
     def cherry_pick(self, sha: str, branch: str = "main") -> dict[str, Any]:
         """
         Cherry pick a commit.
