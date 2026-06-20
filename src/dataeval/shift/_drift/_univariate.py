@@ -333,7 +333,13 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
 
         if self.method == "mwu":
             result = scipy.stats.mannwhitneyu(x, y, alternative=self.alternative)
-            return np.float32(result.statistic), np.float32(result.pvalue)
+            # scipy >=1.18 returns NaN for the two-sided test when every value is tied
+            # (zero variance, e.g. a constant feature): the statistic is undefined.
+            # Identical distributions imply no drift, so treat this as p-value 1.0.
+            pvalue = result.pvalue
+            if np.isnan(pvalue):
+                pvalue = np.float32(1.0)
+            return np.float32(result.statistic), np.float32(pvalue)
 
         if self.method == "anderson":
             result = scipy.stats.anderson_ksamp([x, y])
