@@ -115,7 +115,7 @@ def set_device(device: DeviceLike | None) -> None:
 
     See Also
     --------
-    `torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
+    :class:`torch.device`
     """
     _config.device = None if device is None else _todevice(device)
 
@@ -131,7 +131,7 @@ def get_device(override: DeviceLike | None = None) -> torch.device:
 
     Returns
     -------
-    `torch.device`
+    :class:`torch.device`
     """
     if override is not None:
         return _todevice(override)

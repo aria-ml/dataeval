@@ -71,9 +71,9 @@ class Sufficiency(Evaluator, Generic[T, M]):
 
     See Also
     --------
-    :class:`.Sufficiency.Config` : Configuration object
-    :class:`.SufficiencyOutput` : Results with measures and projections
-    :class:`.ModelResetStrategy` : Protocol for reset strategies
+    :class:`~dataeval.performance.Sufficiency.Config` : Configuration object
+    :class:`~dataeval.performance.SufficiencyOutput` : Results with measures and projections
+    :class:`~dataeval.protocols.ModelResetStrategy` : Protocol for reset strategies
 
     Notes
     -----
@@ -117,9 +117,9 @@ class Sufficiency(Evaluator, Generic[T, M]):
 
         See Also
         --------
-        - :class:`.TrainingStrategy`
-        - :class:`.EvaluationStrategy`
-        - :class:`.ModelResetStrategy`
+        - :class:`~dataeval.protocols.TrainingStrategy`
+        - :class:`~dataeval.protocols.EvaluationStrategy`
+        - :class:`~dataeval.protocols.ModelResetStrategy`
 
         Examples
         --------
@@ -309,7 +309,7 @@ class Sufficiency(Evaluator, Generic[T, M]):
         schedule : EvaluationSchedule or int or Iterable[int] or None, default None
             Specify this to collect metrics over a specific set of dataset lengths.
             If `None`, evaluates at each step calculated by
-            `np.geomspace` over the length of the dataset
+            :func:`np.geomspace <numpy.geomspace>` over the length of the dataset
 
         Returns
         -------

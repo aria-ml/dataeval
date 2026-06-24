@@ -385,9 +385,9 @@ class ClassifierUncertaintyExtractor:
 
     See Also
     --------
-    UncertaintyExtractor : Per-instance prediction entropy as a drift feature.
-    ClasswiseUncertaintyExtractor : Per-class prediction entropy distributions.
-    dataeval.shift.DriftUnivariate : Univariate drift detection with multiple statistical tests
+    :class:`~dataeval.extractors.UncertaintyExtractor` : Per-instance prediction entropy as a drift feature.
+    :class:`~dataeval.extractors.ClasswiseUncertaintyExtractor` : Per-class prediction entropy distributions.
+    :class:`~dataeval.shift.DriftUnivariate` : Univariate drift detection with multiple statistical tests
 
     Notes
     -----

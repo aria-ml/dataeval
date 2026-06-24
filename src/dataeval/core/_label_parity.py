@@ -143,6 +143,9 @@ def label_parity(
         If expected label distribution is empty, is all zeros, or if there is a mismatch in the number
         of unique classes between the observed and expected distributions.
 
+    See Also
+    --------
+    :func:`scipy.stats.chisquare`
 
     Notes
     -----
@@ -151,13 +154,12 @@ def label_parity(
       has the same total number of labels as the observed distribution.
     - It then performs a :term:`Chi-Square Test of Independence` to determine if there is a statistically significant
       difference between the observed and expected label distributions.
-    - This function acts as an interface to the scipy.stats.chisquare method, which is documented at
-      https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
+    - This function acts as an interface to :func:`scipy.stats.chisquare`.
 
 
     Examples
     --------
-    Randomly creating some label distributions using ``np.random.default_rng``
+    Randomly creating some label distributions using :func:`np.random.default_rng <numpy.random.default_rng>`
 
     >>> rng = np.random.default_rng(175)
     >>> expected_labels = rng.choice([0, 1, 2, 3, 4], (100))

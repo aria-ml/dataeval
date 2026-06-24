@@ -72,8 +72,8 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
     See Also
     --------
-    :class:`DriftWasserstein.Stats` : Per-prediction statistics returned in
-        :attr:`DriftOutput.details`.
+    :class:`~dataeval.shift.DriftWasserstein.Stats` : Per-prediction statistics returned in
+        :attr:`~dataeval.shift.DriftOutput.details`.
 
     Example
     -------

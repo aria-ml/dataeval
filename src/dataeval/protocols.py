@@ -159,7 +159,7 @@ Type alias for a `Union` representing objects that can be coerced into an array.
 
 See Also
 --------
-`NumPy ArrayLike <https://numpy.org/doc/stable/reference/typing.html#numpy.typing.ArrayLike>`_
+:obj:`numpy.typing.ArrayLike`
 """
 
 DeviceLike: TypeAlias = int | str | tuple[str, int] | torch.device
@@ -168,7 +168,7 @@ Type alias for a `Union` representing types that specify a torch.device.
 
 See Also
 --------
-`torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
+:class:`torch.device`
 """
 
 
@@ -619,7 +619,7 @@ class ModelResetStrategy(Protocol[_M]):
 
     See Also
     --------
-    :class:`.Sufficiency` : Uses this protocol for model reset between runs
+    :class:`~dataeval.performance.Sufficiency` : Uses this protocol for model reset between runs
 
     Examples
     --------
@@ -870,8 +870,8 @@ class UpdateStrategy(Protocol):
 
     See Also
     --------
-    LastSeenUpdate : Built-in strategy keeping the last n samples
-    ReservoirSamplingUpdate : Built-in strategy using reservoir sampling
+    :class:`~dataeval.shift.update_strategies.LastSeenUpdateStrategy` : Built-in strategy keeping the last n samples
+    :class:`~dataeval.shift.update_strategies.ReservoirSamplingUpdateStrategy` : Built-in strategy using reservoir sampling
 
     Notes
     -----
@@ -946,7 +946,7 @@ class UpdateStrategy(Protocol):
     >>> # Detect drift on new data - reference will be updated automatically
     >>> new_data = np.random.normal(0.5, 1, (50, 10))
     >>> result = detector.predict(new_data)
-    """
+    """  # noqa: E501
 
     def __call__(self, reference_data: NDArray[np.float32], data: NDArray[np.float32]) -> NDArray[np.float32]:
         """Return updated reference data."""

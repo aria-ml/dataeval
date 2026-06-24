@@ -72,7 +72,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
 
     See Also
     --------
-    :class:`DriftDomainClassifier.Stats` : Per-prediction statistics returned in :attr:`DriftOutput.details`.
+    :class:`~dataeval.shift.DriftDomainClassifier.Stats` : Per-prediction statistics returned in :attr:`~dataeval.shift.DriftOutput.details`.
 
     Examples
     --------

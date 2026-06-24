@@ -63,7 +63,7 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
 
     See Also
     --------
-    :class:`DriftReconstruction.Stats` : Per-prediction statistics returned in :attr:`DriftOutput.details`.
+    :class:`~dataeval.shift.DriftReconstruction.Stats` : Per-prediction statistics returned in :attr:`~dataeval.shift.DriftOutput.details`.
 
     Examples
     --------
@@ -74,7 +74,7 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
     >>> detector = DriftReconstruction(model).fit(ref)
     >>> test = torch.rand(50, 1, 28, 28).numpy()
     >>> result = detector.predict(test)
-    """
+    """  # noqa: E501
 
     class Stats(_DriftReconstructionStats):
         """Statistics from reconstruction-based drift detection.

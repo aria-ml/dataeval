@@ -1112,8 +1112,8 @@ class Duplicates(Evaluator):
 
         See Also
         --------
-        evaluate : Compute hashes and find duplicates in one call
-        from_clusters : Find duplicates using cluster-based detection
+        :meth:`~dataeval.quality.Duplicates.evaluate` : Compute hashes and find duplicates in one call
+        :meth:`~dataeval.quality.Duplicates.from_clusters` : Find duplicates using cluster-based detection
         """
         # Normalize to a single or list of StatsResults
         calc_results: StatsResult | list[StatsResult]
@@ -1162,9 +1162,9 @@ class Duplicates(Evaluator):
 
         See Also
         --------
-        dataeval.core.cluster : Function to compute clusters from embeddings
-        from_stats : Find duplicates from pre-computed hash statistics
-        evaluate : Find duplicates by computing hashes from images
+        :func:`~dataeval.core.cluster` : Function to compute clusters from embeddings
+        :meth:`~dataeval.quality.Duplicates.from_stats` : Find duplicates from pre-computed hash statistics
+        :meth:`~dataeval.quality.Duplicates.evaluate` : Find duplicates by computing hashes from images
 
         Notes
         -----

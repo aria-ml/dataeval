@@ -48,7 +48,7 @@ class BaseChunker(ReprMixin, Chunker, ABC):
 class CountChunker(BaseChunker):
     """Split array into a fixed number of chunks.
 
-    Uses ``np.array_split`` to distribute samples as evenly as possible
+    Uses :func:`np.array_split <numpy.array_split>` to distribute samples as evenly as possible
     across exactly ``chunk_count`` chunks. When samples don't divide evenly,
     the first chunks each receive one extra sample rather than creating a
     tiny leftover chunk.

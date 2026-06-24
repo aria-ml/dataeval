@@ -64,7 +64,7 @@ class DriftKNeighbors(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftKNeigh
 
     See Also
     --------
-    :class:`DriftKNeighbors.Stats` : Per-prediction statistics returned in :attr:`DriftOutput.details`.
+    :class:`~dataeval.shift.DriftKNeighbors.Stats` : Per-prediction statistics returned in :attr:`~dataeval.shift.DriftOutput.details`.
 
     Examples
     --------

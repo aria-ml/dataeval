@@ -409,11 +409,11 @@ class Prioritize(Evaluator):
     See Also
     --------
     :class:`~dataeval.selection.Indices`
-    :func:`dataeval.core.rank_knn`
-    :func:`dataeval.core.rank_kmeans_distance`
-    :func:`dataeval.core.rank_kmeans_complexity`
-    :func:`dataeval.core.rank_hdbscan_distance`
-    :func:`dataeval.core.rank_hdbscan_complexity`
+    :func:`~dataeval.core.rank_knn`
+    :func:`~dataeval.core.rank_kmeans_distance`
+    :func:`~dataeval.core.rank_kmeans_complexity`
+    :func:`~dataeval.core.rank_hdbscan_distance`
+    :func:`~dataeval.core.rank_hdbscan_complexity`
 
     Examples
     --------

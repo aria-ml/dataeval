@@ -84,7 +84,7 @@ class Diversity(Evaluator):
 
     See Also
     --------
-    scipy.stats.entropy
+    :func:`scipy.stats.entropy`
 
     Notes
     -----

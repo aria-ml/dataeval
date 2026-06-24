@@ -179,7 +179,7 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
 
     See Also
     --------
-    :class:`DriftMMD.Stats` : Per-prediction statistics returned in :attr:`DriftOutput.details`.
+    :class:`~dataeval.shift.DriftMMD.Stats` : Per-prediction statistics returned in :attr:`~dataeval.shift.DriftOutput.details`.
 
     Example
     -------

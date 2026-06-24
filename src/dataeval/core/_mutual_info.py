@@ -106,9 +106,9 @@ def mutual_info(  # noqa: C901
 
     See Also
     --------
-    sklearn.feature_selection.mutual_info_classif
-    sklearn.feature_selection.mutual_info_regression
-    sklearn.metrics.mutual_info_score
+    :func:`sklearn.feature_selection.mutual_info_classif`
+    :func:`sklearn.feature_selection.mutual_info_regression`
+    :func:`sklearn.metrics.mutual_info_score`
 
     Notes
     -----
@@ -237,9 +237,9 @@ def mutual_info_classwise(
 
     See Also
     --------
-    sklearn.feature_selection.mutual_info_classif
-    sklearn.feature_selection.mutual_info_regression
-    sklearn.metrics.mutual_info_score
+    :func:`sklearn.feature_selection.mutual_info_classif`
+    :func:`sklearn.feature_selection.mutual_info_regression`
+    :func:`sklearn.metrics.mutual_info_score`
 
     Notes
     -----

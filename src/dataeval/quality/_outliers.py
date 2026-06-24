@@ -1269,10 +1269,10 @@ class Outliers(Evaluator):
 
         See Also
         --------
-        dataeval.core.cluster : Function to compute clusters from embeddings
-        dataeval.core.compute_cluster_stats : Computes statistics for adaptive detection
-        from_stats : Find outliers from pre-computed image statistics
-        evaluate : Find outliers by computing statistics from images
+        :func:`~dataeval.core.cluster` : Function to compute clusters from embeddings
+        :func:`~dataeval.core.compute_cluster_stats` : Computes statistics for adaptive detection
+        :meth:`~dataeval.quality.Outliers.from_stats` : Find outliers from pre-computed image statistics
+        :meth:`~dataeval.quality.Outliers.evaluate` : Find outliers by computing statistics from images
 
         Notes
         -----

@@ -117,7 +117,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
 
     See Also
     --------
-    :class:`DriftUnivariate.Stats` : Per-prediction statistics returned in :attr:`DriftOutput.details`.
+    :class:`~dataeval.shift.DriftUnivariate.Stats` : Per-prediction statistics returned in :attr:`~dataeval.shift.DriftOutput.details`.
 
     Example
     -------

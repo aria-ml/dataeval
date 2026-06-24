@@ -36,7 +36,7 @@ def diversity_shannon(
 
     See Also
     --------
-    scipy.stats.entropy
+    :func:`scipy.stats.entropy`
     """
     _logger.debug("Computing Shannon diversity for %d factors", counts.shape[1] if counts.ndim > 1 else 1)
     raw_entropy = np.asarray(entropy(counts, axis=0))

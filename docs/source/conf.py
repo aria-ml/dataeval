@@ -78,6 +78,10 @@ suppress_warnings = ["ref.python", "autoapi.python_import_resolution"]
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "maite": ("https://mit-ll-ai-technology.github.io/maite/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+    "sklearn": ("https://scikit-learn.org/stable/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "torch": ("https://pytorch.org/docs/stable/", None),
 }
 
 # ---------------------------------------------------------------------------------

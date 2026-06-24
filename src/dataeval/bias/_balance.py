@@ -89,9 +89,9 @@ class Balance(Evaluator):
 
     See Also
     --------
-    sklearn.feature_selection.mutual_info_classif
-    sklearn.feature_selection.mutual_info_regression
-    sklearn.metrics.mutual_info_score
+    :func:`sklearn.feature_selection.mutual_info_classif`
+    :func:`sklearn.feature_selection.mutual_info_regression`
+    :func:`sklearn.metrics.mutual_info_score`
 
     Notes
     -----

@@ -578,8 +578,8 @@ class Metadata(Array, FeatureExtractor):
 
         See Also
         --------
-        image_data : Filter to image-level rows only
-        target_data : Filter to target-level rows only
+        :attr:`~dataeval.Metadata.image_data` : Filter to image-level rows only
+        :attr:`~dataeval.Metadata.target_data` : Filter to target-level rows only
 
         Notes
         -----

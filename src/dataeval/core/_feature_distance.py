@@ -89,9 +89,8 @@ def feature_distance(
 
     See Also
     --------
-    Earth mover's distance
-
-    Kolmogorov-Smirnov two-sample test
+    :func:`scipy.stats.wasserstein_distance` : Earth mover's distance
+    :func:`scipy.stats.ks_2samp` : Kolmogorov-Smirnov two-sample test
     """
     _logger.info("Starting feature_distance calculation")
 

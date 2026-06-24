@@ -84,7 +84,7 @@ def parity(  # noqa: C901
 
     See Also
     --------
-    balance
+    :class:`~dataeval.bias.Balance`
 
     Notes
     -----

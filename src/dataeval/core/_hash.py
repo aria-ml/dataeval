@@ -322,8 +322,8 @@ def phash_d4(image: Array3D[Any]) -> str:
 
     See Also
     --------
-    phash : Standard orientation-sensitive perceptual hash
-    dhash_d4 : Orientation-invariant difference hash
+    :func:`~dataeval.core.phash` : Standard orientation-sensitive perceptual hash
+    :func:`~dataeval.core.dhash_d4` : Orientation-invariant difference hash
 
     Notes
     -----
@@ -363,8 +363,8 @@ def dhash_d4(image: Array3D[Any]) -> str:
 
     See Also
     --------
-    dhash : Standard orientation-sensitive difference hash
-    phash_d4 : Orientation-invariant perceptual hash
+    :func:`~dataeval.core.dhash` : Standard orientation-sensitive difference hash
+    :func:`~dataeval.core.phash_d4` : Orientation-invariant perceptual hash
 
     Notes
     -----

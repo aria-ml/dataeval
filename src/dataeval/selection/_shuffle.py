@@ -25,7 +25,7 @@ class Shuffle(Selection[Any]):
 
     See Also
     --------
-    `NumPy Random Generator <https://numpy.org/doc/stable/reference/random/generator.html>`_
+    :class:`numpy.random.Generator`
     """
 
     seed: int | NDArray[Any] | SeedSequence | BitGenerator | Generator | None

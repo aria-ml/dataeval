@@ -167,7 +167,7 @@ class Parity(Evaluator):
 
         Examples
         --------
-        Randomly creating some "continuous" and categorical variables using ``np.random.default_rng``
+        Randomly creating some "continuous" and categorical variables using :func:`np.random.default_rng <numpy.random.default_rng>`
 
         >>> from dataeval import Metadata
         >>> metadata = Metadata(dataset)
@@ -187,7 +187,7 @@ class Parity(Evaluator):
         │ time_of_day ┆ 0.157489 ┆ 0.07135  ┆ false          ┆ true                  │
         │ weather     ┆ 0.0      ┆ 0.567789 ┆ false          ┆ false                 │
         └─────────────┴──────────┴──────────┴────────────────┴───────────────────────┘
-        """
+        """  # noqa: E501
         # Convert AnnotatedDataset to Metadata if needed
         if isinstance(data, MetadataLike):
             self.metadata = data
