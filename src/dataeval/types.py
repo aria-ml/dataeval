@@ -45,7 +45,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.dataclasses import dataclass
 from typing_extensions import Self
 
-from dataeval import __version__
+try:
+    from dataeval._version import __version__
+except ImportError:  # pragma: no cover
+    __version__ = "unknown"
+__version__ = str(__version__)
+
 from dataeval._helpers import apply_config, get_overrides
 from dataeval.protocols import Array, FeatureExtractor, SequenceLike
 
