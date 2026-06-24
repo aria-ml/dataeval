@@ -82,7 +82,6 @@ stages:
           - uv.lock
       paths:
         - $UV_CACHE_DIR
-        - data
   after_script:
     - uv cache prune --ci
   variables:

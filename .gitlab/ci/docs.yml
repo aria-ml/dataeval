@@ -18,6 +18,24 @@ docs:
     - if [ "$CI_COMMIT_BRANCH" != "main" ]; then bash docs/fetch-docs-cache.sh || true; fi
     - uvx nox -P 3.13 -e docs $DOCS_CLEAN
     - bash docs/push-docs-cache.sh
+  cache:
+    # uv cache, shared with the other .nox jobs (same key derived from uv.lock).
+    - key:
+        files:
+          - uv.lock
+      paths:
+        - $UV_CACHE_DIR
+    # Notebook datasets downloaded during the docs build. Notebooks (and
+    # docs/source/data.py) execute with their working dir set to
+    # docs/source/notebooks, so datasets land in docs/source/notebooks/data.
+    # Dedicated key so other jobs don't clobber it; keyed on data.py so adding
+    # or changing a dataset invalidates the cache.
+    - key:
+        files:
+          - docs/source/data.py
+        prefix: docs-datasets
+      paths:
+        - docs/source/notebooks/data
   artifacts:
     paths:
       - output/docs/html/
