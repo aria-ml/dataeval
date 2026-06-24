@@ -49,6 +49,7 @@ dependencies = [
 cpu = ["torch>=2.2.0", "torchvision>=0.17.0"]
 cu118 = ["torch>=2.2.0", "torchvision>=0.17.0"]
 cu128 = ["torch>=2.2.0", "torchvision>=0.17.0"]
+litert = ["ai-edge-litert>=2.0; python_version <= '3.14'"]
 opencv = ["opencv-python-headless>=4.8.0"]
 onnx = [
   "onnx>=1.14.0",
@@ -75,6 +76,14 @@ dataeval_outliers = "dataeval.quality:Outliers"
 dataeval_duplicates = "dataeval.quality:Duplicates"
 dataeval_sufficiency = "dataeval.performance:Sufficiency"
 
+[project.entry-points."maite.protocols.image_classification.Model"]
+dataeval_OnnxImageClassifier = "dataeval.models:OnnxImageClassifier"
+dataeval_LiteRtImageClassifier = "dataeval.models:LiteRtImageClassifier"
+
+[project.entry-points."maite.protocols.object_detection.Model"]
+dataeval_OnnxObjectDetector = "dataeval.models:OnnxObjectDetector"
+dataeval_LiteRtObjectDetector = "dataeval.models:LiteRtObjectDetector"
+
 [dependency-groups]
 base = [
   "uv>=0.8.0",
@@ -94,6 +103,7 @@ docsync = [
 test = [
   "coverage[toml]>=7.6",
   "onnx>=1.14.0",
+  "onnxscript>=0.6.0",
   "pytest>=8.3",
   "pytest-cov>=6.1",
   "pytest-xdist>=3.6.1",

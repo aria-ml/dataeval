@@ -7,6 +7,7 @@ All extractors implement the :class:`~dataeval.protocols.FeatureExtractor` proto
 """
 
 __all__ = [
+    "DetectionGeometryExtractor",
     "FlattenExtractor",
     "OnnxExtractor",
     "TorchExtractor",
@@ -14,11 +15,14 @@ __all__ = [
     "UncertaintyExtractor",
     "ClasswiseUncertaintyExtractor",
     "ClassifierUncertaintyExtractor",
+    "ScoresExtractor",
 ]
 
 from dataeval.extractors._bovw import BoVWExtractor
 from dataeval.extractors._flatten import FlattenExtractor
+from dataeval.extractors._geometry import DetectionGeometryExtractor
 from dataeval.extractors._onnx import OnnxExtractor
+from dataeval.extractors._scores import ScoresExtractor
 from dataeval.extractors._torch import TorchExtractor
 from dataeval.extractors._uncertainty import (
     ClassifierUncertaintyExtractor,

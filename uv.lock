@@ -109,6 +109,42 @@ constraints = [
 ]
 
 [[package]]
+name = "ai-edge-litert"
+version = "2.1.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "backports-strenum" },
+    { name = "flatbuffers" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "protobuf" },
+    { name = "tqdm" },
+    { name = "typing-extensions" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/f3/348482b341c92733d10fab18b9dfff80a51009f955b5e5e28639fa77b7c9/ai_edge_litert-2.1.5-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:c1d558d801ec783fa29730f87c73c66ee609e66b556b83675f81c5be72bf4167", size = 9708688, upload-time = "2026-05-15T23:34:12.942Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/a5/f4d3bf26fe7d596d14230114c0da1f0b8f9ccfe4baeeeb4c1f5caaeabd4f/ai_edge_litert-2.1.5-cp310-cp310-manylinux_2_27_aarch64.whl", hash = "sha256:06b9c2ea2a6c9c54a0f1f14825e26511c75ddfc140da81f264151d94bea0c845", size = 12864390, upload-time = "2026-05-15T23:11:18.248Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/ce/e48f602f2c9ad380faf99d15f4a1d7c563a43980725bb5d6f0badff8f4a1/ai_edge_litert-2.1.5-cp310-cp310-manylinux_2_27_x86_64.whl", hash = "sha256:90af4d726e34458f50f01118fe7bf8a6b223a820e6981c9d741f08d8f8489706", size = 17564222, upload-time = "2026-05-15T23:05:28.906Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/19/3225b96e713b2e874c18bbedd982725704c89f224ea722c0802df23f320d/ai_edge_litert-2.1.5-cp310-cp310-win_amd64.whl", hash = "sha256:9e70304490274992be0a03b29faf819f76dc7dd2754a3ddcfed25e689dab150c", size = 17752338, upload-time = "2026-05-15T23:39:19.831Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/7f/ec543ef2f79cf5b5909521cb614162ec1e6fc9df863ccae23142260dd8c7/ai_edge_litert-2.1.5-cp311-cp311-macosx_12_0_arm64.whl", hash = "sha256:cf9a6e98677d26fd900ec9459a19cf5cce9f94c64132d728485eeb9accd5c162", size = 9709620, upload-time = "2026-05-15T23:34:15.065Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/84/a1ec0a9c6c345e79207b2a3a2a8e1e9572f412143100dc650f332c53d84f/ai_edge_litert-2.1.5-cp311-cp311-manylinux_2_27_aarch64.whl", hash = "sha256:1edf83d132919b0b95bb5ded64e79bfed018168d3584c28fa30a8eb0d3bfca6b", size = 12866358, upload-time = "2026-05-15T23:11:20.539Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/44/3c365bc63b744316ef61c75761e53f34f9cdc0ba31fddc1d1039ca5322b4/ai_edge_litert-2.1.5-cp311-cp311-manylinux_2_27_x86_64.whl", hash = "sha256:7c54e45589831fbaeec1481df530e336d0112002a6193bc28f7aafa5f4898a3a", size = 17566472, upload-time = "2026-05-15T23:05:31.285Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/47/d3956aeddc00194463dcc83991ad58759b1a94672d66e7b7c5d2be1d95de/ai_edge_litert-2.1.5-cp311-cp311-win_amd64.whl", hash = "sha256:ad7844c7c2431dfe36debf6d4541f27af198848ed3090cbaacbdf2bb2cd377c7", size = 17753382, upload-time = "2026-05-15T23:39:22.178Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/37/cf525a4ed6aff573b10a162b7bff19673e50ce6f45daac0a095dcd099a28/ai_edge_litert-2.1.5-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:b62fd3d90e643bcc3e3a31885a7636b5662527d48c27154cf07793f26896f018", size = 9711976, upload-time = "2026-05-15T23:34:16.988Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/6f/b43fc56831ecc439a6e6eb0e1bfdffbfe6213e8c706aa421017dce1ac56b/ai_edge_litert-2.1.5-cp312-cp312-manylinux_2_27_aarch64.whl", hash = "sha256:1d282722cdfb70bb42d457f4bfe7789f88187ccadd73fea9f0107dce6e98fe45", size = 12867617, upload-time = "2026-05-15T23:11:22.759Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/20/a76ba29b1c4c3009b5c64f4ec7f5fe5165104fe15481bd79b55927948541/ai_edge_litert-2.1.5-cp312-cp312-manylinux_2_27_x86_64.whl", hash = "sha256:f1c6d8db4382890881baeb8ed13c0802ada022e0b104b0db8fccf31353899ee0", size = 17570644, upload-time = "2026-05-15T23:05:33.664Z" },
+    { url = "https://files.pythonhosted.org/packages/82/fa/5399085daffd9949668d13a83a48db9f69af535ef9f9d06fdf71f0205321/ai_edge_litert-2.1.5-cp312-cp312-win_amd64.whl", hash = "sha256:6d2db6759188b12be9fd095468c3c7069c1bc7c128de78f42f862fb654d247ea", size = 17755006, upload-time = "2026-05-15T23:39:24.555Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/fd/28f24305904954f31ee1a979eea39b670c6a1ab13cf6e5e4fe5f128e9eff/ai_edge_litert-2.1.5-cp313-cp313-macosx_12_0_arm64.whl", hash = "sha256:2af16685a4cc8923d9a89ee5c732b8c66ae2c4d0cb538dbcebba3b93afb662ca", size = 9713185, upload-time = "2026-05-15T23:34:19.431Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/88/e7e32b37f972b4877df788d1ad0995388f823d74dc2743b200bf71a25a53/ai_edge_litert-2.1.5-cp313-cp313-manylinux_2_27_aarch64.whl", hash = "sha256:57506e9e9b91ee04e4cf3e986d184b0c92f1aa9f510c32841835c0d719a7fbb5", size = 12867247, upload-time = "2026-05-15T23:11:24.667Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/c1/5192c360a467dd6e09fa28388022c37bca5d9777e616da40dc5d517186a9/ai_edge_litert-2.1.5-cp313-cp313-manylinux_2_27_x86_64.whl", hash = "sha256:b7825e13454a90e7a4782ecdb6f6d987a2bcc9147aa90eb181193867bf696f24", size = 17570488, upload-time = "2026-05-15T23:05:36.078Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/ba/154599984a8eccbdd14bcd89fabc2e9cbdfcbf537a3c1ab08712c7ce7d02/ai_edge_litert-2.1.5-cp313-cp313-win_amd64.whl", hash = "sha256:602fc90f6baf396df0fe4b0317b35627305c2233beb48db194b79e7e420bafa7", size = 17755085, upload-time = "2026-05-15T23:39:26.901Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/51/34f0ad0def8b15093d602ca6904b129d3ab242ae4711c872190d5c95c010/ai_edge_litert-2.1.5-cp314-cp314-macosx_12_0_arm64.whl", hash = "sha256:597ea79f947452c79ca7e9dd7abfedad6179302851df4a4bb4c755069a2f5ffe", size = 9712496, upload-time = "2026-05-15T23:34:21.36Z" },
+    { url = "https://files.pythonhosted.org/packages/42/43/2b8ef317dca3096372cbf820aa5a3a6c8857dad67f31840a1e17a951e2d3/ai_edge_litert-2.1.5-cp314-cp314-manylinux_2_27_aarch64.whl", hash = "sha256:41d2e8267f047ed14f14a5ff4e0f677a9c5143dd17a36991513f8cc5ef580a3b", size = 12867899, upload-time = "2026-05-15T23:11:26.584Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/d5/9640952de755409c84e09eec5d107675c59fe4f4859391464275eb2c3db6/ai_edge_litert-2.1.5-cp314-cp314-manylinux_2_27_x86_64.whl", hash = "sha256:4fa10d99b2f8647678850684d31075fbb304f50535d5788c2ca93e273ce727a8", size = 17570849, upload-time = "2026-05-15T23:05:37.981Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/d4/0843e5a41bf71eb99ccd1e54714485df527bec19e8c8e679e1395176345d/ai_edge_litert-2.1.5-cp314-cp314-win_amd64.whl", hash = "sha256:14b35558bfce76146046cc2fc647f3fde97146e8b7622ea7fb02e85ac16cd906", size = 18380722, upload-time = "2026-05-15T23:39:29.365Z" },
+]
+
+[[package]]
 name = "alabaster"
 version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -286,6 +322,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7d/b2/51899539b6ceeeb420d40ed3cd4b7a40519404f9baf3d4ac99dc413a834b/babel-2.18.0.tar.gz", hash = "sha256:b80b99a14bd085fcacfa15c9165f651fbb3406e66cc603abf11c5750937c992d", size = 9959554, upload-time = "2026-02-01T12:30:56.078Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/77/f5/21d2de20e8b8b0408f0681956ca2c69f1320a3848ac50e6e7f39c6159675/babel-2.18.0-py3-none-any.whl", hash = "sha256:e2b422b277c2b9a9630c1d7903c2a00d0830c409c59ac8cae9081c92f1aeba35", size = 10196845, upload-time = "2026-02-01T12:30:53.445Z" },
+]
+
+[[package]]
+name = "backports-strenum"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/c7/2ed54c32fed313591ffb21edbd48db71e68827d43a61938e5a0bc2b6ec91/backports_strenum-1.3.1.tar.gz", hash = "sha256:77c52407342898497714f0596e86188bb7084f89063226f4ba66863482f42414", size = 7257, upload-time = "2023-12-09T14:36:40.937Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/50/56cf20e2ee5127b603b81d5a69580a1a325083e2b921aa8f067da83927c0/backports_strenum-1.3.1-py3-none-any.whl", hash = "sha256:cdcfe36dc897e2615dc793b7d3097f54d359918fc448754a517e6f23044ccf83", size = 8304, upload-time = "2023-12-09T14:36:39.905Z" },
 ]
 
 [[package]]
@@ -1156,6 +1201,9 @@ cu128 = [
     { name = "torch", version = "2.10.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
     { name = "torchvision", version = "0.25.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
 ]
+litert = [
+    { name = "ai-edge-litert", marker = "python_full_version < '3.15' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
+]
 onnx = [
     { name = "onnx" },
     { name = "onnxruntime", version = "1.23.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
@@ -1194,6 +1242,7 @@ dev = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
     { name = "onnx" },
+    { name = "onnxscript" },
     { name = "opencv-python-headless" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
     { name = "pandas", version = "3.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
@@ -1267,6 +1316,7 @@ security = [
 test = [
     { name = "coverage", extra = ["toml"] },
     { name = "onnx" },
+    { name = "onnxscript" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
@@ -1281,6 +1331,7 @@ verify = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ai-edge-litert", marker = "python_full_version < '3.15' and extra == 'litert'", specifier = ">=2.0" },
     { name = "lightgbm", specifier = ">=4" },
     { name = "maite", specifier = ">=0.9.4" },
     { name = "numba", specifier = ">=0.61.0" },
@@ -1307,7 +1358,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.12" },
     { name = "xxhash", specifier = ">=3.4" },
 ]
-provides-extras = ["cpu", "cu118", "cu128", "onnx", "onnx-gpu", "opencv"]
+provides-extras = ["cpu", "cu118", "cu128", "litert", "onnx", "onnx-gpu", "opencv"]
 
 [package.metadata.requires-dev]
 base = [{ name = "uv", specifier = ">=0.8.0" }]
@@ -1330,6 +1381,7 @@ dev = [
     { name = "nox-uv", specifier = ">=0.6.2" },
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "onnx", specifier = ">=1.14.0" },
+    { name = "onnxscript", specifier = ">=0.6.0" },
     { name = "opencv-python-headless", specifier = ">=4.8.0" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "pip", specifier = ">=25.1" },
@@ -1394,6 +1446,7 @@ security = [
 test = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.6" },
     { name = "onnx", specifier = ">=1.14.0" },
+    { name = "onnxscript", specifier = ">=0.6.0" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-cov", specifier = ">=6.1" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
@@ -4172,6 +4225,23 @@ wheels = [
 ]
 
 [[package]]
+name = "onnx-ir"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ml-dtypes" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "onnx" },
+    { name = "sympy" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/35/e6/672fefb2f108d077f58181a7babf4c0f8d1182a30353ffc9c79c63afc5ee/onnx_ir-0.2.1.tar.gz", hash = "sha256:8b8b10a93f43e65962104de6070c43c5dacb0e3cdfefc7c8059dd83c9db64f35", size = 144279, upload-time = "2026-04-20T20:21:47.735Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8c/aa/f7a53321c60b9ad9ee184b6018292ed6b5389947592a2c8c09c736bb7f9e/onnx_ir-0.2.1-py3-none-any.whl", hash = "sha256:c7285da889312f91882de2092e298a9eeeefbfc1d1951c49d983992967eb09a7", size = 166792, upload-time = "2026-04-20T20:21:46.357Z" },
+]
+
+[[package]]
 name = "onnxruntime"
 version = "1.23.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4480,6 +4550,24 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/3e/5b/82b27f766b64f97c9a98b772dc07b608e900bd2faafdfa176b86d20be7f8/onnxruntime_gpu-1.24.4-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:af9dd7ef92d94c75e5523cf070e180f3d8cdbb2fc007dcea97ba71b03e3b96d6", size = 252765395, upload-time = "2026-03-17T22:04:37.305Z" },
     { url = "https://files.pythonhosted.org/packages/5d/95/fa8c48e03790c979167d08164b34a8442c7074bca4c7253b4455497025de/onnxruntime_gpu-1.24.4-cp314-cp314-win_amd64.whl", hash = "sha256:4dde3d2f1039060c42b12fd446fc0da5b836cc65dceb4020ca60a04cffa1d90d", size = 209597109, upload-time = "2026-03-17T21:58:58.136Z" },
     { url = "https://files.pythonhosted.org/packages/1a/98/7707edefcecf69d6c45b83a83f13ac58257017b4eaf58772668d302f849f/onnxruntime_gpu-1.24.4-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:097c6f53e99ee35f21d0fdba76ca283b92465a0e364c6f0209cb9653c424e2a4", size = 252776951, upload-time = "2026-03-17T22:04:49.715Z" },
+]
+
+[[package]]
+name = "onnxscript"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ml-dtypes" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "onnx" },
+    { name = "onnx-ir" },
+    { name = "packaging" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9b/99/fd948eba63ba65b52265a4cd09a14f96bb9f5b730fcef58876c4358bf406/onnxscript-0.7.0.tar.gz", hash = "sha256:c95ed7b339b02cface56ee27689565c46612e1fc542c562298dddfdad5268dc5", size = 612032, upload-time = "2026-04-20T17:09:19.775Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/ce/2ed92575cc3be4ea1db5f38f16f20765f9b20b69b14d6c1d9972658a8ee9/onnxscript-0.7.0-py3-none-any.whl", hash = "sha256:5b356907d4501e9919f8599c91d8da967406a37b1fac2b40caa55a49acf242ea", size = 714842, upload-time = "2026-04-20T17:09:22.089Z" },
 ]
 
 [[package]]
@@ -7951,6 +8039,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5a/76/4921c00511f88af86a33de770d64141170f1cfd9c00311aea689949e274e/tornado-6.5.5-cp39-abi3-win32.whl", hash = "sha256:dd3eafaaeec1c7f2f8fdcd5f964e8907ad788fe8a5a32c4426fbbdda621223b7", size = 448582, upload-time = "2026-03-10T21:30:57.142Z" },
     { url = "https://files.pythonhosted.org/packages/2c/23/f6c6112a04d28eed765e374435fb1a9198f73e1ec4b4024184f21faeb1ad/tornado-6.5.5-cp39-abi3-win_amd64.whl", hash = "sha256:6443a794ba961a9f619b1ae926a2e900ac20c34483eea67be4ed8f1e58d3ef7b", size = 448990, upload-time = "2026-03-10T21:30:58.857Z" },
     { url = "https://files.pythonhosted.org/packages/b7/c8/876602cbc96469911f0939f703453c1157b0c826ecb05bdd32e023397d4e/tornado-6.5.5-cp39-abi3-win_arm64.whl", hash = "sha256:2c9a876e094109333f888539ddb2de4361743e5d21eece20688e3e351e4990a6", size = 448016, upload-time = "2026-03-10T21:31:00.43Z" },
+]
+
+[[package]]
+name = "tqdm"
+version = "4.68.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/87/d7/0535a28b1f5f24f6612fb3ff1e89fb1a8d160fee0f976e0aa6803862134b/tqdm-4.68.3.tar.gz", hash = "sha256:00dfa48452b6b6cfae3dd9885636c23d3422d1ec97c66d96818cbd5e0821d482", size = 170596, upload-time = "2026-06-17T07:36:52.105Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/8e/bb97bb0c71802080bfc8952937d174e49cfc50de5c951dd47b2496f0dcdb/tqdm-4.68.3-py3-none-any.whl", hash = "sha256:39832cc2def2789a6f29df83f172db7416cea70052c0907a57801c5f2fdccb03", size = 78337, upload-time = "2026-06-17T07:36:50.132Z" },
 ]
 
 [[package]]

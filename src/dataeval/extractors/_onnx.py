@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.extractors._resize import resize_chw
 from dataeval.protocols import Array, Transform
 from dataeval.types import ReprMixin
 from dataeval.utils._internal import as_numpy, iter_images
@@ -245,26 +246,10 @@ class OnnxExtractor(ReprMixin):
         # Resize the CHW image to the configured user-imposed model input size (height, width),
         # preferred over the model's native size.
         if self._image_size is not None:
-            result = self._resize_chw(as_numpy(result), self._image_size)
+            result = resize_chw(as_numpy(result), self._image_size)
 
         # Ensure float32 for ONNX
         return result.astype(np.float32)
-
-    @staticmethod
-    def _resize_chw(image: NDArray[Any], size: tuple[int, int]) -> NDArray[np.floating[Any]]:
-        """Bilinearly resize a CHW image to ``(height, width)``."""
-        import torch
-
-        height, width = size
-        tensor = torch.as_tensor(np.asarray(image)).float()
-        if tensor.ndim != 3:
-            raise ValueError(
-                f"OnnxExtractor image_size resize expects CHW images; got shape {tuple(tensor.shape)}",
-            )
-        resized = torch.nn.functional.interpolate(
-            tensor.unsqueeze(0), size=(height, width), mode="bilinear", align_corners=False
-        )
-        return resized.squeeze(0).numpy()
 
     def __call__(self, data: Any) -> Array:  # noqa: C901
         """

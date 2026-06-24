@@ -203,9 +203,9 @@ def postprocess_fn(output: tuple) -> torch.Tensor:
 # returns decoded detection scores; {class}`.UncertaintyExtractor` then converts each detection's class scores (here
 # `logits`, since YOLO scores are not normalized) into a single normalized-entropy value.
 
-# %% tags=["hide_output"]
+# %%
 # Load the underlying torch module from the Ultralytics wrapper
-model = YOLO("yolov8s.pt").model
+model = YOLO("data/yolov8s.pt").model
 
 # Decode the detector into per-detection class scores
 scores = TorchExtractor(
@@ -345,6 +345,7 @@ print(f"SeaDrone     -> drift: {result_drone.drifted}  (ratio: {result_drone.dis
 # %% [markdown]
 # ## Related how-to guides
 #
+# - [Detect uncertainty drift with a MAITE model](../notebooks/h2_detect_uncertainty_drift.py)
 # - [Encode a dataset with an ONNX model](../notebooks/h2_encode_with_onnx.py)
 # - [Configure global hardware settings](../notebooks/h2_configure_hardware_settings.py)
 
