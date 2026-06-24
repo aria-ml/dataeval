@@ -162,6 +162,7 @@ shifts in deployed systems.
 
 ../notebooks/h2_measure_divergence.py
 ../notebooks/h2_measure_label_independence.py
+../notebooks/h2_detect_uncertainty_drift.py
 ```
 
 :::{list-table}
@@ -174,11 +175,16 @@ shifts in deployed systems.
 - - [](../notebooks/h2_measure_label_independence.py)
   - Compare label distributions between 2 datasets
   - [![Open In Colab][colab-badge]][lbl-colab]
+- - [](../notebooks/h2_detect_uncertainty_drift.py)
+  - Detect distribution shift from a MAITE model's prediction
+    uncertainty, with no custom decoding
+  - [![Open In Colab][colab-badge]][unc-colab]
 
 :::
 
 [div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_measure_divergence.ipynb
 [lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_measure_label_independence.ipynb
+[unc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_detect_uncertainty_drift.ipynb
 
 <!-- Google collab badge icon for all collab links -->
 

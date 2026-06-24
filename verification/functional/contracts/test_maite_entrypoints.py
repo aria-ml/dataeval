@@ -36,3 +36,19 @@ def test_task_entrypoint_target_importable(ep) -> None:
     """Every advertised maite.tasks target must import (IR-1-H-3 / IR-1-R-2)."""
     obj = ep.load()
     assert obj is not None
+
+
+def test_declares_maite_model_protocol_entrypoints() -> None:
+    from importlib.metadata import distribution
+
+    groups = {ep.group for ep in distribution("dataeval").entry_points}
+    assert "maite.protocols.image_classification.Model" in groups
+    assert "maite.protocols.object_detection.Model" in groups
+
+
+def test_model_entrypoint_targets_importable() -> None:
+    from importlib.metadata import distribution
+
+    for ep in distribution("dataeval").entry_points:
+        if ep.group.startswith("maite.protocols"):
+            assert ep.load() is not None

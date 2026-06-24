@@ -20,6 +20,7 @@ __all__ = [
     "exceptions",
     "flags",
     "log",
+    "models",
     "protocols",
     "types",
     "Embeddings",
@@ -28,7 +29,7 @@ __all__ = [
 
 import logging
 
-from . import config, exceptions, flags, protocols, types
+from . import config, exceptions, flags, models, protocols, types
 from ._embeddings import Embeddings
 from ._metadata import Metadata
 

@@ -8,8 +8,11 @@ Classes: person, car, van, boat, plane
 Metadata: time_of_day, weather, angle, location
 """
 
+import json
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -311,6 +314,108 @@ def _create_model() -> torch.nn.Module:
 
 
 # =============================================================================
+# Opinionated ONNX predictor fixtures (dataeval.models doctests)
+# =============================================================================
+
+
+class _TinyClassifier(torch.nn.Module):
+    """Deterministic stand-in classifier emitting per-class scores in [0, 1]."""
+
+    def __init__(self, n_classes: int) -> None:
+        super().__init__()
+        self.n_classes = n_classes
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # x: (B, 3, H, W)
+        pooled = x.flatten(1).mean(dim=1, keepdim=True)  # (B, 1)
+        logits = pooled.repeat(1, self.n_classes) * torch.arange(self.n_classes).float()
+        return torch.softmax(logits, dim=1)  # (B, n_classes)
+
+
+class _TinyDetector(torch.nn.Module):
+    """Deterministic stand-in detector emitting normalized boxes and scores."""
+
+    def __init__(self, n_boxes: int, n_classes: int) -> None:
+        super().__init__()
+        self.n_boxes = n_boxes
+        self.n_classes = n_classes
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:  # x: (B, 3, H, W)
+        b = x.shape[0]
+        seed = x.flatten(1).mean(dim=1).reshape(b, 1, 1)  # (B, 1, 1)
+        boxes = torch.sigmoid(seed.repeat(1, self.n_boxes, 4))  # (B, nBoxes, 4)
+        scores = torch.softmax(seed.repeat(1, self.n_boxes, self.n_classes), dim=2)
+        return boxes, scores
+
+
+def _write_model_metadata(path: Path, interface: str, n_classes: int, n_boxes: int | None = None) -> Path:
+    """Write a minimal opinionated model-metadata.json for the given task."""
+    output: dict[str, Any] = {"nClasses": n_classes}
+    if n_boxes is not None:
+        output["nBoxes"] = n_boxes
+    path.write_text(
+        json.dumps({
+            "interface": {"name": "JATIC_ONNX", "version": "v1"},
+            "io": {
+                "batchSize": -1,
+                "interface": interface,
+                "input": {"channels": "RGB", "height": 8, "width": 8},
+                "output": output,
+            },
+        }),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _export_tiny_onnx(model: torch.nn.Module, path: Path, output_names: list[str]) -> Path:
+    """Export a tiny torch model to ONNX with batch-dynamic axes for doctests."""
+    import warnings
+
+    dummy = torch.zeros(1, 3, 8, 8)
+    dynamic_axes = {"image": {0: "batch"}} | {name: {0: "batch"} for name in output_names}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        torch.onnx.export(
+            model.eval(),
+            (dummy,),
+            str(path),
+            input_names=["image"],
+            output_names=output_names,
+            dynamic_axes=dynamic_axes,
+            opset_version=13,
+        )
+    return path
+
+
+def _register_model_fixtures(doctest_namespace: dict[str, Any]) -> None:
+    """Register ONNX model/metadata paths for :mod:`dataeval.models` doctests.
+
+    Guarded so that an environment without ``onnx``/``onnxruntime`` simply
+    skips registration rather than failing the whole doctest session; the
+    affected predictor doctests run only under the onnx-enabled doctest env.
+    """
+    try:
+        import onnx  # noqa: F401
+        import onnxruntime  # noqa: F401
+    except ImportError:
+        return
+
+    tmp = Path(tempfile.mkdtemp(prefix="dataeval-doctest-models-"))
+
+    classifier_path = _export_tiny_onnx(_TinyClassifier(n_classes=4), tmp / "classifier.onnx", ["scores"])
+    detector_path = _export_tiny_onnx(_TinyDetector(n_boxes=5, n_classes=4), tmp / "detector.onnx", ["boxes", "scores"])
+    classifier_meta = _write_model_metadata(tmp / "classifier-metadata.json", "IMAGE_CLASSIFICATION", n_classes=4)
+    detector_meta = _write_model_metadata(
+        tmp / "detector-metadata.json", "IMAGE_OBJECT_DETECTION", n_classes=4, n_boxes=5
+    )
+
+    doctest_namespace["onnx_classifier_path"] = classifier_path
+    doctest_namespace["onnx_detector_path"] = detector_path
+    doctest_namespace["classifier_metadata_path"] = classifier_meta
+    doctest_namespace["detector_metadata_path"] = detector_meta
+
+
+# =============================================================================
 # Pytest fixtures
 # =============================================================================
 
@@ -511,6 +616,11 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
     doctest_namespace["CustomTrainingStrategy"] = TrainingStrategy
     doctest_namespace["CustomEvaluationStrategy"] = EvaluationStrategy
     doctest_namespace["CustomResetStrategy"] = ResetStrategy
+
+    # -------------------------------------------------------------------------
+    # Opinionated ONNX predictors (dataeval.models)
+    # -------------------------------------------------------------------------
+    _register_model_fixtures(doctest_namespace)
 
     # -------------------------------------------------------------------------
     # Utility functions and classes

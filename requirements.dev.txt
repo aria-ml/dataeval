@@ -1340,7 +1340,10 @@ ml-dtypes==0.5.4 \
     --hash=sha256:cb73dccfc991691c444acc8c0012bee8f2470da826a92e3a20bb333b1a7894e6 \
     --hash=sha256:ce756d3a10d0c4067172804c9cc276ba9cc0ff47af9078ad439b075d1abdc29b \
     --hash=sha256:f21c9219ef48ca5ee78402d5cc831bd58ea27ce89beda894428bc67a52da5328
-    # via onnx
+    # via
+    #   onnx
+    #   onnx-ir
+    #   onnxscript
 mpmath==1.3.0 \
     --hash=sha256:7a28eb2a9774d00c7bc92411c19a89209d5da7c4c9a9e227be8330a23a25b91f \
     --hash=sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c
@@ -1526,7 +1529,9 @@ numpy==2.2.6 ; python_full_version < '3.11' \
     #   ml-dtypes
     #   numba
     #   onnx
+    #   onnx-ir
     #   onnxruntime
+    #   onnxscript
     #   opencv-python
     #   opencv-python-headless
     #   pandas
@@ -1623,7 +1628,9 @@ numpy==2.4.4 ; python_full_version >= '3.11' \
     #   ml-dtypes
     #   numba
     #   onnx
+    #   onnx-ir
     #   onnxruntime
+    #   onnxscript
     #   opencv-python
     #   opencv-python-headless
     #   pandas
@@ -1745,7 +1752,14 @@ onnx==1.21.0 \
     --hash=sha256:f2c7c234c568402e10db74e33d787e4144e394ae2bcbbf11000fbfe2e017ad68 \
     --hash=sha256:f53b3c15a3b539c16b99655c43c365622046d68c49b680c48eba4da2a4fb6f27 \
     --hash=sha256:fc2635400fe39ff37ebc4e75342cc54450eadadf39c540ff132c319bf4960095
-    # via dataeval
+    # via
+    #   dataeval
+    #   onnx-ir
+    #   onnxscript
+onnx-ir==0.2.1 \
+    --hash=sha256:8b8b10a93f43e65962104de6070c43c5dacb0e3cdfefc7c8059dd83c9db64f35 \
+    --hash=sha256:c7285da889312f91882de2092e298a9eeeefbfc1d1951c49d983992967eb09a7
+    # via onnxscript
 onnxruntime==1.23.2 ; python_full_version < '3.11' \
     --hash=sha256:0be6a37a45e6719db5120e9986fcd30ea205ac8103fd1fb74b6c33348327a0cc \
     --hash=sha256:0f9b4ae77f8e3c9bee50c27bc1beede83f786fe1d52e99ac85aa8d65a01e9b77 \
@@ -1796,6 +1810,9 @@ onnxruntime==1.24.4 ; python_full_version >= '3.11' \
     --hash=sha256:e99a48078baaefa2b50fe5836c319499f71f13f76ed32d0211f39109147a49e0 \
     --hash=sha256:fbff2a248940e3398ae78374c5a839e49a2f39079b488bc64439fa0ec327a3e4
     # via dataeval
+onnxscript==0.7.0 \
+    --hash=sha256:5b356907d4501e9919f8599c91d8da967406a37b1fac2b40caa55a49acf242ea \
+    --hash=sha256:c95ed7b339b02cface56ee27689565c46612e1fc542c562298dddfdad5268dc5
 opencv-python==4.13.0.92 \
     --hash=sha256:0bc2596e68f972ca452d80f444bc404e08807d021fbba40df26b61b18e01838a \
     --hash=sha256:372fe164a3148ac1ca51e5f3ad0541a4a276452273f503441d718fab9c5e5f59 \
@@ -1837,6 +1854,7 @@ packaging==26.0 \
     #   nbconvert
     #   nox
     #   onnxruntime
+    #   onnxscript
     #   plotly
     #   pytest
     #   scikit-image
@@ -3082,6 +3100,7 @@ sympy==1.14.0 \
     --hash=sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517 \
     --hash=sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5
     # via
+    #   onnx-ir
     #   onnxruntime
     #   torch
 tabulate==0.10.0 \
@@ -3314,6 +3333,8 @@ typing-extensions==4.15.0 \
     #   mistune
     #   myst-nb
     #   onnx
+    #   onnx-ir
+    #   onnxscript
     #   pydantic
     #   pydantic-core
     #   pydantic-extra-types
