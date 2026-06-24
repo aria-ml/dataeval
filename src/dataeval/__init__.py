@@ -25,6 +25,7 @@ __all__ = [
     "types",
     "Embeddings",
     "Metadata",
+    "Ontology",
 ]
 
 import logging
@@ -32,6 +33,7 @@ import logging
 from . import config, exceptions, flags, models, protocols, types
 from ._embeddings import Embeddings
 from ._metadata import Metadata
+from ._ontology import Ontology
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 

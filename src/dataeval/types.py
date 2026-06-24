@@ -19,6 +19,7 @@ __all__ = [
     "MappingOutput",
     "MetadataJson",
     "ModelInfo",
+    "OntologyConcept",
     "Output",
     "ReprMixin",
     "SCHEMA_VERSION",
@@ -546,6 +547,40 @@ class MetadataJson(BaseModel):
         if self.dataset is None and self.model is None and self.extractor is None:
             raise ValueError("MetadataJson requires at least one of `dataset`, `model`, or `extractor`.")
         return self
+
+
+class OntologyConcept(BaseModel):
+    """
+    A single concept (class) within an ontology.
+
+    A portable, serializable descriptor for one concept of a class hierarchy. The
+    behavior-bearing container that links these into a queryable graph is
+    :class:`dataeval.Ontology`.
+
+    Attributes
+    ----------
+    id : str
+        Stable identifier for the concept, typically an IRI or CURIE.
+    label : str
+        Preferred human-readable name (``skos:prefLabel`` or ``rdfs:label``).
+    synonyms : tuple[str, ...]
+        Alternate labels (``skos:altLabel``) used for matching.
+    parents : tuple[str, ...]
+        Ids of direct superclasses (``rdfs:subClassOf`` / ``skos:broader``).
+        Parent ids that are not themselves defined concepts are treated as
+        external references, not errors (ontologies are frequently
+        distributed as subsets).
+    definition : str or None
+        Optional textual definition (``skos:definition``).
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    label: str
+    synonyms: tuple[str, ...] = ()
+    parents: tuple[str, ...] = ()
+    definition: str | None = None
 
 
 _T = TypeVar("_T", covariant=True)

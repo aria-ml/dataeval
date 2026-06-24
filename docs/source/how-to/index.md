@@ -65,6 +65,7 @@ datasets for machine learning.
 ../notebooks/h2_wrap_dataframe_od_dataset.py
 ../notebooks/h2_metadata_from_dataframe.py
 ../notebooks/h2_lazy_load_images.py
+../notebooks/h2_reconcile_labels_ontology.py
 ```
 
 :::{list-table}
@@ -107,6 +108,10 @@ datasets for machine learning.
 - - [](../notebooks/h2_lazy_load_images.py)
   - Defer image decoding to speed up metadata-only analysis
   - [![Open In Colab][colab-badge]][lazy-colab]
+- - [](../notebooks/h2_reconcile_labels_ontology.py)
+  - Validate dataset class names against an ontology and
+    recover their hierarchy
+  - [![Open In Colab][colab-badge]][onto-colab]
 
 :::
 
@@ -121,6 +126,7 @@ datasets for machine learning.
 [wdfod-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_wrap_dataframe_od_dataset.ipynb
 [mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_metadata_from_dataframe.ipynb
 [lazy-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_lazy_load_images.ipynb
+[onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_reconcile_labels_ontology.ipynb
 
 ## Model Development
 

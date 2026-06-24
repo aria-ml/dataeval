@@ -5,6 +5,8 @@ __all__ = [
     "ExperimentalWarning",
     "MaiteShapeError",
     "NotFittedError",
+    "OntologyCycleError",
+    "OntologyError",
     "ShapeMismatchError",
 ]
 
@@ -40,6 +42,23 @@ class ShapeMismatchError(ValueError):
     This error indicates that input arrays have incorrect dimensions,
     incompatible shapes, or mismatched lengths where they are expected
     to be consistent.
+    """
+
+
+class OntologyError(ValueError):
+    """Raised when an :class:`dataeval.Ontology` fails validation.
+
+    Covers structural problems detected at construction time, such as duplicate
+    concept ids or malformed hierarchy input. Inherits from :class:`ValueError`
+    so callers that previously caught the bare ``ValueError`` keep working.
+    """
+
+
+class OntologyCycleError(OntologyError):
+    """Raised when an :class:`dataeval.Ontology`'s is-a graph contains a cycle.
+
+    A taxonomy must be acyclic; a cycle (a concept that is its own ancestor)
+    makes ancestor/descendant queries ill-defined.
     """
 
 
