@@ -1,0 +1,129 @@
+{
+  "@context": {
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "dcterms": "http://purl.org/dc/terms/",
+    "cv": "http://example.org/cv-ontology#",
+
+    "label": "rdfs:label",
+    "subClassOf": { "@id": "http://www.w3.org/2000/01/rdf-schema#subClassOf", "@type": "@id" },
+    "altLabel": "skos:altLabel",
+    "prefLabel": "skos:prefLabel",
+    "definition": "skos:definition",
+    "classification": "cv:classification"
+  },
+  "@graph": [
+
+    { "@id": "cv:Aircraft", "@type": "owl:Class", "prefLabel": { "@language": "en", "@value": "Aircraft" } },
+    { "@id": "cv:LandVehicle", "@type": "owl:Class", "prefLabel": { "@language": "en", "@value": "Land Vehicle" } },
+    { "@id": "cv:WaterVessel", "@type": "owl:Class", "prefLabel": { "@language": "en", "@value": "Water Vessel" } },
+
+    { "@id": "cv:CommercialAirliner", "@type": "owl:Class", "subClassOf": "cv:Aircraft", "prefLabel": { "@language": "en", "@value": "Commercial Airliner" } },
+    { "@id": "cv:FighterJet", "@type": "owl:Class", "subClassOf": "cv:Aircraft", "prefLabel": { "@language": "en", "@value": "Fighter Jet" } },
+    { "@id": "cv:UAV", "@type": "owl:Class", "subClassOf": "cv:Aircraft", "prefLabel": { "@language": "en", "@value": "Unmanned Aerial Vehicle" } },
+
+    {
+      "@id": "cv:Boeing737",
+      "@type": "owl:Class",
+      "subClassOf": "cv:CommercialAirliner",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "Boeing 737" },
+      "altLabel": [ { "@language": "en", "@value": "737" }, { "@language": "en", "@value": "B737" } ],
+      "definition": { "@language": "en", "@value": "A narrow-body commercial airliner produced by Boeing." }
+    },
+    {
+      "@id": "cv:F16FightingFalcon",
+      "@type": "owl:Class",
+      "subClassOf": "cv:FighterJet",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "F-16 Fighting Falcon" },
+      "altLabel": [ { "@language": "en", "@value": "F-16" }, { "@language": "en", "@value": "Viper" } ],
+      "definition": { "@language": "en", "@value": "A single-engine supersonic multirole fighter aircraft originally developed by General Dynamics." }
+    },
+    {
+      "@id": "cv:MQ9Reaper",
+      "@type": "owl:Class",
+      "subClassOf": "cv:UAV",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "MQ-9 Reaper" },
+      "altLabel": [ { "@language": "en", "@value": "MQ-9" }, { "@language": "en", "@value": "Predator B" }, { "@language": "en", "@value": "Combat Drone" } ],
+      "definition": { "@language": "en", "@value": "An unmanned aerial vehicle capable of remotely controlled or autonomous flight operations." }
+    },
+
+    { "@id": "cv:MainBattleTank", "@type": "owl:Class", "subClassOf": "cv:LandVehicle", "prefLabel": { "@language": "en", "@value": "Main Battle Tank" } },
+    { "@id": "cv:PickupTruck", "@type": "owl:Class", "subClassOf": "cv:LandVehicle", "prefLabel": { "@language": "en", "@value": "Pickup Truck" } },
+    { "@id": "cv:Sedan", "@type": "owl:Class", "subClassOf": "cv:LandVehicle", "prefLabel": { "@language": "en", "@value": "Sedan" } },
+
+    {
+      "@id": "cv:M1Abrams",
+      "@type": "owl:Class",
+      "subClassOf": "cv:MainBattleTank",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "M1 Abrams" },
+      "altLabel": [ { "@language": "en", "@value": "Abrams" }, { "@language": "en", "@value": "M1A2" } ],
+      "definition": { "@language": "en", "@value": "A third-generation American main battle tank designed by Chrysler Defense." }
+    },
+    {
+      "@id": "cv:FordF150",
+      "@type": "owl:Class",
+      "subClassOf": "cv:PickupTruck",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "Ford F-150" },
+      "altLabel": [ { "@language": "en", "@value": "F150" }, { "@language": "en", "@value": "Light Duty Truck" } ],
+      "definition": { "@language": "en", "@value": "A popular light-duty pickup truck manufactured by Ford." }
+    },
+    {
+      "@id": "cv:ToyotaCorolla",
+      "@type": "owl:Class",
+      "subClassOf": "cv:Sedan",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "Toyota Corolla" },
+      "altLabel": [ { "@language": "en", "@value": "Corolla" }, { "@language": "en", "@value": "Compact Car" } ],
+      "definition": { "@language": "en", "@value": "A series of compact cars manufactured and marketed globally by Toyota." }
+    },
+
+    { "@id": "cv:Frigate", "@type": "owl:Class", "subClassOf": "cv:WaterVessel", "prefLabel": { "@language": "en", "@value": "Frigate" } },
+    { "@id": "cv:AircraftCarrier", "@type": "owl:Class", "subClassOf": "cv:WaterVessel", "prefLabel": { "@language": "en", "@value": "Aircraft Carrier" } },
+    { "@id": "cv:CargoShip", "@type": "owl:Class", "subClassOf": "cv:WaterVessel", "prefLabel": { "@language": "en", "@value": "Cargo Ship" } },
+
+    {
+      "@id": "cv:SigmaClassFrigate",
+      "@type": "owl:Class",
+      "subClassOf": "cv:Frigate",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "Sigma Class FF" },
+      "altLabel": [ { "@language": "en", "@value": "Sigma" }, { "@language": "en", "@value": "Sigma 9813" } ],
+      "definition": { "@language": "en", "@value": "A frigate built by Damen-Schelde Naval Shipbuilding, measuring 98 meters in length." }
+    },
+    {
+      "@id": "cv:NimitzClassCarrier",
+      "@type": "owl:Class",
+      "subClassOf": "cv:AircraftCarrier",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "Nimitz Class Carrier" },
+      "altLabel": [ { "@language": "en", "@value": "CVN" }, { "@language": "en", "@value": "Supercarrier" } ],
+      "definition": { "@language": "en", "@value": "A class of ten nuclear-powered aircraft carriers in service with the United States Navy." }
+    },
+    {
+      "@id": "cv:PanamaxContainerShip",
+      "@type": "owl:Class",
+      "subClassOf": "cv:CargoShip",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "Panamax Container Ship" },
+      "altLabel": [ { "@language": "en", "@value": "Panamax" }, { "@language": "en", "@value": "Freighter" } ],
+      "definition": { "@language": "en", "@value": "A mid-sized cargo ship capable of passing through the lock chambers of the Panama Canal." }
+    },
+
+    {
+      "@id": "cv:Submarine",
+      "@type": "owl:Class",
+      "subClassOf": "cv:UnderseaVessel",
+      "classification": "UNCLASSIFIED",
+      "prefLabel": { "@language": "en", "@value": "Submarine" },
+      "altLabel": [ { "@language": "en", "@value": "Sub" }, { "@language": "en", "@value": "Attack Submarine" } ],
+      "definition": { "@language": "en", "@value": "A watercraft capable of independent operation underwater. Its parent class 'Undersea Vessel' is intentionally omitted to illustrate an incomplete (subset) ontology." }
+    }
+  ]
+}

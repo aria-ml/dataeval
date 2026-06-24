@@ -6,6 +6,7 @@ They are organized by the major themes in DataEval rather than individual tools.
 Each page may cover several evaluators that work together to answer questions about your data.
 
 - [Data Integrity](DataIntegrity.md)
+- [Ontology](Ontology.md)
 - [Embeddings](Embeddings.md)
 - [Clustering](Clustering.md)
 - [Dataset Bias and Coverage](DatasetBias.md)
@@ -19,6 +20,7 @@ Each page may cover several evaluators that work together to answer questions ab
 :hidden:
 
 DataIntegrity
+Ontology
 Embeddings
 Clustering
 DatasetBias

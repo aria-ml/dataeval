@@ -10,6 +10,7 @@ __all__ = [
     "FeatureDistanceResult",
     "LabelErrorResult",
     "LabelParityResult",
+    "LabelReconciliationResult",
     "LabelStatsResult",
     "MSTResult",
     "MutualInfoResult",
@@ -38,6 +39,7 @@ __all__ = [
     "factor_predictors",
     "label_errors",
     "label_parity",
+    "label_reconciliation",
     "label_stats",
     "minimum_spanning_tree",
     "mutual_info",
@@ -72,6 +74,7 @@ from dataeval.core._feature_distance import FeatureDistanceResult, feature_dista
 from dataeval.core._hash import dhash, dhash_d4, phash, phash_d4, xxhash
 from dataeval.core._label_errors import LabelErrorResult, label_errors
 from dataeval.core._label_parity import LabelParityResult, label_parity
+from dataeval.core._label_reconcile import LabelReconciliationResult, label_reconciliation
 from dataeval.core._label_stats import LabelStatsResult, label_stats
 from dataeval.core._metadata_insights import factor_deviation, factor_predictors
 from dataeval.core._mst import MSTResult, compute_neighbors, minimum_spanning_tree
