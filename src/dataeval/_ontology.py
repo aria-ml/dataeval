@@ -208,6 +208,18 @@ class Ontology:
         self._require(concept_id)
         return tuple(self._ancestors(concept_id))
 
+    def children(self, concept_id: str) -> tuple[str, ...]:
+        """
+        Return the ids of the direct subclasses (children) of ``concept_id``.
+
+        Children are the defined concepts that declare ``concept_id`` among their
+        ``parents``; order follows concept insertion order. Unlike
+        :meth:`descendants` this is the immediate, non-transitive layer. Raises
+        ``KeyError`` if ``concept_id`` is not a defined concept.
+        """
+        self._require(concept_id)
+        return tuple(self._children.get(concept_id, ()))
+
     def descendants(self, concept_id: str) -> tuple[str, ...]:
         """
         Return all descendant concept ids of ``concept_id``, nearest-first.

@@ -2,11 +2,11 @@ __all__ = []
 
 from collections.abc import Iterator, Sequence
 from enum import IntEnum
-from typing import Generic, TypeVar, cast
+from typing import Generic, TypeVar
 
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
-from dataeval.utils._validate import DatasetKind, validate_dataset
+from dataeval.utils._validate import DatasetKind, aggregate_required_kind, validate_dataset
 
 _TDatum = TypeVar("_TDatum")
 
@@ -108,7 +108,7 @@ class Select(AnnotatedDataset[_TDatum]):
         self._subselections = []
 
         # Fail fast if any selection requires a target the source dataset cannot provide.
-        required_kind = self._aggregate_required_kind(self._selections)
+        required_kind = aggregate_required_kind(s.requires for s in self._selections)
         if required_kind is not None and self._size_limit > 0:
             validate_dataset(dataset, expected=required_kind, caller="Select")
 
@@ -161,21 +161,6 @@ class Select(AnnotatedDataset[_TDatum]):
         sep = "-" * len(title)
         selections = f"Selections: [{', '.join([str(s) for s in self._selections])}]"
         return f"{title}\n{sep}{nt}{selections}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
-
-    @staticmethod
-    def _aggregate_required_kind(selections: Sequence["Selection[_TDatum]"]) -> DatasetKind | None:
-        """Return the strictest MAITE kind declared across ``selections``.
-
-        ``None`` means no selection inspects targets (e.g. only :class:`Limit`,
-        :class:`Shuffle`) — validation is skipped to keep image-only datasets
-        usable. A specific kind (``classification`` / ``object_detection``)
-        wins over the generic ``any_target``.
-        """
-        kinds: list[DatasetKind] = [cast(DatasetKind, s.requires) for s in selections if s.requires is not None]
-        if not kinds:
-            return None
-        specific: list[DatasetKind] = [k for k in kinds if k != "any_target"]
-        return specific[0] if specific else "any_target"
 
     def _sort_selections(
         self,

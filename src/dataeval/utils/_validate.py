@@ -26,11 +26,11 @@ message that names the calling function, what was expected, and what was
 observed.
 """
 
-__all__ = ["DatasetKind", "requires_maite_dataset", "validate_dataset"]
+__all__ = ["DatasetKind", "aggregate_required_kind", "requires_maite_dataset", "validate_dataset"]
 
 import functools
 import inspect
-from collections.abc import Callable, Sized
+from collections.abc import Callable, Iterable, Sized
 from typing import Any, Literal, TypeVar, cast, get_args
 
 from dataeval.exceptions import MaiteShapeError
@@ -60,6 +60,20 @@ DatasetKind = Literal[
 _KINDS: frozenset[str] = frozenset(get_args(DatasetKind))
 
 _F = TypeVar("_F", bound=Callable[..., Any])
+
+
+def aggregate_required_kind(kinds: Iterable[DatasetKind | None]) -> DatasetKind | None:
+    """Fold per-op MAITE requirements into the single strictest kind to validate.
+
+    ``None`` means no op inspects targets (validation is skipped, keeping image-only
+    datasets usable); a specific kind (``classification`` / ``object_detection`` /
+    ``segmentation``) wins over the generic ``any_target``.
+    """
+    present: list[DatasetKind] = [k for k in kinds if k is not None]
+    if not present:
+        return None
+    specific: list[DatasetKind] = [k for k in present if k != "any_target"]
+    return specific[0] if specific else "any_target"
 
 
 def _target_matches(target: Any, expected: DatasetKind) -> bool:

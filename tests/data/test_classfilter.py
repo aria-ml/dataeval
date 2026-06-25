@@ -6,8 +6,9 @@ import pytest
 from numpy.typing import NDArray
 
 from dataeval._metadata import Metadata
-from dataeval.data._classfilter import ClassFilter, _try_mask_object
+from dataeval.data._classfilter import ClassFilter
 from dataeval.data._select import Select
+from dataeval.utils._internal import try_mask_object
 
 
 @pytest.mark.required
@@ -23,7 +24,7 @@ class TestTryMaskObject:
         ],
     )
     def test_nonmaskable(self, obj, expected):
-        result = _try_mask_object(obj, self.mask)
+        result = try_mask_object(obj, self.mask)
         assert len(result) == len(expected)
         assert all(result[i] == expected[i] for i in range(len(result)))
 

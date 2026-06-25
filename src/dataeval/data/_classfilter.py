@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 from dataeval.data._select import Select, Selection, SelectionStage, Subselection
 from dataeval.protocols import Array, ObjectDetectionDatum, ObjectDetectionTarget, SegmentationDatum, SegmentationTarget
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._internal import as_numpy, try_mask_object
 from dataeval.utils._validate import DatasetKind
 
 
@@ -63,15 +63,8 @@ class ClassFilter(Selection[Any]):
         dataset._subselections.append((ClassFilterSubSelection(self.classes), subselection))
 
 
-_T = TypeVar("_T")
 _TDatum = TypeVar("_TDatum", ObjectDetectionDatum, SegmentationDatum)
 _TTarget = TypeVar("_TTarget", ObjectDetectionTarget, SegmentationTarget)
-
-
-def _try_mask_object(obj: _T, mask: NDArray[np.bool_]) -> _T:
-    if not isinstance(obj, str | bytes | bytearray) and isinstance(obj, Sequence | Array) and len(obj) == len(mask):
-        return obj[mask] if isinstance(obj, Array) else cast(_T, [item for i, item in enumerate(obj) if mask[i]])
-    return obj
 
 
 class ClassFilterTarget(Generic[_TTarget]):
@@ -86,7 +79,7 @@ class ClassFilterTarget(Generic[_TTarget]):
             return super().__getattribute__(name)
 
         attr = getattr(self._target, name)
-        return _try_mask_object(attr, self._mask)
+        return try_mask_object(attr, self._mask)
 
 
 class ClassFilterSubSelection(Subselection[Any]):
@@ -94,7 +87,7 @@ class ClassFilterSubSelection(Subselection[Any]):
         self.classes = classes
 
     def _filter(self, d: Mapping[str, Any], mask: NDArray[np.bool_]) -> dict[str, Any]:
-        return {k: self._filter(v, mask) if isinstance(v, dict) else _try_mask_object(v, mask) for k, v in d.items()}
+        return {k: self._filter(v, mask) if isinstance(v, dict) else try_mask_object(v, mask) for k, v in d.items()}
 
     def __call__(self, datum: _TDatum) -> _TDatum:
         # build a mask for any arrays

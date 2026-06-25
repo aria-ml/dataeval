@@ -16,8 +16,7 @@ def __getattr__(name: str) -> Any:
     if name in _MOVED:
         warnings.warn(
             f"dataeval.selection.{name} has moved to dataeval.data.{name}; importing it from "
-            "dataeval.selection is deprecated and will be removed in the v1.2.0 release. "
-            "Import it from dataeval.data instead.",
+            "dataeval.selection is deprecated and will be removed in v1.2.0.",
             DeprecationWarning,
             stacklevel=2,
         )

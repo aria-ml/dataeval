@@ -10,7 +10,7 @@ from enum import Enum
 from importlib import import_module
 from os import cpu_count
 from types import ModuleType
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, Literal, TypeVar, cast, overload
 
 import numpy as np
 import torch
@@ -846,6 +846,19 @@ def merge_metadata(
 
 R = TypeVar("R")
 T = TypeVar("T")
+
+
+def try_mask_object(obj: T, mask: NDArray[np.bool_]) -> T:
+    """Apply a boolean per-element mask to ``obj`` if it is a maskable sequence/array.
+
+    Returns ``obj`` unchanged when it is not a per-element collection matching the
+    mask length (e.g. a scalar or a string). Used to mask per-detection attributes
+    (boxes, scores, labels) and metadata when dropping detections.
+    """
+    if not isinstance(obj, str | bytes | bytearray) and isinstance(obj, Sequence | Array) and len(obj) == len(mask):
+        return obj[mask] if isinstance(obj, Array) else cast(T, [item for i, item in enumerate(obj) if mask[i]])
+    return obj
+
 
 # fork is fastest (no serialization) and safe on Linux.
 # macOS defaults to spawn (fork unsafe with Objective-C runtime).
