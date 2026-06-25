@@ -69,10 +69,9 @@ import requests
 from maite_datasets.object_detection import VOCDetection
 
 from dataeval import Embeddings
+from dataeval.data import Limit, Select
 from dataeval.extractors import OnnxExtractor
-from dataeval.selection import Limit, Select
 from dataeval.utils.onnx import to_encoding_model
-
 
 # %% [markdown]
 # ## Preparing an ONNX model for embeddings

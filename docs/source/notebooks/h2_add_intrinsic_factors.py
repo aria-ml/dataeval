@@ -66,13 +66,12 @@ from maite_datasets.image_classification import CIFAR10
 from dataeval import Metadata
 from dataeval.bias import Balance, Diversity
 from dataeval.core import compute_stats
+from dataeval.data import Limit, Select, Shuffle
 from dataeval.flags import ImageStats
-from dataeval.selection import Limit, Select, Shuffle
 
 _ = pl.Config.set_tbl_rows(-1)
 # Use plotly to render plots
-dep.set_default_backend("plotly")
-dep.set_default_backend("matplotlib")  # LOL BUMP BUMP
+dep.set_default_backend("matplotlib")
 
 # Use the notebook renderer so JS is embedded
 pio.renderers.default = "notebook"

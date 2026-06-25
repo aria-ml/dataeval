@@ -116,8 +116,8 @@ from maite_datasets.image_classification import CIFAR10, MNIST
 
 import dataeval
 from dataeval import Embeddings
+from dataeval.data import ClassFilter, Limit, Select, Shuffle
 from dataeval.extractors import TorchExtractor
-from dataeval.selection import ClassFilter, Limit, Select, Shuffle
 from dataeval.shift import OODKNeighbors, OODReconstruction
 from dataeval.utils.models import AE, VAE, GMMDensityNet
 from dataeval.utils.preprocessing import rescale, resize, to_canonical_grayscale

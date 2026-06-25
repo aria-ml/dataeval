@@ -3,7 +3,7 @@ __all__ = []
 from collections.abc import Sequence
 from typing import Any
 
-from dataeval.selection._select import Select, Selection, SelectionStage
+from dataeval.data._select import Select, Selection, SelectionStage
 
 
 class Indices(Selection[Any]):

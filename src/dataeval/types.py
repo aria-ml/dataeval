@@ -323,7 +323,7 @@ SCHEMA_VERSION = "1.0"
 
 class SelectionInfo(BaseModel):
     """
-    Descriptor for a single :mod:`dataeval.selection` step.
+    Descriptor for a single :mod:`dataeval.data` selection step.
 
     Mirrors the shape of DataEval-Flow's ``SelectionStep`` config so a single
     selector can be described identically on input (config) and output (sidecar).
@@ -375,7 +375,7 @@ class DatasetInfo(BaseModel):
         SPDX license identifier or license name.
     selections : list of list of SelectionInfo or None
         Applied selection lineage, grouped by construction call to mirror
-        :attr:`dataeval.selection.Select.selection_groups`. The outer list is
+        :attr:`dataeval.data.Select.selection_groups`. The outer list is
         ordered innermost (oldest) first; each inner list is one
         ``Select(...)`` call's worth of selectors.
     """

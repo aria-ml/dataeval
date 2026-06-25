@@ -408,7 +408,7 @@ class Prioritize(Evaluator):
 
     See Also
     --------
-    :class:`~dataeval.selection.Indices`
+    :class:`~dataeval.data.Indices`
     :func:`~dataeval.core.rank_knn`
     :func:`~dataeval.core.rank_kmeans_distance`
     :func:`~dataeval.core.rank_kmeans_complexity`

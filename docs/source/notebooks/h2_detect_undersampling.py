@@ -95,8 +95,8 @@ from sklearn.manifold import TSNE
 
 from dataeval import Embeddings, Metadata
 from dataeval.core import coverage_adaptive
+from dataeval.data import Limit, Select
 from dataeval.extractors import TorchExtractor
-from dataeval.selection import Limit, Select
 
 print(torch.cuda.is_available())
 

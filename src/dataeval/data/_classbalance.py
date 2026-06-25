@@ -8,8 +8,8 @@ import numpy as np
 
 from dataeval.config import get_seed
 from dataeval.core._label_stats import label_stats
+from dataeval.data._select import Select, Selection, SelectionStage
 from dataeval.protocols import AnnotatedDataset, Array, ObjectDetectionTarget, SegmentationTarget
-from dataeval.selection._select import Select, Selection, SelectionStage
 from dataeval.utils._internal import as_numpy
 from dataeval.utils._validate import DatasetKind
 

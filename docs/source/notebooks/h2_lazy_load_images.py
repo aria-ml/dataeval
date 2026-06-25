@@ -69,9 +69,9 @@ except Exception:
 # %%
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, TypeVar
-from collections.abc import Callable
 
 import numpy as np
 import pandas as pd

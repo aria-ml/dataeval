@@ -64,8 +64,8 @@ from maite_datasets.object_detection import SeaDrone
 
 from dataeval.config import set_max_processes
 from dataeval.core import compute_stats
+from dataeval.data import Limit, Select
 from dataeval.flags import ImageStats
-from dataeval.selection import Limit, Select
 
 set_max_processes(4)
 

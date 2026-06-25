@@ -65,8 +65,8 @@ from maite_datasets.image_classification import MNIST
 from dataeval import Embeddings, Metadata
 from dataeval.config import set_seed
 from dataeval.core import ber_mst
+from dataeval.data import ClassBalance, ClassFilter, Limit, Select
 from dataeval.extractors import FlattenExtractor
-from dataeval.selection import ClassBalance, ClassFilter, Limit, Select
 
 set_seed(42)  # For reproducibility
 

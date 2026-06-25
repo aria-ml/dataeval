@@ -73,7 +73,7 @@ class Select(AnnotatedDataset[_TDatum]):
 
     Examples
     --------
-    >>> from dataeval.selection import ClassFilter, Limit
+    >>> from dataeval.data import ClassFilter, Limit
 
     >>> # Apply selection criteria to the dataset
     >>> selections = [Limit(size=5), ClassFilter(classes=[0, 2])]

@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval.selection._classbalance import ClassBalance
-from dataeval.selection._select import Select
+from dataeval.data._classbalance import ClassBalance
+from dataeval.data._select import Select
 
 
 def one_hot(label: int, num_classes: int = 3):

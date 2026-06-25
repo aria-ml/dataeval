@@ -7,9 +7,8 @@ import pytest
 from numpy.typing import NDArray
 
 from dataeval._metadata import Metadata
-from dataeval.utils.data import (
-    DatasetSplits,
-    TrainValSplit,
+from dataeval.data import DatasetSplits, TrainValSplit, split_dataset
+from dataeval.data._split import (
     _build_multilabel_matrix,
     _calculate_validation_fraction,
     _IterativeStratifiedKFold,
@@ -20,7 +19,6 @@ from dataeval.utils.data import (
     _validate_groupable,
     _validate_labels,
     _validate_stratifiable,
-    split_dataset,
 )
 
 

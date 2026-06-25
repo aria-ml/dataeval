@@ -13,15 +13,10 @@ import pytest
 
 from dataeval._embeddings import Embeddings
 from dataeval._metadata import Metadata
+from dataeval.data import ClassFilter, Limit, Select, Shuffle, split_dataset, unzip_dataset
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import DatasetMetadata, DatumMetadata
-from dataeval.selection import ClassFilter, Limit, Select, Shuffle
-from dataeval.utils.data import (
-    requires_maite_dataset,
-    split_dataset,
-    unzip_dataset,
-    validate_dataset,
-)
+from dataeval.utils.data import requires_maite_dataset, validate_dataset
 
 # ---------- fixtures ----------
 

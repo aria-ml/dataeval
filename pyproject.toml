@@ -324,7 +324,7 @@ ignore = ["ANN101", "ANN102", "ANN401", "C408", "C416", "COM812", "NPY002", "SLF
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-per-file-ignores = { "!src/*" = ["ANN", "ARG", "BLE", "S", "SLF", "RET", "C90", "D", "FIX", "N", "PERF"], "docs/*" = ["B904"], "docs/source/notebooks/*" = ["E402", "E501", "E703", "I001", "RUF100", "SIM105", "UP009"] }
+per-file-ignores = { "!src/*" = ["ANN", "ARG", "BLE", "S", "SLF", "RET", "C90", "D", "FIX", "N", "PERF"], "docs/*" = ["B904"], "docs/source/notebooks/*" = ["E402", "E501", "E703", "RUF100", "SIM105", "UP009"] }
 
 [tool.ruff.lint.flake8-builtins]
 builtins-strict-checking = false

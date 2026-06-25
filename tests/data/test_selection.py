@@ -4,13 +4,13 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval.selection._classbalance import ClassBalance
-from dataeval.selection._classfilter import ClassFilter
-from dataeval.selection._indices import Indices
-from dataeval.selection._limit import Limit
-from dataeval.selection._reverse import Reverse
-from dataeval.selection._select import Select
-from dataeval.selection._shuffle import Shuffle
+from dataeval.data._classbalance import ClassBalance
+from dataeval.data._classfilter import ClassFilter
+from dataeval.data._indices import Indices
+from dataeval.data._limit import Limit
+from dataeval.data._reverse import Reverse
+from dataeval.data._select import Select
+from dataeval.data._shuffle import Shuffle
 from dataeval.types import SourceIndex
 
 

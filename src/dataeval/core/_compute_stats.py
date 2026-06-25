@@ -17,11 +17,11 @@ import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
+from dataeval.data import unzip_dataset
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback
 from dataeval.types import SourceIndex, StatsMap
 from dataeval.utils._internal import PoolWrapper
-from dataeval.utils.data import unzip_dataset
 from dataeval.utils.preprocessing import BoundingBox, BoxLike, to_bounding_box
 
 _logger = logging.getLogger(__name__)

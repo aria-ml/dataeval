@@ -78,7 +78,6 @@ import pandas as pd
 from dataeval.bias import Balance
 from dataeval.protocols import MetadataLike
 
-
 # %% [markdown]
 # ## Write the adapter
 #

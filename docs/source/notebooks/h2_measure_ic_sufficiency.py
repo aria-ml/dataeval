@@ -88,9 +88,9 @@ from torch.utils.data import DataLoader, Subset
 from torch.utils.data import Dataset as TorchDataset
 
 from dataeval import config
+from dataeval.data import Limit, Select
 from dataeval.performance import Sufficiency
 from dataeval.protocols import Dataset, DatumMetadata
-from dataeval.selection import Limit, Select
 
 DatumType = tuple[NDArray[np.number[Any]], NDArray[np.number[Any]], DatumMetadata]
 

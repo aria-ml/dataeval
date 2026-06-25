@@ -371,7 +371,7 @@ class TestRdfAdapters:
 
 
 CV = "http://example.org/cv-ontology#"
-VEHICLE_ONTOLOGY = Path(__file__).parents[1] / "data" / "vehicle_ontology.jsonld"
+VEHICLE_ONTOLOGY = Path(__file__).parent / "vehicle_ontology.jsonld"
 
 
 @pytest.mark.optional

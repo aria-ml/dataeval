@@ -60,8 +60,8 @@ from maite_datasets.image_classification import MNIST
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
+from dataeval.data import Indices, Select
 from dataeval.quality import Duplicates
-from dataeval.selection import Indices, Select
 
 set_max_processes(4)
 

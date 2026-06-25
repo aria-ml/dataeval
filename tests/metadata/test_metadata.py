@@ -10,9 +10,9 @@ from dataeval._metadata import FactorInfo, Metadata, _binned
 from dataeval.core import compute_stats
 from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._label_stats import label_stats
+from dataeval.data import unzip_dataset
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.flags import ImageStats
-from dataeval.utils.data import unzip_dataset
 from tests.embeddings.test_embeddings import MockDataset
 
 

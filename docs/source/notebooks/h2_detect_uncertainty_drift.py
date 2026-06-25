@@ -88,9 +88,9 @@ from maite_datasets.image_classification import CIFAR10, MNIST
 from torch import nn
 
 from dataeval.config import set_seed
+from dataeval.data import Indices, Limit, Select, Shuffle
 from dataeval.extractors import ScoresExtractor, UncertaintyExtractor
 from dataeval.models import OnnxImageClassifier
-from dataeval.selection import Indices, Limit, Select, Shuffle
 from dataeval.shift import DriftWasserstein
 
 set_seed(0, all_generators=True)

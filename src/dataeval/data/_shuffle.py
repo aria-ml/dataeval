@@ -9,8 +9,8 @@ import numpy as np
 from numpy.random import BitGenerator, Generator, SeedSequence
 from numpy.typing import NDArray
 
+from dataeval.data._select import Select, Selection, SelectionStage
 from dataeval.protocols import Array
-from dataeval.selection._select import Select, Selection, SelectionStage
 from dataeval.utils._internal import as_numpy
 
 

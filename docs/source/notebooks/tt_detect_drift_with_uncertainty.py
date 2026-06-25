@@ -90,8 +90,8 @@ from torchvision.transforms.functional import resize
 from ultralytics import YOLO
 
 from dataeval.config import set_batch_size
+from dataeval.data import Indices, Limit, Select, Shuffle
 from dataeval.extractors import ClasswiseUncertaintyExtractor, TorchExtractor, UncertaintyExtractor
-from dataeval.selection import Indices, Limit, Select, Shuffle
 from dataeval.shift import DriftWasserstein
 
 # Set default torch device for notebook

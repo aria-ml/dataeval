@@ -6,8 +6,8 @@ import pytest
 from numpy.typing import NDArray
 
 from dataeval._metadata import Metadata
-from dataeval.selection._classfilter import ClassFilter, _try_mask_object
-from dataeval.selection._select import Select
+from dataeval.data._classfilter import ClassFilter, _try_mask_object
+from dataeval.data._select import Select
 
 
 @pytest.mark.required

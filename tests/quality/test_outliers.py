@@ -8,11 +8,11 @@ from dataeval.config import use_max_processes
 from dataeval.core import compute_stats
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
+from dataeval.data import unzip_dataset
 from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality._outliers import Outliers, OutliersOutput, _build_class_ids, _get_outlier_mask
 from dataeval.types import SourceIndex
-from dataeval.utils.data import unzip_dataset
 from dataeval.utils.thresholds import (
     IQRThreshold,
     ModifiedZScoreThreshold,

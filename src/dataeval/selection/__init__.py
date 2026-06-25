@@ -1,20 +1,27 @@
-"""Provides selection classes for selecting subsets of Computer Vision datasets."""
+"""Deprecated location. Selection classes moved to :mod:`dataeval.data`.
 
-__all__ = [
-    "ClassBalance",
-    "ClassFilter",
-    "Indices",
-    "Limit",
-    "Reverse",
-    "Select",
-    "Selection",
-    "Shuffle",
-]
+Importing from ``dataeval.selection`` is deprecated; import these classes from
+:mod:`dataeval.data` instead.
+"""
 
-from dataeval.selection._classbalance import ClassBalance
-from dataeval.selection._classfilter import ClassFilter
-from dataeval.selection._indices import Indices
-from dataeval.selection._limit import Limit
-from dataeval.selection._reverse import Reverse
-from dataeval.selection._select import Select, Selection
-from dataeval.selection._shuffle import Shuffle
+__all__ = []
+
+import warnings
+from typing import Any
+
+_MOVED = ("ClassBalance", "ClassFilter", "Indices", "Limit", "Reverse", "Select", "Selection", "Shuffle")
+
+
+def __getattr__(name: str) -> Any:
+    if name in _MOVED:
+        warnings.warn(
+            f"dataeval.selection.{name} has moved to dataeval.data.{name}; importing it from "
+            "dataeval.selection is deprecated and will be removed in the v1.2.0 release. "
+            "Import it from dataeval.data instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        import dataeval.data
+
+        return getattr(dataeval.data, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
