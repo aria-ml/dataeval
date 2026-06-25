@@ -5629,8 +5629,7 @@ version = "3.14.3"
 description = "rapid fuzzy string matching"
 optional = false
 python-versions = ">=3.10"
-groups = ["lock"]
-markers = "python_version < \"3.14\""
+groups = ["dev", "docs", "lock"]
 files = [
     {file = "rapidfuzz-3.14.3-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:b9fcd4d751a4fffa17aed1dde41647923c72c74af02459ad1222e3b0022da3a1"},
     {file = "rapidfuzz-3.14.3-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:4ad73afb688b36864a8d9b7344a9cf6da186c471e5790cbf541a635ee0f457f2"},
@@ -5716,6 +5715,7 @@ files = [
     {file = "rapidfuzz-3.14.3-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:56fefb4382bb12250f164250240b9dd7772e41c5c8ae976fd598a32292449cc5"},
     {file = "rapidfuzz-3.14.3.tar.gz", hash = "sha256:2491937177868bc4b1e469087601d53f925e8d270ccc21e07404b4b5814b7b5f"},
 ]
+markers = {lock = "python_version < \"3.14\""}
 
 [package.extras]
 all = ["numpy"]

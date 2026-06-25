@@ -8,6 +8,7 @@ __all__ = [
     "CoverageResult",
     "DivergenceResult",
     "FeatureDistanceResult",
+    "LabelAlignmentResult",
     "LabelErrorResult",
     "LabelParityResult",
     "LabelReconciliationResult",
@@ -37,6 +38,7 @@ __all__ = [
     "feature_distance",
     "factor_deviation",
     "factor_predictors",
+    "label_alignment",
     "label_errors",
     "label_parity",
     "label_reconciliation",
@@ -72,6 +74,7 @@ from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
 from dataeval.core._hash import dhash, dhash_d4, phash, phash_d4, xxhash
+from dataeval.core._label_alignment import LabelAlignmentResult, label_alignment
 from dataeval.core._label_errors import LabelErrorResult, label_errors
 from dataeval.core._label_parity import LabelParityResult, label_parity
 from dataeval.core._label_reconciliation import LabelReconciliationResult, label_reconciliation

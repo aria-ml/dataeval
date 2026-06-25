@@ -66,6 +66,7 @@ datasets for machine learning.
 ../notebooks/h2_metadata_from_dataframe.py
 ../notebooks/h2_lazy_load_images.py
 ../notebooks/h2_reconcile_labels_ontology.py
+../notebooks/h2_align_label_spaces.py
 ```
 
 :::{list-table}
@@ -112,6 +113,10 @@ datasets for machine learning.
   - Validate dataset class names against an ontology and
     recover their hierarchy
   - [![Open In Colab][colab-badge]][onto-colab]
+- - [](../notebooks/h2_align_label_spaces.py)
+  - Align two label vocabularies into typed correspondences
+    and a carry-over class remapping
+  - [![Open In Colab][colab-badge]][algn-colab]
 
 :::
 
@@ -127,6 +132,7 @@ datasets for machine learning.
 [mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_metadata_from_dataframe.ipynb
 [lazy-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_lazy_load_images.ipynb
 [onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_reconcile_labels_ontology.ipynb
+[algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_align_label_spaces.ipynb
 
 ## Model Development
 
