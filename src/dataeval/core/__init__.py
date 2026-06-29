@@ -17,6 +17,7 @@ __all__ = [
     "MutualInfoResult",
     "NullModelMetrics",
     "NullModelMetricsResult",
+    "OntologyValidationResult",
     "ParityResult",
     "RankResult",
     "StatsResult",
@@ -51,6 +52,7 @@ __all__ = [
     "nullmodel_precision",
     "nullmodel_metrics",
     "nullmodel_recall",
+    "ontology_validation",
     "parity",
     "phash",
     "phash_d4",
@@ -91,6 +93,7 @@ from dataeval.core._nullmodel import (
     nullmodel_precision,
     nullmodel_recall,
 )
+from dataeval.core._ontology_validation import OntologyValidationResult, ontology_validation
 from dataeval.core._parity import ParityResult, parity
 from dataeval.core._rank import (
     RankResult,

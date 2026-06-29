@@ -164,18 +164,17 @@ def _broader_diagnostics(
     for anchor in equivalences:
         if anchor.target not in target:
             continue
-        for child in target.children(anchor.target):
-            subtree = {child, *target.descendants(child)}
-            if subtree.isdisjoint(reached):
-                diagnostics.append(
-                    Correspondence(
-                        source=anchor.source,
-                        target=child,
-                        relation="broader",
-                        confidence=anchor.confidence,
-                        matcher="structural",
-                    )
-                )
+        diagnostics.extend(
+            Correspondence(
+                source=anchor.source,
+                target=child,
+                relation="broader",
+                confidence=anchor.confidence,
+                matcher="structural",
+            )
+            for child in target.children(anchor.target)
+            if target.subtree_ids(child).isdisjoint(reached)
+        )
     return diagnostics
 
 

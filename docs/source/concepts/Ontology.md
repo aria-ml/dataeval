@@ -14,11 +14,12 @@ form, that structure lets a team do three things it otherwise cannot:
   can be compared, graded against each other, or combined.
 
 DataEval calls that written-down structure an {class}`.Ontology`. This page
-defines the term, the vocabulary the library uses, and the two operations DataEval
+defines the term, the vocabulary the library uses, and the operations DataEval
 performs over an ontology — **reconciliation** (checking one dataset's labels
-against it) and **alignment** (relating two vocabularies through it) — mapping each
-to the formal knowledge-representation standards it derives from and the language
-working computer-vision practitioners use day to day.
+against it), **alignment** (relating two vocabularies through it), and
+**validation** (checking the ontology artifact itself) — mapping each to the formal
+knowledge-representation standards it derives from and the language working
+computer-vision practitioners use day to day.
 
 ## What is it
 
@@ -334,12 +335,45 @@ geometry conventions, sensor domains, or sampling — the distributional gaps be
 sources that are the subject of [distribution shift](DistributionShift.md) and
 [divergence](Divergence.md), and that persist after the label spaces are reconciled.
 
+## Validation: checking the ontology artifact
+
+Reconciliation and alignment judge data _against_ an ontology; both presume the
+ontology itself is sound. {func}`.ontology_validation` turns the lens on the
+**artifact**, reporting the structural and naming facts that bear on its quality,
+independent of any dataset. An {class}`.Ontology` already guarantees the hard
+invariants at construction — unique ids and an acyclic is-a graph — so what remains
+to check is the **legal-but-questionable** structure those invariants do not preclude.
+
+Like reconciliation, it reports **ingredients, not a verdict**: an empty finding is
+the "clean" signal, but whether a finding is a defect is contextual — a dangling
+ancestor is expected in a deliberately distributed subset and a problem only in an
+ontology meant to be complete. The call records four families of fact:
+
+- **Connectivity** — the `roots` and `leaves`, `isolated` concepts (with neither
+  parents nor children), and `external_ancestors`: concepts whose is-a path is
+  truncated at an undefined ("floating") parent.
+- **Redundancy and contradiction** — `redundant_edges` (a direct is-a edge already
+  implied by a longer path), `ancestor_siblings` (a concept declared alongside one
+  of its own ancestors, e.g. `car` placed next to `vehicle`), and `unary_parents` (a
+  single-child link, which adds depth without discriminating).
+- **Naming** — `label_collisions`, names resolving to more than one concept (the
+  artifact-side cause of reconciliation _ambiguity_), and, when a `label_pattern` is
+  supplied, `nonconforming_labels` that fail it (e.g. a `lowercase_snake_case` lint).
+- **Shape** — the per-concept `depth`, `fan_out`, and `parent_count`: the raw
+  material for judging depth imbalance, over-broad parents, and multiple-inheritance
+  load, without the function imposing a threshold of its own.
+
+Turning these facts into a pass/fail call — which findings matter, at what severity,
+where the thresholds sit — is policy left to a downstream evaluator, the same way a
+conformance verdict is read off a reconciliation result rather than baked into it.
+
 ## The taxonomic core vs. the operational annotation schema
 
 "Ontology" is used in computer vision at two levels of richness, and because the
 word is overloaded it is worth being explicit about the split. **DataEval models
 the first — the taxonomic core.** The second — the operational annotation schema —
-is out of scope, except for two checks (covered at the end) that are taxonomic
+is out of scope, except for two checks — performed by {func}`.ontology_validation`
+(see [Validation](#validation-checking-the-ontology-artifact)) — that are taxonomic
 despite where annotation platforms file them.
 
 - **The taxonomic (semantic) core** (what {class}`.Ontology` models) — concepts
@@ -378,14 +412,19 @@ therefore **out of scope for the present taxonomy model** and would be a
 separate, schema-driven validator rather than an extension of {class}`.Ontology`.
 
 Two checks that annotation platforms bundle into the operational layer are
-nonetheless purely _taxonomic_ and within DataEval's scope:
+nonetheless purely _taxonomic_, and DataEval performs them on the artifact in
+{func}`.ontology_validation`:
 
-- **Naming / format linting** — flag concept labels that are not
-  `lowercase_snake_case`, or that mix separators, to keep the vocabulary uniform.
+- **Naming / format linting** — flagging concept labels that mix separators or are
+  not `lowercase_snake_case`, to keep the vocabulary uniform.
 - **Structural smells** — a concept and one of its own ancestors appearing as
-  _siblings_ (e.g. `car` placed alongside `vehicle`), over-specification (many
-  leaf concepts carrying very few samples, when paired with a dataset), or
-  lopsided depth across the hierarchy.
+  _siblings_ (`car` placed alongside `vehicle`), redundant is-a edges, or
+  single-child chains.
+
+One related check is _not_ artifact-only: over-specification — many leaf concepts
+carrying very few samples — needs a _dataset_ to judge, so it sits with
+reconciliation rather than with validation, which reports depth and breadth as
+metrics for an evaluator to weigh.
 
 ## How this maps to standards and datasets
 
