@@ -17,6 +17,7 @@ __all__ = [
     "ImageClassificationDatum",
     "ImageClassificationDataset",
     "LossFn",
+    "Matcher",
     "MetadataLike",
     "ModelMetadata",
     "ModelResetStrategy",
@@ -45,8 +46,9 @@ __all__ = [
 ]
 
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import (
+    TYPE_CHECKING,
     Any,
     Protocol,
     TypeAlias,
@@ -62,6 +64,9 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from dataeval.types import Correspondence, OntologyConcept
 
 # ========== MAITE RE-EXPORTS ==========
 #
@@ -1282,6 +1287,80 @@ class Threshold(Protocol):
         tuple[float | None, float | None]
             A tuple containing the lower and upper threshold values. If a particular
             threshold is not applicable, it can be set to None.
+        """
+        ...
+
+
+# ========== ONTOLOGY ALIGNMENT ==========
+
+
+@runtime_checkable
+class Matcher(Protocol):
+    """
+    Protocol for an element-level matcher used in ontology alignment.
+
+    A matcher proposes candidate :class:`~dataeval.types.Correspondence` objects
+    between a *source* and a *target* vocabulary, each supplied as an iterable of
+    :class:`~dataeval.types.OntologyConcept` (an :class:`~dataeval.Ontology`
+    satisfies this directly). It is the extension seam of
+    :func:`dataeval.core.label_alignment`: exact terminological anchoring is built
+    into ``label_alignment`` itself, while additional matchers (string-similarity,
+    and later embedding / instance-based matchers) are supplied via its
+    ``matchers`` argument and consulted for source concepts the exact pass left
+    unanchored.
+
+    A matcher needs only each concept's ``id``, ``label``, and ``synonyms``
+    (``parents`` is available for light structural hints) so it can be written and
+    tested against a plain list of concepts.
+
+    Implementations should be permissive — propose any plausible correspondence
+    with a calibrated ``confidence`` — and let ``label_alignment`` apply the
+    acceptance threshold and pick the best proposal per source concept. A matcher
+    need not deduplicate or resolve conflicts itself.
+
+    Example
+    -------
+    A trivial matcher proposing an equivalence for an exact id match:
+
+    >>> from dataeval.types import Correspondence
+    >>> from dataeval.protocols import Matcher
+    >>>
+    >>> class IdMatcher:
+    ...     def __call__(self, source, target):
+    ...         target_ids = {c.id for c in target}
+    ...         return [
+    ...             Correspondence(source=c.id, target=c.id, relation="equivalent", matcher="id")
+    ...             for c in source
+    ...             if c.id in target_ids
+    ...         ]
+    >>>
+    >>> isinstance(IdMatcher(), Matcher)
+    True
+    """
+
+    def __call__(
+        self,
+        source: "Iterable[OntologyConcept]",
+        target: "Iterable[OntologyConcept]",
+    ) -> "Sequence[Correspondence]":
+        """
+        Propose candidate correspondences from ``source`` concepts to ``target``.
+
+        Parameters
+        ----------
+        source : Iterable[OntologyConcept]
+            The vocabulary being mapped *from*. May be traversed more than once,
+            so pass a re-iterable collection (an :class:`~dataeval.Ontology` or a
+            list), not a one-shot iterator.
+        target : Iterable[OntologyConcept]
+            The reference vocabulary being mapped *to*.
+
+        Returns
+        -------
+        Sequence[Correspondence]
+            Candidate correspondences, each with a ``confidence`` in ``[0, 1]``.
+            ``label_alignment`` filters by threshold and keeps the best per source
+            concept.
         """
         ...
 
