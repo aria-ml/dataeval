@@ -158,6 +158,24 @@ class Ontology:
         """
         return tuple(sorted(pid for pid in self._children if pid not in self._concepts))
 
+    @property
+    def label_collisions(self) -> dict[str, tuple[str, ...]]:
+        """
+        Case-folded names that resolve to more than one concept.
+
+        Each entry maps a normalized name (a preferred label or synonym shared
+        across concepts) to the distinct concept ids :meth:`find` would return for
+        it — the artifact-side source of reconciliation *ambiguity*. Empty when
+        every name resolves uniquely. Unlike :meth:`find`, exact-id matches are not
+        considered, since an id is unique by construction.
+        """
+        collisions: dict[str, tuple[str, ...]] = {}
+        for name, ids in self._label_index.items():
+            unique = tuple(dict.fromkeys(ids))
+            if len(unique) > 1:
+                collisions[name] = unique
+        return collisions
+
     # --- queries ---
 
     def find(self, name: str) -> tuple[str, ...]:
@@ -322,6 +340,16 @@ class Ontology:
 
         return depth(concept_id)
 
+    def subtree_ids(self, concept_id: str) -> frozenset[str]:
+        """
+        Return ``concept_id`` together with all its descendant ids (its subtree).
+
+        A lightweight id-set form of :meth:`subtree`, for membership and
+        disjointedness tests that do not need a full sub-ontology. Raises
+        ``KeyError`` if ``concept_id`` is not a defined concept.
+        """
+        return frozenset((concept_id, *self.descendants(concept_id)))
+
     def subtree(self, concept_id: str) -> "Ontology":
         """
         Return a new :class:`Ontology` rooted at ``concept_id``.
@@ -330,8 +358,7 @@ class Ontology:
         outside the subtree are pruned so ``concept_id`` becomes a root. Raises
         ``KeyError`` if ``concept_id`` is not a defined concept.
         """
-        self._require(concept_id)
-        node_ids = {concept_id, *self.descendants(concept_id)}
+        node_ids = self.subtree_ids(concept_id)
         concepts = []
         for nid in node_ids:
             concept = self._concepts[nid]

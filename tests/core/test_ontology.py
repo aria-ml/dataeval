@@ -99,6 +99,15 @@ class TestOntologyModel:
     def test_external_ids(self):
         assert build_ontology().external_ids == ("ext:heavy",)
 
+    def test_label_collisions(self):
+        # boat and plane share the synonym "Craft"; nothing else collides
+        assert build_ontology().label_collisions == {"craft": ("boat", "plane")}
+
+    def test_label_collisions_dedupes_self_reuse(self):
+        # a concept whose synonym casefold-equals its own label is not a collision
+        onto = Ontology([OntologyConcept(id="car", label="car", synonyms=("Car",))])
+        assert onto.label_collisions == {}
+
     def test_lowest_common_ancestor(self):
         onto = build_ontology()
         assert onto.lowest_common_ancestor("car", "amphibious") == "land_vehicle"
@@ -164,6 +173,13 @@ class TestOntologyModel:
         assert onto.depth_of("amphibious") == 2
         # only parent is external (ext:heavy) -> depth 1
         assert onto.depth_of("truck") == 1
+
+    def test_subtree_ids(self):
+        onto = build_ontology()
+        assert onto.subtree_ids("land_vehicle") == frozenset({"land_vehicle", "car", "amphibious"})
+        assert onto.subtree_ids("car") == frozenset({"car"})  # leaf: just itself
+        with pytest.raises(KeyError):
+            onto.subtree_ids("ext:heavy")
 
     def test_subtree(self):
         sub = build_ontology().subtree("land_vehicle")
