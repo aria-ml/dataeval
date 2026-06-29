@@ -67,6 +67,7 @@ datasets for machine learning.
 ../notebooks/h2_lazy_load_images.py
 ../notebooks/h2_reconcile_labels_ontology.py
 ../notebooks/h2_align_label_spaces.py
+../notebooks/h2_conform_and_merge_datasets.py
 ```
 
 :::{list-table}
@@ -117,6 +118,10 @@ datasets for machine learning.
   - Align two label vocabularies into typed correspondences
     and a carry-over class remapping
   - [![Open In Colab][colab-badge]][algn-colab]
+- - [](../notebooks/h2_conform_and_merge_datasets.py)
+  - Conform an incoming dataset to a reference vocabulary
+    and merge the two
+  - [![Open In Colab][colab-badge]][cmrg-colab]
 
 :::
 
@@ -133,6 +138,7 @@ datasets for machine learning.
 [lazy-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_lazy_load_images.ipynb
 [onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_reconcile_labels_ontology.ipynb
 [algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_align_label_spaces.ipynb
+[cmrg-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_conform_and_merge_datasets.ipynb
 
 ## Model Development
 
