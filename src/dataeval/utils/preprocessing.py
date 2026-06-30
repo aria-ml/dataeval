@@ -8,9 +8,9 @@ __all__ = [
     "BoxLike",
     "FloatBox",
     "IntBox",
-    "clip_and_pad",
     "clip_box",
     "compute_iou",
+    "crop_with_fill",
     "edge_filter",
     "get_bitdepth",
     "is_valid_box",
@@ -24,16 +24,17 @@ __all__ = [
 
 import logging
 import math
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import DTypeLike, NDArray
 from scipy.ndimage import zoom
 from scipy.signal import convolve2d
 
+from dataeval._experimental import deprecated
 from dataeval.exceptions import ShapeMismatchError
 
 try:
@@ -518,11 +519,72 @@ def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
     return edges
 
 
+def crop_with_fill(
+    image: NDArray[Any],
+    window: Box,
+    fill: float | NDArray[Any] | Callable[[NDArray[Any]], NDArray[Any]] = np.nan,
+    *,
+    dtype: DTypeLike | None = None,
+) -> tuple[NDArray[Any], tuple[int, int]]:
+    """
+    Extract a window from an image into an output of the window's size, filling out-of-bounds pixels with ``fill``.
+
+    The window may extend past the image edges; pixels outside the image take the fill value.
+
+    Parameters
+    ----------
+    image : NDArray
+        Input image array in format C, H, W (channels first)
+    window : Box
+        Window to extract as (x0, y0, x1, y1); may extend past the image edges
+    fill : float, NDArray, or callable, default np.nan
+        Value for out-of-bounds pixels. A scalar or per-channel array is broadcast
+        directly; a callable is passed the in-bounds region (C, H, W; possibly
+        empty) and must return a scalar or per-channel array.
+    dtype : DTypeLike or None, default None
+        Output dtype. Defaults to a dtype that can hold both the image pixels and the
+        fill, so ``np.nan`` fill promotes an integer image to float automatically.
+
+    Returns
+    -------
+    tuple[NDArray, tuple[int, int]]
+        The extracted window and its integer (x0, y0) origin in image coordinates
+        (maps an output coordinate back to the source image).
+    """
+    x0, y0, x1, y1 = to_int_box(window)
+    out_w, out_h = max(1, x1 - x0), max(1, y1 - y0)
+    channels = image.shape[-3] if image.ndim > 2 else 1
+
+    # In-bounds source pixels: the window clipped to the image (may be empty).
+    sbox = clip_box(image.shape, (x0, y0, x1, y1))
+    region = image[..., sbox[1] : sbox[3], sbox[0] : sbox[2]]
+    fill_value = fill(region) if callable(fill) else fill
+
+    if dtype is None:
+        # Hold both the real pixels and the fill, so NaN fill promotes an integer image to float.
+        dtype = np.result_type(image.dtype, np.asarray(fill_value))
+    output = np.empty((channels, out_h, out_w), dtype=dtype)
+    output[:] = np.reshape(fill_value, (channels, 1, 1)) if np.ndim(fill_value) else fill_value
+
+    # Paste the real pixels at their offset within the (window-sized) output.
+    if is_valid_box(sbox):
+        dx, dy = sbox[0] - x0, sbox[1] - y0
+        output[..., dy : dy + (sbox[3] - sbox[1]), dx : dx + (sbox[2] - sbox[0])] = region
+
+    return output, (x0, y0)
+
+
+@deprecated(since="1.1", removal="1.2")
 def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
     """
     Extract a region from an image based on a bounding box.
 
     Clips to image boundaries and pads out-of-bounds areas with np.nan.
+
+    .. deprecated:: 1.1
+        Use :func:`crop_with_fill` and pass ``fill=np.nan`` and take the
+        first tuple value for the equivalent functionality.  Will be
+        removed in v1.2.
 
     Parameters
     ----------
@@ -537,24 +599,7 @@ def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
     NDArray
         The extracted region with out-of-bounds areas padded with np.nan
     """
-    # Create output array filled with NaN with a minimum size of 1x1
-    box = to_int_box(box)
-    bw, bh = max(1, box[2] - box[0]), max(1, box[3] - box[1])
-
-    output = np.full((image.shape[-3] if image.ndim > 2 else 1, bh, bw), np.nan)
-
-    # Calculate source box
-    sbox = clip_box(image.shape, box)
-
-    # Calculate destination box
-    x0, y0 = sbox[0] - box[0], sbox[1] - box[1]
-    x1, y1 = x0 + (sbox[2] - sbox[0]), y0 + (sbox[3] - sbox[1])
-
-    # Copy the source if valid from the image to the output
-    if is_valid_box(sbox):
-        output[:, y0:y1, x0:x1] = image[:, sbox[1] : sbox[3], sbox[0] : sbox[2]]
-
-    return output
+    return crop_with_fill(image, box, fill=np.nan, dtype=float)[0]
 
 
 def resize(image: NDArray[np.uint8], resize_dim: int, use_pil: bool = True) -> NDArray[np.uint8]:

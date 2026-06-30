@@ -8,9 +8,9 @@ from dataeval.utils.preprocessing import (
     BitDepth,
     BoundingBox,
     BoundingBoxFormat,
-    clip_and_pad,
     clip_box,
     compute_iou,
+    crop_with_fill,
     edge_filter,
     get_bitdepth,
     is_valid_box,
@@ -362,20 +362,20 @@ class TestImageUtils:
 @pytest.mark.parametrize("image", [np.arange(25).reshape(1, 5, 5), np.arange(75).reshape(3, 5, 5)])
 class TestClipAndPad:
     def test_inside(self, image):
-        result = clip_and_pad(image, BoundingBox(1.2, 1.0, 3.9, 3.1).xyxy_int)
+        result = crop_with_fill(image, BoundingBox(1.2, 1.0, 3.9, 3.1).xyxy_int)[0]
         assert not np.isnan(result).any()
 
     def test_outside_right_bottom(self, image):
-        result = clip_and_pad(image, BoundingBox(2.5, 2.1, 7.2, 6.7).xyxy_int)
+        result = crop_with_fill(image, BoundingBox(2.5, 2.1, 7.2, 6.7).xyxy_int)[0]
         print(result)
         assert np.isnan(result).any()
 
     def test_outside_left_top(self, image):
-        result = clip_and_pad(image, BoundingBox(-2.3, -1.8, 3.0, 2.2).xyxy_int)
+        result = crop_with_fill(image, BoundingBox(-2.3, -1.8, 3.0, 2.2).xyxy_int)[0]
         assert np.isnan(result).any()
 
     def test_outside(self, image):
-        result = clip_and_pad(image, BoundingBox(-5.5, -5.4, -2.1, -2.6).xyxy_int)
+        result = crop_with_fill(image, BoundingBox(-5.5, -5.4, -2.1, -2.6).xyxy_int)[0]
         assert np.isnan(result).all()
 
 

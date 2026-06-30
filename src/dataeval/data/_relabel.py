@@ -10,7 +10,7 @@ from dataeval._ontology import Ontology
 from dataeval.data._conform import Conformer
 from dataeval.exceptions import OntologyError
 from dataeval.protocols import Array, DatasetMetadata, ObjectDetectionTarget
-from dataeval.utils._internal import as_numpy, try_mask_object
+from dataeval.utils._internal import MaskedTarget, as_numpy, mask_metadata
 from dataeval.utils._validate import DatasetKind
 
 TargetVocabulary: TypeAlias = Ontology | Mapping[int, str] | Sequence[str]
@@ -61,30 +61,6 @@ def _label_remap(
             dropped[int(index)] = str(name)
 
     return (mapping, index2label, dropped)
-
-
-def _mask_metadata(metadata: Mapping[str, Any], mask: NDArray[np.bool_]) -> dict[str, Any]:
-    """Recursively mask per-detection arrays inside a datum metadata mapping."""
-    return {
-        k: _mask_metadata(v, mask) if isinstance(v, dict) else try_mask_object(v, mask) for k, v in metadata.items()
-    }
-
-
-class _RelabelTarget:
-    """Proxy over an object-detection target: drop unmapped detections, remap labels."""
-
-    def __init__(self, target: ObjectDetectionTarget, mask: NDArray[np.bool_], labels: NDArray[np.intp]) -> None:
-        self.__dict__.update(target.__dict__)
-        self._mask = mask
-        self._labels = labels
-        self._target = target
-
-    def __getattribute__(self, name: str) -> Any:
-        if name in ("_mask", "_labels", "_target") or (name.startswith("__") and name.endswith("__")):
-            return super().__getattribute__(name)
-        if name == "labels":
-            return self._labels
-        return try_mask_object(getattr(self._target, name), self._mask)
 
 
 class Relabel(Conformer[Any]):
@@ -191,7 +167,7 @@ class Relabel(Conformer[Any]):
         image, target, metadata = datum
         if isinstance(target, ObjectDetectionTarget):
             new_target, mask = self._conform_detections(target, self.mapping)
-            return image, new_target, _mask_metadata(metadata, mask)
+            return image, new_target, mask_metadata(metadata, mask)
         if isinstance(target, Array):
             return image, self._conform_scores(target, self.mapping, len(self.index2label)), metadata
         raise TypeError(f"Relabel does not support targets of type {type(target)}.")
@@ -208,10 +184,10 @@ class Relabel(Conformer[Any]):
     @staticmethod
     def _conform_detections(
         target: ObjectDetectionTarget, mapping: Mapping[int, int]
-    ) -> tuple[_RelabelTarget, NDArray[np.bool_]]:
+    ) -> tuple[MaskedTarget, NDArray[np.bool_]]:
         """Object detection: drop unmapped detections and remap the rest."""
         labels = as_numpy(target.labels)
         keep = [int(label) in mapping for label in labels]
         mask = np.array(keep, dtype=np.bool_)
         new_labels = np.array([mapping[int(label)] for label, k in zip(labels, keep, strict=True) if k], dtype=np.intp)
-        return _RelabelTarget(target, mask, new_labels), mask
+        return MaskedTarget(target, mask, {"labels": new_labels}), mask

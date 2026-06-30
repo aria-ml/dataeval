@@ -1,14 +1,13 @@
 __all__ = []
 
-from collections.abc import Iterable, Mapping, Sequence, Sized
-from typing import Any, Generic, TypeVar, cast
+from collections.abc import Iterable, Sequence
+from typing import Any, TypeVar, cast
 
 import numpy as np
-from numpy.typing import NDArray
 
 from dataeval.data._select import Select, Selection, SelectionStage, Subselection
 from dataeval.protocols import Array, ObjectDetectionDatum, ObjectDetectionTarget, SegmentationDatum, SegmentationTarget
-from dataeval.utils._internal import as_numpy, try_mask_object
+from dataeval.utils._internal import MaskedTarget, as_numpy, mask_metadata
 from dataeval.utils._validate import DatasetKind
 
 
@@ -64,38 +63,19 @@ class ClassFilter(Selection[Any]):
 
 
 _TDatum = TypeVar("_TDatum", ObjectDetectionDatum, SegmentationDatum)
-_TTarget = TypeVar("_TTarget", ObjectDetectionTarget, SegmentationTarget)
-
-
-class ClassFilterTarget(Generic[_TTarget]):
-    def __init__(self, target: _TTarget, mask: NDArray[np.bool_]) -> None:
-        self.__dict__.update(target.__dict__)
-        self._length = len(target.labels) if isinstance(target.labels, Sized) else int(bool(target.labels))
-        self._mask = mask
-        self._target = target
-
-    def __getattribute__(self, name: str) -> Any:
-        if name in ("_length", "_mask", "_target") or name.startswith("__") and name.endswith("__"):
-            return super().__getattribute__(name)
-
-        attr = getattr(self._target, name)
-        return try_mask_object(attr, self._mask)
 
 
 class ClassFilterSubSelection(Subselection[Any]):
     def __init__(self, classes: Sequence[int]) -> None:
         self.classes = classes
 
-    def _filter(self, d: Mapping[str, Any], mask: NDArray[np.bool_]) -> dict[str, Any]:
-        return {k: self._filter(v, mask) if isinstance(v, dict) else try_mask_object(v, mask) for k, v in d.items()}
-
     def __call__(self, datum: _TDatum) -> _TDatum:
         # build a mask for any arrays
         image, target, metadata = datum
 
         mask = np.isin(as_numpy(target.labels), self.classes)
-        filtered_metadata = self._filter(metadata, mask)
+        filtered_metadata = mask_metadata(metadata, mask)
 
         # return a masked datum
-        filtered_datum = image, ClassFilterTarget(target, mask), filtered_metadata
+        filtered_datum = image, MaskedTarget(target, mask), filtered_metadata
         return cast(_TDatum, filtered_datum)

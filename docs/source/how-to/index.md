@@ -55,6 +55,7 @@ datasets for machine learning.
 :hidden:
 
 ../notebooks/h2_encode_with_onnx.py
+../notebooks/h2_embed_detection_crops.py
 ../notebooks/h2_cluster_analysis.py
 ../notebooks/h2_deduplicate.py
 ../notebooks/h2_visualize_cleaning_issues.py
@@ -77,6 +78,9 @@ datasets for machine learning.
 - - [](../notebooks/h2_encode_with_onnx.py)
   - Encode image embeddings with an ONNX model
   - [![Open In Colab][colab-badge]][onx-colab]
+- - [](../notebooks/h2_embed_detection_crops.py)
+  - Embed object detection box crops and visualize class clusters
+  - [![Open In Colab][colab-badge]][crop-colab]
 - - [](../notebooks/h2_cluster_analysis.py)
   - Identify outliers and anomalies with clustering algorithms
   - [![Open In Colab][colab-badge]][clst-colab]
@@ -126,6 +130,7 @@ datasets for machine learning.
 :::
 
 [onx-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_encode_with_onnx.ipynb
+[crop-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_embed_detection_crops.ipynb
 [clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_cluster_analysis.ipynb
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_deduplicate.ipynb
 [clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_visualize_cleaning_issues.ipynb

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import NamedTuple
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -8,6 +9,7 @@ from numpy.typing import NDArray
 from dataeval._metadata import Metadata
 from dataeval.data._classfilter import ClassFilter
 from dataeval.data._select import Select
+from dataeval.protocols import ObjectDetectionTarget
 from dataeval.utils._internal import try_mask_object
 
 
@@ -270,3 +272,34 @@ class TestObjectDetectionSelections:
         md = Metadata(select)
         # With dual-key indexing, target_data filters to only target-level rows
         assert md.target_data["nested"].to_list() == [0, 2, 3, 3]
+
+    def test_namedtuple_target_still_satisfies_protocol(self):
+        """Regression: MAITE targets are namedtuples (no __dict__); the filtered proxy must
+        still pass isinstance(..., ObjectDetectionTarget), which uses getattr_static."""
+
+        class ObjectDetectionTargetTuple(NamedTuple):  # mirrors maite_datasets' namedtuple target
+            boxes: NDArray[np.float32]
+            labels: NDArray[np.intp]
+            scores: NDArray[np.float32]
+
+        items = [
+            (
+                "image_0",
+                ObjectDetectionTargetTuple(
+                    boxes=np.array([[0, 0, 10, 10], [10, 10, 20, 20]], dtype=np.float32),
+                    labels=np.array([0, 2]),
+                    scores=np.array([0.9, 0.7], dtype=np.float32),
+                ),
+                {"id": 0, "bbox_metadata": ["box0", "box2"]},
+            ),
+        ]
+        dataset = MagicMock()
+        dataset.__len__.return_value = len(items)
+        dataset.__getitem__.side_effect = lambda idx: items[idx]
+
+        select = Select(dataset, selections=[ClassFilter(classes=(0,), filter_detections=True)])
+        _, target, _ = select[0]
+
+        assert isinstance(target, ObjectDetectionTarget)  # the exact pre-fix failure
+        assert np.array_equal(target.labels, np.array([0]))  # class 2 detection dropped
+        assert len(np.asarray(target.boxes)) == 1
