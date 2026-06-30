@@ -194,7 +194,7 @@ print("The maximum achievable accuracy:", 1 - new_result["upper_bound"])
 #
 # - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py)
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py)
-# - [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.py)
+# - [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 #
 # ### Tutorials
 #

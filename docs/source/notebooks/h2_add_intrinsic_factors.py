@@ -186,7 +186,7 @@ dep.plot(diversity_output)
 # ### How-to guides
 #
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py)
-# - [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.py)
+# - [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 #
 # ### Tutorials
 #

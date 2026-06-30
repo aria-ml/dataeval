@@ -1171,7 +1171,7 @@ plt.show()
 # - Try the [data cleaning tutorial](./tt_clean_dataset.py)
 #
 # To learn more about setting a global seed in DataEval, see the
-# [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.py).
+# [configuration defaults how-to](../notebooks/h2_configure_defaults.py).
 
 # %% [markdown]
 # ## Related how-to guides
@@ -1179,7 +1179,7 @@ plt.show()
 # Apply OOD detection to your own data with these focused, task-oriented guides:
 #
 # - [Encode image embeddings with an ONNX model](../notebooks/h2_encode_with_onnx.py)
-# - [Configure global hardware settings](../notebooks/h2_configure_hardware_settings.py)
+# - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 
 # %% [markdown]
 # ## On your own

@@ -253,7 +253,7 @@ print("\nCleanup complete!")
 #
 # ### How-to guides
 #
-# - [How to configure global hardware configuration defaults in DataEval](./h2_configure_hardware_settings.py)
+# - [How to configure global DataEval defaults](./h2_configure_defaults.py)
 #
 # ### Tutorials
 #

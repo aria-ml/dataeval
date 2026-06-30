@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to configure global hardware configuration defaults in DataEval
+# # How to configure global DataEval defaults
 
 # %% [markdown]
 # ## Problem statement

@@ -106,7 +106,7 @@ set_batch_size(32)
 # > The device is the piece of hardware where the model and data live in memory; if a GPU is available this notebook uses
 # > it, otherwise the CPU. The batch size set above is the default I/O chunk size DataEval uses when streaming images
 # > through an extractor. For more on these global settings, see the
-# > [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.py).
+# > [configuration defaults how-to](../notebooks/h2_configure_defaults.py).
 
 # %% [markdown]
 # ## Load the datasets
@@ -347,7 +347,7 @@ print(f"SeaDrone     -> drift: {result_drone.drifted}  (ratio: {result_drone.dis
 #
 # - [Detect uncertainty drift with a MAITE model](../notebooks/h2_detect_uncertainty_drift.py)
 # - [Encode a dataset with an ONNX model](../notebooks/h2_encode_with_onnx.py)
-# - [Configure global hardware settings](../notebooks/h2_configure_hardware_settings.py)
+# - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 
 # %% [markdown]
 # ## On your own

@@ -487,7 +487,7 @@ label_parity(train_md.class_labels, operational_md.class_labels, num_classes=20)
 # - Learn about [identifying out-of-distribution samples](./tt_identify_ood_samples.py)
 #
 # To learn more about setting a global seed in DataEval, see the
-# [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.py).
+# [configuration defaults how-to](../notebooks/h2_configure_defaults.py).
 
 # %% [markdown]
 # ## Related how-to guides
@@ -496,7 +496,7 @@ label_parity(train_md.class_labels, operational_md.class_labels, num_classes=20)
 #
 # - [Display data distributions between two datasets](../notebooks/h2_measure_divergence.py)
 # - [Compare label distributions between two datasets](../notebooks/h2_measure_label_independence.py)
-# - [Configure global hardware settings](../notebooks/h2_configure_hardware_settings.py)
+# - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 
 # %% [markdown]
 # ## On your own

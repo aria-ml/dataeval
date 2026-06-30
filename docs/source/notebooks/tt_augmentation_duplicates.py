@@ -643,7 +643,7 @@ print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 # [Concept pages](../concepts/index.md).
 #
 # To learn more about setting a global seed in DataEval, see the
-# [hardware configuration how-to](../notebooks/h2_configure_hardware_settings.py).
+# [configuration defaults how-to](../notebooks/h2_configure_defaults.py).
 
 # %% [markdown]
 # ## Related how-to guides
@@ -652,7 +652,7 @@ print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 #
 # - [Identify and remove duplicates from a PyTorch Dataset](../notebooks/h2_deduplicate.py)
 # - [Find negatively impactful images](../notebooks/h2_visualize_cleaning_issues.py)
-# - [Configure global hardware settings](../notebooks/h2_configure_hardware_settings.py)
+# - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 
 # %% [markdown]
 # ## On your own

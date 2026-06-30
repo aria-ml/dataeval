@@ -355,7 +355,7 @@ output.inv_project([0.90, 0.93, 0.99])
 #
 # - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py)
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py)
-# - [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.py)
+# - [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 #
 # ### Tutorials
 #

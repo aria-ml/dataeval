@@ -26,7 +26,7 @@ environment.
 ```{toctree}
 :hidden:
 
-../notebooks/h2_configure_hardware_settings.py
+../notebooks/h2_configure_defaults.py
 ../notebooks/h2_configure_logging.py
 ```
 
@@ -34,8 +34,8 @@ environment.
 :widths: 30 50 20
 :header-rows: 0
 
-- - [](../notebooks/h2_configure_hardware_settings.py)
-  - Configure global hardware settings used in DataEval
+- - [](../notebooks/h2_configure_defaults.py)
+  - Configure global DataEval defaults
   - [![Open In Colab][colab-badge]][hdw-colab]
 - - [](../notebooks/h2_configure_logging.py)
   - Configure logging with DataEval
@@ -43,7 +43,7 @@ environment.
 
 :::
 
-[hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_configure_hardware_settings.ipynb
+[hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_configure_defaults.ipynb
 [log-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/h2_configure_logging.ipynb
 
 ## Data Engineering

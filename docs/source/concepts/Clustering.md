@@ -150,7 +150,7 @@ number of classes is a reasonable starting hint.
 cluster assignments matter for your workflow (for example, if you are using
 cluster assignments as input to a downstream analysis), call
 `dataeval.config.set_seed(your_seed)` before running KMeans. See the
-[Configuring the seed](../notebooks/h2_configure_hardware_settings.py#configuring-the-global-seed)
+[Configuring the seed](../notebooks/h2_configure_defaults.py#configuring-the-global-seed)
 how-to for an example.
 
 **Clustering is embedding-dependent.** The clusters discovered by either
@@ -202,7 +202,7 @@ into a test report.
 ### How-to guides
 
 - [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
-- [How to configure global hardware configuration defaults in DataEval](../notebooks/h2_configure_hardware_settings.py)
+- [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 
 ### Tutorials
 
