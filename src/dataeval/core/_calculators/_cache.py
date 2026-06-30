@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 from dataeval.utils.preprocessing import (
     BoundingBox,
-    clip_and_pad,
+    crop_with_fill,
     normalize_image_shape,
     rescale,
 )
@@ -44,13 +44,10 @@ class CalculatorCache:
 
     @cached_property
     def image(self) -> NDArray[Any]:
-        # Only normalize image shape if we have bounding boxes, since only image/video data
-        # will have bounding box concepts. Otherwise, we cannot assume dimensionality >= 3.
-        if self.has_box:
-            return clip_and_pad(normalize_image_shape(self.raw), self.box.xyxy_int)
-        # For non-image data or data without boxes, return as-is after ensuring minimum shape
-        if self.raw.ndim >= 3:
-            return clip_and_pad(normalize_image_shape(self.raw), self.box.xyxy_int)
+        # Crop/pad to the bounding box (a full-image default when none was given), but only for
+        # image-like data: bounding-box geometry assumes channels-first dimensionality >= 3.
+        if self.has_box or self.raw.ndim >= 3:
+            return crop_with_fill(normalize_image_shape(self.raw), self.box.xyxy_int)[0]
         # For data with < 3 dimensions, don't normalize or clip
         return self.raw
 

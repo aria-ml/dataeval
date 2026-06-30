@@ -1,10 +1,4 @@
-"""Dataset organization tools: conform, filter, split, and reshape dataset views.
-
-This package is the home for DataEval's data-organization operations — lazy,
-read-only dataset views that subset (:class:`Select`), split
-(:func:`split_dataset`), and reshape (:func:`unzip_dataset`) datasets without
-mutating the source.
-"""
+"""Dataset organization tools: conform, filter, split, and reshape dataset views."""
 
 __all__ = [
     "ClassBalance",
@@ -12,6 +6,7 @@ __all__ = [
     "Conform",
     "Conformer",
     "DatasetSplits",
+    "DetectionCrops",
     "Indices",
     "Limit",
     "Relabel",
@@ -28,6 +23,7 @@ __all__ = [
 from dataeval.data._classbalance import ClassBalance
 from dataeval.data._classfilter import ClassFilter
 from dataeval.data._conform import Conform, Conformer
+from dataeval.data._crops import DetectionCrops
 from dataeval.data._indices import Indices
 from dataeval.data._limit import Limit
 from dataeval.data._merge import merge_datasets
