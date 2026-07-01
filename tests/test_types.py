@@ -1,8 +1,13 @@
 """Tests for dataeval.types module."""
 
+from __future__ import annotations
+
+import dataclasses
+
+import numpy as np
 import pytest
 
-from dataeval.types import MappingOutput, SequenceOutput, SourceIndex
+from dataeval.types import MappingOutput, SequenceOutput, SourceIndex, Track
 
 
 class TestSourceIndex:
@@ -138,3 +143,77 @@ class TestSequenceOutput:
         output = SequenceOutput(data)
         result = list(output)
         assert result == [10, 20, 30, 40]
+
+
+def _make_track(track_id=1, length=3):
+    """Build a contiguous Track of the given length, mirroring build_tracks."""
+    return Track(
+        track_id=track_id,
+        boxes=np.array([[i, 0, i + 10, 10] for i in range(length)], dtype=np.float32),
+        frame_indices=np.arange(length, dtype=np.int64),
+        scores=np.ones(length, dtype=np.float32),
+        labels=np.zeros(length, dtype=np.int64),
+    )
+
+
+class TestTrack:
+    """Tests for the ``Track`` dataclass."""
+
+    def test_is_a_dataclass_with_expected_fields(self):
+        assert dataclasses.is_dataclass(Track)
+        field_names = {f.name for f in dataclasses.fields(Track)}
+        assert field_names == {"track_id", "boxes", "frame_indices", "scores", "labels"}
+
+    def test_construction_stores_track_id(self):
+        track = _make_track(track_id=42)
+        assert track.track_id == 42
+
+    def test_construction_stores_arrays(self):
+        boxes = np.array([[0, 0, 10, 10], [10, 0, 20, 10]], dtype=np.float32)
+        frames = np.array([0, 1], dtype=np.int64)
+        scores = np.array([0.9, 0.8], dtype=np.float32)
+        labels = np.array([2, 2], dtype=np.int64)
+        track = Track(track_id=1, boxes=boxes, frame_indices=frames, scores=scores, labels=labels)
+
+        np.testing.assert_array_equal(track.boxes, boxes)
+        np.testing.assert_array_equal(track.frame_indices, frames)
+        np.testing.assert_allclose(track.scores, scores, rtol=1e-6)
+        np.testing.assert_array_equal(track.labels, labels)
+
+    def test_boxes_shape(self):
+        track = _make_track(length=4)
+        assert track.boxes.shape == (4, 4)
+        assert track.frame_indices.shape == (4,)
+
+    def test_single_observation_track(self):
+        track = Track(
+            track_id=7,
+            boxes=np.array([[1, 1, 2, 2]], dtype=np.float32),
+            frame_indices=np.array([5], dtype=np.int64),
+            scores=np.array([1.0], dtype=np.float32),
+            labels=np.array([0], dtype=np.int64),
+        )
+        assert track.boxes.shape == (1, 4)
+        np.testing.assert_array_equal(track.frame_indices, [5])
+
+    def test_track_with_gap_preserves_frame_indices(self):
+        track = Track(
+            track_id=3,
+            boxes=np.array([[0, 0, 10, 10], [30, 0, 40, 10]], dtype=np.float32),
+            frame_indices=np.array([0, 3], dtype=np.int64),
+            scores=np.array([0.9, 0.9], dtype=np.float32),
+            labels=np.array([1, 1], dtype=np.int64),
+        )
+        np.testing.assert_array_equal(track.frame_indices, [0, 3])
+        assert track.boxes.shape == (2, 4)
+
+    def test_field_dtypes_preserved(self):
+        track = _make_track()
+        assert track.boxes.dtype == np.float32
+        assert track.frame_indices.dtype == np.int64
+        assert track.scores.dtype == np.float32
+        assert track.labels.dtype == np.int64
+
+    def test_repr_includes_class_name(self):
+        track = _make_track()
+        assert "Track" in repr(track)

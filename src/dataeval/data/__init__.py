@@ -15,6 +15,7 @@ __all__ = [
     "Selection",
     "Shuffle",
     "TrainValSplit",
+    "build_tracks",
     "merge_datasets",
     "split_dataset",
     "unzip_dataset",
@@ -32,4 +33,5 @@ from dataeval.data._reverse import Reverse
 from dataeval.data._select import Select, Selection
 from dataeval.data._shuffle import Shuffle
 from dataeval.data._split import DatasetSplits, TrainValSplit, split_dataset
+from dataeval.data._tracks import build_tracks
 from dataeval.data._unzip import unzip_dataset

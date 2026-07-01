@@ -21,6 +21,7 @@ __all__ = [
     "ParityResult",
     "RankResult",
     "StatsResult",
+    "TrackStatsResult",
     "ber_knn",
     "ber_mst",
     "cluster",
@@ -63,6 +64,7 @@ __all__ = [
     "rank_kmeans_complexity",
     "rank_result_class_balanced",
     "rank_result_stratified",
+    "track_stats",
     "xxhash",
     "uap",
 ]
@@ -105,4 +107,5 @@ from dataeval.core._rank import (
     rank_result_class_balanced,
     rank_result_stratified,
 )
+from dataeval.core._track_stats import TrackStatsResult, track_stats
 from dataeval.core._uap import uap
