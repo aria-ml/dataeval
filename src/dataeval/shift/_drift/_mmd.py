@@ -565,7 +565,11 @@ class GaussianRBF(torch.nn.Module):
         y: Array,
         infer_sigma: bool = False,
     ) -> torch.Tensor:
-        x, y = torch.as_tensor(x), torch.as_tensor(y)
+        # Place inputs on the kernel's own device: the data may arrive as CPU numpy (see
+        # BaseDrift._encode) while ``sigma``/``gamma`` live on the configured device, so relying
+        # on a matching torch default device (e.g. via torch.set_default_device) is not safe.
+        device = self.log_sigma.device
+        x, y = torch.as_tensor(x, device=device), torch.as_tensor(y, device=device)
         dist = _squared_pairwise_distance(x.flatten(1), y.flatten(1))  # [Nx, Ny]
 
         if infer_sigma or self.init_required:

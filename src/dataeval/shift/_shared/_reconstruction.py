@@ -84,8 +84,8 @@ def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelPara
     d = cov.shape[1]
     # Use adaptive epsilon that scales with covariance magnitude to ensure numerical stability
     max_diag = torch.max(torch.diagonal(cov, dim1=-2, dim2=-1))
-    adaptive_epsilon = torch.maximum(max_diag * 1e-6, torch.tensor(1e-6))
-    chol = torch.linalg.cholesky(cov + torch.eye(d) * adaptive_epsilon)  # K x D x D
+    adaptive_epsilon = torch.maximum(max_diag * 1e-6, torch.tensor(1e-6, device=cov.device))
+    chol = torch.linalg.cholesky(cov + torch.eye(d, device=cov.device) * adaptive_epsilon)  # K x D x D
     log_det_cov = 2.0 * torch.sum(torch.log(torch.diagonal(chol, dim1=-2, dim2=-1)), 1)  # K
 
     return GaussianMixtureModelParams(phi, mu, cov, chol, log_det_cov)
@@ -130,7 +130,7 @@ def gmm_energy(
         sample_energy = torch.mean(sample_energy)
 
     # inverse sum of variances
-    cov_diag = torch.sum(torch.divide(torch.tensor(1), torch.diagonal(params.cov, dim1=-2, dim2=-1)))
+    cov_diag = torch.sum(torch.reciprocal(torch.diagonal(params.cov, dim1=-2, dim2=-1)))
 
     return sample_energy, cov_diag
 
