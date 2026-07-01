@@ -26,7 +26,7 @@
 #
 # ## What you'll do
 #
-# - Construct [embeddings](../concepts/Embeddings.md) by training a simple neural network
+# - Construct [embeddings](../concepts/Embeddings.md) by inferencing images through a pretrained network
 # - Compare different drift detectors and understand their strengths
 # - Inspect detector-specific outputs for root-cause analysis
 # - Use chunked drift detection to monitor drift across data segments
@@ -83,6 +83,7 @@ from torchvision.models import ResNet18_Weights, resnet18
 from torchvision.transforms.v2 import GaussianNoise
 
 from dataeval import Embeddings, Metadata
+from dataeval.config import set_device, set_seed
 from dataeval.core import label_parity
 from dataeval.extractors import TorchExtractor
 from dataeval.shift import ChunkedDrift, DriftDomainClassifier, DriftKNeighbors, DriftMMD, DriftUnivariate
@@ -90,9 +91,12 @@ from dataeval.shift import ChunkedDrift, DriftDomainClassifier, DriftKNeighbors,
 # Set a random seed
 rng = np.random.default_rng(213)
 
-# Set default torch device for notebook
+# Set default device for notebook
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.set_default_device(device)
+set_device(device)
+
+# Seed NumPy and torch so the added Gaussian noise (and drift detectors) are reproducible
+set_seed(213, all_generators=True)
 
 # %% [markdown]
 # > **More on device**
@@ -103,29 +107,15 @@ torch.set_default_device(device)
 # > [PyTorch device page](https://pytorch.org/tutorials/recipes/recipes/changing_default_device.html).
 
 # %% [markdown]
-# ## Constructing embeddings
+# ## Construct embeddings
 #
-# An important concept in many aspects of machine learning is {term}`Dimensionality Reduction`. While this step is not
-# always necessary, it is good practice to use embeddings over raw images to improve the speed and memory efficiency of
-# many workflows without sacrificing downstream performance.
+# Rather than compare raw pixels, you'll work in [embedding](../concepts/Embeddings.md) space: a compact feature vector
+# per image that keeps drift detection fast and memory-light without sacrificing accuracy.
 #
-# ### Define model architecture
-#
-# In this section, you will use a
-# [pretrained ResNet18 model](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
-# Torchvision to reduce the dimensionality of the VOC dataset.
-
-# %%
-resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
-
-# Replace the final fully connected layer with a Linear layer
-resnet.fc = torch.nn.Linear(resnet.fc.in_features, 128)
-
-# %% [markdown]
 # ### Download VOC dataset
 #
-# With the model created on the device set at the beginning, you will download the train and validation splits of the 2012
-# VOC Dataset.
+# Download the `train` and `val` splits of the 2012 VOC dataset — `val` stands in for the operational data you'd see
+# after deployment.
 
 # %%
 # Load the training dataset
@@ -137,57 +127,37 @@ print(f"Image 0 shape: {train_ds[0][0].shape}")
 # Load the "operational" dataset
 operational_ds = VOCDetection("./data", year="2012", image_set="val", download=True)
 print(operational_ds)
-print(f"Image 0 shape: {train_ds[0][0].shape}")
-
-# %% [markdown]
-# It is good to notice a few points about each dataset:
-#
-# - Number of datapoints
-# - Resize size
-#
-# These two values give an estimate of the memory impact that each dataset has. The following step will modify the resize
-# size by creating model embeddings for each image to reduce this impact.
+print(f"Image 0 shape: {operational_ds[0][0].shape}")
 
 # %% [markdown]
 # ### Extract embeddings
 #
-# Now it is time to process the datasets through your model. Aggregating the model outputs gives you the embeddings of the
-# data. This will be helpful in determining drift between the training and operational splits.
-
-# %% [markdown]
-# Below you will call the helper function and create embeddings for both the train and operational splits. The labels will
-# also be saved so they can be used in a later step.
+# Reduce each image to a feature vector with a
+# [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
+# Torchvision: point a {class}`.TorchExtractor` at its penultimate `avgpool` layer (its learned features, not the
+# 1000-class logits) and run each split through {class}`.Embeddings`, which applies the model's standard
+# resize-and-normalize preprocessing for you. Keeping the `transforms` in a variable lets you reuse them further down.
+#
+# > For other ways to build embeddings, see [Encode images with an ONNX model](h2_encode_with_onnx.py) (a
+# > framework-agnostic ONNX extractor) and [Embed object detection crops](h2_embed_detection_crops.py) (one embedding
+# > per object box).
 
 # %%
-# Define pretrained model transformations
+resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
 transforms = ResNet18_Weights.DEFAULT.transforms()
+extractor = TorchExtractor(resnet, transforms=transforms, layer_name="avgpool")
 
-# Create extractor with model and transforms
-extractor = TorchExtractor(resnet, transforms=transforms)
-
-# Create training batches and targets
+# Create embeddings for the train and operational splits
 train_embs = Embeddings(train_ds, extractor=extractor, batch_size=64)
-
-# Create operational batches and targets
 operational_embs = Embeddings(operational_ds, extractor=extractor, batch_size=64)
 
 # %% [markdown]
-# Notice that the shape of embeddings is different than before.
-#
-# #### Previously
-#
-# Training shape - (5717, 3, 442, 500)\
-# Operational shape - (5823, 3, 442, 500)
-#
-# #### After embeddings
+# Each image is now a single feature vector instead of a full-resolution image, which speeds up the drift algorithms
+# below without impacting the accuracy of the results.
 
 # %%
 print(f"({len(train_embs)}, {train_embs[0].shape})")  # (5717, shape)
 print(f"({len(operational_embs)}, {operational_embs[0].shape})")  # (5823, shape)
-
-# %% [markdown]
-# The reduced shape of both the training and operational datasets will improve the performance of the upcoming drift
-# algorithms without impacting the accuracy of the results.
 
 # %% [markdown]
 # ## Understanding drift detectors
@@ -271,7 +241,7 @@ for name, detector in detectors.items():
 noisy_transforms = [transforms, GaussianNoise()]
 
 # Create extractor with noisy transforms
-noisy_extractor = TorchExtractor(resnet, transforms=noisy_transforms)
+noisy_extractor = TorchExtractor(resnet, transforms=noisy_transforms, layer_name="avgpool")
 
 # Applies gaussian noise to images before processing
 noisy_embs = Embeddings(operational_ds, extractor=noisy_extractor, batch_size=64)

@@ -83,14 +83,15 @@ from maite_datasets.object_detection import VOCDetection
 from torchvision.models import ResNet18_Weights, resnet18
 
 from dataeval import Embeddings
-from dataeval.config import set_max_processes
+from dataeval.config import set_device, set_max_processes, set_seed
 from dataeval.core import cluster, coverage_adaptive
 from dataeval.extractors import TorchExtractor
 from dataeval.quality import Outliers
 
-# Set default torch device for notebook
+# Set default device for notebook
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.set_default_device(device)
+set_device(device)
+set_seed(0, all_generators=True)  # reproducible init for the fresh projection head added below
 
 # Use plotly to render plots
 dep.set_default_backend("plotly")
@@ -112,75 +113,47 @@ set_max_processes(4)
 # :::
 
 # %% [markdown]
-# ## Constructing embeddings
+# ## Construct embeddings
 #
-# An important concept in many aspects of machine learning is {term}`Dimensionality Reduction`. While this step is not
-# always necessary, it is good practice to use embeddings over raw images to improve the speed and memory efficiency of
-# many workflows without sacrificing downstream performance.
+# Rather than analyze raw pixels, you'll work in [embedding](../concepts/Embeddings.md) space: a compact feature vector
+# per image that keeps the downstream algorithms fast and memory-light without sacrificing accuracy.
 #
-# ### Define model architecture
-#
-# In this section, you will use a
-# [pretrained ResNet18 model](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
-# Torchvision to reduce the dimensionality of the VOC dataset.
-
-# %%
-resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
-
-# Replace the final fully connected layer with a Linear layer
-resnet.fc = torch.nn.Linear(resnet.fc.in_features, 128)
-
-# %% [markdown]
 # ### Download VOC dataset
 #
-# Now you will download the train split using the {class}`.VOCDetection` class. The train split contains 5717 images with
-# a varying number of targets in each image. This makes it useful for determining gaps in coverage.
-#
-# You can also run this tutorial with your own MAITE compliant dataset.
+# Download the train split with the {class}`.VOCDetection` class — 5717 images with a varying number of targets each.
+# You can also run this tutorial with your own MAITE-compliant dataset.
 
 # %%
 # Load the training dataset
 dataset = VOCDetection(root="./data", year="2012", image_set="train", download=True)
 
 print(dataset)
-
 print(dataset[0][0].shape)
-
-# %% [markdown]
-# It is good to notice a few points about each dataset:
-#
-# - Number of datapoints
-# - Image size
-#
-# These two values give an estimate of the memory impact that the dataset has. The following step will modify the resize
-# size by creating model embeddings for each image to reduce this impact.
 
 # %% [markdown]
 # ### Extract embeddings
 #
-# Now it is time to process the datasets through your model. Aggregating the model outputs gives you the embeddings of the
-# data. This will be helpful in determining clusters that are representative of your dataset.
+# Reduce each image to a compact 128-dimensional embedding with a
+# [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
+# Torchvision: replace its 1000-class head with a fresh {class}`~torch.nn.Linear` layer that projects the network's 512
+# pooled features down to 128 dimensions, wrap it in a {class}`.TorchExtractor`, and run the dataset through
+# {class}`.Embeddings`, which applies the model's standard resize-and-normalize preprocessing for you.
+#
+# > For other ways to build embeddings, see [Encode images with an ONNX model](h2_encode_with_onnx.py) (a
+# > framework-agnostic ONNX extractor) and [Embed object detection crops](h2_embed_detection_crops.py) (one embedding
+# > per object box).
 
 # %%
-# Create extractor with model and pretrained transforms
-extractor = TorchExtractor(
-    resnet,
-    transforms=ResNet18_Weights.DEFAULT.transforms(),
-)
-
-# Extract embeddings from the dataset using the ResNet18 model after applying transforms
+resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
+resnet.fc = torch.nn.Linear(resnet.fc.in_features, 128)  # project the 512 pooled features -> 128 dims
+extractor = TorchExtractor(resnet, ResNet18_Weights.DEFAULT.transforms())
 embeddings = Embeddings(dataset=dataset, extractor=extractor, batch_size=64)[:]
 
-print(embeddings.shape)
+print("embedding shape:", embeddings.shape)
 
 # %% [markdown]
-# The shape has been reduced to (128,). This will greatly improve the performance of the upcoming algorithms without
-# impacting the accuracy of the results. Notice that the original number of images, 5717, is the same as before you
-# created image embeddings.
-#
-# Embeddings create a more performant representation of the data than simply resizing but are more computational
-# expensive. In most cases, this step is not the bottleneck of a pipeline and is generally considered worth the
-# improvement in performance of downstream tasks.
+# Each of the 5717 images is now a single 128-dimensional feature vector rather than a full-resolution image, which
+# greatly speeds up the algorithms below without impacting the accuracy of the results.
 
 # %% [markdown]
 # ## Cluster the embeddings
