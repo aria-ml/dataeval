@@ -28,11 +28,15 @@ class CompletenessResult(TypedDict):
     nearest_neighbor_pairs : Sequence[tuple[int, int]]
         Sequence of tuples (i, j) representing point indices and their nearest neighbors,
         sorted by decreasing nearest neighbor distance. Each pair appears only once.
+    nearest_neighbor_distances : Sequence[float]
+        Distance between each pair in ``nearest_neighbor_pairs``, aligned 1:1 and sharing
+        the same decreasing order. The small-distance tail flags near-duplicate samples.
     """
 
     completeness: float
     isotropy: float
     nearest_neighbor_pairs: Sequence[tuple[int, int]]
+    nearest_neighbor_distances: Sequence[float]
 
 
 def _get_effective_dim(x: Array, do_ranks: bool = True) -> float:
@@ -167,6 +171,7 @@ def completeness(embeddings: Array) -> CompletenessResult:
             completeness=float(completeness_score),
             isotropy=float(isotropy_score),
             nearest_neighbor_pairs=[],
+            nearest_neighbor_distances=[],
         )
 
     # Fit nearest neighbors model (k=2 because first neighbor is always the point itself)
@@ -195,9 +200,10 @@ def completeness(embeddings: Array) -> CompletenessResult:
             seen_pairs.add(pair_key)
             pairs_with_distances.append((i, j, dist))
 
-    # Sort by distance descending and extract just the index pairs
+    # Sort by distance descending and split into aligned pair / distance sequences
     pairs_with_distances.sort(key=lambda x: x[2], reverse=True)
     nearest_neighbor_pairs = [(i, j) for i, j, _ in pairs_with_distances]
+    nearest_neighbor_distances = [float(dist) for _, _, dist in pairs_with_distances]
 
     _logger.info(
         "Completeness calculation complete: completeness=%.4f, %d nearest neighbor pairs identified",
@@ -209,4 +215,5 @@ def completeness(embeddings: Array) -> CompletenessResult:
         completeness=float(completeness_score),
         isotropy=float(isotropy_score),
         nearest_neighbor_pairs=nearest_neighbor_pairs,
+        nearest_neighbor_distances=nearest_neighbor_distances,
     )

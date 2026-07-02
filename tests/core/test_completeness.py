@@ -5,6 +5,33 @@ from dataeval.core._completeness import completeness
 
 
 @pytest.mark.required
+class TestNearestNeighborDistancesUnit:
+    def test_distances_align_with_pairs(self):
+        """Each returned distance is the euclidean distance between its pair, in pair order."""
+        rng = np.random.default_rng(0)
+        embs = rng.random((50, 4))
+        result = completeness(embs)
+        pairs = result["nearest_neighbor_pairs"]
+        distances = result["nearest_neighbor_distances"]
+
+        assert len(distances) == len(pairs)
+        for (i, j), d in zip(pairs, distances, strict=True):
+            np.testing.assert_allclose(d, float(np.linalg.norm(embs[i] - embs[j])))
+
+    def test_distances_sorted_decreasing_like_pairs(self):
+        """Distances share the pairs' decreasing-distance ordering."""
+        rng = np.random.default_rng(1)
+        embs = rng.random((40, 3))
+        distances = completeness(embs)["nearest_neighbor_distances"]
+        assert list(distances) == sorted(distances, reverse=True)
+
+    def test_distances_empty_for_single_point(self):
+        """No neighbors, no distances."""
+        result = completeness(np.random.default_rng(2).random((1, 4)))
+        assert list(result["nearest_neighbor_distances"]) == []
+
+
+@pytest.mark.required
 class TestCompletenessUnit:
     def test_uniform_data_completeness(self):
         """Test that uniform random data has high completeness."""

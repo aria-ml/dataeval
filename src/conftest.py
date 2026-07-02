@@ -13,7 +13,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -23,6 +23,7 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval.config import _config, set_batch_size, set_device, set_seed
+from dataeval.protocols import DatasetMetadata, DatumMetadata, ObjectDetectionTarget
 
 # Set numpy print option to legacy 1.25 so native numpy types
 # are not printed with dtype information.
@@ -243,10 +244,10 @@ class ObjectDetectionDataset:
         self._image_metadata = image_metadata
         self._classes = classes
         self._index2label = dict(enumerate(classes))
-        self._metadata = {"id": dataset_id, "index2label": self._index2label}
+        self._metadata = DatasetMetadata(id=dataset_id, index2label=self._index2label)
 
     @property
-    def metadata(self) -> dict[str, Any]:
+    def metadata(self) -> DatasetMetadata:
         """Return dataset metadata."""
         return self._metadata
 
@@ -254,7 +255,7 @@ class ObjectDetectionDataset:
         """Return number of images."""
         return len(self._images)
 
-    def _get_target(self, idx: int) -> MagicMock:
+    def _get_target(self, idx: int) -> ObjectDetectionTarget:
         """Create target object with labels, boxes, and scores."""
         target = MagicMock()
         target.labels = np.array(self._labels[idx], dtype=np.intp)
@@ -269,20 +270,20 @@ class ObjectDetectionDataset:
 
         return target
 
-    def __getitem__(self, key: int | slice) -> tuple[Any, MagicMock, dict[str, Any]] | Self:
+    def __getitem__(self, key: int) -> tuple[Any, ObjectDetectionTarget, DatumMetadata]:
         """Return datum at given index or slice."""
-        if isinstance(key, slice):
-            start, stop, step = key.indices(len(self._images))
-            indices = range(start, stop, step)
-            return ObjectDetectionDataset(
-                images=[self._images[i] for i in indices],
-                labels=[self._labels[i] for i in indices],
-                boxes=[self._boxes[i] for i in indices],
-                image_metadata=[self._image_metadata[i] for i in indices],
-                classes=self._classes,
-                dataset_id=self._metadata["id"],
-            )  # type: ignore
-        return self._images[key], self._get_target(key), self._image_metadata[key]
+        # if isinstance(key, slice):
+        #     start, stop, step = key.indices(len(self._images))
+        #     indices = range(start, stop, step)
+        #     return ObjectDetectionDataset(
+        #         images=[self._images[i] for i in indices],
+        #         labels=[self._labels[i] for i in indices],
+        #         boxes=[self._boxes[i] for i in indices],
+        #         image_metadata=[self._image_metadata[i] for i in indices],
+        #         classes=self._classes,
+        #         dataset_id=self._metadata["id"],
+        #     )  # type: ignore
+        return self._images[key], self._get_target(key), cast(DatumMetadata, self._image_metadata[key])
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -298,8 +299,16 @@ class ObjectDetectionDataset:
 # =============================================================================
 
 
+_EMBEDDER_WEIGHTS = Path(__file__).parent.parent / "tests" / "fixtures" / "doctest_embedder.pt"
+
+
 def _create_model() -> torch.nn.Module:
-    """Create a simple embedding model for doctests."""
+    """Load the frozen doctest embedding model.
+
+    The weights are checked in (see ``tests/fixtures/generate_doctest_embedder.py``) rather
+    than randomly initialized each run so that embedding-derived doctest output — e.g. the
+    per-class ``dispersion`` from :class:`~dataeval.scope.Coverage` — is reproducible.
+    """
     model = torch.nn.Sequential(
         torch.nn.AdaptiveAvgPool2d((4, 4)),
         torch.nn.Flatten(),
@@ -307,10 +316,10 @@ def _create_model() -> torch.nn.Module:
         torch.nn.ReLU(),
         torch.nn.Linear(64, 32),
     )
-    # Initialize lazy modules
-    dummy_input = torch.randn(1, 3, 64, 64)
-    model(dummy_input)
-    return model
+    # Run a dummy forward so the LazyLinear materializes before loading the frozen weights.
+    model(torch.randn(1, 3, 64, 64))
+    model.load_state_dict(torch.load(_EMBEDDER_WEIGHTS, weights_only=True))
+    return model.eval()
 
 
 # =============================================================================
@@ -556,6 +565,16 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
     # Create an extractor fixture for Prioritize and other doctests
     extractor = TorchExtractor(model)
     doctest_namespace["extractor"] = extractor
+
+    # Coverage on object detection: a DetectionCrops view of the dataset (one crop per
+    # detection) plus an extractor that resizes the variable-size crops so they can be
+    # batched, keeping the resize transform out of the Coverage doctest itself.
+    import torchvision.transforms.v2 as tv_transforms
+
+    from dataeval.data import DetectionCrops
+
+    doctest_namespace["crop_extractor"] = TorchExtractor(model, transforms=tv_transforms.Resize((64, 64)))
+    doctest_namespace["cropped_dataset"] = DetectionCrops(dataset)
 
     # -------------------------------------------------------------------------
     # Prioritize fixtures

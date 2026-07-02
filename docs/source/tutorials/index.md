@@ -30,6 +30,7 @@ local checkout.
 
 ../notebooks/tt_clean_dataset.py
 ../notebooks/tt_assess_data_space.py
+../notebooks/tt_identify_dataset_gaps.py
 ../notebooks/tt_identify_bias.py
 ../notebooks/tt_augmentation_duplicates.py
 ```
@@ -46,6 +47,10 @@ local checkout.
   - Learn how to fix and prevent gaps in data to develop more reliable and
     robust models.
   - [![Open In Colab][colab-badge]][dataspace-colab]
+* - [](../notebooks/tt_identify_dataset_gaps.py)
+  - Combine an ontology, labels, and embeddings to find label-space and
+    embedding-space gaps in a labeled dataset.
+  - [![Open In Colab][colab-badge]][gaps-colab]
 * - [](../notebooks/tt_identify_bias.py)
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
@@ -62,6 +67,7 @@ local checkout.
 
 [eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_clean_dataset.ipynb
 [dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_assess_data_space.ipynb
+[gaps-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_identify_dataset_gaps.ipynb
 [bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_identify_bias.ipynb
 [augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_augmentation_duplicates.ipynb
 
