@@ -65,11 +65,11 @@ local checkout.
 
 <!-- markdownlint-disable MD053 -->
 
-[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_clean_dataset.ipynb
-[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_assess_data_space.ipynb
-[gaps-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_identify_dataset_gaps.ipynb
-[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_identify_bias.ipynb
-[augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_augmentation_duplicates.ipynb
+[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc0/notebooks/tt_clean_dataset.ipynb
+[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc0/notebooks/tt_assess_data_space.ipynb
+[gaps-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc0/notebooks/tt_identify_dataset_gaps.ipynb
+[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc0/notebooks/tt_identify_bias.ipynb
+[augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc0/notebooks/tt_augmentation_duplicates.ipynb
 
 <!-- markdownlint-enable MD053 -->
 
@@ -107,9 +107,9 @@ local checkout.
 
 <!-- markdownlint-disable MD053 -->
 
-[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_monitor_shift.ipynb
-[uncertainty-drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_detect_drift_with_uncertainty.ipynb
-[iood-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.0.0/notebooks/tt_identify_ood_samples.ipynb
+[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc0/notebooks/tt_monitor_shift.ipynb
+[uncertainty-drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc0/notebooks/tt_detect_drift_with_uncertainty.ipynb
+[iood-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc0/notebooks/tt_identify_ood_samples.ipynb
 
 <!-- markdownlint-enable MD053 -->
 

@@ -1,6 +1,126 @@
-[//]: # (1b9cc4e742a2a74634efd9aa14631295728520e1)
+[//]: # (ebe557fd9bfc9f5b9c82197349d55e8d7c376fd6)
 
 # DataEval Change Log
+
+## v1.1.0-rc0
+
+🌟 **Feature Release**
+
+- `ebe557fd` - [feat] Develop representation and coverage evaluators with label/ontology and embedding analysis
+- `d0c4488f` - [feat] Add multi-object tracking (MOT) support: `Track` type, build_tracks, and per-track statistics
+- `42410c52` - [feat] Add detection crop transform to help extract detection embeddings
+- `8664c4bc` - [feat] Add ontology validation functionality to core
+- `35a2f8da` - [feat] Add Conform orchestrator class and Relabel conformation class
+- `15df90b0` - [feat] Implement ontology-based label alignment
+- `8543cd02` - [feat] Implement class label reconciliation against ontology
+- `dfc3b397` - [feat] Implement MAITE predict for prediction based features
+- `bbde67cf` - [feat] Enhance uncertainty-based extractor and added Wasserstein drift detector
+
+    - [docs] Add tutorial on drift detection via prediction uncertainty
+    - [feat] Add DriftWasserstein detector with validation-calibrated baseline
+    - [feat] Add Uncertainty and Classwise extractors, deprecate classifier variant
+    - [feat] Add inference batching and output decoding to TorchExtractor
+    - [feat] Add inference batch_size to OnnxExtractor
+    - [feat] Resolve Embeddings batch size from extractor and global default
+    - [impr] Support ragged inputs and pre/postprocess hooks in predict
+    - [feat] Add resolve_batch_size helper to config
+- `7c8243cf` - [feat] Add DriftWasserstein detector with validation-calibrated baseline
+- `715cbeec` - [feat] Add Uncertainty and Classwise extractors, deprecate classifier variant
+- `b031a062` - [feat] Add inference batching and output decoding to TorchExtractor
+- `cd8c1c30` - [feat] Add inference batch_size to OnnxExtractor
+- `1820e7c5` - [feat] Resolve Embeddings batch size from extractor and global default
+- `19cafb63` - [feat] Add resolve_batch_size helper to config
+- `7f2fef9e` - [feat] Add info schema and types for serializable descriptors of components
+
+🛠️ **Improvements and Enhancements**
+
+- `d8824ab4` - [impr] Move data organization related concepts to data module
+- `a6487bea` - [impr] Allow image size overrides per IR requirements
+- `1b2967c9` - [impr] Support ragged inputs and pre/postprocess hooks in predict
+- `6722372a` - Replace internal mirrors with MAITE imports
+- `cd09eb42` - [impr] Make selections nest within a single Select class wrapper
+- `05f42136` - Provide better input validation for MAITE datasets
+- `3664bc1f` - Added isotropy attribute to CompletenessResult class.
+- `077e5903` - Develop null model metrics for object detection
+- `ed718126` - New sample-size-adaptive threshold for is_continuous()
+- `f1dbe2c2` - Use our standard normalized mutual information in metadata insights.
+
+👾 **Fixes**
+
+- `c4a69cf8` - [fix] Counting bug in ClassBalance and update tests
+- `c6a85c26` - [fix] Ensure no device mismatch on mmd and gmm tensors
+- `eaf15b5d` - [fix] Address scipy>=1.18 change for NaN on mannwhitneyu test for zero variance values
+- `b4382ca4` - [fix] noise points incorrectly flagged as duplicates in compare_links_to_cluster_std
+- `ef14f677` - [fix] Build explicit polars dataframe to avoid inferring dtypes
+- `9c75b1a5` - [fix] Avoid slicing MAITE datasets in extractor
+- `ff4bd296` - [fix] Ensure MAITE datasets are compatible with extractors
+- `6ae26348` - [fix] Address metadata related issues
+
+    - fixed `Metadata.include` with a string interpreted as a sequence of chars
+    - fixed `Metadata.add_factors` improperly dropping previous factors
+    - fixed support for image vs target level factors in Metadata
+    - fixed bias (`balance`, `diversity`) functions indexing into index2label incorrectly
+- `974dc9cb` - [fix] image stats normalization bug and option to not normalize
+
+    - fixed image hashing for images normalized to 0-1 pixel values
+    - fixed `get_bitdepth` numerator sign bug
+    - added parameter to `compute_stats` to skip normalizing images for stats
+    - rename `dataset_index` column to `dataset_indices` column for MultiDuplicatesOutput
+- `8518c1c4` - [fix] Regression in Metadata handling of classes in datasets with unobserved class labels
+- `2964321b` - [fix] Ensure Metadata index2label mapping is robust
+- `cf3c046a` - [fix] Bump version and update pyproject.toml authors and development status
+
+📝 **Miscellaneous**
+
+- `2d24fa7c` - [test] Address code coverage gaps
+- `f374426c` - [depr] Switch deprecated ClassifierUncertaintyExtractor to use new logic internally
+- `885102d6` - [misc] Change default value for normalize_pixel_values
+- `88a1807c` - [docs] Use layer_name feature of TorchExtractor for embedding extraction
+- `3514984e` - [docs] Rename how-to for setting global defaults
+- `a5f1fc6b` - [misc] Minor refactor cleanup work
+- `cbd09f69` - [docs] Add more intersphinx links to scipy, sklearn and torch
+- `8420c75d` - [devsecops] Skip link checks on ieeexplore.ieee.org
+- `ac65b530` - [devsecops] Configure CI/CD cache key for downloaded datasets
+- `4245e64d` - [misc] Fix import to prevent circular import short circuiting autoapi
+- `f4e92298` - [test] Set max processes and threads to 1 to avoid oversubscription
+- `5b0f7111` - [misc] Enhance changelog enumerator to include non-merge commits
+- `e05b7539` - [docs] Crosslink MAITE protocol types
+- `9a484d3c` - [docs] Add new how-tos for wrapping dataframe datasets and lazy-load images
+- `d3dea4ea` - [misc] Add and expose MOT protocol
+- `d3dde532` - [deps] Bump MAITE minimum dependency to 0.9.4 for MOT
+- `b398c5b7` - [misc] Minor logging improvements
+- `8cb7556a` - [deps] Bump MAITE dependency to 0.9.4
+- `bb559c0f` - [docs] Add tutorial on drift detection via prediction uncertainty
+- `eaa5b468` - [misc] Exclude Jupyter notebooks from ruff
+- `53bcd345` - [test] Fix fragile dependency on sklearn ordering for tie-breaking
+- `5d2743ef` - [docs] Fix export of symbols in root package
+- `137ba4e1` - [docs] Taxonomy of Leakage
+- `b9314a44` - [devsecops] Bump components branch to 1.1.0
+- `a482b70d` - [docs] Add cross-linking to notebooks and instructions for local ipynb generation
+- `941b9a21` - Address TR compliance issues
+- `d55fb05d` - [misc] Skip sciencedirect link validation (bot blocking)
+- `f7ab7bbc` - [misc] Improve typing for iter_image and unwrap_images
+- `3712d222` - [devsecops] Update branching strategy markdown
+- `3560c60e` - [devsecops] Bump compliance pipeline to 1.0.1
+- `c367a394` - [devsecops] Add PUBLISH_VERIFICATION trigger
+- `b0dd4236` - [docs] Update verification scripts
+- `33e4542e` - [docs] Additional clarification for NMI and other doc fixes
+- `ae5178e8` - [perf] Switch to internal nearest neighbor computation for critical value radii
+- `fca2a3e7` - [docs] Address documentation inconsistencies
+- `95caf1cc` - [devsecops] Ensure security jobs run on protected refs
+- `f449b7cf` - [lint] Fix lints from ruff update
+- `d2670847` - [devsecops] Remove CUDA 12.4
+- `a9af11a5` - [type] Fix verification type check failures
+- `4f6e30bc` - [devsecops] Lock poetry to 2.2.0 to match devsecops components
+- `fdf486a8` - [devsecops] Update ruff rules and bump poetry dependencies
+- `657c2ccb` - [devsecops] Remove harbor references and docker usage for documentation
+- `014c7e2a` - [devsecops] Run compliance pipeline only on main
+- `88951794` - [docs] Remove extraneous autoapisummary template
+- `e7ac85cf` - Switch to python files for notebook source-of-truth
+- `01726f0c` - [test] Add edge case tests for Metadata
+- `6ddc30b1` - [deps] Bump maite-datasets to v0.0.12
+- `d94ea95f` - [devsecops] Update changelog spacing and correct docs trigger for patch releases
+- `a66fb59e` - [devsecops] Ensure tags are fetched for GitLab docs build
 
 ## v1.0.0
 
