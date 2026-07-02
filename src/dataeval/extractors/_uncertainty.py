@@ -3,7 +3,7 @@
 __all__ = []
 
 from collections.abc import Sequence
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import numpy as np
 import torch
@@ -13,10 +13,15 @@ from scipy.stats import entropy
 
 from dataeval._experimental import deprecated
 from dataeval.config import get_device
+from dataeval.extractors._torch import TorchExtractor
 from dataeval.protocols import Array, DeviceLike, FeatureExtractor, Transform
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import as_numpy, iter_images
-from dataeval.utils.training import predict
+from dataeval.utils._internal import as_numpy
+
+
+def _to_float32(x: torch.Tensor) -> torch.Tensor:
+    """Cast to float32, matching the legacy predict() path that always did so."""
+    return x.to(torch.float32)
 
 
 def _prediction_uncertainty(
@@ -271,61 +276,6 @@ class ClasswiseUncertaintyExtractor(_UncertaintyBase):
         return _classwise_prediction_uncertainty(preds, self.preds_type, self.normalize, self.threshold)
 
 
-def _classifier_uncertainty(
-    preds: Array,
-    preds_type: Literal["probs", "logits"] = "probs",
-) -> torch.Tensor:
-    """Convert model predictions to uncertainty scores using entropy.
-
-    Computes prediction uncertainty as the entropy of the predicted class
-    probability distribution. Higher entropy indicates greater model uncertainty,
-    with maximum uncertainty at uniform distributions and minimum at confident
-    single-class predictions.
-
-    Parameters
-    ----------
-    preds : Array
-        Model predictions for a batch of instances. For "probs" type, should
-        contain class probabilities that sum to 1 across the last dimension.
-        For "logits" type, contains raw model outputs before softmax.
-    preds_type : "probs" or "logits", default "probs"
-        Type of prediction values. "probs" expects probabilities in [0,1] that
-        sum to 1. "logits" expects raw outputs in [-inf,inf] and applies softmax.
-        Default "probs" assumes model outputs normalized probabilities.
-
-    Returns
-    -------
-    torch.Tensor
-        Uncertainty scores for each instance with shape (n_samples, 1).
-        Values are always >= 0, with higher values indicating greater uncertainty.
-
-    Raises
-    ------
-    ValueError
-        If preds_type is "probs" but probabilities don't sum to 1 within tolerance.
-    NotImplementedError
-        If preds_type is not "probs" or "logits".
-
-    Notes
-    -----
-    Uncertainty is computed as Shannon entropy: -sum(p * log(p)) where p are
-    the predicted class probabilities. This provides a principled measure of
-    model confidence that is widely used in uncertainty quantification.
-    """
-    preds_np = as_numpy(preds)
-    if preds_type == "probs":
-        if np.abs(1 - np.nan_to_num(np.nansum(preds_np, axis=-1))).mean() > 1e-6:
-            raise ValueError("Probabilities across labels should sum to 1")
-        probs = preds_np
-    elif preds_type == "logits":
-        probs = softmax(preds_np, axis=-1)
-    else:
-        raise NotImplementedError("Only prediction types 'probs' and 'logits' supported.")
-
-    uncertainties = cast(np.ndarray, entropy(probs, axis=-1))
-    return torch.as_tensor(uncertainties[:, None])
-
-
 @deprecated(
     since="1.1",
     removal="2.0",
@@ -343,7 +293,7 @@ class ClassifierUncertaintyExtractor:
         Wrap a ``TorchExtractor`` (or any ``FeatureExtractor``) in
         :class:`UncertaintyExtractor` for per-instance uncertainty, or
         :class:`ClasswiseUncertaintyExtractor` for per-class uncertainty.
-        ``ClassifierUncertaintyExtractor`` will be removed in version 2.0.
+        ``ClassifierUncertaintyExtractor`` will be removed in version 1.2.
 
     This class implements the :class:`~dataeval.protocols.FeatureExtractor` protocol
     for use with drift detectors (e.g., :class:`~dataeval.shift.DriftUnivariate`).
@@ -483,11 +433,17 @@ class ClassifierUncertaintyExtractor:
             [] if transforms is None else [transforms] if isinstance(transforms, Transform) else list(transforms)
         )
 
-    def _apply_transforms(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply preprocessing transforms to input data."""
-        for transform in self._transforms:
-            x = transform(x)
-        return x
+        # Delegate to the new capability: a TorchExtractor produces per-instance class
+        # scores, UncertaintyExtractor turns them into entropy. The legacy behaviour is
+        # raw (un-normalized) entropy, and legacy inference always cast inputs to float32
+        # after transforms, so append that cast and disable normalization.
+        scores = TorchExtractor(
+            model,
+            transforms=[*self._transforms, _to_float32],
+            device=self.device,
+            batch_size=batch_size,
+        )
+        self._delegate = UncertaintyExtractor(scores, preds_type=preds_type, normalize=False)
 
     def __call__(self, data: Any) -> Array:
         """Extract uncertainty features from raw data.
@@ -504,13 +460,7 @@ class ClassifierUncertaintyExtractor:
         Array
             Uncertainty scores as numpy array of shape (n_samples, 1).
         """
-        batch_images: list[np.ndarray] = [as_numpy(image) for image in iter_images(data)]
-        if not batch_images:
-            return np.empty((0, 1), dtype=np.float32)
-        batch_array = np.stack(batch_images)
-        preds = predict(batch_array, self.model, self.device, self.batch_size, self._apply_transforms)
-        uncertainties = _classifier_uncertainty(preds[0] if isinstance(preds, tuple) else preds, self.preds_type)
-        return uncertainties.cpu().numpy()
+        return self._delegate(data)
 
     def __repr__(self) -> str:
         """Return string representation of the extractor."""
