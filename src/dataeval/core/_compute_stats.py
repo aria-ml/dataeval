@@ -378,15 +378,15 @@ def compute_stats(  # noqa: C901
     per_channel : bool, default False
         If True, compute per-channel statistics. If False, statistics are
         aggregated across all channels.
-    normalize_pixel_values : bool, default True
+    normalize_pixel_values : bool, default False
         If True, pixel values are normalized to [0, 1] based on each image's
         inferred bit depth before any statistic is computed. This makes results
         comparable across images with different bit depths (8-bit, 16-bit, etc.).
         If False, statistics are computed on raw pixel values.
 
         .. deprecated::
-            The default will change to False in v1.1. Pass explicitly to silence
-            the deprecation warning.
+            The default changed to False in v1.1. Pass explicitly to silence
+            the deprecation warning. This warning will be removed in v1.2.
     progress_callback : ProgressCallback or None, default None
         Callback to report progress during calculation. Called after each image is processed
         with the current image count and total number of images (if known).
@@ -435,12 +435,13 @@ def compute_stats(  # noqa: C901
     """
     if normalize_pixel_values is _UNSET:
         warnings.warn(
-            "The default value of normalize_pixel_values will change from True to False in v1.1. "
-            "Pass normalize_pixel_values explicitly to silence this warning.",
+            "The default value of normalize_pixel_values changed to False in v1.1. "
+            "Pass normalize_pixel_values explicitly to silence this warning. "
+            "This warning will be removed in v1.2.",
             FutureWarning,
             stacklevel=2,
         )
-        normalize_pixel_values = True
+        normalize_pixel_values = False
 
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
