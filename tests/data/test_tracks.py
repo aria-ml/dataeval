@@ -315,3 +315,10 @@ class TestBuildAllTracks:
         dataset = _FakeDataset([datum], cast(DatasetMetadata, _ExplodingDict(id="")))
         result = build_tracks(dataset)
         assert list(result["vid"].keys()) == [1]
+
+    def test_unsupported_source_type_raises_type_error(self):
+        # A source that is neither a MultiobjectTrackingTarget (no frame_tracks
+        # sequence) nor a Dataset (no __getitem__/__len__ protocol) falls
+        # through to the final TypeError guard.
+        with pytest.raises(TypeError, match="'source' must be"):
+            build_tracks(cast(MultiobjectTrackingTarget, 42))

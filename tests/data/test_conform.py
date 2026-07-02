@@ -81,3 +81,17 @@ class TestConform:
         assert aggregate_required_kind([None]) is None
         assert aggregate_required_kind(["any_target", "object_detection"]) == "object_detection"  # specific wins
         assert aggregate_required_kind(["any_target"]) == "any_target"
+
+    def test_repr(self):
+        conformed = Conform(SimpleDataset(5), [KeepEven(), AddOne()])
+        text = repr(conformed)
+        assert text.startswith("Conform(")
+        assert "conformers=[" in text
+        assert "len=3" in text
+
+    def test_str(self):
+        conformed = Conform(SimpleDataset(5), [KeepEven()])
+        text = str(conformed)
+        assert "Conform Dataset" in text
+        assert "Conformers: [" in text
+        assert "Conformed Size: 3" in text

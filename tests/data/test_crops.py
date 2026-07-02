@@ -233,3 +233,101 @@ class TestValidation:
     def test_non_od_dataset_rejected(self, ic_dataset):
         with pytest.raises(MaiteShapeError):
             DetectionCrops(ic_dataset([0, 1], {0: "a", 1: "b"}))
+
+
+class _NoLabelMapODDataset(_ODDataset):
+    """OD dataset whose metadata carries no index2label, exercising the derived fallback."""
+
+    def __init__(self, images, targets, ids=None) -> None:
+        super().__init__(images, targets, index2label={}, ids=ids)
+        # Drop the mapping entirely so `metadata.get("index2label")` returns None.
+        self.metadata = DatasetMetadata(id=self.metadata["id"])
+
+
+@pytest.mark.required
+class TestIndex2LabelFallback:
+    def test_derived_when_no_mapping_provided(self):
+        """With no source index2label, labels are derived from the observed classes (line 226)."""
+        images = np.stack([_positional_image()])
+        # Observed labels are 2 then 0; the fallback maps each to str(label), sorted.
+        ds = _NoLabelMapODDataset(images, [_ODTarget([[0, 0, 10, 10], [20, 20, 30, 30]], [2, 0])])
+        crops = DetectionCrops(ds)
+        assert ds.metadata.get("index2label") is None  # precondition for the fallback branch
+        assert crops.index2label == {0: "0", 2: "2"}
+        assert "index2label" in crops.metadata
+        assert crops.metadata["index2label"] == {0: "0", 2: "2"}
+
+
+@pytest.mark.required
+class TestDunders:
+    def test_iter_yields_every_crop_in_order(self):
+        """Iterating matches indexed access one-for-one (__iter__)."""
+        crops = DetectionCrops(_simple_dataset())
+        iterated = list(crops)
+        assert len(iterated) == len(crops)
+        for i, (crop, onehot, meta) in enumerate(iterated):
+            indexed_crop, indexed_onehot, indexed_meta = crops[i]
+            np.testing.assert_array_equal(crop, indexed_crop)
+            np.testing.assert_array_equal(onehot, indexed_onehot)
+            assert meta == indexed_meta
+
+    def test_repr_identifies_class_and_params(self):
+        crops = DetectionCrops(_simple_dataset(), region="object", square="pad")
+        text = repr(crops)
+        assert text.startswith("DetectionCrops(")
+        assert "region='object'" in text
+        assert "square='pad'" in text
+        assert f"len={len(crops)}" in text
+
+    def test_str_summarizes_region_and_counts(self):
+        crops = DetectionCrops(_simple_dataset(), min_size=4)
+        text = str(crops)
+        assert "DetectionCrops Dataset" in text
+        assert "region: object" in text
+        assert f"crops: {len(crops)} ({crops.n_dropped} dropped)" in text
+        assert f"classes: {len(crops.index2label)}" in text
+
+
+@pytest.mark.required
+class TestSquareWindowOverflow:
+    def test_expand_side_exceeds_both_image_dims(self):
+        """square='expand' with a padded region larger than the image skips both inward-shift
+        clamps (branches 319->321 and 321->323 take the False path)."""
+        # 8x8 image, near-full box grown 100% each side: side = 24 > width(8) and > height(8),
+        # so neither `if side <= width/height` clamp runs.
+        images = np.stack([_positional_image(8, 8)])
+        ds = _ODDataset(images, [_ODTarget([[0, 0, 8, 8]], [0])], index2label={0: "a"})
+        crop = DetectionCrops(ds, square="expand", padding=1.0)[0][0]
+        assert crop.shape == (3, 24, 24)  # square canvas at the oversized side
+
+
+@pytest.mark.required
+class TestSurroundMaskEdges:
+    def test_degenerate_mask_box_is_a_noop(self):
+        """A box whose masked region collapses to zero area hits the early return (line 356)."""
+        images = np.stack([_positional_image(20, 20)])
+        # Box's left edge sits at the image's right boundary: the (clipped) crop is a 1px column
+        # to the left of the box, so the box maps to an empty region in crop coordinates.
+        ds = _ODDataset(images, [_ODTarget([[20, 5, 25, 15]], [0])], index2label={0: "a"})
+        crops = DetectionCrops(ds, region="surround", padding=0.1, square="off", fill="zero")
+        crop = crops[0][0]  # must not raise; nothing is masked
+        assert crop.shape[-1] == 1  # the degenerate 1px-wide clip
+        assert (crop != 0).any()  # no masking applied — the early return fired
+
+    def test_surround_mean_fills_box_with_ring_mean(self):
+        """fill='mean' in surround masks the object to the surrounding ring's per-channel mean
+        (lines 361-365)."""
+        images = np.stack([_positional_image(40, 40)])
+        ds = _ODDataset(images, [_ODTarget([[10, 10, 20, 20]], [0])], index2label={0: "a"})
+        crop, _, meta = DetectionCrops(ds, region="surround", padding=0.5, square="off", fill="mean")[0]
+        # Padded region [5,5,25,25] -> crop origin (5,5); the box maps to crop coords [5:15, 5:15].
+        masked = crop[:, 5:15, 5:15]
+        # Masked interior is a single per-channel value (not the source gradient).
+        for channel in range(crop.shape[0]):
+            assert np.ptp(masked[channel]) == 0
+        # And that value is the mean over the retained ring (the non-masked pixels).
+        ring_mask = np.ones(crop.shape[-2:], dtype=bool)
+        ring_mask[5:15, 5:15] = False
+        ring = crop[..., ring_mask]
+        for channel in range(crop.shape[0]):
+            assert masked[channel, 0, 0] == pytest.approx(ring[channel].mean(), abs=1)

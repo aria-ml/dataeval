@@ -6,6 +6,7 @@ import pytest
 from dataeval.core._nullmodel import (
     _calculate_accuracy,
     _calculate_fpr,
+    _calculate_localization_ap,
     _calculate_multiclass_accuracy,
     _calculate_precision,
     _calculate_recall,
@@ -16,8 +17,54 @@ from dataeval.core._nullmodel import (
     _reduce_macro,
     _reduce_micro,
     _to_confusion_matrix,
+    nullmodel_accuracy,
+    nullmodel_fpr,
     nullmodel_metrics,
+    nullmodel_precision,
+    nullmodel_recall,
 )
+
+
+@pytest.mark.required
+class TestLocalizationAP:
+    def test_empty_hit_probs_returns_zero(self):
+        ap = _calculate_localization_ap(
+            np.array([], dtype=np.float64), np.array([0.5, 0.5]), np.array([], dtype=np.intp)
+        )
+        assert ap == 0.0
+
+    def test_guaranteed_hits_high_ap(self):
+        # every GT box is certain to be localized and its class is likely -> high AP in [0, 1]
+        ap = _calculate_localization_ap(np.array([1.0, 1.0]), np.array([0.5, 0.5]), np.array([0, 1], dtype=np.intp))
+        assert 0.0 <= ap <= 1.0
+        assert ap > 0.5
+
+    def test_zero_hit_probs_zero_ap(self):
+        # no localization is ever a hit, so nothing is recalled and AP collapses to 0
+        ap = _calculate_localization_ap(np.array([0.0, 0.0]), np.array([0.5, 0.5]), np.array([0, 1], dtype=np.intp))
+        assert ap == 0.0
+
+
+@pytest.mark.required
+class TestNullModelBinaryWrappers:
+    """The public one-vs-rest metric wrappers over _to_confusion_matrix."""
+
+    def test_accuracy_binary(self):
+        assert nullmodel_accuracy([1, 0], [1, 0]) == 1.0
+
+    def test_accuracy_multiclass_delegates(self):
+        # multiclass=True routes to _calculate_multiclass_accuracy instead of the CM path
+        expected = _calculate_multiclass_accuracy([0.5, 0.5], [0.5, 0.5])
+        assert nullmodel_accuracy([0.5, 0.5], [0.5, 0.5], multiclass=True) == expected
+
+    def test_precision(self):
+        assert nullmodel_precision([1, 0], [1, 0]) == 1.0
+
+    def test_recall(self):
+        assert nullmodel_recall([1, 0], [1, 0]) == 1.0
+
+    def test_fpr(self):
+        assert nullmodel_fpr([0, 1], [1, 0]) == 1.0
 
 
 @pytest.mark.required

@@ -107,3 +107,14 @@ class TestBalanceFunctional:
             np.array([[1.0, 0.8, 0.670401], [0.8, 1.0, 0.680443], [0.670401, 0.680443, 0.621398]]),
             atol=1e-6,
         )
+
+    def test_constant_factor_zero_norm(self):
+        """A constant factor has zero entropy, so its normalization factor is 0 and MI is 0.0."""
+        # First factor is constant (single value) -> entropy 0 -> norm_factor 0.
+        factor_data = np.column_stack([np.full(10, 7), np.arange(10) % 3])
+        result = mutual_info(CLASS_LABELS, factor_data, discrete_features=[True, True])
+
+        # The constant factor is index 0 in the interfactor matrix.
+        assert result["interfactor"][0, 0] == 0.0
+        # class-to-constant-factor MI is also driven to 0.0.
+        assert result["class_to_factor"][1] == 0.0

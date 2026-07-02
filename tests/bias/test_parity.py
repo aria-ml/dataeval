@@ -6,7 +6,7 @@ import pytest
 
 from dataeval._metadata import Metadata
 from dataeval.bias._parity import Parity
-from tests.conftest import MockMetadata, to_metadata
+from tests.conftest import MockICDataset, MockMetadata, to_metadata
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
@@ -87,6 +87,19 @@ class TestParityUnit:
         assert parity_obj.metadata is not None
         assert isinstance(parity_obj.metadata, Metadata)
         assert parity_obj.metadata.factor_names == metadata.factor_names
+
+    def test_evaluate_with_raw_dataset(self):
+        """Passing a raw AnnotatedDataset wraps it in Metadata (else branch, line 195)."""
+        labels = [0] * 5 + [1] * 5
+        factors = [{"factor1": "foo"}] * 10
+        images = np.zeros((len(labels), 1, 16, 16))
+        raw_dataset = MockICDataset(images, labels, metadata=factors)
+
+        parity_obj = Parity()
+        result = parity_obj.evaluate(raw_dataset)  # type: ignore
+
+        assert isinstance(result.factors, pl.DataFrame)
+        assert isinstance(parity_obj.metadata, Metadata)
 
     def test_threshold_parameters(self):
         """Test that custom thresholds affect correlation detection."""

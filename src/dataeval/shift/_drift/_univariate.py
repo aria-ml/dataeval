@@ -24,6 +24,8 @@ from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptive
 from dataeval.types import set_metadata
 from dataeval.utils.thresholds import ZScoreThreshold
 
+_ANDERSON_KSAMP_SUPPORTS_VARIANT = scipy.__version__ >= "1.17.0"
+
 
 class _DriftUnivariateStats(TypedDict):
     p_val: float
@@ -342,7 +344,8 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             return np.float32(result.statistic), np.float32(pvalue)
 
         if self.method == "anderson":
-            result = scipy.stats.anderson_ksamp([x, y])
+            anderson_ksamp_kwargs = {"variant": "midrank"} if _ANDERSON_KSAMP_SUPPORTS_VARIANT else {}
+            result = scipy.stats.anderson_ksamp([x, y], **anderson_ksamp_kwargs)  # type: ignore py3.10
             return np.float32(result.statistic), np.float32(result.pvalue)  # type: ignore
 
         if self.method == "bws":

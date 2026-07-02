@@ -79,6 +79,11 @@ class TestLabelRemap:
         assert mapping == {0: 1, 1: 0}  # car -> vehicle(1), boat -> vessel(0)
         assert dropped == {2: "ufo"}  # not in class_remap
 
+    def test_target_string_raises_type_error(self):
+        # a bare string is not a valid target vocabulary
+        with pytest.raises(TypeError, match="Ontology"):
+            _label_remap({0: "car"}, {"car": "vehicle"}, "vehicle")
+
     def test_target_none_derives_vocab_from_class_map(self):
         # no target: vocabulary = distinct class_map values, first-seen order
         mapping, index2label, dropped = _label_remap(
@@ -171,6 +176,29 @@ class TestRelabel:
         relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)
         with pytest.raises(OntologyError, match="Conform"):
             _ = relabel.mapping
+
+    def test_unapplied_relabel_dropped_raises(self, vehicle_target):
+        relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)
+        with pytest.raises(OntologyError, match="Conform"):
+            _ = relabel.dropped
+
+    def test_unapplied_relabel_index2label_raises(self, vehicle_target):
+        relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)
+        with pytest.raises(OntologyError, match="Conform"):
+            _ = relabel.index2label
+
+    def test_keeps_unsupported_target_type_raises(self, vehicle_target):
+        relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)
+        # a plain string is neither an ObjectDetectionTarget nor an Array
+        with pytest.raises(TypeError, match="does not support targets of type"):
+            relabel.keeps(("image", "not-a-target"))
+
+    def test_conform_datum_unsupported_target_type_raises(self, ic_dataset, vehicle_target):
+        relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)
+        # apply through Conform so the internal mapping is populated
+        Conform(ic_dataset([0], {0: "sedan"}), [relabel])
+        with pytest.raises(TypeError, match="does not support targets of type"):
+            relabel.conform_datum(("image", "not-a-target", {}))
 
     def test_manual_remap_without_ontology(self, ic_dataset):
         # no Ontology, no alignment — just a hand-written remap + a plain target vocab

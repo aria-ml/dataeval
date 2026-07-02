@@ -19,3 +19,16 @@ def test_dataeval_log_custom():
     mock_handler.emit = MagicMock()
     dataeval.log(logging.DEBUG, mock_handler)
     assert mock_handler.emit.called
+
+
+@pytest.mark.required
+def test_dataeval_log_idempotent():
+    """Calling log twice with the same handler does not attach it twice (68->70)."""
+    logger = logging.getLogger("dataeval")
+    handler = logging.StreamHandler()
+    try:
+        dataeval.log(logging.DEBUG, handler)
+        dataeval.log(logging.DEBUG, handler)
+        assert logger.handlers.count(handler) == 1
+    finally:
+        logger.removeHandler(handler)

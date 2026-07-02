@@ -48,3 +48,8 @@ class TestMergeDatasets:
         merged = merge_datasets(_LabeledDataset("a", 3, i2l))
         assert len(merged) == 3
         assert merged.metadata.get("index2label") == i2l
+
+    def test_repr_reports_dataset_count_and_length(self):
+        i2l = {0: "cat", 1: "dog"}
+        merged = merge_datasets(_LabeledDataset("a", 2, i2l), _LabeledDataset("b", 3, i2l))
+        assert repr(merged) == "merge_datasets(2 datasets, len=5)"

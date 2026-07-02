@@ -273,6 +273,31 @@ class TestObjectDetectionSelections:
         # With dual-key indexing, target_data filters to only target-level rows
         assert md.target_data["nested"].to_list() == [0, 2, 3, 3]
 
+    def test_unsupported_target_type_raises_type_error(self):
+        """A datum whose target is neither an Array nor an object-detection/segmentation
+        target hits the final TypeError guard in ClassFilter.__call__."""
+        items = [
+            # Item 0 is a valid ObjectDetectionTarget so the upfront "any_target"
+            # dataset validation (which only probes dataset[0]) passes.
+            (
+                "image_0",
+                MockDetectionTarget(
+                    boxes=np.array([[0, 0, 10, 10]]),
+                    labels=np.array([0]),
+                    scores=np.array([0.9]),
+                ),
+                {"id": 0, "bbox_metadata": ["box1"]},
+            ),
+            # Item 1 has an unsupported target type (a plain dict).
+            ("image_1", {"not": "a target"}, {"id": 1}),
+        ]
+        dataset = MagicMock()
+        dataset.__len__.return_value = len(items)
+        dataset.__getitem__.side_effect = lambda idx: items[idx]
+
+        with pytest.raises(TypeError, match="ClassFilter does not support targets of type"):
+            Select(dataset, selections=[ClassFilter(classes=(0,), filter_detections=True)])
+
     def test_namedtuple_target_still_satisfies_protocol(self):
         """Regression: MAITE targets are namedtuples (no __dict__); the filtered proxy must
         still pass isinstance(..., ObjectDetectionTarget), which uses getattr_static."""

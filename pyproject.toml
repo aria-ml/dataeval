@@ -264,6 +264,10 @@ reportMissingImports = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+  "ignore:The default value of normalize_pixel_values changed:FutureWarning",
+  "ignore:Clustering metrics expect discrete values but received continuous values:UserWarning",
+]
 addopts = [
   "--pythonwarnings=ignore::DeprecationWarning",
   "--verbose",

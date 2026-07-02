@@ -819,3 +819,9 @@ class TestMMDChunked:
         cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu")
         with pytest.raises(NotFittedError, match="Must call fit"):
             cd._compute_mmd2(np.zeros((10, 5), dtype=np.float32), np.zeros((10, 5), dtype=np.float32))
+
+    def test_kernel_matrix_method_before_fit_raises(self):
+        """_kernel_matrix requires a fitted kernel."""
+        cd = DriftMMD(p_val=0.05, n_permutations=10, device="cpu")
+        with pytest.raises(NotFittedError, match="Must call fit"):
+            cd._kernel_matrix(np.zeros((10, 5), dtype=np.float32), np.zeros((8, 5), dtype=np.float32))

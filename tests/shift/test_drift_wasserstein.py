@@ -35,6 +35,15 @@ class TestDriftWassersteinFit:
         det = DriftWasserstein(n_features=8).fit(_ref(seed=1), _ref(n=100, seed=2))
         assert det.n_features == 8
 
+    def test_fit_without_validation_data_raises(self):
+        """fit requires validation_data; omitting it raises ValueError."""
+        with pytest.raises(ValueError, match="requires both `reference_data` and `validation_data`"):
+            DriftWasserstein().fit(_ref(seed=1))
+
+    def test_fit_with_none_validation_data_raises(self):
+        with pytest.raises(ValueError, match="requires both `reference_data` and `validation_data`"):
+            DriftWasserstein().fit(_ref(seed=1), validation_data=None)
+
 
 @pytest.mark.required
 class TestDriftWassersteinNotFitted:

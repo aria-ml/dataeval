@@ -3,11 +3,26 @@
 from __future__ import annotations
 
 import dataclasses
+import warnings
+from dataclasses import dataclass
+from datetime import datetime
 
 import numpy as np
+import polars as pl
 import pytest
 
-from dataeval.types import MappingOutput, SequenceOutput, SourceIndex, Track
+from dataeval.types import (
+    DataFrameOutput,
+    DictOutput,
+    Evaluator,
+    EvaluatorConfig,
+    ExecutionMetadata,
+    MappingOutput,
+    ReprMixin,
+    SequenceOutput,
+    SourceIndex,
+    Track,
+)
 
 
 class TestSourceIndex:
@@ -217,3 +232,143 @@ class TestTrack:
     def test_repr_includes_class_name(self):
         track = _make_track()
         assert "Track" in repr(track)
+
+
+class TestReprMixin:
+    """Tests for ReprMixin.__repr__ rendering of init params, overrides, and extras."""
+
+    def test_repr_renders_params_overrides_and_extras(self):
+        class Widget(ReprMixin):
+            def __init__(self, shown, hidden, model):
+                self.shown = shown
+                self._hidden = hidden  # rendered via the "_name" fallback
+                self.model = model
+
+            def _repr_overrides(self):
+                return {"model": "ResNet"}
+
+            def _repr_extras(self):
+                return {"fitted": True}
+
+        assert repr(Widget(1, 2, object())) == "Widget(shown=1, hidden=2, model=ResNet, fitted=True)"
+
+    def test_repr_defaults_are_empty(self):
+        class Bare(ReprMixin):
+            def __init__(self, value):
+                self.value = value
+
+        assert repr(Bare(7)) == "Bare(value=7)"
+
+
+class TestEvaluatorRepr:
+    """Tests for Evaluator._repr across config kinds."""
+
+    def test_repr_with_pydantic_config(self):
+        class MyEval(Evaluator):
+            class Config(EvaluatorConfig):
+                alpha: float = 0.5
+                beta: int = 3
+
+            alpha: float
+            beta: int
+
+            def __init__(self, alpha=None, beta=None, config=None):
+                super().__init__(locals())
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # pydantic model_fields instance-access deprecation
+            assert repr(MyEval(alpha=0.9)) == "MyEval(alpha=0.9, beta=3)"
+
+    def test_repr_with_dataclass_config(self):
+        @dataclass
+        class DataclassConfig:
+            x: int = 1
+
+        class DriftLike(Evaluator):
+            pass
+
+        evaluator = DriftLike()
+        evaluator._config = DataclassConfig()
+        assert evaluator._repr() == "DriftLike(x=1)"
+        # extras=False takes the branch that skips the extras loop
+        assert evaluator._repr(extras=False) == "DriftLike(x=1)"
+
+    def test_repr_without_config_has_no_fields(self):
+        class NoConfig(Evaluator):
+            pass
+
+        assert repr(NoConfig()) == "NoConfig()"
+
+
+class TestExecutionMetadata:
+    """Tests for ExecutionMetadata.__repr__ and __str__."""
+
+    def _make(self):
+        return ExecutionMetadata(
+            name="my_fn",
+            execution_time=datetime(2020, 1, 2, 3, 4, 5),
+            execution_duration=1.2345,
+            arguments={"a": 1},
+            state={},
+            version="1.0",
+        )
+
+    def test_repr(self):
+        assert repr(self._make()) == (
+            "ExecutionMetadata(name='my_fn', execution_time=2020-01-02T03:04:05, "
+            "execution_duration=1.2345s, version='1.0')"
+        )
+
+    def test_str(self):
+        assert str(self._make()) == "my_fn (1.2345s)"
+
+
+class TestDataFrameOutput:
+    """Tests for the DataFrame-proxying dunder methods."""
+
+    def _output(self):
+        return DataFrameOutput(pl.DataFrame({"a": [1, 2], "b": [3, 4]}))
+
+    def test_repr_and_str_delegate(self):
+        out = self._output()
+        assert repr(out) == repr(out.data())
+        assert str(out) == str(out.data())
+
+    def test_len_iter_contains_getitem(self):
+        out = self._output()
+        assert len(out) == 2
+        assert [s.name for s in out] == ["a", "b"]
+        assert "a" in out
+        assert "z" not in out
+        assert out["a"].to_list() == [1, 2]
+
+    def test_getattr_delegates_public_attributes(self):
+        out = self._output()
+        assert out.columns == ["a", "b"]
+
+    def test_getattr_rejects_private_names(self):
+        out = self._output()
+        with pytest.raises(AttributeError, match="has no attribute '_missing'"):
+            out._missing  # noqa: B018
+
+
+class TestDictOutput:
+    """Tests for DictOutput.__repr__ and value formatting."""
+
+    def test_repr_formats_dataframe_ndarray_and_scalars(self):
+        class MyDict(DictOutput):
+            def __init__(self, scalar, arr, frame):
+                self.scalar = scalar
+                self.arr = arr
+                self.frame = frame
+
+        out = MyDict(5, np.array([1, 2, 3]), pl.DataFrame({"a": [1]}))
+        assert repr(out) == "MyDict(scalar=5, arr=ndarray(shape=(3,), dtype=int64), frame=DataFrame(shape=(1, 1)))"
+
+    def test_str_returns_data_dict(self):
+        class MyDict(DictOutput):
+            def __init__(self, value):
+                self.value = value
+
+        out = MyDict(42)
+        assert str(out) == str({"value": 42})

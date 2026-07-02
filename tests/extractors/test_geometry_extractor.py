@@ -50,3 +50,38 @@ def test_geometry_feeds_drift(onnx_detector: Path, tmp_path: Path):
     det = DriftUnivariate().fit(ref)
     result = det.predict(np.asarray(ext([np.full((3, 8, 8), 255, dtype=np.uint8)] * 4)))
     assert result is not None
+
+
+class _Prediction:
+    def __init__(self, boxes, scores):
+        self.boxes = boxes
+        self.scores = scores
+
+
+class _FakeDetector:
+    """A minimal detection model returning fixed predictions (no ONNX)."""
+
+    def __init__(self, predictions):
+        self._predictions = predictions
+
+    def __call__(self, images):
+        return self._predictions
+
+
+def test_repr_renders_model_class_name():
+    ext = DetectionGeometryExtractor(_FakeDetector([]), confidence=0.5)
+    assert repr(ext) == "DetectionGeometryExtractor(model=_FakeDetector, confidence=0.5)"
+
+
+def test_low_confidence_detections_are_dropped():
+    # two detections; only the first clears the confidence floor
+    preds = [_Prediction(np.array([[0, 0, 0.5, 0.5], [0.5, 0.5, 1.0, 1.0]]), np.array([[0.9, 0.1], [0.2, 0.1]]))]
+    ext = DetectionGeometryExtractor(_FakeDetector(preds), confidence=0.5)
+    out = ext([np.zeros((3, 8, 8), dtype=np.uint8)])
+    assert out.shape == (1, 6)
+
+
+def test_no_kept_detections_returns_empty():
+    preds = [_Prediction(np.zeros((0, 4)), np.zeros((0, 2)))]
+    out = DetectionGeometryExtractor(_FakeDetector(preds))([np.zeros((3, 8, 8), dtype=np.uint8)])
+    assert out.shape == (0, 6)

@@ -1,6 +1,8 @@
 """Tests for OnnxExtractor."""
 
+import sys
 from pathlib import Path
+from typing import NamedTuple
 from unittest.mock import patch
 
 import numpy as np
@@ -9,8 +11,42 @@ import pytest
 pytest.importorskip("onnx")
 pytest.importorskip("onnxruntime")
 
+import dataeval.extractors._onnx as onnx_mod
 from dataeval.extractors import OnnxExtractor
 from dataeval.protocols import FeatureExtractor
+
+
+class _IO(NamedTuple):
+    name: str
+
+
+class _FakeSession:
+    """A fake InferenceSession returning a fixed output, bypassing real inference."""
+
+    def __init__(self, inputs, outputs, output_array) -> None:
+        self._inputs = inputs
+        self._outputs = outputs
+        self._output_array = output_array
+
+    def get_inputs(self):
+        return self._inputs
+
+    def get_outputs(self):
+        return self._outputs
+
+    def run(self, names, feed):
+        return [self._output_array]
+
+
+def _patch_extractor(
+    extractor: OnnxExtractor,
+    session: _FakeSession,
+    input_name: str | None,
+    output_names: list[str],
+) -> None:
+    extractor._session = session  # type: ignore
+    extractor._input_name = input_name
+    extractor._output_names = output_names
 
 
 def _create_simple_onnx_model(model_path: Path, input_dim: int = 768, output_dim: int = 128) -> Path:
@@ -147,6 +183,11 @@ class TestOnnxExtractorInit:
         """Test initialization with output name."""
         extractor = OnnxExtractor(simple_onnx_model, output_name="output")
         assert extractor.output_name == "output"
+
+    def test_batch_size_property(self, simple_onnx_model: Path) -> None:
+        """The batch_size property echoes the configured value."""
+        assert OnnxExtractor(simple_onnx_model, batch_size=8).batch_size == 8
+        assert OnnxExtractor(simple_onnx_model).batch_size is None
 
     def test_init_with_transforms(self, simple_onnx_model: Path) -> None:
         """Test initialization with transforms."""
@@ -382,3 +423,138 @@ class TestOnnxExtractorBytesInput:
         extractor = OnnxExtractor(model_bytes)
         repr_str = repr(extractor)
         assert "bytes" in repr_str
+
+
+def _fake_session_factory(session):
+    """Patch model loading to hand back a given fake session."""
+    return patch.object(onnx_mod, "_get_inference_session", return_value=lambda *a, **k: session)
+
+
+@pytest.mark.optional
+class TestOnnxRuntimeHelpers:
+    """Test the module-level onnxruntime helpers."""
+
+    def test_get_ort_returns_module(self):
+        assert onnx_mod._get_ort().__name__ == "onnxruntime"
+
+    def test_get_ort_raises_without_runtime(self):
+        with (
+            patch.dict(sys.modules, {"onnxruntime": None}),
+            pytest.raises(ImportError, match="onnxruntime is required"),
+        ):
+            onnx_mod._get_ort()
+
+    def test_get_inference_session_raises_without_runtime(self):
+        with (
+            patch.dict(sys.modules, {"onnxruntime": None}),
+            pytest.raises(ImportError, match="onnxruntime is required"),
+        ):
+            onnx_mod._get_inference_session()
+
+    def test_get_execution_providers_raises_without_runtime(self):
+        with (
+            patch.dict(sys.modules, {"onnxruntime": None}),
+            pytest.raises(ImportError, match="onnxruntime is required"),
+        ):
+            onnx_mod._get_execution_providers()
+
+    def test_execution_providers_fall_back_to_cpu(self):
+        import onnxruntime as ort
+
+        with patch.object(ort, "get_available_providers", return_value=[]):
+            assert onnx_mod._get_execution_providers() == ["CPUExecutionProvider"]
+
+
+@pytest.mark.optional
+class TestOnnxExtractorImageSize:
+    """Test the image_size resize option and its validation."""
+
+    def test_non_positive_image_size_raises(self):
+        with pytest.raises(ValueError, match="image_size must be positive"):
+            OnnxExtractor(b"<bytes>", image_size=(0, 8))
+
+    def test_image_size_resizes_before_inference(self):
+        session = _FakeSession([_IO("i")], [_IO("o")], np.zeros((1, 4), dtype=np.float32))
+        recorded = {}
+        original_run = session.run
+
+        def run(names, feed):
+            recorded["shape"] = feed["i"].shape
+            return original_run(names, feed)
+
+        session.run = run
+        extractor = OnnxExtractor(b"<bytes>", image_size=(8, 8))
+        _patch_extractor(extractor, session, "i", ["o"])
+
+        extractor([np.zeros((3, 16, 16), dtype=np.float32)])
+        assert recorded["shape"] == (1, 3, 8, 8)  # resized from 16x16
+
+
+@pytest.mark.optional
+class TestOnnxExtractorFlatten:
+    """Test flattening of higher-dimensional outputs."""
+
+    def _loaded(self, output_array, *, flatten: bool) -> OnnxExtractor:
+        session = _FakeSession([_IO("i")], [_IO("o")], output_array)
+        extractor = OnnxExtractor(b"<bytes>", flatten=flatten)
+        _patch_extractor(extractor, session, "i", ["o"])
+        return extractor
+
+    def test_flatten_collapses_spatial_dims(self):
+        extractor = self._loaded(np.zeros((2, 3, 2, 2), dtype=np.float32), flatten=True)
+        result = extractor([np.zeros((3, 16, 16), dtype=np.float32)] * 2)
+        assert result.shape == (2, 12)  # 3*2*2 flattened
+
+    def test_flatten_false_preserves_shape(self):
+        extractor = self._loaded(np.zeros((1, 3, 2, 2), dtype=np.float32), flatten=False)
+        result = extractor([np.zeros((3, 16, 16), dtype=np.float32)])
+        assert result.shape == (1, 3, 2, 2)
+
+
+@pytest.mark.optional
+class TestOnnxExtractorLoadingEdges:
+    """Test the defensive branches in model loading and inference."""
+
+    def test_session_creation_returning_none_raises(self):
+        with _fake_session_factory(None):
+            extractor = OnnxExtractor(b"<bytes>")
+            with pytest.raises(RuntimeError, match="Failed to create"):
+                extractor([np.zeros((3, 16, 16), dtype=np.float32)])
+
+    def test_model_with_no_inputs_raises(self):
+        session = _FakeSession([], [_IO("o")], np.zeros((1, 4), dtype=np.float32))
+        with _fake_session_factory(session):
+            extractor = OnnxExtractor(b"<bytes>")
+            with pytest.raises(ValueError, match="no inputs"):
+                extractor([np.zeros((3, 16, 16), dtype=np.float32)])
+
+    def test_model_with_no_outputs_raises(self):
+        session = _FakeSession([_IO("i")], [], np.zeros((1, 4), dtype=np.float32))
+        with _fake_session_factory(session):
+            extractor = OnnxExtractor(b"<bytes>")
+            with pytest.raises(ValueError, match="no outputs"):
+                extractor([np.zeros((3, 16, 16), dtype=np.float32)])
+
+    def test_ensure_loaded_raises_when_load_leaves_session_none(self):
+        extractor = OnnxExtractor(b"<bytes>")
+        with (
+            patch.object(OnnxExtractor, "_load_model", lambda self: None),
+            pytest.raises(RuntimeError, match="Failed to load"),
+        ):
+            extractor._ensure_loaded()
+
+    def test_missing_input_name_raises(self):
+        session = _FakeSession([_IO("i")], [_IO("o")], np.zeros((1, 4), dtype=np.float32))
+        extractor = OnnxExtractor(b"<bytes>")
+        _patch_extractor(extractor, session, None, ["o"])
+        with pytest.raises(RuntimeError, match="input name not set"):
+            extractor([np.zeros((3, 16, 16), dtype=np.float32)])
+
+    def test_already_loaded_session_is_reused(self):
+        session = _FakeSession([_IO("i")], [_IO("o")], np.zeros((1, 4), dtype=np.float32))
+        extractor = OnnxExtractor(b"<bytes>")
+        _patch_extractor(extractor, session, "i", ["o"])
+        # _load_model must NOT be called again when a session already exists
+        with patch.object(OnnxExtractor, "_load_model", side_effect=AssertionError("should not reload")):
+            result = extractor([np.zeros((3, 16, 16), dtype=np.float32)])
+        assert result.shape == (1, 4)

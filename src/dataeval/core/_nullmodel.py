@@ -14,6 +14,34 @@ from dataeval.utils._internal import as_numpy
 from dataeval.utils.preprocessing import compute_iou
 
 
+def np_trapezoid(y: NDArray[np.float64], x: NDArray[np.float64]) -> np.float64:
+    """
+    Compute the integral of y with respect to x using the trapezoidal rule.
+
+    This function is a wrapper around NumPy's trapezoidal integration function, providing compatibility
+    with both older and newer versions of NumPy.
+
+    Parameters
+    ----------
+    y : NDArray[np.float64]
+        The y-coordinates of the points to integrate.
+    x : NDArray[np.float64]
+        The x-coordinates of the points to integrate.
+
+    Returns
+    -------
+    np.float64
+        The computed integral value.
+    """
+    # np.trapezoid replaces np.trapz in NumPy 2.0+; fall back for older versions
+    _trapezoid = getattr(np, "trapezoid", None) or getattr(np, "trapz", None)
+    if _trapezoid is None:
+        raise ImportError(
+            "NumPy version does not support trapezoid integration; please upgrade to NumPy 1.20 or later."
+        )
+    return _trapezoid(y, x)
+
+
 def _estimate_hit_probabilities(
     gt_boxes: NDArray[np.float64],
     image_size: tuple[int, int],
@@ -119,8 +147,7 @@ def _calculate_localization_ap(
 
     # Compute AP using trapezoidal rule or step integration
     # Standard AP is typically the area under the precision-recall curve
-    # Use np.trapezoid (modern replacement for np.trapz in NumPy 2.0+)
-    return float(np.trapezoid(precisions, recalls))
+    return float(np_trapezoid(precisions, recalls))
 
 
 _logger = logging.getLogger(__name__)

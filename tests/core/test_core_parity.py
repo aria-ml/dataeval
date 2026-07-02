@@ -114,6 +114,15 @@ class TestParity:
         assert len(result["scores"]) == 1
         assert len(result["p_values"]) == 1
 
+    def test_single_sample_zero_score(self):
+        """A single sample yields a contingency total of 1 (n <= 1), giving a 0.0 score."""
+        binned_data = np.array([[0]], dtype=np.intp)
+        class_labels = np.array([0], dtype=np.intp)
+
+        result = parity(binned_data, class_labels)
+
+        assert result["scores"][0] == 0.0
+
     def test_single_class(self):
         """Test with only one class label."""
         binned_data = np.array([[0], [1], [0], [1]], dtype=np.intp)

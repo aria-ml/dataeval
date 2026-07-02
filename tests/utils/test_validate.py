@@ -16,6 +16,7 @@ from dataeval._metadata import Metadata
 from dataeval.data import ClassFilter, Limit, Select, Shuffle, split_dataset, unzip_dataset
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import DatasetMetadata, DatumMetadata
+from dataeval.utils import _validate
 from dataeval.utils.data import requires_maite_dataset, validate_dataset
 
 # ---------- fixtures ----------
@@ -70,6 +71,26 @@ class _ODDataset:
         return np.zeros((3, 8, 8), dtype=np.float32), _ODTarget(), DatumMetadata(id=i)
 
 
+class _SegTarget:
+    def __init__(self) -> None:
+        self.mask = np.zeros((1, 8, 8), dtype=np.float32)
+        self.labels = np.array([0], dtype=np.intp)
+        self.scores = np.array([[1.0]], dtype=np.float32)
+
+
+class _SegDataset:
+    metadata: DatasetMetadata = DatasetMetadata(id="seg_test")
+
+    def __init__(self, n: int = 4) -> None:
+        self.n = n
+
+    def __len__(self) -> int:
+        return self.n
+
+    def __getitem__(self, i: int) -> tuple[np.ndarray, _SegTarget, DatumMetadata]:
+        return np.zeros((3, 8, 8), dtype=np.float32), _SegTarget(), DatumMetadata(id=i)
+
+
 # ---------- validate_dataset: happy paths ----------
 
 
@@ -86,9 +107,13 @@ class TestValidateDatasetHappy:
     def test_object_detection(self) -> None:
         assert validate_dataset(_ODDataset(), expected="object_detection") == "object_detection"
 
+    def test_segmentation(self) -> None:
+        assert validate_dataset(_SegDataset(), expected="segmentation") == "segmentation"
+
     def test_any_target_resolves_concrete_kind(self) -> None:
         assert validate_dataset(_ICDataset(), expected="any_target") == "classification"
         assert validate_dataset(_ODDataset(), expected="any_target") == "object_detection"
+        assert validate_dataset(_SegDataset(), expected="any_target") == "segmentation"
 
 
 # ---------- validate_dataset: failure modes ----------
@@ -146,6 +171,54 @@ class TestValidateDatasetFailures:
         with pytest.raises(ValueError, match="unknown expected"):
             validate_dataset(_ICDataset(), expected="bogus")  # type: ignore[arg-type]
 
+    def test_sized_but_not_indexable_dataset(self) -> None:
+        # has __len__ (Sized) but no __getitem__, so it is not a Dataset
+        class _NoGetItem:
+            def __len__(self) -> int:
+                return 3
+
+        with pytest.raises(MaiteShapeError, match="not a Dataset"):
+            validate_dataset(_NoGetItem(), expected="image_only")
+
+    def test_image_only_wrong_tuple_arity(self) -> None:
+        class _TwoTuple:
+            metadata = DatasetMetadata(id="two")
+
+            def __len__(self) -> int:
+                return 1
+
+            def __getitem__(self, i: int) -> tuple[Any, Any]:
+                return np.zeros((3, 8, 8)), {"id": i}
+
+        with pytest.raises(MaiteShapeError, match="tuple of length 2"):
+            validate_dataset(_TwoTuple(), expected="image_only")
+
+    def test_non_tuple_datum_described_by_type(self) -> None:
+        # a scalar datum has no shape, so _describe falls back to the bare type name
+        class _ScalarDatum:
+            metadata = DatasetMetadata(id="scalar")
+
+            def __len__(self) -> int:
+                return 1
+
+            def __getitem__(self, i: int) -> int:
+                return 42
+
+        with pytest.raises(MaiteShapeError, match="got int"):
+            validate_dataset(_ScalarDatum(), expected="classification")
+
+
+class TestValidateHelpers:
+    def test_target_matches_image_only_is_false(self) -> None:
+        # _target_matches is never called with "image_only" through validate_dataset
+        # (it is short-circuited earlier), so exercise the fallback directly
+        assert _validate._target_matches(object(), "image_only") is False  # type: ignore[arg-type]
+
+    def test_infer_caller_without_frame_returns_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # when no frame is available, the caller name defaults to "validate_dataset"
+        monkeypatch.setattr(_validate.inspect, "currentframe", lambda: None)
+        assert _validate._infer_caller() == "validate_dataset"
+
 
 # ---------- @requires_maite_dataset ----------
 
@@ -185,6 +258,16 @@ class TestRequiresMaiteDataset:
 
             @requires_maite_dataset(expected="any_target")
             def f(x: Any) -> None: ...
+
+    def test_unbindable_args_pass_through_to_real_call(self) -> None:
+        # too many positional args make sig.bind_partial raise; validation is skipped
+        # and the underlying call runs to surface the real TypeError
+        @requires_maite_dataset(expected="any_target")
+        def f(dataset: Any) -> str:
+            return "ok"
+
+        with pytest.raises(TypeError):
+            f(1, 2, 3)  # type: ignore
 
 
 # ---------- integration: public entry points ----------

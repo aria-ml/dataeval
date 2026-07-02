@@ -76,6 +76,35 @@ class TestDriftReconstructionNonChunked:
         assert "mean_ref_error" in result.details
         assert "mean_test_error" in result.details
 
+    def test_zero_ref_std_degenerate_branch(self, ref_data, shifted_data):
+        """When reference std is zero, the z-test is skipped and p_val is 0 or 1."""
+        model = AE(input_shape=input_shape)
+        det = DriftReconstruction(model, config=DriftReconstruction.Config(epochs=3, batch_size=30)).fit(ref_data)
+
+        # Force the degenerate branch: identical reference reconstruction scores.
+        det._ref_std = 0.0
+        det._ref_mean = 0.0
+
+        # shifted_data yields a mean_test error > ref_mean(0.0) -> p_val == 0.0 -> drifted.
+        result = det.predict(shifted_data)
+        assert isinstance(result, DriftOutput)
+        assert result.details["p_val"] in (0.0, 1.0)
+        assert result.details["p_val"] == 0.0
+        assert result.drifted is True
+
+    def test_zero_ref_std_no_drift_branch(self, ref_data, shifted_data):
+        """Zero reference std with a very high ref_mean yields p_val == 1.0 (no drift)."""
+        model = AE(input_shape=input_shape)
+        det = DriftReconstruction(model, config=DriftReconstruction.Config(epochs=3, batch_size=30)).fit(ref_data)
+
+        det._ref_std = 0.0
+        det._ref_mean = 1e9  # unreachably high; mean_test will not exceed it
+
+        result = det.predict(shifted_data)
+        assert isinstance(result, DriftOutput)
+        assert result.details["p_val"] == 1.0
+        assert result.drifted is False
+
     def test_no_drift_similar(self, ref_data, similar_data):
         model = AE(input_shape=input_shape)
         det = DriftReconstruction(model, config=DriftReconstruction.Config(epochs=3, batch_size=30)).fit(ref_data)

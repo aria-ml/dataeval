@@ -135,6 +135,20 @@ def test_knn_score_computation(reference_embeddings, query_embeddings):
 
 
 @pytest.mark.required
+def test_knn_reference_embeddings_property(reference_embeddings):
+    """The reference_embeddings property exposes the fitted reference data."""
+    knn = OODKNeighbors(k=5, distance_metric="euclidean")
+    knn.fit(reference_embeddings)
+
+    ref = knn.reference_embeddings
+    assert ref is not None
+    # Should match the preprocessed reference data used to fit the scorer.
+    expected = knn._preprocess(reference_embeddings)
+    assert ref.shape == expected.shape
+    np.testing.assert_allclose(ref, expected)
+
+
+@pytest.mark.required
 def test_knn_different_distance_metrics(reference_embeddings, query_embeddings):
     """Test that different distance metrics produce different results."""
     query_array = query_embeddings

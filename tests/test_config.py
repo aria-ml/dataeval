@@ -33,6 +33,32 @@ class TestDevice:
         finally:
             config._config.device = original_device
 
+    @pytest.mark.skipif(
+        not hasattr(torch, "get_default_device"),
+        reason="torch.get_default_device is not available",
+    )
+    def test_get_device_default_when_unset(self):
+        """get_device() returns torch.get_default_device() when global device is None (line 141)."""
+        original_device = config._config.device
+        try:
+            config.set_device(None)
+            assert config._config.device is None
+            result = config.get_device()
+            assert isinstance(result, torch.device)
+            assert result == torch.get_default_device()
+        finally:
+            config._config.device = original_device
+
+    def test_get_device_cpu_fallback_without_get_default_device(self, monkeypatch):
+        """On torch builds lacking get_default_device, get_device() falls back to CPU (line 142)."""
+        original_device = config._config.device
+        monkeypatch.delattr(torch, "get_default_device", raising=False)
+        try:
+            config.set_device(None)
+            assert config.get_device() == torch.device("cpu")
+        finally:
+            config._config.device = original_device
+
     def test_device_context(self):
         original_device = config._config.device
         try:

@@ -43,6 +43,24 @@ def test_variable_dim_without_override_raises():
         build_model_input([np.zeros((3, 8, 8), dtype=np.uint8)], spec)
 
 
+def test_variable_width_without_override_raises():
+    # height is fixed but width is variable and unoverridden
+    spec = ModelIOSpec("IMAGE_CLASSIFICATION", "RGB", 8, -1, -1, 3)
+    with pytest.raises(ValueError, match="width"):
+        build_model_input([np.zeros((3, 8, 8), dtype=np.uint8)], spec)
+
+
+def test_non_chw_image_raises():
+    with pytest.raises(ValueError, match="CHW"):
+        build_model_input([np.zeros((8, 8), dtype=np.uint8)], RGB)
+
+
+def test_unconvertible_channel_count_raises():
+    # a 2-channel image cannot be coerced to the 3-channel RGB layout
+    with pytest.raises(ValueError, match="cannot convert image"):
+        build_model_input([np.zeros((2, 8, 8), dtype=np.uint8)], RGB)
+
+
 def test_float_image_already_normalized_passes_through():
     # Float inputs are assumed to be in [0, 1] and must NOT be divided by 255.
     out = build_model_input([np.full((3, 8, 8), 0.5, dtype=np.float32)], RGB)

@@ -69,6 +69,23 @@ def test_missing_field_raises_naming_field(tmp_path: Path):
         read_model_metadata(p)
 
 
+def test_invalid_channels_raises(tmp_path: Path):
+    p = _write(
+        tmp_path,
+        {
+            "interface": {"name": "JATIC_ONNX", "version": "v1"},
+            "io": {
+                "batchSize": 1,
+                "interface": "IMAGE_CLASSIFICATION",
+                "input": {"channels": "BGR", "height": 8, "width": 8},
+                "output": {"nClasses": 10},
+            },
+        },
+    )
+    with pytest.raises(ValueError, match="channels must be 'RGB' or 'GRAYSCALE'"):
+        read_model_metadata(p)
+
+
 def test_unknown_task_raises(tmp_path: Path):
     p = _write(
         tmp_path,

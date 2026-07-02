@@ -1,9 +1,17 @@
 """Model-agnostic UncertaintyExtractor."""
 
+import warnings
+
 import numpy as np
 import pytest
+import torch.nn as nn
 
-from dataeval.extractors._uncertainty import ClasswiseUncertaintyExtractor, UncertaintyExtractor
+from dataeval._experimental import DeprecatedWarning
+from dataeval.extractors._uncertainty import (
+    ClassifierUncertaintyExtractor,
+    ClasswiseUncertaintyExtractor,
+    UncertaintyExtractor,
+)
 
 
 class FakeScores:
@@ -54,3 +62,49 @@ class TestClasswiseUncertaintyExtractor:
     def test_has_threshold(self):
         ex = ClasswiseUncertaintyExtractor(FakeScores([[1.0, 0.0]]), threshold=0.5)
         assert ex.threshold == 0.5
+
+
+@pytest.mark.required
+class TestClassifierUncertaintyExtractor:
+    """The deprecated ClassifierUncertaintyExtractor now shims onto the new extractors."""
+
+    def _model(self):
+        return nn.Sequential(nn.Linear(16, 10), nn.Softmax(dim=-1))
+
+    def test_construction_warns_deprecated(self):
+        with pytest.warns(DeprecatedWarning, match="ClassifierUncertaintyExtractor"):
+            ClassifierUncertaintyExtractor(self._model())
+
+    def test_call_returns_per_instance_uncertainty(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecatedWarning)
+            ex = ClassifierUncertaintyExtractor(self._model(), preds_type="probs", batch_size=8)
+            out = np.asarray(ex(np.random.randn(5, 16).astype(np.float32)))
+        assert out.shape == (5, 1)
+
+    def test_logits_preds_type(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecatedWarning)
+            ex = ClassifierUncertaintyExtractor(nn.Linear(16, 10), preds_type="logits")
+            out = np.asarray(ex(np.random.randn(3, 16).astype(np.float32)))
+        assert out.shape == (3, 1)
+
+    @pytest.mark.parametrize(
+        ("transforms", "expected_len"),
+        [(None, 0), ((lambda x: x), 1), ([lambda x: x, lambda x: x], 2)],
+    )
+    def test_transforms_normalized_to_list(self, transforms, expected_len):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecatedWarning)
+            ex = ClassifierUncertaintyExtractor(self._model(), transforms=transforms)
+        assert len(ex._transforms) == expected_len
+
+    def test_repr_names_model_and_config(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecatedWarning)
+            ex = ClassifierUncertaintyExtractor(self._model(), preds_type="probs", batch_size=8, device="cpu")
+        r = repr(ex)
+        assert r.startswith("ClassifierUncertaintyExtractor(")
+        assert "model=Sequential" in r
+        assert "preds_type='probs'" in r
+        assert "batch_size=8" in r

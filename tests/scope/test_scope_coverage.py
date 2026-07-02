@@ -1,8 +1,33 @@
 import numpy as np
 import polars as pl
 import pytest
+import torch
 
-from dataeval.scope._coverage import _PER_CLASS_SCHEMA, Coverage
+from dataeval.exceptions import ShapeMismatchError
+from dataeval.extractors import TorchExtractor
+from dataeval.protocols import DatasetMetadata
+from dataeval.scope._coverage import _PER_CLASS_SCHEMA, Coverage, CoverageOutput
+
+
+class ClassificationDataset:
+    """A minimal image-classification dataset with one-hot targets and index2label."""
+
+    def __init__(self, class_names: list[str], per_class: int, shape: tuple[int, ...] = (3, 4, 4)) -> None:
+        targets = []
+        for i in range(len(class_names)):
+            for _ in range(per_class):
+                onehot = np.zeros(len(class_names))
+                onehot[i] = 1
+                targets.append(onehot.copy())
+        self._targets = targets
+        self._data = np.random.default_rng(0).random((len(targets), *shape)).astype(np.float32)
+        self.metadata = DatasetMetadata(id="d", index2label=dict(enumerate(class_names)))
+
+    def __getitem__(self, i):
+        return self._data[i], self._targets[i], {"id": i}
+
+    def __len__(self) -> int:
+        return len(self._targets)
 
 
 def _two_class_embeddings(rng, class_a, class_b):
@@ -110,3 +135,55 @@ class TestCoverageSchema:
         assert df.schema["near_duplicate_fraction"] == pl.Float64
         # The 5-sample class is below min_class_samples, so both signals are null for it.
         assert df["near_duplicate_fraction"].null_count() >= 1
+
+
+@pytest.mark.required
+class TestEvaluate:
+    def test_evaluate_with_precomputed_embeddings(self):
+        ds = ClassificationDataset(["a", "b"], per_class=25)
+        emb = np.random.default_rng(1).random((len(ds), 4))
+        res = Coverage(num_observations=5, min_class_samples=10).evaluate(ds, embeddings=emb)
+
+        assert isinstance(res, CoverageOutput)
+        assert set(res.data()["class"].to_list()) == {"a", "b"}
+        assert res.coverage_radius > 0
+        assert len(res.critical_value_radii) == len(ds)
+        # uncovered_indices index into the sample set
+        assert all(0 <= i < len(ds) for i in res.uncovered_indices)
+
+    def test_evaluate_naive_method(self):
+        ds = ClassificationDataset(["a", "b"], per_class=25)
+        emb = np.random.default_rng(2).random((len(ds), 4))
+        res = Coverage(num_observations=5, min_class_samples=10, method="naive").evaluate(ds, embeddings=emb)
+        assert res.coverage_radius > 0
+
+    def test_evaluate_computes_embeddings_from_extractor(self):
+        ds = ClassificationDataset(["a", "b"], per_class=25)
+        extractor = TorchExtractor(torch.nn.Flatten(), device="cpu")
+        res = Coverage(extractor=extractor, batch_size=16, num_observations=5, min_class_samples=10).evaluate(ds)
+        assert set(res.data()["class"].to_list()) == {"a", "b"}
+
+    def test_evaluate_shape_mismatch_raises(self):
+        ds = ClassificationDataset(["a", "b"], per_class=25)
+        emb = np.random.default_rng(3).random((10, 4))  # far fewer embeddings than labels
+        with pytest.raises(ShapeMismatchError, match="one embedding per"):
+            Coverage(num_observations=5, min_class_samples=10).evaluate(ds, embeddings=emb)
+
+
+@pytest.mark.required
+class TestEmbeddingsResolution:
+    def test_precomputed_embeddings_returned_as_float64(self):
+        cov = Coverage()
+        emb = cov._embeddings(dataset=None, embeddings=np.ones((4, 3), dtype=np.float32))  # type: ignore
+        assert emb.dtype == np.float64
+        assert emb.shape == (4, 3)
+
+    def test_missing_extractor_and_embeddings_raises(self):
+        with pytest.raises(ValueError, match="Provide pre-computed embeddings"):
+            Coverage()._embeddings(dataset=None, embeddings=None)  # type: ignore
+
+
+@pytest.mark.required
+class TestNearDuplicateFraction:
+    def test_empty_distances_return_none(self):
+        assert Coverage()._near_duplicate_fraction([]) is None

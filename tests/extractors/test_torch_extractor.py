@@ -207,6 +207,32 @@ class TestTorchExtractorTransforms:
 
 
 @pytest.mark.required
+class TestTorchExtractorPostprocess:
+    """Test postprocess_fn functionality."""
+
+    def test_postprocess_reshapes_higher_dim_output(self):
+        """postprocess_fn output with ndim > 2 is collapsed to 2D (line 223)."""
+
+        class IdentityModel(torch.nn.Module):
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                return x
+
+        def postprocess_fn(output: torch.Tensor) -> torch.Tensor:
+            # Decode into a (batch, n_detections, n_classes) 3D tensor.
+            n = output.shape[0]
+            return torch.zeros((n, 4, 7))
+
+        extractor = TorchExtractor(IdentityModel(), device="cpu", postprocess_fn=postprocess_fn)
+
+        images = [torch.randn(3, 8, 8) for _ in range(5)]
+        result = extractor(images)
+
+        # Leading dims collapsed, last dim (n_classes) preserved.
+        assert result.ndim == 2
+        assert result.shape == (5 * 4, 7)
+
+
+@pytest.mark.required
 class TestTorchExtractorRepr:
     """Test __repr__ method."""
 

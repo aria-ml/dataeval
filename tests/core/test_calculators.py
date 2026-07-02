@@ -7,10 +7,12 @@ from scipy.stats import kurtosis as scipy_kurtosis
 from scipy.stats import skew as scipy_skew
 
 from dataeval.core import compute_stats
+from dataeval.core._calculators._base import Calculator
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._dimensionstats import DimensionStatCalculator
 from dataeval.core._calculators._hashstats import HashStatCalculator
 from dataeval.core._calculators._pixelstats import PixelStatCalculator
+from dataeval.core._calculators._visualstats import QUARTILES, VisualStatCalculator
 from dataeval.flags import ImageStats
 from dataeval.utils.preprocessing import BoundingBox
 
@@ -1669,3 +1671,48 @@ class TestNormalizePixelValues:
             warnings.simplefilter("error", FutureWarning)
             compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=True)
             compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+
+
+class TestCalculatorEmptyValuesDefault:
+    """Cover the base Calculator.get_empty_values() default implementation."""
+
+    def test_base_get_empty_values_returns_empty_dict(self):
+        """The base get_empty_values() returns an empty dict (no custom empty values)."""
+        image = np.random.rand(3, 10, 10)
+        cache = CalculatorCache(image, box=None)
+        calculator = DimensionStatCalculator(image, cache)
+
+        # Invoke the base implementation directly (subclasses override it), so the
+        # unbound base method's `return {}` executes.
+        assert Calculator.get_empty_values(calculator) == {}
+
+
+class TestVisualStatsAllNanPerChannel:
+    """Cover the all-NaN per-channel branch of VisualStatCalculator.percentiles."""
+
+    def test_percentiles_all_nan_per_channel(self):
+        """All-NaN image in per-channel mode returns a (channels, len(QUARTILES)) NaN array."""
+        image = np.full((3, 10, 10), np.nan)
+        cache = CalculatorCache(image, box=None, per_channel=True)
+        calculator = VisualStatCalculator(image, cache, per_channel=True)
+
+        result = calculator.percentiles
+
+        assert result.shape == (3, len(QUARTILES))
+        assert np.isnan(result).all()
+
+
+class TestPixelStatsAllNanPerChannel:
+    """Cover the per-channel branch of PixelStatCalculator._nan_list()."""
+
+    def test_nan_list_all_nan_per_channel(self):
+        """All-NaN image in per-channel mode returns one NaN per channel."""
+        image = np.full((3, 10, 10), np.nan)
+        cache = CalculatorCache(image, box=None, per_channel=True)
+        calculator = PixelStatCalculator(image, cache, per_channel=True)
+
+        # _mean() short-circuits to _nan_list() when the cache is all-NaN.
+        result = calculator._mean()
+
+        assert len(result) == 3
+        assert all(np.isnan(v) for v in result)

@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval.core._ber import _get_classes_counts, _knn_lowerbound, ber_knn, ber_mst
+from dataeval.exceptions import ShapeMismatchError
 
 
 @pytest.mark.required
@@ -87,3 +88,11 @@ class TestBERCore:
         """Test minimum class count validation."""
         with pytest.raises(ValueError, match="less than 2 classes"):
             _get_classes_counts(np.ones(1, dtype=np.intp))
+
+    def test_mismatched_embeddings_and_labels_lengths(self):
+        """Mismatched embeddings and class_labels lengths raise ShapeMismatchError."""
+        embeddings = np.random.random(size=(10, 4))
+        labels = np.arange(8)
+
+        with pytest.raises(ShapeMismatchError):
+            ber_mst(embeddings, labels)

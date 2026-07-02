@@ -54,10 +54,52 @@ def _create_simple_onnx_model(model_path: Path) -> Path:
     return model_path
 
 
+def _create_globalaveragepool_model(model_path: Path) -> Path:
+    """Create an ONNX model whose embedding layer is a GlobalAveragePool (no Gemm)."""
+    from onnx import TensorProto, helper, save
+
+    X = helper.make_tensor_value_info("input", TensorProto.FLOAT, ["batch", 3, 16, 16])
+    Y = helper.make_tensor_value_info("pooled", TensorProto.FLOAT, ["batch", 3, 1, 1])
+    gap_node = helper.make_node("GlobalAveragePool", inputs=["input"], outputs=["pooled"])
+
+    graph = helper.make_graph(nodes=[gap_node], name="gap_model", inputs=[X], outputs=[Y])
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
+    model.ir_version = 8
+    save(model, str(model_path))
+    return model_path
+
+
+def _create_no_embedding_model(model_path: Path) -> Path:
+    """Create an ONNX model with neither a Gemm nor a GlobalAveragePool layer."""
+    from onnx import TensorProto, helper, save
+
+    X = helper.make_tensor_value_info("input", TensorProto.FLOAT, ["batch", 3, 16, 16])
+    Y = helper.make_tensor_value_info("output", TensorProto.FLOAT, ["batch", 3, 16, 16])
+    relu_node = helper.make_node("Relu", inputs=["input"], outputs=["output"])
+
+    graph = helper.make_graph(nodes=[relu_node], name="relu_model", inputs=[X], outputs=[Y])
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
+    model.ir_version = 8
+    save(model, str(model_path))
+    return model_path
+
+
 @pytest.fixture
 def simple_classifier_model(tmp_path: Path) -> Path:
     """Create a simple ONNX classifier for testing."""
     return _create_simple_onnx_model(tmp_path / "classifier.onnx")
+
+
+@pytest.fixture
+def globalaveragepool_model(tmp_path: Path) -> Path:
+    """Create an ONNX model whose embedding layer is a GlobalAveragePool."""
+    return _create_globalaveragepool_model(tmp_path / "gap.onnx")
+
+
+@pytest.fixture
+def no_embedding_model(tmp_path: Path) -> Path:
+    """Create an ONNX model with no identifiable embedding layer."""
+    return _create_no_embedding_model(tmp_path / "relu.onnx")
 
 
 @pytest.mark.optional
@@ -77,6 +119,19 @@ class TestFindEmbeddingLayer:
 
         with pytest.raises(FileNotFoundError, match="nonexistent.onnx"):
             find_embedding_layer(tmp_path / "nonexistent.onnx")
+
+    def test_falls_back_to_globalaveragepool(self, globalaveragepool_model: Path) -> None:
+        """With no Gemm, it returns the GlobalAveragePool output."""
+        from dataeval.utils.onnx import find_embedding_layer
+
+        assert find_embedding_layer(globalaveragepool_model) == "pooled"
+
+    def test_raises_when_no_embedding_layer(self, no_embedding_model: Path) -> None:
+        """With neither Gemm nor GlobalAveragePool, it raises ValueError."""
+        from dataeval.utils.onnx import find_embedding_layer
+
+        with pytest.raises(ValueError, match="Could not identify the embedding layer"):
+            find_embedding_layer(no_embedding_model)
 
 
 @pytest.mark.optional
@@ -117,6 +172,21 @@ class TestToEncodingModel:
         assert layer_name == embedding_layer
         assert isinstance(model_bytes, bytes)
 
+    def test_raises_on_unknown_layer(self, simple_classifier_model: Path) -> None:
+        """An explicit layer that is not in the graph shapes raises ValueError."""
+        from dataeval.utils.onnx import to_encoding_model
+
+        with pytest.raises(ValueError, match="not found in graph shapes"):
+            to_encoding_model(simple_classifier_model, embedding_layer="does_not_exist")
+
+    def test_layer_already_an_output(self, globalaveragepool_model: Path) -> None:
+        """When the requested layer is already a graph output, it is returned as-is."""
+        from dataeval.utils.onnx import to_encoding_model
+
+        model_bytes, layer_name = to_encoding_model(globalaveragepool_model, embedding_layer="pooled")
+        assert layer_name == "pooled"
+        assert isinstance(model_bytes, bytes)
+
     def test_works_with_onnx_extractor(self, simple_classifier_model: Path) -> None:
         """Test that the result can be used with OnnxExtractor."""
         from dataeval.extractors import OnnxExtractor
@@ -135,6 +205,21 @@ class TestToEncodingModel:
 
         # Should get embeddings with dimension 768 (flattened 3*16*16)
         assert result.shape == (5, 768)
+
+
+@pytest.mark.optional
+class TestGetOnnx:
+    """Test the lazy onnx import helper."""
+
+    def test_raises_helpful_error_when_onnx_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """When onnx cannot be imported, a helpful ImportError is raised."""
+        import sys
+
+        from dataeval.utils.onnx import _get_onnx
+
+        monkeypatch.setitem(sys.modules, "onnx", None)
+        with pytest.raises(ImportError, match="onnx is required"):
+            _get_onnx()
 
 
 @pytest.mark.optional
