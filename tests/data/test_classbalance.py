@@ -322,3 +322,111 @@ class TestClassBalanceEdgeCases:
 
         # Should return dataset size (12)
         assert len(select) == 12
+
+
+@pytest.mark.required
+class TestClassBalanceLabelYielding:
+    """Cover the target-shape branches in _yield_labels."""
+
+    def _mixed_dataset(self):
+        # index 0 is a valid one-hot (so dataset[0] passes Select validation);
+        # index 1 is an empty Array target; index 2 is a None target.
+        mock = MagicMock()
+        mock.__len__.return_value = 5
+
+        def get_item(idx):
+            if idx == 1:
+                return (idx, np.array([]), {"id": idx})  # empty Array -> len==0 skip (98->95)
+            if idx == 2:
+                return (idx, None, {"id": idx})  # non-target -> neither branch (100->95)
+            return (idx, one_hot(idx % 2, num_classes=2), {"id": idx})
+
+        mock.__getitem__.side_effect = get_item
+        return mock
+
+    def test_empty_and_nontarget_items_yield_no_labels(self):
+        class_balance = ClassBalance(method="interclass", num_samples=4)
+        select = Select(self._mixed_dataset(), selections=[class_balance])
+
+        # The empty-Array item (1) and None-target item (2) contribute no class labels;
+        # only the valid one-hot items (0, 3, 4 -> classes 0/1) define the balanced classes.
+        assert set(class_balance._images_per_class) == {0, 1}
+        assert 1 not in class_balance._images_per_class[0]  # empty-array image not attributed
+        assert 2 not in class_balance._images_per_class.get(0, [])
+        assert len(select) == 4
+
+
+@pytest.mark.required
+class TestClassBalanceEmptyRepeatSampling:
+    """Cover the with-repeat empty-image sampling branch (lines 191-192)."""
+
+    def test_more_empty_requested_than_available(self, od_dataset_with_empty):
+        # Only 3 empty images exist (indices 2, 5, 8) but 5 are requested, forcing
+        # sampling with replacement.
+        class_balance = ClassBalance(method="interclass", num_empty=5)
+        select = Select(od_dataset_with_empty, selections=[class_balance])
+
+        empty_picks = [idx for idx in select._selection if idx in (2, 5, 8)]
+        # Exactly 5 empty slots filled, drawn (with repeats) from the 3 available.
+        assert len(empty_picks) == 5
+        assert set(empty_picks) <= {2, 5, 8}
+
+
+@pytest.mark.required
+class TestClassBalanceGlobalBackground:
+    """Cover the background-class frequency override in _global_balance (line 217)."""
+
+    def test_background_class_frequency_set_to_one(self, classification_dataset):
+        class_balance = ClassBalance(method="global", background_class=1)
+        Select(classification_dataset, selections=[class_balance])
+
+        # background class present in the data -> its frequency is pinned to 1.0
+        assert class_balance._cls_frq[1] == 1.0
+
+
+@pytest.mark.required
+class TestSelectionProbabilityCounts:
+    """_calculate_selection_probability must penalize by COUNTS, not summed positions."""
+
+    def test_repeats_penalized_by_count(self):
+        # idx 3 appears once in current_list, but at position 2. The score must reflect
+        # a repeat count of 1 (score 1/2), not the summed position of 2 (score 1/3).
+        cb = ClassBalance(method="interclass")
+        cb._cls_per_img = {3: [0], 7: [0]}
+        probs = cb._calculate_selection_probability([3, 7], cls=0, current_list=[9, 9, 3])
+        # scores: 3 -> 1/(1+1)=0.5, 7 -> 1/(1+0)=1.0; normalized to [1/3, 2/3]
+        assert probs == pytest.approx([1 / 3, 2 / 3])
+
+    def test_wrong_labels_penalized_by_count(self):
+        # image 3 has a single wrong label (5), sitting at position 2 among [0, 0, 5].
+        # The penalty must use a wrong-label count of 1 (score 1/3), not summed position 2.
+        cb = ClassBalance(method="interclass")
+        cb._cls_per_img = {3: [0, 0, 5], 7: [0]}
+        probs = cb._calculate_selection_probability([3, 7], cls=0, current_list=[])
+        # scores: 3 -> 1/(1+2*1)=1/3, 7 -> 1/1=1.0; normalized to [0.25, 0.75]
+        assert probs == pytest.approx([0.25, 0.75])
+
+
+@pytest.mark.required
+class TestClassBalanceMinimizeDuplicatesReplacement:
+    """Cover the minimize_duplicates + with-replacement branch (lines 344-348)."""
+
+    def _imbalanced_dataset(self):
+        # 8 images of class 0, 2 images of class 1.
+        mock = MagicMock()
+        mock.__len__.return_value = 10
+        mock.__getitem__.side_effect = lambda idx: (idx, one_hot(0 if idx < 8 else 1, num_classes=2), {"id": idx})
+        return mock
+
+    def test_minority_class_oversampled_with_replacement(self):
+        # num_samples=None -> 10 samples, 2 classes -> 5 per class. Class 1 has only 2
+        # images (< 5), so it is sampled with replacement via the minimize_duplicates path.
+        class_balance = ClassBalance(method="interclass", minimize_duplicates=True)
+        select = Select(self._imbalanced_dataset(), selections=[class_balance])
+
+        assert len(select) == 10
+        class1_picks = [idx for idx in select._selection if idx >= 8]
+        # Both minority images are guaranteed included (samples.extend(class_imgs)),
+        # then oversampled to fill the per-class quota of 5.
+        assert {8, 9} <= set(class1_picks)
+        assert len(class1_picks) == 5

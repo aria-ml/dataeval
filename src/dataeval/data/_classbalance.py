@@ -285,8 +285,8 @@ class ClassBalance(Selection[Any]):
         """
         scores = []
         for idx in imgs:
-            num_repeats = np.nonzero(as_numpy(current_list) == idx)[0].sum()
-            wrong_labels = np.nonzero(as_numpy(self._cls_per_img[idx]) != cls)[0].sum()
+            num_repeats = np.count_nonzero(as_numpy(current_list) == idx)
+            wrong_labels = np.count_nonzero(as_numpy(self._cls_per_img[idx]) != cls)
             score = 1 / (1 + num_repeats + 2 * wrong_labels)
             scores.append(score)
 
