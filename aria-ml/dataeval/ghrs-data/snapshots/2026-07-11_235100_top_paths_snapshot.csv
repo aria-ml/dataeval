@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,42,38
+/aria-ml/dataeval/commit/d5bb43f4c3908ef2d045d1a3f2726aeb34e5477c,4,4
+/aria-ml/dataeval/compare/v1.0.0...v1.1.0-rc0,2,2
+/aria-ml/dataeval/tree/main/src/dataeval,2,2
+/aria-ml/dataeval/blob/main/CONTRIBUTING.md,1,1
+/aria-ml/dataeval/blob/main/README.md,1,1
+/aria-ml/dataeval/blob/main/docs/source/getting-started/which-tool.md,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/__init__.py,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/extractors/_torch.py,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/scope/_prioritize.py,1,1
