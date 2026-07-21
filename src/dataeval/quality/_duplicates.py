@@ -1252,9 +1252,21 @@ class Duplicates(Evaluator):
         Parameters
         ----------
         data : Dataset
-            A dataset of images.
+            The images to scan for duplicates. Accepts any object satisfying the
+            :class:`~dataeval.protocols.Dataset` interface (indexed access via
+            ``__getitem__`` and ``__len__``). Each item may be:
+
+            - a bare image array, i.e. ``Dataset[ArrayLike]``; or
+            - a full MAITE ``(image, target, metadata)`` tuple, i.e.
+              ``Dataset[tuple[ArrayLike, Any, Any]]``.
+
+            A plain array or list of image arrays also structurally satisfies
+            :class:`~dataeval.protocols.Dataset` and is accepted directly.
         *other : Dataset
-            Additional datasets for cross-dataset duplicate detection.
+            Zero or more additional datasets for cross-dataset duplicate
+            detection, each accepting the same forms as ``data``. When provided,
+            duplicates are searched across all datasets and the output includes a
+            ``dataset_indices`` column identifying each item's originating dataset.
         per_image : bool, default True
             Whether to compute hashes for full items (images/videos).
         per_target : bool, default False

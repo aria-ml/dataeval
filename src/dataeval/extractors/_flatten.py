@@ -39,7 +39,13 @@ class FlattenExtractor(ReprMixin):
         Parameters
         ----------
         data : Any
-            Iterable of images to flatten. Each image can be any array-like.
+            A batch of images to flatten. Accepts an iterable (or sized,
+            indexable source) of images where each image is any array-like, or a
+            full MAITE dataset whose items are ``(image, target, metadata)``
+            tuples -- the image is auto-unwrapped from element 0 of each tuple.
+            The input must be a batch/iterable of images: a single un-batched
+            ``(C, H, W)`` array is treated as an iterable over its channel axis,
+            not as one image.
 
         Returns
         -------

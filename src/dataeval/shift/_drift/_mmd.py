@@ -306,7 +306,7 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
         self._k_xx: torch.Tensor | None = None
         self._metric_name = "mmd2"
 
-    def fit(self, reference_data: Array) -> Self:
+    def fit(self, reference_data: Any) -> Self:
         """Fit detector with reference data.
 
         Stores reference data, initializes the kernel, and precomputes
@@ -314,8 +314,11 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
 
         Parameters
         ----------
-        reference_data : Array
+        reference_data : Any
             Reference dataset used as baseline distribution for drift detection.
+            When an ``extractor`` is configured, this may be any input the extractor
+            accepts (e.g. a full MAITE dataset or raw images); otherwise it must be
+            array-like or an :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -378,7 +381,7 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
         k_yy = self._kernel(y, y)
         return torch.cat([torch.cat([k_xx, k_xy], 1), torch.cat([k_xy.T, k_yy], 1)], 0)
 
-    def score(self, data: Array) -> tuple[float, float, float]:
+    def score(self, data: Any) -> tuple[float, float, float]:
         """
         Compute the p-value resulting from a permutation test using the maximum mean discrepancy.
 
@@ -387,8 +390,10 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
 
         Parameters
         ----------
-        data : Array
-            Batch of instances to score.
+        data : Any
+            Batch of instances to score. When an ``extractor`` is configured, this
+            may be any input the extractor accepts (e.g. a full MAITE dataset or raw
+            images); otherwise it must be array-like or an :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -427,7 +432,10 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
         Parameters
         ----------
         data : Any
-            Batch of instances to predict drift on.
+            Batch of instances to predict drift on. When an ``extractor`` is
+            configured, this may be any input the extractor accepts (e.g. a full
+            MAITE dataset or raw images); otherwise it must be array-like or an
+            :class:`~dataeval.Embeddings`.
 
         Returns
         -------

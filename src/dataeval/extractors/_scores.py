@@ -25,6 +25,31 @@ class ScoresExtractor(ReprMixin):
         return {"model": self._model.__class__.__name__}
 
     def __call__(self, data: Any) -> NDArray[np.float32]:
+        """Extract per-row class scores from the model's predictions.
+
+        Parameters
+        ----------
+        data : Any
+            An iterable (or sized, indexable source) of images, or a full MAITE
+            dataset whose items are ``(image, target, metadata)`` tuples -- the
+            image is auto-unwrapped from element 0 of each tuple.
+
+        Returns
+        -------
+        NDArray[np.float32]
+            Stacked per-row class scores. For a classification model, shape
+            ``(n_images, n_classes)`` (one row per image); for a detection model,
+            shape ``(n_detections, n_classes)`` (one row per detection, flattened
+            across all images). An empty ``(0, 0)`` array is returned when the
+            model produces no predictions.
+
+        Notes
+        -----
+        This re-runs the configured model on ``data`` to obtain predictions, so
+        any ground-truth targets carried by a passed MAITE dataset are ignored --
+        only the model's own predicted scores are used. A model is required at
+        construction.
+        """
         images = list(iter_images(data))
         preds = self._model(images)
         rows: list[NDArray[np.float32]] = []

@@ -13,7 +13,7 @@ from scipy.stats import norm
 from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError
-from dataeval.protocols import DeviceLike, Threshold
+from dataeval.protocols import DeviceLike, FeatureExtractor, Threshold
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftOutput
 from dataeval.shift._shared._reconstruction import ReconstructionScorer
 from dataeval.types import set_metadata
@@ -58,6 +58,13 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
         Whether to use GMM in latent space.
     p_val : float, default 0.05
         Significance threshold for non-chunked mode.
+    extractor : FeatureExtractor or None, default None
+        Optional feature extractor applied to the input before the array
+        conversion in :meth:`fit`/:meth:`predict`. When provided, you can pass a
+        full MAITE dataset, raw images, or any input accepted by the extractor;
+        the extractor produces the feature array that is then scored. When
+        ``None`` (the default), the detector expects array-like /
+        :class:`~dataeval.Embeddings` input.
     config : DriftReconstruction.Config or None, default None
         Optional configuration object.
 
@@ -127,9 +134,14 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
         model_type: Literal["ae", "vae", "auto"] | None = "auto",
         use_gmm: bool | None = None,
         p_val: float | None = None,
+        extractor: FeatureExtractor | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__()
+
+        # Optional extractor bridge. Kept off of Config so the detector repr is
+        # unchanged when no extractor is given.
+        self.extractor: FeatureExtractor | None = extractor
 
         base_config = config or DriftReconstruction.Config()
 
@@ -158,6 +170,10 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
         self._ref_std: float = 1.0
         self._score_batch_size: int = int(1e10)
 
+    def _encode(self, data: ArrayLike) -> ArrayLike:
+        """Apply the configured extractor, else pass array-like input through unchanged."""
+        return self.extractor(data) if self.extractor is not None else data
+
     def fit(self, reference_data: ArrayLike) -> Self:
         """Fit the reconstruction drift detector.
 
@@ -167,7 +183,9 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
         Parameters
         ----------
         reference_data : ArrayLike
-            Reference data.
+            Reference data. When an ``extractor`` is configured this may be a
+            full MAITE dataset, raw images, or any input accepted by the
+            extractor; otherwise it must be array-like / :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -178,7 +196,7 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
         epochs = self.config.epochs
         batch_size = self.config.batch_size
 
-        self._reference_data = np.asarray(reference_data, dtype=np.float32)
+        self._reference_data = np.asarray(self._encode(reference_data), dtype=np.float32)
         self._score_batch_size = batch_size
 
         # Train the model on reference data
@@ -198,6 +216,14 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
         self._fitted = True
         return self
 
+    def _prepare_data(self, data: ArrayLike) -> NDArray[np.float32]:
+        """Prepare raw input for chunked mode: apply the extractor, then convert.
+
+        Overrides :meth:`BaseDrift._prepare_data`. When no extractor is
+        configured this is byte-for-byte identical to the base implementation.
+        """
+        return np.atleast_2d(np.asarray(self._encode(data), dtype=np.float32))
+
     def _compute_chunk_metric(self, chunk_data: NDArray[np.float32]) -> float:
         """Compute mean reconstruction error for a chunk."""
         iscore, _ = self._scorer.score(chunk_data, batch_size=self._score_batch_size)
@@ -214,7 +240,9 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
         Parameters
         ----------
         data : ArrayLike
-            Test data.
+            Test data. When an ``extractor`` is configured this may be a full
+            MAITE dataset, raw images, or any input accepted by the extractor;
+            otherwise it must be array-like / :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -224,7 +252,7 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
         if not self._fitted:
             raise NotFittedError("Must call fit() before predict().")
 
-        x_test = np.asarray(data, dtype=np.float32)
+        x_test = np.asarray(self._encode(data), dtype=np.float32)
 
         test_scores, _ = self._scorer.score(x_test, batch_size=self._score_batch_size)
         mean_test = float(np.mean(test_scores))

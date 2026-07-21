@@ -258,8 +258,11 @@ class OnnxExtractor(ReprMixin):
         Parameters
         ----------
         data : Any
-            Iterable of images to extract features from. Each image should be
-            array-like in CHW format.
+            A batch of images to extract features from. Accepts an iterable (or
+            sized, indexable source) of images where each image is array-like in
+            CHW format, or a full MAITE dataset whose items are
+            ``(image, target, metadata)`` tuples -- the image is auto-unwrapped
+            from element 0 of each tuple.
 
         Returns
         -------
@@ -272,6 +275,14 @@ class OnnxExtractor(ReprMixin):
             If the model file does not exist.
         ImportError
             If onnxruntime is not installed.
+
+        Notes
+        -----
+        With ``batch_size=None`` (the default), a direct call runs a single
+        inference pass over the *entire* input, stacking all images in memory at
+        once. For large inputs, wrap this extractor in
+        :class:`~dataeval.Embeddings` (which loads and batches the data) instead
+        of calling it directly, or set ``batch_size`` to bound the inference pass.
         """
         session = self._ensure_loaded()
 

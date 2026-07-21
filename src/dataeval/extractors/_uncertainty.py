@@ -206,7 +206,23 @@ class UncertaintyExtractor(_UncertaintyBase):
     """
 
     def __call__(self, data: Any) -> NDArray[np.float32]:
-        """Extract per-instance uncertainty scores of shape ``(n_samples, 1)``."""
+        """Extract per-instance uncertainty scores of shape ``(n_samples, 1)``.
+
+        Parameters
+        ----------
+        data : Any
+            Passed straight through to the wrapped ``scores`` extractor, so the
+            accepted input contract is whatever that extractor accepts -- for
+            example an iterable of images, a full MAITE dataset (whose items are
+            ``(image, target, metadata)`` tuples), a raw ``(n, n_classes)`` score
+            array, or an :class:`~dataeval.Embeddings`.
+
+        Returns
+        -------
+        NDArray[np.float32]
+            Uncertainty scores of shape ``(n_samples, 1)``; an empty ``(0, 1)``
+            array when the score producer yields no rows.
+        """
         preds = self._score(data)
         if preds is None:
             return np.empty((0, 1), dtype=np.float32)
@@ -269,7 +285,25 @@ class ClasswiseUncertaintyExtractor(_UncertaintyBase):
         self.threshold = threshold
 
     def __call__(self, data: Any) -> dict[int, NDArray[np.float32]]:
-        """Compute per-class uncertainty distributions; ``{}`` when data is empty."""
+        """Compute per-class uncertainty distributions; ``{}`` when data is empty.
+
+        Parameters
+        ----------
+        data : Any
+            Passed straight through to the wrapped ``scores`` extractor, so the
+            accepted input contract is whatever that extractor accepts -- for
+            example an iterable of images, a full MAITE dataset (whose items are
+            ``(image, target, metadata)`` tuples), a raw
+            ``(n_detections, n_classes)`` score array, or an
+            :class:`~dataeval.Embeddings`.
+
+        Returns
+        -------
+        dict[int, NDArray[np.float32]]
+            Mapping from class index to a ``(n_detections, 1)`` array of
+            uncertainty scores for detections assigned to that class; ``{}`` when
+            the score producer yields no rows.
+        """
         preds = self._score(data)
         if preds is None:
             return {}

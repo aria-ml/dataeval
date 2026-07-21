@@ -84,7 +84,10 @@ class _BaseImageClassifier(ABC):
         ----------
         input_batch : Sequence[ArrayLike]
             Images in CHW layout. Each is preprocessed to the model's input
-            contract before inference.
+            contract before inference. Each element may also be a MAITE-style
+            ``(image, target, metadata)`` datum tuple, so a full dataset batch can
+            be passed directly — the leading image is used and any target/metadata
+            is ignored.
 
         Returns
         -------
@@ -289,7 +292,10 @@ class _BaseObjectDetector(ABC):
         ----------
         input_batch : Sequence[ArrayLike]
             Images in CHW layout. Each is preprocessed to the model's input
-            contract before inference.
+            contract before inference. Each element may also be a MAITE-style
+            ``(image, target, metadata)`` datum tuple, so a full dataset batch can
+            be passed directly — the leading image is used and any target/metadata
+            is ignored.
 
         Returns
         -------

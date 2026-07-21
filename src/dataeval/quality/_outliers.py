@@ -1517,9 +1517,21 @@ class Outliers(Evaluator):
         Parameters
         ----------
         data : Dataset
-            A dataset of images.
+            The images to scan for outliers. Accepts any object satisfying the
+            :class:`~dataeval.protocols.Dataset` interface (indexed access via
+            ``__getitem__`` and ``__len__``). Each item may be:
+
+            - a bare image array, i.e. ``Dataset[ArrayLike]``; or
+            - a full MAITE ``(image, target, metadata)`` tuple, i.e.
+              ``Dataset[tuple[ArrayLike, Any, Any]]``.
+
+            A plain array or list of image arrays also structurally satisfies
+            :class:`~dataeval.protocols.Dataset` and is accepted directly.
         *other : Dataset
-            Additional datasets for cross-dataset outlier detection.
+            Zero or more additional datasets for cross-dataset outlier
+            detection, each accepting the same forms as ``data``. When provided,
+            the output includes a ``dataset_index`` column identifying each
+            item's originating dataset.
         per_image : bool, default True
             Whether to compute statistics for full items (images/videos).
             When True, item-level outliers will be detected.
@@ -1535,6 +1547,9 @@ class Outliers(Evaluator):
             not cluster-based detection.
         metadata : MetadataLike or None, default None
             Metadata object containing class labels. Required when ``per_class=True``.
+            This is a secondary, per-class grouping input for image-statistics
+            detection only; it is not an alternative to ``data`` and does not
+            itself supply the images to scan.
 
         Returns
         -------

@@ -19,7 +19,7 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError
-from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
 from dataeval.types import set_metadata
 from dataeval.utils.thresholds import ZScoreThreshold
@@ -300,8 +300,10 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
         Parameters
         ----------
         reference_data : Any
-            Reference dataset used as baseline for drift detection.
-            Can be Array or any type supported by the configured extractor.
+            Reference dataset used as baseline for drift detection. When an
+            ``extractor`` is configured, this may be any input the extractor accepts
+            (e.g. a full MAITE dataset or raw images); otherwise it must be
+            array-like or an :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -379,7 +381,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             dist[f], p_val[f] = self._score_fn(reference_data[:, f], data[:, f])
         return p_val, dist
 
-    def score(self, data: Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    def score(self, data: Any) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Compute feature-wise p-values and test statistics.
 
         Applies the detector's statistical test independently to each feature,
@@ -387,8 +389,11 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
 
         Parameters
         ----------
-        data : Array
-            Test dataset to compare against reference data.
+        data : Any
+            Test dataset to compare against reference data. When an ``extractor`` is
+            configured, this may be any input the extractor accepts (e.g. a full
+            MAITE dataset or raw images); otherwise it must be array-like or an
+            :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -477,7 +482,9 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
         Parameters
         ----------
         data : Any
-            Test dataset to analyze for drift.
+            Test dataset to analyze for drift. When an ``extractor`` is configured,
+            this may be any input the extractor accepts (e.g. a full MAITE dataset or
+            raw images); otherwise it must be array-like or an :class:`~dataeval.Embeddings`.
 
         Returns
         -------

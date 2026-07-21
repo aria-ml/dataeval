@@ -174,13 +174,24 @@ class TorchExtractor(ReprMixin):
         Parameters
         ----------
         data : Any
-            Iterable of images to extract features from. Each image should be
-            array-like and convertible to a torch tensor.
+            A batch of images to extract features from. Accepts an iterable (or
+            sized, indexable source) of images where each image is array-like and
+            convertible to a torch tensor, or a full MAITE dataset whose items are
+            ``(image, target, metadata)`` tuples -- the image is auto-unwrapped
+            from element 0 of each tuple.
 
         Returns
         -------
         Array
             Embeddings array of shape (n_images, embedding_dim).
+
+        Notes
+        -----
+        With ``batch_size=None`` (the default), a direct call runs a single
+        forward pass over the *entire* input, stacking all images in memory at
+        once. For large inputs, wrap this extractor in
+        :class:`~dataeval.Embeddings` (which loads and batches the data) instead
+        of calling it directly, or set ``batch_size`` to bound the forward pass.
         """
         images: list[torch.Tensor] = []
         for img in iter_images(data):

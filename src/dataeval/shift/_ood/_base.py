@@ -155,7 +155,9 @@ class BaseOOD(Evaluator):
         Parameters
         ----------
         data : ArrayLike
-            Input data to score.
+            Input data to score. When an ``extractor`` is configured, this may be
+            any input the extractor accepts (e.g. a full MAITE dataset or raw
+            images); otherwise it must be array-like or an :class:`~dataeval.Embeddings`.
         batch_size : int or None, default None
             Number of instances to process per batch (only used by some detectors).
             When None, uses the global batch size from :func:`~dataeval.config.get_batch_size`.
@@ -183,7 +185,9 @@ class BaseOOD(Evaluator):
         Parameters
         ----------
         data : ArrayLike
-            Input data for OOD prediction.
+            Input data for OOD prediction. When an ``extractor`` is configured, this
+            may be any input the extractor accepts (e.g. a full MAITE dataset or raw
+            images); otherwise it must be array-like or an :class:`~dataeval.Embeddings`.
         batch_size : int or None, default None
             Number of instances to process per batch (only used by some detectors).
             When None, uses the global batch size from :func:`~dataeval.config.get_batch_size`.

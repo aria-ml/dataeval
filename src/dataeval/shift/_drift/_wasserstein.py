@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError
-from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
 from dataeval.types import set_metadata
 from dataeval.utils.thresholds import ConstantThreshold
@@ -244,12 +244,15 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         ----------
         reference_data : Any
             Training dataset used as the primary reference for drift detection.
-            Can be Array-like or any type supported by the configured extractor.
+            When an ``extractor`` is configured, this may be any input the extractor
+            accepts (e.g. a full MAITE dataset or raw images); otherwise it must be
+            array-like or an :class:`~dataeval.Embeddings`.
         validation_data : Any, default None
             Validation dataset drawn from the same distribution as
             ``reference_data``. Used to calibrate the baseline distance. Must be
             compatible with ``reference_data`` (same feature dimensionality after
-            encoding). Required despite the ``None`` default.
+            encoding) and accepts the same range of inputs. Required despite the
+            ``None`` default.
 
         Returns
         -------
@@ -321,7 +324,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
             ratios = np.where(zero_mask, np.where(distances == 0.0, 1.0, np.inf), distances / baseline)
         return ratios.astype(np.float32)
 
-    def score(self, data: Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    def score(self, data: Any) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Compute per-feature distance ratios and raw Wasserstein distances.
 
         Encodes ``data``, computes the per-feature Wasserstein distance between
@@ -330,8 +333,11 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         Parameters
         ----------
-        data : Array
-            Test dataset to compare against reference data.
+        data : Any
+            Test dataset to compare against reference data. When an ``extractor`` is
+            configured, this may be any input the extractor accepts (e.g. a full
+            MAITE dataset or raw images); otherwise it must be array-like or an
+            :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -389,7 +395,9 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         Parameters
         ----------
         data : Any
-            Test dataset to analyse for drift.
+            Test dataset to analyse for drift. When an ``extractor`` is configured,
+            this may be any input the extractor accepts (e.g. a full MAITE dataset or
+            raw images); otherwise it must be array-like or an :class:`~dataeval.Embeddings`.
 
         Returns
         -------

@@ -19,13 +19,13 @@ import torch
 from numpy.typing import NDArray
 from typing_extensions import Self
 
-from dataeval.protocols import ArrayLike, DeviceLike
-from dataeval.shift._ood._base import BaseOOD, OODScoreOutput
+from dataeval.protocols import ArrayLike, DeviceLike, FeatureExtractor
+from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODScoreOutput
 from dataeval.shift._shared._reconstruction import ReconstructionScorer
 from dataeval.utils._internal import to_numpy
 
 
-class OODReconstruction(BaseOOD):
+class OODReconstruction(ExtractorMixin, BaseOOD):
     """
     Autoencoder (AE) or Variational Autoencoder (VAE) based out-of-distribution detector.
 
@@ -55,6 +55,14 @@ class OODReconstruction(BaseOOD):
     threshold_perc : float or None, default None
         Percentage of reference data considered normal (0-100).
         If None, uses config.threshold_perc (default 95.0).
+    extractor : FeatureExtractor or None, default None
+        Optional feature extractor applied to the input before the array
+        conversion and ``[0, 1]`` range check. When provided, you can pass a
+        full MAITE dataset, raw images, or any input accepted by the extractor
+        in :meth:`fit`, :meth:`score`, and :meth:`predict`; the extractor
+        produces the feature array that is then validated and scored. When
+        ``None`` (the default), the detector expects array-like /
+        :class:`~dataeval.Embeddings` input already on the unit interval.
     config : OODReconstruction.Config or None, default None
         Optional configuration object with default training parameters. Parameters
         specified in fit() will override these defaults.
@@ -171,6 +179,7 @@ class OODReconstruction(BaseOOD):
         model_type: Literal["ae", "vae", "auto"] | None = "auto",
         use_gmm: bool | None = None,
         threshold_perc: float | None = None,
+        extractor: FeatureExtractor | None = None,
         config: Config | None = None,
     ) -> None:
         # Store config or create default
@@ -178,6 +187,10 @@ class OODReconstruction(BaseOOD):
 
         threshold_perc = threshold_perc if threshold_perc is not None else base_config.threshold_perc
         super().__init__(threshold_perc)
+
+        # Optional extractor bridge (used by ExtractorMixin._preprocess). Kept off
+        # of Config so the detector repr is unchanged when no extractor is given.
+        self._extractor: FeatureExtractor | None = extractor
 
         self.config: OODReconstruction.Config = OODReconstruction.Config(
             loss_fn=base_config.loss_fn,
@@ -237,7 +250,10 @@ class OODReconstruction(BaseOOD):
         Parameters
         ----------
         reference_data : ArrayLike
-            Training data.
+            Training data. When an ``extractor`` is configured this may be a full
+            MAITE dataset, raw images, or any input accepted by the extractor;
+            otherwise it must be array-like / :class:`~dataeval.Embeddings` on the
+            unit interval ``[0, 1]``.
 
         Returns
         -------
@@ -261,8 +277,13 @@ class OODReconstruction(BaseOOD):
         epochs = self.config.epochs
         batch_size = self.config.batch_size
 
+        # Apply the extractor (if any) so the scorer trains on the feature array.
+        # The subsequent self.score() call re-applies it via _preprocess, so the
+        # [0, 1] range check runs on the POST-extraction array.
+        extracted = self._extractor(reference_data) if self._extractor is not None else reference_data
+
         # Delegate training to scorer
-        x_ref_np = to_numpy(reference_data).astype(np.float32)
+        x_ref_np = to_numpy(extracted).astype(np.float32)
         self._scorer.fit(
             reference_data=x_ref_np,
             loss_fn=loss_fn,
