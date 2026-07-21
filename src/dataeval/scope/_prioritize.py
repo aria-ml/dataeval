@@ -16,6 +16,7 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval import Metadata
+from dataeval._embeddings import Embeddings
 from dataeval.core._rank import (
     RankResult,
     rank_hdbscan_complexity,
@@ -362,8 +363,11 @@ class Prioritize(Evaluator):
 
     Parameters
     ----------
-    extractor : FeatureExtractor
-        Feature extractor instance to use for extracting embeddings from data.
+    extractor : FeatureExtractor or Embeddings or None, default None
+        Feature extractor used to compute embeddings from a dataset. Optional only when
+        pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or an ``Array``) are
+        passed to :meth:`evaluate`; it is only needed when :meth:`evaluate` is handed a full
+        dataset that must still be embedded.
     batch_size : int or None, default None
         Batch size for embedding computation. When None, uses the global
         batch size from :func:`~dataeval.config.get_batch_size`.
@@ -471,8 +475,8 @@ class Prioritize(Evaluator):
         Attributes
         ----------
         extractor : FeatureExtractor or None
-            Feature extractor instance to use for extracting embeddings
-            from data.
+            Feature extractor used to compute embeddings from a dataset. Optional only when
+            pre-computed embeddings are passed to :meth:`evaluate`.
         batch_size : int or None, default None
             Batch size for embedding computation. When None, uses the global
             batch size from :func:`~dataeval.config.get_batch_size`.
@@ -507,7 +511,7 @@ class Prioritize(Evaluator):
         num_bins: int = DEFAULT_PRIORITIZE_NUM_BINS
 
     # Type declarations for attributes set by apply_config
-    extractor: FeatureExtractor
+    extractor: FeatureExtractor | Embeddings | None
     batch_size: int | None
     method: MethodType
     k: int | None
@@ -521,7 +525,7 @@ class Prioritize(Evaluator):
 
     def __init__(
         self,
-        extractor: FeatureExtractor | None = None,
+        extractor: FeatureExtractor | Embeddings | None = None,
         batch_size: int | None = None,
         method: MethodType | None = None,
         k: int | None = None,
@@ -534,18 +538,18 @@ class Prioritize(Evaluator):
         reference: AnnotatedDataset[Any] | Array | None = None,
         config: Config | None = None,
     ) -> None:
+        # ``extractor`` is optional: it is only required when :meth:`evaluate` is handed a
+        # dataset that must still be embedded. Pre-computed embeddings / ``Array`` inputs
+        # need no extractor, so validation is deferred to :meth:`evaluate` (mirrors Coverage).
         super().__init__(locals(), exclude={"reference"})
         self._reference = reference
-
-        if self.extractor is None:
-            raise ValueError("extractor must be provided either in __init__ or config")
 
     # ==================== Factory Class Methods ====================
 
     @classmethod
     def knn(
         cls,
-        extractor: FeatureExtractor,
+        extractor: FeatureExtractor | Embeddings | None = None,
         k: int | None = None,
         reference: AnnotatedDataset[Any] | Array | None = None,
     ) -> Self:
@@ -554,8 +558,10 @@ class Prioritize(Evaluator):
 
         Parameters
         ----------
-        extractor : FeatureExtractor
-            Feature extractor instance for embedding extraction.
+        extractor : FeatureExtractor or Embeddings or None, default None
+            Feature extractor for embedding extraction. Optional: only needed when
+            :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
+            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
         k : int or None, default None
             Number of nearest neighbors. If None, uses sqrt(n_samples).
         reference : AnnotatedDataset or Array or None, default None
@@ -578,7 +584,7 @@ class Prioritize(Evaluator):
     @classmethod
     def kmeans_distance(
         cls,
-        extractor: FeatureExtractor,
+        extractor: FeatureExtractor | Embeddings | None = None,
         c: int | None = None,
         n_init: int | Literal["auto"] = "auto",
         reference: AnnotatedDataset[Any] | Array | None = None,
@@ -591,8 +597,10 @@ class Prioritize(Evaluator):
 
         Parameters
         ----------
-        extractor : FeatureExtractor
-            Feature extractor instance for embedding extraction.
+        extractor : FeatureExtractor or Embeddings or None, default None
+            Feature extractor for embedding extraction. Optional: only needed when
+            :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
+            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
         c : int or None, default None
             Number of clusters. If None, uses sqrt(n_samples).
         n_init : int or "auto", default "auto"
@@ -614,7 +622,7 @@ class Prioritize(Evaluator):
     @classmethod
     def kmeans_complexity(
         cls,
-        extractor: FeatureExtractor,
+        extractor: FeatureExtractor | Embeddings | None = None,
         c: int | None = None,
         n_init: int | Literal["auto"] = "auto",
         reference: AnnotatedDataset[Any] | Array | None = None,
@@ -630,8 +638,10 @@ class Prioritize(Evaluator):
 
         Parameters
         ----------
-        extractor : FeatureExtractor
-            Feature extractor instance for embedding extraction.
+        extractor : FeatureExtractor or Embeddings or None, default None
+            Feature extractor for embedding extraction. Optional: only needed when
+            :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
+            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
         c : int or None, default None
             Number of clusters. If None, uses sqrt(n_samples).
         n_init : int or "auto", default "auto"
@@ -653,7 +663,7 @@ class Prioritize(Evaluator):
     @classmethod
     def hdbscan_distance(
         cls,
-        extractor: FeatureExtractor,
+        extractor: FeatureExtractor | Embeddings | None = None,
         c: int | None = None,
         max_cluster_size: int | None = None,
         reference: AnnotatedDataset[Any] | Array | None = None,
@@ -666,8 +676,10 @@ class Prioritize(Evaluator):
 
         Parameters
         ----------
-        extractor : FeatureExtractor
-            Feature extractor instance for embedding extraction.
+        extractor : FeatureExtractor or Embeddings or None, default None
+            Feature extractor for embedding extraction. Optional: only needed when
+            :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
+            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
         c : int or None, default None
             Expected number of clusters (used as hint for min_cluster_size).
             If None, uses sqrt(n_samples).
@@ -696,7 +708,7 @@ class Prioritize(Evaluator):
     @classmethod
     def hdbscan_complexity(
         cls,
-        extractor: FeatureExtractor,
+        extractor: FeatureExtractor | Embeddings | None = None,
         c: int | None = None,
         max_cluster_size: int | None = None,
         reference: AnnotatedDataset[Any] | Array | None = None,
@@ -712,8 +724,10 @@ class Prioritize(Evaluator):
 
         Parameters
         ----------
-        extractor : FeatureExtractor
-            Feature extractor instance for embedding extraction.
+        extractor : FeatureExtractor or Embeddings or None, default None
+            Feature extractor for embedding extraction. Optional: only needed when
+            :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
+            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
         c : int or None, default None
             Expected number of clusters (used as hint for min_cluster_size).
             If None, uses sqrt(n_samples).
@@ -771,6 +785,9 @@ class Prioritize(Evaluator):
         Raises
         ------
         ValueError
+            If ``dataset`` (or ``reference``) must be embedded but no extractor was
+            configured. Pass pre-computed embeddings (an Embeddings or Array) or supply
+            an extractor at construction.
             If class_balanced policy is used with a dataset that lacks metadata
             (e.g., raw arrays).
             If stratified policy is used with complexity methods (no scores).
@@ -800,12 +817,13 @@ class Prioritize(Evaluator):
             embeddings_array = np.asarray(dataset)
         else:
             # Assume dataset is an AnnotatedDataset - compute embeddings
-            try:
-                from dataeval._embeddings import Embeddings as _Embeddings
-
-                embeddings_array = np.asarray(
-                    _Embeddings(dataset, extractor=self.extractor, batch_size=self.batch_size)
+            if self.extractor is None:
+                raise ValueError(
+                    "Provide pre-computed embeddings (pass an Embeddings or Array as `dataset`), "
+                    "or configure an extractor to compute them."
                 )
+            try:
+                embeddings_array = np.asarray(Embeddings(dataset, extractor=self.extractor, batch_size=self.batch_size))
                 if class_labels is None:
                     self._metadata = Metadata(dataset)
                     class_labels = self._metadata.class_labels
@@ -818,11 +836,14 @@ class Prioritize(Evaluator):
             reference_array = None
         elif isinstance(self._reference, Array):
             reference_array = np.asarray(self._reference)
+        elif self.extractor is None:
+            raise ValueError(
+                "Provide pre-computed embeddings for `reference` (an Embeddings or Array), "
+                "or configure an extractor to compute them."
+            )
         else:
-            from dataeval._embeddings import Embeddings as _Embeddings
-
             reference_array = np.asarray(
-                _Embeddings(self._reference, extractor=self.extractor, batch_size=self.batch_size)
+                Embeddings(self._reference, extractor=self.extractor, batch_size=self.batch_size)
             )
 
         # Check if we have labels for the requested policy

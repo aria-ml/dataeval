@@ -6,11 +6,11 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
 from dataeval.extractors._resize import resize_chw
 from dataeval.models._metadata import ModelIOSpec
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._internal import ImageOrItem, as_numpy, unwrap_image
 
 
 def _to_channels(img: NDArray[Any], channels: str) -> NDArray[Any]:
@@ -37,7 +37,7 @@ def _normalize(img: NDArray[Any]) -> NDArray[np.float32]:
 
 
 def build_model_input(
-    images: Sequence[ArrayLike],
+    images: Sequence[ImageOrItem],
     spec: ModelIOSpec,
     *,
     height: int | None = None,
@@ -56,7 +56,10 @@ def build_model_input(
     ----------
     images : Sequence[ArrayLike]
         Images in CHW (channels, height, width) layout. Each may have a different
-        spatial size; all are resized to the resolved target size.
+        spatial size; all are resized to the resolved target size. Each element may
+        also be a MAITE-style ``(image, target, metadata)`` datum tuple, in which
+        case the leading image is used — so a full dataset batch can be passed
+        directly without unwrapping.
     spec : ModelIOSpec
         Model input/output contract, typically from :func:`~dataeval.models.read_model_metadata`.
         Supplies the target color layout and the default ``height``/``width``.
@@ -112,7 +115,9 @@ def build_model_input(
 
     built: list[NDArray[np.float32]] = []
     for image in images:
-        arr = as_numpy(image)
+        # Accept both bare CHW images and MAITE-style (image, target, metadata)
+        # datum tuples, so a full dataset batch can be passed through unchanged.
+        arr = as_numpy(unwrap_image(image))
         if arr.ndim != 3:
             raise ValueError(f"model input expects CHW images; got shape {arr.shape}")
         # Normalize first, while the original dtype is intact: channel conversion

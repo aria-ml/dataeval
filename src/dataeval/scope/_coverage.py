@@ -32,7 +32,7 @@ __all__ = ["Coverage", "CoverageOutput"]
 
 import logging
 from collections.abc import Mapping
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 import polars as pl
@@ -42,7 +42,7 @@ from dataeval import Metadata
 from dataeval.core._completeness import completeness as _completeness
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.exceptions import ShapeMismatchError
-from dataeval.protocols import AnnotatedDataset, Array, FeatureExtractor
+from dataeval.protocols import AnnotatedDataset, Array, ArrayLike, FeatureExtractor, MetadataLike
 from dataeval.types import DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _logger = logging.getLogger(__name__)
@@ -251,7 +251,9 @@ class Coverage(Evaluator):
     ) -> None:
         super().__init__(locals())
 
-    def _embeddings(self, dataset: AnnotatedDataset[Any] | Metadata, embeddings: Array | None) -> NDArray[np.float64]:
+    def _embeddings(
+        self, dataset: AnnotatedDataset[Any] | MetadataLike | ArrayLike, embeddings: Array | None
+    ) -> NDArray[np.float64]:
         """Use pre-computed embeddings if given, else extract them from the dataset."""
         if embeddings is not None:
             return np.asarray(embeddings, dtype=np.float64)
@@ -259,7 +261,40 @@ class Coverage(Evaluator):
             raise ValueError("Provide pre-computed embeddings, or configure an extractor to compute them.")
         from dataeval._embeddings import Embeddings as _Embeddings
 
-        return np.asarray(_Embeddings(dataset, extractor=self.extractor, batch_size=self.batch_size), dtype=np.float64)
+        # Reached only when no embeddings were supplied, i.e. ``dataset`` is a real image
+        # dataset (raw labels / MetadataLike are rejected upstream unless embeddings are given).
+        image_source = cast("AnnotatedDataset[Any]", dataset)
+        return np.asarray(
+            _Embeddings(image_source, extractor=self.extractor, batch_size=self.batch_size), dtype=np.float64
+        )
+
+    def _resolve_labels(
+        self,
+        dataset: AnnotatedDataset[Any] | MetadataLike | ArrayLike,
+        embeddings: Array | None,
+    ) -> tuple[NDArray[np.intp], Mapping[int, str]]:
+        """Read class labels and their names from a dataset/metadata, or accept raw labels.
+
+        A full :class:`~dataeval.protocols.AnnotatedDataset`, a :class:`~dataeval.Metadata`,
+        or any object implementing the :class:`~dataeval.protocols.MetadataLike` protocol
+        yields the class labels (and, when available, an ``index2label`` naming). When
+        pre-computed ``embeddings`` are supplied, ``dataset`` may instead be a raw sequence
+        of integer class labels (one per embedding) so no MAITE dataset or metadata object
+        is required; the labels then name themselves by their integer index.
+        """
+        # A Metadata is itself a MetadataLike (and is not an AnnotatedDataset), so the
+        # MetadataLike branch below covers it — no separate concrete-Metadata case needed.
+        if isinstance(dataset, AnnotatedDataset):
+            dataset = Metadata(dataset)
+        if isinstance(dataset, MetadataLike):
+            index2label = getattr(dataset, "index2label", None) or {}
+            return np.asarray(dataset.class_labels, dtype=np.intp), index2label
+        if embeddings is None:
+            raise ValueError(
+                "Raw class labels require pre-computed embeddings. Pass embeddings=..., or provide a "
+                "dataset/Metadata so labels and embeddings can be read/computed from it."
+            )
+        return np.asarray(dataset, dtype=np.intp).reshape(-1), {}
 
     def _coverage(self, embeddings: NDArray[np.float64]) -> CoverageResult:
         """Run the configured global coverage computation (auto-rescaling to unit interval)."""
@@ -345,18 +380,34 @@ class Coverage(Evaluator):
         return sorted(rows, key=lambda row: (not row["assessable"], row["dispersion"] or 0.0, row["class"]))
 
     @set_metadata
-    def evaluate(self, dataset: AnnotatedDataset[Any] | Metadata, embeddings: Array | None = None) -> CoverageOutput:
+    def evaluate(
+        self,
+        dataset: AnnotatedDataset[Any] | MetadataLike | ArrayLike,
+        embeddings: Array | None = None,
+    ) -> CoverageOutput:
         """
         Evaluate a dataset's embedding-space coverage, broken down by class.
 
         Parameters
         ----------
-        dataset : AnnotatedDataset or Metadata
-            The dataset to evaluate. Class labels are read from it; embeddings are computed
-            from it via the configured extractor unless provided directly.
+        dataset : AnnotatedDataset, MetadataLike, or ArrayLike of int
+            The source of class labels, accepted in four forms:
+
+            * a full :class:`~dataeval.protocols.AnnotatedDataset` — class labels and their
+              ``index2label`` names are read from it, and embeddings are computed from it via
+              the configured extractor unless ``embeddings`` is passed;
+            * a :class:`~dataeval.Metadata` — same, but labels/names come straight from it;
+            * any :class:`~dataeval.protocols.MetadataLike` object (e.g. a custom lightweight
+              metadata container) — its ``class_labels`` are used, and ``index2label`` if it
+              exposes one;
+            * a raw sequence/array of integer class labels (one per embedding) — the minimal
+              form for when you already hold ``embeddings`` and just a label array, requiring
+              no MAITE dataset or Metadata. Classes then name themselves by their integer
+              index. Only valid when ``embeddings`` is provided.
         embeddings : Array or None, default None
-            Pre-computed embeddings, one per label. When omitted, an extractor must be
-            configured and embeddings are computed from ``dataset``.
+            Pre-computed embeddings, one per label. When omitted, ``dataset`` must be a full
+            dataset/Metadata and an extractor must be configured so embeddings can be computed
+            from it. Required when ``dataset`` is a raw label array.
 
         Returns
         -------
@@ -387,18 +438,17 @@ class Coverage(Evaluator):
         │ person ┆ 20    ┆ 1         ┆ 1.488841   │
         └────────┴───────┴───────────┴────────────┘
         """
-        metadata = dataset if isinstance(dataset, Metadata) else Metadata(dataset)
+        class_labels, index2label = self._resolve_labels(dataset, embeddings)
         emb = self._embeddings(dataset, embeddings)
-        class_labels = np.asarray(metadata.class_labels)
         if len(emb) != len(class_labels):
             raise ShapeMismatchError(
                 f"Got {len(emb)} embeddings for {len(class_labels)} labels. Coverage assumes one embedding per "
                 "label (image classification). For object detection, wrap the dataset with "
                 "dataeval.data.DetectionCrops to get one crop per detection aligned 1:1 with the labels, or supply "
-                "detection-level embeddings you have computed yourself, aligned 1:1 with metadata.class_labels."
+                "detection-level embeddings you have computed yourself, aligned 1:1 with the class labels."
             )
         coverage = self._coverage(emb)
-        rows = self._per_class(emb, class_labels, metadata.index2label, coverage["uncovered_indices"])
+        rows = self._per_class(emb, class_labels, index2label, coverage["uncovered_indices"])
         return CoverageOutput(
             pl.DataFrame(rows, schema=_PER_CLASS_SCHEMA),
             uncovered_indices=coverage["uncovered_indices"],

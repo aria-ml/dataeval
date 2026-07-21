@@ -172,7 +172,10 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         Parameters
         ----------
         reference_data : Any
-            Reference dataset for drift comparison.
+            Reference dataset for drift comparison. When an ``extractor`` is
+            configured, this may be any input the extractor accepts (e.g. a full
+            MAITE dataset or raw images); otherwise it must be array-like or an
+            :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -187,7 +190,9 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         Parameters
         ----------
         data : Any
-            Test dataset to evaluate.
+            Test dataset to evaluate. When an ``extractor`` is configured, this may
+            be any input the extractor accepts (e.g. a full MAITE dataset or raw
+            images); otherwise it must be array-like or an :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -366,7 +371,10 @@ class ChunkedDrift(Generic[TDetails]):
             Reference dataset(s), forwarded verbatim to the underlying detector's
             ``fit()``. Most detectors take a single reference; detectors with a
             calibrated baseline (e.g. :class:`DriftWasserstein`) take both a
-            training and a validation reference.
+            training and a validation reference. When the underlying detector has an
+            ``extractor`` configured, each reference may be any input the extractor
+            accepts (e.g. a full MAITE dataset or raw images); otherwise each must be
+            array-like or an :class:`~dataeval.Embeddings`.
 
         Returns
         -------
@@ -411,7 +419,10 @@ class ChunkedDrift(Generic[TDetails]):
         ----------
         data : Any, optional
             Test dataset to analyze. Split into chunks using the fitted
-            chunker. Required unless ``chunks`` is provided.
+            chunker. Required unless ``chunks`` is provided. When the underlying
+            detector has an ``extractor`` configured, this may be any input the
+            extractor accepts (e.g. a full MAITE dataset or raw images); otherwise it
+            must be array-like or an :class:`~dataeval.Embeddings`.
         chunks : list[Any] or None, default None
             Pre-built test data chunks. When provided, each array is
             treated as a separate chunk and ``data`` is ignored.

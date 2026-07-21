@@ -2,6 +2,7 @@
 
 __all__ = []
 
+from collections.abc import Sized
 from functools import partial
 from typing import Any
 
@@ -224,8 +225,11 @@ class BoVWExtractor:
         ----------
         data : Any
             Iterable of images in (C, H, W) format. Supports RGB (3 channels)
-            and grayscale (1 channel) images. Also accepts (image, label) tuples
-            as returned by PyTorch datasets.
+            and grayscale (1 channel) images. Also accepts MAITE-style
+            ``(image, target, metadata)`` (or ``(image, label)``) tuples as
+            returned by PyTorch/MAITE datasets — the leading image is used. Both
+            sized inputs (lists, datasets) and one-shot iterables (generators) are
+            accepted; a generator is materialized internally to size the output.
 
         Returns
         -------
@@ -244,12 +248,16 @@ class BoVWExtractor:
 
         n_clusters: int = int(self._kmeans.n_clusters)  # type: ignore
 
-        result = np.zeros((len(data), n_clusters), dtype=np.float32)
+        # Pre-allocation needs a length; materialize one-shot iterables (generators)
+        # while leaving Sized inputs (lists, datasets) to stream through imap as before.
+        images: Any = data if isinstance(data, Sized) else list(data)
+
+        result = np.zeros((len(images), n_clusters), dtype=np.float32)
 
         with PoolWrapper(get_max_processes(), context="spawn") as pool:
             for idx, histogram in pool.imap_unordered(
                 partial(_transform_single, kmeans=self._kmeans, n_clusters=n_clusters),
-                enumerate(data),
+                enumerate(images),
             ):
                 result[idx] = histogram
 
@@ -270,7 +278,9 @@ class BoVWExtractor:
         Parameters
         ----------
         data : Any
-            Iterable of images in (C, H, W) format.
+            Iterable of images in (C, H, W) format, a MAITE dataset yielding
+            ``(image, target, metadata)`` tuples, or a one-shot generator of
+            either. See :meth:`transform` for the full accepted forms.
 
         Returns
         -------

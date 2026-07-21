@@ -57,9 +57,18 @@ class Select(AnnotatedDataset[_TDatum]):
 
     Parameters
     ----------
-    dataset : AnnotatedDataset[_TDatum]
-        Source dataset to wrap and filter. Must implement AnnotatedDataset
-        interface with indexed access to data tuples.
+    dataset : Dataset[_TDatum]
+        Source dataset to wrap and filter. Any object implementing the
+        :class:`~dataeval.protocols.Dataset` interface -- indexed access via
+        ``__getitem__`` and ``__len__`` -- is accepted, including a bare,
+        image-only dataset. A target-bearing (annotated) dataset is only
+        required when an applied selection reads per-datum targets, i.e. when a
+        selection declares :attr:`Selection.requires` (e.g. :class:`ClassFilter`,
+        :class:`ClassBalance`). Target-free selections such as :class:`Limit`,
+        :class:`Shuffle`, :class:`Reverse`, and :class:`Indices` operate on a
+        plain dataset. Selections that need targets trigger an upfront
+        validation of the source dataset, raising
+        :class:`~dataeval.exceptions.MaiteShapeError` if the targets are missing.
     selections : Selection or Sequence[Selection] or None, default None
         Selection criteria to apply for filtering the dataset. When None,
         returns all items from the source dataset. Default None creates

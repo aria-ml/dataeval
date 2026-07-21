@@ -45,10 +45,17 @@ class Embeddings(Array, FeatureExtractor):
 
     Parameters
     ----------
-    dataset : ImageClassificationDataset, ObjectDetectionDataset, or None, default None
-        Dataset to access original images from. When None, creates an unbound instance
-        that can be used as a reusable feature extractor. Use :meth:`bind` to attach
-        a dataset later, or pass data directly to :meth:`__call__`.
+    dataset : Dataset, sequence of images, or None, default None
+        Source of the original images to embed. Accepts either a MAITE dataset
+        (an :class:`ImageClassificationDataset` or :class:`ObjectDetectionDataset`
+        whose items are ``(image, target, metadata)`` tuples) or any indexable,
+        sized source of bare images -- for example a plain ``list`` of image
+        arrays or a single stacked ``ndarray`` of images (validated as
+        "image_only"). MAITE tuple items are auto-unwrapped to their image
+        (element 0); bare-image sources pass through unchanged. When None,
+        creates an unbound instance that can be used as a reusable feature
+        extractor. Use :meth:`bind` to attach a dataset later, or pass data
+        directly to :meth:`__call__`.
     extractor : FeatureExtractor or None, default None
         Feature extractor for converting images to embeddings. Handles model inference,
         device management, and transforms. When None, uses

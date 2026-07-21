@@ -13,16 +13,18 @@ genuinely rare can assert a minimum share for it instead.
 __all__ = ["Representation", "RepresentationOutput"]
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
+import numpy as np
 import polars as pl
+from numpy.typing import NDArray
 
 from dataeval import Metadata
 from dataeval._ontology import Ontology
 from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
 from dataeval.core._label_stats import label_stats
-from dataeval.protocols import AnnotatedDataset
+from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _logger = logging.getLogger(__name__)
@@ -253,17 +255,77 @@ class Representation(Evaluator):
             dark_branches=pl.DataFrame(self._dark_branches(coverage), schema=_DARK_BRANCHES_SCHEMA),
         )
 
+    def _label_counts(
+        self,
+        data: "AnnotatedDataset[Any] | MetadataLike | Mapping[str, int] | Mapping[int, int] | Sequence[int] | NDArray[np.integer]",  # noqa: E501
+        index2label: Mapping[int, str] | None,
+    ) -> dict[str, int]:
+        """Reduce any accepted input form to the ``{label_name: count}`` mapping the core consumes.
+
+        Class *names* (not indices) are what resolve against the ontology, so integer labels
+        are named through ``index2label`` (or their own string form when it is absent).
+        """
+        # A count mapping: {label_name: count} is used as-is; {label_index: count} is named.
+        if isinstance(data, Mapping):
+            if all(isinstance(key, str) for key in data):
+                return {str(key): int(count) for key, count in data.items()}
+            i2l = {int(k): str(v) for k, v in (index2label or {}).items()}
+            return {i2l.get(int(key), str(int(key))): int(count) for key, count in data.items()}
+        # Dataset / Metadata / generic MetadataLike: all reduce to a label array plus a naming.
+        # A Metadata is a MetadataLike, so only AnnotatedDataset needs converting first.
+        if isinstance(data, AnnotatedDataset):
+            data = Metadata(data)
+        if isinstance(data, MetadataLike):
+            return self._counts_from_labels(data.class_labels, getattr(data, "index2label", None) or index2label)
+        # A raw label sequence: count it, then name the observed indices.
+        return self._counts_from_labels(data, index2label)
+
+    @staticmethod
+    def _counts_from_labels(
+        labels: "Sequence[int] | NDArray[np.integer]",
+        index2label: Mapping[int, str] | None,
+    ) -> dict[str, int]:
+        """Count integer labels and name each class via ``index2label`` (or its own string index)."""
+        stats = label_stats(np.asarray(labels).reshape(-1), index2label=index2label)
+        i2l = stats["index2label"]
+        return {i2l[idx]: count for idx, count in stats["label_counts_per_class"].items()}
+
     @set_metadata
-    def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> RepresentationOutput:
+    def evaluate(
+        self,
+        data: "AnnotatedDataset[Any] | MetadataLike | Mapping[str, int] | Mapping[int, int] | Sequence[int] | NDArray[np.integer]",  # noqa: E501
+        *,
+        index2label: Mapping[int, str] | None = None,
+    ) -> RepresentationOutput:
         """
         Evaluate a dataset's coverage of the ontology.
 
         Parameters
         ----------
-        data : AnnotatedDataset or Metadata
-            The dataset (or its :class:`~dataeval.Metadata`) to evaluate. Class labels
-            and the ``index2label`` mapping are read from it; raw label counts are
-            derived via :func:`~dataeval.core.label_stats`.
+        data : AnnotatedDataset, MetadataLike, Mapping, or Sequence of int
+            The source of class labels, accepted in several forms:
+
+            * a full :class:`~dataeval.protocols.AnnotatedDataset` — class labels and their
+              ``index2label`` names are read from it and counted via
+              :func:`~dataeval.core.label_stats`;
+            * a :class:`~dataeval.Metadata` — same, but read straight from it;
+            * any :class:`~dataeval.protocols.MetadataLike` object — its ``class_labels`` are
+              counted, named via its own ``index2label`` if present, else the ``index2label``
+              argument;
+            * a ``{label_name: count}`` mapping (string keys) — the minimal form the core
+              consumes; class names resolve directly against the ontology, so no dataset or
+              ``index2label`` is needed;
+            * a ``{label_index: count}`` mapping (integer keys) — indices are named through
+              ``index2label`` (or their own string form when it is omitted);
+            * a raw sequence/array of integer class labels — counted, then named the same way
+              as the integer mapping.
+        index2label : Mapping[int, str] or None, default None
+            Optional mapping from integer class index to human-readable name, used only when
+            ``data`` is integer labels (a raw sequence or an integer-keyed mapping). Ignored
+            for the dataset, Metadata, and ``{label_name: count}`` forms, which already carry
+            or are their own names. When omitted, integer labels name themselves by their
+            string form (which resolves against the ontology only if its concept ids/labels
+            are those strings).
 
         Returns
         -------
@@ -293,9 +355,6 @@ class Representation(Evaluator):
         >>> result.leaf_coverage
         0.75
         """
-        metadata = data if isinstance(data, Metadata) else Metadata(data)
-        stats = label_stats(metadata.class_labels, index2label=metadata.index2label)
-        index2label = stats["index2label"]
-        label_counts = {index2label[idx]: count for idx, count in stats["label_counts_per_class"].items()}
+        label_counts = self._label_counts(data, index2label)
         coverage = label_coverage(label_counts, self._ontology)
         return self._build_output(coverage, total=sum(label_counts.values()))

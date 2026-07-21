@@ -51,6 +51,28 @@ def _to_col(name: str, info: FactorInfo, binned: bool = True) -> str:
     return name
 
 
+# Fixed columns the metadata dataframe always carries; factor names colliding with
+# these are prefixed with ``metadata_`` to avoid clobbering them.
+_RESERVED_COLUMNS: tuple[str, ...] = ("item_index", "target_index", "class_label", "score", "box")
+
+
+def _build_index2label(
+    provided: Mapping[int, str] | None,
+    observed_labels: Iterable[Any],
+) -> dict[int, str]:
+    """Map each class index to a name, backfilling observed labels missing from ``provided``.
+
+    When ``provided`` is given it is the source of truth; any observed label without an
+    entry gets an ``UNDEFINED_CLASS_<i>`` placeholder. Otherwise labels name themselves.
+    """
+    if provided is not None:
+        index2label = {int(k): str(v) for k, v in provided.items()}
+        for lbl in observed_labels:
+            index2label.setdefault(int(lbl), f"UNDEFINED_CLASS_{int(lbl)}")
+        return index2label
+    return {int(lbl): str(int(lbl)) for lbl in observed_labels}
+
+
 class Metadata(Array, FeatureExtractor):
     """Collection of binned metadata using Polars DataFrames.
 
@@ -139,6 +161,161 @@ class Metadata(Array, FeatureExtractor):
         self._include = {include} if isinstance(include, str) else set(include or ())
         self._target_factors_only = False
 
+    @classmethod
+    def from_factors(
+        cls,
+        factors: Mapping[str, Array1D[Any]],
+        class_labels: Array1D[Any] | None = None,
+        *,
+        index2label: Mapping[int, str] | None = None,
+        item_indices: Array1D[Any] | None = None,
+        continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
+        auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
+        exclude: str | Sequence[str] | None = None,
+        include: str | Sequence[str] | None = None,
+    ) -> Self:
+        """Build a :class:`Metadata` from raw factor arrays without a MAITE dataset.
+
+        This is the "minimal data" constructor: use it when you already have a table of
+        metadata factors (and, optionally, class labels) but do not own a full
+        :term:`MAITE<Modular AI Trustworthy Engineering (MAITE)>` image dataset. The
+        resulting instance is fully structured and can be passed directly to the bias
+        evaluators (:class:`~dataeval.bias.Balance`, :class:`~dataeval.bias.Diversity`,
+        :class:`~dataeval.bias.Parity`) and to :func:`~dataeval.data.split_dataset`,
+        exactly like a :class:`Metadata` built from a dataset.
+
+        Continuous factors are binned and categorical factors digitized using the
+        same machinery as the dataset-backed constructor, so ``continuous_factor_bins``
+        and ``auto_bin_method`` behave identically here.
+
+        Parameters
+        ----------
+        factors : Mapping[str, ArrayLike]
+            Mapping from factor name to a 1D array of that factor's raw (un-binned)
+            values. Every array must have the same length ``N`` — one entry per
+            target/detection.
+        class_labels : ArrayLike or None, default None
+            Integer class label per row, length ``N``. When None, a single class
+            (all zeros) is assumed; supply real labels for any class-aware analysis
+            (e.g. :class:`~dataeval.bias.Parity`), which is otherwise degenerate.
+        index2label : Mapping[int, str] or None, default None
+            Optional mapping from integer class index to human-readable name. When
+            None, labels are their own names. Missing observed labels are backfilled.
+        item_indices : ArrayLike or None, default None
+            Optional array of length ``N`` mapping each row back to its source image
+            index (used, e.g., for object-detection where multiple detections share
+            an image). When None a 1:1 mapping is assumed (one factor row per image).
+        continuous_factor_bins : Mapping[str, int | Sequence[float]] or None, default None
+            Bin counts or explicit edges for continuous factors. When None, uses
+            automatic discretization via ``auto_bin_method``.
+        auto_bin_method : {"uniform_width", "uniform_count", "clusters"}, default "uniform_width"
+            Binning strategy for continuous factors without explicit bins.
+        exclude : str or Sequence[str] or None, default None
+            Factor names to exclude. Mutually exclusive with ``include``.
+        include : str or Sequence[str] or None, default None
+            Factor names to include. Mutually exclusive with ``exclude``.
+
+        Returns
+        -------
+        Metadata
+            A structured Metadata instance backed by the provided factors.
+
+        Raises
+        ------
+        ShapeMismatchError
+            When factor arrays (or ``class_labels`` / ``item_indices``) do not all
+            share the same length.
+        ValueError
+            When both ``exclude`` and ``include`` are specified.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> from dataeval import Metadata
+        >>> from dataeval.bias import Balance
+        >>>
+        >>> factors = {"age_bin": np.array([0, 1, 0, 2]), "weather": np.array([1, 1, 0, 0])}
+        >>> labels = np.array([0, 1, 0, 1])
+        >>> md = Metadata.from_factors(factors, labels, index2label={0: "cat", 1: "dog"})
+        >>> md.factor_data.shape
+        (4, 2)
+        >>> result = Balance().evaluate(md)
+        """
+        inst = cls(
+            None,
+            continuous_factor_bins=continuous_factor_bins,
+            auto_bin_method=auto_bin_method,
+            exclude=exclude,
+            include=include,
+        )
+        inst._load_factors(factors, class_labels, index2label=index2label, item_indices=item_indices)
+        return inst
+
+    def _load_factors(  # noqa: C901
+        self,
+        factors: Mapping[str, Array1D[Any]],
+        class_labels: Array1D[Any] | None,
+        *,
+        index2label: Mapping[int, str] | None,
+        item_indices: Array1D[Any] | None,
+    ) -> None:
+        """Populate structured state directly from raw factor arrays (see from_factors)."""
+        factor_arrays = {str(k): as_numpy(v).reshape(-1) for k, v in dict(factors).items()}
+
+        lengths = {len(v) for v in factor_arrays.values()}
+        if len(lengths) > 1:
+            raise ShapeMismatchError(f"All factor arrays must have the same length; got lengths {sorted(lengths)}.")
+        factor_len = next(iter(lengths)) if factor_arrays else None
+
+        if class_labels is not None:
+            labels = as_numpy(class_labels).reshape(-1).astype(np.intp)
+            n = len(labels)
+            if factor_len is not None and factor_len != n:
+                raise ShapeMismatchError(f"class_labels length {n} does not match factor length {factor_len}.")
+        elif factor_len is not None:
+            n = factor_len
+            labels = np.zeros(n, dtype=np.intp)
+        else:
+            n = 0
+            labels = np.array([], dtype=np.intp)
+
+        if item_indices is None:
+            srcidx = np.arange(n, dtype=np.intp)
+        else:
+            srcidx = as_numpy(item_indices).reshape(-1).astype(np.intp)
+            if len(srcidx) != n:
+                raise ShapeMismatchError(f"item_indices length {len(srcidx)} does not match row count {n}.")
+
+        # polars ingests the numpy arrays directly; no per-element .tolist() round-trip.
+        rows: dict[str, Any] = {
+            "item_index": srcidx,
+            "target_index": np.zeros(n, dtype=np.intp),
+            "class_label": labels,
+            "score": [None] * n,
+            "box": [None] * n,
+        }
+        factor_names: list[str] = []
+        for name, values in factor_arrays.items():
+            col = f"metadata_{name}" if name in rows else name
+            rows[col] = values
+            factor_names.append(col)
+
+        self._dataframe = pl.DataFrame(rows)
+        self._raw = []
+        self._index2label = _build_index2label(index2label, np.unique(labels))
+        self._class_labels = labels
+        self._item_indices = srcidx
+        self._has_targets = False
+        self._image_factors = set(factor_names)
+        self._target_factors = set()
+        self._dropped_factors = {}
+        self._count = n
+        self._is_structured = True
+        self._is_binned = False
+        # Reuse the canonical factor builder so List/Struct columns are filtered
+        # out exactly as they are on the dataset path.
+        self._build_factors()
+
     def __repr__(self) -> str:
         bound = self._dataset is not None
         parts = [f"bound={bound}"]
@@ -169,6 +346,11 @@ class Metadata(Array, FeatureExtractor):
             True if a dataset is bound, False otherwise.
         """
         return self._dataset is not None
+
+    @property
+    def _is_fitted(self) -> bool:
+        """Whether factor data is available — either a dataset is bound or state was loaded directly."""
+        return self._dataset is not None or self._is_structured
 
     @requires_maite_dataset("dataset", expected="any_target")
     def bind(self, dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> Self:
@@ -230,7 +412,7 @@ class Metadata(Array, FeatureExtractor):
         NotFittedError
             If no dataset is bound.
         """
-        if self._dataset is None:
+        if not self._is_fitted:
             raise NotFittedError("No dataset bound. Call bind() first.")
         return self._count
 
@@ -264,9 +446,10 @@ class Metadata(Array, FeatureExtractor):
         NotFittedError
             If no dataset is bound.
         """
-        if self._dataset is None:
+        if not self._is_fitted:
             raise NotFittedError("No dataset bound. Call bind() first.")
-        return (len(self._dataset), len(self.factor_names))
+        n_rows = len(self._dataset) if self._dataset is not None else self._count
+        return (n_rows, len(self.factor_names))
 
     def __iter__(self) -> Iterator[NDArray[np.int64]]:
         """Iterate over rows of the binned metadata.
@@ -281,7 +464,7 @@ class Metadata(Array, FeatureExtractor):
         NotFittedError
             If no dataset is bound.
         """
-        if self._dataset is None:
+        if not self._is_fitted:
             raise NotFittedError("No dataset bound. Call bind() first.")
         yield from self.factor_data
 
@@ -307,7 +490,7 @@ class Metadata(Array, FeatureExtractor):
         KeyError
             If a specified factor name is not found in the metadata.
         """
-        if self._dataset is None:
+        if not self._is_fitted:
             raise NotFittedError("No dataset bound. Call bind() first.")
 
         data = self.factor_data
@@ -1287,7 +1470,7 @@ class Metadata(Array, FeatureExtractor):
         existing = self._factors if hasattr(self, "_factors") else {}
         self._factors = {k: existing.get(k) for k in usable_factors}
 
-    def _structure(  # noqa: C901
+    def _structure(
         self,
         *,
         progress_callback: ProgressCallback | None = None,
@@ -1330,18 +1513,9 @@ class Metadata(Array, FeatureExtractor):
             )
 
         unique_labels = np.unique(labels) if len(labels) else np.array([], dtype=np.intp)
-        provided_i2l = self._dataset.metadata.get("index2label", None)
-        if provided_i2l is not None:
-            # Use the full provided mapping as the source of truth
-            index2label = {int(k): str(v) for k, v in provided_i2l.items()}
-            # Add fallback entries for any observed labels not in the provided mapping
-            for lbl in unique_labels:
-                if int(lbl) not in index2label:
-                    index2label[int(lbl)] = f"UNDEFINED_CLASS_{int(lbl)}"
-        else:
-            index2label = {int(lbl): str(int(lbl)) for lbl in unique_labels}
+        index2label = _build_index2label(self._dataset.metadata.get("index2label", None), unique_labels)
         target_idx = self._compute_target_indices(srcidx, datum_count, bool(self._has_targets))
-        reserved = ["item_index", "target_index", "class_label", "score", "box"]
+        reserved = list(_RESERVED_COLUMNS)
         target_factor_dict = {}
 
         # Build target-level and image-level rows

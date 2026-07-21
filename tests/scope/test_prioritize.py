@@ -100,10 +100,19 @@ class TestPrioritize:
         assert len(result.indices) == 1000
         assert any(i != j for i, j in zip(result.indices, range(1000), strict=False))
 
-    def test_prioritize_encoder_required(self):
-        """Test that extractor must be provided."""
-        with pytest.raises(ValueError, match="extractor must be provided"):
-            Prioritize()
+    def test_prioritize_extractor_optional_at_construction(self):
+        """Extractor is optional at construction; it is only required when evaluate must embed.
+
+        Mirrors the Coverage contract: construction with no extractor succeeds, and the
+        requirement is deferred to evaluate() when handed a dataset that needs embedding.
+        """
+        # Construction with no extractor no longer raises.
+        p = Prioritize()
+        assert isinstance(p, Prioritize)
+
+        # Evaluate on a dataset that needs embedding (not an Array) raises a clear ValueError.
+        with pytest.raises(ValueError, match="extractor"):
+            p.evaluate(self.get_dataset(n=50))
 
     def test_prioritize_default_method_and_policy(self, extractor):
         """Test that default method (knn) and order (easy_first) are used."""

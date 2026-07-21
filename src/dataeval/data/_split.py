@@ -5,7 +5,7 @@ __all__ = []
 import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -662,7 +662,7 @@ def _split_ic(
 
 
 def split_dataset(
-    dataset: AnnotatedDataset[Any] | MetadataLike,
+    dataset: AnnotatedDataset[Any] | MetadataLike | Sequence[int] | NDArray[Any],
     num_folds: int = 1,
     stratify: bool = False,
     split_on: Sequence[str] | None = None,
@@ -674,8 +674,19 @@ def split_dataset(
 
     Parameters
     ----------
-    dataset : AnnotatedDataset or MetadataLike
-        Dataset to split.
+    dataset : AnnotatedDataset, MetadataLike, or Sequence[int] or NDArray
+        Data to split. Accepts any of:
+
+        - An :class:`~dataeval.protocols.AnnotatedDataset` (a MAITE-shaped dataset),
+          from which a :class:`~dataeval.Metadata` is extracted internally.
+        - A :class:`~dataeval.protocols.MetadataLike` (e.g. :class:`~dataeval.Metadata`
+          or one built with :meth:`~dataeval.Metadata.from_factors`).
+        - A bare sequence or ``NDArray`` of integer class labels, one per item. This
+          is the minimal input for the common non-grouped, non-OD case: only the
+          class labels are needed for simple and stratified splits. Note that
+          ``split_on`` (grouping) is *not* available with raw labels because it
+          requires factor metadata — pass a dataset or a ``MetadataLike``
+          (e.g. via :meth:`~dataeval.Metadata.from_factors`) to group on factors.
     num_folds : int, default 1
         Number of [train, val] folds. If equal to 1, val_frac must be greater than 0.0
     stratify : bool, default False
@@ -684,7 +695,8 @@ def split_dataset(
     split_on : list or None, default None
         Keys of the metadata dictionary upon which to group the dataset.
         A grouped partition is divided such that no group is present within both the training and
-        validation set. Split_on groups should be selected to mitigate validation bias
+        validation set. Split_on groups should be selected to mitigate validation bias.
+        Requires factor metadata; not supported when ``dataset`` is a raw label array.
     test_frac : float, default 0.0
         Fraction of data to be optionally held out for test set
     val_frac : float, default 0.0
@@ -696,6 +708,12 @@ def split_dataset(
     split_defs : DatasetSplits
         Output class containing a list of indices of training
         and validation data for each fold and optional test indices
+
+    Raises
+    ------
+    ValueError
+        If ``split_on`` is requested but ``dataset`` is a raw label array with no
+        factor metadata to group on.
 
     Notes
     -----
@@ -716,10 +734,31 @@ def split_dataset(
     # Import Metadata at runtime to avoid circular import
     from dataeval._metadata import Metadata
 
-    # MetadataLike instances are pre-extracted; raw datasets must satisfy the MAITE shape.
-    if not isinstance(dataset, MetadataLike):
+    # Dispatch on input kind. The isinstance checks below narrow `dataset` directly (rather
+    # than via an intermediate flag) so the raw-label, MetadataLike, and MAITE-dataset paths
+    # each see a correctly-typed value. Note a bare sequence/NDArray of class labels is neither
+    # a MetadataLike nor a MAITE dataset; datasets that merely implement __getitem__/__len__ are
+    # not registered collections.abc.Sequences, so they fall through to the dataset path.
+    if isinstance(dataset, MetadataLike):
+        # MetadataLike instances are already pre-extracted.
+        metadata: MetadataLike = dataset
+    elif isinstance(dataset, np.ndarray) or (isinstance(dataset, Sequence) and not isinstance(dataset, (str, bytes))):
+        # Bare sequence/NDArray of integer class labels: only class labels are available,
+        # so grouping via split_on (which needs factor metadata) is not supported.
+        if split_on is not None:
+            raise ValueError(
+                "split_on requires factor metadata, but split_dataset received a raw label array "
+                "with no factors to group on. Pass an AnnotatedDataset or a MetadataLike "
+                "(e.g. build one with Metadata.from_factors(factors, class_labels=...)) to use split_on."
+            )
+        # Reuse Metadata.from_factors to obtain a structured, factor-less MetadataLike whose
+        # class_labels/item_indices drive the standard (non-grouped, non-OD) split paths.
+        metadata = Metadata.from_factors({}, class_labels=np.asarray(dataset))
+    else:
+        # Raw MAITE datasets must satisfy the MAITE shape before metadata extraction.
         validate_dataset(dataset, expected="any_target", caller="split_dataset")
-    metadata = dataset if isinstance(dataset, MetadataLike) else Metadata(dataset)
+        metadata = Metadata(cast(AnnotatedDataset[Any], dataset))
+
     class_labels = metadata.class_labels
 
     # Detect OD datasets: more detections than images means multi-label
