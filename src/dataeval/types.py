@@ -334,9 +334,9 @@ class SelectionInfo(BaseModel):
     Attributes
     ----------
     type : str
-        Selector class name (e.g. ``"ClassFilter"``, ``"Limit"``, ``"Indices"``).
+        Operation class name (e.g. ``"ClassFilter"``, ``"Limit"``, ``"Indices"``).
     params : dict
-        Keyword arguments passed to the selector's constructor.
+        Keyword arguments passed to the operation's constructor.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
@@ -378,9 +378,9 @@ class DatasetInfo(BaseModel):
         SPDX license identifier or license name.
     selections : list of list of SelectionInfo or None
         Applied selection lineage, grouped by construction call to mirror
-        :attr:`dataeval.data.Select.selection_groups`. The outer list is
+        :attr:`dataeval.data.View.operation_groups`. The outer list is
         ordered innermost (oldest) first; each inner list is one
-        ``Select(...)`` call's worth of selectors.
+        ``View(...)`` call's worth of operations.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")

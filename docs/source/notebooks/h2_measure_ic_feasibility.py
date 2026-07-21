@@ -65,7 +65,7 @@ from maite_datasets.image_classification import MNIST
 from dataeval import Embeddings, Metadata
 from dataeval.config import set_seed
 from dataeval.core import ber_mst
-from dataeval.data import ClassBalance, ClassFilter, Limit, Select
+from dataeval.data import ClassBalance, ClassFilter, View
 from dataeval.extractors import FlattenExtractor
 
 set_seed(42)  # For reproducibility
@@ -73,11 +73,12 @@ set_seed(42)  # For reproducibility
 # %% [markdown]
 # ## Loading in data
 #
-# While you can use your own dataset, for this example we imported the `MNIST` dataset and will use it going forward. It
-# was imported from the DataEval utils package.
+# We use the `MNIST` handwritten-digit dataset (imported from `maite-datasets`). Suppose we need a classifier that
+# reaches **99% accuracy**. We will use BER to check whether that target is _feasible_ — first for the full ten-digit
+# problem, then for progressively narrower versions of the task.
 #
-# To highlight the effects of modifying the dataset on its Bayes Error Rate, we will only include a subset of 6,000 images
-# and their labels for digits 1, 4, and 9
+# BER is estimated from a one-dimensional feature per image. MNIST images are small, so we flatten the raw pixels
+# directly (no embedding necessary); in practice you would first reduce dimensionality with an autoencoder.
 
 # %%
 # Configure the dataset transforms
@@ -86,100 +87,89 @@ transforms = [
     lambda x: x.astype(np.float32),  # convert to float32
 ]
 
-# Load the train set of the MNIST dataset and apply transforms
-train_ds = MNIST(root="./data/", image_set="train", transforms=transforms, download=True)
-
-# Get the indices of the first 2000 samples for labels 1, 4, and 9
-train_ds = Select(train_ds, selections=[Limit(6000), ClassFilter((1, 4, 9)), ClassBalance("interclass")])
-
-# Split out the embeddings and labels
+# Load the MNIST train set and a flattening feature extractor
+mnist = MNIST(root="./data/", image_set="train", transforms=transforms, download=True)
 extractor = FlattenExtractor()
-embeddings = Embeddings(train_ds, extractor=extractor, batch_size=64)
-labels = Metadata(train_ds).class_labels
-
-print(train_ds)
-
-# %%
-print("Number of training samples: ", len(embeddings))
-print("Image shape:", embeddings.shape)
-print("Label counts: ", np.unique(labels, return_counts=True))
 
 # %% [markdown]
-# We have taken a subset of the data that is only the digits 1, 4, and 9. The BER estimate requires 1 dimension, that's
-# why we have flattened images. This is ok since MNIST images are small, in practice we would need to do some dimension
-# reduction (autoencoder) here.
+# ## 1. All ten digits
 #
-# We now have 6,000 flattened images of size 784. Next we can move on to evaluation of the dataset.
-
-# %% [markdown]
-# ## Evaluation
-#
-# Suppose we would like to build a classifier that differentiates between the handwritten digits 1, 4, and 9 with
-# predetermined accuracy requirement of 99%.
-#
-# We will use BER to check the feasibility of the task. As the images are small, we can simple use the flattened raw pixel
-# intensities to calculate BER (no embedding necessary). _Note_: This will not be the case in general.
+# First we measure the ceiling for the full task: telling all ten digits apart. We take a class-balanced subset of 6,000
+# images (600 per digit) so that no class dominates the estimate.
 
 # %%
-# Evaluate the BER metric for the MNIST data with digits 1, 4, 9.
-# One minus the value of this metric gives our estimate of the upper bound on accuracy.
-ber_result = ber_mst(embeddings, labels)
+digits_all = View(mnist, operations=[ClassBalance("interclass", num_samples=6000)])
+embeddings_all = Embeddings(digits_all, extractor=extractor, batch_size=64)
+labels_all = Metadata(digits_all).class_labels
+print("Label counts:", np.unique(labels_all, return_counts=True))
 
-# %%
-print("The bayes error rate estimation:", ber_result["upper_bound"])
+ber_all = ber_mst(embeddings_all, labels_all)
+print("Maximum achievable accuracy (10 digits):", 1 - ber_all["upper_bound"])
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert 0.93 < 1 - ber_result["upper_bound"] < 0.96
+assert 0.92 < 1 - ber_all["upper_bound"] < 0.95
 
 # %% [markdown]
-# The estimate of the maximum achievable accuracy is one minus the BER estimate.
-
-# %%
-print("The maximum achievable accuracy:", 1 - ber_result["upper_bound"])
+# The ceiling for the ten-digit task is only about **94%** — well short of our 99% requirement. On raw pixels several
+# digits are easily confused (4/9, 3/5/8), so no classifier can reliably do better on this data.
 
 # %% [markdown]
-# ### Initial results
+# ## 2. Narrow the task to three digits (1, 4, 9)
 #
-# The maximum achievable accuracy on a dataset of 1, 4, and 9 is about 94%. This _does not_ meet our requirement of 99%
-# accuracy!
-
-# %% [markdown]
-# ## Modify dataset classification
-#
-# To address insufficient accuracy, lets modify the dataset to classify an image as "1" or "Not a 1". By combining
-# classes, we can hopefully achieve the desired level of attainable accuracy.
+# If the application only needs to distinguish a few digits, the task is easier. We keep just 1, 4, and 9 and, with the
+# same 6,000-image budget concentrated on fewer classes, balance to 2,000 per class.
 
 # %%
-# Creates a binary mask where current label == 1 that can be used as the new labels
-labels_merged = labels == 1
-print("New label counts:", np.unique(labels_merged, return_counts=True))
+digits_149 = View(mnist, operations=[ClassFilter((1, 4, 9)), ClassBalance("interclass", num_samples=6000)])
+embeddings_149 = Embeddings(digits_149, extractor=extractor, batch_size=64)
+labels_149 = Metadata(digits_149).class_labels
+print("Label counts:", np.unique(labels_149, return_counts=True))
 
-# %%
-# Evaluate the BER metric for the MNIST data with updated labels
-new_result = ber_mst(embeddings, labels_merged)
-
-# %%
-print("The bayes error rate estimation:", new_result["upper_bound"])
+ber_149 = ber_mst(embeddings_149, labels_149)
+print("Maximum achievable accuracy (1, 4, 9):", 1 - ber_149["upper_bound"])
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert 0.99 < 1 - new_result["upper_bound"] < 0.995
+assert 0.96 < 1 - ber_149["upper_bound"] < 0.98
 
 # %% [markdown]
-# The estimate of the maximum achievable accuracy is one minus the BER estimate.
+# Narrowing from ten classes to three raises the ceiling to about **97%** — a concrete demonstration that feasibility is
+# a property of the _task_, not just the data. But 97% still does not meet our 99% requirement.
+
+# %% [markdown]
+# ## 3. Reformulate as a binary problem (1 vs. not-1)
+#
+# Suppose the real question is only "is this a 1?". We collapse the three-digit labels into a binary target and re-check
+# feasibility on the same images.
 
 # %%
-print("The maximum achievable accuracy:", 1 - new_result["upper_bound"])
+labels_binary = labels_149 == 1
+print("Label counts:", np.unique(labels_binary, return_counts=True))
+
+ber_binary = ber_mst(embeddings_149, labels_binary)
+print("Maximum achievable accuracy (1 vs. not-1):", 1 - ber_binary["upper_bound"])
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+assert 0.99 < 1 - ber_binary["upper_bound"] < 0.998
 
 # %% [markdown]
-# ### Modified results
+# The binary formulation reaches about **99.5%**, which _does_ meet our requirement.
+
+# %% [markdown]
+# ## Summary
 #
-# The maximum achievable accuracy on a dataset of 1 and not 1 (4, 9) is about 99%. This _does_ meet our accuracy
-# requirement.
+# BER lets us check feasibility _before_ investing in modeling. On raw-pixel MNIST:
 #
-# By using BER to check for feasibility early on, we were able to reformulate the problem such that it is feasible under
-# our specifications
+# | task | classes | max achievable accuracy |
+# | --- | --- | --- |
+# | all digits | 10 | ~94% |
+# | 1, 4, 9 | 3 | ~97% |
+# | 1 vs. not-1 | 2 | ~99.5% |
+#
+# Only the binary formulation clears a 99% requirement. When a task is infeasible at your target accuracy, BER can guide
+# you to reformulate it: narrowing the class set (or merging classes) raises the achievable ceiling.
 
 # %% [markdown]
 # ## Related concepts

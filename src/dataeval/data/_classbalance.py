@@ -8,13 +8,13 @@ import numpy as np
 
 from dataeval.config import get_seed
 from dataeval.core._label_stats import label_stats
-from dataeval.data._select import Select, Selection, SelectionStage
+from dataeval.data._view import Operation, View
 from dataeval.protocols import AnnotatedDataset, Array, ObjectDetectionTarget, SegmentationTarget
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._internal import argmax_label, as_numpy
 from dataeval.utils._validate import DatasetKind
 
 
-class ClassBalance(Selection[Any]):
+class ClassBalance(Operation):
     """
     Select a balanced subset of images based on class distribution.
 
@@ -54,7 +54,6 @@ class ClassBalance(Selection[Any]):
     - Uses numpy random number generator seeded from dataeval config
     """
 
-    stage = SelectionStage.FILTER
     requires: DatasetKind | None = "any_target"
 
     def __init__(
@@ -78,13 +77,13 @@ class ClassBalance(Selection[Any]):
         self._images_per_class: Mapping[int, Sequence[int]]
         self._classes: Sequence[int]
 
-    def _yield_labels(self, dataset: Select[Any]) -> Iterator[tuple[int, int]]:  # noqa: C901
+    def _yield_labels(self, dataset: View[Any]) -> Iterator[tuple[int, int]]:  # noqa: C901
         """
         Yield (label, image_index) pairs from dataset targets.
 
         Parameters
         ----------
-        dataset : Select[Any]
+        dataset : View[Any]
             Dataset to analyze, containing (input, target) pairs.
 
         Yields
@@ -96,7 +95,7 @@ class ClassBalance(Selection[Any]):
             target = datum[1] if isinstance(datum, tuple) else None
             if isinstance(target, Array):
                 if len(target) > 0:
-                    yield (int(np.argmax(as_numpy(target))), img_idx)
+                    yield (argmax_label(target), img_idx)
             elif isinstance(target, ObjectDetectionTarget | SegmentationTarget):
                 labels_raw = target.labels if isinstance(target.labels, Iterable) else [target.labels]
                 for lbl in labels_raw:
@@ -104,7 +103,7 @@ class ClassBalance(Selection[Any]):
 
     def _compute_label_stats(
         self,
-        dataset: Select[Any],
+        dataset: View[Any],
     ) -> tuple[dict[int, list[int]], dict[int, list[int]], dict[int, float], list[int]]:
         """
         Compute label statistics for the dataset using core label_stats.
@@ -114,7 +113,7 @@ class ClassBalance(Selection[Any]):
 
         Parameters
         ----------
-        dataset : Select[Any]
+        dataset : View[Any]
             Dataset to analyze, containing (input, target) pairs.
 
         Returns
@@ -353,9 +352,9 @@ class ClassBalance(Selection[Any]):
 
         return samples
 
-    def __call__(self, dataset: Select[Any]) -> None:
-        selection = []
-        self._num_images = len(dataset)
+    def apply(self, view: View[Any]) -> None:
+        positions: list[int] = []
+        self._num_images = len(view)
         self._empty = (
             int(self._num_images * self.num_empty)
             if isinstance(self.num_empty, float)
@@ -366,10 +365,12 @@ class ClassBalance(Selection[Any]):
             self._cls_per_img,
             self._cls_frq,
             self._empty_image_indices,
-        ) = self._compute_label_stats(dataset)
+        ) = self._compute_label_stats(view)
         self._classes = list(self._images_per_class.keys())
         if self._empty is not None and len(self._empty_image_indices) > 0:
-            selection.extend(self._get_empty_images())
-        selection.extend(self._global_balance() if self.method == "global" else self._inter_balance())
-        selection.sort()
-        dataset._selection = selection
+            positions.extend(self._get_empty_images())
+        positions.extend(self._global_balance() if self.method == "global" else self._inter_balance())
+        positions.sort()
+        # Sampling works in position space (0..len-1); map positions back through the
+        # current selection so balancing composes correctly after upstream filtering.
+        view.selection = [view.selection[p] for p in positions]

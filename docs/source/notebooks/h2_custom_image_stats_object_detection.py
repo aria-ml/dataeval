@@ -64,7 +64,7 @@ from maite_datasets.object_detection import SeaDrone
 
 from dataeval.config import set_max_processes
 from dataeval.core import compute_stats
-from dataeval.data import Limit, Select
+from dataeval.data import Limit, View
 from dataeval.flags import ImageStats
 
 set_max_processes(4)
@@ -82,7 +82,7 @@ set_max_processes(4)
 sd_dataset = SeaDrone(root="./data", image_set="val", download=True)
 
 # Limit to first 50 images for demonstration
-dataset = Select(sd_dataset, Limit(50))
+dataset = View(sd_dataset, Limit(50))
 
 print(f"Dataset size: {len(dataset)} images")
 print(f"Sample image shape: {dataset[0][0].shape}")

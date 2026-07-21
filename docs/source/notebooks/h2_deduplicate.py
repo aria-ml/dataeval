@@ -60,7 +60,7 @@ from maite_datasets.image_classification import MNIST
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
-from dataeval.data import Indices, Select
+from dataeval.data import Indices, View
 from dataeval.quality import Duplicates
 
 set_max_processes(4)
@@ -95,7 +95,7 @@ for i in [1, 2, 5, 9]:
 # %%
 # Create a subset with the identified duplicate indices swapped
 indices_with_duplicates = [duplicates.get(i, i) for i in range(len(testing_dataset))]
-duplicates_ds = Select(testing_dataset, Indices(indices_with_duplicates))
+duplicates_ds = View(testing_dataset, Indices(indices_with_duplicates))
 
 # %% [markdown]
 # ## Finding the duplicates

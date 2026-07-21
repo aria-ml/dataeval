@@ -88,7 +88,7 @@ from maite_datasets.image_classification import CIFAR10, MNIST
 from torch import nn
 
 from dataeval.config import set_seed
-from dataeval.data import Indices, Limit, Select, Shuffle
+from dataeval.data import Indices, Limit, Shuffle, View
 from dataeval.extractors import ScoresExtractor, UncertaintyExtractor
 from dataeval.models import OnnxImageClassifier
 from dataeval.shift import DriftWasserstein
@@ -224,12 +224,12 @@ mnist_test = MNIST("./data", image_set="test", download=True)
 # (train, val) and a held-out set that should NOT drift (test).
 perm = np.random.default_rng(1).permutation(len(mnist_test))
 train_idx, val_idx, test_idx = np.array_split(perm[: 3 * SAMPLES_PER_SPLIT], 3)
-trainset = Select(mnist_test, Indices(train_idx.tolist()))
-valset = Select(mnist_test, Indices(val_idx.tolist()))
-testset = Select(mnist_test, Indices(test_idx.tolist()))
+trainset = View(mnist_test, Indices(train_idx.tolist()))
+valset = View(mnist_test, Indices(val_idx.tolist()))
+testset = View(mnist_test, Indices(test_idx.tolist()))
 
 # Shifted "operational" data: CIFAR-10 natural images
-cifarset = Select(CIFAR10("./data", image_set="test", download=True), [Shuffle(0), Limit(SAMPLES_PER_SPLIT)])
+cifarset = View(CIFAR10("./data", image_set="test", download=True), [Shuffle(0), Limit(SAMPLES_PER_SPLIT)])
 
 print(f"train: {len(trainset)}  val: {len(valset)}  test: {len(testset)}  cifar: {len(cifarset)}")
 

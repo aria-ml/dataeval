@@ -86,7 +86,7 @@ rainy conditions, or partially occluded targets).
 DataEval's {class}`.Sufficiency` class allows the user to compare model performance
 of multiple models, including current model performance and predicted performance
 at different amounts of data, along with the predicted model saturation point.
-DataEval also has a {class}`.Select` class that allows the user to create subsets
+DataEval also has a {class}`.View` class that allows the user to create subsets
 of the data based on a user defined selection.
 
 ### Perform error analysis to identify systemic weaknesses
@@ -96,7 +96,7 @@ misclassifications). Visualize these errors to identify patterns, such as the
 model consistently confusing two similar-looking objects or failing to detect
 objects at a distance.
 
-By combining multiple DataEval functions -- {class}`.Select` class, {func}`.imagestats`,
+By combining multiple DataEval functions -- {class}`.View` class, {func}`.imagestats`,
 {func}`.labelstats`, {func}`.cluster`, {func}`.balance`, and {func}`.diversity`
 -- model failures can be investigated at the image level.
 

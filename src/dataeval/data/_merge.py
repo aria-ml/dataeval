@@ -117,7 +117,7 @@ def merge_datasets(*datasets: AnnotatedDataset[_TDatum]) -> AnnotatedDataset[_TD
     Returns a lazy, read-only :class:`~dataeval.protocols.AnnotatedDataset` that
     indexes through the given datasets in order. All datasets must already share
     the same ``index2label`` so their integer labels denote the same classes —
-    use :class:`dataeval.data.Conform` with :class:`dataeval.data.Relabel`
+    use :class:`dataeval.data.View` with :class:`dataeval.data.Relabel`
     to conform datasets to a common reference vocabulary first. Datasets must also
     share a compatible datum shape (e.g. all MAITE ``(input, target, metadata)``
     triples); merging structurally different datums is not supported.
@@ -148,7 +148,7 @@ def merge_datasets(*datasets: AnnotatedDataset[_TDatum]) -> AnnotatedDataset[_TD
 
     See Also
     --------
-    dataeval.data.Conform : Conform a dataset to a reference vocabulary.
+    dataeval.data.View : Build a dataset view (e.g. relabel to a reference vocabulary).
     """
     if not datasets:
         raise ValueError("merge_datasets requires at least one dataset.")

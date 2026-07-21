@@ -95,7 +95,7 @@ from sklearn.manifold import TSNE
 
 from dataeval import Embeddings, Metadata
 from dataeval.core import coverage_adaptive
-from dataeval.data import Limit, Select
+from dataeval.data import Limit, View
 from dataeval.extractors import TorchExtractor
 
 print(torch.cuda.is_available())
@@ -119,7 +119,7 @@ transforms = [
 train_ds = MNIST(root="./data", image_set="train", transforms=transforms, download=True)
 
 # Select a subset of the dataset
-subset = Select(train_ds, Limit(2000))
+subset = View(train_ds, Limit(2000))
 
 
 # %% [markdown]

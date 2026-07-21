@@ -116,7 +116,7 @@ from maite_datasets.image_classification import CIFAR10, MNIST
 
 import dataeval
 from dataeval import Embeddings
-from dataeval.data import ClassFilter, Limit, Select, Shuffle
+from dataeval.data import ClassFilter, Limit, Shuffle, View
 from dataeval.extractors import TorchExtractor
 from dataeval.shift import OODKNeighbors, OODReconstruction
 from dataeval.utils.models import AE, VAE, GMMDensityNet
@@ -149,17 +149,17 @@ in_dist_digits = [0, 1, 2, 3, 4, 5, 6, 7]
 out_of_dist_digits = [8, 9]
 
 
-mnist_train = Select(
+mnist_train = View(
     MNIST("./data", image_set="train", download=True, transforms=normalize),
-    selections=[Shuffle(), Limit(10000), ClassFilter(in_dist_digits)],
+    operations=[ClassFilter(in_dist_digits), Shuffle(), Limit(10000)],
 )
-mnist_test_in = Select(
+mnist_test_in = View(
     MNIST("./data", image_set="test", download=True, transforms=normalize),
-    selections=[Shuffle(), Limit(1000), ClassFilter(in_dist_digits)],
+    operations=[ClassFilter(in_dist_digits), Shuffle(), Limit(1000)],
 )
-mnist_test_ood = Select(
+mnist_test_ood = View(
     MNIST("./data", image_set="test", download=True, transforms=normalize),
-    selections=[Shuffle(), Limit(1000), ClassFilter(out_of_dist_digits)],
+    operations=[ClassFilter(out_of_dist_digits), Shuffle(), Limit(1000)],
 )
 
 print(f"Training set size: {len(mnist_train)}")

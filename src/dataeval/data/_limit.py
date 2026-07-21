@@ -2,12 +2,17 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.data._select import Select, Selection, SelectionStage
+from dataeval.data._view import Operation, View
 
 
-class Limit(Selection[Any]):
+class Limit(Operation):
     """
-    Limit the size of the dataset.
+    Cap the dataset to the first ``size`` items currently selected.
+
+    Applied in place, in pipeline order: ``Limit`` truncates whatever selection
+    precedes it, so ``[Shuffle(), Limit(100)]`` keeps a random 100 while
+    ``[Limit(100), Shuffle()]`` shuffles the first 100. Chaining is allowed —
+    ``[Limit(1000), Shuffle(), Limit(100)]`` keeps a random 100 of the first 1000.
 
     Parameters
     ----------
@@ -15,10 +20,8 @@ class Limit(Selection[Any]):
         The maximum size of the dataset.
     """
 
-    stage = SelectionStage.STATE
-
     def __init__(self, size: int) -> None:
         self.size = size
 
-    def __call__(self, dataset: Select[Any]) -> None:
-        dataset._size_limit = self.size
+    def apply(self, view: View[Any]) -> None:
+        view.selection = view.selection[: self.size]

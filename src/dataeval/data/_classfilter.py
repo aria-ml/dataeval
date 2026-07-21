@@ -1,19 +1,24 @@
 __all__ = []
 
-from collections.abc import Iterable, Sequence
-from typing import Any, TypeVar, cast
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import numpy as np
 
-from dataeval.data._select import Select, Selection, SelectionStage, Subselection
-from dataeval.protocols import Array, ObjectDetectionDatum, ObjectDetectionTarget, SegmentationDatum, SegmentationTarget
-from dataeval.utils._internal import MaskedTarget, as_numpy, mask_metadata
+from dataeval.data._view import Operation, View
+from dataeval.protocols import Array, ObjectDetectionTarget, SegmentationTarget
+from dataeval.utils._internal import MaskedTarget, argmax_label, as_numpy, mask_metadata
 from dataeval.utils._validate import DatasetKind
 
 
-class ClassFilter(Selection[Any]):
+class ClassFilter(Operation):
     """
     Select dataset indices based on class labels, keeping only those present in `classes`.
+
+    Filters images by class (cardinality) and, for object-detection and segmentation
+    datasets, masks out the detections that belong to other classes (content). Reads
+    each datum through preceding operations, so ``[Relabel(...), ClassFilter([0])]``
+    filters on the relabeled vocabulary.
 
     Parameters
     ----------
@@ -23,59 +28,44 @@ class ClassFilter(Selection[Any]):
         Whether to filter detections from targets for object detection and segmentation datasets.
     """
 
-    stage = SelectionStage.FILTER
     requires: DatasetKind | None = "any_target"
 
     def __init__(self, classes: Sequence[int], filter_detections: bool = True) -> None:
         self.classes = classes
         self.filter_detections = filter_detections
 
-    def __call__(self, dataset: Select[Any]) -> None:  # noqa: C901
+    def apply(self, view: View[Any]) -> None:  # noqa: C901
         if not self.classes:
             return
 
-        selection = []
-        subselection = set()
-        for idx in dataset._selection:
-            target = dataset._dataset[idx][1]
+        keep = set(self.classes)
+        selection: list[int] = []
+        mask_where: set[int] = set()
+        for idx in view.selection:
+            target = view.read(idx)[1]  # through preceding operations (e.g. Relabel)
             if isinstance(target, Array):
-                # Get the label for the image
-                label = int(np.argmax(as_numpy(target)))
-                # Check to see if the label is in the classes to keep
-                if label in self.classes:
-                    # Include the image index
+                if argmax_label(target) in keep:
                     selection.append(idx)
             elif isinstance(target, ObjectDetectionTarget | SegmentationTarget):
-                # Get the set of labels from the target
-                labels = set(target.labels if isinstance(target.labels, Iterable) else [target.labels])
-                # Check to see if any labels are in the classes to filter for
-                if labels.intersection(self.classes):
-                    # Include the image index
+                labels = set(np.atleast_1d(as_numpy(target.labels)).tolist())
+                if labels & keep:
                     selection.append(idx)
-                    # If we are filtering out other labels and there are other labels, add a subselection filter
-                    if self.filter_detections and labels.difference(self.classes):
-                        subselection.add(idx)
+                    if self.filter_detections and (labels - keep):
+                        mask_where.add(idx)
             else:
                 raise TypeError(f"ClassFilter does not support targets of type {type(target)}.")
 
-        dataset._selection = selection
-        dataset._subselections.append((ClassFilterSubSelection(self.classes), subselection))
+        view.selection = selection
+        if mask_where:
+            view.map(_mask_to_classes(self.classes), where=mask_where)
 
 
-_TDatum = TypeVar("_TDatum", ObjectDetectionDatum, SegmentationDatum)
+def _mask_to_classes(classes: Sequence[int]) -> Callable[[Any], Any]:
+    keep = list(classes)
 
-
-class ClassFilterSubSelection(Subselection[Any]):
-    def __init__(self, classes: Sequence[int]) -> None:
-        self.classes = classes
-
-    def __call__(self, datum: _TDatum) -> _TDatum:
-        # build a mask for any arrays
+    def mask(datum: Any) -> Any:
         image, target, metadata = datum
+        detection_mask = np.isin(as_numpy(target.labels), keep)
+        return image, MaskedTarget(target, detection_mask), mask_metadata(metadata, detection_mask)
 
-        mask = np.isin(as_numpy(target.labels), self.classes)
-        filtered_metadata = mask_metadata(metadata, mask)
-
-        # return a masked datum
-        filtered_datum = image, MaskedTarget(target, mask), filtered_metadata
-        return cast(_TDatum, filtered_datum)
+    return mask

@@ -56,7 +56,7 @@ from maite_datasets.object_detection import VOCDetection
 from torchvision.models import ResNet18_Weights, resnet18
 
 from dataeval import Embeddings, Metadata
-from dataeval.data import ClassFilter, DetectionCrops, Select
+from dataeval.data import ClassFilter, DetectionCrops, View
 from dataeval.extractors import TorchExtractor
 
 # Use the GPU if one is available, otherwise the CPU.
@@ -81,7 +81,7 @@ print(ds)
 #
 # VOC has 20 classes; coloring every crop of all of them at once is hard to read. Pick a
 # handful of visually distinct classes and keep only their detections with
-# {class}`.ClassFilter` (applied through {class}`.Select`). This also keeps the example fast
+# {class}`.ClassFilter` (applied through {class}`.View`). This also keeps the example fast
 # — fewer classes means fewer crops to embed and project. Skip this step to use the whole
 # dataset.
 
@@ -92,7 +92,7 @@ name_to_index = {name: index for index, name in index2label.items()}
 focus_classes = ["aeroplane", "bicycle", "bird", "car", "cat", "dog"]
 focus_indices = [name_to_index[name] for name in focus_classes]
 
-focused = Select(ds, [ClassFilter(focus_indices)])
+focused = View(ds, [ClassFilter(focus_indices)])
 print(f"{len(focused)} images contain at least one of {focus_classes}")
 
 # %% [markdown]

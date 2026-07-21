@@ -89,7 +89,7 @@ Apply formal statistical tests to validate hypotheses about differences in image
 characteristics between data subsets (e.g., comparing the average bounding box
 in 'day' vs. 'night' images).
 
-Use DataEval's {class}`.Select` class to create different subsets of the dataset
+Use DataEval's {class}`.View` class to create different subsets of the dataset
 that can then be compared using the results of DataEval's {func}`.imagestats`
 function.
 
@@ -140,7 +140,7 @@ Go beyond top-line metrics to perform detailed error analysis. Visualize the
 false positives and false negatives to understand why the model is failing
 (e.g., it confuses similar objects, fails on small objects, or struggles in low light).
 
-By combining multiple DataEval functions -- {class}`.Select` class, {func}`.imagestats`,
+By combining multiple DataEval functions -- {class}`.View` class, {func}`.imagestats`,
 {func}`.labelstats`, {func}`.cluster`, {func}`.balance`, and {func}`.diversity`
 -- false positives and false negatives can be further analyzed.
 

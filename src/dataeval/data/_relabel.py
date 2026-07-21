@@ -7,10 +7,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._ontology import Ontology
-from dataeval.data._conform import Conformer
+from dataeval.data._view import Operation, View
 from dataeval.exceptions import OntologyError
 from dataeval.protocols import Array, DatasetMetadata, ObjectDetectionTarget
-from dataeval.utils._internal import MaskedTarget, as_numpy, mask_metadata
+from dataeval.utils._internal import MaskedTarget, argmax_label, as_numpy, mask_metadata
 from dataeval.utils._validate import DatasetKind
 
 TargetVocabulary: TypeAlias = Ontology | Mapping[int, str] | Sequence[str]
@@ -63,7 +63,7 @@ def _label_remap(
     return (mapping, index2label, dropped)
 
 
-class Relabel(Conformer[Any]):
+class Relabel(Operation):
     """
     Conform a dataset's class labels to a target vocabulary via a class mapping.
 
@@ -127,23 +127,23 @@ class Relabel(Conformer[Any]):
     def mapping(self) -> Mapping[int, int]:
         """Source label index to target label index (computed during conform)."""
         if self._mapping is None:
-            raise OntologyError("Relabel must be applied through Conform(...) before use.")
+            raise OntologyError("Relabel must be applied through View(...) before use.")
         return self._mapping
 
     @property
     def dropped(self) -> Mapping[int, str]:
         """Source classes dropped as out-of-vocabulary (source index to name)."""
         if self._dropped is None:
-            raise OntologyError("Relabel must be applied through Conform(...) before use.")
+            raise OntologyError("Relabel must be applied through View(...) before use.")
         return self._dropped
 
     @property
     def index2label(self) -> Mapping[int, str]:
         if self._index2label is None:
-            raise OntologyError("Relabel must be applied through Conform(...) before use.")
+            raise OntologyError("Relabel must be applied through View(...) before use.")
         return self._index2label
 
-    def conform_metadata(self, metadata: DatasetMetadata) -> DatasetMetadata:
+    def apply_metadata(self, metadata: DatasetMetadata) -> DatasetMetadata:
         source_index2label = metadata.get("index2label")
         if not source_index2label:
             raise OntologyError("Relabel requires the dataset metadata to provide 'index2label'.")
@@ -155,15 +155,21 @@ class Relabel(Conformer[Any]):
             raise OntologyError(f"Source classes not expressible in target vocabulary: {names}")
         return cast(DatasetMetadata, {**metadata, "index2label": self.index2label})
 
-    def keeps(self, datum: Any) -> bool:
+    def apply(self, view: View[Any]) -> None:
+        # Drop out-of-vocabulary datums (cheap keep-check reads through preceding ops),
+        # then register the label remap applied lazily on access.
+        view.selection = [i for i in view.selection if self._keep(view.read(i))]
+        view.map(self._remap)
+
+    def _keep(self, datum: Any) -> bool:
         target = datum[1]
         if isinstance(target, ObjectDetectionTarget):
             return any(int(label) in self.mapping for label in as_numpy(target.labels))
         if isinstance(target, Array):
-            return int(np.argmax(as_numpy(target))) in self.mapping
+            return argmax_label(target) in self.mapping
         raise TypeError(f"Relabel does not support targets of type {type(target)}.")
 
-    def conform_datum(self, datum: Any) -> Any:
+    def _remap(self, datum: Any) -> Any:
         image, target, metadata = datum
         if isinstance(target, ObjectDetectionTarget):
             new_target, mask = self._conform_detections(target, self.mapping)
