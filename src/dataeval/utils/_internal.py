@@ -160,6 +160,11 @@ def as_numpy(
     return to_numpy(array, dtype=dtype, required_ndim=required_ndim, required_shape=required_shape, copy=False)
 
 
+def argmax_label(target: ArrayLike) -> int:
+    """Return the predicted class index (top-1) of an image-classification score vector."""
+    return int(np.argmax(as_numpy(target)))
+
+
 def to_numpy(  # noqa: C901
     array: ArrayLike | SequenceLike[Any] | None,
     *,

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from dataeval.data._classbalance import ClassBalance
-from dataeval.data._select import Select
+from dataeval.data._view import View
 
 
 def one_hot(label: int, num_classes: int = 3):
@@ -75,7 +75,7 @@ class TestClassBalanceInterclass:
     def test_interclass_basic(self, classification_dataset):
         """Test basic interclass balancing with equal class distribution."""
         class_balance = ClassBalance(method="interclass")
-        select = Select(classification_dataset, selections=[class_balance])
+        select = View(classification_dataset, operations=[class_balance])
 
         # Should have equal samples from each class
         assert len(select) == 12
@@ -88,7 +88,7 @@ class TestClassBalanceInterclass:
     def test_interclass_with_num_samples(self, classification_dataset):
         """Test interclass with specific number of samples."""
         class_balance = ClassBalance(method="interclass", num_samples=9)
-        select = Select(classification_dataset, selections=[class_balance])
+        select = View(classification_dataset, operations=[class_balance])
 
         assert len(select) == 9
         counts = {0: 0, 1: 0, 2: 0}
@@ -101,7 +101,7 @@ class TestClassBalanceInterclass:
     def test_interclass_with_background_class(self, classification_dataset):
         """Test interclass excluding background class."""
         class_balance = ClassBalance(method="interclass", background_class=2)
-        select = Select(classification_dataset, selections=[class_balance])
+        select = View(classification_dataset, operations=[class_balance])
 
         # Should only sample from classes 0 and 1, excluding background class 2
         counts = {0: 0, 1: 0, 2: 0}
@@ -121,7 +121,7 @@ class TestClassBalanceGlobal:
     def test_global_basic(self, classification_dataset):
         """Test basic global balancing."""
         class_balance = ClassBalance(method="global")
-        select = Select(classification_dataset, selections=[class_balance])
+        select = View(classification_dataset, operations=[class_balance])
 
         # With equal class distribution, global should give roughly equal results
         assert len(select) == 12
@@ -136,18 +136,18 @@ class TestClassBalanceGlobal:
         """Test global with different aggregation functions."""
         # Test with mean aggregation
         class_balance_mean = ClassBalance(method="global", aggregation_func="mean")
-        select_mean = Select(classification_dataset, selections=[class_balance_mean])
+        select_mean = View(classification_dataset, operations=[class_balance_mean])
         assert len(select_mean) == 12
 
         # Test with max aggregation
         class_balance_max = ClassBalance(method="global", aggregation_func="max")
-        select_max = Select(classification_dataset, selections=[class_balance_max])
+        select_max = View(classification_dataset, operations=[class_balance_max])
         assert len(select_max) == 12
 
     def test_global_with_oversample_factor(self, classification_dataset):
         """Test global with oversample factor."""
         class_balance = ClassBalance(method="global", oversample_factor=2.0)
-        select = Select(classification_dataset, selections=[class_balance])
+        select = View(classification_dataset, operations=[class_balance])
         assert len(select) == 12
 
 
@@ -158,7 +158,7 @@ class TestClassBalanceEmptyImages:
     def test_empty_images_tracked_with_none(self, od_dataset_with_empty):
         """Test that empty images are tracked separately."""
         class_balance = ClassBalance(method="interclass", num_empty=0)
-        select = Select(od_dataset_with_empty, selections=[class_balance])
+        select = View(od_dataset_with_empty, operations=[class_balance])
 
         # After balancing, check that the ClassBalance instance tracks empty images separately
         assert hasattr(class_balance, "_empty_image_indices")
@@ -167,37 +167,37 @@ class TestClassBalanceEmptyImages:
         # None should NOT be in images_per_class
         assert None not in class_balance._images_per_class
         # Empty images should not be in the selection since num_empty=0
-        empty_in_selection = [idx for idx in select._selection if idx in [2, 5, 8]]
+        empty_in_selection = [idx for idx in select.selection if idx in [2, 5, 8]]
         assert len(empty_in_selection) == 0
 
     def test_interclass_with_num_empty(self, od_dataset_with_empty):
         """Test interclass balancing with num_empty parameter."""
         class_balance = ClassBalance(method="interclass", num_empty=2)
-        select = Select(od_dataset_with_empty, selections=[class_balance])
+        select = View(od_dataset_with_empty, operations=[class_balance])
 
         # Should include 2 empty images plus balanced non-empty images
         assert len(select) >= 2
 
         # Count how many images in selection are empty
-        empty_count = sum(1 for idx in select._selection if idx in [2, 5, 8])
+        empty_count = sum(1 for idx in select.selection if idx in [2, 5, 8])
         assert empty_count == 2
 
     def test_global_with_num_empty(self, od_dataset_with_empty):
         """Test global balancing with num_empty parameter."""
         class_balance = ClassBalance(method="global", num_empty=1)
-        select = Select(od_dataset_with_empty, selections=[class_balance])
+        select = View(od_dataset_with_empty, operations=[class_balance])
 
         # Should include AT LEAST 1 empty image (may have more due to sampling)
-        empty_count = sum(1 for idx in select._selection if idx in [2, 5, 8])
+        empty_count = sum(1 for idx in select.selection if idx in [2, 5, 8])
         assert empty_count >= 1
 
     def test_num_empty_as_proportion(self, od_dataset_with_empty):
         """Test num_empty as proportion of dataset."""
         # 0.2 * 10 = 2 empty images
         class_balance = ClassBalance(method="interclass", num_empty=0.2)
-        select = Select(od_dataset_with_empty, selections=[class_balance])
+        select = View(od_dataset_with_empty, operations=[class_balance])
 
-        empty_count = sum(1 for idx in select._selection if idx in [2, 5, 8])
+        empty_count = sum(1 for idx in select.selection if idx in [2, 5, 8])
         assert empty_count == 2
 
 
@@ -208,7 +208,7 @@ class TestClassBalanceNoneSentinel:
     def test_empty_images_not_in_classes(self, od_dataset_with_empty):
         """Test that empty images are not tracked in images_per_class."""
         class_balance = ClassBalance(method="interclass", num_empty=0)
-        Select(od_dataset_with_empty, selections=[class_balance])
+        View(od_dataset_with_empty, operations=[class_balance])
 
         # None should NOT be in images_per_class (empty images tracked separately)
         assert None not in class_balance._images_per_class
@@ -243,7 +243,7 @@ class TestClassBalanceNoneSentinel:
         mock_dataset.__getitem__.side_effect = get_item
 
         class_balance = ClassBalance(method="interclass", num_empty=0)
-        Select(mock_dataset, selections=[class_balance])
+        View(mock_dataset, operations=[class_balance])
 
         # -1 should be treated as a valid class
         assert -1 in class_balance._images_per_class
@@ -263,7 +263,7 @@ class TestClassBalanceMinimizeDuplicates:
         # Dataset has 12 images (4 of each class 0,1,2)
         # num_samples defaults to None which means dataset size (12)
         class_balance = ClassBalance(method="interclass", minimize_duplicates=True)
-        select = Select(classification_dataset, selections=[class_balance])
+        select = View(classification_dataset, operations=[class_balance])
 
         # Should get all 12 images
         assert len(select) == 12
@@ -294,7 +294,7 @@ class TestClassBalanceEdgeCases:
         mock_dataset.__getitem__.side_effect = get_item
 
         class_balance = ClassBalance(method="interclass")
-        select = Select(mock_dataset, selections=[class_balance])
+        select = View(mock_dataset, operations=[class_balance])
 
         # With no actual classes, selection should be empty or only contain empty images
         # depending on num_empty setting
@@ -307,7 +307,7 @@ class TestClassBalanceEdgeCases:
         mock_dataset.__getitem__.side_effect = lambda idx: (idx, one_hot(0, num_classes=1), {"id": idx})
 
         class_balance = ClassBalance(method="interclass", num_samples=3)
-        select = Select(mock_dataset, selections=[class_balance])
+        select = View(mock_dataset, operations=[class_balance])
 
         # Should work with single class
         assert len(select) == 3
@@ -318,7 +318,7 @@ class TestClassBalanceEdgeCases:
         """Test with num_samples larger than dataset size."""
         # With num_samples=None, it uses dataset size
         class_balance = ClassBalance(method="interclass")
-        select = Select(classification_dataset, selections=[class_balance])
+        select = View(classification_dataset, operations=[class_balance])
 
         # Should return dataset size (12)
         assert len(select) == 12
@@ -346,7 +346,7 @@ class TestClassBalanceLabelYielding:
 
     def test_empty_and_nontarget_items_yield_no_labels(self):
         class_balance = ClassBalance(method="interclass", num_samples=4)
-        select = Select(self._mixed_dataset(), selections=[class_balance])
+        select = View(self._mixed_dataset(), operations=[class_balance])
 
         # The empty-Array item (1) and None-target item (2) contribute no class labels;
         # only the valid one-hot items (0, 3, 4 -> classes 0/1) define the balanced classes.
@@ -364,9 +364,9 @@ class TestClassBalanceEmptyRepeatSampling:
         # Only 3 empty images exist (indices 2, 5, 8) but 5 are requested, forcing
         # sampling with replacement.
         class_balance = ClassBalance(method="interclass", num_empty=5)
-        select = Select(od_dataset_with_empty, selections=[class_balance])
+        select = View(od_dataset_with_empty, operations=[class_balance])
 
-        empty_picks = [idx for idx in select._selection if idx in (2, 5, 8)]
+        empty_picks = [idx for idx in select.selection if idx in (2, 5, 8)]
         # Exactly 5 empty slots filled, drawn (with repeats) from the 3 available.
         assert len(empty_picks) == 5
         assert set(empty_picks) <= {2, 5, 8}
@@ -378,7 +378,7 @@ class TestClassBalanceGlobalBackground:
 
     def test_background_class_frequency_set_to_one(self, classification_dataset):
         class_balance = ClassBalance(method="global", background_class=1)
-        Select(classification_dataset, selections=[class_balance])
+        View(classification_dataset, operations=[class_balance])
 
         # background class present in the data -> its frequency is pinned to 1.0
         assert class_balance._cls_frq[1] == 1.0
@@ -422,10 +422,10 @@ class TestClassBalanceMinimizeDuplicatesReplacement:
         # num_samples=None -> 10 samples, 2 classes -> 5 per class. Class 1 has only 2
         # images (< 5), so it is sampled with replacement via the minimize_duplicates path.
         class_balance = ClassBalance(method="interclass", minimize_duplicates=True)
-        select = Select(self._imbalanced_dataset(), selections=[class_balance])
+        select = View(self._imbalanced_dataset(), operations=[class_balance])
 
         assert len(select) == 10
-        class1_picks = [idx for idx in select._selection if idx >= 8]
+        class1_picks = [idx for idx in select.selection if idx >= 8]
         # Both minority images are guaranteed included (samples.extend(class_imgs)),
         # then oversampled to fill the per-class quota of 5.
         assert {8, 9} <= set(class1_picks)

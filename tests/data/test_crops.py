@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from dataeval import Metadata
-from dataeval.data import DetectionCrops, Reverse, Select
+from dataeval.data import DetectionCrops, Reverse, View
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import Array, DatasetMetadata, DatumMetadata, ObjectDetectionTarget
 
@@ -132,7 +132,7 @@ class TestStructure:
             _ODTarget([[1, 1, 11, 11]], [2]),
         ]
         ds = _ODDataset(images, targets, ids=["img-a", "img-b", "img-c"])
-        crops = DetectionCrops(Select(ds, Reverse()))
+        crops = DetectionCrops(View(ds, Reverse()))
         # Reverse maps view positions 0,1,2 onto source ids c,b,a — source_id follows the id,
         # not the (reversed) position it now sits at.
         assert [crops[i][2].get("source_id", -1) for i in range(len(crops))] == ["img-c", "img-b", "img-a"]

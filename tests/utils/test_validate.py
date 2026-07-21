@@ -3,7 +3,7 @@
 Covers :func:`dataeval.utils.data.validate_dataset`, the
 ``@requires_maite_dataset`` decorator, and integration with the
 public entry points it guards (:class:`Embeddings`, :class:`Metadata`,
-:class:`Select` + :class:`ClassFilter`, ``split_dataset``, ``unzip_dataset``).
+:class:`View` + :class:`ClassFilter`, ``split_dataset``, ``unzip_dataset``).
 """
 
 from typing import Any
@@ -13,7 +13,7 @@ import pytest
 
 from dataeval._embeddings import Embeddings
 from dataeval._metadata import Metadata
-from dataeval.data import ClassFilter, Limit, Select, Shuffle, split_dataset, unzip_dataset
+from dataeval.data import ClassFilter, Limit, Operation, Shuffle, View, split_dataset, unzip_dataset
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import DatasetMetadata, DatumMetadata
 from dataeval.utils import _validate
@@ -299,19 +299,33 @@ class TestIntegrationMetadata:
         Metadata(None)
 
 
-class TestIntegrationSelect:
-    def test_target_agnostic_filters_skip_validation(self) -> None:
+class TestIntegrationView:
+    def test_target_agnostic_operations_skip_validation(self) -> None:
         # Limit/Shuffle don't read targets; image-only datasets must keep working.
-        assert len(Select(_ImageOnly(10), selections=[Limit(size=3)])) == 3
-        assert len(Select(_ImageOnly(10), selections=[Shuffle()])) == 10
+        assert len(View(_ImageOnly(10), operations=[Limit(size=3)])) == 3
+        assert len(View(_ImageOnly(10), operations=[Shuffle()])) == 10
 
     def test_classfilter_on_bare_image_fails_fast(self) -> None:
         with pytest.raises(MaiteShapeError, match="3-tuple"):
-            Select(_ImageOnly(), selections=[ClassFilter(classes=[0])])
+            View(_ImageOnly(), operations=[ClassFilter(classes=[0])])
 
     def test_classfilter_on_maite_dataset_works(self) -> None:
         # Should not raise; whether anything is selected depends on labels.
-        Select(_ICDataset(), selections=[ClassFilter(classes=[0, 1, 2])])
+        View(_ICDataset(), operations=[ClassFilter(classes=[0, 1, 2])])
+
+    def test_strictest_required_kind_wins_across_operations(self) -> None:
+        # A specific kind beats the generic "any_target" declared by ClassFilter.
+        class _NeedsOD(Operation):
+            requires = "object_detection"
+
+            def apply(self, view: View) -> None: ...
+
+        with pytest.raises(MaiteShapeError, match="ObjectDetectionTarget"):
+            View(_ICDataset(), operations=[ClassFilter(classes=[0]), _NeedsOD()])
+
+    def test_empty_dataset_skips_validation(self) -> None:
+        # Nothing to probe — an empty source is legal even for target-reading operations.
+        assert len(View(_ImageOnly(0), operations=[ClassFilter(classes=[0])])) == 0
 
 
 class TestIntegrationUnzip:

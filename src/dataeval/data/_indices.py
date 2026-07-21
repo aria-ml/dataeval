@@ -3,10 +3,10 @@ __all__ = []
 from collections.abc import Sequence
 from typing import Any
 
-from dataeval.data._select import Select, Selection, SelectionStage
+from dataeval.data._view import Operation, View
 
 
-class Indices(Selection[Any]):
+class Indices(Operation):
     """
     Selects only the given indices from the dataset.
 
@@ -16,10 +16,9 @@ class Indices(Selection[Any]):
         The specific indices to select.
     """
 
-    stage = SelectionStage.FILTER
-
     def __init__(self, indices: Sequence[int]) -> None:
         self.indices = indices
 
-    def __call__(self, dataset: Select[Any]) -> None:
-        dataset._selection = [index for index in self.indices if index in dataset._selection]
+    def apply(self, view: View[Any]) -> None:
+        current = set(view.selection)
+        view.selection = [index for index in self.indices if index in current]

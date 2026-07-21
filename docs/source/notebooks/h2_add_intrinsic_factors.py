@@ -66,7 +66,7 @@ from maite_datasets.image_classification import CIFAR10
 from dataeval import Metadata
 from dataeval.bias import Balance, Diversity
 from dataeval.core import compute_stats
-from dataeval.data import Limit, Select, Shuffle
+from dataeval.data import Limit, Shuffle, View
 from dataeval.flags import ImageStats
 
 _ = pl.Config.set_tbl_rows(-1)
@@ -86,7 +86,7 @@ pio.renderers.default = "notebook"
 
 # %%
 # Load in the CIFAR10 dataset and limit to 20,000 images with random shuffling
-cifar10 = Select(CIFAR10("data", image_set="base", download=True), [Limit(20000), Shuffle(seed=0)])
+cifar10 = View(CIFAR10("data", image_set="base", download=True), [Limit(20000), Shuffle(seed=0)])
 print(cifar10)
 
 # %% [markdown]

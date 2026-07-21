@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 from dataeval._metadata import Metadata
 from dataeval.data._classfilter import ClassFilter
-from dataeval.data._select import Select
+from dataeval.data._view import View
 from dataeval.protocols import ObjectDetectionTarget
 from dataeval.utils._internal import try_mask_object
 
@@ -161,7 +161,7 @@ class TestObjectDetectionSelections:
     def test_detection_filter_classes_only(self, mock_detection_dataset):
         """Test filtering a detection dataset by class."""
         class_filter = ClassFilter(classes=(0, 1), filter_detections=True)
-        select = Select(mock_detection_dataset, selections=[class_filter])
+        select = View(mock_detection_dataset, operations=[class_filter])
 
         # Items 0, 1, 2 have classes 0 or 1, so they should be included
         assert len(select) == 3
@@ -188,7 +188,7 @@ class TestObjectDetectionSelections:
     def test_detection_filter_no_filtering(self, mock_detection_dataset):
         """Test with filter_detections=False to keep all detections in included images."""
         class_filter = ClassFilter(classes=(0,), filter_detections=False)
-        select = Select(mock_detection_dataset, selections=[class_filter])
+        select = View(mock_detection_dataset, operations=[class_filter])
 
         # Only items 0 and 1 have class 0
         assert len(select) == 2
@@ -206,7 +206,7 @@ class TestObjectDetectionSelections:
         """Test that filtering preserves correct index alignment between images, targets, and metadata."""
         # Only select class 2, which appears in items 0, 2, and 3
         class_filter = ClassFilter(classes=(2,), filter_detections=True)
-        select = Select(mock_detection_dataset, selections=[class_filter])
+        select = View(mock_detection_dataset, operations=[class_filter])
 
         # Check that only items with class 2 are included
         assert len(select) == 3
@@ -296,7 +296,7 @@ class TestObjectDetectionSelections:
         dataset.__getitem__.side_effect = lambda idx: items[idx]
 
         with pytest.raises(TypeError, match="ClassFilter does not support targets of type"):
-            Select(dataset, selections=[ClassFilter(classes=(0,), filter_detections=True)])
+            View(dataset, operations=[ClassFilter(classes=(0,), filter_detections=True)])
 
     def test_namedtuple_target_still_satisfies_protocol(self):
         """Regression: MAITE targets are namedtuples (no __dict__); the filtered proxy must
@@ -322,7 +322,7 @@ class TestObjectDetectionSelections:
         dataset.__len__.return_value = len(items)
         dataset.__getitem__.side_effect = lambda idx: items[idx]
 
-        select = Select(dataset, selections=[ClassFilter(classes=(0,), filter_detections=True)])
+        select = View(dataset, operations=[ClassFilter(classes=(0,), filter_detections=True)])
         _, target, _ = select[0]
 
         assert isinstance(target, ObjectDetectionTarget)  # the exact pre-fix failure

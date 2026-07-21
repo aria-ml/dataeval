@@ -29,8 +29,17 @@
 # {class}`.Ontology`) and then **merges** the two into a single dataset you can
 # analyze together. It builds on
 # [ontology alignment](h2_align_label_spaces.py): alignment establishes *how* the
-# labels correspond; {class}`.Conform` with {class}`.Relabel` *applies* that to the
+# labels correspond; {class}`.View` with {class}`.Relabel` *applies* that to the
 # data, and {func}`.merge_datasets` combines the conformed results.
+
+# %% [markdown]
+# ```{note}
+# The dataset-view API is {class}`.View`, built from an ordered pipeline of
+# {class}`.Operation` steps (such as {class}`.Relabel`, {class}`.ClassFilter`, and
+# {class}`.Limit`). The former `Select`/`Selector` names and the `dataeval.selection`
+# module are deprecated aliases and will be removed in a future release — use
+# {class}`.View` and {class}`.Operation` instead.
+# ```
 
 # %% [markdown]
 # ### When to use
@@ -62,7 +71,7 @@ import numpy as np
 
 from dataeval import Ontology
 from dataeval.core import label_alignment
-from dataeval.data import Conform, Relabel, merge_datasets
+from dataeval.data import Relabel, View, merge_datasets
 from dataeval.protocols import DatasetMetadata
 
 # %% [markdown]
@@ -132,7 +141,7 @@ reference_raw = ToyDataset(
 )
 
 reference_alignment = label_alignment(reference_raw.metadata.get("index2label", {}).values(), reference_ontology)
-reference = Conform(reference_raw, [Relabel(reference_alignment["class_remap"], reference_ontology)])
+reference = View(reference_raw, [Relabel(reference_alignment["class_remap"], reference_ontology)])
 
 print("reference images:", len(reference))
 print("reference now uses the vocabulary:", reference.metadata.get("index2label"))
@@ -177,7 +186,7 @@ print("out-of-vocabulary:", incoming_alignment["unaligned_source"])
 
 # %%
 relabel = Relabel(incoming_alignment["class_remap"], reference_ontology)
-incoming_conformed = Conform(incoming, [relabel])
+incoming_conformed = View(incoming, [relabel])
 
 print("kept", len(incoming_conformed), "of", len(incoming), "images")
 print("dropped (out-of-vocabulary):", dict(relabel.dropped))
@@ -217,13 +226,13 @@ except ValueError as error:
 #
 # - A reference {class}`.Ontology` defines the shared target vocabulary.
 # - {func}`.label_alignment` relates each dataset's class *names* to that vocabulary
-#   (by name, so reordered indices don't matter); {class}`.Conform` with
+#   (by name, so reordered indices don't matter); {class}`.View` with
 #   {class}`.Relabel` applies it — rewriting labels, resizing the label space, and
 #   dropping out-of-vocabulary classes.
 # - Once datasets share an `index2label`, {func}`.merge_datasets` combines them into
 #   one dataset; it refuses datasets whose vocabularies differ, so conforming is a
 #   prerequisite, not an afterthought.
-# - {class}`.Conform` is a general seam: `Relabel` is the first conformer, with
+# - {class}`.View` is a general seam: `Relabel` is the first {class}`.Operation`, with
 #   metadata- and value-conforming operations to follow.
 
 # %% [markdown]

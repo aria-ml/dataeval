@@ -90,7 +90,7 @@ from torchvision.transforms.functional import resize
 from ultralytics import YOLO
 
 from dataeval.config import set_batch_size
-from dataeval.data import Indices, Limit, Select, Shuffle
+from dataeval.data import Indices, Limit, Shuffle, View
 from dataeval.extractors import ClasswiseUncertaintyExtractor, TorchExtractor, UncertaintyExtractor
 from dataeval.shift import DriftWasserstein
 
@@ -119,7 +119,7 @@ set_batch_size(32)
 #   the detector should report _no_ drift here.
 # - **drone** — SeaDrone maritime imagery, a genuinely shifted operational stream; the detector should report drift here.
 #
-# To keep the tutorial fast, each split is capped to a small random subset with {class}`.Select` and {class}`.Limit`.
+# To keep the tutorial fast, each split is capped to a small random subset with {class}`.View` and {class}`.Limit`.
 # Both datasets are already used by other guides, so they are typically cached locally. Raise `SAMPLES_PER_SPLIT` (or drop
 # the `Select` wrappers) to run on more data.
 
@@ -134,12 +134,12 @@ voc = VOCDetection("./data", year="2012", image_set="train", download=True)
 # train-vs-val baseline genuinely predicts the train-vs-test distance.
 perm = np.random.default_rng(0).permutation(len(voc))
 train_idx, val_idx, test_idx = np.array_split(perm[: 3 * SAMPLES_PER_SPLIT], 3)
-trainset = Select(voc, Indices(train_idx.tolist()))
-valset = Select(voc, Indices(val_idx.tolist()))
-testset = Select(voc, Indices(test_idx.tolist()))
+trainset = View(voc, Indices(train_idx.tolist()))
+valset = View(voc, Indices(val_idx.tolist()))
+testset = View(voc, Indices(test_idx.tolist()))
 
 # Shifted "operational" data: the SeaDrone maritime aerial (drone-captured) detection dataset
-droneset = Select(SeaDrone("./data", image_set="val", download=True), [Shuffle(0), Limit(SAMPLES_PER_SPLIT)])
+droneset = View(SeaDrone("./data", image_set="val", download=True), [Shuffle(0), Limit(SAMPLES_PER_SPLIT)])
 
 print(f"train: {len(trainset)}  val: {len(valset)}  test: {len(testset)}  drone: {len(droneset)}")
 

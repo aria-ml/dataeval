@@ -2,13 +2,11 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.data._select import Select, Selection, SelectionStage
+from dataeval.data._view import Operation, View
 
 
-class Reverse(Selection[Any]):
+class Reverse(Operation):
     """Select dataset indices in reverse order."""
 
-    stage = SelectionStage.ORDER
-
-    def __call__(self, dataset: Select[Any]) -> None:
-        dataset._selection.reverse()
+    def apply(self, view: View[Any]) -> None:
+        view.selection.reverse()

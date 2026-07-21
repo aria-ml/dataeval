@@ -227,9 +227,9 @@ DataEval's public API.
   - ✔
   - ✔
   - ✔
-* - {class}`.Select`
-  - A set of dataset filters that enable rapid 
-  development of various datasets
+* - {class}`.View`
+  - Build a dataset view from an ordered pipeline of
+  filter, transform, and relabel operations
   - ✔
   - ✔
   - ✔
@@ -536,7 +536,7 @@ For more information on a specific algorithm, click the name in the table.
   - *Optional*{sup}`3`
   - 
   -
-* - {class}`.Select`{sup}`2`
+* - {class}`.View`{sup}`2`
   - *Optional*
   - *Optional*
   - 

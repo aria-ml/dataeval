@@ -69,7 +69,7 @@ import requests
 from maite_datasets.object_detection import VOCDetection
 
 from dataeval import Embeddings
-from dataeval.data import Limit, Select
+from dataeval.data import Limit, View
 from dataeval.extractors import OnnxExtractor
 from dataeval.utils.onnx import to_encoding_model
 
@@ -161,7 +161,7 @@ print(extractor)
 # %%
 # Generate embeddings using the Embeddings class
 # We'll use a subset for demonstration
-subset = Select(dataset, Limit(100))
+subset = View(dataset, Limit(100))
 embeddings = Embeddings(subset, extractor=extractor, batch_size=16)
 
 print(f"Embeddings shape: {embeddings.shape}")

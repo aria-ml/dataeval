@@ -9,12 +9,12 @@ import numpy as np
 from numpy.random import BitGenerator, Generator, SeedSequence
 from numpy.typing import NDArray
 
-from dataeval.data._select import Select, Selection, SelectionStage
+from dataeval.data._view import Operation, View
 from dataeval.protocols import Array
 from dataeval.utils._internal import as_numpy
 
 
-class Shuffle(Selection[Any]):
+class Shuffle(Operation):
     """
     Select dataset indices in a random order.
 
@@ -29,7 +29,6 @@ class Shuffle(Selection[Any]):
     """
 
     seed: int | NDArray[Any] | SeedSequence | BitGenerator | Generator | None
-    stage = SelectionStage.ORDER
 
     def __init__(
         self,
@@ -38,6 +37,6 @@ class Shuffle(Selection[Any]):
         _seed = get_seed() if seed is None else seed
         self.seed = as_numpy(_seed) if isinstance(_seed, Sequence | Array) else _seed
 
-    def __call__(self, dataset: Select[Any]) -> None:
+    def apply(self, view: View[Any]) -> None:
         rng = np.random.default_rng(self.seed)
-        rng.shuffle(dataset._selection)
+        rng.shuffle(view.selection)

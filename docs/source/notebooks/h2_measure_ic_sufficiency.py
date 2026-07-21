@@ -88,7 +88,7 @@ from torch.utils.data import DataLoader, Subset
 from torch.utils.data import Dataset as TorchDataset
 
 from dataeval import config
-from dataeval.data import Limit, Select
+from dataeval.data import Limit, View
 from dataeval.performance import Sufficiency
 from dataeval.protocols import Dataset, DatumMetadata
 
@@ -134,8 +134,8 @@ transforms = [
 ]
 
 # Download the mnist dataset and apply the transforms and subset the data
-train_ds = Select(MNIST("./data", image_set="train", transforms=transforms, download=True), selections=[Limit(2500)])
-test_ds = Select(MNIST("./data", image_set="test", transforms=transforms, download=True), selections=[Limit(500)])
+train_ds = View(MNIST("./data", image_set="train", transforms=transforms, download=True), operations=[Limit(2500)])
+test_ds = View(MNIST("./data", image_set="test", transforms=transforms, download=True), operations=[Limit(500)])
 
 
 # %% [markdown]
