@@ -151,6 +151,14 @@ security = [  # keep in sync with [tool.uv.constraint-dependencies]
   "protobuf>=6.33.5",        # GHSA-7gcm-g887-7qv7
   "setuptools>=82.0.0",      # CVE-2026-23949: (jaraco_context) path traversal in tarball()
                              # CVE-2026-24049: (wheel) privilege escalation via unpack
+  # FIPS: opencv builds newer than 4.12.0.88 are not approved for FIPS-enabled
+  # hosts. All three distributions below ship the same `cv2` module and are
+  # interchangeable to a resolver, so capping only one leaves the others free to
+  # supply a newer cv2 (ultralytics pulls opencv-python). Cap all three.
+  # Do not raise this ceiling without a compliance review.
+  "opencv-python-headless<=4.12.0.88",
+  "opencv-python<=4.12.0.88",
+  "opencv-contrib-python<=4.12.0.88",
 ]
 dev = [
   { include-group = "base" },
@@ -179,6 +187,14 @@ constraint-dependencies = [
     "protobuf>=6.33.5",        # GHSA-7gcm-g887-7qv7
     "setuptools>=82.0.0",      # CVE-2026-23949: (jaraco_context) path traversal in tarball()
                                # CVE-2026-24049: (wheel) privilege escalation via unpack
+    # FIPS: opencv builds newer than 4.12.0.88 are not approved for FIPS-enabled
+    # hosts. All three distributions below ship the same `cv2` module and are
+    # interchangeable to a resolver, so capping only one leaves the others free to
+    # supply a newer cv2 (ultralytics pulls opencv-python). Cap all three.
+    # Do not raise this ceiling without a compliance review.
+    "opencv-python-headless<=4.12.0.88",
+    "opencv-python<=4.12.0.88",
+    "opencv-contrib-python<=4.12.0.88",
 ]
 
 [[tool.uv.index]]
