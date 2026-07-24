@@ -1,6 +1,19 @@
-[//]: # (ebe557fd9bfc9f5b9c82197349d55e8d7c376fd6)
+[//]: # (c51f889c3904e8964f18ea1918f76f2235eca317)
 
 # DataEval Change Log
+
+## v1.1.0-rc1
+
+🛠️ **Improvements and Enhancements**
+
+- `c51f889c` - [impr] Merge Select and Conform into View
+- `9769eaef` - [impr] Expand input flexibility for all evaluators and helpers
+
+📝 **Miscellaneous**
+
+- `6cb7c0d3` - [deps] Restrict opencv-python to <=4.12.0.88 for FIPS compatibility
+- `78b3ebd3` - [devsecops] Update components to v1.2.0
+- `61c52acf` - Pre-release v1.1.0-rc0
 
 ## v1.1.0-rc0
 
