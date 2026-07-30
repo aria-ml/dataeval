@@ -29,30 +29,6 @@ _logger = logging.getLogger(__name__)
 SOURCE_INDEX = "source_index"
 
 
-# Dependency mapping: stat -> required dependency
-_STAT_DEPENDENCIES: dict[ImageStats, ImageStats] = {
-    ImageStats.PIXEL_ENTROPY: ImageStats.PIXEL_HISTOGRAM,
-    ImageStats.VISUAL_BRIGHTNESS: ImageStats.VISUAL_PERCENTILES,
-    ImageStats.VISUAL_CONTRAST: ImageStats.VISUAL_PERCENTILES,
-    ImageStats.VISUAL_DARKNESS: ImageStats.VISUAL_PERCENTILES,
-}
-
-
-def _resolve_dependencies(flags: Flag) -> Flag:
-    resolved = flags
-    changed = True
-
-    # Iterate until no new dependencies are added
-    while changed:
-        old_resolved = resolved
-        for stat, dependency in _STAT_DEPENDENCIES.items():
-            if stat in resolved:
-                resolved |= dependency
-        changed = resolved != old_resolved
-
-    return resolved
-
-
 class StatsResult(TypedDict):
     """
     Type definition for calculation output.
@@ -366,7 +342,9 @@ def compute_stats(  # noqa: C901
         Optional bounding boxes for each image. If None, defers to the data provided.
     stats : ImageStats, default ImageStats.ALL
         Flags indicating which statistics to compute. Can combine multiple flags
-        using bitwise OR (|). Dependencies are resolved automatically.
+        using bitwise OR (|). Dependencies are resolved automatically for calculation,
+        but intermediate/dependency statistics are not included in the output by
+        default unless explicitly requested.
     per_image : bool, default True
         If True, compute statistics for entire images. When boxes are provided
         and per_image=True, statistics are computed for both the full image and
@@ -404,6 +382,14 @@ def compute_stats(  # noqa: C901
 
         Output is sorted by (item_index, box_index, channel_index) ascending,
         with None values appearing before 0.
+
+    Notes
+    -----
+    .. versionchanged:: 1.1
+        Statistics computed as intermediate dependencies (such as `PIXEL_HISTOGRAM` for
+        `PIXEL_ENTROPY` or `VISUAL_PERCENTILES` for `VISUAL_BRIGHTNESS`) are cached at
+        runtime and discarded afterwards. They are no longer returned in the final output
+        by default unless they are explicitly requested.
 
     Examples
     --------
@@ -463,9 +449,6 @@ def compute_stats(  # noqa: C901
     # Validate parameters
     if not per_image and not per_target:
         raise ValueError("At least one of 'per_image' or 'per_target' must be True")
-
-    # Resolve dependencies
-    stats = _resolve_dependencies(stats)
 
     # Get calculators from registry based on flags
     calculators = CalculatorRegistry.get_calculators(stats)

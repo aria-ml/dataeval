@@ -138,7 +138,7 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
 
     1. Adaptive WD threshold: the Wasserstein distance of the NNN from uniform shrinks as O(1/sqrt(n))
        for truly continuous data. We use 0.5 / sqrt(n) as the primary threshold, which is equivalent
-       to the previously used  fixed threshold of 0.054 at n = 86.
+       to the previously used fixed threshold of 0.054 at n = 86.
 
     2. Duplicate fraction: truly continuous data drawn from a floating-point representation has
        probability zero of producing exact duplicates. The presence of duplicates is a strong signal

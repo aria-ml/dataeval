@@ -512,20 +512,30 @@ class TestMetadata:
             md.get_target_factors(0, 999)
 
     def test_infer_factor_level_errors(self, get_od_dataset):
-        """Test _infer_factor_level error conditions (lines 777, 783)."""
+        """_infer_factor_level resolves each array independently and reports every accepted length."""
         images = np.random.random((5, 3, 16, 16))
         dataset = get_od_dataset(images, 2, True)
 
         md = Metadata(dataset)
 
-        with pytest.raises(ShapeMismatchError, match="All factors must have the same length"):
-            md._infer_factor_level({"a": [1, 2, 3], "b": [1, 2]}, num_image_rows=5, num_target_rows=10)
+        assert md._infer_factor_level([1] * 5, num_image_rows=5, num_target_rows=10) == "image"
+        assert md._infer_factor_level([1] * 10, num_image_rows=5, num_target_rows=10) == "target"
+        assert md._infer_factor_level([1] * 15, num_image_rows=5, num_target_rows=10) == "combined"
 
-        with pytest.raises(ShapeMismatchError, match="different length"):
-            md._infer_factor_level({"a": [1, 2, 3]}, num_image_rows=5, num_target_rows=10)
+        with pytest.raises(ShapeMismatchError, match="Expected 5 .*10 .*15 .*got 3"):
+            md._infer_factor_level([1, 2, 3], num_image_rows=5, num_target_rows=10)
+
+    def test_infer_factor_level_without_targets_only_offers_image(self):
+        """A dataset without targets has no target or combined level to infer."""
+        md = Metadata(MockDataset(np.ones((5, 3, 3)), np.ones((5, 3))))
+
+        assert md._infer_factor_level([1] * 5, num_image_rows=5, num_target_rows=5) == "image"
+
+        with pytest.raises(ShapeMismatchError, match=r"Expected 5 \(image count\), got 10"):
+            md._infer_factor_level([1] * 10, num_image_rows=5, num_target_rows=5)
 
     def test_validate_factor_lengths_invalid_level(self, get_od_dataset):
-        """Test _validate_factor_lengths with invalid level (line 803)."""
+        """_validate_factor_lengths rejects unknown levels, including the unresolved 'auto'."""
         images = np.random.random((5, 3, 16, 16))
         dataset = get_od_dataset(images, 2, True)
 
@@ -533,11 +543,16 @@ class TestMetadata:
 
         with pytest.raises(ValueError, match="Invalid level"):
             md._validate_factor_lengths(
-                {"a": [1, 2, 3]},
+                [1, 2, 3],
                 level="invalid",  # type: ignore
                 num_image_rows=5,
                 num_target_rows=10,
             )
+
+        # "auto" must be resolved by _infer_factor_level before validation; reaching the
+        # validator with it is a bug, not a free pass.
+        with pytest.raises(ValueError, match="Invalid level"):
+            md._validate_factor_lengths([1, 2, 3], level="auto", num_image_rows=5, num_target_rows=10)
 
     def test_filter_by_factor_with_condition(self, get_od_dataset):
         """Test filter_by_factor returns filtered results (line 1199)."""

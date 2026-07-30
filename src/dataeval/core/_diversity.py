@@ -14,9 +14,8 @@ def diversity_shannon(
     num_bins: NDArray[np.intp],
 ) -> NDArray[np.double]:
     """
-    Compute :term:`diversity<Diversity>` for discrete/categorical variables and continuous variables.
+    Compute :term:`diversity<Diversity>` for discrete/categorical variables.
 
-    Uses standard histogram binning for continuous variables.
     We define diversity as a normalized form of the Shannon entropy.
 
     diversity = 1 implies that samples are evenly distributed across a particular factor
@@ -52,9 +51,8 @@ def diversity_simpson(
     num_bins: NDArray[np.intp],
 ) -> NDArray[np.double]:
     """
-    Compute :term:`diversity<Diversity>` for discrete/categorical variables and continuous variables.
+    Compute :term:`diversity<Diversity>` for discrete/categorical variables.
 
-    Uses standard histogram binning for continuous variables.
     We define diversity as the inverse Simpson diversity index linearly rescaled to the unit interval.
 
     diversity = 1 implies that samples are evenly distributed across a particular factor
