@@ -68,6 +68,7 @@ class ImageStats(Flag):
     - `DIMENSION_BASIC` : Width, height, channels
     - `DIMENSION_OFFSET` : Offset X and Y
     - `DIMENSION_POSITION` : Center, distance to center, distance to edge
+    - `DIMENSION_BOX` : Width, height, aspect ratio, size, offset, distance to center/edge, invalid box
     - `HASH_DUPLICATES_BASIC` : Standard duplicate detection (xxhash + phash + dhash)
     - `HASH_DUPLICATES_D4` : Rotation/flip-invariant detection (xxhash + phash_d4 + dhash_d4)
 
@@ -77,6 +78,7 @@ class ImageStats(Flag):
     - `PIXEL` : All pixel statistics
     - `VISUAL` : All visual statistics
     - `DIMENSION` : All dimension statistics
+    - `NO_HASH`: All non-hash statistics
     - `HASH` : All hash statistics
     - `ALL` : All available statistics
 
@@ -182,9 +184,21 @@ class ImageStats(Flag):
     DIMENSION_BASIC = DIMENSION_WIDTH | DIMENSION_HEIGHT | DIMENSION_CHANNELS | DIMENSION_ASPECT_RATIO
     DIMENSION_OFFSET = DIMENSION_OFFSET_X | DIMENSION_OFFSET_Y
     DIMENSION_POSITION = DIMENSION_CENTER | DIMENSION_DISTANCE_CENTER | DIMENSION_DISTANCE_EDGE
+    DIMENSION_BOX = (
+        DIMENSION_WIDTH
+        | DIMENSION_HEIGHT
+        | DIMENSION_ASPECT_RATIO
+        | DIMENSION_SIZE
+        | DIMENSION_OFFSET
+        | DIMENSION_DISTANCE_CENTER
+        | DIMENSION_DISTANCE_EDGE
+        | DIMENSION_INVALID_BOX
+    )
 
     HASH_DUPLICATES_BASIC = HASH_XXHASH | HASH_PHASH | HASH_DHASH
     HASH_DUPLICATES_D4 = HASH_XXHASH | HASH_PHASH_D4 | HASH_DHASH_D4
 
+    NO_HASH = PIXEL | VISUAL | DIMENSION
+
     # Ultimate convenience
-    ALL = PIXEL | VISUAL | DIMENSION | HASH
+    ALL = NO_HASH | HASH

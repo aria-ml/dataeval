@@ -1716,3 +1716,19 @@ class TestPixelStatsAllNanPerChannel:
 
         assert len(result) == 3
         assert all(np.isnan(v) for v in result)
+
+
+class TestDependencyRemoval:
+    """Test that computed dependencies are not returned in the output."""
+
+    def test_entropy_does_not_return_histogram(self):
+        images = [np.random.random((10, 10))]
+        result = compute_stats(images, stats=ImageStats.PIXEL_ENTROPY, normalize_pixel_values=False)
+        assert "entropy" in result["stats"]
+        assert "histogram" not in result["stats"]
+
+    def test_brightness_does_not_return_percentiles(self):
+        images = [np.random.random((10, 10))]
+        result = compute_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=False)
+        assert "brightness" in result["stats"]
+        assert "percentiles" not in result["stats"]

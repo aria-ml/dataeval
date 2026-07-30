@@ -53,7 +53,7 @@ class Diversity(Evaluator):
     """
     Computes diversity and classwise diversity for discrete/categorical variables.
 
-    Through standard histogram binning, for continuous variables.
+    Uses user provided bins or the auto_bin_method in Metadata to discretize continuous variables.
 
     The method specified defines diversity as the inverse Simpson diversity index linearly rescaled to
     the unit interval [0, 1], or the normalized form of the Shannon entropy.

@@ -40,7 +40,7 @@ class FactorInfo:
     factor_type: Literal["categorical", "continuous", "discrete"]
     is_binned: bool = False
     is_digitized: bool = False
-    level: Literal["image", "target"] = "image"
+    level: Literal["image", "target", "combined"] = "image"
 
 
 def _to_col(name: str, info: FactorInfo, binned: bool = True) -> str:
@@ -145,9 +145,11 @@ class Metadata(Array, FeatureExtractor):
         self._dataframe: pl.DataFrame
         self._raw: Sequence[Mapping[str, Any]]
         self._has_targets: bool | None = None
+        self._added_factor_levels: dict[str, Literal["image", "target", "combined"]]
 
         self._is_structured = False
         self._is_binned = False
+        self._added_factor_levels = {}
 
         self._dataset = dataset
         self._count = len(dataset) if dataset is not None and isinstance(dataset, Sized) else 0
@@ -382,6 +384,7 @@ class Metadata(Array, FeatureExtractor):
         self._is_structured = False
         self._is_binned = False
         self._has_targets = None
+        self._added_factor_levels = {}
         return self
 
     def __array__(self) -> NDArray[np.int64]:
@@ -1262,44 +1265,72 @@ class Metadata(Array, FeatureExtractor):
 
     def _infer_factor_level(
         self,
-        factors: Mapping[str, Array1D[Any]],
+        factor: Array1D[Any],
         num_image_rows: int,
         num_target_rows: int,
-    ) -> Literal["image", "target"]:
-        """Infer factor level based on array lengths."""
-        factor_lengths = {len(v) for v in factors.values()}
-        if len(factor_lengths) > 1:
-            raise ShapeMismatchError("All factors must have the same length when using level='auto'")
-        factor_len = factor_lengths.pop()
+    ) -> Literal["image", "target", "combined"]:
+        """Infer the level of a single factor array from its length."""
+        factor_len = len(factor)
 
         if factor_len == num_image_rows:
             return "image"
-        if factor_len == num_target_rows:
-            return "target"
+        if self.has_targets():
+            if factor_len == num_target_rows:
+                return "target"
+            if factor_len == num_image_rows + num_target_rows:
+                return "combined"
+
+        expected = (
+            f"{num_image_rows} (image count), {num_target_rows} (target count) or "
+            f"{num_image_rows + num_target_rows} (image count + target count)"
+            if self.has_targets()
+            else f"{num_image_rows} (image count)"
+        )
         raise ShapeMismatchError(
             "The lists/arrays in the provided factors have a different length "
-            f"than the current metadata factors. Expected {num_image_rows} (image count) "
-            f"or {num_target_rows} (target count), got {factor_len}.",
+            f"than the current metadata factors. Expected {expected}, got {factor_len}.",
         )
 
     def _validate_factor_lengths(
         self,
-        factors: Mapping[str, Array1D[Any]],
+        factors: Array1D[Any],
         level: str,
         num_image_rows: int,
         num_target_rows: int,
     ) -> None:
-        """Validate that factor lengths match the specified level."""
-        if level == "image":
-            expected_len = num_image_rows
-            if not all(len(v) == expected_len for v in factors.values()):
-                raise ShapeMismatchError(f"All image-level factors must have length {expected_len} (image count)")
-        elif level == "target":
-            expected_len = num_target_rows
-            if not all(len(v) == expected_len for v in factors.values()):
-                raise ShapeMismatchError(f"All target-level factors must have length {expected_len} (target count)")
-        else:
-            raise ValueError(f"Invalid level: {level}. Must be 'image', 'target', or 'auto'")
+        """Validate that a single factor array's length matches the requested level."""
+        expected = {
+            "image": (num_image_rows, "image count"),
+            "target": (num_target_rows, "target count"),
+            "combined": (num_image_rows + num_target_rows, "image count + target count"),
+        }.get(level)
+        if expected is None:
+            raise ValueError(f"Invalid level: {level}. Must be 'image', 'target', 'combined', or 'auto'")
+
+        if level != "image" and not self.has_targets():
+            raise ValueError(
+                f"Invalid level: {level}. The bound dataset has no targets, so only 'image' "
+                "(or 'auto') is meaningful. Use level='image'."
+            )
+
+        expected_len, description = expected
+        if len(factors) != expected_len:
+            raise ShapeMismatchError(f"All {level}-level factors must have length {expected_len} ({description})")
+
+    def _source_index_order(self) -> list[int]:
+        """Row positions of the dataframe sorted by ``(item_index, target_index)``, image row first.
+
+        This is the row ordering produced by :func:`~dataeval.core.compute_stats` when both
+        ``per_image`` and ``per_target`` are enabled, and is what ``level="combined"`` expects.
+        Element ``j`` of the returned list is the dataframe row that the ``j``-th value of a
+        combined-level array belongs to.
+        """
+        items = self._dataframe["item_index"].to_list()
+        targets = self._dataframe["target_index"].to_list()
+        return sorted(
+            range(len(items)),
+            key=lambda i: (items[i], -1 if targets[i] is None else targets[i]),
+        )
 
     def _create_factor_column(self, data_array: NDArray, level: str, num_image_rows: int) -> list:
         """Create a factor column with values at the appropriate level.
@@ -1322,6 +1353,15 @@ class Metadata(Array, FeatureExtractor):
                 target_values = []
 
             return image_values + target_values
+        if level == "combined":
+            # Combined arrays arrive in source-index order (item, then target within item,
+            # image row first) while the dataframe stores every image row ahead of every
+            # target row. Scatter each value onto the row it actually describes.
+            values = data_array.tolist()
+            column: list = [None] * len(values)
+            for source_position, row in enumerate(self._source_index_order()):
+                column[row] = values[source_position]
+            return column
         # level == "target"
         # Create column: None in image rows, target-level values in target rows
         return [None] * num_image_rows + list(data_array)
@@ -1688,8 +1728,13 @@ class Metadata(Array, FeatureExtractor):
         for i, col in enumerate(factors_to_process):
             data = data_df[col].to_numpy()
             df, info = self._process_factor(df, col, data, factor_bins, is_od)
-            if is_od and col in target_only:
-                info.level = "target"
+            if is_od:
+                # Factors added via add_factors carry an explicit level; built-in factors are
+                # image-level (the FactorInfo default) unless they only exist on target rows.
+                if col in self._added_factor_levels:
+                    info.level = self._added_factor_levels[col]
+                elif col in target_only:
+                    info.level = "target"
             factor_info[col] = info
 
             if progress_callback:
@@ -1700,32 +1745,91 @@ class Metadata(Array, FeatureExtractor):
         self._factors.update(factor_info)
         self._is_binned = True
 
+    def _resolve_factor_name(self, name: str, taken: set[str], overwrite: bool, append_string: str) -> str:
+        """Pick the dataframe column a new factor should be written to.
+
+        Reserved columns are never written to directly; user factors that collide with
+        one are prefixed the same way :meth:`_structure` prefixes dataset metadata keys.
+        """
+        if name in _RESERVED_COLUMNS:
+            _logger.warning(
+                "Factor '%s' collides with a reserved column; storing it as 'metadata_%s' instead.", name, name
+            )
+            name = f"metadata_{name}"
+
+        if name not in taken or overwrite:
+            return name
+
+        candidate = f"{name}{append_string}"
+        suffix = 2
+        while candidate in taken:
+            candidate = f"{name}{append_string}_{suffix}"
+            suffix += 1
+        return candidate
+
     def add_factors(  # noqa: C901
         self,
         factors: Mapping[str, Array1D[Any]],
-        level: Literal["image", "target", "auto"] = "auto",
+        level: Literal["image", "target", "combined", "auto"] = "auto",
+        overwrite: bool = False,
+        append_string: str = "_added",
     ) -> None:
         """Add additional factors to metadata collection.
 
-        Extend the current metadata with new factors at either image or target level.
-        For image-level factors, values are stored only in image-level rows.
-        For target-level factors, values are stored only in target-level rows.
+        Extend the current metadata with new factors at image, target or combined level.
+        For image-level factors, values are stored in image-level rows and replicated to
+        the target rows of the same image. For target-level factors, values are stored
+        only in target-level rows.
 
         Parameters
         ----------
         factors : Mapping[str, _1DArray[Any]]
             Mapping of factor names to their values. Factor length must match
-            the specified level (image count or target count).
-        level : {"image", "target", "auto"}, default="auto"
+            the specified level (image count or target count or image count + target count).
+        level : {"image", "target", "combined", "auto"}, default="auto"
             Level at which to store the factors:
+
             - "image": Array length must match image count, stored in image-level rows only
             - "target": Array length must match target count, stored in target-level rows only
-            - "auto": Automatically infers level based on array length
+            - "combined": Array length must match image count + target count, holding both
+              per-image and per-target values in source-index order (see Notes)
+            - "auto": Infers the level of each factor independently from its array length
+
+            Datasets without targets (image classification) only accept "image" and "auto".
+        overwrite : bool, default False
+            Whether to overwrite factors of the same name already present in the metadata.
+            When False, a colliding factor is stored under a new name instead (see `append_string`).
+        append_string : str, default "_added"
+            Suffix appended to a factor name that collides with an existing column when
+            `overwrite` is False. If the suffixed name is also taken, an incrementing
+            counter is appended (``brightness_added``, ``brightness_added_2``, ...).
 
         Raises
         ------
-        ValueError
+        ShapeMismatchError
             When factor lengths do not match the specified level's dimensions.
+        ValueError
+            When `level` is not one of the accepted values, or a target/combined level is
+            requested for a dataset without targets.
+
+        Notes
+        -----
+        If providing a group of factors that have different levels (i.e. some of the factors are image-level
+        and some of the factors are target-level), then use "auto" for the level value.
+
+        A "combined" array is ordered the way :func:`~dataeval.core.compute_stats` orders its
+        results when both ``per_image`` and ``per_target`` are enabled: sorted by item, with each
+        image's own value ahead of that image's target values. Output of ``compute_stats`` can
+        therefore be passed straight through without reordering. This differs from the
+        dataframe's own layout, which stores every image row ahead of every target row;
+        `add_factors` maps between the two.
+
+        Multi-dimensional values (vector-valued statistics such as ``histogram``,
+        ``percentiles`` or ``center``) have no single-column representation and are skipped
+        with a warning; the skipped names are recorded in :attr:`dropped_factors`.
+
+        Either every factor in `factors` is added or none is — a validation failure on any
+        factor leaves the metadata unchanged.
 
         Examples
         --------
@@ -1752,29 +1856,63 @@ class Metadata(Array, FeatureExtractor):
         num_image_rows = len(self.image_data)
         num_target_rows = len(self.target_data)
 
-        # Determine the level
-        if level == "auto":
-            level = self._infer_factor_level(factors, num_image_rows, num_target_rows)
+        # Resolve, validate and materialize every column before touching any state, so that a
+        # bad factor anywhere in the mapping leaves this Metadata instance exactly as it was.
+        taken = set(self._dataframe.columns)
+        resolved: list[tuple[str, Literal["image", "target", "combined"], list]] = []
+        skipped: list[str] = []
+        for name, values in factors.items():
+            data_array = as_numpy(values)
+            if data_array.ndim > 1:
+                skipped.append(name)
+                continue
+            if level == "auto":
+                col_level = self._infer_factor_level(data_array, num_image_rows, num_target_rows)
+            else:
+                col_level = level
+                self._validate_factor_lengths(data_array, col_level, num_image_rows, num_target_rows)
+            column = self._create_factor_column(data_array, col_level, num_image_rows)
+            col_name = self._resolve_factor_name(name, taken, overwrite, append_string)
+            taken.add(col_name)
+            resolved.append((col_name, col_level, column))
 
-        # Validate factor lengths match the specified level
-        self._validate_factor_lengths(factors, level, num_image_rows, num_target_rows)
+        if skipped:
+            _logger.warning(
+                "Skipping multi-dimensional factors %s; add_factors only accepts 1-D arrays. "
+                "Reduce vector-valued statistics to one value per row before adding them.",
+                sorted(skipped),
+            )
+            for name in skipped:
+                reasons = self._dropped_factors.setdefault(name, [])
+                if "multi_dimensional" not in reasons:
+                    reasons.append("multi_dimensional")
 
-        # Add factors to the appropriate rows
-        new_columns = []
-        for k, v in factors.items():
-            data_array = as_numpy(v)
-            full_data = self._create_factor_column(data_array, level, num_image_rows)
-            new_columns.append(pl.Series(name=k, values=full_data))
-            self._factors[k] = None
+        if not resolved:
+            return
 
-        if new_columns:
-            self._dataframe = self.dataframe.with_columns(new_columns)
-            self._is_binned = False
-            if level == "image":
-                self._image_factors.update(factors)
-            elif level == "target":
-                self._target_factors.update(factors)
-            self._build_factors()
+        # Drop any stale binned/digitized companion columns of the factors being replaced,
+        # otherwise _bin() skips them and they disappear from factor_info.
+        self._reset_bins([name for name, _, _ in resolved])
+
+        self._dataframe = self._dataframe.with_columns([
+            pl.Series(name=name, values=column) for name, _, column in resolved
+        ])
+        for name, col_level, _ in resolved:
+            # A factor has exactly one level; clear stale membership before re-registering.
+            self._image_factors.discard(name)
+            self._target_factors.discard(name)
+            # "combined" factors are registered as target factors only: they hold per-target
+            # values, so target_factors_only must keep them, and _build_factors computes that
+            # set as _target_factors - _image_factors. Their level is tracked separately.
+            if col_level == "image":
+                self._image_factors.add(name)
+            else:
+                self._target_factors.add(name)
+            self._added_factor_levels[name] = col_level
+            self._factors[name] = None
+
+        self._is_binned = False
+        self._build_factors()
 
     def filter_by_factor(self, condition: Callable[[str, FactorInfo], bool]) -> NDArray[np.float64]:
         """Filter metadata factors by factor name or FactorInfo.
