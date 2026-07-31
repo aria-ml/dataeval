@@ -338,15 +338,51 @@ def lock(session: nox.Session) -> None:
 
 @session(uv_only_groups=["docsync"], uv_no_install_project=True)
 def docsync(session: nox.Session) -> None:
-    """Sync notebook .py/.ipynb pairs."""
+    """
+    Sync notebook .py/.ipynb pairs.
+
+    Posargs:
+        adopt [stem ...] -- generate .py scripts for orphan .ipynb files
+        prune [stem ...] -- delete orphan .ipynb files
+    """
     notebook_dir = "docs/source/notebooks"
 
-    # Generate .py for any new .ipynb files without a script pair
+    adopt = "adopt" in session.posargs
+    prune = "prune" in session.posargs
+    if adopt and prune:
+        session.error("Pass either 'adopt' or 'prune', not both")
+    selected = {arg for arg in session.posargs if arg not in {"adopt", "prune"}}
+    if selected and not (adopt or prune):
+        session.error(f"Notebook names require 'adopt' or 'prune': {', '.join(sorted(selected))}")
+
+    # The .py scripts are the committed source of truth and the .ipynb files are gitignored
+    # build artifacts, so an .ipynb without a script pair is usually left over from another
+    # branch rather than a new notebook. Never touch those implicitly -- adopting one into a
+    # script (or deleting it) is opt-in.
     ipynb_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.ipynb")}
     py_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.py")}
-    for stem in sorted(ipynb_stems - py_stems):
-        session.log(f"Generating script for new notebook: {stem}.ipynb")
-        session.run("jupytext", "--to", "py:percent", f"{notebook_dir}/{stem}.ipynb")
+    orphans = sorted(ipynb_stems - py_stems)
+    if selected:
+        unknown = selected - set(orphans)
+        if unknown:
+            session.error(f"Not an orphan notebook: {', '.join(sorted(unknown))}")
+        orphans = sorted(selected)
+
+    for stem in orphans:
+        if adopt:
+            session.log(f"Generating script for notebook: {stem}.ipynb")
+            session.run("jupytext", "--to", "py:percent", f"{notebook_dir}/{stem}.ipynb")
+        elif prune:
+            session.log(f"Removing orphan notebook: {stem}.ipynb")
+            Path(f"{notebook_dir}/{stem}.ipynb").unlink()
+        else:
+            session.warn(f"Skipping orphan notebook (no {stem}.py pair): {stem}.ipynb")
+    if orphans and not (adopt or prune):
+        session.warn(
+            "Orphan notebooks are usually left over from another branch. Delete them with "
+            "'nox -s docsync -- prune [name ...]', or keep a new one with "
+            "'nox -s docsync -- adopt [name ...]'."
+        )
 
     # Bidirectional sync: updates whichever side is stale (uses jupytext.toml pairing)
     # If ipynb is newer -> updates py; if py is newer -> updates ipynb

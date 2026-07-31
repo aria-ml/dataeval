@@ -22,7 +22,7 @@ nox -e docsync    # generates .ipynb files from .py source
 
 1. Create `docs/source/notebooks/<name>.ipynb` in VS Code or Jupyter
 2. Edit cells and run them
-3. Run `nox -e docsync` to generate the `.py` pair
+3. Run `nox -e docsync -- adopt <name>` to generate the `.py` pair
 4. Commit only the `.py` file
 
 ### Editing an Existing Notebook
@@ -41,9 +41,22 @@ nox -e docsync    # generates .ipynb files from .py source
 
 `nox -e docsync` runs two steps in order:
 
-1. **Orphan detection** -- generates `.py` for any new `.ipynb` without a script pair
+1. **Orphan detection** -- reports any `.ipynb` without a `.py` pair and leaves it alone
 2. **Bidirectional sync** -- `jupytext --sync` updates whichever side is stale based on
    file modification timestamps
+
+Because `.ipynb` files are gitignored, they survive branch switches: a notebook that only
+exists on another branch is left behind as an orphan when you check this one out. Generating
+a script for it would resurrect that notebook on the wrong branch, so orphans are never
+adopted implicitly. Two posargs act on them explicitly:
+
+```bash
+nox -e docsync -- prune            # delete every orphan .ipynb (leftovers from other branches)
+nox -e docsync -- adopt <name>     # generate the .py pair for a genuinely new notebook
+```
+
+Both accept one or more notebook names (stems, without the extension) to act on a subset;
+with no names, they act on every orphan.
 
 ## Documentation Build
 
