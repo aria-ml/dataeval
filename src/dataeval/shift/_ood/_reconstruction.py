@@ -101,6 +101,16 @@ class OODReconstruction(ExtractorMixin, BaseOOD):
     >>> ood = OODReconstruction(vae, model_type="vae", use_gmm=False, threshold_perc=95, config=config)
     >>> ood.fit(train_data)
     OODReconstruction(loss_fn=None, optimizer=None, epochs=20, batch_size=64, threshold_perc=95, gmm_weight=0.5, gmm_score_mode='standardized', fitted=False)
+
+    References
+    ----------
+    [1] Back to the basics: Revisiting out-of-distribution detection baselines.
+        Kuan, J., & Mueller, J. (2022). arXiv preprint arXiv:2207.03061.
+        https://arxiv.org/abs/2207.03061
+    [2] Alibi Detect: Algorithms for outlier, adversarial and drift detection.
+        Van Looveren, A., Klaise, J., Vacanti, G., Cobb, O., Scillitoe, A., Samoilescu, R., & Athorne, A. (2024). Seldon
+        Technologies.
+        https://docs.seldon.ai/alibi-detect
     """  # noqa: E501
 
     @dataclass

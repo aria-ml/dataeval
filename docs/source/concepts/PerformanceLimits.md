@@ -125,7 +125,7 @@ $$\hat{e}_\text{upper} = \frac{2 \cdot \text{mismatches}}{n}$$
 
 The lower bound is derived from the multi-class extension of the
 Hellman-Devroye inequality (see Tumer & Ghosh, 1996; Th. 3 and Th. 4 in
-Noshad et al., 2019):
+Sekeh et al., 2020):
 
 $$\hat{e}_\text{lower} = \frac{m-1}{m}\left(1 - \sqrt{\max\!\left(0,\; 1 - \frac{2m}{m-1}\hat{e}_\text{upper}\right)}\right)$$
 
@@ -337,8 +337,9 @@ mismatch between train and test — the projection will be optimistic.
 1. Devroye, L. (1981). On the inequality of Cover and Hart in nearest neighbor
    discrimination. _IEEE Transactions on Information Theory_, 27(1), 68–70. [paper](https://ieeexplore.ieee.org/document/4767052)
 
-2. Noshad, M., Xu, L., & Hero, A. O. (2019). Learning to bound the multi-class
-   Bayes error. _IEEE Transactions on Signal Processing_, 67(14), 3657–3669. [paper](https://arxiv.org/abs/1811.06419)  
+2. Sekeh, S. Y., Oselio, B., & Hero, A. O. (2020). Learning to bound the
+   multi-class Bayes error. _IEEE Transactions on Signal Processing_, 68,
+   3793–3807. doi: 10.1109/TSP.2020.2994807 [paper](https://arxiv.org/abs/1811.06419)  
    (Theorems 3 and 4 provide the MST and KNN bound derivations used in DataEval.)
 
 3. Borji, A., & Iranmanesh, S. M. (2019). Empirical upper bound in object

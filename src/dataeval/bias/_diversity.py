@@ -92,6 +92,13 @@ class Diversity(Evaluator):
     - If there is only one category, the diversity index takes a value of 0.
     - Factors with diversity values <= threshold represent low diversity and are flagged.
 
+    References
+    ----------
+    [1] Diversity and evenness: A unifying notation and its consequences.
+        Hill, M. O. (1973). Ecology, 54(2), 427-432.
+    [2] Indices of diversity and evenness.
+        Heip, C. H. R., Herman, P. M. J., & Soetaert, K. (1998). Oceanis, 24(4), 61-87.
+
     Examples
     --------
     Initialize the Diversity class:

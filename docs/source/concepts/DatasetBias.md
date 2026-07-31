@@ -346,11 +346,17 @@ the data truly reaches:
 
 $\text{isotropy} = \frac{d_\text{eff}}{r}$
 
-where $r = \text{rank}(X)$ is computed from the raw (non-rank-normalized) SVD
-using a numerically stable threshold. Isotropy is always in $[0, 1]$: a value of
-1.0 means variance is distributed evenly across all occupied dimensions; a low
-value means a few directions dominate and the occupied subspace is
-underutilized.
+where $r = \text{rank}(X)$ is computed using a numerically stable threshold.
+Isotropy is always in $[0, 1]$: a value of 1.0 means variance is distributed
+evenly across all occupied dimensions; a low value means a few directions
+dominate and the occupied subspace is underutilized.
+
+One implementation detail matters when comparing the two numbers directly:
+isotropy's $d_\text{eff}$ is computed from the **raw** centered embeddings,
+while completeness's is computed from the **rank-normalized** matrix described
+above. Completeness is therefore invariant to monotone rescaling of individual
+dimensions and isotropy is not; isotropy reports the variance geometry of the
+embedding space as the extractor actually produced it.
 
 Completeness and isotropy are complementary. Completeness is penalized by both
 unused ambient dimensions and uneven variance within the occupied subspace.
@@ -359,6 +365,33 @@ independent of how many ambient dimensions are unused. A dataset can have low
 completeness with high isotropy (data confined to a low-dimensional subspace but
 evenly spread within it), or high completeness with low isotropy (data reaching
 many dimensions but with variance concentrated in a few).
+
+**Where this estimator comes from.** Both metrics rest on the effective
+dimensionality $d_\text{eff} = e^H$, where $H$ is the Shannon entropy of the
+covariance eigenvalues normalized to sum to one. This estimator is novel in this
+exact form but not unprecedented: it is closely related to the **effective
+rank** of [Roy & Vetterli (2007)](#ref15), which applies the same $e^H$
+construction to the normalized _singular_ values. Taking the entropy over _eigenvalues_ instead
+makes $d_\text{eff}$ the exponential of the von Neumann entropy of the
+trace-normalized covariance matrix — the form
+[Kim et al. (2023)](#ref17) use to regularize representation rank and isotropy,
+and [Zhuo et al. (2023)](#ref18) apply to feature-correlation eigenvalues. It is
+the entropy-based sibling of the **participation ratio**
+$\left(\sum_i \lambda_i\right)^2 / \sum_i \lambda_i^2$ commonly used for the
+effective dimensionality of neural representations
+([Gao et al., 2017](#ref16)); both summarize a spectrum by how evenly its mass
+is spread, the participation ratio through a second-moment ratio and
+$d_\text{eff}$ through entropy, which weights the long tail of small
+eigenvalues more heavily.
+
+Beyond the choice of spectrum summary, what DataEval adds is the normalization:
+the two metrics differ only in what $d_\text{eff}$ is divided by. Completeness
+divides by the ambient dimension $d$, yielding the fraction of the
+representation space the data occupies. Isotropy divides by the numerical rank
+$r$, yielding directional evenness within the occupied subspace. Neither
+normalization is inherited from the works above, and neither has been validated
+against an external implementation — see
+[Validation and Trust](ValidationAndTrust.md#core-functions).
 
 Completeness also returns **nearest neighbor pairs** sorted by decreasing
 distance, identifying the samples that are most isolated from any neighbor.
@@ -564,3 +597,24 @@ explicitly.
 14. [Linfoot, E.H. (1957). "An Informational Measure of Correlation."
     Information and Control, 1(1), 85-89.
     [paper]<https://www.sciencedirect.com/science/article/pii/S001999585790116X>]{#ref14}
+
+15. [Roy, O., & Vetterli, M. (2007). The effective rank: A measure of effective
+    dimensionality. _Proceedings of the 15th European Signal Processing
+    Conference (EUSIPCO)_, 606–610.
+    [paper](https://www.eurasip.org/Proceedings/Eusipco/Eusipco2007/Papers/a5p-h05.pdf)]{#ref15}
+
+16. [Gao, P., Trautmann, E., Yu, B., Santhanam, G., Ryu, S., Shenoy, K., &
+    Ganguli, S. (2017). A theory of multineuronal dimensionality, dynamics and
+    measurement. _bioRxiv_, 214262.
+    [paper](https://doi.org/10.1101/214262)]{#ref16}
+
+17. [Kim, J., Kang, S., Hwang, D., Shin, J., & Rhee, W. (2023). VNE: An effective
+    method for improving deep representation by manipulating eigenvalue
+    distribution. _Proceedings of the IEEE/CVF Conference on Computer Vision and
+    Pattern Recognition (CVPR)_, 3799–3810.
+    [paper](https://openaccess.thecvf.com/content/CVPR2023/html/Kim_VNE_An_Effective_Method_for_Improving_Deep_Representation_by_Manipulating_CVPR_2023_paper.html)]{#ref17}
+
+18. [Zhuo, Z., Wang, Y., Ma, J., & Wang, Y. (2023). Towards a unified theoretical
+    understanding of non-contrastive learning via rank differential mechanism.
+    _International Conference on Learning Representations (ICLR)_.
+    [paper](https://arxiv.org/abs/2303.02387)]{#ref18}

@@ -15,6 +15,7 @@ Each page may cover several evaluators that work together to answer questions ab
 - [Divergence](Divergence.md)
 - [Data Leakage](Leakage.md)
 - [Acting on Results](ActingOnResults.md)
+- [Validation and Trust](ValidationAndTrust.md)
 
 :::{toctree}
 :hidden:
@@ -29,4 +30,5 @@ DistributionShift
 Divergence
 Leakage
 ActingOnResults
+ValidationAndTrust
 :::

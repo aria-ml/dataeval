@@ -960,6 +960,15 @@ class Duplicates(Evaluator):
     merge_near_duplicates : bool
         Whether to merge overlapping near duplicate groups.
 
+    References
+    ----------
+    [1] Implementation and benchmarking of perceptual image hash functions.
+        Zauner, C. (2010). Bachelor's thesis, Upper Austria University of Applied Sciences.
+        https://www.phash.org/docs/pubs/thesis_zauner.pdf
+    [2] Semantic redundancy in image classification datasets.
+        Birodkar, V., Mobahi, H., & Bengio, S. (2019). arXiv preprint arXiv:1901.11409.
+        https://arxiv.org/abs/1901.11409
+
     Examples
     --------
     Basic hash-based detection (default):

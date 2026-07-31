@@ -80,6 +80,18 @@ class Sufficiency(Evaluator, Generic[T, M]):
     Multiple runs average results to reduce variance.
 
     Parameters passed directly to __init__ override config defaults.
+
+    References
+    ----------
+    [1] Deep learning scaling is predictable, empirically.
+        Hestness, J., Narang, S., Ardalani, N., Diamos, G., Jun, H., Kianinejad, H., Patwary, M. A., Yang, Y., & Zhou,
+        Y. (2017). arXiv preprint arXiv:1712.00409.
+        https://arxiv.org/abs/1712.00409
+    [2] Global optimization by basin-hopping and the lowest energy structures of Lennard-Jones clusters containing up to
+        110 atoms.
+        Wales, D. J., & Doye, J. P. K. (1997). Journal of Physical Chemistry A, 101(28), 5111-5116. (Basin-hopping
+        algorithm used for power law curve fitting.)
+        https://arxiv.org/abs/cond-mat/9803344
     """
 
     class Config(EvaluatorConfig, Generic[_T, _M]):

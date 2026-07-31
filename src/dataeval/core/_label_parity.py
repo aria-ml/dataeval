@@ -157,6 +157,13 @@ def label_parity(
     - This function acts as an interface to :func:`scipy.stats.chisquare`.
 
 
+    References
+    ----------
+    [1] On the criterion that a given system of deviations from the probable in the
+        case of a correlated system of variables is such that it can be reasonably
+        supposed to have arisen from random sampling.
+        Pearson, K. (1900). Philosophical Magazine, 50(302), 157-175.
+
     Examples
     --------
     Randomly creating some label distributions using :func:`np.random.default_rng <numpy.random.default_rng>`

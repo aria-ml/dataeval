@@ -125,6 +125,9 @@ variety of metrics and tasks.
 - [Dataset Bias and Coverage](DatasetBias.md) — how coverage and completeness
   analyze the embedding space
 - [Distribution Shift](DistributionShift.md) — monitoring shifts in the embedding space
+- [Validation and Trust](ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers)
+  — every extractor DataEval ships, what each one embeds, and how each can
+  mislead a downstream metric
 - [Acting on Results](ActingOnResults.md) — how to interpret and respond to
   analyses that rely on embeddings
 

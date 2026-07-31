@@ -1671,6 +1671,20 @@ class Metadata(Array, FeatureExtractor):
         df = self._add_column_with_padding(df, col_bn, binned_data.astype(np.int64), is_od)
         return df, FactorInfo("continuous", is_binned=True)
 
+    def _continuity_sample(self, col: str, data: NDArray, is_od: bool) -> NDArray:
+        """
+        Return the values whose spacing decides whether a factor is continuous.
+
+        For object detection, an image-level factor is replicated across every target in
+        that image. Those repeats are one observation recorded many times, and counting
+        them multiplies exact duplicates until a continuous factor reads as discrete. The
+        image-level rows already hold one value per image, so use them directly rather
+        than trying to recover them from the replicated column.
+        """
+        if is_od and col in self._image_factors:
+            return self.image_data[col].to_numpy()
+        return data
+
     def _process_factor(
         self,
         df: pl.DataFrame,
@@ -1686,7 +1700,7 @@ class Metadata(Array, FeatureExtractor):
         _, ordinal = np.unique(data, return_inverse=True)
         if not np.issubdtype(data.dtype, np.number):
             return self._process_categorical_factor(df, col, ordinal, is_od)
-        if is_continuous(data, self.item_indices):
+        if is_continuous(self._continuity_sample(col, data, is_od)):
             return self._process_continuous_factor(df, col, data, is_od)
         # Digitize discrete numeric factors so that factor_data always
         # contains non-negative integers (required by np.bincount in

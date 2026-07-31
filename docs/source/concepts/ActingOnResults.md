@@ -230,6 +230,28 @@ diversity on the identified low-utilization dimensions requires understanding
 what those dimensions correspond to in the embedding model, which is an
 interpretation task requiring domain knowledge.
 
+Read completeness alongside the **isotropy** score returned by the same call
+before deciding what to collect. Both divide the same effective dimensionality
+$d_\text{eff} = e^H$, completeness by the ambient dimensionality and isotropy by
+the numerical rank, so the pair separates two different shortfalls (see
+[Completeness and isotropy](DatasetBias.md#measuring-coverage-geometry-in-embedding-space)):
+
+- **Low completeness, high isotropy** — the data occupies a small subspace but
+  fills it evenly. The missing variation is in factors the current collection
+  never varied at all. Collect along _new_ axes: new sites, sensors, seasons,
+  viewpoints.
+- **Low completeness, low isotropy** — a few directions dominate. Some factor is
+  varying much more than the rest, often an incidental one (a single dominant
+  background, one camera's color response). Rebalance what you already collect
+  before adding axes.
+- **High completeness** — the diversity question is answered at the population
+  level; move to coverage gaps for the region-level one.
+
+Isotropy is also reported per class by {class}`.Coverage`, which is where it is
+most actionable — a single class varying along one axis is a collection gap you
+can name, while a dataset-level score is not. That column is null, not zero, for
+classes with fewer samples than the embedding has dimensions.
+
 Both metrics are contingent on the quality of the embedding. Coverage gaps and
 completeness scores are only as meaningful as the embedding model is
 discriminative for your task. See the [Embeddings](Embeddings.md) concept page

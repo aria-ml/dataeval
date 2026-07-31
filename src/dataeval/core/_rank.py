@@ -131,6 +131,15 @@ def rank_knn(
     ValueError
         If k is invalid (>= dataset size or negative).
 
+    References
+    ----------
+    [1] Beyond neural scaling laws: beating power law scaling via data pruning.
+        Sorscher, B., Geirhos, R., Shekhar, S., Ganguli, S., & Morcos, A. S. (2022). Advances in Neural Information
+        Processing Systems 35 (NeurIPS 2022). (Benchmarks neighborhood-distance metrics of this kind against other
+        pruning metrics; this function implements the general k-th nearest neighbor distance rather than that paper's
+        proposed metric.)
+        https://arxiv.org/abs/2206.14486
+
     Examples
     --------
     >>> from dataeval.core import rank_knn
@@ -183,6 +192,14 @@ def rank_kmeans_distance(
     ValueError
         If c is invalid (>= dataset size or negative).
 
+    References
+    ----------
+    [1] Beyond neural scaling laws: beating power law scaling via data pruning.
+        Sorscher, B., Geirhos, R., Shekhar, S., Ganguli, S., & Morcos, A. S. (2022). Advances in Neural Information
+        Processing Systems 35 (NeurIPS 2022). (Source of the self-supervised prototypicality metric: cluster the
+        embeddings, then rank each sample by its distance to its cluster centroid.)
+        https://arxiv.org/abs/2206.14486
+
     Examples
     --------
     >>> from dataeval.core import rank_kmeans_distance
@@ -233,6 +250,14 @@ def rank_kmeans_complexity(
     ValueError
         If c is invalid (>= dataset size or negative).
 
+    References
+    ----------
+    [1] Effective pruning of web-scale datasets based on complexity of concept clusters.
+        Abbas, A., Rusak, E., Tirumala, K., Brendel, W., Chaudhuri, K., & Morcos, A. S. (2024). International Conference
+        on Learning Representations (ICLR 2024). (Source of the cluster complexity measure - the product of intra-
+        cluster and inter-cluster distance - and of allocating a sampling budget across clusters in proportion to it.)
+        https://arxiv.org/abs/2401.04578
+
     Examples
     --------
     >>> from dataeval.core import rank_kmeans_complexity
@@ -277,6 +302,14 @@ def rank_hdbscan_distance(
         - scores: NDArray[np.float32] | None - Distance to cluster center for each sample
         - method: str - "hdbscan_distance"
         - policy: str - "easy_first"
+
+    References
+    ----------
+    [1] Beyond neural scaling laws: beating power law scaling via data pruning.
+        Sorscher, B., Geirhos, R., Shekhar, S., Ganguli, S., & Morcos, A. S. (2022). Advances in Neural Information
+        Processing Systems 35 (NeurIPS 2022). (Source of the self-supervised prototypicality metric: cluster the
+        embeddings, then rank each sample by its distance to its cluster centroid.)
+        https://arxiv.org/abs/2206.14486
 
     Examples
     --------
@@ -329,6 +362,14 @@ def rank_hdbscan_complexity(
 
         - indices: NDArray[np.intp] - Indices sorted in easy-first order
         - scores: None (this method does not produce scores)
+
+    References
+    ----------
+    [1] Effective pruning of web-scale datasets based on complexity of concept clusters.
+        Abbas, A., Rusak, E., Tirumala, K., Brendel, W., Chaudhuri, K., & Morcos, A. S. (2024). International Conference
+        on Learning Representations (ICLR 2024). (Source of the cluster complexity measure - the product of intra-
+        cluster and inter-cluster distance - and of allocating a sampling budget across clusters in proportion to it.)
+        https://arxiv.org/abs/2401.04578
 
     Examples
     --------
@@ -475,6 +516,14 @@ def rank_result_stratified(
     ------
     ValueError
         If result does not contain scores.
+
+    References
+    ----------
+    [1] Coverage-centric Coreset Selection for High Pruning Rates.
+        Zheng, H., Liu, R., Lai, F., & Prakash, A. (2023). International Conference on Learning Representations (ICLR
+        2023). (Source of stratifying samples into score bins and selecting across bins to preserve distribution
+        coverage at high pruning rates.)
+        https://arxiv.org/abs/2210.15809
     """
     if result["scores"] is None:
         raise ValueError(
