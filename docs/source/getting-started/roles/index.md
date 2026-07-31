@@ -143,7 +143,7 @@ of the data distributions between the test set and the train and validation sets
 After the test set is adequately divergent from both the train and validation sets,
 the T&E Engineer focuses on identifying the edge cases in the dataset. They use
 a combination of [imagestats](../../notebooks/h2_visualize_cleaning_issues.py),
-{func}`.labelstats`, [coverage](../../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) and the
+{func}`.label_stats`, [coverage](../../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) and the
 [out-of-distribution (OOD) detectors](../../concepts/DistributionShift.md#out-of-distribution-detection).
 After identifying the edge cases, they test both models on the entire test set, noting the performance of each model
 on the edge case images. They discover that the convolutional-based model has an

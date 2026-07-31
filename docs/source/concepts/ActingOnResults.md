@@ -209,7 +209,7 @@ limitation).
 
 ### Coverage and completeness
 
-{func}`.coverage` identifies regions of the embedding space with no reference
+{class}`.Coverage` identifies regions of the embedding space with no reference
 samples nearby — gaps in the feature space where the model will be operating
 without having seen similar data during training. {func}`.completeness` measures
 the effective dimensionality utilization of the embedding space: whether the
@@ -618,7 +618,7 @@ class, the `.factors` attribute provides this format directly.
 ## Divergence scores
 
 Where drift detectors return a binary signal — drifted or not — HP divergence
-({func}`.divergence`) returns a continuous score between 0 and 1. The two are
+({func}`.divergence_mst`) returns a continuous score between 0 and 1. The two are
 complementary: drift detection tells you when to act; divergence tells you _how
 much_ the situation has changed, which is the information needed to calibrate
 the urgency and scale of the response.

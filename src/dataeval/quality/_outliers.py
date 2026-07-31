@@ -586,7 +586,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             - ``float``: symmetric multiplier for modified z-score
             - ``str``: named threshold type (``"zscore"``, ``"iqr"``, etc.)
             - ``tuple``: named threshold with bounds, e.g. ``("zscore", 2.5)``
-            - :class:`~dataeval.utils.thresholds.Threshold`: fully configured
+            - :class:`~dataeval.protocols.Threshold`: fully configured
               threshold
             - ``Mapping[str, ThresholdLike]``: per-metric thresholds
         cluster_threshold : ThresholdLike or None
@@ -902,7 +902,7 @@ class Outliers(Evaluator):
     Supports two complementary detection methods:
 
     1. **Image statistics-based**: Computes pixel-level statistics (brightness, contrast, etc.)
-       and flags images with unusual values using configurable :class:`~dataeval.utils.thresholds.Threshold`
+       and flags images with unusual values using configurable :class:`~dataeval.protocols.Threshold`
        objects.
     2. **Cluster-based**: Uses embeddings from a neural network to cluster images and identifies
        outliers based on distance from cluster centers in embedding space.
@@ -928,7 +928,7 @@ class Outliers(Evaluator):
         - ``tuple[float | None, float | None]``: asymmetric ``(lower, upper)`` multipliers
         - ``tuple[str, ThresholdBounds]``: named threshold with bounds, e.g.
           ``("zscore", 2.5)`` or ``("iqr", (1.0, 3.0))``
-        - :class:`~dataeval.utils.thresholds.Threshold`: a fully configured threshold
+        - :class:`~dataeval.protocols.Threshold`: a fully configured threshold
           (e.g., ``ZScoreThreshold``, ``IQRThreshold``, ``ConstantThreshold``,
           ``AdaptiveThreshold``)
         - ``Mapping[str, ThresholdLike]``: per-metric thresholds keyed by metric name.
@@ -993,7 +993,7 @@ class Outliers(Evaluator):
     **Cluster-based Detection:**
 
     Uses adaptive distance-based detection that accounts for varying cluster densities.
-    A :class:`~dataeval.utils.thresholds.Threshold` is applied per-cluster to the distance
+    A :class:`~dataeval.protocols.Threshold` is applied per-cluster to the distance
     distribution (default: ``ZScoreThreshold(upper_multiplier=2.5)``), and points whose
     distance exceeds the upper bound are flagged as outliers.
 

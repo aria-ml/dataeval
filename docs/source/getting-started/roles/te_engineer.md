@@ -60,8 +60,8 @@ Perform a thorough analysis of the test data to identify and flag quality issues
 such as blurry or corrupt images, and annotation errors like misaligned bounding
 boxes, incorrect class labels, or inconsistent labeling standards.
 
-Use DataEval's {func}`.labelstats` function to provide the necessary label
-distributions and counts as well as DataEval's {func}`.imagestats` function to
+Use DataEval's {func}`.label_stats` function to provide the necessary label
+distributions and counts as well as DataEval's {func}`.compute_stats` function to
 identify any loading or annotation errors. DataEval also includes a
 {class}`.Outliers` class and a {class}`.Duplicates` class to identify anomaly
 and redundant images.
@@ -73,9 +73,9 @@ represent the target operational conditions, including sensor types, camera
 angles, weather, lighting, and environments.
 
 For datasets that contain acquisition conditions as metadata, DataEval has
-a set of bias metrics, {func}`.balance` and {func}`.diversity`, that can assist
+a set of bias metrics, {class}`.Balance` and {class}`.Diversity`, that can assist
 in determining relevant conditions. It also contains a {func}`.completeness` and
-{func}`.coverage` metric to determine the representativeness of the dataset.
+{class}`.Coverage` metric to determine the representativeness of the dataset.
 
 ### Evaluate performance on critical data subgroups
 
@@ -96,8 +96,8 @@ misclassifications). Visualize these errors to identify patterns, such as the
 model consistently confusing two similar-looking objects or failing to detect
 objects at a distance.
 
-By combining multiple DataEval functions -- {class}`.View` class, {func}`.imagestats`,
-{func}`.labelstats`, {func}`.cluster`, {func}`.balance`, and {func}`.diversity`
+By combining multiple DataEval functions -- {class}`.View` class, {func}`.compute_stats`,
+{func}`.label_stats`, {func}`.cluster`, {class}`.Balance`, and {class}`.Diversity`
 -- model failures can be investigated at the image level.
 
 ### Explore unknown risks and potential failure modes
@@ -120,7 +120,7 @@ new data and the training data, then propose a retraining or calibration strateg
 
 DataEval has a set of [drift](../../concepts/DistributionShift.md#drift-detection)
 and [out-of-distribution (OOD)](../../concepts/DistributionShift.md#out-of-distribution-detection)
-detection functions, along with {func}`.divergence` and {func}`.label_parity`, to identify
+detection functions, along with {func}`.divergence_mst` and {func}`.label_parity`, to identify
 differences between operational and training distributions of both images and labels.
 
 <!--### Develop summary reports and provide recommendations

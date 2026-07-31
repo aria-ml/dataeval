@@ -24,7 +24,7 @@
 # regional sparsity is through [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space)
 # analysis.
 #
-# To help with this, DataEval has introduced a {func}`.coverage` function, that provides a user with example images which
+# To help with this, DataEval has introduced a {func}`.coverage_adaptive` function, that provides a user with example images which
 # have few similar instances within the provided dataset.
 
 # %% [markdown]

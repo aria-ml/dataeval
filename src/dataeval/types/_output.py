@@ -61,7 +61,7 @@ class DataFrameOutput(Output[pl.DataFrame]):
         Methods delegated via :meth:`__getattr__` (e.g. ``filter``,
         ``select``, ``sort``) return a plain :class:`polars.DataFrame`, *not*
         an instance of the subclass. Any subclass-specific attributes such as
-        :attr:`~OutliersOutput.calculation_results` or :meth:`meta` will not
+        :attr:`~dataeval.quality.OutliersOutput.calculation_results` or :meth:`meta` will not
         be available on the result.
 
     .. note:: **Instance attribute names to avoid in subclasses**

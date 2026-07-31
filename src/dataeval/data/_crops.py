@@ -133,7 +133,7 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
     - ``source_id`` (``int | str``) — the source datum's own ``DatumMetadata`` ``id`` (not a
       positional index), so a crop flagged downstream (e.g. as low-dispersion or uncovered)
       still resolves to the correct image after the source has been filtered, sorted, or
-      otherwise re-indexed by a view such as :class:`~dataeval.data.Select` (which renumbers
+      otherwise re-indexed by a view such as :class:`~dataeval.data.View` (which renumbers
       positions but passes each datum's ``id`` through unchanged). Falls back to the
       positional index for source data that omits the protocol-required ``id``.
     - ``target`` (``int``) — the detection's index within its source image (its position in

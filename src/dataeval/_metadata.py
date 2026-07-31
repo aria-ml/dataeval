@@ -881,7 +881,7 @@ class Metadata(Array, FeatureExtractor):
 
         Notes
         -----
-        This property is part of the :class:`~dataeval.protocols.Metadata`
+        This property is part of the :class:`~dataeval.protocols.MetadataLike`
         and aligns with scientific computing conventions where discrete factors
         are treated differently from continuous ones in statistical analyses.
         """

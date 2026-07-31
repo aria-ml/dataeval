@@ -1064,7 +1064,7 @@ As of v{{ release }}:
 
 - {class}`.ClassifierUncertaintyExtractor` → use
   {class}`.UncertaintyExtractor` or {class}`.ClasswiseUncertaintyExtractor`
-- {func}`.clip_and_pad` → use {func}`.crop_with_fill`, passing `fill=np.nan`
+- `clip_and_pad` → use {func}`.crop_with_fill`, passing `fill=np.nan`
   and taking the first tuple value
 
 **Changed defaults** (the symbol is not deprecated; only the transitional

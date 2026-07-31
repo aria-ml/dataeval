@@ -99,7 +99,7 @@ metadata = Metadata(cifar10)
 print(f"Factor names: {metadata.factor_names}")
 
 # %% [markdown]
-# A quick check of the {func}`.balance` of the single factor will show no mutual information between the classes and the
+# A quick check of the {class}`.Balance` of the single factor will show no mutual information between the classes and the
 # `batch_num` which indicates the on-disk binary file the image was extracted from.
 
 # %%

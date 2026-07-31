@@ -28,7 +28,7 @@
 # DataEval does not require any particular dataset class. Its evaluators consume
 # any object that satisfies the {class}`.AnnotatedDataset` protocol - a minimal
 # interface of `__len__`, `__getitem__`, and a `metadata` property. For object
-# detection, `__getitem__` returns an {class}`.ObjectDetectionTarget` (bounding
+# detection, `__getitem__` returns an {obj}`.ObjectDetectionTarget` (bounding
 # boxes, labels, and scores) instead of a single class label.
 #
 # This guide shows you how to wrap a long-format DataFrame in an object detection
@@ -141,11 +141,11 @@ catalog.head()
 #   **unique images**, not the number of rows
 # - `__getitem__(index)` - an `(image, target, datum_metadata)` tuple for one image
 #    - `image` - an array of shape `(C, H, W)`
-#    - `target` - an {class}`.ObjectDetectionTarget`: `boxes` of shape `(N, 4)` in
+#    - `target` - an {obj}`.ObjectDetectionTarget`: `boxes` of shape `(N, 4)` in
 #      `(x0, y0, x1, y1)` format, `labels` of shape `(N,)`, and `scores` of shape
 #      `(N,)`
 #    - `datum_metadata` - a `dict` of per-item metadata, which must contain an `id`
-# - a `metadata` property - a {class}`.DatasetMetadata` describing the dataset as a
+# - a `metadata` property - a {obj}`.DatasetMetadata` describing the dataset as a
 #   whole, including the `index2label` class-name mapping
 #
 # `ObjectDetectionTarget` is a runtime-checkable protocol, so any object that

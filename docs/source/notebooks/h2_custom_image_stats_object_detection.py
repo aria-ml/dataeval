@@ -25,7 +25,7 @@
 # - Image-level statistics: Properties of entire images
 # - Box-level statistics: Properties of individual bounding boxes within images
 #
-# This guide will show you how to use {func}`.calculate` with custom {class}`.ImageStats` flags to capture statistics on
+# This guide will show you how to use {func}`.compute_stats` with custom {class}`.ImageStats` flags to capture statistics on
 # full images and individual bounding boxes.
 
 # %% [markdown]
@@ -196,7 +196,7 @@ print(f"Target-level results: {len(target_indices)}")
 # %% [markdown]
 # ## Conclusion
 #
-# This notebook demonstrated how to use {func}`.calculate` with custom {class}`.ImageStats` flags to perform flexible,
+# This notebook demonstrated how to use {func}`.compute_stats` with custom {class}`.ImageStats` flags to perform flexible,
 # efficient analysis on object detection datasets.
 #
 # These techniques are valuable for:

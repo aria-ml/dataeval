@@ -338,7 +338,7 @@ print("embedding shape:", embeddings.shape)
 #
 # ResNet18 keeps this tutorial fast. If you need sharper separation between varied and
 # near-duplicate classes on your own data, swap in a larger backbone such as
-# {func}`~torchvision.models.resnet50` — the rest of the workflow is unchanged.
+# `torchvision.models.resnet50` — the rest of the workflow is unchanged.
 #
 # :::
 

@@ -63,8 +63,8 @@ steps required by the model. Additionally, apply augmentation techniques during
 training to improve model generalization.
 
 Data can be cleaned with DataEval's {class}`.Outliers` class and {class}`.Duplicates`
-class and be analyzed for biases and correlations with DataEval's {func}`.balance`,
-{func}`.diversity`, and {func}`.parity` functions.
+class and be analyzed for biases and correlations with DataEval's {class}`.Balance`,
+{class}`.Diversity`, and {class}`.Parity` functions.
 
 DataEval's {class}`.Dataset` class supports preprocessing/augmentation libraries such as
 torchvision, albumentations, and others which perform the normalization,
@@ -75,7 +75,7 @@ resizing, and transformation steps.
 Analyze the dataset to determine if the cleaned dataset is an adequate dataset
 given the problem requirements and complexity.
 
-DataEval's {func}`.ber` and {func}`.uap` functions calculate the upper performance
+DataEval's {func}`.ber_mst` and {func}`.uap` functions calculate the upper performance
 bound given the specific dataset. It allows for comparison of different datasets
 to determine the best dataset for the problem.
 
@@ -87,7 +87,7 @@ are no correlations between the splits.
 
 Datasets can be split using DataEval's {func}`.split_dataset`, which has options that
 enable the user to split the data based on metadata. DataEval's bias functions,
-{func}`.balance` and {func}`.diversity` can help identify when there may be spurious
+{class}`.Balance` and {class}`.Diversity` can help identify when there may be spurious
 correlations between the splits.
 
 <!-- ### Build robust and scalable data ingestion pipelines
@@ -126,8 +126,8 @@ Go beyond top-line metrics to perform detailed error analysis. Visualize the
 false positives and false negatives to understand why the model is failing
 (e.g., it confuses similar objects, fails on small objects, or struggles in low light).
 
-By combining multiple DataEval functions -- {class}`.View` class, {func}`.imagestats`,
-{func}`.labelstats`, {func}`.cluster`, {func}`.balance`, and {func}`.diversity`
+By combining multiple DataEval functions -- {class}`.View` class, {func}`.compute_stats`,
+{func}`.label_stats`, {func}`.cluster`, {class}`.Balance`, and {class}`.Diversity`
 -- model failures can be investigated at the image level.
 
 ### Monitor model performance
@@ -139,5 +139,5 @@ new data and the training data, then propose a retraining or calibration strateg
 
 DataEval has a set of [drift](../../concepts/DistributionShift.md#drift-detection)
 and [out-of-distribution (OOD)](../../concepts/DistributionShift.md#out-of-distribution-detection)
-detection functions, along with {func}`.divergence` and {func}`.label_parity`, to identify
+detection functions, along with {func}`.divergence_mst` and {func}`.label_parity`, to identify
 differences between operational and training distributions of both images and labels.

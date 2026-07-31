@@ -365,7 +365,7 @@ class Prioritize(Evaluator):
     ----------
     extractor : FeatureExtractor or Embeddings or None, default None
         Feature extractor used to compute embeddings from a dataset. Optional only when
-        pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or an ``Array``) are
+        pre-computed embeddings (an :class:`~dataeval.Embeddings` or an ``Array``) are
         passed to :meth:`evaluate`; it is only needed when :meth:`evaluate` is handed a full
         dataset that must still be embedded.
     batch_size : int or None, default None
@@ -561,7 +561,7 @@ class Prioritize(Evaluator):
         extractor : FeatureExtractor or Embeddings or None, default None
             Feature extractor for embedding extraction. Optional: only needed when
             :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
-            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
+            passed pre-computed embeddings (an :class:`~dataeval.Embeddings` or ``Array``).
         k : int or None, default None
             Number of nearest neighbors. If None, uses sqrt(n_samples).
         reference : AnnotatedDataset or Array or None, default None
@@ -600,7 +600,7 @@ class Prioritize(Evaluator):
         extractor : FeatureExtractor or Embeddings or None, default None
             Feature extractor for embedding extraction. Optional: only needed when
             :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
-            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
+            passed pre-computed embeddings (an :class:`~dataeval.Embeddings` or ``Array``).
         c : int or None, default None
             Number of clusters. If None, uses sqrt(n_samples).
         n_init : int or "auto", default "auto"
@@ -641,7 +641,7 @@ class Prioritize(Evaluator):
         extractor : FeatureExtractor or Embeddings or None, default None
             Feature extractor for embedding extraction. Optional: only needed when
             :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
-            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
+            passed pre-computed embeddings (an :class:`~dataeval.Embeddings` or ``Array``).
         c : int or None, default None
             Number of clusters. If None, uses sqrt(n_samples).
         n_init : int or "auto", default "auto"
@@ -679,7 +679,7 @@ class Prioritize(Evaluator):
         extractor : FeatureExtractor or Embeddings or None, default None
             Feature extractor for embedding extraction. Optional: only needed when
             :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
-            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
+            passed pre-computed embeddings (an :class:`~dataeval.Embeddings` or ``Array``).
         c : int or None, default None
             Expected number of clusters (used as hint for min_cluster_size).
             If None, uses sqrt(n_samples).
@@ -727,7 +727,7 @@ class Prioritize(Evaluator):
         extractor : FeatureExtractor or Embeddings or None, default None
             Feature extractor for embedding extraction. Optional: only needed when
             :meth:`evaluate` is passed a full dataset that must be embedded, not when it is
-            passed pre-computed embeddings (an :class:`~dataeval.data.Embeddings` or ``Array``).
+            passed pre-computed embeddings (an :class:`~dataeval.Embeddings` or ``Array``).
         c : int or None, default None
             Expected number of clusters (used as hint for min_cluster_size).
             If None, uses sqrt(n_samples).

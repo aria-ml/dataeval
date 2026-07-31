@@ -114,7 +114,7 @@ class Representation(Evaluator):
     expected : Mapping[str, float] or None, default None
         Class name to its minimum expected share of the dataset (a fraction in
         ``[0, 1]``). Named classes use this floor as their target in place of the
-        uniform share, and are validated in :attr:`RepresentationOutput.violations`;
+        uniform share, and are validated in :attr:`~dataeval.scope.RepresentationOutput.violations`;
         unnamed classes keep the uniform target. ``None`` means a uniform expectation
         for every leaf.
     config : Representation.Config or None, default None

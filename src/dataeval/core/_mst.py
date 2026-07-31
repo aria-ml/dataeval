@@ -291,8 +291,8 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
 
     See Also
     --------
-    :func:`~dataeval.core._mst.minimum_spanning_tree_edges` : Lower-level function that returns edge weights
-    :func:`~dataeval.core._mst.compute_neighbor_distances` : Computes the k-NN graph
+    :func:`~dataeval.core.minimum_spanning_tree` : Lower-level function that returns edge weights
+    :func:`~dataeval.core.compute_neighbors` : Computes the k-NN graph
 
     Notes
     -----
@@ -397,7 +397,7 @@ def compute_neighbors(
     See Also
     --------
     :class:`sklearn.neighbors.NearestNeighbors` : Similar sklearn interface
-    :func:`~dataeval.core._mst.compute_neighbor_distances` : For self-query (single dataset)
+    :func:`~dataeval.core.compute_neighbors` : For self-query (single dataset)
 
     Notes
     -----

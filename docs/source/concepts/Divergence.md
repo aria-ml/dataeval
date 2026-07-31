@@ -120,7 +120,7 @@ operate at different levels of the same question:
 | `DriftMMD`              | Has the joint distribution shifted significantly? | Single p-value       | Monitoring, sensitive to complex multivariate shifts |
 | `DriftDomainClassifier` | Can a classifier distinguish the datasets?        | AUROC                | Monitoring, feature importance for diagnosed shift   |
 
-HP divergence is also closely related to {func}`.ber` — both the MST and KNN
+HP divergence is also closely related to {func}`.ber_mst` — both the MST and KNN
 estimators for HP divergence are derived from the same foundational papers as
 the BER estimators ([Renggli et al., 2021](#ref3)). Where BER estimates the irreducible classification error
 _within_ a dataset (overlap between classes), HP divergence estimates the

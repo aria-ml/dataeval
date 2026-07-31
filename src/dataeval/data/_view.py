@@ -175,7 +175,7 @@ class View(AnnotatedDataset[_TDatum]):
 
         ``View(View(base, [A, B]), [C])`` returns ``[[A, B], [C]]``. Empty wrappers
         contribute nothing. The grouping matches the user's nesting intent and is the
-        natural shape for sidecar metadata (see :mod:`dataeval.io`).
+        natural shape for sidecar metadata.
         """
         groups: list[list[Operation]] = []
         current: Dataset[_TDatum] = self

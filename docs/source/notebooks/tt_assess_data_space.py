@@ -120,7 +120,7 @@ set_max_processes(4)
 #
 # ### Download VOC dataset
 #
-# Download the train split with the {class}`.VOCDetection` class — 5717 images with a varying number of targets each.
+# Download the train split with `VOCDetection` from `maite_datasets` — 5717 images with a varying number of targets each.
 # You can also run this tutorial with your own MAITE-compliant dataset.
 
 # %%
@@ -332,7 +332,7 @@ dep.plot(
 #
 # ### Calculate coverage
 #
-# The {func}`.coverage` function will return a list of image indices that it finds to be underrepresented. This means it
+# The {func}`.coverage_adaptive` function will return a list of image indices that it finds to be underrepresented. This means it
 # does not have enough similar images around it. This should sound familiar as outliers have a very similar situation.
 # However, underrepresented images should be handled different than outliers. More on this in the next section.
 

@@ -61,7 +61,7 @@ Compute statistics on image properties like brightness, contrast, sharpness,
 and color distributions. For object detection, analyze the distributions of
 bounding box sizes, aspect ratios, and locations.
 
-Use DataEval's {func}`.imagestats` to provide the necessary image statistics
+Use DataEval's {func}`.compute_stats` to provide the necessary image statistics
 on both the image and any bounding boxes.
 
 ### Identify data quality issues
@@ -70,7 +70,7 @@ Systematically scan for problems like corrupt or unreadable image files,
 incorrect or missing labels, inconsistent annotation formats
 (e.g., COCO vs. YOLO), and misaligned bounding boxes.
 
-Use DataEval's {func}`.labelstats` to provide the necessary label distributions
+Use DataEval's {func}`.label_stats` to provide the necessary label distributions
 and counts as well as DataEval's {class}`.Dataset` class to identify any loading or annotation
 errors. DataEval also includes a {class}`.Outliers` class and a {class}`.Duplicates`
 class to identify anomaly and redundant images.
@@ -90,7 +90,7 @@ characteristics between data subsets (e.g., comparing the average bounding box
 in 'day' vs. 'night' images).
 
 Use DataEval's {class}`.View` class to create different subsets of the dataset
-that can then be compared using the results of DataEval's {func}`.imagestats`
+that can then be compared using the results of DataEval's {func}`.compute_stats`
 function.
 
 ### Quantify bias and representativeness
@@ -99,9 +99,9 @@ Use quantitative metrics to measure image metadata like class balance, backgroun
 diversity, lighting conditions, and camera angles for potential biases, and
 dataset coverage of the operational domain.
 
-DataEval has a set of bias metrics -- {func}`.balance`, {func}`.diversity`, and
-{func}`.parity` -- to identify potential shortcuts based on the metadata. It
-also contains {func}`.completeness` and {func}`.coverage` to determine the
+DataEval has a set of bias metrics -- {class}`.Balance`, {class}`.Diversity`, and
+{class}`.Parity` -- to identify potential shortcuts based on the metadata. It
+also contains {func}`.completeness` and {class}`.Coverage` to determine the
 representativeness of the dataset.
 
 ### Determine problem feasibility
@@ -109,7 +109,7 @@ representativeness of the dataset.
 Analyze the dataset to determine if the cleaned dataset is an adequate dataset
 given the problem requirements and complexity.
 
-DataEval's {func}`.ber` and {func}`.uap` functions calculate the upper performance
+DataEval's {func}`.ber_mst` and {func}`.uap` functions calculate the upper performance
 bound given the specific dataset. It allows for comparison of different datasets
 to determine the best dataset for the problem.
 
@@ -121,7 +121,7 @@ are no correlations between the splits.
 
 Datasets can be split using DataEval's {func}`.split_dataset`, which has options that
 enable the user to split the data based on metadata. DataEval's bias functions,
-{func}`.balance` and {func}`.diversity` can help identify when there may be spurious
+{class}`.Balance` and {class}`.Diversity` can help identify when there may be spurious
 correlations between the splits.
 
 ### Build and evaluate models
@@ -140,8 +140,8 @@ Go beyond top-line metrics to perform detailed error analysis. Visualize the
 false positives and false negatives to understand why the model is failing
 (e.g., it confuses similar objects, fails on small objects, or struggles in low light).
 
-By combining multiple DataEval functions -- {class}`.View` class, {func}`.imagestats`,
-{func}`.labelstats`, {func}`.cluster`, {func}`.balance`, and {func}`.diversity`
+By combining multiple DataEval functions -- {class}`.View` class, {func}`.compute_stats`,
+{func}`.label_stats`, {func}`.cluster`, {class}`.Balance`, and {class}`.Diversity`
 -- false positives and false negatives can be further analyzed.
 
 ### Monitor model performance
@@ -153,5 +153,5 @@ new data and the training data, then propose a retraining or calibration strateg
 
 DataEval has a set of [drift](../../concepts/DistributionShift.md#drift-detection)
 and [out-of-distribution (OOD)](../../concepts/DistributionShift.md#out-of-distribution-detection)
-detection functions, along with {func}`.divergence` and {func}`.label_parity`, to identify
+detection functions, along with {func}`.divergence_mst` and {func}`.label_parity`, to identify
 differences between operational and training distributions of both images and labels.

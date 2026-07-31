@@ -124,7 +124,7 @@ catalog.head()
 #    - `image` - an array of shape `(C, H, W)`
 #    - `target` - the label as a one-hot encoded array
 #    - `datum_metadata` - a `dict` of per-item metadata, which must contain an `id`
-# - a `metadata` property - a {class}`.DatasetMetadata` describing the dataset as a
+# - a `metadata` property - a {obj}`.DatasetMetadata` describing the dataset as a
 #   whole, including the `index2label` class-name mapping
 #
 # The adapter below reads each row of the DataFrame on demand, decodes the image

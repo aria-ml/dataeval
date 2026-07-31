@@ -69,7 +69,7 @@ pio.renderers.default = "notebook"  # embed the plotly JS in the notebook output
 # %% [markdown]
 # ## 1. Load an object detection dataset
 #
-# Download the PASCAL VOC 2012 training split with {class}`.VOCDetection`. Each image
+# Download the PASCAL VOC 2012 training split with `VOCDetection` from `maite_datasets`. Each image
 # carries a variable number of object detections, each with a bounding box and a class.
 
 # %%
