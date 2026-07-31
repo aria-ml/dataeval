@@ -100,6 +100,19 @@ class Balance(Evaluator):
     seed. MI is computed differently for categorical and continuous variables, and
     in all cases normalized or transformed to [0, 1] prior to being returned.
 
+    References
+    ----------
+    [1] Information theoretic measures for clusterings comparison: Variants, properties, normalization and correction
+        for chance.
+        Vinh, N. X., Epps, J., & Bailey, J. (2010). Journal of Machine Learning Research, 11, 2837-2854.
+        https://jmlr.org/papers/v11/vinh10a.html
+    [2] Estimating mutual information.
+        Kraskov, A., Stogbauer, H., & Grassberger, P. (2004). Physical Review E, 69(6), 066138.
+        https://journals.aps.org/pre/abstract/10.1103/PhysRevE.69.066138
+    [3] Mutual information between discrete and continuous data sets.
+        Ross, B. C. (2014). PLOS ONE, 9(2), e87357.
+        https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0087357
+
     Examples
     --------
     Initialize the Balance class:

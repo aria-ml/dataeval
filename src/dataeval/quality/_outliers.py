@@ -997,6 +997,14 @@ class Outliers(Evaluator):
     distribution (default: ``ZScoreThreshold(upper_multiplier=2.5)``), and points whose
     distance exceeds the upper bound are flagged as outliers.
 
+    References
+    ----------
+    [1] How to Detect and Handle Outliers.
+        Iglewicz, B., & Hoaglin, D. C. (1993). ASQC Quality Press.
+        (Origin of the modified z-score and of the 3.5 multiplier used by
+        ``ModifiedZScoreThreshold``. Note this class defaults to
+        ``AdaptiveThreshold()``, not to the modified z-score.)
+
     Examples
     --------
     Basic image statistics-based outlier detection (default: modified z-score):

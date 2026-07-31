@@ -100,6 +100,15 @@ def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
         - divergence: float - The divergence value between 0.0 and 1.0
         - errors: int - The number of cross-label edges
 
+    References
+    ----------
+    [1] Learning to Bound the Multi-class Bayes Error.
+        Sekeh, S. Y., Oselio, B., & Hero, A. O. (2020). IEEE Transactions on Signal Processing, 68, 3793-3807.
+        https://arxiv.org/abs/1811.06419
+    [2] Nearest neighbor pattern classification.
+        Cover, T., & Hart, P. (1967). IEEE Transactions on Information Theory, 13(1), 21-27.
+        https://ieeexplore.ieee.org/document/1053964
+
     Examples
     --------
     Return divergence of two datasets (0-no divergence, 1-complete divergence)
@@ -155,6 +164,15 @@ def divergence_fnn(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
 
         - divergence: float - The divergence value between 0.0 and 1.0
         - errors: int - The number of label disagreements
+
+    References
+    ----------
+    [1] Learning to Bound the Multi-class Bayes Error.
+        Sekeh, S. Y., Oselio, B., & Hero, A. O. (2020). IEEE Transactions on Signal Processing, 68, 3793-3807.
+        https://arxiv.org/abs/1811.06419
+    [2] Nearest neighbor pattern classification.
+        Cover, T., & Hart, P. (1967). IEEE Transactions on Information Theory, 13(1), 21-27.
+        https://ieeexplore.ieee.org/document/1053964
 
     Examples
     --------

@@ -12,6 +12,7 @@ from dataeval.core._bin import (
     digitize_data,
     is_continuous,
 )
+from dataeval.exceptions import ShapeMismatchError
 
 
 @pytest.mark.required
@@ -47,6 +48,70 @@ class TestDigitizeDataUnit:
         with pytest.raises(TypeError) as e:
             digitize_data(factors, bins)
         assert err_msg in str(e.value)
+
+
+@pytest.mark.required
+class TestMissingValueBinning:
+    """NaN is missing data, so it gets a bin of its own rather than joining an observed one."""
+
+    @pytest.mark.parametrize("method", ["uniform_width", "uniform_count", "clusters"])
+    def test_bin_data_gives_nan_its_own_bin(self, method):
+        rng = np.random.default_rng(0)
+        data = rng.normal(size=200)
+        data[5] = data[7] = np.nan
+
+        binned = bin_data(data, method)
+        missing = np.isnan(data)
+        assert np.unique(binned[missing]).size == 1
+        assert not set(binned[missing]) & set(binned[~missing])
+
+    def test_bin_data_edges_ignore_missing(self):
+        """Edges are placed on the observed values, so a NaN does not shift them."""
+        rng = np.random.default_rng(0)
+        clean = rng.normal(size=200)
+        with_missing = clean.copy()
+        with_missing[5] = np.nan
+
+        observed = ~np.isnan(with_missing)
+        assert np.array_equal(
+            bin_data(with_missing, "uniform_width")[observed], bin_data(clean, "uniform_width")[observed]
+        )
+
+    def test_bin_data_separates_nan_from_infinity(self):
+        """An infinity is an observed extreme and belongs in an end bin, not the missing bin."""
+        rng = np.random.default_rng(0)
+        data = np.concatenate([rng.normal(size=100), [np.inf, -np.inf, np.nan]])
+
+        binned = bin_data(data, "uniform_width")
+        pos_inf, neg_inf, nan = binned[-3], binned[-2], binned[-1]
+        assert neg_inf == binned[:100].min()  # absorbed by the -inf outer edge
+        assert nan not in (pos_inf, neg_inf)
+
+    def test_bin_data_all_missing(self):
+        """With nothing observed there are no edges to place, so every entry is missing."""
+        assert np.array_equal(bin_data(np.full(30, np.nan), "uniform_width"), np.zeros(30))
+
+    def test_digitize_data_gives_nan_its_own_bin(self):
+        data = np.array([0.1, 1.1, np.nan, 1.2, 0.5])
+        for bins in (2, [-np.inf, 1.0, np.inf]):
+            binned = digitize_data(data, bins)
+            assert binned[2] not in np.delete(binned, 2)
+
+    def test_is_continuous_ignores_missing(self):
+        """A continuous sample stays continuous when a few values go missing."""
+        rng = np.random.default_rng(0)
+        data = rng.normal(size=200)
+        assert is_continuous(data) is True
+
+        data[5] = data[7] = np.nan
+        assert is_continuous(data) is True
+
+    def test_is_continuous_counts_only_observed(self):
+        """The 20-observation floor counts values, not placeholders for absent ones."""
+        rng = np.random.default_rng(0)
+        data = np.full(100, np.nan)
+        data[:18] = rng.normal(size=18)
+        assert is_continuous(data) is False
 
 
 @pytest.mark.optional
@@ -100,13 +165,16 @@ class TestBinDataFunctional:
 @pytest.mark.required
 class TestIsContinuousFunctional:
     @pytest.mark.parametrize(
-        ("data", "repeats"),
+        ("data", "groups"),
         [
+            # Every row its own group: nothing to collapse.
             (np.array([0, 4, 3, 5, 6, 8] * 15), np.arange(15 * 6)),
+            # Factor varies within each group, so the rows are kept at full length.
             (np.array([0, 1, 9, 4, 3, 5, 2, 7, 8] * 10), np.array([0, 4, 3, 5, 6, 8] * 15)),
+            # Factor constant within group: collapses to 20 integers, still a lattice.
             (
                 np.concatenate([np.repeat(val, 3) for val in range(20)]),
-                np.concatenate([np.repeat(val, 2) for val in range(20)]),
+                np.repeat(np.arange(20), 3),
             ),
             (
                 np.concatenate(
@@ -115,35 +183,29 @@ class TestIsContinuousFunctional:
                         for val in [0, 5, 13, 18, 2, 14, 1, 19, 16, 7, 15, 17, 4, 9, 10, 8, 12, 6, 11, 3]
                     ],
                 ),
-                np.concatenate(
-                    [
-                        np.repeat(val, 3)
-                        for val in [0, 5, 13, 18, 2, 14, 1, 19, 16, 7, 15, 17, 4, 9, 10, 8, 12, 6, 11, 3]
-                    ],
-                ),
+                np.repeat(np.arange(20), 3),
             ),
         ],
     )
-    def test_is_continuous_repeats(self, data, repeats):
-        _, image_unsorted = np.unique(repeats, return_index=True)
-        image_indices = np.sort(image_unsorted)
-        output = is_continuous(data, image_indices)
+    def test_is_continuous_repeats(self, data, groups):
+        output = is_continuous(data, groups)
         assert output is not True
 
-    def test_is_continuous_no_image_indices(self):
+    def test_is_continuous_no_groups(self):
         data = np.array([0, 4, 3, 5, 6, 8] * 15)
         output = is_continuous(data)
         assert output is not True
 
     def test_is_coninuous_warning(self, caplog):
-        data = np.array([0, 4, 3, 5, 6, 8] * 15)
-        repeats = np.array([0, 4, 3, 5, 6, 8] * 15)
-        _, image_unsorted = np.unique(repeats, return_index=True)
-        image_indices = np.sort(image_unsorted)
-        warn_msg = f"All samples look discrete with so few data points (< {CONTINUOUS_MIN_SAMPLE_SIZE})"
+        # Six values, each replicated across a group of 15 rows, collapse under the floor.
+        data = np.repeat([0, 4, 3, 5, 6, 8], 15)
+        groups = np.repeat(np.arange(6), 15)
+        warn_msg = f"All samples look discrete with so few data points (6 < {CONTINUOUS_MIN_SAMPLE_SIZE})"
         with caplog.at_level(logging.WARNING):
-            output = is_continuous(data, image_indices)
+            output = is_continuous(data, groups)
         assert warn_msg in caplog.text
+        # The count that tripped the floor is the post-grouping one, so say so.
+        assert "after grouping" in caplog.text
         assert output is not True
 
 
@@ -185,16 +247,65 @@ class TestIsContinuousUnit:
         assert result is False
         assert mock_wd.called
 
-    def test_image_indices_handling(self):
-        """Test special handling when image_indices parameter is provided."""
-        data = np.array([3, 1, 4, 1, 5, 9, 2, 6])
-        image_indices = np.array([1, 3, 6, 7])  # Indices of unique values
+    def test_groups_scores_one_entry_per_group(self):
+        """The Wasserstein test sees one entry per group, not one per row."""
+        rng = np.random.default_rng(0)
+        groups = np.repeat(np.arange(30), 4)
+        data = rng.normal(size=30)[groups]  # 120 rows, 30 distinct values
 
-        # This should trigger the image-specific logic
-        with patch("dataeval.core._bin.wasserstein_distance", return_value=0.03):
-            result = is_continuous(data, image_indices)
-            # The function should process data in a specific way for images
-            assert isinstance(result, bool)
+        with patch("dataeval.core._bin.wasserstein_distance", return_value=0.03) as mock_wd:
+            assert is_continuous(data, groups) is True
+        # dx holds n - 2 near-neighbor samples, so 28 for the collapsed sample and
+        # 118 had the repeats been counted.
+        assert mock_wd.call_args.args[0].size == 28
+
+    def test_groups_collapses_replicated_factor(self):
+        """A factor constant within each group is scored once per group, not once per row."""
+        rng = np.random.default_rng(0)
+        per_group = rng.normal(size=40)
+        groups = np.repeat(np.arange(40), 3)
+        replicated = per_group[groups]
+
+        # The replicated rows are two-thirds exact duplicates, which reads as discrete.
+        assert is_continuous(replicated) is False
+        # Collapsed to one value per group, the same factor is continuous.
+        assert is_continuous(replicated, groups) is True
+
+    def test_groups_preserves_within_group_variation(self):
+        """A factor that varies within a group is left at full length."""
+        rng = np.random.default_rng(0)
+        data = rng.normal(size=120)
+        groups = np.repeat(np.arange(40), 3)
+
+        assert is_continuous(data, groups) == is_continuous(data)
+
+    def test_groups_tolerates_missing_values(self):
+        """A missing value is still constant within its group, so grouping still applies."""
+        rng = np.random.default_rng(0)
+        per_group = rng.normal(size=40)
+        per_group[5] = np.nan
+        groups = np.repeat(np.arange(40), 3)
+        replicated = per_group[groups]
+
+        # NaN != NaN, so an exact equality check would fall back to all 120 rows here.
+        assert is_continuous(replicated, groups) is True
+
+    def test_groups_logs_when_replication_check_fails(self, caplog):
+        """Falling back to the ungrouped sample is recorded, since the verdicts differ."""
+        rng = np.random.default_rng(0)
+        groups = np.repeat(np.arange(40), 3)
+        data = rng.normal(size=40)[groups]
+        data[1] += 1e-9  # one entry out of place
+
+        with caplog.at_level(logging.DEBUG, logger="dataeval.core._bin"):
+            assert is_continuous(data, groups) is False
+        assert "not constant within every group" in caplog.text
+
+    def test_groups_length_mismatch_raises(self):
+        """A groups array that does not align with the data is an error, not a no-op."""
+        data = np.arange(30, dtype=np.float64)
+        with pytest.raises(ShapeMismatchError, match="groups length 5 does not match data length 30"):
+            is_continuous(data, np.arange(5))
 
     def test_duplicate_values_handling(self):
         """Test that duplicate values are handled correctly in NNN calculation."""

@@ -40,6 +40,20 @@ class CompletenessResult(TypedDict):
 
 
 def _get_effective_dim(x: Array, do_ranks: bool = True) -> float:
+    """
+    Effective dimensionality ``exp(H)`` of ``x``'s covariance spectrum.
+
+    ``H`` is the Shannon entropy of the covariance eigenvalues normalized to sum to one, so
+    the result is the exponential of the von Neumann entropy of the trace-normalized
+    covariance matrix. It ranges from 1 (all variance on a single axis) to ``min(n - 1, d)``
+    (variance spread evenly over every available direction), and is the entropy-based
+    counterpart of the participation ratio.
+
+    With ``do_ranks=True`` each column is replaced by its within-column rank, rescaled to
+    ``(-1/2, 1/2)`` before decomposition, which makes the estimate invariant to monotone
+    transformations of individual dimensions. ``completeness`` uses that form; ``isotropy``
+    uses the raw centered embeddings.
+    """
     n, d = x.shape
 
     # Get singular values, either with ranks or with raw data.
@@ -103,6 +117,57 @@ def completeness(embeddings: Array) -> CompletenessResult:
         If embeddings are not 2D
     ValueError
         If embeddings have a zero dimension
+
+    Notes
+    -----
+    Both scores are built from the same effective dimensionality
+    ``d_eff = exp(H)``, where ``H`` is the Shannon entropy of the covariance
+    eigenvalues normalized to sum to one. They differ in the denominator:
+    ``completeness = d_eff / d`` divides by the ambient dimensionality ``d``,
+    giving the fraction of the representation space the data occupies, while
+    ``isotropy = d_eff / r`` divides by the numerical rank ``r``, giving
+    directional evenness *within* the occupied subspace. A dataset can score low
+    on completeness and high on isotropy (confined to a low-dimensional subspace
+    but evenly spread within it) or the reverse (reaching many dimensions with
+    variance concentrated in a few).
+
+    The two also decompose different matrices. Completeness ranks each column
+    within itself and rescales the ranks to ``(-1/2, 1/2)`` before the SVD, which
+    makes it invariant to monotone transformations of individual embedding
+    dimensions. Isotropy decomposes the raw centered embeddings, so it reports
+    the variance geometry the feature extractor actually produced.
+
+    ``d_eff`` in this exact form is DataEval's own, but it is not unprecedented.
+    It is closely related to the *effective rank* of Roy & Vetterli (2007), which
+    applies the same ``exp(H)`` construction to normalized singular values rather
+    than eigenvalues; taking the entropy over eigenvalues makes ``d_eff`` the
+    exponential of the von Neumann entropy of the trace-normalized covariance
+    matrix, as used by Kim et al. (2023) and Zhuo et al. (2023). It is the
+    entropy-based sibling of the participation ratio used for the effective
+    dimensionality of neural representations (Gao et al., 2017). The two
+    normalizations above are not inherited from those works and are not verified
+    against an independent implementation — see the ``Validation and Trust``
+    concept page.
+
+    References
+    ----------
+    [1] The effective rank: A measure of effective dimensionality.
+        Roy, O., & Vetterli, M. (2007). Proceedings of the 15th European Signal Processing Conference (EUSIPCO),
+        606-610. (Same ``exp(entropy)`` construction, applied to normalized singular values.)
+        https://www.eurasip.org/Proceedings/Eusipco/Eusipco2007/Papers/a5p-h05.pdf
+    [2] A theory of multineuronal dimensionality, dynamics and measurement.
+        Gao, P., Trautmann, E., Yu, B., Santhanam, G., Ryu, S., Shenoy, K., & Ganguli, S. (2017). bioRxiv, 214262.
+        doi: 10.1101/214262 (Participation ratio, the second-moment counterpart of this entropy-based estimate.)
+        https://doi.org/10.1101/214262
+    [3] VNE: An effective method for improving deep representation by manipulating eigenvalue distribution.
+        Kim, J., Kang, S., Hwang, D., Shin, J., & Rhee, W. (2023). Proceedings of the IEEE/CVF Conference on
+        Computer Vision and Pattern Recognition (CVPR), 3799-3810. (von Neumann entropy of the normalized
+        eigenvalue spectrum, used to regularize representation rank and isotropy.)
+        https://openaccess.thecvf.com/content/CVPR2023/html/Kim_VNE_An_Effective_Method_for_Improving_Deep_Representation_by_Manipulating_CVPR_2023_paper.html
+    [4] Towards a unified theoretical understanding of non-contrastive learning via rank differential mechanism.
+        Zhuo, Z., Wang, Y., Ma, J., & Wang, Y. (2023). International Conference on Learning Representations (ICLR).
+        (Same entropy-of-eigenvalues construction applied to feature-correlation eigenvalues.)
+        https://arxiv.org/abs/2303.02387
 
     Examples
     --------

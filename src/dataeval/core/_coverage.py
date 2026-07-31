@@ -103,11 +103,15 @@ def coverage_naive(
     r = (1/√π) * ((2 * k * Γ(d/2 + 1)) / n)^(1/d)
     where k is num_observations, d is the dimensionality, and n is the number of samples.
 
-    Reference
-    ---------
-    This implementation is based on https://dl.acm.org/doi/abs/10.1145/3448016.3457315.
-
-    [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
+    References
+    ----------
+    [1] Identifying Insufficient Data Coverage for Ordinal Continuous-Valued Attributes.
+        Asudeh, A., Shahbazi, N., Jin, Z., & Jagadish, H. V. (2021). Proceedings of the 2021 International Conference on
+        Management of Data (SIGMOD '21). doi: 10.1145/3448016.3457315
+        https://dl.acm.org/doi/abs/10.1145/3448016.3457315
+    [2] Applied Sampling.
+        Sudman, S. (1976). Academic Press.
+        (Source of the 20-50 observations guidance for ``num_observations``.)
     """
     _logger.info("Starting coverage_naive calculation with num_observations=%d", num_observations)
 
@@ -192,11 +196,15 @@ def coverage_adaptive(
     as uncovered. This approach is more flexible than the naive method and adapts to
     the actual distribution of the data.
 
-    Reference
-    ---------
-    This implementation is based on https://dl.acm.org/doi/abs/10.1145/3448016.3457315.
-
-    [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
+    References
+    ----------
+    [1] Identifying Insufficient Data Coverage for Ordinal Continuous-Valued Attributes.
+        Asudeh, A., Shahbazi, N., Jin, Z., & Jagadish, H. V. (2021). Proceedings of the 2021 International Conference on
+        Management of Data (SIGMOD '21). doi: 10.1145/3448016.3457315
+        https://dl.acm.org/doi/abs/10.1145/3448016.3457315
+    [2] Applied Sampling.
+        Sudman, S. (1976). Academic Press.
+        (Source of the 20-50 observations guidance for ``num_observations``.)
     """
     _logger.info(
         "Starting coverage_adaptive calculation with num_observations=%d, percent=%.2f",

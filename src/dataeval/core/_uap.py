@@ -49,6 +49,12 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> float:
     This function calculates the empirical mean precision using the
     ``average_precision_score`` from scikit-learn, weighted by the class distribution.
 
+    References
+    ----------
+    [1] Empirical upper bound in object detection and more.
+        Borji, A., & Iranmanesh, S. M. (2019). arXiv preprint arXiv:1911.12451.
+        https://arxiv.org/abs/1911.12451
+
     Examples
     --------
     >>> y_true = np.array([0, 0, 1, 1])

@@ -1,6 +1,7 @@
 """Tests for dual-key (item_index, target_index) indexing in Metadata."""
 
 import logging
+from typing import Any
 
 import numpy as np
 import pytest
@@ -601,3 +602,56 @@ class TestAddFactorsRobustness:
 
         assert md.factor_data.shape[0] == len(md.class_labels) == 6
         assert md.factor_data.shape[1] == len(md.factor_names) == len(md.is_discrete)
+
+
+class TestContinuitySample:
+    """The continuous/discrete call is made on the values, not on their repetition."""
+
+    @staticmethod
+    def _od_dataset(n_images, detections_per_image, image_factor, target_factor=None):
+        from dataclasses import dataclass
+
+        @dataclass
+        class ODTarget:
+            boxes: np.ndarray
+            labels: np.ndarray
+            scores: np.ndarray
+
+        data = np.ones((n_images, 3, 32, 32))
+        targets = [
+            ODTarget(
+                boxes=np.tile(np.array([[0, 0, 10, 10]]), (detections_per_image, 1)),
+                labels=np.zeros(detections_per_image, dtype=np.intp),
+                scores=np.ones(detections_per_image),
+            )
+            for _ in range(n_images)
+        ]
+        metadata: list[dict[str, Any]] = [{"altitude": float(image_factor[i])} for i in range(n_images)]
+        if target_factor is not None:
+            for i, meta in enumerate(metadata):
+                meta["obj_size"] = [float(v) for v in target_factor[i]]
+        return MockDataset(data, targets, metadata)
+
+    def test_image_factor_scored_once_per_image(self):
+        """An image-level factor is judged on its per-image values, not the repeats."""
+        rng = np.random.default_rng(0)
+        per_image = rng.normal(size=40)
+        md = Metadata(self._od_dataset(40, 3, per_image))
+
+        # 120 target rows, of which two thirds are exact duplicates; scored on the 40
+        # distinct per-image values the factor is continuous.
+        assert md.target_data.height == 120
+        assert md.factor_info["altitude"].factor_type == "continuous"
+
+    def test_target_factor_keeps_every_detection(self):
+        """A target-level factor is never thinned, even when constant within each image."""
+        rng = np.random.default_rng(0)
+        per_image = rng.normal(size=40)
+        # Genuinely per-detection, but happens to repeat the same value inside an image.
+        target_factor = [[per_image[i]] * 3 for i in range(40)]
+        md = Metadata(self._od_dataset(40, 3, per_image, target_factor))
+
+        assert md.factor_info["obj_size"].level == "target"
+        # 120 real observations whose values collide; collapsing them to 40 would be an
+        # invention, so the duplicates stand and the factor reads as discrete.
+        assert md.factor_info["obj_size"].factor_type == "discrete"

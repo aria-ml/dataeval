@@ -266,6 +266,12 @@ def phash(image: Array3D[Any]) -> str:
 
     It captures frequency information, making it effective for detecting
     images that have been resized or slightly modified.
+
+    References
+    ----------
+    [1] Implementation and benchmarking of perceptual image hash functions.
+        Zauner, C. (2010). Bachelor's thesis, Upper Austria University of Applied Sciences.
+        https://www.phash.org/docs/pubs/thesis_zauner.pdf
     """
     return _log_and_return(_phash(image))
 
@@ -297,6 +303,12 @@ def dhash(image: Array3D[Any]) -> str:
 
     The horizontal gradient approach makes it particularly effective for
     detecting cropped or slightly shifted versions of images.
+
+    References
+    ----------
+    [1] Implementation and benchmarking of perceptual image hash functions.
+        Zauner, C. (2010). Bachelor's thesis, Upper Austria University of Applied Sciences.
+        https://www.phash.org/docs/pubs/thesis_zauner.pdf
     """
     return _log_and_return(_dhash(image))
 
@@ -337,6 +349,12 @@ def phash_d4(image: Array3D[Any]) -> str:
     produces the identical hash.
 
     Computation cost is ~8x that of regular phash.
+
+    References
+    ----------
+    [1] Implementation and benchmarking of perceptual image hash functions.
+        Zauner, C. (2010). Bachelor's thesis, Upper Austria University of Applied Sciences.
+        https://www.phash.org/docs/pubs/thesis_zauner.pdf
     """
     return _log_and_return(_phash_d4(image))
 
@@ -378,6 +396,12 @@ def dhash_d4(image: Array3D[Any]) -> str:
     produces the identical hash.
 
     Computation cost is ~8x that of regular dhash.
+
+    References
+    ----------
+    [1] Implementation and benchmarking of perceptual image hash functions.
+        Zauner, C. (2010). Bachelor's thesis, Upper Austria University of Applied Sciences.
+        https://www.phash.org/docs/pubs/thesis_zauner.pdf
     """
     return _log_and_return(_dhash_d4(image))
 

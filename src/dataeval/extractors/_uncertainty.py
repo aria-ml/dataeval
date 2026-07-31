@@ -312,7 +312,7 @@ class ClasswiseUncertaintyExtractor(_UncertaintyBase):
 
 @deprecated(
     since="1.1",
-    removal="2.0",
+    removal="1.2",
     alternative="UncertaintyExtractor or ClasswiseUncertaintyExtractor",
     details=(
         "Wrap a TorchExtractor (or any FeatureExtractor) in UncertaintyExtractor for per-instance "

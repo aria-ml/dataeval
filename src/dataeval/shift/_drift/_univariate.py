@@ -146,6 +146,15 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
 
     >>> config = DriftUnivariate.Config(method="cvm", p_val=0.01, correction="fdr")
     >>> drift = DriftUnivariate(config=config).fit(train_emb)
+
+    References
+    ----------
+    [1] Failing loudly: An empirical study of methods for detecting dataset shift.
+        Rabanser, S., Gunnemann, S., & Lipton, Z. (2019). Advances in Neural Information Processing Systems, 32.
+        https://arxiv.org/abs/1810.11953
+    [2] Controlling the false discovery rate: a practical and powerful approach to multiple testing.
+        Benjamini, Y., & Hochberg, Y. (1995). Journal of the Royal Statistical Society: Series B, 57(1), 289-300.
+        https://rss.onlinelibrary.wiley.com/doi/10.1111/j.2517-6161.1995.tb02031.x
     """  # noqa: E501
 
     class Stats(_DriftUnivariateStats):

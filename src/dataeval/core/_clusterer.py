@@ -688,6 +688,13 @@ def cluster(  # noqa: C901
     P, is less than 500. If flattening a CxHxW image results in a dimension
     larger than 500, then it is recommended to reduce the dimensions.
 
+    References
+    ----------
+    [1] HDBSCAN documentation.
+        https://hdbscan.readthedocs.io/en/latest/
+    [2] scikit-learn KMeans documentation.
+        https://scikit-learn.org/stable/modules/clustering.html#k-means
+
     Examples
     --------
     Two distinct clusters

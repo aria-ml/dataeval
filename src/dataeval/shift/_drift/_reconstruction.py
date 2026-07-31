@@ -72,6 +72,16 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
     --------
     :class:`~dataeval.shift.DriftReconstruction.Stats` : Per-prediction statistics returned in :attr:`~dataeval.shift.DriftOutput.details`.
 
+    References
+    ----------
+    [1] Alibi Detect: Algorithms for outlier, adversarial and drift detection.
+        Van Looveren, A., Klaise, J., Vacanti, G., Cobb, O., Scillitoe, A., Samoilescu, R., & Athorne, A. (2024). Seldon
+        Technologies.
+        https://docs.seldon.ai/alibi-detect
+    [2] Failing loudly: An empirical study of methods for detecting dataset shift.
+        Rabanser, S., Gunnemann, S., & Lipton, Z. (2019). Advances in Neural Information Processing Systems, 32.
+        https://arxiv.org/abs/1810.11953
+
     Examples
     --------
     >>> from dataeval.utils.models import AE

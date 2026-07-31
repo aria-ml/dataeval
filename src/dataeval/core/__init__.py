@@ -41,6 +41,7 @@ __all__ = [
     "feature_distance",
     "factor_deviation",
     "factor_predictors",
+    "is_continuous",
     "label_alignment",
     "label_coverage",
     "label_errors",
@@ -72,6 +73,7 @@ __all__ = [
 ]
 
 from dataeval.core._ber import BERResult, ber_knn, ber_mst
+from dataeval.core._bin import is_continuous
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
 from dataeval.core._completeness import CompletenessResult, completeness
 from dataeval.core._compute_ratios import compute_ratios

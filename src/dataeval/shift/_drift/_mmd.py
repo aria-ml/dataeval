@@ -210,6 +210,16 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
 
     >>> config = DriftMMD.Config(p_val=0.01, n_permutations=200)
     >>> drift = DriftMMD(config=config).fit(train_emb)
+
+    References
+    ----------
+    [1] A kernel two-sample test.
+        Gretton, A., Borgwardt, K. M., Rasch, M. J., Scholkopf, B., & Smola, A. (2012). Journal of Machine Learning
+        Research, 13(1), 723-773.
+        https://jmlr.csail.mit.edu/papers/v13/gretton12a.html
+    [2] Failing loudly: An empirical study of methods for detecting dataset shift.
+        Rabanser, S., Gunnemann, S., & Lipton, Z. (2019). Advances in Neural Information Processing Systems, 32.
+        https://arxiv.org/abs/1810.11953
     """  # noqa: E501
 
     class Stats(_DriftMMDStats):

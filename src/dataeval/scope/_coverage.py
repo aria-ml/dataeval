@@ -165,7 +165,13 @@ class Coverage(Evaluator):
     space. ``isotropy`` is the class's effective dimensionality relative to the subspace it
     spans (via :func:`~dataeval.core.completeness`): ``~1`` means it varies evenly in every
     direction it occupies, low means its variation collapses onto a few axes — orthogonal to
-    ``dispersion``, which only measures how far it spreads. ``near_duplicate_fraction`` is the
+    ``dispersion``, which only measures how far it spreads. The effective dimensionality is
+    ``exp(H)`` over the class's normalized covariance eigenvalues — the eigenvalue form of
+    Roy & Vetterli's effective rank — and is degenerate unless the class has more samples
+    than the embedding has dimensions, which is what ``isotropy_min_samples`` guards; on a
+    high-dimensional extractor most classes fall below that floor and report ``isotropy``
+    as null rather than zero. Reduce the embedding dimensionality (for example with PCA) if
+    you need the signal on classes of a few hundred samples. ``near_duplicate_fraction`` is the
     share of within-class nearest-neighbor pairs closer than ``near_duplicate_factor`` x the
     class median, surfacing repeated / near-identical samples that inflate counts without
     adding variety. Embeddings are auto-rescaled to the unit interval for the coverage
@@ -173,6 +179,19 @@ class Coverage(Evaluator):
     object detection, wrap the dataset with :class:`~dataeval.data.DetectionCrops` to present
     its boxes as an image-classification dataset (one crop per detection, aligned 1:1 with the
     labels) and evaluate that, or supply detection-level embeddings you have computed yourself.
+
+    References
+    ----------
+    [1] Identifying Insufficient Data Coverage for Ordinal Continuous-Valued Attributes.
+        Asudeh, A., Shahbazi, N., Jin, Z., & Jagadish, H. V. (2021). Proceedings of the 2021 International Conference on
+        Management of Data (SIGMOD '21). doi: 10.1145/3448016.3457315 (Source of the coverage radius. The per-class
+        dispersion, isotropy and near-duplicate signals this class adds are not from that work.)
+        https://dl.acm.org/doi/abs/10.1145/3448016.3457315
+    [2] The effective rank: A measure of effective dimensionality.
+        Roy, O., & Vetterli, M. (2007). Proceedings of the 15th European Signal Processing Conference (EUSIPCO),
+        606-610. (Closest antecedent of the effective-dimensionality estimate behind ``isotropy``; see
+        :func:`~dataeval.core.completeness` for the full lineage.)
+        https://www.eurasip.org/Proceedings/Eusipco/Eusipco2007/Papers/a5p-h05.pdf
 
     Examples
     --------
