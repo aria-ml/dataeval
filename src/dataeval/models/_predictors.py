@@ -52,7 +52,7 @@ class _BaseImageClassifier(ABC):
     callable on a batch of images.
     """
 
-    #: Short backend identifier used in the :attr:`metadata` id; overridden per subclass.
+    # Short backend identifier used in the :attr:`metadata` id; overridden per subclass.
     _backend_label: str = "model"
 
     def __init__(
@@ -258,7 +258,7 @@ class _BaseObjectDetector(ABC):
     on a batch of images.
     """
 
-    #: Short backend identifier used in the :attr:`metadata` id; overridden per subclass.
+    # Short backend identifier used in the :attr:`metadata` id; overridden per subclass.
     _backend_label: str = "model"
 
     def __init__(

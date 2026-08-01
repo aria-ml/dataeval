@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, get_args
 
 import numpy as np
 import polars as pl
@@ -22,6 +24,15 @@ from dataeval.types import (
     SequenceOutput,
     SourceIndex,
     Track,
+    _factors,
+)
+from dataeval.types._factors import (
+    _FACTOR_LEVEL_HIERARCHY,
+    FactorLevel,
+    FactorLevelSchema,
+    _closure,
+    _relink,
+    _validate_acyclic,
 )
 
 
@@ -372,3 +383,211 @@ class TestDictOutput:
 
         out = MyDict(42)
         assert str(out) == str({"value": 42})
+
+
+@pytest.mark.required
+class TestLevelSchema:
+    def test_of_relinks_parents_around_omitted_levels(self):
+        schema = FactorLevelSchema.of("instance")
+        assert schema.levels == ("instance",)
+        assert schema.parents_of("instance") == ()
+
+    def test_parents_view_is_read_only(self):
+        schema = FactorLevelSchema.of("image", "instance")
+        assert schema.parents == {"image": (), "instance": ("image",)}
+        with pytest.raises(TypeError):
+            schema.parents["instance"] = ("instance",)  # type: ignore[index]
+
+    def test_rejects_unknown_level(self):
+        with pytest.raises(ValueError, match="Unknown level"):
+            FactorLevelSchema.of("sequence")  # type: ignore[arg-type]
+
+    def test_rejects_repeated_level(self):
+        with pytest.raises(ValueError, match="appear more than once"):
+            FactorLevelSchema(("image", "image"), {"image": ()})
+
+    def test_rejects_dangling_parent(self):
+        with pytest.raises(ValueError, match="not part of this schema"):
+            FactorLevelSchema(("instance",), {"instance": ("image",)})
+
+    def test_rejects_a_bare_string_of_parents(self):
+        """``str`` is a ``Sequence[str]``, so this would otherwise become 5 parents."""
+        with pytest.raises(TypeError, match="not the bare string"):
+            FactorLevelSchema(("image", "instance"), {"instance": "image"})  # type: ignore[dict-item]
+
+    def test_rejects_a_repeated_parent(self):
+        with pytest.raises(ValueError, match="same parent more than once"):
+            FactorLevelSchema(("image", "instance"), {"instance": ("image", "image")})
+
+    def test_deepcopy_round_trips(self):
+        """The schema travels inside every Metadata, so it has to be copyable."""
+        schema = FactorLevelSchema.of("image", "instance")
+        clone = copy.deepcopy(schema)
+        assert clone == schema
+        assert clone.parents == schema.parents
+
+
+# A level graph with a genuine diamond, of the shape multi-object tracking needs: a
+# per-frame detection sits inside both a frame and a track, which are themselves
+# siblings under a sequence. The shipped vocabulary has only two levels and so cannot
+# express one, but the machinery has to handle it before anything declares it.
+#
+# Typed ``Any`` throughout this section: the names deliberately sit outside the
+# ``FactorLevel`` literal, which is exactly what makes the shape untypable today.
+DIAMOND: Any = {
+    "sequence": (),
+    "image": ("sequence",),
+    "track": ("sequence",),
+    "instance": ("image", "track"),
+}
+
+# Re-bound through Any so the checker does not reject every synthetic level name below.
+# Annotating each call instead would put a type-ignore on nearly every line of these
+# three classes, which buries what they are actually asserting.
+closure: Any = _closure
+relink: Any = _relink
+validate_acyclic: Any = _validate_acyclic
+schema_of: Any = FactorLevelSchema.of
+
+
+@pytest.mark.required
+class TestGraphTraversal:
+    """The graph walks, exercised on a shape the current vocabulary cannot declare."""
+
+    def test_closure_reports_both_branches_nearest_first(self):
+        assert closure("instance", DIAMOND) == ("image", "track", "sequence")
+
+    def test_closure_reports_a_shared_ancestor_once(self):
+        """`sequence` is reachable by two paths and must not appear twice."""
+        assert closure("instance", DIAMOND).count("sequence") == 1
+
+    def test_closure_of_a_root_is_empty(self):
+        assert closure("sequence", DIAMOND) == ()
+
+    def test_relink_keeps_both_branches(self):
+        assert relink("instance", {"image", "track", "instance"}, DIAMOND) == ("image", "track")
+
+    def test_relink_collapses_a_diamond_to_its_meet(self):
+        """Dropping both middle levels splices the edges rather than severing them."""
+        assert relink("instance", {"sequence", "instance"}, DIAMOND) == ("sequence",)
+
+    def test_relink_drops_a_branch_that_is_entirely_absent(self):
+        """Projecting the tracking graph onto plain object detection."""
+        assert relink("instance", {"image", "instance"}, DIAMOND) == ("image",)
+
+    def test_relink_of_a_root_is_empty(self):
+        assert relink("sequence", {"sequence", "instance"}, DIAMOND) == ()
+
+
+@pytest.mark.required
+class TestAcyclicValidation:
+    def test_a_diamond_is_not_a_cycle(self):
+        validate_acyclic(tuple(DIAMOND), DIAMOND)
+
+    def test_a_cycle_is_rejected(self):
+        cyclic = {"image": ("instance",), "instance": ("image",)}
+        with pytest.raises(ValueError, match="form a cycle"):
+            validate_acyclic(("image", "instance"), cyclic)
+
+    def test_a_level_parented_to_itself_is_rejected(self):
+        with pytest.raises(ValueError, match="form a cycle"):
+            validate_acyclic(("image",), {"image": ("image",)})
+
+
+@pytest.mark.required
+class TestMultiParentSchema:
+    """A whole schema over the diamond, with the vocabulary patched to allow it."""
+
+    @pytest.fixture
+    def schema(self, monkeypatch) -> Any:
+        monkeypatch.setattr(_factors, "_FACTOR_LEVEL_HIERARCHY", DIAMOND)
+        return schema_of("sequence", "image", "track", "instance")
+
+    def test_instance_reports_both_parents(self, schema: Any):
+        assert schema.parents_of("instance") == ("image", "track")
+
+    def test_ancestors_span_both_branches(self, schema: Any):
+        assert schema.ancestors("instance") == ("image", "track", "sequence")
+
+    def test_factors_propagate_down_every_edge(self, schema: Any):
+        """The predicate _build_factors uses: a track factor must reach instance rows."""
+        for source in ("image", "track", "sequence"):
+            assert schema.propagates_to(source, "instance")
+
+    def test_siblings_do_not_propagate_to_each_other(self, schema: Any):
+        assert not schema.propagates_to("track", "image")
+        assert not schema.propagates_to("image", "track")
+
+    def test_descendants_follow_both_branches(self, schema: Any):
+        assert schema.descendants("sequence") == ("image", "track", "instance")
+        assert schema.descendants("track") == ("instance",)
+
+    def test_highest_of_incomparable_levels_is_schema_order(self, schema: Any):
+        """No graph answer exists for two siblings, so declaration order decides."""
+        assert schema.highest(["track", "image"]) == "image"
+        assert schema.highest(["instance", "track"]) == "track"
+
+
+@pytest.mark.required
+class TestLevelSchemaValidate:
+    """A schema knows only levels that exist; retired spellings never reach it."""
+
+    def test_real_level_resolves_without_warning(self, recwarn):
+        schema = FactorLevelSchema.of("image", "instance")
+        assert schema.validate("instance") == "instance"
+        assert not recwarn.list
+
+    def test_unknown_level_raises(self):
+        schema = FactorLevelSchema.of("image", "instance")
+        with pytest.raises(ValueError, match="Unknown level 'nope'"):
+            schema.validate("nope")  # type: ignore[arg-type]
+
+    def test_retired_target_is_not_a_level(self):
+        """``"target"`` is translated by Metadata, not by the schema."""
+        schema = FactorLevelSchema.of("image", "instance")
+        with pytest.raises(ValueError, match="Unknown level 'target'"):
+            schema.validate("target")  # type: ignore[arg-type]
+
+
+@pytest.mark.required
+class TestLevelHierarchy:
+    """LEVEL_HIERARCHY is the sole declaration of the vocabulary and its edges."""
+
+    def test_ordered_coarsest_first(self):
+        assert tuple(_FACTOR_LEVEL_HIERARCHY) == ("image", "instance")
+
+    def test_instance_hangs_off_image(self):
+        """Both tasks put their targets here, so it has exactly one parent."""
+        assert _FACTOR_LEVEL_HIERARCHY["instance"] == ("image",)
+
+    def test_level_literal_matches_the_hierarchy(self):
+        """The one declaration that cannot be derived, so it is asserted instead.
+
+        A Literal alias is static and cannot be computed from a runtime mapping, so
+        adding a level means editing both. This is what catches forgetting one.
+        """
+        assert set(get_args(FactorLevel)) == set(_FACTOR_LEVEL_HIERARCHY)
+
+    def test_every_parent_is_itself_a_level(self):
+        named = {parent for edges in _FACTOR_LEVEL_HIERARCHY.values() for parent in edges}
+        assert named <= set(_FACTOR_LEVEL_HIERARCHY)
+
+    def test_parents_are_declared_before_their_children(self):
+        """Canonical order must be a topological order of the edges, not just coarse-first.
+
+        Schema order is what :meth:`FactorLevelSchema.highest` resolves ties on, and the graph
+        is a partial order, so the declaration has to keep every level after its parents
+        for that tie-break to never contradict the ancestry.
+        """
+        ordered = list(_FACTOR_LEVEL_HIERARCHY)
+        for index, level in enumerate(ordered):
+            for parent in _FACTOR_LEVEL_HIERARCHY[level]:
+                assert ordered.index(parent) < index
+
+    def test_no_level_is_its_own_parent(self):
+        for level, edges in _FACTOR_LEVEL_HIERARCHY.items():
+            assert level not in edges
+
+    def test_hierarchy_is_read_only(self):
+        with pytest.raises(TypeError):
+            _FACTOR_LEVEL_HIERARCHY["frame"] = ()  # type: ignore[index]

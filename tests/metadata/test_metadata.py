@@ -150,24 +150,21 @@ class TestMetadata:
     def test_add_empty_factors(self):
         md = Metadata(None)  # type: ignore
         md._dataframe = pl.DataFrame()
-        md._factors = {}
+        md._factors = set()
         md._count = 0
         md._is_structured = True
         md.add_factors({})
         assert md.factor_names == []
 
     def test_all_factor_types(self, RNG: np.random.Generator):
-        md = Metadata(None)  # type: ignore
-        md_dict = {
-            "cat_str": RNG.choice(["A", "B"], size=100).tolist(),
-            "con_flt": RNG.random(size=100).tolist(),
-            "dis_flt": RNG.choice([0.1, 0.2, 0.4, 0.6, 0.8], size=100).tolist(),
-            "dis_int": np.arange(100).tolist(),
-        }
-        md._dataframe = pl.from_dict(md_dict)
-        md._factors = dict.fromkeys(md_dict, None)
-        md._is_structured = True
-        md._item_indices = np.arange(100)
+        md = Metadata.from_factors(
+            {
+                "cat_str": RNG.choice(["A", "B"], size=100),
+                "con_flt": RNG.random(size=100),
+                "dis_flt": RNG.choice([0.1, 0.2, 0.4, 0.6, 0.8], size=100),
+                "dis_int": np.arange(100),
+            },
+        )
 
         md._bin()
         assert [f.factor_type for f in md.factor_info.values()] == [
@@ -262,7 +259,9 @@ class TestMetadata:
                 (np.zeros((3, 16, 16)), ObjectDetectionTarget([[0, 0, 0, 0]], [0], [0, 0, 0]), {"id": 0}),
             ],  # type: ignore
         )
-        with pytest.raises(ValueError, match="Encountered unexpected target type in dataset"):
+        # The first datum's target selects the strategy; the second one then fails
+        # to satisfy it.
+        with pytest.raises(TypeError, match="Encountered unsupported target type"):
             md._structure()
 
     def test_process_include(self, mock_ds):
@@ -315,14 +314,14 @@ class TestMetadata:
     def test_empty_binned_data(self):
         md = Metadata(None)  # type: ignore
         md._is_structured = True
-        md._factors = {"foo": None}
+        md._factors = {"foo"}
         md._exclude = {"foo"}
         assert md.factor_data.size == 0
 
     def test_empty_factor_data(self):
         md = Metadata(None)  # type: ignore
         md._is_structured = True
-        md._factors = {"foo": None}
+        md._factors = {"foo"}
         md._exclude = {"foo"}
         assert md.raw_data.size == 0
 
@@ -335,17 +334,21 @@ class TestMetadata:
         ],
     )
     def test_reset_bins(self, is_binned, exists):
+        """The companion column and its cached info go together, whatever _is_binned says."""
         md = Metadata(None)  # type: ignore
         col = "foo"
         col_bn = _binned(col)
         md._dataframe = pl.from_dict({col: [0], col_bn: [0]} if exists else {col: [0]})
-        md._factors = {col: FactorInfo("continuous", is_binned=exists)}
+        md._factors = {col}
+        md._factor_cache = {col: FactorInfo("continuous", is_binned=exists)}
         md._is_binned = is_binned
         md._reset_bins()
         assert not md._is_binned
         assert col_bn not in md._dataframe.columns
-        factor_info = md._factors[col]
-        assert exists if factor_info is None else not factor_info.is_binned
+        # Info survives only where there was no column to drop; the factor stays visible
+        # either way, since _reset_bins clears binning and not the factor registry.
+        assert (col in md._factor_cache) is not exists
+        assert md._factors == {col}
 
     def test_structure_progress_callback(self, mock_ds):
         """Test that _structure calls progress_callback with correct values."""
@@ -357,23 +360,19 @@ class TestMetadata:
 
         # Verify callback was called for each datum
         assert callback.call_count == len(mock_ds)
-        # Check that the last call has the correct final values
-        callback.assert_called_with(len(mock_ds) - 1, total=len(mock_ds))
+        # Progress counts items completed, so the last call reports the total.
+        callback.assert_called_with(len(mock_ds), total=len(mock_ds))
 
     def test_bin_progress_callback(self, RNG: np.random.Generator):
         """Test that _bin calls progress_callback with correct values."""
         from unittest.mock import Mock
 
-        md = Metadata(None)  # type: ignore
         md_dict = {
-            "cat_str": RNG.choice(["A", "B"], size=100).tolist(),
-            "con_flt": RNG.random(size=100).tolist(),
-            "dis_int": np.arange(100).tolist(),
+            "cat_str": RNG.choice(["A", "B"], size=100),
+            "con_flt": RNG.random(size=100),
+            "dis_int": np.arange(100),
         }
-        md._dataframe = pl.from_dict(md_dict)
-        md._factors = dict.fromkeys(md_dict, None)
-        md._is_structured = True
-        md._item_indices = np.arange(100)
+        md = Metadata.from_factors(md_dict)
 
         callback = Mock()
         md._bin(progress_callback=callback)
@@ -386,24 +385,17 @@ class TestMetadata:
 
     def test_multidimensional_factors_skipped(self, RNG: np.random.Generator):
         """Test that multi-dimensional factors are skipped during binning and filtered from outputs."""
-        md = Metadata(None)  # type: ignore
-
-        # Create a mix of 1D and 2D factors
-        md_dict = {
-            "factor_1d": RNG.random(size=50).tolist(),
-            "embedding_2d": RNG.random(size=(50, 10)).tolist(),  # 2D factor (e.g., embedding)
-            "another_1d": RNG.choice(["A", "B", "C"], size=50).tolist(),
-        }
-
-        md._dataframe = pl.from_dict(md_dict)
-        md._factors = dict.fromkeys(md_dict, None)
-        md._target_factors = set(md_dict)
-        md._image_factors = set()
-        md._is_structured = True
-        md._item_indices = np.arange(50)
-        md._class_labels = RNG.integers(0, 3, size=50)
-
-        # Trigger factor filtering
+        md = Metadata.from_factors(
+            {
+                "factor_1d": RNG.random(size=50),
+                "another_1d": RNG.choice(["A", "B", "C"], size=50),
+            },
+            class_labels=RNG.integers(0, 3, size=50),
+        )
+        # A 2D factor (e.g. an embedding) sitting in the dataframe as a polars List column.
+        # add_factors refuses to create one, so it is written directly.
+        md._dataframe = md.dataframe.with_columns(pl.Series("embedding_2d", RNG.random(size=(50, 10))))
+        md._factors_by_level.setdefault("image", set()).add("embedding_2d")
         md._build_factors()
 
         # Trigger binning
@@ -428,12 +420,26 @@ class TestMetadata:
         # Verify that the 2D factor is still in the dataframe (not removed, just skipped)
         assert "embedding_2d" in md.dataframe.columns
 
-        # Verify that _factors has None for the 2D factor
-        assert md._factors["factor_1d"] is not None
-        assert md._factors["another_1d"] is not None
+        # The 1D factors were processed; the 2D one never entered the visible set.
+        assert md._factor_cache["factor_1d"] is not None
+        assert md._factor_cache["another_1d"] is not None
+        assert "embedding_2d" not in md._factors
 
-    def test_target_factors_only_toggle(self, get_mock_od_dataset, RNG: np.random.Generator):
-        """Test that toggling target_factors_only properly resets binned data dimensions."""
+    def test_add_factors_skips_multidimensional(self, RNG: np.random.Generator):
+        """A multi-dimensional array has no single-column form, so add_factors drops it."""
+        md = Metadata.from_factors(
+            {"factor_1d": RNG.random(size=50)},
+            class_labels=RNG.integers(0, 3, size=50),
+        )
+
+        md.add_factors({"embedding_2d": RNG.random(size=(50, 10)), "scalar": RNG.random(size=50)})
+
+        assert "embedding_2d" not in md.dataframe.columns
+        assert md.dropped_factors["embedding_2d"] == ["multi_dimensional"]
+        assert "scalar" in md.factor_names
+
+    def test_inherited_toggle(self, get_mock_od_dataset, RNG: np.random.Generator):
+        """Test that toggling inherited properly resets binned data dimensions."""
         # Create an OD dataset with both image-level and target-level factors
         images = [np.random.random((3, 64, 64)) for _ in range(10)]
         labels = [[0, 1] for _ in range(10)]  # 2 targets per image
@@ -463,8 +469,8 @@ class TestMetadata:
         assert initial_binned_shape[0] == 20  # 10 images * 2 targets each
         assert initial_binned_shape[1] >= 2  # At least 2 factors
 
-        # Set target_factors_only to True - should only have target-level factors
-        md.target_factors_only = True
+        # Drop inherited factors - should only have instance-native factors
+        md.inherited = False
         target_only_factor_names = set(md.factor_names)
         target_only_binned_shape = md.factor_data.shape
 
@@ -474,8 +480,8 @@ class TestMetadata:
         assert target_only_binned_shape[0] == 20  # Still 20 targets
         assert target_only_binned_shape[1] < initial_binned_shape[1]  # Fewer factors
 
-        # Set target_factors_only back to False - should have both factors again
-        md.target_factors_only = False
+        # Restore inherited factors - should have both factors again
+        md.inherited = True
         final_factor_names = set(md.factor_names)
         final_binned_shape = md.factor_data.shape
 
@@ -512,47 +518,36 @@ class TestMetadata:
             md.get_target_factors(0, 999)
 
     def test_infer_factor_level_errors(self, get_od_dataset):
-        """_infer_factor_level resolves each array independently and reports every accepted length."""
+        """Inferring a level fails on lengths matching no level."""
         images = np.random.random((5, 3, 16, 16))
-        dataset = get_od_dataset(images, 2, True)
+        md = Metadata(get_od_dataset(images, 2, True))
+        md._structure()
 
-        md = Metadata(dataset)
+        with pytest.raises(ShapeMismatchError, match="different length"):
+            md.add_factors({"a": [1, 2, 3]})
 
-        assert md._infer_factor_level([1] * 5, num_image_rows=5, num_target_rows=10) == "image"
-        assert md._infer_factor_level([1] * 10, num_image_rows=5, num_target_rows=10) == "target"
-        assert md._infer_factor_level([1] * 15, num_image_rows=5, num_target_rows=10) == "combined"
+        # Levels are inferred per factor, so a ragged mapping fails on the bad member.
+        with pytest.raises(ShapeMismatchError, match="different length"):
+            md.add_factors({"a": [1] * 5, "b": [1, 2]})
 
-        with pytest.raises(ShapeMismatchError, match="Expected 5 .*10 .*15 .*got 3"):
-            md._infer_factor_level([1, 2, 3], num_image_rows=5, num_target_rows=10)
-
-    def test_infer_factor_level_without_targets_only_offers_image(self):
-        """A dataset without targets has no target or combined level to infer."""
-        md = Metadata(MockDataset(np.ones((5, 3, 3)), np.ones((5, 3))))
-
-        assert md._infer_factor_level([1] * 5, num_image_rows=5, num_target_rows=5) == "image"
-
-        with pytest.raises(ShapeMismatchError, match=r"Expected 5 \(image count\), got 10"):
-            md._infer_factor_level([1] * 10, num_image_rows=5, num_target_rows=5)
-
-    def test_validate_factor_lengths_invalid_level(self, get_od_dataset):
-        """_validate_factor_lengths rejects unknown levels, including the unresolved 'auto'."""
+    def test_infer_factor_level_per_factor(self, get_od_dataset):
+        """A mapping mixing levels is placed factor by factor under level="auto"."""
         images = np.random.random((5, 3, 16, 16))
-        dataset = get_od_dataset(images, 2, True)
+        md = Metadata(get_od_dataset(images, 2, True))
+        md._structure()
 
-        md = Metadata(dataset)
+        md.add_factors({"bright": np.arange(5.0), "iou": np.arange(10.0)})
 
-        with pytest.raises(ValueError, match="Invalid level"):
-            md._validate_factor_lengths(
-                [1, 2, 3],
-                level="invalid",  # type: ignore
-                num_image_rows=5,
-                num_target_rows=10,
-            )
+        assert md.factor_info["bright"].level == "image"
+        assert md.factor_info["iou"].level == "instance"
 
-        # "auto" must be resolved by _infer_factor_level before validation; reaching the
-        # validator with it is a bug, not a free pass.
-        with pytest.raises(ValueError, match="Invalid level"):
-            md._validate_factor_lengths([1, 2, 3], level="auto", num_image_rows=5, num_target_rows=10)
+    def test_add_factors_invalid_level(self, get_od_dataset):
+        """An explicit level outside the dataset's schema is rejected."""
+        images = np.random.random((5, 3, 16, 16))
+        md = Metadata(get_od_dataset(images, 2, True))
+
+        with pytest.raises(ValueError, match="Unknown level 'invalid'"):
+            md.add_factors({"a": [1, 2, 3]}, level="invalid")  # type: ignore[arg-type]
 
     def test_filter_by_factor_with_condition(self, get_od_dataset):
         """Test filter_by_factor returns filtered results (line 1199)."""
