@@ -625,7 +625,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
 
     @property
     def items(self) -> Self:
-        """Return a filtered DuplicatesOutput containing only item-level duplicate groups.
+        """Filtered DuplicatesOutput containing only item-level duplicate groups.
 
         The returned object supports the same properties (``exact``, ``near``)
         and aggregation methods as the original output.
@@ -634,7 +634,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
 
     @property
     def targets(self) -> Self:
-        """Return a filtered DuplicatesOutput containing only target-level duplicate groups.
+        """Filtered DuplicatesOutput containing only target-level duplicate groups.
 
         The returned object supports the same properties (``exact``, ``near``)
         and aggregation methods as the original output.

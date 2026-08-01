@@ -5,7 +5,7 @@ __all__ = []
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import numpy as np
 import polars as pl
@@ -20,6 +20,13 @@ from dataeval.utils._internal import flatten_samples
 from dataeval.utils.thresholds import ZScoreThreshold
 
 TDetails = TypeVar("TDetails", Mapping[str, Any], pl.DataFrame)
+
+
+class _MannWhitneyuResult(NamedTuple):
+    """Typed representation of Mann-Whitney U test result."""
+
+    statistic: float
+    pvalue: float
 
 
 @dataclass(frozen=True, repr=False)

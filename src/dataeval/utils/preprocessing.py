@@ -145,42 +145,42 @@ class BoundingBox:
 
     @property
     def x0(self) -> float:
-        """Get x0 coordinate."""
+        """The x0 coordinate."""
         return self._x0
 
     @property
     def y0(self) -> float:
-        """Get y0 coordinate."""
+        """The y0 coordinate."""
         return self._y0
 
     @property
     def x1(self) -> float:
-        """Get x1 coordinate."""
+        """The x1 coordinate."""
         return self._x1
 
     @property
     def y1(self) -> float:
-        """Get y1 coordinate."""
+        """The y1 coordinate."""
         return self._y1
 
     @property
     def xyxy(self) -> tuple[float, float, float, float]:
-        """Get coordinates in XYXY format (x0, y0, x1, y1)."""
+        """Coordinates in XYXY format (x0, y0, x1, y1)."""
         return (self._x0, self._y0, self._x1, self._y1)
 
     @property
     def xyxy_int(self) -> tuple[int, int, int, int]:
-        """Get coordinates in XYXY format as int (x0, y0, x1, y1)."""
+        """Coordinates in XYXY format as int (x0, y0, x1, y1)."""
         return math.floor(self._x0), math.floor(self._y0), math.ceil(self._x1), math.ceil(self._y1)
 
     @property
     def xywh(self) -> tuple[float, float, float, float]:
-        """Get coordinates in XYWH format (x, y, width, height)."""
+        """Coordinates in XYWH format (x, y, width, height)."""
         return (self._x0, self._y0, self._x1 - self._x0, self._y1 - self._y0)
 
     @property
     def cxcywh(self) -> tuple[float, float, float, float]:
-        """Get coordinates in CXCYWH format (center_x, center_y, width, height)."""
+        """Coordinates in CXCYWH format (center_x, center_y, width, height)."""
         center_x = (self._x0 + self._x1) / 2
         center_y = (self._y0 + self._y1) / 2
         width = self._x1 - self._x0
@@ -189,7 +189,7 @@ class BoundingBox:
 
     @property
     def yolo(self) -> tuple[float, float, float, float]:
-        """Get coordinates in YOLO format (center_x, center_y, width, height) normalized to [0, 1]."""
+        """Coordinates in YOLO format (center_x, center_y, width, height) normalized to [0, 1]."""
         h, w = self.image_hw
         center_x = (self._x0 + self._x1) / 2 / w
         center_y = (self._y0 + self._y1) / 2 / h
@@ -199,17 +199,17 @@ class BoundingBox:
 
     @property
     def width(self) -> float:
-        """Get bounding box width."""
+        """Bounding box width."""
         return self._x1 - self._x0
 
     @property
     def height(self) -> float:
-        """Get bounding box height."""
+        """Bounding box height."""
         return self._y1 - self._y0
 
     @property
     def image_hw(self) -> tuple[int, int]:
-        """Get image height and width."""
+        """Image height and width."""
         if self._image_shape is None:
             raise ValueError("Image shape is required for bounds checking and YOLO format.")
 

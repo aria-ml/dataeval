@@ -136,7 +136,7 @@ class Embeddings(Array, FeatureExtractor):
 
     @property
     def batch_size(self) -> int:
-        """Return the batch size used for embedding computation.
+        """Batch size used for embedding computation.
 
         Returns
         -------

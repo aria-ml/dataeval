@@ -198,7 +198,7 @@ class ImageDataset:
 
     @property
     def metadata(self) -> dict[str, Any]:
-        """Return dataset metadata."""
+        """Dataset metadata."""
         return self._metadata
 
     def __len__(self) -> int:
@@ -248,7 +248,7 @@ class ObjectDetectionDataset:
 
     @property
     def metadata(self) -> DatasetMetadata:
-        """Return dataset metadata."""
+        """Dataset metadata."""
         return self._metadata
 
     def __len__(self) -> int:

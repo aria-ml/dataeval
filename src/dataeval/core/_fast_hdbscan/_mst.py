@@ -79,7 +79,7 @@ def _expand_tree(
     return new_tree
 
 
-@numba.njit(locals={"i": numba.types.intp, "nbr": numba.types.intp, "dist": numba.types.float32}, cache=True)
+@numba.njit(locals={"i": numba.intp, "nbr": numba.intp, "dist": numba.float32}, cache=True)
 def _update_tree(  # noqa: C901
     tree: NDArray[np.float32],
     total_edge: int,
@@ -145,7 +145,7 @@ def _update_tree(  # noqa: C901
     return tree, total_edge, disjoint_set, cluster_points
 
 
-@numba.njit(locals={"i": numba.types.uint32}, cache=True)
+@numba.njit(locals={"i": numba.uint32}, cache=True)
 def _cluster_edges(
     tracker: NDArray[np.int64],
     final_merge_idx: int,
@@ -257,7 +257,7 @@ def _flatten_and_sort(
     return nbrs_sorted, dist_sorted, index_sorted
 
 
-@numba.njit(locals={"i": numba.types.int32}, cache=True)
+@numba.njit(locals={"i": numba.int32}, cache=True)
 def compare_links_to_cluster_std(
     mst: NDArray[np.float32],
     clusters: NDArray[np.int64],

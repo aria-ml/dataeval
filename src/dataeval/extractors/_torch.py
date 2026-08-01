@@ -121,22 +121,22 @@ class TorchExtractor(ReprMixin):
 
     @property
     def layer_name(self) -> str | None:
-        """Return the layer name for intermediate extraction, if set."""
+        """Layer name for intermediate extraction, if set."""
         return self._layer_name
 
     @property
     def use_output(self) -> bool:
-        """Return whether output (True) or input (False) is captured from the layer."""
+        """Whether output (True) or input (False) is captured from the layer."""
         return self._use_output
 
     @property
     def flatten(self) -> bool:
-        """Return whether outputs are flattened to 2D."""
+        """Whether outputs are flattened to 2D."""
         return self._flatten
 
     @property
     def batch_size(self) -> int | None:
-        """Return the default batch size for inference, if set."""
+        """Default batch size for inference, if set."""
         return self._batch_size
 
     def _normalize_transforms(

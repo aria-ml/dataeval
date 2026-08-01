@@ -163,12 +163,12 @@ class OnnxExtractor(ReprMixin):
 
     @property
     def output_name(self) -> str | None:
-        """Return the output name for extraction, if set."""
+        """Output name for extraction, if set."""
         return self._output_name
 
     @property
     def batch_size(self) -> int | None:
-        """Return the default batch size for inference, if set."""
+        """Default batch size for inference, if set."""
         return self._batch_size
 
     def _normalize_transforms(

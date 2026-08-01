@@ -84,7 +84,7 @@ class SufficiencyOutput(DictOutput):
     @property
     def params(self) -> Mapping[str, NDArray[np.float64]]:
         """
-        Get the curve fit parameters for the power law model.
+        Curve fit parameters for the power law model.
 
         Returns
         -------

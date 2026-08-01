@@ -11,7 +11,7 @@ __all__ = []
 
 import math
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 import numpy as np
 import scipy.stats
@@ -20,7 +20,7 @@ from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
-from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
+from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput, _MannWhitneyuResult
 from dataeval.types import set_metadata
 from dataeval.utils.thresholds import ZScoreThreshold
 
@@ -349,6 +349,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             # scipy >=1.18 returns NaN for the two-sided test when every value is tied
             # (zero variance, e.g. a constant feature): the statistic is undefined.
             # Identical distributions imply no drift, so treat this as p-value 1.0.
+            result = cast(_MannWhitneyuResult, result)
             pvalue = result.pvalue
             if np.isnan(pvalue):
                 pvalue = np.float32(1.0)
