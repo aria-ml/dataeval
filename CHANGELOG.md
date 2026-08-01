@@ -1,6 +1,26 @@
-[//]: # (c51f889c3904e8964f18ea1918f76f2235eca317)
+[//]: # (fa9acf4fc716649b735d17b17c74b137fe048b13)
 
 # DataEval Change Log
+
+## v1.1.0-rc2
+
+🛠️ **Improvements and Enhancements**
+
+- `fa9acf4f` - [impr] Metadata restructure to prepare for additional dataset modalities
+- `e7af0896` - Enhance Metadata add_factors to allow for combined factors
+
+👾 **Fixes**
+
+- `d5f508bf` - [fix] Additional lint and type rules
+
+📝 **Miscellaneous**
+
+- `e6663c24` - [deps] Bump dependencies
+- `e4a7950f` - [docs] Fix broken xrefs and add a unit test to validate
+- `18f66392` - [devsecops] Prevent accidental resurrection of orphan ipynb files in docs
+- `e8697e31` - [misc] Refactor types to submodule
+- `34ae329c` - [docs] Add validation and trust section to concepts page
+- `b303a6f1` - Pre-release v1.1.0-rc1
 
 ## v1.1.0-rc1
 
