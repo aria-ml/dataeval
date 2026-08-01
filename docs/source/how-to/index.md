@@ -61,6 +61,7 @@ datasets for machine learning.
 ../notebooks/h2_visualize_cleaning_issues.py
 ../notebooks/h2_custom_image_stats_object_detection.py
 ../notebooks/h2_add_intrinsic_factors.py
+../notebooks/h2_bin_factors_by_level.py
 ../notebooks/h2_detect_undersampling.py
 ../notebooks/h2_wrap_dataframe_ic_dataset.py
 ../notebooks/h2_wrap_dataframe_od_dataset.py
@@ -98,6 +99,10 @@ datasets for machine learning.
   - Apply DataEval's statistical outputs to
     DataEval's {class}`.Metadata` object for bias analysis
   - [![Open In Colab][colab-badge]][imd-colab]
+- - [](../notebooks/h2_bin_factors_by_level.py)
+  - Understand how factors are binned at their own level and
+    what that means for bias results
+  - [![Open In Colab][colab-badge]][bin-colab]
 - - [](../notebooks/h2_detect_undersampling.py)
   - Detect undersampled subsets of datasets
   - [![Open In Colab][colab-badge]][cov-colab]
@@ -141,6 +146,7 @@ datasets for machine learning.
 [clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc1/notebooks/h2_visualize_cleaning_issues.ipynb
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc1/notebooks/h2_custom_image_stats_object_detection.ipynb
 [imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc1/notebooks/h2_add_intrinsic_factors.ipynb
+[bin-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc1/notebooks/h2_bin_factors_by_level.ipynb
 [cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc1/notebooks/h2_detect_undersampling.ipynb
 [wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc1/notebooks/h2_wrap_dataframe_ic_dataset.ipynb
 [wdfod-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc1/notebooks/h2_wrap_dataframe_od_dataset.ipynb

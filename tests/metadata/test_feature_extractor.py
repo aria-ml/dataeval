@@ -154,27 +154,46 @@ class TestMetadataErrorCases:
             _ = metadata[1.5]  # type: ignore
 
 
-class TestMetadataTargetFactorsOnly:
-    """Test target_factors_only property."""
+class TestMetadataInherited:
+    """Test the inherited property."""
 
-    def test_target_factors_only_default(self, mock_ds):
-        """Test target_factors_only defaults to False."""
+    def test_inherited_default(self, mock_ds):
+        """Test inherited defaults to True."""
         metadata = Metadata(mock_ds)
-        assert not metadata.target_factors_only
+        assert metadata.inherited
 
-    def test_target_factors_only_setter_triggers_rebuild(self, get_od_dataset):
-        """Test setting target_factors_only triggers factor rebuild."""
+    def test_inherited_setter_triggers_rebuild(self, get_od_dataset):
+        """Test setting inherited triggers factor rebuild."""
         od_ds = get_od_dataset(10, 2)
 
         metadata = Metadata(od_ds)
         initial_factors = set(metadata.factor_names)
 
-        # Set target_factors_only to True should rebuild
-        metadata.target_factors_only = True
+        # Dropping inherited factors should rebuild
+        metadata.inherited = False
         filtered_factors = set(metadata.factor_names)
 
-        # Should have fewer or equal factors when filtering to target-only
+        # Should have fewer or equal factors when filtering to view-native only
         assert len(filtered_factors) <= len(initial_factors)
+
+    def test_constructor_arg_matches_the_setter(self, get_od_dataset):
+        """The constructor argument and the toggle reach the same state."""
+        od_ds = get_od_dataset(10, 2)
+
+        constructed = Metadata(od_ds, inherited=False)
+        toggled = Metadata(od_ds)
+        toggled.inherited = False
+
+        assert constructed.inherited is False
+        assert list(constructed.factor_names) == list(toggled.factor_names)
+
+    def test_new_carries_the_flag_forward(self, get_od_dataset):
+        """new() reproduces the config, which has to include this one."""
+        od_ds = get_od_dataset(10, 2)
+
+        metadata = Metadata(od_ds, inherited=False)
+
+        assert metadata.new(od_ds).inherited is False
 
 
 class TestMetadataItemCount:

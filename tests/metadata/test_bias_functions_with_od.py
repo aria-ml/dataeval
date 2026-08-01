@@ -147,20 +147,21 @@ class TestMetadataStructureWithBiasFunctions:
         assert all(target_rows["target_index"].is_not_null())
         assert all(target_rows["weather"].is_not_null())
 
-    def test_ic_metadata_has_only_target_rows(self, ic_dataset_for_bias):
-        """Verify IC datasets only create target rows (no separate image rows)."""
+    def test_ic_metadata_has_an_image_row_and_a_label_row_per_item(self, ic_dataset_for_bias):
+        """IC separates item rows from label rows, so an unlabeled item keeps its row."""
         md = Metadata(ic_dataset_for_bias)
 
-        # Should have 5 rows only (one per image)
-        assert len(md.dataframe) == 5
+        assert "image" == "image"
+        assert "instance" == "instance"
+        assert md.level_counts == {"image": 5, "instance": 5}
 
-        # All rows are image and target rows for IC
-        target_rows = md.target_data
-        assert len(target_rows) == 5
+        # One block per level: 5 image rows followed by 5 label rows.
+        assert len(md.dataframe) == 10
 
-        # All rows are image and target rows for IC
-        image_rows = md.image_data
-        assert len(image_rows) == 5
+        # Every image here is labelled, so the two levels have the same height.
+        assert len(md.target_data) == 5
+        assert len(md.rows_at("image")) == 5
+        assert len(md.image_data) == 5
 
     def test_od_factor_data_uses_target_rows(self, od_dataset_for_bias):
         """Verify factor_data for OD uses target rows (9 rows)."""

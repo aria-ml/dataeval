@@ -39,8 +39,13 @@ def mock_metadata(
     m.factor_names = list(_factors)
     m.factor_data = np.hstack(_factor_data) if _factor_data else np.array([])
     m.factor_info = _factors
+    m._factor_info = _factors
     m.dataframe = pl.DataFrame(m.factor_data, schema=m.factor_names)
+    # Single-level stand-in: every row belongs to the view, so the level filter is a no-op.
+    m._view_level = "image"
+    m.rows_at = lambda _level: m.dataframe
 
+    m._project = lambda columns, dtype: Metadata._project(m, columns, dtype)
     m.filter_by_factor = lambda x: Metadata.filter_by_factor(m, x)
     m.filter_by_factor_type = lambda x: Metadata.filter_by_factor_type(m, x)
 

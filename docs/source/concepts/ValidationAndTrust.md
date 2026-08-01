@@ -325,8 +325,8 @@ called discrete.
 - - Anything reading `Metadata.factor_data`
   - **Applied**
   - `factor_data` is the binned, integer-valued view and is what the bias
-    evaluators and grouping code consume. `Metadata.raw_data` returns the
-    unbinned values, and `Metadata.factor_info` reports per factor whether it
+    evaluators and grouping code consume. `Metadata.rows_at(md.view)` carries
+    the unbinned values, and `Metadata.factor_info` reports per factor whether it
     was binned or digitized.
 - - {func}`.factor_deviation`, {func}`.factor_predictors`
   - **Not applied**

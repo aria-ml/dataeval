@@ -308,7 +308,8 @@ print(f"Factor names: {metadata.factor_names}")
 # `occlusion` changes from box to box.
 
 # %%
-print(metadata.target_data.select(["item_index", "target_index", "class_label", "weather", "occlusion"]).head(8))
+instances = metadata.rows_at(metadata.label_level)
+print(instances.select(["item_index", "target_index", "class_label", "weather", "occlusion"]).head(8))
 
 # %% [markdown]
 # That is all it takes: a small adapter that groups per-box rows - and tells

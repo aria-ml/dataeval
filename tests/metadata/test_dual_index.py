@@ -8,7 +8,21 @@ import pytest
 
 from dataeval._metadata import Metadata
 from dataeval.exceptions import ShapeMismatchError
+from dataeval.types import SourceIndex
 from tests.embeddings.test_embeddings import MockDataset
+
+# compute_stats order for the 3-image / 2-1-3-detection fixture, both levels enabled.
+SOURCE_INDEX_3_IMAGES_6_CROPS = [
+    SourceIndex(0, None),
+    SourceIndex(0, 0),
+    SourceIndex(0, 1),
+    SourceIndex(1, None),
+    SourceIndex(1, 0),
+    SourceIndex(2, None),
+    SourceIndex(2, 0),
+    SourceIndex(2, 1),
+    SourceIndex(2, 2),
+]
 
 
 def _od_targets():
@@ -256,11 +270,11 @@ class TestDualKeyIndexing:
             md.add_factors({"bad_factor": [1, 2]})  # Only 2 values, need 3 or 6
 
         # Wrong length with explicit level
-        with pytest.raises(ValueError, match="image count"):
+        with pytest.raises(ValueError, match="image row count"):
             md.add_factors({"bad_factor": [1, 2]}, level="image")
 
-        with pytest.raises(ValueError, match="target count"):
-            md.add_factors({"bad_factor": [1, 2]}, level="target")
+        with pytest.raises(ValueError, match="instance row count"):
+            md.add_factors({"bad_factor": [1, 2]}, level="instance")
 
     def test_factor_info_level_od_dataset(self, od_dataset_with_metadata):
         """Test that factor_info.level distinguishes image vs target factors on OD datasets."""
@@ -276,11 +290,12 @@ class TestDualKeyIndexing:
         md = Metadata(od_dataset_with_metadata)
 
         md.add_factors({"brightness": [0.5, 0.7, 0.3]}, level="image")
-        md.add_factors({"iou": [0.9, 0.8, 0.95, 0.85, 0.75, 0.92]}, level="target")
+        md.add_factors({"iou": [0.9, 0.8, 0.95, 0.85, 0.75, 0.92]}, level="instance")
 
         info = md.factor_info
         assert info["brightness"].level == "image"
-        assert info["iou"].level == "target"
+        # The target level reports its real name, not the retired "target".
+        assert info["iou"].level == "instance" == "instance"
 
     def test_factor_info_level_ic_dataset(self):
         """Test that IC dataset factors default to image level."""
@@ -291,56 +306,113 @@ class TestDualKeyIndexing:
         assert info["weather"].level == "image"
 
     def test_add_factors_mixed_levels_od_dataset(self, od_dataset_with_metadata):
-        """Test that we can add mixed-level factors (image, target, combined) in a single call with level='auto'."""
+        """Test that we can add mixed-level factors in a single call with level='auto'."""
         md = Metadata(od_dataset_with_metadata)
 
         # Image-level factor: 3 images
         brightness = [0.5, 0.7, 0.3]
-        # Target-level factor: 6 targets
+        # Instance-level factor: 6 targets
         iou = [0.9, 0.8, 0.95, 0.85, 0.75, 0.92]
-        # Combined-level factor: 3 images + 6 targets = 9 elements, in source-index order
-        combined_stat = [0.1, 0.4, 0.5, 0.2, 0.6, 0.3, 0.7, 0.8, 0.9]
 
         md.add_factors(
             {
                 "added_brightness": brightness,
                 "added_iou": iou,
-                "added_combined": combined_stat,
             },
             level="auto",
         )
 
         info = md.factor_info
         assert info["added_brightness"].level == "image"
-        assert info["added_iou"].level == "target"
-        assert info["added_combined"].level == "combined"
+        assert info["added_iou"].level == "instance"
 
         # Values must land on the rows they describe, not merely be present.
         assert md.image_data["added_brightness"].to_list() == brightness
         assert md.target_data["added_iou"].to_list() == iou
-        assert md.image_data["added_combined"].to_list() == [0.1, 0.2, 0.3]
-        assert md.target_data["added_combined"].to_list() == [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
-    def test_add_factors_combined_uses_source_index_order(self, od_dataset_with_metadata):
-        """A combined array is ordered by (item, target) with the image row first, not blockwise."""
+    def test_add_factors_source_index_splits_by_level(self, od_dataset_with_metadata):
+        """A source index spanning two levels yields one factor per level, placed by label."""
         md = Metadata(od_dataset_with_metadata)
 
-        # source-index order for 3 images with 2/1/3 detections:
+        # compute_stats order for 3 images with 2/1/3 detections:
         #   (0,-) (0,0) (0,1) (1,-) (1,0) (2,-) (2,0) (2,1) (2,2)
-        md.add_factors({"cs": np.arange(9.0)}, level="combined")
-
-        rows = md.dataframe.select("item_index", "target_index", "cs").rows()
-        assert rows == [
-            (0, None, 0.0),
-            (1, None, 3.0),
-            (2, None, 5.0),
-            (0, 0, 1.0),
-            (0, 1, 2.0),
-            (1, 0, 4.0),
-            (2, 0, 6.0),
-            (2, 1, 7.0),
-            (2, 2, 8.0),
+        source_index = [
+            SourceIndex(0, None),
+            SourceIndex(0, 0),
+            SourceIndex(0, 1),
+            SourceIndex(1, None),
+            SourceIndex(1, 0),
+            SourceIndex(2, None),
+            SourceIndex(2, 0),
+            SourceIndex(2, 1),
+            SourceIndex(2, 2),
         ]
+        md.add_factors({"cs": np.arange(9.0)}, source_index=source_index)
+
+        # Each level's half becomes its own factor, so neither is lost to analysis.
+        assert md.factor_info["image_cs"].level == "image"
+        assert md.factor_info["instance_cs"].level == "instance"
+        assert "cs" not in md.dataframe.columns
+
+        assert md.image_data["image_cs"].to_list() == [0.0, 3.0, 5.0]
+        assert md.target_data["instance_cs"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
+        # The image-level half propagates down, so it is visible from the instance rows too.
+        assert md.target_data["image_cs"].to_list() == [0.0, 0.0, 3.0, 5.0, 5.0, 5.0]
+
+    def test_add_factors_source_index_ignores_input_ordering(self, od_dataset_with_metadata):
+        """Placement follows the source-index labels, not the position of each value."""
+        md = Metadata(od_dataset_with_metadata)
+
+        # Same values as above, handed over in a scrambled order alongside their labels.
+        pairs = [
+            (SourceIndex(2, 2), 8.0),
+            (SourceIndex(0, None), 0.0),
+            (SourceIndex(1, 0), 4.0),
+            (SourceIndex(2, None), 5.0),
+            (SourceIndex(0, 1), 2.0),
+            (SourceIndex(2, 0), 6.0),
+            (SourceIndex(1, None), 3.0),
+            (SourceIndex(0, 0), 1.0),
+            (SourceIndex(2, 1), 7.0),
+        ]
+        md.add_factors(
+            {"cs": np.array([value for _, value in pairs])},
+            source_index=[index for index, _ in pairs],
+        )
+
+        assert md.image_data["image_cs"].to_list() == [0.0, 3.0, 5.0]
+        assert md.target_data["instance_cs"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
+
+    def test_add_factors_source_index_single_level_keeps_bare_name(self, od_dataset_with_metadata):
+        """A source index covering one level needs no level qualifier on the name."""
+        md = Metadata(od_dataset_with_metadata)
+
+        source_index = [SourceIndex(0, 0), SourceIndex(0, 1), SourceIndex(1, 0)] + [SourceIndex(2, i) for i in range(3)]
+        md.add_factors({"iou": np.arange(6.0)}, source_index=source_index)
+
+        assert md.factor_info["iou"].level == "instance"
+        assert md.target_data["iou"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+
+    def test_add_factors_source_index_rejects_per_channel(self, od_dataset_with_metadata):
+        """Per-channel values are many-per-row and have no single-column form."""
+        md = Metadata(od_dataset_with_metadata)
+
+        with pytest.raises(ValueError, match="per-channel"):
+            md.add_factors(
+                {"cs": np.arange(6.0)},
+                source_index=[SourceIndex(i // 2, None, i % 2) for i in range(6)],
+            )
+
+    def test_add_factors_source_index_and_level_are_exclusive(self, od_dataset_with_metadata):
+        """source_index sets the level, so passing both is a contradiction."""
+        md = Metadata(od_dataset_with_metadata)
+
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            md.add_factors(
+                {"b": [1.0, 2.0, 3.0]},
+                level="image",
+                source_index=[SourceIndex(i, None) for i in range(3)],
+            )
 
     def test_add_factors_from_compute_stats_and_ratios(self, od_dataset_varied_pixels):
         """Outputs of compute_stats and compute_ratios wire into Metadata with values on the right rows."""
@@ -372,8 +444,9 @@ class TestDualKeyIndexing:
         width_tgt = tgt_stats["stats"]["width"]
         mean_tgt = tgt_stats["stats"]["mean"]
 
-        # 3. Combined stats -> image and target values interleaved in source-index order
-        combined_stats = compute_stats(
+        # 3. Both levels at once -> one array spanning image and target rows, labelled
+        #    by the accompanying source index
+        both_stats = compute_stats(
             od_dataset_varied_pixels,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
@@ -381,35 +454,38 @@ class TestDualKeyIndexing:
             per_channel=False,
             normalize_pixel_values=False,
         )
-        mean_combined = combined_stats["stats"]["mean"]
+        mean_both = both_stats["stats"]["mean"]
 
         # 4. Ratios -> one value per detection
-        ratios = compute_ratios(combined_stats)
+        ratios = compute_ratios(both_stats)
         mean_ratio = ratios["stats"]["mean"]
 
         # Guard the guard: if every mean were equal, a misaligned column would still "pass".
-        assert len(set(np.round(mean_combined, 6))) == 9
+        assert len(set(np.round(mean_both, 6))) == 9
 
         md.add_factors(
             {
                 "image_mean": mean_img,
                 "target_width": width_tgt,
-                "combined_mean": mean_combined,
                 "target_mean_ratio": mean_ratio,
             },
             level="auto",
         )
+        # The two-level array is placed by its source index, splitting into one factor
+        # per level rather than sharing a column.
+        md.add_factors({"mean": mean_both}, source_index=both_stats["source_index"])
 
         info = md.factor_info
         assert info["image_mean"].level == "image"
-        assert info["target_width"].level == "target"
-        assert info["combined_mean"].level == "combined"
-        assert info["target_mean_ratio"].level == "target"
+        assert info["target_width"].level == "instance"
+        assert info["target_mean_ratio"].level == "instance"
+        assert info["image_mean_added"].level == "image"
+        assert info["instance_mean"].level == "instance"
 
-        # The combined column must decompose back into the independently-computed
-        # image-only and target-only stats. This is what catches a bad permutation.
-        assert md.image_data["combined_mean"].to_numpy() == pytest.approx(mean_img)
-        assert md.target_data["combined_mean"].to_numpy() == pytest.approx(mean_tgt)
+        # Each half must match the independently-computed image-only and target-only
+        # stats. This is what catches a bad permutation.
+        assert md.image_data["image_mean_added"].to_numpy() == pytest.approx(mean_img)
+        assert md.target_data["instance_mean"].to_numpy() == pytest.approx(mean_tgt)
 
         assert md.image_data["image_mean"].to_numpy() == pytest.approx(mean_img)
         assert md.target_data["target_width"].to_numpy() == pytest.approx(width_tgt)
@@ -522,19 +598,42 @@ class TestAddFactorsRobustness:
         assert "b_added" not in md.dataframe.columns
         assert md.image_data["b"].to_list() == [4.0, 5.0, 6.0]
 
-    def test_target_and_combined_levels_rejected_without_targets(self):
-        """An IC dataset has no target rows; asking for one must fail loudly and early."""
+    def test_levels_outside_the_schema_rejected(self):
+        """A name that is not a level must fail loudly and early, not deep inside polars."""
         md = Metadata(MockDataset(np.ones((5, 3, 16, 16)), np.eye(3)[[0, 1, 0, 1, 0]], [{"w": i} for i in range(5)]))
-        assert not md.has_targets()
+        md._structure()
 
-        for level in ("target", "combined"):
-            with pytest.raises(ValueError, match="no targets"):
-                md.add_factors({"foo": np.arange(10.0)}, level=level)
+        with pytest.raises(ValueError, match="Unknown level 'sequence'"):
+            md.add_factors({"foo": np.arange(10.0)}, level="sequence")  # type: ignore[arg-type]
 
         # A polars ShapeError from deep inside with_columns is not an acceptable substitute,
         # and the rejected factor must not linger in any state.
         assert "foo" not in md.factor_names
         assert "foo" not in md.dataframe.columns
+
+    def test_combined_level_splits_with_a_deprecation(self):
+        """v1.1's "combined" is not a level, but it still has to place the data it described."""
+        md = Metadata(MockDataset(np.ones((5, 3, 16, 16)), np.eye(3)[[0, 1, 0, 1, 0]], [{"w": i} for i in range(5)]))
+
+        with pytest.warns(DeprecationWarning, match="level='combined'.*source_index"):
+            md.add_factors({"bright": np.arange(10.0)}, level="combined")
+
+        # The image half and the instance half become separate factors, named the way a
+        # source index spanning both levels names them.
+        assert "image_bright" in md.factor_names
+        assert "instance_bright" in md.factor_names
+        assert md.rows_at("image")["image_bright"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0]
+        assert md.rows_at("instance")["instance_bright"].to_list() == [5.0, 6.0, 7.0, 8.0, 9.0]
+
+    def test_combined_level_rejects_a_wrong_length(self):
+        md = Metadata(MockDataset(np.ones((5, 3, 16, 16)), np.eye(3)[[0, 1, 0, 1, 0]], [{"w": i} for i in range(5)]))
+
+        with (
+            pytest.warns(DeprecationWarning, match="level='combined' is deprecated"),
+            pytest.raises(ShapeMismatchError, match="must have length 10"),
+        ):
+            md.add_factors({"bright": np.arange(9.0)}, level="combined")
+        assert "bright" not in md.dataframe.columns
 
     def test_multidimensional_factors_are_reported_not_silently_dropped(self, od_dataset_with_metadata, caplog):
         """Vector-valued stats have no single-column form; the caller must be told they were skipped."""
@@ -561,44 +660,48 @@ class TestAddFactorsRobustness:
             normalize_pixel_values=False,
         )
 
-        md.add_factors(results["stats"])
+        md.add_factors(results["stats"], source_index=results["source_index"])
 
+        # The stats span both levels, so each scalar one arrives as an image- and a
+        # instance-level factor rather than a single column shared between them.
         scalar_stats = {k for k, v in results["stats"].items() if np.asarray(v).ndim == 1}
-        assert scalar_stats <= set(md.factor_names)
+        assert {f"image_{k}" for k in scalar_stats} <= set(md.factor_names)
+        assert {f"instance_{k}" for k in scalar_stats} <= set(md.factor_names)
         # histogram/percentiles are vector-valued and cannot become columns
         assert set(md.dropped_factors) >= {"histogram", "percentiles"} & set(results["stats"])
 
-    def test_combined_factor_survives_target_factors_only(self, od_dataset_with_metadata):
-        """Combined factors carry per-target values, so target-only mode must keep them."""
+    def test_instance_half_of_a_split_factor_survives_inherited_false(self, od_dataset_with_metadata):
+        """The instance half carries per-target values, so view-native mode must keep it."""
         md = Metadata(od_dataset_with_metadata)
-        md.add_factors({"cs": np.arange(9.0)}, level="combined")
+        md.add_factors({"cs": np.arange(9.0)}, source_index=SOURCE_INDEX_3_IMAGES_6_CROPS)
 
-        md.target_factors_only = True
+        md.inherited = False
 
-        assert "cs" in md.factor_names
-        assert md.target_data["cs"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
+        assert "instance_cs" in md.factor_names
+        assert "image_cs" not in md.factor_names
+        assert md.rows_at(md.label_level)["instance_cs"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
         assert md.factor_data.shape == (6, len(md.factor_names))
 
     def test_relevelling_a_factor_clears_stale_membership(self, od_dataset_with_metadata):
         """Re-adding a factor at a different level must not leave it registered at both."""
         md = Metadata(od_dataset_with_metadata)
 
-        md.add_factors({"x": np.arange(6.0)}, level="target")
-        assert md.factor_info["x"].level == "target"
+        md.add_factors({"x": np.arange(6.0)}, level="instance")
+        assert md.factor_info["x"].level == "instance"
 
         md.add_factors({"x": np.arange(3.0)}, level="image", overwrite=True)
 
         assert md.factor_info["x"].level == "image"
-        assert "x" in md._image_factors
-        assert "x" not in md._target_factors
-        # Stale target membership would silently drop "x" from target-only mode.
-        md.target_factors_only = True
+        assert "x" in md._factors_by_level["image"]
+        assert "x" not in md._factors_by_level.get("instance", set())
+        # Stale instance membership would silently drop "x" from view-native mode.
+        md.inherited = False
         assert "x" not in md.factor_names
 
-    def test_combined_factor_feeds_evaluators_aligned_with_class_labels(self, od_dataset_with_metadata):
-        """factor_data rows must stay aligned with class_labels once a combined factor is present."""
+    def test_split_factor_feeds_evaluators_aligned_with_class_labels(self, od_dataset_with_metadata):
+        """factor_data rows must stay aligned with class_labels once a split factor is present."""
         md = Metadata(od_dataset_with_metadata)
-        md.add_factors({"cs": np.arange(9.0)}, level="combined")
+        md.add_factors({"cs": np.arange(9.0)}, source_index=SOURCE_INDEX_3_IMAGES_6_CROPS)
 
         assert md.factor_data.shape[0] == len(md.class_labels) == 6
         assert md.factor_data.shape[1] == len(md.factor_names) == len(md.is_discrete)
@@ -644,14 +747,37 @@ class TestContinuitySample:
         assert md.factor_info["altitude"].factor_type == "continuous"
 
     def test_target_factor_keeps_every_detection(self):
-        """A target-level factor is never thinned, even when constant within each image."""
+        """An instance-level factor is never thinned, even when constant within each image."""
         rng = np.random.default_rng(0)
         per_image = rng.normal(size=40)
         # Genuinely per-detection, but happens to repeat the same value inside an image.
         target_factor = [[per_image[i]] * 3 for i in range(40)]
         md = Metadata(self._od_dataset(40, 3, per_image, target_factor))
 
-        assert md.factor_info["obj_size"].level == "target"
+        assert md.factor_info["obj_size"].level == "instance"
         # 120 real observations whose values collide; collapsing them to 40 would be an
         # invention, so the duplicates stand and the factor reads as discrete.
         assert md.factor_info["obj_size"].factor_type == "discrete"
+
+
+@pytest.mark.required
+class TestSourceIndexLevelLimits:
+    """A SourceIndex names two kinds of value, so it can address exactly two levels."""
+
+    def test_mixed_kinds_rejected_when_items_and_labels_share_a_level(self):
+        """from_factors puts both at one level; merging the two kinds would be silent."""
+        md = Metadata.from_factors({"a": np.arange(3.0)})
+        assert md.item_level == md.label_level
+
+        source_index = [SourceIndex(0, None, None), SourceIndex(0, 0, None), SourceIndex(1, 0, None)]
+        with pytest.raises(ValueError, match="mixes per-item entries .* with per-label entries"):
+            md.add_factors({"bright": np.arange(3.0)}, source_index=source_index)
+        assert "bright" not in md.dataframe.columns
+
+    def test_a_single_kind_is_still_accepted_there(self):
+        md = Metadata.from_factors({"a": np.arange(3.0)})
+        md.add_factors(
+            {"bright": np.arange(3.0)},
+            source_index=[SourceIndex(i, None, None) for i in range(3)],
+        )
+        assert "bright" in md.factor_names
