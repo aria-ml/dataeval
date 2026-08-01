@@ -325,13 +325,13 @@ def lock(session: nox.Session) -> None:
     session.run(
         "p2c",
         "yaml",
-        "-f",
+        "--pyproject",
         "pyproject.toml",
         "--python-include",
         "infer",
-        "-n",
+        "--name",
         "dataeval",
-        "-o",
+        "--output",
         "environment.yml",
     )
 
