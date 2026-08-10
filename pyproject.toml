@@ -53,13 +53,14 @@ litert = ["ai-edge-litert>=2.0; python_version <= '3.14'"]
 opencv = ["opencv-python-headless>=4.8.0"]
 onnx = [
   "onnx>=1.14.0",
-  "onnxruntime>=1.14.0,<1.24; python_version == '3.10'",
-  "onnxruntime>=1.14.0; python_version >= '3.11'",
+  "onnxruntime>=1.15.0,<1.24; python_version == '3.10'",
+  "onnxruntime>=1.15.0; python_version >= '3.11'",
 ]
 onnx-gpu = [
   "onnx>=1.14.0",
-  "onnxruntime-gpu>=1.14.0,<1.24; python_version == '3.10'",
-  "onnxruntime-gpu>=1.14.0,<1.27; python_version >= '3.11'",  # 1.27+ requires CUDA 13.0
+  "onnxruntime-gpu>=1.15.0,<1.24; python_version == '3.10'",
+  "onnxruntime-gpu>=1.15.0,<1.27; python_version >= '3.11'",  # 1.27+ requires CUDA 13.0
+  "onnxruntime-gpu>=1.24,<1.27; python_version >= '3.14'",  # 1.24+ for cp314 wheels
 ]
 ontology = ["rdflib>=7.0"]
 

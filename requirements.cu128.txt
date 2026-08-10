@@ -5,7 +5,7 @@ annotated-types==0.8.0 \
     --hash=sha256:13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7 \
     --hash=sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0
     # via pydantic
-coloredlogs==15.0.1 \
+coloredlogs==15.0.1 ; python_full_version < '3.11' \
     --hash=sha256:612ee75c546f53e92e70049c9dbfcc18c935a2b9a53b66085ce9ef6a6e5c0934 \
     --hash=sha256:7c991aa71a4577af2f82600d8f8f3a89f936baeaf9b50a9c197da014e5bf16b0
     # via onnxruntime-gpu
@@ -46,7 +46,7 @@ fsspec==2026.7.0 \
     --hash=sha256:b57ddbafedfaef7018c1ecab32aa200a9d7ca26b77965f64e48b70061249d279 \
     --hash=sha256:c803c40f4cf860b49dea58ee3e1c33cb9c790520e233537e1340049f89b82a88
     # via torch
-humanfriendly==10.0 \
+humanfriendly==10.0 ; python_full_version < '3.11' \
     --hash=sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477 \
     --hash=sha256:6b0b831ce8f15f7300721aa49829fc4e83921a9a301cc7f606be6686a2288ddc
     # via coloredlogs
@@ -492,7 +492,7 @@ onnx==1.22.0 \
     --hash=sha256:ef40c0aaf0b643857ea9306fc7eddce17eaf9fb0407e4801f1fc5758443a38e0 \
     --hash=sha256:f3c120dcdb70ad738f3c061b32798f408ea299eb69f84dd69ab4a6bf3c2ec01f
     # via dataeval
-onnxruntime-gpu==1.23.2 \
+onnxruntime-gpu==1.23.2 ; python_full_version < '3.11' \
     --hash=sha256:054282614c2fc9a4a27d74242afbae706a410f1f63cc35bc72f99709029a5ba4 \
     --hash=sha256:18de50c6c8eea50acc405ea13d299aec593e46478d7a22cd32cdbbdf7c42899d \
     --hash=sha256:1e8f75af5da07329d0c3a5006087f4051d8abd133b4be7c9bae8cdab7bea4c26 \
@@ -502,6 +502,18 @@ onnxruntime-gpu==1.23.2 \
     --hash=sha256:d76d1ac7a479ecc3ac54482eea4ba3b10d68e888a0f8b5f420f0bdf82c5eec59 \
     --hash=sha256:deba091e15357355aa836fd64c6c4ac97dd0c4609c38b08a69675073ea46b321 \
     --hash=sha256:fe925a84b00e291e0ad3fac29bfd8f8e06112abc760cdc82cb711b4f3935bd95
+    # via dataeval
+onnxruntime-gpu==1.26.0 ; python_full_version >= '3.11' \
+    --hash=sha256:3c01119ed4d9449d60367fa8ccffcd02bd3fe736754284e4b198d131f54edad6 \
+    --hash=sha256:3e592439b0183d303c2374517b5b392599a3d50b2dc9de949b9b15731ac921c9 \
+    --hash=sha256:4fa231294c2643911d2a7d16469c4808b0bdcdc4b5f4063d3a53744ce25b683a \
+    --hash=sha256:56dc7b73954ff4bdc71f5b8ab306b6f61be5d007881b6ef423a609e2b9cd088b \
+    --hash=sha256:5f49c44689894650990e4c8a857d2edafc276fbd79bba57ceb224bd18d25d491 \
+    --hash=sha256:6ab9f9c741d2e239b2e321ab0d389c04329d4ab7f11e3b92dd3aa7db1c59dee4 \
+    --hash=sha256:9e6e4fb1ec9ae1cf456534d9115f106ab2a1ae96fa513b4ed0f4795302b4a2c6 \
+    --hash=sha256:bcf6f347cad9f88a9a625c2b352cf9de927528aedb627ebbc089a201f1990b94 \
+    --hash=sha256:cc5329aad02d9745cc3ae9cdb185bfa1aad242a7bf89b8c471280002ec40f98a \
+    --hash=sha256:cfda2fad535595bfc3e570eb588092717711dcb2957656d814695e0c9ceb1508
     # via dataeval
 opencv-python-headless==4.11.0.86 \
     --hash=sha256:0e0a27c19dd1f40ddff94976cfe43066fbbe9dfbb2ec1907d66c19caef42a57b \
@@ -767,7 +779,7 @@ pydantic-core==2.46.4 \
     --hash=sha256:fc010ab034c8c7452522748bf937df58020d256ccae0874463d1f4d01758af8e \
     --hash=sha256:fc3e9034a63de20e15e8ade85358bc6efc614008cab72898b4b4952bea0509ff
     # via pydantic
-pyreadline3==3.5.6 ; sys_platform == 'win32' \
+pyreadline3==3.5.6 ; python_full_version < '3.11' and sys_platform == 'win32' \
     --hash=sha256:61e53218b99656091ddb077df9e71f25850e72e030b6183b39c9b7e6e4f4a9bf \
     --hash=sha256:8449b734232e42a5dcd74048e39b60db2839a4c38cf3ae2bf7707d58b5389c0d
     # via humanfriendly
