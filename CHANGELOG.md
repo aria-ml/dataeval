@@ -2,6 +2,19 @@
 
 # DataEval Change Log
 
+## v1.1.0-rc3
+
+👾 **Fixes**
+
+- `0f6ec081` - [fix] Drop parents listing itself as a child as trivial
+
+📝 **Miscellaneous**
+
+- `1ade5252` - [docs] Silence ipykernelapp warnings
+- `3bc47ff5` - [deps] Bump onnxruntime-gpu minimum for py3.14 wheels
+- `40c4aca2` - [deps] Freeze onnxruntime-gpu for cuda 12.X
+- `a56cccac` - Pre-release v1.1.0-rc2
+
 ## v1.1.0-rc2
 
 🛠️ **Improvements and Enhancements**
