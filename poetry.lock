@@ -7989,4 +7989,4 @@ opencv = ["opencv-python-headless"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "5f0500198e1bae92a7cf4223e71d02a8d9a4957d73abaa0339ea11a9cc80e9a9"
+content-hash = "ac215b78d9af461b72de68b4ed61b57a970ca784d708f786b43829fa2b32f910"
