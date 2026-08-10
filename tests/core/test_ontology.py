@@ -200,6 +200,35 @@ class TestOntologyModel:
                 OntologyConcept(id="b", label="B", parents=("a",)),
             ])
 
+    def test_cycle_error_names_the_cycle_not_its_descendants(self):
+        # "c" and "d" are merely downstream of the a<->b cycle; naming them sends
+        # the user looking at concepts whose own edges are fine.
+        with pytest.raises(OntologyCycleError) as exc_info:
+            Ontology([
+                OntologyConcept(id="a", label="A", parents=("b",)),
+                OntologyConcept(id="b", label="B", parents=("a",)),
+                OntologyConcept(id="c", label="C", parents=("a",)),
+                OntologyConcept(id="d", label="D", parents=("c",)),
+            ])
+        message = str(exc_info.value)
+        assert "'a'" in message
+        assert "'b'" in message
+        assert "'c'" not in message
+        assert "'d'" not in message
+
+    def test_self_parent_is_not_a_cycle(self):
+        # X is-a X is trivially true (and materialized by RDFS/OWL reasoners);
+        # it carries no information, so it is dropped rather than rejected.
+        onto = Ontology([
+            OntologyConcept(id="a", label="A", parents=("a",)),
+            OntologyConcept(id="b", label="B", parents=("a", "b")),
+        ])
+        assert onto.concept("a").parents == ()
+        assert onto.roots == ("a",)
+        assert onto.children("a") == ("b",)  # not ("a", "b")
+        assert onto.descendants("a") == ("b",)
+        assert onto.ancestors("b") == ("a",)
+
     def test_typed_exceptions_subclass_valueerror(self):
         # back-compat: existing `except ValueError` still catches these
         assert issubclass(OntologyError, ValueError)
@@ -291,6 +320,15 @@ class TestFromHierarchy:
         with pytest.raises(OntologyCycleError):
             Ontology.from_hierarchy({"a": {"b": {"a": None}}})
 
+    def test_node_repeated_under_itself_is_not_a_cycle(self):
+        # annotation schemas often list a category among its own choices (the
+        # "unspecified" option): vehicle -> [vehicle, aircraft -> [aircraft, ...]]
+        onto = Ontology.from_hierarchy({"vehicle": ["vehicle", {"aircraft": ["aircraft", "helicopter"]}]})
+        assert onto.roots == ("vehicle",)
+        assert onto.children("vehicle") == ("aircraft",)
+        assert onto.children("aircraft") == ("helicopter",)
+        assert onto.ancestors("helicopter") == ("aircraft", "vehicle")
+
     def test_non_string_label_raises(self):
         with pytest.raises(OntologyError, match="Unexpected hierarchy node"):
             Ontology.from_hierarchy({"car": [123]})
@@ -377,6 +415,14 @@ class TestRdfAdapters:
         dog = onto.concept("ex:Dog")
         assert dog.synonyms == ("Canine",)  # scalar form
         assert onto.is_a("ex:Dog", "ex:Animal")
+
+    def test_reflexive_subclassof_loads(self):
+        # rdfs:subClassOf is reflexive under RDFS/OWL entailment, so materialized
+        # ontologies commonly ship `X rdfs:subClassOf X`.
+        reflexive = TURTLE + "\nex:Animal rdfs:subClassOf ex:Animal .\n"
+        onto = Ontology.from_rdf(reflexive, format="turtle")
+        assert onto.concept("http://example.org/Animal").parents == ()
+        assert onto.children("http://example.org/Animal") == ("http://example.org/Dog",)
 
     def test_from_rdflib_graph(self):
         rdflib = pytest.importorskip("rdflib")

@@ -37,9 +37,11 @@ class Ontology:
 
     The graph is built from a collection of concepts linked by their ``parents``
     (is-a edges). A concept may have more than one parent, so the graph is a DAG
-    rather than a tree; cycles are rejected. Parent ids referencing concepts not
-    present in the collection are kept as *external* references — they
-    participate in ancestor/LCA queries but are not themselves concepts.
+    rather than a tree; cycles are rejected. A concept listing *itself* as a
+    parent is not a cycle — that edge is trivially true and is dropped. Parent
+    ids referencing concepts not present in the collection are kept as
+    *external* references — they participate in ancestor/LCA queries but are not
+    themselves concepts.
 
     Once built, the graph is queryable for ancestors, descendants, siblings,
     lowest common ancestors, depth, and rooted subtrees, and resolves class
@@ -68,6 +70,12 @@ class Ontology:
         for concept in concepts:
             if concept.id in self._concepts:
                 raise OntologyError(f"Duplicate concept id: {concept.id!r}")
+            # A concept is trivially its own superclass (RDFS/OWL entail it, and
+            # reasoners materialize `X rdfs:subClassOf X`). The edge carries no
+            # information, so drop it rather than reporting a self-loop as a cycle.
+            if concept.id in concept.parents:
+                _logger.debug("Dropping self-referential parent on concept %r", concept.id)
+                concept = concept.model_copy(update={"parents": tuple(p for p in concept.parents if p != concept.id)})
             self._concepts[concept.id] = concept
 
         # children map keyed by parent id (external parents are valid keys)
@@ -98,8 +106,27 @@ class Ontology:
                     queue.append(child)
             removed += 1
         if removed != len(self._concepts):
-            stuck = next(cid for cid, deg in indegree.items() if deg > 0)
-            raise OntologyCycleError(f"Ontology contains a cycle involving {stuck!r}")
+            stuck = {cid for cid, deg in indegree.items() if deg > 0}
+            cycle = self._find_cycle(stuck)
+            trace = " -> ".join(repr(cid) for cid in (*cycle, cycle[0]))
+            raise OntologyCycleError(f"Ontology contains a cycle (is-a edges): {trace}")
+
+    def _find_cycle(self, stuck: set[str]) -> list[str]:
+        """Return the ids of one concrete cycle within the unresolved set.
+
+        The unresolved set holds the cycle *and* everything downstream of it, so
+        reporting an arbitrary member points at concepts whose own edges are
+        fine. Every unresolved concept has an unresolved parent, so walking
+        parent-ward must revisit a node; that repeat delimits the real cycle.
+        """
+        path: list[str] = []
+        position: dict[str, int] = {}
+        current = min(stuck)  # deterministic entry point
+        while current not in position:
+            position[current] = len(path)
+            path.append(current)
+            current = next(p for p in self._concepts[current].parents if p in stuck)
+        return path[position[current] :]
 
     # --- mapping-like access ---
 
