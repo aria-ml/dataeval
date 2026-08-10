@@ -20,6 +20,7 @@ if __name__ == "__main__":
     import sys
 
     from gitlab import Gitlab
+    from rest import RestError
 
     # Get the version prefix from environment variable
     version_prefix = os.getenv("CREATE_RELEASE_BRANCH", "").strip()
@@ -46,9 +47,8 @@ if __name__ == "__main__":
         print(f"INFO: Release branch '{release_branch}' already exists")
         print("No action needed. Use the existing branch for patch releases.")
         sys.exit(0)
-    except ConnectionError as e:
-        status_code = int(str(e))
-        if status_code != 404:
+    except RestError as e:
+        if e.status_code != 404:
             raise
 
     # Find the latest tag matching vX.Y.*

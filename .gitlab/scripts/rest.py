@@ -5,6 +5,21 @@ from typing import Any, cast
 from requests import JSONDecodeError, Response
 
 
+class RestError(ConnectionError):
+    """
+    Raised when a REST request returns a non-successful status code.
+
+    Subclasses :class:`ConnectionError` for backwards compatibility with callers
+    catching that type, but exposes the status code and response body so callers
+    can branch on the code without parsing the message.
+    """
+
+    def __init__(self, status_code: int, body: str = "") -> None:
+        self.status_code = status_code
+        self.body = body
+        super().__init__(f"{status_code}: {body}" if body else str(status_code))
+
+
 class _VerboseSingleton:
     verbose = False
 
@@ -87,7 +102,7 @@ class RestWrapper:
 
         Raises
         ------
-        ConnectionError
+        RestError
             Raises if the response status code is not successful (200-299)
         """
         if not isinstance(resource, str):
@@ -124,7 +139,7 @@ class RestWrapper:
             verbose(f"Request '{fncall.__name__}' issued: {args_to_print}")
             verbose(f"Response received: {response}")
             if response.status_code not in range(200, 299):
-                raise ConnectionError(response.status_code)
+                raise RestError(response.status_code, response.text[:500])
 
             try:
                 response_json = response.json()

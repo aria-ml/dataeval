@@ -26,6 +26,11 @@ if __name__ == "__main__":
     # Calculate next pre-release version
     version_tag = vt.next_prerelease(version_type)
 
+    # Bail out before committing if the tag already exists (e.g. a concurrent
+    # pipeline won the race) - otherwise the commit lands on main untagged
+    if version_tag and gl.tag_exists(version_tag):
+        raise SystemExit(f"Tag {version_tag} already exists - another pipeline created it. Nothing to do.")
+
     # Generate changelog with pre-release version
     _, payload = rg.generate_prerelease(version_tag)
 

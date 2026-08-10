@@ -7,6 +7,12 @@ if __name__ == "__main__":
     gl = Gitlab(verbose=True)
     rg = ReleaseGen(gl)
     version_tag, payload = rg.generate()  # This computes and sets the pending version
+
+    # Bail out before committing if the tag already exists (e.g. a concurrent
+    # pipeline won the race) - otherwise the commit lands on main untagged
+    if version_tag and gl.tag_exists(version_tag):
+        raise SystemExit(f"Tag {version_tag} already exists - another pipeline created it. Nothing to do.")
+
     if version_tag and payload:
         print(f"Updating jupyter cache and changelog and tagging to {version_tag}:")
         commit_id = gl.commit("main", f"Release {version_tag}", payload)["id"]

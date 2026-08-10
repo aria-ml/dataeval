@@ -6,7 +6,7 @@ from uuid import uuid4
 from zipfile import ZipFile
 
 from requests import delete, get, post, put
-from rest import RestWrapper
+from rest import RestError, RestWrapper
 
 DATAEVAL_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/151/"
 DATAEVAL_BUILD_PAT = "DATAEVAL_BUILD_PAT"
@@ -53,6 +53,32 @@ class Gitlab(RestWrapper):
         """
         return self._request(get, TAGS)
 
+    def tag_exists(self, tag_name: str) -> bool:
+        """
+        Check whether a tag already exists in the project.
+
+        Parameters
+        ----------
+        tag_name : str
+            The name of the tag (e.g. "v0.1.0")
+
+        Returns
+        -------
+        bool
+            True if the tag exists, False otherwise
+
+        Note
+        ----
+        https://docs.gitlab.com/ee/api/tags.html#get-a-single-repository-tag
+        """
+        try:
+            self._request(get, f"{TAGS}/{quote(tag_name, safe='')}")
+        except RestError as e:
+            if e.status_code == 404:
+                return False
+            raise
+        return True
+
     def add_tag(self, tag_name: str, ref: str = "main", message: str | None = None) -> dict[str, Any]:
         """
         Create a new tag.
@@ -71,10 +97,18 @@ class Gitlab(RestWrapper):
         Dict[str, Any]:
             The response received after issuing the request
 
+        Raises
+        ------
+        ValueError
+            If the tag already exists (e.g. a concurrent pipeline created it first)
+
         Note
         ----
         https://docs.gitlab.com/ee/api/tags.html#create-a-new-tag
         """
+        # Fail fast with a readable message rather than a bare 400 from the API
+        if self.tag_exists(tag_name):
+            raise ValueError(f"Tag {tag_name} already exists.")
         tag_content = {"tag_name": tag_name, "ref": ref}
         if message is not None:
             tag_content.update({"message": message})
@@ -98,12 +132,11 @@ class Gitlab(RestWrapper):
         https://docs.gitlab.com/ee/api/tags.html#delete-a-tag
         """
         try:
-            self._request(delete, f"{TAGS}/{tag_name}")
-        except ConnectionError as e:
-            status_code = int(str(e))
+            self._request(delete, f"{TAGS}/{quote(tag_name, safe='')}")
+        except RestError as e:
             # Don't fail if the tag doesn't exist (i.e. function is idempotent)
-            if status_code != 404:
-                raise e
+            if e.status_code != 404:
+                raise
 
     def get_single_repository_branch(self, branch: str) -> dict[str, Any]:
         """
@@ -183,10 +216,9 @@ class Gitlab(RestWrapper):
         """
         try:
             self._request(delete, f"{BRANCHES}/{quote(branch, safe='')}")
-        except ConnectionError as e:
-            status_code = int(str(e))
-            if status_code != 404:
-                raise e
+        except RestError as e:
+            if e.status_code != 404:
+                raise
 
     def list_merge_requests(
         self,
