@@ -16,6 +16,12 @@ docs/source/tutorials/notebooks/checkpoints/
 # See scripts/README.md for details
 .jupyter_cache/
 
+# IPython runtime files and configuration
+docs/source/.ipython/*
+!docs/source/.ipython/profile_default/
+docs/source/.ipython/profile_default/*
+!docs/source/.ipython/profile_default/ipython_kernel_config.py
+
 # Generated notebook files - stored in docs-artifacts branches for Colab
 docs/source/notebooks/*.ipynb
 

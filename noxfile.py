@@ -91,7 +91,12 @@ os.environ.setdefault("UV_VENV_CLEAR", "1")
 nox.options.default_venv_backend = "uv" if nox_uv is not None else "virtualenv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
 
-DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
+DOCS_ENVS = {
+    "LANG": "C",
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+    "PYDEVD_DISABLE_FILE_VALIDATION": "1",
+    "IPYTHONDIR": os.path.abspath("docs/source/.ipython"),
+}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
 
 

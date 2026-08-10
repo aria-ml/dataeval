@@ -56,6 +56,7 @@ exclude_patterns = [
     ".DS_Store",
     # Specific directories -- relative to source directories
     ".jupyter_cache",
+    ".ipython",
     "build",
     # ipynb files are paired with py:percent scripts via jupytext - py is the source of truth
     "**/*.ipynb",
