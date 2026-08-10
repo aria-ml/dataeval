@@ -7,7 +7,6 @@ variables:
   UV_IMAGE: ghcr.io/astral-sh/uv
   UV_BASE_LAYER: bookworm
   FORCE_COLOR: '1'
-  ENV_AUTO_STOP_IN: '1 week'
   RELEASE_BRANCH_PATTERN: '/^release\/v.*/'
 
 .python_versions: &python_versions
@@ -29,8 +28,6 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
     # Merge Request Workflow
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      variables:
-        ENV_PREFIX: '$CI_MERGE_REQUEST_IID/'
     # API-triggered pipelines on release branches or main (from release scripts for docs builds)
     - if: $CI_PIPELINE_SOURCE == 'api' && ($CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN || $CI_COMMIT_BRANCH == 'main')
     # Skip CHANGELOG.md updates
@@ -47,7 +44,6 @@ workflow:
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_RUNNER_TAG: 'multi-gpu'
-        ENV_AUTO_STOP_IN: 'never'
     # Commit Release Branch Workflow
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
 
@@ -110,16 +106,6 @@ stages:
   parallel:
     matrix: *python_versions
 
-.publish_merge_request_env:
-  stage: release
-  artifacts:
-    paths:
-      - public/
-  environment:
-    name: '$ENV_PREFIX$ENV_JOB'
-    url: 'https://jatic.pages.jatic.net/-/aria/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html'
-    auto_stop_in: '$ENV_AUTO_STOP_IN'
-
 ### SHARED RULE TEMPLATES ###
 
 .rules_main_mr:
@@ -168,17 +154,13 @@ stages:
           - uv.lock
           - '*.md'
 
-.rules_mr_docs:
+# Any merge request, regardless of which files changed. The preview site is
+# assembled from whichever of the docs and coverage jobs actually ran.
+.rules_mr_preview:
   rules:
     - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      changes:
-        paths:
-          - src/**/*
-          - docs/**/*
-          - uv.lock
-          - '*.md'
 
 .rules_mr_only:
   rules:
