@@ -26,19 +26,21 @@
 #
 # ## What you'll do
 #
+# - Narrow a dataset to the classes your deployment monitors with a dataset view
 # - Construct [embeddings](../concepts/Embeddings.md) by inferencing images through a pretrained network
 # - Compare different drift detectors and understand their strengths
 # - Inspect detector-specific outputs for root-cause analysis
 # - Use chunked drift detection to monitor drift across data segments
-# - Compare the label distributions between a training and operational set
+# - Compare the label distributions between a training and operational set, and see the check fail on a broken one
 #
 # ## What you'll learn
 #
 # - Learn the strengths and trade-offs of each drift detector
 # - Learn how to analyze embeddings for operational drift
+# - Learn that an embedding encodes the whole image, not only the classes you kept
 # - Learn how to inspect per-feature and per-detector statistics
 # - Learn how to use chunked drift detection for temporal monitoring
-# - Learn how to analyze label distributions
+# - Learn how to analyze label distributions, and what a parity failure looks like
 #
 # ## What you'll need
 #
@@ -57,8 +59,10 @@
 # For this tutorial, you will use the popular
 # [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main) computer vision dataset to detect drift
 # between the image distribution of the `train` split and the `val` split, which will represent an operational dataset in
-# this guide. You will then determine if the labels within these two datasets has high
-# [parity](../concepts/DistributionShift.md#label-parity), or equivalent label distributions.
+# this guide. Both splits are narrowed to the indoor concepts a deployed model would actually see, mirroring how you
+# monitor the slice your model serves rather than an entire benchmark. You will then determine if the labels within
+# these two datasets has high [parity](../concepts/DistributionShift.md#label-parity), or equivalent label
+# distributions.
 
 # %% [markdown]
 # ## Setup
@@ -85,6 +89,7 @@ from torchvision.transforms.v2 import GaussianNoise
 from dataeval import Embeddings, Metadata
 from dataeval.config import set_device, set_seed
 from dataeval.core import label_parity
+from dataeval.data import Relabel, View
 from dataeval.extractors import TorchExtractor
 from dataeval.shift import ChunkedDrift, DriftDomainClassifier, DriftKNeighbors, DriftMMD, DriftUnivariate
 
@@ -130,6 +135,39 @@ print(operational_ds)
 print(f"Image 0 shape: {operational_ds[0][0].shape}")
 
 # %% [markdown]
+# ### Narrow both splits to the monitored classes
+#
+# A deployed model rarely sees an entire benchmark. It sees the slice its operating environment contains, and that
+# slice is what you monitor. Here you will narrow both splits to four indoor concepts with a {class}`.View`, which
+# wraps a dataset without copying it. Working on a smaller, focused slice also keeps this tutorial quick to run.
+#
+# {class}`.Relabel` conforms a dataset to a target vocabulary. The four concepts below are kept, every other VOC class
+# is out-of-vocabulary and gets dropped, and any image left with no labels drops along with them.
+#
+# > **The view narrows labels, not pixels**
+# >
+# > A kept image is one that *contains* indoor furniture. Most of them also contain people, bottles, or pets, and
+# > those objects are still in the frame. Embeddings are computed from the whole image, so each vector encodes the
+# > entire scene rather than only the four classes you kept. Keep this in mind whenever you monitor embeddings: the
+# > vector reflects everything the camera saw, not just what you labeled.
+#
+# > For other ways to reshape a dataset in place, see [Build dataset views](h2_build_dataset_views.py).
+
+# %%
+# The indoor concepts this deployment monitors
+FURNITURE = ("chair", "diningtable", "sofa", "tvmonitor")
+
+# Keep these four concepts as-is; every other VOC class is dropped as out-of-vocabulary
+furniture_only = Relabel({name: name for name in FURNITURE}, FURNITURE)
+
+train_view = View(train_ds, operations=[furniture_only])
+operational_view = View(operational_ds, operations=[furniture_only])
+
+print(f"train:       {len(train_ds)} -> {len(train_view)} images")
+print(f"operational: {len(operational_ds)} -> {len(operational_view)} images")
+print(f"vocabulary:  {train_view.metadata.get('index2label')}")
+
+# %% [markdown]
 # ### Extract embeddings
 #
 # Reduce each image to a feature vector with a
@@ -148,16 +186,16 @@ transforms = ResNet18_Weights.DEFAULT.transforms()
 extractor = TorchExtractor(resnet, transforms=transforms, layer_name="avgpool")
 
 # Create embeddings for the train and operational splits
-train_embs = Embeddings(train_ds, extractor=extractor, batch_size=64)
-operational_embs = Embeddings(operational_ds, extractor=extractor, batch_size=64)
+train_embs = Embeddings(train_view, extractor=extractor, batch_size=64)
+operational_embs = Embeddings(operational_view, extractor=extractor, batch_size=64)
 
 # %% [markdown]
 # Each image is now a single feature vector instead of a full-resolution image, which speeds up the drift algorithms
 # below without impacting the accuracy of the results.
 
 # %%
-print(f"({len(train_embs)}, {train_embs[0].shape})")  # (5717, shape)
-print(f"({len(operational_embs)}, {operational_embs[0].shape})")  # (5823, shape)
+print(f"({len(train_embs)}, {train_embs[0].shape})")  # (1163, shape)
+print(f"({len(operational_embs)}, {operational_embs[0].shape})")  # (1173, shape)
 
 # %% [markdown]
 # ## Understanding drift detectors
@@ -221,8 +259,9 @@ detectors: dict[str, DriftDetector] = {
 
 # %%
 # Iterate and print the name of the detector class and its boolean drift prediction
-for name, detector in detectors.items():
-    print(f"{name} detected drift? {detector.predict(operational_embs).drifted}")
+clean_results = {name: detector.predict(operational_embs) for name, detector in detectors.items()}
+
+print("\n".join(f"{res[0]} detected drift? {res[1].drifted}" for res in clean_results.items()))
 
 # %% [markdown]
 # Did you expect these results?
@@ -244,12 +283,11 @@ noisy_transforms = [transforms, GaussianNoise()]
 noisy_extractor = TorchExtractor(resnet, transforms=noisy_transforms, layer_name="avgpool")
 
 # Applies gaussian noise to images before processing
-noisy_embs = Embeddings(operational_ds, extractor=noisy_extractor, batch_size=64)
+noisy_embs = Embeddings(operational_view, extractor=noisy_extractor, batch_size=64)
 
 # %%
 # Iterate and print the name of the detector class and its boolean drift prediction
-for name, detector in detectors.items():
-    print(f"{name} detected drift? {detector.predict(noisy_embs).drifted}")
+print("\n".join(f"{det[0]} detected drift? {det[1].predict(noisy_embs).drifted}" for det in detectors.items()))
 
 # %% [markdown]
 # Now drift is detected!
@@ -301,8 +339,7 @@ print(f"Per-fold AUROCs: {[round(a, 4) for a in mvdc_details['fold_aurocs']]}")
 importances = np.array(mvdc_details["feature_importances"])
 top_indices = np.argsort(importances)[::-1][:5]
 print("\nTop 5 features driving drift:")
-for idx in top_indices:
-    print(f"  Feature {idx}: importance = {importances[idx]:.4f}")
+print("\n".join(f"  Feature {idx}: importance = {importances[idx]:.4f}" for idx in top_indices))
 
 # %% [markdown]
 # #### DriftKNeighbors: distance comparison
@@ -317,7 +354,7 @@ knn_details = knn_result.details
 print(f"Mean reference k-NN distance: {knn_details['mean_ref_distance']:.4f}")
 print(f"Mean test k-NN distance:      {knn_details['mean_test_distance']:.4f}")
 print(f"Distance increase:             {knn_details['mean_test_distance'] - knn_details['mean_ref_distance']:.4f}")
-print(f"P-value: {knn_details['p_val']:.6f}")
+print(f"P-value:                       {knn_details['p_val']:.6f}")
 
 # %% [markdown]
 # #### DriftMMD: multivariate distribution distance
@@ -391,8 +428,11 @@ chunked_detectors: dict[str, ChunkedDrift] = {
 # #### Predict on combined data and display chunk results
 
 # %%
+chunked_results = {}
+
 for name, detector in chunked_detectors.items():
     result = detector.predict(combined_embs)
+    chunked_results[name] = result
     print(f"\n{name} - Overall drift detected: {result.drifted} (metric: {result.metric_name})")
     if isinstance(result.details, pl.DataFrame):
         display(result.details)
@@ -414,23 +454,104 @@ for name, detector in chunked_detectors.items():
 # You will now compare the label distributions using the `label_parity` function.
 
 # %%
-# Get the metadata for each dataset
-train_md = Metadata(train_ds)
-operational_md = Metadata(operational_ds)
+# Get the metadata for each view
+train_md = Metadata(train_view)
+operational_md = Metadata(operational_view)
 
-# The VOC dataset has 20 classes
-label_parity(train_md.class_labels, operational_md.class_labels, num_classes=20)["p_value"]
+# The views expose the four monitored classes
+label_parity(train_md.class_labels, operational_md.class_labels, num_classes=len(FURNITURE))["p_value"]
 
 # %% [markdown]
-# From the {func}`.label_parity` function, you can see that it calculated a p_value of ~**0.95**. Since this is close to
+# From the {func}`.label_parity` function, you can see that it calculated a p_value of ~**0.96**. Since this is close to
 # 1.0, it can be said that the two distributions **have** class label parity, or similar distributions.
+
+# %% [markdown]
+# ### What a parity failure looks like
+#
+# A passing check is hard to interpret on its own, so it helps to see the alarm actually go off. You will build a
+# deliberately broken operational set and re-run the same check.
+#
+# Imagine an upstream annotation policy change: partway through deployment, the labeling team decides `sofa` is close
+# enough to `chair` and stops distinguishing them. Another {class}`.Relabel` expresses exactly that — two source
+# classes collapsing into one target concept.
+#
+# The important part is what does **not** change. Every image is still in the set and every box is still annotated;
+# only the names attached to them move. The drift detectors from earlier in this tutorial would see nothing at all
+# here, because the pixels feeding the embeddings are identical. Label parity is what catches this class of problem.
+
+# %%
+# An upstream policy stops distinguishing sofas from chairs -- the images are untouched
+policy_change = Relabel(
+    {"chair": "chair", "diningtable": "diningtable", "sofa": "chair", "tvmonitor": "tvmonitor"},
+    FURNITURE,
+)
+
+# Nest the change on the operational view rather than rebuilding it from the raw split
+poor_parity_view = View(operational_view, operations=[policy_change])
+poor_parity_md = Metadata(poor_parity_view)
+
+# Gather the counts of each label in the training and broken operational sets
+train_label_counts = np.bincount(np.asarray(train_md.class_labels), minlength=len(FURNITURE))
+poor_parity_label_counts = np.bincount(np.asarray(poor_parity_md.class_labels), minlength=len(FURNITURE))
+
+print(f"images:                   {len(operational_view)} -> {len(poor_parity_view)} (unchanged)")
+print(f"train label counts:       {train_label_counts}")
+print(f"poor parity label counts: {poor_parity_label_counts}")
+
+# %%
+label_parity(train_md.class_labels, poor_parity_md.class_labels, num_classes=len(FURNITURE))["p_value"]
+
+# %% [markdown]
+# The p_value is now effectively **zero**. Every `sofa` has been counted as a `chair`, so one class is empty while
+# another is inflated, and the two distributions **lack** parity.
+#
+# In a real deployment this is the signal to go looking for a cause before retraining on the operational data: an
+# annotation policy that changed underneath you, a class your model never sees anymore, or an operational mix that has
+# genuinely shifted. Each needs a different response, and each would leave the images themselves looking perfectly
+# normal.
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Lock the claims this tutorial makes in prose, so a dependency or data change cannot
+# silently invert them while the narrative keeps asserting the old result.
+
+# The monitored slice is the size the prose and inline comments quote
+assert len(train_view) == 1163, f"train view size changed: {len(train_view)}"
+assert len(operational_view) == 1173, f"operational view size changed: {len(operational_view)}"
+assert tuple(train_view.metadata.get("index2label", {}).values()) == FURNITURE
+
+# "There is no drift detected between the train and operational embeddings"
+for name, result in clean_results.items():
+    assert not result.drifted, f"{name} reported drift on clean operational data"
+
+# "Now drift is detected!" -- every detector must fire once noise is added
+for name, result in results.items():
+    assert result.drifted, f"{name} failed to detect drift on noisy data"
+
+# "The first two chunks (covering the clean 40%) should show no drift, while the
+# later chunks (covering the noisy 60%) should trigger drift alerts."
+for name, result in chunked_results.items():
+    assert list(result.details["drifted"]) == [False, False, True, True, True], (
+        f"{name} chunk pattern changed: {list(result.details['drifted'])}"
+    )
+
+# "a p_value of ~0.96 ... close to 1.0"
+parity_p_value = label_parity(train_md.class_labels, operational_md.class_labels, num_classes=len(FURNITURE))["p_value"]
+assert parity_p_value > 0.9, f"label parity dropped to {parity_p_value}"
+
+# "The p_value is now effectively zero" -- and the contrived set must change labels only
+assert len(poor_parity_view) == len(operational_view), "the policy change should not drop images"
+assert len(poor_parity_md.class_labels) == len(operational_md.class_labels), "it should not drop annotations"
+poor_parity_result = label_parity(train_md.class_labels, poor_parity_md.class_labels, num_classes=len(FURNITURE))
+poor_parity_p_value = poor_parity_result["p_value"]
+assert poor_parity_p_value < 0.01, f"contrived poor-parity set no longer trips the check: {poor_parity_p_value}"
 
 # %% [markdown]
 # ## Conclusion
 #
 # In this tutorial, you have learned to create embeddings from the VOC dataset, compare different drift detectors and
 # their unique outputs, use chunked monitoring to identify when drift begins, and calculate the parity of label
-# distributions.
+# distributions for both a healthy and a deliberately broken operational set.
 #
 # Key takeaways:
 #
@@ -439,6 +560,7 @@ label_parity(train_md.class_labels, operational_md.class_labels, num_classes=20)
 # - **DriftMMD** provides a single multivariate distance that captures complex distributional changes
 # - **DriftKNeighbors** offers fast, lightweight detection based on distance comparisons
 # - **Chunked monitoring** helps pinpoint _when_ drift begins in a data stream
+# - **Label parity** catches shifts the image detectors cannot see — the pixels can be identical while the labels move
 #
 # These are important steps when monitoring data, as drift and lack of parity can affect a model's ability to achieve
 # performance recorded during model training. When data drift is detected or the label distributions lack parity, it is a
@@ -479,3 +601,6 @@ label_parity(train_md.class_labels, operational_md.class_labels, num_classes=20)
 # - **Different embeddings for KNN**: ResNet, ViT, CLIP, or domain-specific pretrained models
 # - **Custom architectures**: Design models for your specific data type (not generic examples)
 # - **Different drift scenarios**: Test on your own data with varying difficulty levels
+# - **Wider operational domains**: This tutorial monitors a narrow slice, which keeps the reference distribution tight
+#   and makes injected noise easy to spot. Expect weaker, noisier signals as the monitored domain broadens — drop the
+#   view above to run the same analysis across all 20 VOC classes and compare.
