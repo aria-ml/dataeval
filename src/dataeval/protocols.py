@@ -17,6 +17,7 @@ __all__ = [
     "ImageClassificationDatum",
     "ImageClassificationDataset",
     "LossFn",
+    "is_multiobject_tracking_target",
     "Matcher",
     "MetadataLike",
     "ModelMetadata",
@@ -96,6 +97,7 @@ SingleFrameObjectTrackingTarget: TypeAlias = maite.protocols.multiobject_trackin
 Single-frame object-tracking target (tracked objects within one frame).
 """
 
+
 VideoFrame: TypeAlias = maite.protocols.multiobject_tracking.VideoFrame
 """
 Contents of a single decoded video frame.
@@ -105,6 +107,52 @@ VideoStream: TypeAlias = maite.protocols.multiobject_tracking.VideoStream
 """
 Iterable of :obj:`VideoFrame` representing a single video.
 """
+
+
+def is_multiobject_tracking_target(target: Any) -> bool:
+    """Whether a target carries per-frame tracking annotations.
+
+    MAITE declares :obj:`MultiobjectTrackingTarget` without ``@runtime_checkable``, so
+    ``isinstance(target, MultiobjectTrackingTarget)`` raises :class:`TypeError` rather
+    than returning False. Code dispatching on task therefore cannot ask the question that
+    way — and a check written that way fails for *every* target it sees, not only for
+    non-tracking ones. This asks it structurally instead.
+
+    The attribute must actually *be* a sequence, as the protocol declares it. Merely
+    existing is too weak a test to dispatch on: attribute-fabricating stand-ins such as
+    :class:`unittest.mock.Mock` answer every ``hasattr`` yes, so a target standing in for
+    a detection target would be taken for a tracking one.
+
+    Parameters
+    ----------
+    target : Any
+        Target object from a MAITE datum, i.e. ``dataset[i][1]``.
+
+    Returns
+    -------
+    bool
+        True when ``target`` exposes ``frame_tracks`` as a sequence — the one attribute
+        :obj:`MultiobjectTrackingTarget` adds over :obj:`ObjectDetectionTarget`.
+
+    Examples
+    --------
+    >>> class Tracks:
+    ...     frame_tracks = []
+    >>> is_multiobject_tracking_target(Tracks())
+    True
+
+    >>> is_multiobject_tracking_target(np.zeros(3))
+    False
+
+    A stand-in that fabricates attributes on demand is not mistaken for a real one:
+
+    >>> from unittest.mock import Mock
+    >>> is_multiobject_tracking_target(Mock())
+    False
+    """
+    frame_tracks = getattr(target, "frame_tracks", None)
+    return isinstance(frame_tracks, Sequence) and not isinstance(frame_tracks, (str, bytes))
+
 
 DatumMetadata: TypeAlias = maite.protocols.DatumMetadata
 """

@@ -2,7 +2,7 @@
 
 The core :class:`~dataeval.Metadata` engine is task agnostic: it consumes a
 :class:`StructuredData` bundle and never inspects the dataset itself. Everything
-that depends on what a dataset item is (e.g. image) and
+that depends on what a dataset item is (e.g. image, or video sequence) and
 where the labels sit (e.g. image, or instance) lives in a :class:`Structurer`.
 """
 
@@ -12,6 +12,7 @@ __all__ = [
     "DatasetStructurer",
     "FactorsStructurer",
     "ICStructurer",
+    "MOTStructurer",
     "ODImageStructurer",
     "RowBlock",
     "RowLayout",
@@ -25,10 +26,10 @@ __all__ = [
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping, Sequence, Sized
+from collections.abc import Callable, Container, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -39,6 +40,8 @@ from dataeval.protocols import (
     DatumMetadata,
     ObjectDetectionTarget,
     ProgressCallback,
+    SingleFrameObjectTrackingTarget,
+    is_multiobject_tracking_target,
 )
 from dataeval.types import FactorLevel, FactorLevelSchema
 from dataeval.utils._internal import as_numpy, merge_metadata
@@ -46,7 +49,7 @@ from dataeval.utils._internal import as_numpy, merge_metadata
 _logger = logging.getLogger(__name__)
 
 # Task identifier of a structuring strategy.
-TASK = Literal["IC", "OD", "factors", "unknown"]
+TASK = Literal["IC", "OD", "MOT", "factors", "unknown"]
 
 
 # Columns the metadata dataframe has always carried. Retained verbatim because
@@ -58,22 +61,49 @@ LEGACY_COLUMNS: tuple[str, ...] = ("item_index", "target_index", "class_label", 
 # the remaining columns carry the components of a level's compound key. Only
 # columns a structurer actually writes belong here — a name reserved for a level
 # that does not exist yet costs a user their metadata key for nothing.
+#
+# ``image_index``, ``track_index`` and ``sequence_index`` exist for multi-object tracking,
+# the only task whose item level is not ``image``: there a frame's position within its
+# sequence is not ``item_index`` (that identifies the video) and has nowhere else to go.
+# ``image_index`` and ``track_index`` are written on the tracking task's instance rows
+# too, naming the frame a detection was observed in and the track it belongs to — without
+# ``image_index``, ``(item_index, instance_index)`` repeats across the frames of one
+# sequence. ``track_index`` is ``-1`` on a detection no tracker linked. An image-item task
+# has no use for any of them, and writes none.
 LEVEL_COLUMNS: tuple[str, ...] = (
     "level",
     "instance_index",
+    "image_index",
+    "track_index",
+    "sequence_index",
 )
+
+# Identifiers only some tasks produce. ``track_id`` names the track a tracking detection
+# belongs to, ``-1`` when the detection is untracked.
+#
+# A reserved column rather than a factor, because it is an identifier: as a factor it
+# would be binned and handed to bias and diversity analysis as though a track number
+# were an observed property of the data, which is exactly what ``item_index`` and
+# ``target_index`` are reserved to prevent. It stays fully queryable —
+# ``rows_at("instance")["track_id"]`` — and this is also the column a future ``track``
+# level would key its rows on, so nothing has to move when tracks become rows.
+IDENTIFIER_COLUMNS: tuple[str, ...] = ("track_id",)
 
 # Factor names colliding with any of these are prefixed with ``metadata_``. This is
 # wider than the historical five-column set: the level key columns are just as
 # load-bearing, so a metadata key named ``level`` or ``instance_index`` is renamed
 # rather than allowed to clobber the column. :data:`LEGACY_COLUMNS` still holds the
 # original tuple for callers that need it.
-RESERVED_COLUMNS: tuple[str, ...] = LEGACY_COLUMNS + LEVEL_COLUMNS
+RESERVED_COLUMNS: tuple[str, ...] = LEGACY_COLUMNS + LEVEL_COLUMNS + IDENTIFIER_COLUMNS
 
-# The level-key columns, i.e. everything in LEVEL_COLUMNS that is not the level tag
-# itself. A block carries the key components of its own level and no others, so
-# these are emitted only when supplied.
-_LEVEL_KEY_COLUMNS: tuple[str, ...] = tuple(name for name in LEVEL_COLUMNS if name != "level")
+# Reserved columns a block emits only when it actually has a value for them: the
+# level-key columns, i.e. everything in LEVEL_COLUMNS that is not the level tag itself,
+# plus the optional identifiers. A block carries the key components of its own level and
+# of any ancestor its ``item_index`` does not already identify, and no others.
+_OPTIONAL_COLUMNS: tuple[str, ...] = (
+    *(name for name in LEVEL_COLUMNS if name != "level"),
+    *IDENTIFIER_COLUMNS,
+)
 
 
 def reserved_block_columns(level: FactorLevel, size: int, **values: Any) -> dict[str, list[Any]]:
@@ -93,8 +123,9 @@ def reserved_block_columns(level: FactorLevel, size: int, **values: Any) -> dict
         Values for individual reserved columns, as a sequence of length ``size``.
         Every column in :data:`LEGACY_COLUMNS` is emitted whether supplied or not,
         filled with null when omitted; the level-key columns of
-        :data:`LEVEL_COLUMNS` are emitted only when supplied, since a block
-        carries the key components of its own level and no others.
+        :data:`LEVEL_COLUMNS` and the identifiers of :data:`IDENTIFIER_COLUMNS` are
+        emitted only when supplied, since a block carries its own level's key
+        components and only the identifiers its task produces.
 
     Returns
     -------
@@ -115,7 +146,7 @@ def reserved_block_columns(level: FactorLevel, size: int, **values: Any) -> dict
     for name in LEGACY_COLUMNS:
         supplied = values.get(name)
         columns[name] = [None] * size if supplied is None else _as_column(supplied)
-    columns.update({name: _as_column(values[name]) for name in _LEVEL_KEY_COLUMNS if values.get(name) is not None})
+    columns.update({name: _as_column(values[name]) for name in _OPTIONAL_COLUMNS if values.get(name) is not None})
     _reject_ragged(level, size, columns)
     return columns
 
@@ -156,11 +187,31 @@ def safe_column_name(name: str) -> str:
 
 
 def _take(values: Any, positions: NDArray[np.intp]) -> list[Any]:
-    """Gather ``values`` at ``positions``, tolerating arrays, lists and other sequences."""
+    """Gather ``values`` at ``positions``, tolerating arrays, lists and other sequences.
+
+    A **negative position** means the row has no ancestor at that level and yields None.
+    That is not a defensive nicety: it is the only representation of partial ancestry the
+    layout has, and the diamond in the level graph makes partial ancestry real — a
+    detection no tracker linked has a frame but no track, so a per-track factor has no
+    value for it. Gathering such a row naively would index from the end of the array and
+    silently attribute another track's value to it.
+    """
+    missing = positions < 0
+    if missing.all():
+        return [None] * len(positions)
+
+    # Clamped rather than filtered so the gather stays one vectorized operation; every
+    # clamped slot is overwritten with None below.
+    safe = np.where(missing, 0, positions)
     if isinstance(values, np.ndarray):
-        return values[positions].tolist()
-    sequence = values if isinstance(values, (list, tuple)) else list(values)
-    return [sequence[position] for position in positions]
+        gathered = values[safe].tolist()
+    else:
+        sequence = values if isinstance(values, (list, tuple)) else list(values)
+        gathered = [sequence[position] for position in safe]
+
+    for index in np.flatnonzero(missing):
+        gathered[index] = None
+    return gathered
 
 
 def _log_items_without_targets(without: Sequence[int], level: FactorLevel, items: int) -> None:
@@ -182,6 +233,10 @@ def _log_items_without_targets(without: Sequence[int], level: FactorLevel, items
         list(without) if len(without) <= 10 else [*without[:10], "..."],
         level,
     )
+
+
+# Sentinel for "the iterator had nothing left", distinct from any value it could yield.
+_EXHAUSTED: Any = object()
 
 
 def _running_index(parents: NDArray[np.intp]) -> NDArray[np.intp]:
@@ -221,6 +276,13 @@ class RowBlock:
         For the block's own level and each ancestor level, the position of the
         corresponding row within *that* level's block. This is what makes
         downward factor propagation a gather rather than a join.
+
+        A **negative** position marks a row with no ancestor at that level, and
+        propagates as None. A level absent from the mapping entirely is the different,
+        block-wide statement that no row here has such an ancestor. Both arise from the
+        diamond in the level graph: an untracked detection has a frame but no track, so
+        its ``track`` position is negative, while a frame row has no ``track`` key at all
+        because ``image`` and ``track`` are siblings.
     """
 
     level: FactorLevel
@@ -256,11 +318,42 @@ class RowLayout:
         """Number of rows at each level, in row order."""
         return MappingProxyType({level: size for level, size, _ in self.blocks})
 
+    def partial_ancestry(self, level: FactorLevel, at: FactorLevel) -> bool:
+        """Whether some row at ``at`` has no ancestor at ``level``.
+
+        True only for the in-between case: ``level`` does reach ``at``, but not from every
+        row. A detection no tracker linked is the instance of it — it has a frame and no
+        track, so a per-track factor is null on that one row while being present on its
+        neighbours. Callers that need a total column have to exclude such a factor, which
+        is a property of the layout rather than of the values, so it is answered here.
+
+        Parameters
+        ----------
+        level : str
+            Level the values are defined at.
+        at : str
+            Level whose rows would read them.
+
+        Returns
+        -------
+        bool
+            True when at least one row at ``at`` records no ancestor position at ``level``.
+            False when every row has one, and False when ``at`` has no rows at all.
+        """
+        for block_level, _, ancestor_pos in self.blocks:
+            if block_level != at:
+                continue
+            positions = ancestor_pos.get(level)
+            return positions is not None and bool(np.any(positions < 0))
+        return False
+
     def expand(self, values: Any, level: FactorLevel) -> list[Any]:
         """Spread values defined at ``level`` across every dataframe row.
 
         Rows at ``level`` receive their own value, rows at descendant levels
-        receive their ancestor's value, and every other row receives None.
+        receive their ancestor's value, and every other row receives None — as does a
+        descendant row that has no ancestor at ``level``, such as a detection no tracker
+        linked when ``level`` is ``track``.
 
         Parameters
         ----------
@@ -545,12 +638,15 @@ class PropagationMixin:
 class InstanceBuildingMixin:
     """Box/label extraction shared by instance-producing structurers.
 
-    Used by object detection strategies.
+    Used by object detection and multi-object tracking strategies. A
+    :obj:`~dataeval.protocols.SingleFrameObjectTrackingTarget` is an
+    :obj:`~dataeval.protocols.ObjectDetectionTarget` plus ``track_ids``, so both tasks
+    read boxes and labels the same way and tracking adds one call on top.
     """
 
     @staticmethod
     def _instance_arrays(
-        target: ObjectDetectionTarget,
+        target: ObjectDetectionTarget | SingleFrameObjectTrackingTarget,
     ) -> tuple[NDArray[np.intp], NDArray[np.float32], NDArray[np.float32]]:
         """Extract per-detection labels, boxes and scores from a detection target.
 
@@ -568,6 +664,26 @@ class InstanceBuildingMixin:
         )
         scores = as_numpy(target.scores).astype(np.float32) if count else np.empty(0, dtype=np.float32)
         return labels, boxes, scores
+
+    @staticmethod
+    def _track_ids(target: SingleFrameObjectTrackingTarget, count: int) -> NDArray[np.intp]:
+        """Extract per-detection track ids from one frame's tracking target.
+
+        Parameters
+        ----------
+        target : SingleFrameObjectTrackingTarget
+            Frame target to read ``track_ids`` from.
+        count : int
+            Detections in this frame, as already established by :meth:`_instance_arrays`.
+
+        Returns
+        -------
+        NDArray[np.intp]
+            One track id per detection, ``-1`` where a detection belongs to no track.
+        """
+        if not count:
+            return np.empty(0, dtype=np.intp)
+        return as_numpy(target.track_ids).reshape(-1).astype(np.intp)
 
 
 class ICStructurer(PropagationMixin, DatasetStructurer):
@@ -790,6 +906,484 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
         )
 
 
+class _FrameRows(NamedTuple):
+    """One frame's contribution to a tracking dataset: its own keys, plus its detections.
+
+    A named tuple rather than a bare one because the walk needs seven fields per frame,
+    and ``rows.track_ids`` at the call site says what ``rows[6]`` cannot.
+    """
+
+    frame_index: int
+    time_s: float | None
+    pts: int | None
+    labels: NDArray[np.intp]
+    boxes: NDArray[np.float32]
+    scores: NDArray[np.float32]
+    track_ids: NDArray[np.intp]
+
+
+@dataclass
+class _MOTAccumulator:
+    """Row accumulators for one pass over a tracking dataset.
+
+    A class rather than a wall of locals in ``build``, because the walk fills three levels
+    at once — frames, tracks and instances — and has to keep a per-sequence track registry
+    alive while it does. Threading that many parallel lists through helpers is what makes
+    the alternative unreadable.
+
+    Tracks are discovered rather than declared: a sequence's track rows are created on each
+    ``track_id``'s first appearance, so they end up densely numbered in order of first
+    observation whatever ids the dataset used. The registry is per sequence, which is what
+    keeps the same id in two videos two separate tracks.
+    """
+
+    frame_sequence: list[int] = field(default_factory=list)
+    frame_index: list[int] = field(default_factory=list)
+    frame_time_s: list[float | None] = field(default_factory=list)
+    frame_pts: list[int | None] = field(default_factory=list)
+
+    track_sequence: list[int] = field(default_factory=list)
+    track_id: list[int] = field(default_factory=list)
+    track_length: list[int] = field(default_factory=list)
+    track_first_frame: list[int] = field(default_factory=list)
+    track_last_frame: list[int] = field(default_factory=list)
+    track_first_time: list[float | None] = field(default_factory=list)
+    track_last_time: list[float | None] = field(default_factory=list)
+
+    instance_labels: list[NDArray[Any]] = field(default_factory=list)
+    instance_boxes: list[NDArray[Any]] = field(default_factory=list)
+    instance_scores: list[NDArray[Any]] = field(default_factory=list)
+    instance_track_ids: list[NDArray[Any]] = field(default_factory=list)
+    instance_sequence: list[int] = field(default_factory=list)
+    instance_image_pos: list[int] = field(default_factory=list)
+    instance_track_pos: list[int] = field(default_factory=list)
+
+    def add_item(self, item: int, frames: Iterable[_FrameRows]) -> None:
+        """Absorb one dataset item — one video — and everything inside it."""
+        registry: dict[int, int] = {}
+        for rows in frames:
+            position = len(self.frame_sequence)
+            self.frame_sequence.append(item)
+            self.frame_index.append(rows.frame_index)
+            self.frame_time_s.append(rows.time_s)
+            self.frame_pts.append(rows.pts)
+
+            if len(rows.labels):
+                self.instance_labels.append(rows.labels)
+                self.instance_boxes.append(rows.boxes)
+                self.instance_scores.append(rows.scores)
+                self.instance_track_ids.append(rows.track_ids)
+                self.instance_sequence.extend([item] * len(rows.labels))
+                self.instance_image_pos.extend([position] * len(rows.labels))
+                self._add_tracks(item, rows, registry)
+
+    def _add_tracks(self, item: int, rows: _FrameRows, registry: dict[int, int]) -> None:
+        """Attach one frame's detections to their tracks, opening any not yet seen.
+
+        A detection with a negative id belongs to no track, and records ``-1`` as its track
+        position: the layout's marker for "no ancestor at that level". Nothing is invented
+        for it — a singleton track would be a track the data says does not exist, and would
+        skew every per-track statistic toward length one.
+        """
+        for track_id in rows.track_ids.tolist():
+            if track_id < 0:
+                self.instance_track_pos.append(-1)
+                continue
+
+            position = registry.get(track_id)
+            if position is None:
+                position = registry[track_id] = len(self.track_sequence)
+                self.track_sequence.append(item)
+                self.track_id.append(track_id)
+                self.track_length.append(0)
+                self.track_first_frame.append(rows.frame_index)
+                self.track_last_frame.append(rows.frame_index)
+                self.track_first_time.append(rows.time_s)
+                self.track_last_time.append(rows.time_s)
+            else:
+                # min/max rather than "the latest wins": frame_index comes off the stream
+                # and a duck-typed frame is not obliged to number its frames in order.
+                self.track_first_frame[position] = min(self.track_first_frame[position], rows.frame_index)
+                self.track_last_frame[position] = max(self.track_last_frame[position], rows.frame_index)
+                self.track_first_time[position] = _min_or_none(self.track_first_time[position], rows.time_s)
+                self.track_last_time[position] = _max_or_none(self.track_last_time[position], rows.time_s)
+
+            self.track_length[position] += 1
+            self.instance_track_pos.append(position)
+
+
+def _without(factors: Mapping[str, Any], displaced: Container[str], level: FactorLevel) -> dict[str, Any]:
+    """Drop factor names a structurer derives itself, logging each one it removes.
+
+    A factor belongs to exactly one level, so a metadata key spelling the same name as a
+    derived factor cannot simply coexist with it. The derived value wins — it is read off
+    the dataset's own frames and targets — and the displacement is logged rather than
+    silent, because the value a caller sees is not the one their metadata supplied.
+    """
+    kept = {name: values for name, values in factors.items() if name not in displaced}
+    for name in factors:
+        if name not in kept:
+            _logger.info(
+                "Metadata key %r at the %r level is displaced by the derived factor of the same "
+                "name, which is read from the dataset's own frames and targets.",
+                name,
+                level,
+            )
+    return kept
+
+
+def _min_or_none(current: float | None, candidate: float | None) -> float | None:
+    """Smaller of two optional times, None when either is missing."""
+    return None if current is None or candidate is None else min(current, candidate)
+
+
+def _max_or_none(current: float | None, candidate: float | None) -> float | None:
+    """Larger of two optional times, None when either is missing."""
+    return None if current is None or candidate is None else max(current, candidate)
+
+
+class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
+    """Multi-object tracking over video: items are sequences, targets are instances.
+
+    Four levels, and the only task whose graph is a diamond rather than a chain:
+    ``sequence`` is the item level (one dataset item is one video), ``image`` is a frame
+    and ``track`` is one tracked object — siblings under the sequence — and ``instance``
+    is the label level, one row per detection, which sits under *both*. A detection is one
+    observation: of a track, in a frame.
+
+    Because ``image`` sits between the item level and the label level, an instance row
+    needs its frame's key as well as its own to be uniquely identified: ``instance_index``
+    counts within the frame, so ``(item_index, image_index, instance_index)`` is the
+    compound key, and ``(item_index, image_index)`` joins instance rows to their frame's
+    row. ``target_index`` keeps counting within the whole item, as it does for every task.
+
+    A track is a level rather than a column so that metadata can be organized *by track*:
+    a factor added at ``track`` is stored once per track and propagates down to every
+    detection in it, and ``rows_at("track")`` reads it once per track rather than once per
+    detection. Tracks are scoped to their sequence — the same ``track_id`` in two videos is
+    two tracks — and ``track_index`` numbers them densely within each, in order of first
+    appearance, because a dataset's own ids may be sparse or arbitrary.
+
+    A detection that no tracker linked (``track_id == -1``) has a frame but **no track**.
+    Its ``track_index`` is ``-1``, which propagates every track-level factor to it as null
+    rather than inventing a singleton track for it. :class:`~dataeval.Metadata` keeps such
+    a factor out of factor analysis at any view where some row is untracked, and
+    ``md.at("track")`` still reads it in full — see :attr:`~dataeval.Metadata.factor_data`.
+
+    Per-frame metadata is merged at the ``image`` level, not the instance level. A video's
+    list-valued metadata is per frame — one timestamp per frame, not one per detection —
+    so expanding it across detections would be wrong even where the counts happen to
+    match. Instance-level factors therefore come only from the target data itself.
+    """
+
+    task = "MOT"
+    levels = FactorLevelSchema.of("sequence", "image", "track", "instance")
+    item_level = "sequence"
+    label_level = "instance"
+    multi_target = True
+
+    @classmethod
+    def _frames_of(
+        cls,
+        video_stream: Any,
+        frame_tracks: Sequence[SingleFrameObjectTrackingTarget],
+    ) -> Iterator[_FrameRows]:
+        """Pair each decoded frame with its target, yielding one frame's rows at a time.
+
+        Streams rather than materializing the frames: only each frame's keys and timings
+        are retained, while a decoded :obj:`~dataeval.protocols.VideoFrame` holds a full
+        pixel array.
+
+        A frame count that disagrees with the target count is a dataset bug and is raised
+        rather than absorbed. Pairing the two up to the shorter of them would either drop
+        real detections or annotate frames with another frame's boxes, and would give no
+        signal that either had happened.
+
+        Yields
+        ------
+        _FrameRows
+            One frame's index, timings and detection arrays. ``time_s`` and ``pts`` are
+            None for a frame that does not declare them.
+
+        Raises
+        ------
+        ValueError
+            When the stream and the target disagree on how many frames the item has.
+        """
+        frames = iter(video_stream)
+        for position, frame_target in enumerate(frame_tracks):
+            frame = next(frames, _EXHAUSTED)
+            if frame is _EXHAUSTED:
+                raise ValueError(
+                    f"Tracking target declares {len(frame_tracks)} frame target(s) but the item's "
+                    f"video stream yielded only {position}; frame_tracks must hold exactly one "
+                    "target per frame.",
+                )
+            labels, boxes, scores = cls._instance_arrays(frame_target)
+            # MAITE's VideoFrame declares frame_index, time_s and pts, but dispatch here
+            # duck-types the target rather than requiring the full protocol, so each is
+            # optional. frame_index falls back to decode order, which is what it means for
+            # a conforming stream anyway; a timing has no such stand-in and stays None.
+            yield _FrameRows(
+                getattr(frame, "frame_index", position),
+                getattr(frame, "time_s", None),
+                getattr(frame, "pts", None),
+                labels,
+                boxes,
+                scores,
+                cls._track_ids(frame_target, len(labels)),
+            )
+
+        if next(frames, _EXHAUSTED) is not _EXHAUSTED:
+            raise ValueError(
+                f"Item's video stream yields more frames than the tracking target's "
+                f"{len(frame_tracks)} frame target(s); frame_tracks must hold exactly one "
+                "target per frame.",
+            )
+
+    @staticmethod
+    def _frame_factors(rows: _MOTAccumulator) -> dict[str, NDArray[Any]]:
+        """Per-frame timings, as image-level factors, when every frame supplies them.
+
+        All-or-nothing rather than null-padded. A partially null numeric factor cannot be
+        binned — sorting it compares None against a float — so a factor present for only
+        some frames would break factor analysis for the whole dataset rather than degrade
+        gracefully. A conforming :obj:`~dataeval.protocols.VideoStream` declares both, so
+        the all-or-nothing case is the normal one; a duck-typed stream that omits them gets
+        no timing factors and a log line saying so.
+        """
+        factors: dict[str, NDArray[Any]] = {}
+        for name, values, dtype in (
+            ("time_s", rows.frame_time_s, np.float64),
+            ("pts", rows.frame_pts, np.intp),
+        ):
+            missing = sum(value is None for value in values)
+            if missing:
+                _logger.info(
+                    "%d of %d frame(s) do not declare %r, so no %r factor is produced; a "
+                    "partially populated factor cannot be binned.",
+                    missing,
+                    len(values),
+                    name,
+                    name,
+                )
+                continue
+            factors[name] = np.asarray(values, dtype=dtype)
+        return factors
+
+    @staticmethod
+    def _track_factors(rows: _MOTAccumulator) -> dict[str, NDArray[Any]]:
+        """Derive per-track factors: how long each track is, and how far it spans.
+
+        ``track_length`` counts observations; ``frame_span`` counts frames from first to
+        last inclusive. They differ exactly when a track has gaps, which makes the pair
+        more informative than either alone. ``duration_s`` is the elapsed time over the
+        same span, and follows the same all-or-nothing rule as the frame timings.
+        """
+        factors: dict[str, NDArray[Any]] = {
+            "track_length": np.asarray(rows.track_length, dtype=np.intp),
+            "frame_span": np.asarray(rows.track_last_frame, dtype=np.intp)
+            - np.asarray(rows.track_first_frame, dtype=np.intp)
+            + 1,
+        }
+        if all(value is not None for value in (*rows.track_first_time, *rows.track_last_time)):
+            factors["duration_s"] = np.asarray(rows.track_last_time, dtype=np.float64) - np.asarray(
+                rows.track_first_time, dtype=np.float64
+            )
+        return factors
+
+    @staticmethod
+    def _stacked(
+        labels: Sequence[NDArray[Any]],
+        boxes: Sequence[NDArray[Any]],
+        scores: Sequence[NDArray[Any]],
+        track_ids: Sequence[NDArray[Any]],
+    ) -> tuple[NDArray[np.intp], NDArray[np.float32], NDArray[np.float32], NDArray[np.intp]]:
+        """Concatenate the per-frame arrays into one array each, coarsest dtype preserved.
+
+        Each is built explicitly when there is nothing to concatenate, because
+        :func:`numpy.concatenate` rejects an empty sequence and because an empty result
+        still has to carry the right dtype and, for boxes, the right width — a dataset
+        with no detections at all must still produce a well-typed empty block.
+        """
+        return (
+            np.concatenate(labels).astype(np.intp) if labels else np.empty(0, dtype=np.intp),
+            np.concatenate(boxes).astype(np.float32) if boxes else np.empty((0, 4), dtype=np.float32),
+            np.concatenate(scores).astype(np.float32) if scores else np.empty(0, dtype=np.float32),
+            np.concatenate(track_ids).astype(np.intp) if track_ids else np.empty(0, dtype=np.intp),
+        )
+
+    def build(
+        self,
+        dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]],
+        *,
+        progress_callback: ProgressCallback | None = None,
+    ) -> StructuredData:
+        raw: list[Mapping[str, Any]] = []
+        count = len(dataset)
+        rows = _MOTAccumulator()
+
+        for i in range(count):
+            video_stream, target, metadata = self._datum(dataset, i)
+            raw.append(metadata)
+            rows.add_item(i, self._frames_of(video_stream, target.frame_tracks))
+            if progress_callback:
+                progress_callback(i + 1, total=count)
+
+        sequence_of_frame = np.asarray(rows.frame_sequence, dtype=np.intp)
+        frame_own_index_arr = np.asarray(rows.frame_index, dtype=np.intp)
+        n_frames = len(sequence_of_frame)
+
+        sequence_of_track = np.asarray(rows.track_sequence, dtype=np.intp)
+        n_tracks = len(sequence_of_track)
+
+        class_labels, box_values, score_values, track_id_values = self._stacked(
+            rows.instance_labels,
+            rows.instance_boxes,
+            rows.instance_scores,
+            rows.instance_track_ids,
+        )
+        sequence_of_instance = np.asarray(rows.instance_sequence, dtype=np.intp)
+        image_pos_of_instance = np.asarray(rows.instance_image_pos, dtype=np.intp)
+        track_pos_of_instance = np.asarray(rows.instance_track_pos, dtype=np.intp)
+        n_instances = len(sequence_of_instance)
+
+        # Two distinct running indices, because an instance's direct parent (image) and
+        # its item (sequence) are no longer the same level, unlike object detection:
+        # - instance_index: this level's own key, index within its own frame.
+        # - target_index: the legacy public spelling, index within the whole item.
+        # Instances were appended frame-by-frame within sequence-by-sequence order, so
+        # both grouping arrays are already contiguous and _running_index applies directly.
+        instance_index = _running_index(image_pos_of_instance)
+        instance_target_index = _running_index(sequence_of_instance)
+        # Derived from the finished counts rather than tracked during the walk: a sequence
+        # contributes no instance rows exactly when none of its frames held a detection.
+        instances_per_item = np.bincount(sequence_of_instance, minlength=count)
+        undetected = np.flatnonzero(instances_per_item == 0).tolist()
+        # The parent frame's own key, carried onto the instance row so that the compound
+        # key is unique: instance_index alone repeats across the frames of one sequence.
+        image_index_of_instance = frame_own_index_arr[image_pos_of_instance]
+        # Dense within the sequence, in order of first observation. Tracks were opened
+        # sequence-by-sequence, so the grouping array is already contiguous.
+        track_index = _running_index(sequence_of_track)
+        # Gathered with the -1 markers preserved — clamped first, since a marker would
+        # otherwise index from the end and report another track's number. Guarded for a
+        # dataset in which nothing is tracked at all: there is then no index to gather from.
+        track_index_of_instance = (
+            np.where(track_pos_of_instance < 0, -1, track_index[np.maximum(track_pos_of_instance, 0)])
+            if n_tracks
+            else np.full(n_instances, -1, dtype=np.intp)
+        )
+
+        # Per-frame, not per-instance: a video's list-valued metadata has one value per
+        # frame. Expanding it across detections would be wrong even when the counts
+        # coincide, and dropping it — which is what expanding across detections does
+        # whenever they disagree — loses the per-frame factors entirely.
+        frames_per_item = np.bincount(sequence_of_frame, minlength=count).astype(int).tolist()
+        image_factors, dropped = self._merge_factors(raw, ignore_lists=False, targets_per_item=frames_per_item)
+        sequence_factors, _ = self._merge_factors(raw, ignore_lists=True)
+        # Same rule as the image-based tasks: a name both merges produced is item metadata
+        # replicated onto the frame rows, so keep it once at the sequence level and let
+        # propagation do the replicating.
+        image_factors = {name: values for name, values in image_factors.items() if name not in sequence_factors}
+
+        track_factors = self._track_factors(rows)
+        frame_factors = self._frame_factors(rows)
+        # A factor can only be declared at one level, so the structurer's own derived
+        # values displace a metadata key of the same name rather than colliding with it:
+        # these are read off the frames and the targets themselves, which outranks a
+        # per-item dictionary that happens to reuse the spelling.
+        derived = {*track_factors, *frame_factors}
+        sequence_factors = _without(sequence_factors, derived, "sequence")
+        image_factors = {**_without(image_factors, derived, "image"), **frame_factors}
+
+        sequence_block = RowBlock(
+            "sequence",
+            count,
+            reserved_block_columns("sequence", count, item_index=list(range(count)), sequence_index=list(range(count))),
+            {"sequence": self._own_positions(count)},
+        )
+        image_block = RowBlock(
+            "image",
+            n_frames,
+            reserved_block_columns("image", n_frames, item_index=sequence_of_frame, image_index=frame_own_index_arr),
+            {**self._inherit(sequence_block.ancestor_pos, sequence_of_frame), "image": self._own_positions(n_frames)},
+        )
+        track_block = RowBlock(
+            "track",
+            n_tracks,
+            reserved_block_columns(
+                "track",
+                n_tracks,
+                item_index=sequence_of_track,
+                track_index=track_index,
+                track_id=np.asarray(rows.track_id, dtype=np.intp),
+            ),
+            {**self._inherit(sequence_block.ancestor_pos, sequence_of_track), "track": self._own_positions(n_tracks)},
+        )
+        instance_block = RowBlock(
+            "instance",
+            n_instances,
+            reserved_block_columns(
+                "instance",
+                n_instances,
+                item_index=sequence_of_instance,
+                target_index=instance_target_index,
+                class_label=class_labels,
+                score=score_values,
+                box=box_values,
+                instance_index=instance_index,
+                image_index=image_index_of_instance,
+                track_index=track_index_of_instance,
+                track_id=track_id_values,
+            ),
+            # The diamond: two parents, so two inherited maps. The image branch supplies
+            # ``sequence`` and is spread last, because the track branch would supply it too
+            # and an untracked row's track position is a null marker rather than an index.
+            # ``track`` is taken from the accumulator directly, negatives intact — the track
+            # block's own positions are the identity, so gathering through them would only
+            # destroy the markers.
+            {
+                "track": track_pos_of_instance,
+                **self._inherit(image_block.ancestor_pos, image_pos_of_instance),
+                "instance": self._own_positions(n_instances),
+            },
+        )
+
+        _log_items_without_targets(undetected, "instance", count)
+        untracked = int(np.count_nonzero(track_pos_of_instance < 0))
+        if untracked:
+            _logger.info(
+                "%d of %d detection(s) carry no track id and contribute no %r rows. Track-level "
+                "factors read as null on them, and are excluded from factor analysis at any view "
+                "where that happens; Metadata.at('track') reads them in full.",
+                untracked,
+                n_instances,
+                "track",
+            )
+        _logger.info(
+            "MOT dataset: %d sequences, %d frames, %d tracks, %d classes, %d detections",
+            count,
+            n_frames,
+            n_tracks,
+            len(np.unique(class_labels)),
+            n_instances,
+        )
+        return StructuredData(
+            [sequence_block, image_block, track_block, instance_block],
+            {
+                "sequence": sequence_factors,
+                "image": image_factors,
+                "track": track_factors,
+                "instance": {},
+            },
+            dropped,
+            raw,
+            class_labels,
+            sequence_of_instance,
+        )
+
+
 class FactorsStructurer(Structurer):
     """Single-level structuring for instances built from raw factor arrays.
 
@@ -857,10 +1451,10 @@ class FactorsStructurer(Structurer):
 
 
 # Target predicates in priority order; the first that matches wins. Entries are
-# ordered most specific first, so a future tracking predicate — a *positive*
-# check for its own target type — sits above the detection entry rather than
-# being carved out of it.
+# ordered most specific first, so the tracking predicate — a *positive* check for its
+# own target type — sits above the detection entry rather than being carved out of it.
 DISPATCH: tuple[tuple[Callable[[Any], bool], type[DatasetStructurer]], ...] = (
+    (is_multiobject_tracking_target, MOTStructurer),
     (lambda x: isinstance(x, ObjectDetectionTarget), ODImageStructurer),
     (lambda x: isinstance(x, Array), ICStructurer),
 )
@@ -869,13 +1463,14 @@ DISPATCH: tuple[tuple[Callable[[Any], bool], type[DatasetStructurer]], ...] = (
 # also names the strategies no caller can ask for by name: ``"factors"`` is reached
 # through :meth:`~dataeval.Metadata.from_factors` and ``"unknown"`` is only the
 # unspecialized base class's default.
-TaskOverride = Literal["IC", "OD"]
+TaskOverride = Literal["IC", "OD", "MOT"]
 
 # Explicit task overrides, for datasets whose protocols MAITE has not defined yet.
 TASK_STRUCTURERS: Mapping[str, type[DatasetStructurer]] = MappingProxyType(
     {
         "IC": ICStructurer,
         "OD": ODImageStructurer,
+        "MOT": MOTStructurer,
     },
 )
 

@@ -19,7 +19,8 @@ dataset) and checks:
    (:class:`~dataeval.protocols.Array` for classification,
    :obj:`~dataeval.protocols.ObjectDetectionTarget` for OD,
    :class:`~dataeval.protocols.SegmentationTarget` for segmentation,
-   any of the three for ``"any_target"``).
+   :obj:`~dataeval.protocols.MultiobjectTrackingTarget` for multi-object
+   tracking, any of the four for ``"any_target"``).
 
 On failure, raises :class:`~dataeval.exceptions.MaiteShapeError` with a
 message that names the calling function, what was expected, and what was
@@ -30,7 +31,7 @@ __all__ = ["DatasetKind", "aggregate_required_kind", "requires_maite_dataset", "
 
 import functools
 import inspect
-from collections.abc import Callable, Iterable, Sized
+from collections.abc import Callable, Iterable, Mapping, Sized
 from typing import Any, Literal, TypeVar, cast, get_args
 
 from dataeval.exceptions import MaiteShapeError
@@ -39,6 +40,7 @@ from dataeval.protocols import (
     Dataset,
     ObjectDetectionTarget,
     SegmentationTarget,
+    is_multiobject_tracking_target,
 )
 
 DatasetKind = Literal[
@@ -46,6 +48,7 @@ DatasetKind = Literal[
     "classification",
     "object_detection",
     "segmentation",
+    "multiobject_tracking",
     "any_target",
 ]
 """Kind of MAITE dataset a consumer requires.
@@ -54,6 +57,7 @@ DatasetKind = Literal[
 - ``"classification"`` — full 3-tuple; ``datum[1]`` is an :class:`Array` of class scores/logits.
 - ``"object_detection"`` — full 3-tuple; ``datum[1]`` is an :obj:`ObjectDetectionTarget`.
 - ``"segmentation"`` — full 3-tuple; ``datum[1]`` is a :class:`SegmentationTarget`.
+- ``"multiobject_tracking"`` — full 3-tuple; ``datum[1]`` is a :obj:`MultiobjectTrackingTarget`.
 - ``"any_target"`` — full 3-tuple; ``datum[1]`` matches *any* of the above.
 """
 
@@ -67,7 +71,7 @@ def aggregate_required_kind(kinds: Iterable[DatasetKind | None]) -> DatasetKind 
 
     ``None`` means no op inspects targets (validation is skipped, keeping image-only
     datasets usable); a specific kind (``classification`` / ``object_detection`` /
-    ``segmentation``) wins over the generic ``any_target``.
+    ``segmentation`` / ``multiobject_tracking``) wins over the generic ``any_target``.
     """
     present: list[DatasetKind] = [k for k in kinds if k is not None]
     if not present:
@@ -76,16 +80,25 @@ def aggregate_required_kind(kinds: Iterable[DatasetKind | None]) -> DatasetKind 
     return specific[0] if specific else "any_target"
 
 
+# One predicate per target-consuming kind, **most specific first**. The order is what
+# resolves ``any_target`` to a concrete kind, so a target satisfying more than one is
+# reported as the most specific of them. Tracking is checked structurally rather than
+# with ``isinstance``: MAITE's ``MultiobjectTrackingTarget`` is not ``@runtime_checkable``,
+# so an instance check against it raises instead of answering.
+_TARGET_CHECKS: Mapping[str, Callable[[Any], bool]] = {
+    "multiobject_tracking": is_multiobject_tracking_target,
+    "object_detection": lambda target: isinstance(target, ObjectDetectionTarget),
+    "segmentation": lambda target: isinstance(target, SegmentationTarget),
+    "classification": lambda target: isinstance(target, Array),
+}
+
+
 def _target_matches(target: Any, expected: DatasetKind) -> bool:
-    if expected == "classification":
-        return isinstance(target, Array)
-    if expected == "object_detection":
-        return isinstance(target, ObjectDetectionTarget)
-    if expected == "segmentation":
-        return isinstance(target, SegmentationTarget)
     if expected == "any_target":
-        return isinstance(target, Array | ObjectDetectionTarget | SegmentationTarget)
-    return False  # unreachable for valid kinds; "image_only" is short-circuited earlier
+        return any(check(target) for check in _TARGET_CHECKS.values())
+    check = _TARGET_CHECKS.get(expected)
+    # None only for "image_only", which is short-circuited before this is reached.
+    return check is not None and check(target)
 
 
 def _describe(value: Any) -> str:
@@ -126,7 +139,8 @@ def validate_dataset(  # noqa: C901
     DatasetKind
         The inferred concrete kind. For ``expected == "any_target"`` this
         will be one of ``"classification" | "object_detection" |
-        "segmentation"``; for other inputs it echoes ``expected``.
+        "segmentation" | "multiobject_tracking"``; for other inputs it
+        echoes ``expected``.
 
     Raises
     ------
@@ -179,7 +193,8 @@ def validate_dataset(  # noqa: C901
             "classification": "an Array of class scores/logits",
             "object_detection": "an ObjectDetectionTarget (boxes/labels/scores)",
             "segmentation": "a SegmentationTarget (mask/labels/scores)",
-            "any_target": "an Array, ObjectDetectionTarget, or SegmentationTarget",
+            "multiobject_tracking": "a MultiobjectTrackingTarget (frame_tracks)",
+            "any_target": ("an Array, ObjectDetectionTarget, SegmentationTarget, or MultiobjectTrackingTarget"),
         }[expected]
         raise MaiteShapeError(
             f"{where}: argument {arg_name!r} has dataset[0][1] of type {type(target).__name__}; "
@@ -187,11 +202,10 @@ def validate_dataset(  # noqa: C901
         )
 
     if expected == "any_target":
-        if isinstance(target, ObjectDetectionTarget):
-            return "object_detection"
-        if isinstance(target, SegmentationTarget):
-            return "segmentation"
-        return "classification"
+        # _target_matches has already established that one of them matches, so the search
+        # cannot come up empty. Driven by the same ordered table, so "most specific wins"
+        # is declared once rather than restated here.
+        return cast(DatasetKind, next(kind for kind, check in _TARGET_CHECKS.items() if check(target)))
     return expected
 
 

@@ -399,8 +399,9 @@ class TestLevelSchema:
             schema.parents["instance"] = ("instance",)  # type: ignore[index]
 
     def test_rejects_unknown_level(self):
+        # A plausible misspelling of a real level: the frame level is called "image".
         with pytest.raises(ValueError, match="Unknown level"):
-            FactorLevelSchema.of("sequence")  # type: ignore[arg-type]
+            FactorLevelSchema.of("frame")  # type: ignore[arg-type]
 
     def test_rejects_repeated_level(self):
         with pytest.raises(ValueError, match="appear more than once"):
@@ -554,11 +555,60 @@ class TestLevelHierarchy:
     """LEVEL_HIERARCHY is the sole declaration of the vocabulary and its edges."""
 
     def test_ordered_coarsest_first(self):
-        assert tuple(_FACTOR_LEVEL_HIERARCHY) == ("image", "instance")
+        assert tuple(_FACTOR_LEVEL_HIERARCHY) == ("sequence", "image", "track", "instance")
 
-    def test_instance_hangs_off_image(self):
-        """Both tasks put their targets here, so it has exactly one parent."""
-        assert _FACTOR_LEVEL_HIERARCHY["instance"] == ("image",)
+    def test_instance_hangs_off_both_image_and_track(self):
+        """A detection is one observation: of a track, in a frame. Hence the diamond."""
+        assert _FACTOR_LEVEL_HIERARCHY["instance"] == ("image", "track")
+
+    def test_image_and_track_hang_off_sequence(self):
+        """Both sit inside a video; an image-item task omits sequence and re-roots."""
+        assert _FACTOR_LEVEL_HIERARCHY["image"] == ("sequence",)
+        assert _FACTOR_LEVEL_HIERARCHY["track"] == ("sequence",)
+        assert FactorLevelSchema.of("image", "instance").parents_of("image") == ()
+
+    def test_sequence_is_the_only_root(self):
+        roots = [level for level, parents in _FACTOR_LEVEL_HIERARCHY.items() if not parents]
+        assert roots == ["sequence"]
+
+
+@pytest.mark.required
+class TestLevelDiamond:
+    """``instance`` has two parents, which is the case the DAG machinery exists for."""
+
+    def setup_method(self):
+        self.schema = FactorLevelSchema.of("sequence", "image", "track", "instance")
+
+    def test_ancestors_report_the_meeting_level_once(self):
+        """Breadth-first, so the branches come before the level where they part."""
+        assert self.schema.ancestors("instance") == ("image", "track", "sequence")
+
+    def test_siblings_do_not_propagate_to_each_other(self):
+        assert self.schema.propagates_to("image", "track") is False
+        assert self.schema.propagates_to("track", "image") is False
+
+    def test_both_branches_reach_the_label_level(self):
+        assert self.schema.propagates_to("image", "instance") is True
+        assert self.schema.propagates_to("track", "instance") is True
+
+    def test_the_root_reaches_everything(self):
+        assert all(self.schema.propagates_to("sequence", level) for level in self.schema.levels)
+
+    def test_omitting_one_branch_leaves_the_other_intact(self):
+        """An image-based task keeps neither sequence nor track, and still sees one parent."""
+        assert FactorLevelSchema.of("image", "instance").parents_of("instance") == ("image",)
+
+    def test_omitting_the_level_where_branches_part_keeps_both(self):
+        """Dropping sequence re-roots image and track separately rather than severing them."""
+        schema = FactorLevelSchema.of("image", "track", "instance")
+        assert schema.parents_of("instance") == ("image", "track")
+        assert schema.parents_of("image") == ()
+        assert schema.parents_of("track") == ()
+
+    def test_highest_tie_breaks_on_schema_order_for_incomparable_levels(self):
+        """image and track are genuinely incomparable, so declaration order decides."""
+        assert self.schema.highest(["track", "image"]) == "image"
+        assert self.schema.highest(["instance", "track"]) == "track"
 
     def test_level_literal_matches_the_hierarchy(self):
         """The one declaration that cannot be derived, so it is asserted instead.

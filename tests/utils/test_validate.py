@@ -91,6 +91,32 @@ class _SegDataset:
         return np.zeros((3, 8, 8), dtype=np.float32), _SegTarget(), DatumMetadata(id=i)
 
 
+class _FrameTarget:
+    def __init__(self) -> None:
+        self.boxes = np.zeros((1, 4), dtype=np.float32)
+        self.labels = np.array([0], dtype=np.intp)
+        self.scores = np.array([1.0], dtype=np.float32)
+        self.track_ids = np.array([0], dtype=np.intp)
+
+
+class _MOTTarget:
+    def __init__(self, frames: int = 2) -> None:
+        self.frame_tracks = [_FrameTarget() for _ in range(frames)]
+
+
+class _MOTDataset:
+    metadata: DatasetMetadata = DatasetMetadata(id="mot_test")
+
+    def __init__(self, n: int = 4) -> None:
+        self.n = n
+
+    def __len__(self) -> int:
+        return self.n
+
+    def __getitem__(self, i: int) -> tuple[list, _MOTTarget, DatumMetadata]:
+        return [np.zeros((3, 8, 8), dtype=np.float32)] * 2, _MOTTarget(), DatumMetadata(id=i)
+
+
 # ---------- validate_dataset: happy paths ----------
 
 
@@ -110,10 +136,20 @@ class TestValidateDatasetHappy:
     def test_segmentation(self) -> None:
         assert validate_dataset(_SegDataset(), expected="segmentation") == "segmentation"
 
+    def test_multiobject_tracking(self) -> None:
+        assert validate_dataset(_MOTDataset(), expected="multiobject_tracking") == "multiobject_tracking"
+
     def test_any_target_resolves_concrete_kind(self) -> None:
         assert validate_dataset(_ICDataset(), expected="any_target") == "classification"
         assert validate_dataset(_ODDataset(), expected="any_target") == "object_detection"
         assert validate_dataset(_SegDataset(), expected="any_target") == "segmentation"
+        assert validate_dataset(_MOTDataset(), expected="any_target") == "multiobject_tracking"
+
+    def test_detection_target_is_not_taken_for_tracking(self) -> None:
+        """Tracking is probed first, so it has to answer False for every other kind."""
+        assert validate_dataset(_ODDataset(), expected="any_target") == "object_detection"
+        with pytest.raises(MaiteShapeError, match="MultiobjectTrackingTarget"):
+            validate_dataset(_ODDataset(), expected="multiobject_tracking")
 
 
 # ---------- validate_dataset: failure modes ----------
