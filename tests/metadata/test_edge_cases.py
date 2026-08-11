@@ -42,7 +42,7 @@ class TestStructuringEmptyDataset:
     def test_empty_dataset_builds_empty_rows(self):
         """An empty dataset structures into zero rows rather than failing."""
         data = ICStructurer().build(MockDataset(np.empty((0, 3, 3)), np.empty((0, 3)), []))
-        assert data.layout.counts == {"image": 0, "instance": 0}
+        assert data.layout.counts == {"unit": 0, "instance": 0}
         assert len(data.class_labels) == 0
         assert all(len(values) == 0 for values in data.to_rows().values())
 
@@ -66,7 +66,7 @@ class TestMetadataFactorValueTypes:
     def test_image_rows_with_iterables(self, od_dataset_with_varied_types):
         """Item-level rows are built from datasets carrying iterable factor values."""
         metadata = Metadata(od_dataset_with_varied_types)
-        assert len(metadata.rows_at("image")) == 3
+        assert len(metadata.rows_at("unit")) == 3
 
     def test_item_factor_values_replicate_across_instances(self, od_dataset_with_varied_types):
         """An image-level factor reaches every instance of that image by propagation."""
@@ -92,7 +92,7 @@ class TestMetadataFactorValueTypes:
         metadata = Metadata(dataset)
         assert metadata.target_data["iou"].to_list() == [0.1, 0.2, 0.3]
         # Instance-level values have no image-level counterpart, so image rows are null.
-        assert metadata.rows_at("image")["iou"].to_list() == [None, None]
+        assert metadata.rows_at("unit")["iou"].to_list() == [None, None]
 
 
 class TestMetadataBuildFactors:

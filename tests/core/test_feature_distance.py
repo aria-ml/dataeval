@@ -42,7 +42,7 @@ def mock_metadata(
     m._factor_info = _factors
     m.dataframe = pl.DataFrame(m.factor_data, schema=m.factor_names)
     # Single-level stand-in: every row belongs to the view, so the level filter is a no-op.
-    m._view_level = "image"
+    m._view_level = "unit"
     m.rows_at = lambda _level: m.dataframe
 
     m._project = lambda columns, dtype: Metadata._project(m, columns, dtype)

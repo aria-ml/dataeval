@@ -46,15 +46,15 @@ class TestNativeLevelBinning:
         md = _od([2, 1, 2], {"brightness": [0.1, 0.5, 0.9]})
         column = _companion(md, "brightness")
 
-        assert md.factor_info["brightness"].level == "image"
-        assert md.rows_at("image")[column].to_list() == [0, 1, 2]
+        assert md.factor_info["brightness"].level == "unit"
+        assert md.rows_at("unit")[column].to_list() == [0, 1, 2]
 
     def test_bin_assignment_is_the_same_from_either_level(self):
         """The invariant: a level projection must not change what a bin means."""
         md = _od([3, 1, 2, 4], {"brightness": [0.1, 0.5, 0.9, 0.3]})
         column = _companion(md, "brightness")
 
-        at_image = md.rows_at("image")[column].to_list()
+        at_image = md.rows_at("unit")[column].to_list()
         instances = md.target_data
         gathered = [instances.filter(instances["item_index"] == i)[column][0] for i in range(4)]
 
@@ -69,8 +69,8 @@ class TestNativeLevelBinning:
         md = _od([2, 1, 2, 0], {"brightness": [0.1, 0.5, 0.9, 99.0]})
         column = _companion(md, "brightness")
 
-        assert md.rows_at("image")["brightness"].to_list() == [0.1, 0.5, 0.9, 99.0]
-        assert md.rows_at("image")[column].to_list() == [0, 1, 2, 3]
+        assert md.rows_at("unit")["brightness"].to_list() == [0.1, 0.5, 0.9, 99.0]
+        assert md.rows_at("unit")[column].to_list() == [0, 1, 2, 3]
 
     def test_edges_come_from_the_native_distribution(self):
         """uniform_count quantiles are density-weighted when taken over target rows."""
@@ -82,7 +82,7 @@ class TestNativeLevelBinning:
         column = _companion(md, "b")
 
         assert md.factor_info["b"].factor_type == "continuous"
-        np.testing.assert_array_equal(md.rows_at("image")[column].to_numpy(), bin_data(values, "uniform_count"))
+        np.testing.assert_array_equal(md.rows_at("unit")[column].to_numpy(), bin_data(values, "uniform_count"))
 
     def test_target_level_factors_are_unchanged(self):
         """The compatibility pin: nothing moves for a factor already at the target level."""
@@ -125,6 +125,6 @@ class TestImageClassificationUnaffected:
         md = self._ic(labels, {"brightness": [0.1, 0.5, 99.0, 0.3]})
         column = _companion(md, "brightness")
 
-        assert md.level_counts["image"] == 4
+        assert md.level_counts["unit"] == 4
         assert md.level_counts["instance"] == 3
-        assert None not in md.rows_at("image")[column].to_list()
+        assert None not in md.rows_at("unit")[column].to_list()

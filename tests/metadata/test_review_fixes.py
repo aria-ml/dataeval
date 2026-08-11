@@ -45,7 +45,7 @@ class TestFilterByRowsAndTypes:
 
     def test_rows_align_with_class_labels(self):
         md = Metadata(_od_dataset())
-        assert md.level_counts == {"image": 3, "instance": 6}
+        assert md.level_counts == {"unit": 3, "instance": 6}
 
         filtered = md.filter_by_factor(lambda *_: True)
         assert filtered.shape[0] == len(md.class_labels) == 6
@@ -70,7 +70,7 @@ class TestFilterByRowsAndTypes:
         md = Metadata(_od_dataset())
         md.add_factors({"iou": np.arange(6, dtype=np.float64)}, level="instance")
 
-        image_level = md.filter_by_factor(lambda _, fi: fi.level == "image")
+        image_level = md.filter_by_factor(lambda _, fi: fi.level == "unit")
         instance_level = md.filter_by_factor(lambda _, fi: fi.level == "instance")
         assert image_level.shape == (6, 2)  # hour + weather, read from the instance rows
         assert instance_level.shape == (6, 1)  # iou
@@ -110,33 +110,33 @@ class TestAmbiguousAutoLevel:
     def test_one_detection_per_image_adds_without_warning(self, recwarn):
         """Equal row counts that correspond one-to-one are not ambiguous."""
         md = Metadata(_od_dataset(counts=(1, 1, 1)))
-        assert md.level_counts == {"image": 3, "instance": 3}
+        assert md.level_counts == {"unit": 3, "instance": 3}
 
         md.add_factors({"foo": np.arange(3)})
 
         # The coarsest match wins, as it always has. Either level would put the same
         # values on the target rows here, so there is nothing to warn about.
-        assert md.factor_info["foo"].level == "image"
-        assert md.rows_at("image")["foo"].to_list() == [0, 1, 2]
+        assert md.factor_info["foo"].level == "unit"
+        assert md.rows_at("unit")["foo"].to_list() == [0, 1, 2]
         assert not [w for w in recwarn.list if "matches the" in str(w.message)]
 
     def test_fully_labelled_classification_adds_without_warning(self, recwarn):
         """The common case: image count == instance count on every labelled IC dataset."""
         md = Metadata(MockDataset(np.zeros((3, 3, 4, 4)), np.eye(3), [{"a": i} for i in range(3)]))
-        assert md.level_counts == {"image": 3, "instance": 3}
+        assert md.level_counts == {"unit": 3, "instance": 3}
 
         md.add_factors({"bright": np.arange(3.0)})
-        assert md.factor_info["bright"].level == "image"
+        assert md.factor_info["bright"].level == "unit"
         assert not [w for w in recwarn.list if "matches the" in str(w.message)]
 
     def test_equal_counts_that_do_not_correspond_do_warn(self):
         """3 images and 3 detections, but spread 0/1/2 — the choice changes the data."""
         md = Metadata(_od_dataset(counts=(0, 1, 2)))
-        assert md.level_counts == {"image": 3, "instance": 3}
+        assert md.level_counts == {"unit": 3, "instance": 3}
 
         with pytest.warns(UserWarning, match="do not correspond one-to-one"):
             md.add_factors({"foo": np.arange(3)})
-        assert md.factor_info["foo"].level == "image"
+        assert md.factor_info["foo"].level == "unit"
 
     def test_unambiguous_length_does_not_warn(self, recwarn):
         md = Metadata(_od_dataset())
@@ -174,20 +174,19 @@ class TestBindResetsLevelState:
         md = Metadata(_od_dataset())
         with pytest.warns(DeprecationWarning, match="FactorInfo.level now reports"):
             _ = md.factor_info
-        assert "instance" == "instance"
-        assert md.level_counts == {"image": 3, "instance": 6}
+        assert md.level_counts == {"unit": 3, "instance": 6}
 
         md.bind(MockDataset(np.zeros((2, 3, 4, 4)), np.eye(2)))
         # Read before any structuring, exactly as a stale attribute read would: the
         # level state must be back to its defaults, not the previous dataset's.
-        assert md._label_level == "image"
-        assert md._view_level == "image"
-        assert list(md._levels) == ["image"]
+        assert md._label_level == "unit"
+        assert md._view_level == "unit"
+        assert list(md._levels) == ["unit"]
         assert md._layout.counts == {}
         assert md._factors_by_level == {}
 
         # And structuring then answers for the dataset that is actually bound.
-        assert md.level_counts == {"image": 2, "instance": 2}
+        assert md.level_counts == {"unit": 2, "instance": 2}
 
     def test_rebinding_restores_the_rename_warning(self):
         md = Metadata(_od_dataset())
@@ -224,7 +223,7 @@ class TestBlockColumnValidation:
 class TestLevelSchemaDuplicates:
     def test_of_rejects_a_repeated_level(self):
         with pytest.raises(ValueError, match="appear more than once"):
-            FactorLevelSchema.of("image", "image")
+            FactorLevelSchema.of("unit", "unit")
 
 
 @pytest.mark.required
@@ -291,12 +290,12 @@ class TestUnlabeledClassificationItems:
     def test_item_row_and_factors_survive(self):
         md = Metadata(self._partially_labeled())
 
-        assert md.level_counts == {"image": 3, "instance": 2}
+        assert md.level_counts == {"unit": 3, "instance": 2}
         assert md.item_count == 3
-        assert md.rows_at("image").height == 3
+        assert md.rows_at("unit").height == 3
         # The unlabeled item's metadata is still here — this is the whole point.
-        assert md.rows_at("image")["weather"].to_list() == ["sun", "fog", "rain"]
-        assert md.rows_at("image")["brightness"].to_list() == [0.1, 0.9, 0.5]
+        assert md.rows_at("unit")["weather"].to_list() == ["sun", "fog", "rain"]
+        assert md.rows_at("unit")["brightness"].to_list() == [0.1, 0.9, 0.5]
 
     def test_label_aware_views_cover_only_labelled_items(self):
         md = Metadata(self._partially_labeled())
@@ -322,8 +321,8 @@ class TestUnlabeledClassificationItems:
         source_index = [SourceIndex(i, None, None) for i in range(3)]
         md.add_factors({"sharpness": np.array([10.0, 20.0, 30.0])}, source_index=source_index)
 
-        assert md.factor_info["sharpness"].level == "image"
-        assert md.rows_at("image")["sharpness"].to_list() == [10.0, 20.0, 30.0]
+        assert md.factor_info["sharpness"].level == "unit"
+        assert md.rows_at("unit")["sharpness"].to_list() == [10.0, 20.0, 30.0]
         # Image-level values reach the target rows of the items that have them.
         assert md.rows_at(md.label_level)["sharpness"].to_list() == [10.0, 30.0]
 
@@ -367,7 +366,7 @@ class TestLevelModelIsExposed:
 
     def test_item_and_label_levels_are_public(self):
         od = Metadata(_od_dataset())
-        assert (od.item_level, od.label_level) == ("image", "instance")
+        assert (od.item_level, od.label_level) == ("unit", "instance")
         assert od.rows_at(od.item_level).height == 3
         assert od.rows_at(od.label_level).height == 6
 
@@ -375,11 +374,11 @@ class TestLevelModelIsExposed:
         """Neither row counts nor level names can: both tasks name their levels the same,
         and an OD dataset with one detection per image has equal counts."""
         one_each = Metadata(_od_dataset(counts=(1, 1, 1)))
-        assert one_each.level_counts["image"] == one_each.level_counts["instance"] == 3
+        assert one_each.level_counts["unit"] == one_each.level_counts["instance"] == 3
         assert one_each.multi_target is True
 
         ic = Metadata(MockDataset(np.zeros((3, 3, 4, 4)), np.eye(3)))
-        assert ic.item_level == "image"
+        assert ic.item_level == "unit"
         assert ic.label_level == "instance"
         assert ic.multi_target is False
 
@@ -413,7 +412,7 @@ class TestView:
         detections-per-image, and read from image rows is not."""
         md = Metadata(_od_dataset(counts=(3, 1, 1)))
 
-        zoomed = md.at("image")
+        zoomed = md.at("unit")
         instance_view = md.factor_data
         image_view = zoomed.factor_data
 
@@ -429,16 +428,16 @@ class TestView:
 
     def test_at_leaves_the_original_alone(self):
         md = Metadata(_od_dataset())
-        zoomed = md.at("image")
+        zoomed = md.at("unit")
 
-        assert zoomed.view == "image"
+        assert zoomed.view == "unit"
         assert md.view == "instance"
         assert md.factor_data.shape[0] == 6
 
     def test_at_copies_are_independent(self):
         md = Metadata(_od_dataset())
-        zoomed = md.at("image")
-        zoomed.add_factors({"extra": np.arange(3.0)}, level="image")
+        zoomed = md.at("unit")
+        zoomed.add_factors({"extra": np.arange(3.0)}, level="unit")
 
         assert "extra" in zoomed.factor_names
         assert "extra" not in md.factor_names
@@ -447,7 +446,7 @@ class TestView:
         md = Metadata(_od_dataset())
         assert md.factor_data.shape[0] == 6
 
-        md.view = "image"
+        md.view = "unit"
         assert md.factor_data.shape[0] == 3
 
         md.view = "instance"
@@ -460,7 +459,7 @@ class TestView:
 
     def test_class_labels_refuses_a_view_above_the_label_level(self):
         """Silently returning instance labels for image rows would misalign every evaluator."""
-        md = Metadata(_od_dataset()).at("image")
+        md = Metadata(_od_dataset()).at("unit")
         with pytest.raises(ValueError, match="no label per row"):
             _ = md.class_labels
 
@@ -470,8 +469,8 @@ class TestView:
             _ = md.factor_data
 
     def test_bind_clears_an_explicit_view(self):
-        md = Metadata(_od_dataset(), view="image")
-        assert md.view == "image"
+        md = Metadata(_od_dataset(), view="unit")
+        assert md.view == "unit"
 
         md.bind(_od_dataset())
         assert md.view == "instance"
@@ -534,7 +533,7 @@ class TestBinsSurviveTheView:
 
     def test_at_bins_factors_the_source_view_never_saw(self):
         """Moving down exposes finer factors; they must not be counted but unprocessed."""
-        md = Metadata(_od_dataset(), view="image")
+        md = Metadata(_od_dataset(), view="unit")
         md.add_factors({"iou": np.arange(6.0)}, level="instance")
         md.factor_data  # noqa: B018  - bins the image factors at the image view
 
@@ -553,15 +552,15 @@ class TestBinsSurviveTheView:
         original = dict(md.factor_info)
 
         # 'iou' is invisible from the image view, then visible again from instance.
-        assert "iou" not in md.at("image").factor_names
-        assert md.at("image").at("instance").factor_info == original
+        assert "iou" not in md.at("unit").factor_names
+        assert md.at("unit").at("instance").factor_info == original
 
     def test_view_assignment_keeps_bins(self):
         md = Metadata(_od_dataset())
         md.factor_data  # noqa: B018
         binned = [c for c in md.dataframe.columns if c.endswith(("#", "%"))]
 
-        md.view = "image"
+        md.view = "unit"
         md.view = "instance"
         assert [c for c in md.dataframe.columns if c.endswith(("#", "%"))] == binned
         assert set(md.factor_info) == {"hour", "weather"}
@@ -577,7 +576,7 @@ class TestResetBinsIsNotGuarded:
         md.factor_data  # noqa: B018
         md.exclude = ["weather"]
 
-        md.add_factors({"hour": np.array([100.0, 200.0, 300.0])}, level="image", overwrite=True)
+        md.add_factors({"hour": np.array([100.0, 200.0, 300.0])}, level="unit", overwrite=True)
 
         assert list(md.factor_names) == ["hour"]
         assert md.shape == (6, 1)
@@ -599,7 +598,7 @@ class TestViewAwareAccessors:
         md = Metadata(_od_dataset())
         assert md.item_indices.tolist() == [0, 0, 1, 1, 1, 2]
 
-        image = md.at("image")
+        image = md.at("unit")
         assert len(image.item_indices) == image.factor_data.shape[0] == 3
         assert image.item_indices.tolist() == [0, 1, 2]
 
@@ -609,7 +608,7 @@ class TestViewAwareAccessors:
         with pytest.warns(DeprecationWarning, match="FactorInfo.level"):
             md.factor_info  # noqa: B018
         with pytest.warns(DeprecationWarning, match="FactorInfo.level"):
-            md.at("image").factor_info  # noqa: B018
+            md.at("unit").factor_info  # noqa: B018
 
 
 @pytest.mark.required
@@ -649,5 +648,5 @@ class TestAddFactorsDtype:
 
     def test_string_factor_is_still_a_string(self):
         md = Metadata(_od_dataset())
-        md.add_factors({"tag": np.array(["a", "b", "c"])}, level="image")
+        md.add_factors({"tag": np.array(["a", "b", "c"])}, level="unit")
         assert md.dataframe.schema["tag"] == pl.String

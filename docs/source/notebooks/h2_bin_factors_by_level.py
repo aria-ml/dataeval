@@ -31,8 +31,13 @@
 # different numbers of values - and a dataset where some images are crowded and
 # others are sparse has *unevenly* different numbers.
 #
+# The level one media item sits at is called the **unit** level, because that item
+# is not always an image: on a video dataset a unit is a frame, and
+# {attr}`.Metadata.unit_type` reports which it is. Everything below is an image
+# dataset, so read "unit-level" as "one value per image".
+#
 # That raises a question with a wrong answer that is easy to reach: which rows
-# should the binner read? If an image-level factor were discretized over detection
+# should the binner read? If a unit-level factor were discretized over detection
 # rows, its value would count once per detection, so crowded images would pull the
 # bin boundaries toward themselves and an image with no detections at all would not
 # be counted whatsoever.
@@ -83,7 +88,7 @@ from dataeval.protocols import DatasetMetadata, DatumMetadata
 # The dataset below has 40 images. The first 20 are *sparse* - one detection each
 # - and the last 20 are *crowded*, with eight detections apiece. `altitude_m`
 # increases across the images and `weather` leans rainy in the crowded half, so
-# both image-level factors are correlated with detection density: exactly the
+# both unit-level factors are correlated with detection density: exactly the
 # situation where the choice of binning level changes the answer.
 
 
@@ -142,7 +147,7 @@ counts = [1] * 20 + [8] * 20
 dataset = CrowdingDataset(counts)
 metadata = Metadata(dataset, auto_bin_method="uniform_count", exclude=["id"])
 
-print(f"images:     {metadata.level_counts['image']}")
+print(f"images:     {metadata.level_counts['unit']}")
 print(f"detections: {metadata.level_counts['instance']}")
 
 # %% [markdown]
@@ -156,9 +161,9 @@ for name, info in metadata.factor_info.items():
     print(f"{name:12s} level={info.level:9s} type={info.factor_type}")
 
 # %% [markdown]
-# `altitude_m` and `weather` came back as `image`, `box_area` as `instance`.
+# `altitude_m` and `weather` came back as `unit`, `box_area` as `instance`.
 # DataEval derived this from the shape of the metadata each image supplied: a
-# scalar per image is image-level, a list whose length matches that image's
+# scalar per image is unit-level, a list whose length matches that image's
 # detection count is instance-level.
 #
 # A factor's discretized values live in a companion column, named for how the
@@ -180,13 +185,13 @@ print(f"altitude_m is stored discretized in {altitude_bins!r}")
 # %% [markdown]
 # ## Confirm the bin edges come from the images
 #
-# `altitude_m` is continuous and image-level, so its bins are cut over the 40 image
+# `altitude_m` is continuous and unit-level, so its bins are cut over the 40 image
 # values rather than over the 180 detection rows those values propagate to. With
 # `auto_bin_method="uniform_count"` the boundaries sit at quantiles, so you can see
 # the difference directly.
 
 # %%
-altitudes = metadata.rows_at("image")["altitude_m"].to_numpy()
+altitudes = metadata.rows_at("unit")["altitude_m"].to_numpy()
 replicated = np.repeat(altitudes, counts)
 
 print(f"quartile edges over the 40 images:     {np.round(np.percentile(altitudes, [0, 25, 50, 75, 100]), 1)}")
@@ -210,11 +215,11 @@ print(f"quartile edges over the 180 detections: {np.round(np.percentile(replicat
 # you compare a result computed on image rows with one computed on detection rows.
 
 # %%
-at_image = metadata.rows_at("image")[altitude_bins].to_list()
+at_unit = metadata.rows_at("unit")[altitude_bins].to_list()
 detections = metadata.rows_at("instance")
 gathered = [detections.filter(detections["item_index"] == i)[altitude_bins][0] for i in range(len(counts))]
 
-print(f"identical read from either level: {at_image == gathered}")
+print(f"identical read from either level: {at_unit == gathered}")
 
 # %% [markdown]
 # ## Images with no detections still count
@@ -222,16 +227,16 @@ print(f"identical read from either level: {at_image == gathered}")
 # An image carrying no detections contributes no detection row at all. Were binning
 # done over detection rows, such an image would be invisible to the binner - its
 # values absent from the edges, and the image itself left without a bin, whatever
-# the binning method. Binning at the image level includes it like any other.
+# the binning method. Binning at the unit level includes it like any other.
 
 # %%
 sparse = CrowdingDataset([2, 1, 2, 0])
 sparse_metadata = Metadata(sparse, exclude=["id"])
 sparse_bins = companion(sparse_metadata, "altitude_m")
 
-print(f"images:     {sparse_metadata.level_counts['image']}")
+print(f"images:     {sparse_metadata.level_counts['unit']}")
 print(f"detections: {sparse_metadata.level_counts['instance']}")
-print(f"altitude bins at image level: {sparse_metadata.rows_at('image')[sparse_bins].to_list()}")
+print(f"altitude bins at unit level: {sparse_metadata.rows_at('unit')[sparse_bins].to_list()}")
 
 # %% [markdown]
 # The fourth image has no detections, yet it holds a bin of its own.
@@ -242,7 +247,7 @@ print(f"altitude bins at image level: {sparse_metadata.rows_at('image')[sparse_b
 # Binning is settled; *row counts* are not. {attr}`.Metadata.factor_data` - what
 # every bias evaluator consumes - returns rows at {attr}`.Metadata.view`, which
 # defaults to {attr}`.Metadata.label_level` so that they align with
-# {attr}`.Metadata.class_labels`. An image-level factor is replicated onto those
+# {attr}`.Metadata.class_labels`. A unit-level factor is replicated onto those
 # rows, once per detection. {meth}`.Metadata.at` reads it once per image instead.
 #
 # The bin values are correct. The *marginal distribution* over those rows is not
@@ -250,10 +255,10 @@ print(f"altitude bins at image level: {sparse_metadata.rows_at('image')[sparse_b
 # it contains.
 
 # %%
-image_rows = metadata.rows_at("image")["weather"].to_list()
+unit_rows = metadata.rows_at("unit")["weather"].to_list()
 detection_rows = metadata.rows_at("instance")["weather"].to_list()
 
-print(f"weather over images:     clear={image_rows.count('clear')}, rainy={image_rows.count('rainy')}")
+print(f"weather over images:     clear={unit_rows.count('clear')}, rainy={unit_rows.count('rainy')}")
 print(f"weather over detections: clear={detection_rows.count('clear')}, rainy={detection_rows.count('rainy')}")
 
 # %% [markdown]
@@ -261,7 +266,7 @@ print(f"weather over detections: clear={detection_rows.count('clear')}, rainy={d
 # across the detections - entirely because the rainy images are the crowded ones. An
 # evaluator consuming `factor_data` sees the second distribution. When the question
 # is about *images* - "is my capture schedule biased toward clear weather?" - read
-# the factor at the image level with {meth}`.Metadata.rows_at` rather than through
+# the factor at the unit level with {meth}`.Metadata.rows_at` rather than through
 # `factor_data`.
 #
 # Both readings are legitimate; they answer different questions. What matters is
@@ -275,7 +280,7 @@ print(f"weather over detections: clear={detection_rows.count('clear')}, rainy={d
 # - A bin assignment is the same number read from any level, which keeps results
 #   comparable across levels
 # - Entities with no children are binned like any other
-# - `factor_data` returns target-level rows, so an image-level factor's *marginal*
+# - `factor_data` returns instance-level rows, so a unit-level factor's *marginal*
 #   there is weighted by detection count - read it with `rows_at` when the question
 #   is about images
 

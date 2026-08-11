@@ -395,7 +395,7 @@ class TestMetadata:
         # A 2D factor (e.g. an embedding) sitting in the dataframe as a polars List column.
         # add_factors refuses to create one, so it is written directly.
         md._dataframe = md.dataframe.with_columns(pl.Series("embedding_2d", RNG.random(size=(50, 10))))
-        md._factors_by_level.setdefault("image", set()).add("embedding_2d")
+        md._factors_by_level.setdefault("unit", set()).add("embedding_2d")
         md._build_factors()
 
         # Trigger binning
@@ -538,7 +538,7 @@ class TestMetadata:
 
         md.add_factors({"bright": np.arange(5.0), "iou": np.arange(10.0)})
 
-        assert md.factor_info["bright"].level == "image"
+        assert md.factor_info["bright"].level == "unit"
         assert md.factor_info["iou"].level == "instance"
 
     def test_add_factors_invalid_level(self, get_od_dataset):

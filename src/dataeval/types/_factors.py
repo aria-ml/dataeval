@@ -12,10 +12,10 @@ from typing import Literal, TypeAlias
 #
 # A :obj:`~typing.Literal` rather than an enum because the string *is* the value:
 # it lands directly in the dataframe's ``level`` column and is compared there. An
-# enum-typed parameter would also reject the plain ``rows_at("image")`` spelling
+# enum-typed parameter would also reject the plain ``rows_at("unit")`` spelling
 # that :class:`~dataeval.Metadata` is designed around, and ``enum.StrEnum`` is
 # unavailable on the supported 3.10 floor.
-FactorLevel: TypeAlias = Literal["sequence", "image", "track", "instance"]
+FactorLevel: TypeAlias = Literal["sequence", "unit", "track", "instance"]
 
 # The level vocabulary and its edges — the single place both are declared.
 #
@@ -26,7 +26,7 @@ FactorLevel: TypeAlias = Literal["sequence", "image", "track", "instance"]
 # topological order of the edges below: every level after its parents.
 #
 # Values are each level's parents, empty for a root. Factors propagate *downwards*
-# along these edges (sequence -> image -> instance) and never upwards; rows at a level
+# along these edges (sequence -> unit -> instance) and never upwards; rows at a level
 # above a factor's own level simply carry null values for it.
 #
 # This is a **directed acyclic graph, not a tree**: ``instance`` declares two parents.
@@ -35,11 +35,11 @@ FactorLevel: TypeAlias = Literal["sequence", "image", "track", "instance"]
 # :meth:`FactorLevelSchema.of` collapses edges through levels a task omits, so a schema
 # that keeps only part of the graph still sees the right parents: an image-based task
 # keeps neither ``sequence`` nor ``track``, and its ``instance`` level correctly reports
-# ``image`` as its only parent.
+# ``unit`` as its only parent.
 #
 # Two consequences of the diamond, both load-bearing:
 #
-# - ``image`` and ``track`` are **siblings**, so neither propagates to the other. A
+# - ``unit`` and ``track`` are **siblings**, so neither propagates to the other. A
 #   per-frame factor is not readable from track rows and a per-track factor is not
 #   readable from frame rows; :meth:`FactorLevelSchema.propagates_to` is what says so,
 #   and :class:`~dataeval.Metadata` drops such a factor from factor analysis at that
@@ -49,6 +49,11 @@ FactorLevel: TypeAlias = Literal["sequence", "image", "track", "instance"]
 #   value on it at all. That absence is carried positionally, as a negative parent
 #   position — see ``RowBlock.ancestor_pos`` in the structuring layer.
 #
+# ``unit`` is one element of media: an image, an audio clip, a text document, a
+# tabular row. For a task whose dataset item is an ordered run of them it is one
+# frame or window of that run, which is why it is named for its role rather than
+# for any medium. ``Structurer.unit_type`` carries the medium's own word for it.
+#
 # ``instance`` is one labelled thing inside an item: a detection for object detection
 # or multi-object tracking, the image itself for whole-image classification. Every task
 # shares it, so the same object keeps one level name whichever view produced it — a
@@ -57,8 +62,8 @@ FactorLevel: TypeAlias = Literal["sequence", "image", "track", "instance"]
 # dataset are all instances.
 #
 # ``sequence`` is a video: one dataset item holding an ordered run of frames. It exists
-# so that ``image`` can mean "a frame" without also having to mean "a dataset item" —
-# for multi-object tracking the item level is ``sequence`` and ``image`` sits *between*
+# so that ``unit`` can mean "a frame" without also having to mean "a dataset item" —
+# for multi-object tracking the item level is ``sequence`` and ``unit`` sits *between*
 # the item level and the label level, which no image-based task needs.
 #
 # ``track`` is one tracked object across a sequence: the identity a tracker assigns, of
@@ -69,9 +74,9 @@ FactorLevel: TypeAlias = Literal["sequence", "image", "track", "instance"]
 _FACTOR_LEVEL_HIERARCHY: Mapping[FactorLevel, tuple[FactorLevel, ...]] = MappingProxyType(
     {
         "sequence": (),
-        "image": ("sequence",),
+        "unit": ("sequence",),
         "track": ("sequence",),
-        "instance": ("image", "track"),
+        "instance": ("unit", "track"),
     },
 )
 
@@ -80,8 +85,8 @@ def _as_parents(level: FactorLevel, value: Sequence[FactorLevel]) -> tuple[Facto
     """Normalize one level's declared parents to a tuple.
 
     A bare string is rejected rather than accepted as a single parent: ``str`` is
-    itself a ``Sequence[str]``, so ``{"instance": "image"}`` would silently become
-    five single-character parents.
+    itself a ``Sequence[str]``, so ``{"instance": "unit"}`` would silently become
+    four single-character parents.
     """
     if isinstance(value, str):
         raise TypeError(
@@ -209,8 +214,8 @@ class FactorLevelSchema:
 
     A schema describes the levels a particular task actually produces rows for, and
     how they are wired. Levels absent from the schema are elided from the hierarchy:
-    an object detection image dataset uses ``("image", "instance")``, so ``instance``
-    reports ``image`` as its only parent.
+    an object detection image dataset uses ``("unit", "instance")``, so ``instance``
+    reports ``unit`` as its only parent.
 
     Parameters
     ----------
@@ -232,25 +237,25 @@ class FactorLevelSchema:
 
     Example
     -------
-    >>> schema = FactorLevelSchema.of("sequence", "image", "track", "instance")
+    >>> schema = FactorLevelSchema.of("sequence", "unit", "track", "instance")
     >>> schema.parents_of("instance")
-    ('image', 'track')
+    ('unit', 'track')
     >>> schema.ancestors("instance")
-    ('image', 'track', 'sequence')
+    ('unit', 'track', 'sequence')
 
     Siblings do not propagate to each other, so a per-frame factor cannot be read from
     track rows:
 
-    >>> schema.propagates_to("image", "track")
+    >>> schema.propagates_to("unit", "track")
     False
-    >>> schema.propagates_to("image", "instance")
+    >>> schema.propagates_to("unit", "instance")
     True
 
     Omitting a level splices the graph rather than severing it, so an image-based task
     still sees one parent:
 
-    >>> FactorLevelSchema.of("image", "instance").parents_of("instance")
-    ('image',)
+    >>> FactorLevelSchema.of("unit", "instance").parents_of("instance")
+    ('unit',)
     """
 
     def __init__(
@@ -464,9 +469,9 @@ class FactorInfo:
         Whether a binned companion column was generated for this factor.
     is_digitized : bool, default False
         Whether a digitized companion column was generated for this factor.
-    level : str, default "image"
+    level : str, default "unit"
         Level the factor is defined at, drawn from the bound dataset's level
-        schema (one of ``sequence``, ``image``, ``track``, ``instance``). This is also the level the factor
+        schema (one of ``sequence``, ``unit``, ``track``, ``instance``). This is also the level the factor
         was binned at: its bin edges, its bin count and its continuous/discrete
         verdict all come from its values here, one per entity.
     """
@@ -474,4 +479,4 @@ class FactorInfo:
     factor_type: Literal["categorical", "continuous", "discrete"]
     is_binned: bool = False
     is_digitized: bool = False
-    level: FactorLevel = "image"
+    level: FactorLevel = "unit"

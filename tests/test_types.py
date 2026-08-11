@@ -393,36 +393,36 @@ class TestLevelSchema:
         assert schema.parents_of("instance") == ()
 
     def test_parents_view_is_read_only(self):
-        schema = FactorLevelSchema.of("image", "instance")
-        assert schema.parents == {"image": (), "instance": ("image",)}
+        schema = FactorLevelSchema.of("unit", "instance")
+        assert schema.parents == {"unit": (), "instance": ("unit",)}
         with pytest.raises(TypeError):
             schema.parents["instance"] = ("instance",)  # type: ignore[index]
 
     def test_rejects_unknown_level(self):
-        # A plausible misspelling of a real level: the frame level is called "image".
+        # A plausible misspelling of a real level: the frame level is called "unit".
         with pytest.raises(ValueError, match="Unknown level"):
             FactorLevelSchema.of("frame")  # type: ignore[arg-type]
 
     def test_rejects_repeated_level(self):
         with pytest.raises(ValueError, match="appear more than once"):
-            FactorLevelSchema(("image", "image"), {"image": ()})
+            FactorLevelSchema(("unit", "unit"), {"unit": ()})
 
     def test_rejects_dangling_parent(self):
         with pytest.raises(ValueError, match="not part of this schema"):
-            FactorLevelSchema(("instance",), {"instance": ("image",)})
+            FactorLevelSchema(("instance",), {"instance": ("unit",)})
 
     def test_rejects_a_bare_string_of_parents(self):
-        """``str`` is a ``Sequence[str]``, so this would otherwise become 5 parents."""
+        """``str`` is a ``Sequence[str]``, so this would otherwise become 4 parents."""
         with pytest.raises(TypeError, match="not the bare string"):
-            FactorLevelSchema(("image", "instance"), {"instance": "image"})  # type: ignore[dict-item]
+            FactorLevelSchema(("unit", "instance"), {"instance": "unit"})  # type: ignore[dict-item]
 
     def test_rejects_a_repeated_parent(self):
         with pytest.raises(ValueError, match="same parent more than once"):
-            FactorLevelSchema(("image", "instance"), {"instance": ("image", "image")})
+            FactorLevelSchema(("unit", "instance"), {"instance": ("unit", "unit")})
 
     def test_deepcopy_round_trips(self):
         """The schema travels inside every Metadata, so it has to be copyable."""
-        schema = FactorLevelSchema.of("image", "instance")
+        schema = FactorLevelSchema.of("unit", "instance")
         clone = copy.deepcopy(schema)
         assert clone == schema
         assert clone.parents == schema.parents
@@ -437,9 +437,9 @@ class TestLevelSchema:
 # ``FactorLevel`` literal, which is exactly what makes the shape untypable today.
 DIAMOND: Any = {
     "sequence": (),
-    "image": ("sequence",),
+    "unit": ("sequence",),
     "track": ("sequence",),
-    "instance": ("image", "track"),
+    "instance": ("unit", "track"),
 }
 
 # Re-bound through Any so the checker does not reject every synthetic level name below.
@@ -456,7 +456,7 @@ class TestGraphTraversal:
     """The graph walks, exercised on a shape the current vocabulary cannot declare."""
 
     def test_closure_reports_both_branches_nearest_first(self):
-        assert closure("instance", DIAMOND) == ("image", "track", "sequence")
+        assert closure("instance", DIAMOND) == ("unit", "track", "sequence")
 
     def test_closure_reports_a_shared_ancestor_once(self):
         """`sequence` is reachable by two paths and must not appear twice."""
@@ -466,7 +466,7 @@ class TestGraphTraversal:
         assert closure("sequence", DIAMOND) == ()
 
     def test_relink_keeps_both_branches(self):
-        assert relink("instance", {"image", "track", "instance"}, DIAMOND) == ("image", "track")
+        assert relink("instance", {"unit", "track", "instance"}, DIAMOND) == ("unit", "track")
 
     def test_relink_collapses_a_diamond_to_its_meet(self):
         """Dropping both middle levels splices the edges rather than severing them."""
@@ -474,7 +474,7 @@ class TestGraphTraversal:
 
     def test_relink_drops_a_branch_that_is_entirely_absent(self):
         """Projecting the tracking graph onto plain object detection."""
-        assert relink("instance", {"image", "instance"}, DIAMOND) == ("image",)
+        assert relink("instance", {"unit", "instance"}, DIAMOND) == ("unit",)
 
     def test_relink_of_a_root_is_empty(self):
         assert relink("sequence", {"sequence", "instance"}, DIAMOND) == ()
@@ -486,13 +486,13 @@ class TestAcyclicValidation:
         validate_acyclic(tuple(DIAMOND), DIAMOND)
 
     def test_a_cycle_is_rejected(self):
-        cyclic = {"image": ("instance",), "instance": ("image",)}
+        cyclic = {"unit": ("instance",), "instance": ("unit",)}
         with pytest.raises(ValueError, match="form a cycle"):
-            validate_acyclic(("image", "instance"), cyclic)
+            validate_acyclic(("unit", "instance"), cyclic)
 
     def test_a_level_parented_to_itself_is_rejected(self):
         with pytest.raises(ValueError, match="form a cycle"):
-            validate_acyclic(("image",), {"image": ("image",)})
+            validate_acyclic(("unit",), {"unit": ("unit",)})
 
 
 @pytest.mark.required
@@ -502,30 +502,30 @@ class TestMultiParentSchema:
     @pytest.fixture
     def schema(self, monkeypatch) -> Any:
         monkeypatch.setattr(_factors, "_FACTOR_LEVEL_HIERARCHY", DIAMOND)
-        return schema_of("sequence", "image", "track", "instance")
+        return schema_of("sequence", "unit", "track", "instance")
 
     def test_instance_reports_both_parents(self, schema: Any):
-        assert schema.parents_of("instance") == ("image", "track")
+        assert schema.parents_of("instance") == ("unit", "track")
 
     def test_ancestors_span_both_branches(self, schema: Any):
-        assert schema.ancestors("instance") == ("image", "track", "sequence")
+        assert schema.ancestors("instance") == ("unit", "track", "sequence")
 
     def test_factors_propagate_down_every_edge(self, schema: Any):
         """The predicate _build_factors uses: a track factor must reach instance rows."""
-        for source in ("image", "track", "sequence"):
+        for source in ("unit", "track", "sequence"):
             assert schema.propagates_to(source, "instance")
 
     def test_siblings_do_not_propagate_to_each_other(self, schema: Any):
-        assert not schema.propagates_to("track", "image")
-        assert not schema.propagates_to("image", "track")
+        assert not schema.propagates_to("track", "unit")
+        assert not schema.propagates_to("unit", "track")
 
     def test_descendants_follow_both_branches(self, schema: Any):
-        assert schema.descendants("sequence") == ("image", "track", "instance")
+        assert schema.descendants("sequence") == ("unit", "track", "instance")
         assert schema.descendants("track") == ("instance",)
 
     def test_highest_of_incomparable_levels_is_schema_order(self, schema: Any):
         """No graph answer exists for two siblings, so declaration order decides."""
-        assert schema.highest(["track", "image"]) == "image"
+        assert schema.highest(["track", "unit"]) == "unit"
         assert schema.highest(["instance", "track"]) == "track"
 
 
@@ -534,18 +534,18 @@ class TestLevelSchemaValidate:
     """A schema knows only levels that exist; retired spellings never reach it."""
 
     def test_real_level_resolves_without_warning(self, recwarn):
-        schema = FactorLevelSchema.of("image", "instance")
+        schema = FactorLevelSchema.of("unit", "instance")
         assert schema.validate("instance") == "instance"
         assert not recwarn.list
 
     def test_unknown_level_raises(self):
-        schema = FactorLevelSchema.of("image", "instance")
+        schema = FactorLevelSchema.of("unit", "instance")
         with pytest.raises(ValueError, match="Unknown level 'nope'"):
             schema.validate("nope")  # type: ignore[arg-type]
 
     def test_retired_target_is_not_a_level(self):
         """``"target"`` is translated by Metadata, not by the schema."""
-        schema = FactorLevelSchema.of("image", "instance")
+        schema = FactorLevelSchema.of("unit", "instance")
         with pytest.raises(ValueError, match="Unknown level 'target'"):
             schema.validate("target")  # type: ignore[arg-type]
 
@@ -555,17 +555,17 @@ class TestLevelHierarchy:
     """LEVEL_HIERARCHY is the sole declaration of the vocabulary and its edges."""
 
     def test_ordered_coarsest_first(self):
-        assert tuple(_FACTOR_LEVEL_HIERARCHY) == ("sequence", "image", "track", "instance")
+        assert tuple(_FACTOR_LEVEL_HIERARCHY) == ("sequence", "unit", "track", "instance")
 
-    def test_instance_hangs_off_both_image_and_track(self):
+    def test_instance_hangs_off_both_unit_and_track(self):
         """A detection is one observation: of a track, in a frame. Hence the diamond."""
-        assert _FACTOR_LEVEL_HIERARCHY["instance"] == ("image", "track")
+        assert _FACTOR_LEVEL_HIERARCHY["instance"] == ("unit", "track")
 
-    def test_image_and_track_hang_off_sequence(self):
+    def test_unit_and_track_hang_off_sequence(self):
         """Both sit inside a video; an image-item task omits sequence and re-roots."""
-        assert _FACTOR_LEVEL_HIERARCHY["image"] == ("sequence",)
+        assert _FACTOR_LEVEL_HIERARCHY["unit"] == ("sequence",)
         assert _FACTOR_LEVEL_HIERARCHY["track"] == ("sequence",)
-        assert FactorLevelSchema.of("image", "instance").parents_of("image") == ()
+        assert FactorLevelSchema.of("unit", "instance").parents_of("unit") == ()
 
     def test_sequence_is_the_only_root(self):
         roots = [level for level, parents in _FACTOR_LEVEL_HIERARCHY.items() if not parents]
@@ -577,18 +577,18 @@ class TestLevelDiamond:
     """``instance`` has two parents, which is the case the DAG machinery exists for."""
 
     def setup_method(self):
-        self.schema = FactorLevelSchema.of("sequence", "image", "track", "instance")
+        self.schema = FactorLevelSchema.of("sequence", "unit", "track", "instance")
 
     def test_ancestors_report_the_meeting_level_once(self):
         """Breadth-first, so the branches come before the level where they part."""
-        assert self.schema.ancestors("instance") == ("image", "track", "sequence")
+        assert self.schema.ancestors("instance") == ("unit", "track", "sequence")
 
     def test_siblings_do_not_propagate_to_each_other(self):
-        assert self.schema.propagates_to("image", "track") is False
-        assert self.schema.propagates_to("track", "image") is False
+        assert self.schema.propagates_to("unit", "track") is False
+        assert self.schema.propagates_to("track", "unit") is False
 
     def test_both_branches_reach_the_label_level(self):
-        assert self.schema.propagates_to("image", "instance") is True
+        assert self.schema.propagates_to("unit", "instance") is True
         assert self.schema.propagates_to("track", "instance") is True
 
     def test_the_root_reaches_everything(self):
@@ -596,18 +596,18 @@ class TestLevelDiamond:
 
     def test_omitting_one_branch_leaves_the_other_intact(self):
         """An image-based task keeps neither sequence nor track, and still sees one parent."""
-        assert FactorLevelSchema.of("image", "instance").parents_of("instance") == ("image",)
+        assert FactorLevelSchema.of("unit", "instance").parents_of("instance") == ("unit",)
 
     def test_omitting_the_level_where_branches_part_keeps_both(self):
-        """Dropping sequence re-roots image and track separately rather than severing them."""
-        schema = FactorLevelSchema.of("image", "track", "instance")
-        assert schema.parents_of("instance") == ("image", "track")
-        assert schema.parents_of("image") == ()
+        """Dropping sequence re-roots unit and track separately rather than severing them."""
+        schema = FactorLevelSchema.of("unit", "track", "instance")
+        assert schema.parents_of("instance") == ("unit", "track")
+        assert schema.parents_of("unit") == ()
         assert schema.parents_of("track") == ()
 
     def test_highest_tie_breaks_on_schema_order_for_incomparable_levels(self):
-        """image and track are genuinely incomparable, so declaration order decides."""
-        assert self.schema.highest(["track", "image"]) == "image"
+        """unit and track are genuinely incomparable, so declaration order decides."""
+        assert self.schema.highest(["track", "unit"]) == "unit"
         assert self.schema.highest(["instance", "track"]) == "track"
 
     def test_level_literal_matches_the_hierarchy(self):

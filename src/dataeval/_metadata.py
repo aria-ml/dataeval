@@ -4,7 +4,7 @@ import copy
 import logging
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 import polars as pl
@@ -80,6 +80,31 @@ def _build_index2label(
     return {int(lbl): str(int(lbl)) for lbl in observed_labels}
 
 
+def _resolve_legacy_level(level: str, aliases: Mapping[str, FactorLevel], stacklevel: int, unit_type: str) -> str:
+    """Translate a retired level spelling, warning at the caller's line.
+
+    Shared by the two paths that can be handed one: :meth:`Metadata._resolve_level`,
+    which has a structurer and so knows the task's full alias map, and
+    :meth:`Metadata._load_factors`, which is choosing the level a
+    :class:`FactorsStructurer` will be built with and so has only the base map. One
+    function so the two cannot word the deprecation differently.
+    """
+    alias = aliases.get(level)
+    if alias is None:
+        return level
+    # Naive "+ s" pluralization: correct for every current unit_type ("image",
+    # "frame", "item"). A future unit_type needing an irregular plural should be
+    # given one at its declaration site rather than inflected here.
+    warnings.warn(
+        f"Level {level!r} is deprecated and will stop resolving in a future "
+        f"release. It is no longer a level name; pass {alias!r} instead "
+        f"(this dataset's units are {unit_type}s).",
+        DeprecationWarning,
+        stacklevel=stacklevel,
+    )
+    return alias
+
+
 class Metadata(Array, FeatureExtractor):
     """Collection of binned metadata using Polars DataFrames.
 
@@ -92,23 +117,27 @@ class Metadata(Array, FeatureExtractor):
     Rows are organized by *level*. Which levels exist depends on the task, which is
     detected from the ``(item, target)`` types of the bound dataset:
 
-    ======================================  ==========  ==============  ================================
-    Task                                    Item level  Instance level  Levels
-    ======================================  ==========  ==============  ================================
-    ``IC``  image classification            image       instance        image, instance
-    ``OD``  object detection (image)        image       instance        image, instance
-    ``MOT`` multi-object tracking (video)   sequence    instance        sequence, image, track, instance
-    ======================================  ==========  ==============  ================================
+    ======================================  ==========  ==============  ================================  =========
+    Task                                    Item level  Instance level  Levels                            unit_type
+    ======================================  ==========  ==============  ================================  =========
+    ``IC``  image classification            unit        instance        unit, instance                    image
+    ``OD``  object detection (image)        unit        instance        unit, instance                    image
+    ``MOT`` multi-object tracking (video)   sequence    instance        sequence, unit, track, instance   frame
+    ======================================  ==========  ==============  ================================  =========
 
     An *instance* is one labelled thing inside an item: a detection for object detection
     or multi-object tracking, the image itself for classification. Every task therefore
     shares one label level.
 
-    For multi-object tracking, ``image`` means a frame rather than a dataset item, and the
-    levels form a **diamond** rather than a chain: ``image`` (a frame) and ``track`` (one
-    tracked object) are siblings under ``sequence``, and an instance sits under *both* —
-    a detection is one observation, of a track, in a frame. Two things follow, and neither
-    arises for ``IC``/``OD``:
+    :attr:`unit_type` names what one ``unit`` row holds in the dataset's own
+    vocabulary — ``"image"``, ``"frame"``, and whatever a future modality calls its
+    own — without any of that entering the level vocabulary.
+
+    For multi-object tracking, a ``unit`` is a frame rather than a dataset item, which
+    :attr:`unit_type` reports as ``"frame"``, and the levels form a **diamond** rather than
+    a chain: ``unit`` (a frame) and ``track`` (one tracked object) are siblings under
+    ``sequence``, and an instance sits under *both* — a detection is one observation, of a
+    track, in a frame. Two things follow, and neither arises for ``IC``/``OD``:
 
     - Siblings do not propagate to each other, so a per-frame factor cannot be read from
       track rows, or a per-track factor from frame rows. Such a factor stays in
@@ -127,15 +156,15 @@ class Metadata(Array, FeatureExtractor):
     :attr:`shape` — is a separate, movable choice called the :attr:`view`. It defaults
     to :attr:`label_level`, so that a projection lines up with :attr:`class_labels` out
     of the box; :meth:`at` returns the same metadata read at another level, which is how
-    an image-level factor is read once per image rather than once per detection.
+    a unit-level factor is read once per image rather than once per detection.
 
-    Factors propagate *downwards* only (image to instance); rows above a factor's level, on
+    Factors propagate *downwards* only (``unit`` to ``instance``); rows above a factor's level, on
     a sibling branch of it, or with no ancestor at it carry null values, and factors are
     never aggregated upwards.
 
     Each factor is **binned at its own level** — the level whose rows hold one value per
     entity — and the resulting bins are then propagated downwards like any other value.
-    An image-level factor is therefore binned over one value per image, not over one
+    A unit-level factor is therefore binned over one value per image, not over one
     value per detection, so its bin edges describe the images rather than the detections
     that happen to sit inside them. A factor's bin assignment for a given entity is the
     same number wherever it is read from, which is what makes results comparable across
@@ -154,7 +183,7 @@ class Metadata(Array, FeatureExtractor):
     continuous_factor_bins : Mapping[str, int | Sequence[float]] | None, default None
         Mapping from continuous factor names to bin counts or explicit bin edges.
         When None, uses automatic discretization. A bin count is applied to the factor's
-        values at its own level, so ``{"brightness": 10}`` on an image-level factor means
+        values at its own level, so ``{"brightness": 10}`` on a unit-level factor means
         ten bins over the images.
     auto_bin_method : Literal["uniform_width", "uniform_count", "clusters"], default "uniform_width"
         Binning strategy for continuous factors without explicit bins. Default "uniform_width"
@@ -229,7 +258,7 @@ class Metadata(Array, FeatureExtractor):
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
         exclude: str | Sequence[str] | None = None,
         include: str | Sequence[str] | None = None,
-        view: FactorLevel | None = None,
+        view: FactorLevel | Literal["image"] | None = None,
         inherited: bool = True,
     ) -> None:
         self._class_labels: NDArray[np.intp]
@@ -252,8 +281,10 @@ class Metadata(Array, FeatureExtractor):
         self._exclude = {exclude} if isinstance(exclude, str) else set(exclude or ())
         self._include = {include} if isinstance(include, str) else set(include or ())
         # Validated lazily against the bound dataset's schema, since there is no schema
-        # to validate against until structuring; see _structure.
-        self._view: FactorLevel | None = view
+        # to validate against until structuring; see _structure. A retired spelling like
+        # "image" may be sitting here transiently: the cast documents that _adopt
+        # resolves it (via _resolve_level) before anything treats this as a real level.
+        self._view: FactorLevel | None = cast("FactorLevel | None", view)
         self._inherited = inherited
         self._target_factors_only = False
 
@@ -308,7 +339,7 @@ class Metadata(Array, FeatureExtractor):
         *,
         index2label: Mapping[int, str] | None = None,
         item_indices: Array1D[Any] | None = None,
-        level: FactorLevel | None = None,
+        level: FactorLevel | Literal["image"] | None = None,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
         exclude: str | Sequence[str] | None = None,
@@ -347,8 +378,8 @@ class Metadata(Array, FeatureExtractor):
             index (used, e.g., for object-detection where multiple detections share
             an image). When None a 1:1 mapping is assumed (one factor row per image).
         level : str or None, default None
-            Level the supplied rows sit at, ``image`` or ``instance``. When None the rows
-            are treated as ``image``-level, matching the historical behavior. A
+            Level the supplied rows sit at, ``unit`` or ``instance``. When None the rows
+            are treated as ``unit``-level, matching the historical behavior. A
             factors-only instance has this single level and no separate item level, so an
             unlabeled row is not representable here the way it is for a dataset-backed
             instance.
@@ -416,7 +447,7 @@ class Metadata(Array, FeatureExtractor):
         *,
         index2label: Mapping[int, str] | None,
         item_indices: Array1D[Any] | None,
-        level: FactorLevel | None = None,
+        level: FactorLevel | Literal["image"] | None = None,
     ) -> None:
         """Populate structured state directly from raw factor arrays (see from_factors)."""
         factor_arrays = {str(k): as_numpy(v).reshape(-1) for k, v in dict(factors).items()}
@@ -448,8 +479,14 @@ class Metadata(Array, FeatureExtractor):
         # A factors-only instance has a single level, which is therefore both the
         # item level and the label level. Structuring goes through the same
         # StructuredData bundle as the dataset path, so the reserved columns have
-        # exactly one producer and cannot drift between the two constructors.
-        structurer = FactorsStructurer(level or "image")
+        # exactly one producer and cannot drift between the two constructors. No
+        # structurer instance exists yet to resolve a retired spelling against — this
+        # call is what builds one — so this resolves against the base Structurer's
+        # alias map rather than a task-specific one.
+        requested = _resolve_legacy_level(
+            level or "unit", Structurer.legacy_level_aliases, stacklevel=4, unit_type=Structurer.unit_type
+        )
+        structurer = FactorsStructurer(requested)  # type: ignore[arg-type]
         data = structurer.build_from_arrays(factor_arrays, labels, srcidx)
 
         self._index2label = _build_index2label(index2label, np.unique(labels))
@@ -477,7 +514,8 @@ class Metadata(Array, FeatureExtractor):
         factors = sorted(self._factors) if self._is_structured else []
         factor_str = f", factors={factors}" if factors else ""
         task_str = f", task={self._structurer.task}" if self._is_structured else ""
-        return f"Metadata(n={self._count}, bound={bound}{task_str}{factor_str})"
+        unit_str = f", units={self._structurer.unit_type}" if self._is_structured else ""
+        return f"Metadata(n={self._count}, bound={bound}{task_str}{unit_str}{factor_str})"
 
     @property
     def is_bound(self) -> bool:
@@ -852,6 +890,27 @@ class Metadata(Array, FeatureExtractor):
         return self._label_level
 
     @property
+    def unit_type(self) -> str:
+        """What one row at the ``unit`` level holds, in the dataset's own vocabulary.
+
+        Returns
+        -------
+        str
+            ``"image"`` for image classification and object detection, ``"frame"``
+            for multi-object tracking, ``"item"`` for a factors-only instance.
+
+        Notes
+        -----
+        Descriptive only. It names the medium so that messages and reports can speak
+        the caller's language, and is never consulted by structuring, binning or
+        projection. It is deliberately a plain :class:`str` rather than a member of
+        :data:`~dataeval.types.FactorLevel`: a new modality supplies a new value here
+        and the level vocabulary stays closed and task-independent.
+        """
+        self._structure()
+        return self._structurer.unit_type
+
+    @property
     def multi_target(self) -> bool:
         """Whether one dataset item can carry more than one label.
 
@@ -883,6 +942,10 @@ class Metadata(Array, FeatureExtractor):
         .. deprecated::
             ``"target"`` is accepted with a warning and resolves to the
             ``"instance"`` level.
+
+        .. deprecated::
+            ``"image"`` is accepted with a warning and resolves to the ``"unit"``
+            level. Removed in v1.2.0.
 
         Returns
         -------
@@ -923,14 +986,14 @@ class Metadata(Array, FeatureExtractor):
         return self._view_level
 
     @view.setter
-    def view(self, level: FactorLevel | Literal["target"]) -> None:
+    def view(self, level: FactorLevel | Literal["target", "image"]) -> None:
         self._structure()
         resolved = self._resolve_level(level)
         if resolved != self._view_level:
             self._view = resolved
             self._reset_view_dependent_state()
 
-    def at(self, level: FactorLevel | Literal["target"]) -> Self:
+    def at(self, level: FactorLevel | Literal["target", "image"]) -> Self:
         """Return this metadata read at another level.
 
         Parameters
@@ -941,6 +1004,10 @@ class Metadata(Array, FeatureExtractor):
             .. deprecated::
                 ``"target"`` is accepted with a warning and resolves to the
                 ``"instance"`` level.
+
+            .. deprecated::
+                ``"image"`` is accepted with a warning and resolves to the
+                ``"unit"`` level. Removed in v1.2.0.
 
         Returns
         -------
@@ -967,7 +1034,7 @@ class Metadata(Array, FeatureExtractor):
         >>> metadata.factor_data.shape[0]
         93
         >>> # One row per image, image factors counted once each
-        >>> metadata.at("image").factor_data.shape[0]
+        >>> metadata.at("unit").factor_data.shape[0]
         50
         """
         self._structure()
@@ -1148,14 +1215,14 @@ class Metadata(Array, FeatureExtractor):
         the value is fixed for the instance's lifetime.
 
         Setting this False is usually the wrong half of the fix. The problem it
-        addresses is that an image-level factor read from detection rows has its
+        addresses is that a unit-level factor read from detection rows has its
         marginal distribution weighted by detections-per-image; dropping the factor
-        answers that by discarding it, whereas ``md.at("image")`` answers it by reading
+        answers that by discarding it, whereas ``md.at("unit")`` answers it by reading
         the factor where there is one value per image. Reach for this only when the
         goal really is "instance-native factors and nothing else".
 
         On a task where no factor is native to the view — image classification puts
-        essentially all per-item metadata at the ``image`` level — this leaves no
+        essentially all per-item metadata at the ``unit`` level — this leaves no
         factors at all, and the evaluators will say so.
         """
         return self._inherited
@@ -1232,7 +1299,7 @@ class Metadata(Array, FeatureExtractor):
         Factor binning occurs automatically when accessing factor-related data.
 
         Rows are ordered by level, coarsest first, so for an object detection
-        dataset all image rows precede all instance rows. The legacy ``item_index``
+        dataset all unit rows precede all instance rows. The legacy ``item_index``
         and ``target_index`` columns are retained: ``target_index`` remains null
         on rows above :attr:`label_level`.
         """
@@ -1282,9 +1349,9 @@ class Metadata(Array, FeatureExtractor):
         A factor defined above the view is *replicated* onto these rows, once per
         descendant. Its bin values are correct — binning happens at the factor's own
         level (see :ref:`binning-levels`) — but its marginal distribution here is
-        weighted by how many descendants each entity has, so an image-level factor on
+        weighted by how many descendants each entity has, so a unit-level factor on
         a detection dataset counts crowded images more heavily than sparse ones.
-        ``md.at("image").factor_data`` reads it once per image instead.
+        ``md.at("unit").factor_data`` reads it once per image instead.
 
         A factor the view's rows cannot *all* read is omitted from these columns, and from
         :attr:`factor_names`, rather than represented as a gap — a partly null column has no
@@ -1487,13 +1554,17 @@ class Metadata(Array, FeatureExtractor):
             self._structure()
         return self._count
 
-    def rows_at(self, level: FactorLevel | Literal["target"]) -> pl.DataFrame:
+    def rows_at(self, level: FactorLevel | Literal["target", "image"]) -> pl.DataFrame:
         """Dataframe rows belonging to a single level.
 
         Parameters
         ----------
         level : str
             Level to filter to, one of :attr:`levels`.
+
+            .. deprecated::
+                ``"image"`` is accepted with a warning and resolves to the
+                ``"unit"`` level. Removed in v1.2.0.
 
         Returns
         -------
@@ -1509,7 +1580,7 @@ class Metadata(Array, FeatureExtractor):
         Examples
         --------
         >>> metadata = Metadata(dataset)
-        >>> metadata.rows_at("image").height
+        >>> metadata.rows_at("unit").height
         50
         """
         self._structure()
@@ -1572,11 +1643,12 @@ class Metadata(Array, FeatureExtractor):
             stacklevel=2,
         )
         self._structure()
-        if self._item_level != "image":
+        if self._item_level != "unit":
             raise ValueError(
                 "Metadata.image_data is only defined for image-based tasks, but this dataset has "
-                f"items at the {self._item_level!r} level. Use Metadata.rows_at(md.item_level) for "
-                "item-level rows.",
+                f"items at the {self._item_level!r} level. "
+                'Use Metadata.rows_at("unit") for the image rows, '
+                "or Metadata.rows_at(md.item_level) for item-level rows.",
             )
         return self.rows_at(self._item_level if self.multi_target else self._label_level)
 
@@ -1630,7 +1702,7 @@ class Metadata(Array, FeatureExtractor):
         .. deprecated::
             A single row lookup is one dataframe filter, and phrasing it as a method
             per level does not scale past the two levels that happen to exist today.
-            Use ``rows_at("image").filter(pl.col("item_index") == image_idx)``.
+            Use ``rows_at("unit").filter(pl.col("item_index") == image_idx)``.
             Removed in v1.2.0.
 
         Parameters
@@ -1656,7 +1728,7 @@ class Metadata(Array, FeatureExtractor):
         """
         warnings.warn(
             "Metadata.get_image_factors() is deprecated and will be removed in v1.2.0. Use "
-            'Metadata.rows_at("image").filter(pl.col("item_index") == image_idx) instead.',
+            'Metadata.rows_at("unit").filter(pl.col("item_index") == image_idx) instead.',
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1810,7 +1882,7 @@ class Metadata(Array, FeatureExtractor):
         levels: list[FactorLevel] = [level for level, names in self._factors_by_level.items() if name in names]
         return self._levels.highest(levels) if levels else self._item_level
 
-    def _resolve_level(self, level: FactorLevel | Literal["target"], stacklevel: int = 3) -> FactorLevel:
+    def _resolve_level(self, level: FactorLevel | Literal["target", "image"], stacklevel: int = 4) -> FactorLevel:
         """Validate a caller-supplied level name, translating any retired spelling.
 
         Sole entry point for a level name that came from a caller: :meth:`rows_at` and
@@ -1827,11 +1899,12 @@ class Metadata(Array, FeatureExtractor):
         ----------
         level : str
             Level name as the caller spelled it.
-        stacklevel : int, default 3
-            Frames between the warning and the user's line. The default counts their
-            call, the public method, then this helper — right for every caller that
-            reaches this directly. :meth:`_resolve_requested_level` passes one more,
-            since it sits between :meth:`add_factors` and this.
+        stacklevel : int, default 4
+            Frames between the warning and the user's line. The warning itself is
+            raised one level down, in :func:`_resolve_legacy_level`, so the default
+            counts their call, the public method, this helper, and that helper — right
+            for every caller that reaches this directly. :meth:`_resolve_requested_level`
+            passes one more, since it sits between :meth:`add_factors` and this.
 
         Returns
         -------
@@ -1843,16 +1916,15 @@ class Metadata(Array, FeatureExtractor):
         ValueError
             When the level is not part of this dataset's schema.
         """
-        alias = self._structurer.legacy_level_aliases.get(level)
-        if alias is not None:
-            warnings.warn(
-                f"Level {level!r} is deprecated and will stop resolving in a future "
-                f"release. It is no longer a level name; pass {alias!r} instead.",
-                DeprecationWarning,
-                stacklevel=stacklevel,
-            )
-            return alias
-        return self._levels.validate(level)
+        resolved = _resolve_legacy_level(
+            level, self._structurer.legacy_level_aliases, stacklevel, unit_type=self._structurer.unit_type
+        )
+        try:
+            return self._levels.validate(resolved)
+        except ValueError as exc:
+            # FactorLevelSchema knows the level vocabulary but not the medium, so the
+            # unit-type clause is added here rather than pushed down into validate().
+            raise ValueError(f"{exc} (this dataset's units are {self._structurer.unit_type}s)") from None
 
     def _warn_level_rename(self) -> None:
         """Announce the ``FactorInfo.level`` rename, once per instance.
@@ -2001,10 +2073,10 @@ class Metadata(Array, FeatureExtractor):
         value — one per dataset item, where ``target`` is None, and one per label —
         so it can address :attr:`item_level` and :attr:`label_level` and no others.
         That is a property of the type, not of this method: a schema with a third level
-        between them — multi-object tracking's ``image`` level sits between ``sequence``
+        between them — multi-object tracking's ``unit`` level sits between ``sequence``
         (item) and ``instance`` (label) — has no representable form here, and per-frame
         values (e.g. from :func:`~dataeval.core.compute_stats` run per frame) have to be
-        added with an explicit ``level="image"`` instead. Widening this means widening
+        added with an explicit ``level="unit"`` instead. Widening this means widening
         :class:`~dataeval.types.SourceIndex` first.
         """
         self._reject_unplaceable_source_index(source_index)
@@ -2049,11 +2121,11 @@ class Metadata(Array, FeatureExtractor):
         -----
         No expression over the row counts reproduces this, which is why the
         replacement is a property and not one. ``level_counts["instance"] !=
-        level_counts["image"]`` is False for a detection dataset with one detection
+        level_counts["unit"]`` is False for a detection dataset with one detection
         per image and True for a classification dataset with an unlabeled item, so it
         gets the answer wrong in both directions. Nor is it ``label_level !=
         item_level``: every task now names its labelled level ``instance`` and its
-        item level ``image``, so that comparison is true even for classification.
+        item level ``unit``, so that comparison is true even for classification.
         """
         warnings.warn(
             "Metadata.has_targets() is deprecated and will be removed in v1.2.0. Use Metadata.multi_target instead.",
@@ -2083,7 +2155,7 @@ class Metadata(Array, FeatureExtractor):
         # A factor the view's rows cannot all read stays in the dataframe but out of factor
         # analysis, for either of two reasons the level graph's diamond makes real:
         #
-        # - Off the branch entirely: ``image`` and ``track`` are siblings, so neither
+        # - Off the branch entirely: ``unit`` and ``track`` are siblings, so neither
         #   propagates to the other and a per-frame factor has no value on a track row.
         # - On the branch but not for every row: a detection no tracker linked has no track
         #   ancestor, so a per-track factor is null there. Binning cannot represent that —
@@ -2157,10 +2229,14 @@ class Metadata(Array, FeatureExtractor):
         for level in self._levels:
             self._factors_by_level.setdefault(level, set())
 
-        # A view chosen at construction is validated here, at the first moment there is
-        # a schema to validate it against — and before _build_factors below reads it.
+        # A view chosen at construction is resolved here, at the first moment there is a
+        # schema to resolve it against — and before _build_factors below reads it. It
+        # goes through _resolve_level rather than validate() so that a retired spelling
+        # passed to the constructor deprecates rather than raises. The warning points at
+        # whatever first triggered structuring, not at the constructor call, because the
+        # constructor frame is long gone by then.
         if self._view is not None:
-            self._levels.validate(self._view)
+            self._view = self._resolve_level(self._view, stacklevel=3)
 
         self._raw = data.raw
         self._class_labels = data.class_labels
@@ -2404,7 +2480,7 @@ class Metadata(Array, FeatureExtractor):
 
     def _resolve_requested_level(
         self,
-        level: FactorLevel | Literal["auto", "target", "combined"],
+        level: FactorLevel | Literal["auto", "target", "combined", "image"],
         source_index: Sequence[SourceIndex] | None,
     ) -> FactorLevel | Literal["combined"] | None:
         """Turn ``add_factors``' ``level=`` argument into a destination, or None to infer.
@@ -2438,7 +2514,7 @@ class Metadata(Array, FeatureExtractor):
             return "combined"
         # One frame deeper than the other callers of _resolve_level, which reach it
         # straight from the public method.
-        return self._resolve_level(level, stacklevel=4)
+        return self._resolve_level(level, stacklevel=5)
 
     def _resolve_combined(self, factors: Mapping[str, NDArray[Any]]) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
         """Split a v1.1 ``"combined"`` array into one factor per level.
@@ -2512,7 +2588,7 @@ class Metadata(Array, FeatureExtractor):
             self._validate_factor_lengths(factors, level)
             return [(name, level, values) for name, values in factors.items()]
 
-        # Each factor is inferred independently, so a mapping mixing image-level and
+        # Each factor is inferred independently, so a mapping mixing unit-level and
         # instance-level arrays can be added in a single call. Written as a loop rather than
         # a comprehension so that the stacklevel of the ambiguity warning _infer_factor_level
         # may raise counts the same number of frames on every supported Python.
@@ -2524,7 +2600,7 @@ class Metadata(Array, FeatureExtractor):
     def add_factors(
         self,
         factors: Mapping[str, Array1D[Any]],
-        level: FactorLevel | Literal["auto", "target", "combined"] = "auto",
+        level: FactorLevel | Literal["auto", "target", "combined", "image"] = "auto",
         overwrite: bool = False,
         append_string: str = "_added",
         source_index: Sequence[SourceIndex] | None = None,
@@ -2533,7 +2609,7 @@ class Metadata(Array, FeatureExtractor):
 
         Extend the current metadata with new factors at any level of the bound
         dataset's schema. Values are stored on the rows at that level and
-        propagate downwards to descendant rows, so a factor added at the image
+        propagate downwards to descendant rows, so a factor added at the ``unit``
         level of an object detection dataset is visible from its instance rows.
 
         Parameters
@@ -2546,7 +2622,7 @@ class Metadata(Array, FeatureExtractor):
             Level at which to store the factors — one of :attr:`levels`, or
             ``"auto"`` to infer the level of each factor independently from its
             array length. This also fixes the level the factor is binned at, so a
-            factor stored at the image level is discretized over one value per image
+            factor stored at the ``unit`` level is discretized over one value per image
             (see :ref:`binning-levels`).
 
             Prefer naming the level. Inference reads the level off an array's length,
@@ -2563,6 +2639,10 @@ class Metadata(Array, FeatureExtractor):
                 label-level one. The array is split into ``<level>_<name>`` factors,
                 one per level. Pass `source_index` instead, which labels each value
                 rather than relying on the ordering.
+
+            .. deprecated::
+                ``level="image"`` is accepted with a warning and resolves to the
+                ``"unit"`` level. Removed in v1.2.0.
         overwrite : bool, default False
             Whether to overwrite factors of the same name already present in the metadata.
             When False, a colliding factor is stored under a new name instead (see `append_string`).
@@ -2592,8 +2672,16 @@ class Metadata(Array, FeatureExtractor):
 
         Notes
         -----
+        .. versionchanged:: 1.1
+            The media-unit level was renamed from ``image`` to ``unit``, so a factor that
+            `source_index` splits across levels is now generated as ``unit_<name>`` where it
+            was ``image_<name>`` — ``compute_stats`` output piped through here yields
+            ``unit_brightness`` rather than ``image_brightness``. Unlike the level name
+            itself, the old generated name is not aliased: code that reads such a column by
+            name has to be updated.
+
         Under ``level="auto"`` each factor is placed independently, so a mapping holding
-        both image-level and instance-level arrays can be added in one call. Levels can hold
+        both unit-level and instance-level arrays can be added in one call. Levels can hold
         the same number of rows — an object detection dataset with one detection per image
         has as many instances as images — and an array length that matches several of them is
         stored at the coarsest match, with a warning. Pass `level` explicitly to choose.
@@ -2601,8 +2689,8 @@ class Metadata(Array, FeatureExtractor):
         `source_index` is the way to pass :func:`~dataeval.core.compute_stats` output
         straight through. When it spans several levels — ``per_image`` and ``per_target``
         both enabled — each factor is split into one factor per level, named
-        ``<level>_<name>`` (``image_brightness``, ``instance_brightness``). Both halves stay
-        visible to factor analysis, since image-level values propagate down to instance rows.
+        ``<level>_<name>`` (``unit_brightness``, ``instance_brightness``). Both halves stay
+        visible to factor analysis, since unit-level values propagate down to instance rows.
 
         Multi-dimensional values (vector-valued statistics such as ``histogram``,
         ``percentiles`` or ``center``) have no single-column representation and are skipped
@@ -2610,7 +2698,7 @@ class Metadata(Array, FeatureExtractor):
 
         Factor names that would collide with a reserved dataframe column — ``level``,
         ``item_index``, ``target_index``, ``class_label``, ``score``, ``box``, a level's
-        own key column (``instance_index``, ``image_index``, ``track_index``,
+        own key column (``instance_index``, ``unit_index``, ``track_index``,
         ``sequence_index``) or the ``track_id`` identifier — are prefixed with
         ``metadata_``, matching how dataset
         metadata keys are treated.
@@ -2621,12 +2709,12 @@ class Metadata(Array, FeatureExtractor):
         Examples
         --------
         >>> metadata = Metadata(dataset)
-        >>> # Add image-level factors (e.g., from imagestats)
-        >>> image_factors = {
+        >>> # Add unit-level factors (e.g., from imagestats)
+        >>> unit_factors = {
         ...     "brightness": np.random.rand(50),  # One per image
         ...     "contrast": np.random.rand(50),  # One per image
         ... }
-        >>> metadata.add_factors(image_factors, level="image")
+        >>> metadata.add_factors(unit_factors, level="unit")
         >>>
         >>> # Add instance-level factors (e.g., detection confidence scores)
         >>> target_factors = {

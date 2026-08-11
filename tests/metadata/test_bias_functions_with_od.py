@@ -151,16 +151,14 @@ class TestMetadataStructureWithBiasFunctions:
         """IC separates item rows from label rows, so an unlabeled item keeps its row."""
         md = Metadata(ic_dataset_for_bias)
 
-        assert "image" == "image"
-        assert "instance" == "instance"
-        assert md.level_counts == {"image": 5, "instance": 5}
+        assert md.level_counts == {"unit": 5, "instance": 5}
 
         # One block per level: 5 image rows followed by 5 label rows.
         assert len(md.dataframe) == 10
 
         # Every image here is labelled, so the two levels have the same height.
         assert len(md.target_data) == 5
-        assert len(md.rows_at("image")) == 5
+        assert len(md.rows_at("unit")) == 5
         assert len(md.image_data) == 5
 
     def test_od_factor_data_uses_target_rows(self, od_dataset_for_bias):
@@ -293,7 +291,7 @@ class TestAddedImageFactorsWithODBias:
 
         # Add image-level factor with variation across images
         rng = np.random.default_rng(42)
-        md.add_factors({"brightness": rng.choice(["low", "high"], size=5)}, level="image")
+        md.add_factors({"brightness": rng.choice(["low", "high"], size=5)}, level="unit")
 
         result = Diversity().evaluate(md)
         brightness_rows = result.classwise.filter(pl.col("factor_name") == "brightness")
@@ -308,7 +306,7 @@ class TestAddedImageFactorsWithODBias:
 
         # Add image-level factor with variation across images
         rng = np.random.default_rng(42)
-        md.add_factors({"brightness": rng.choice(["low", "high"], size=5)}, level="image")
+        md.add_factors({"brightness": rng.choice(["low", "high"], size=5)}, level="unit")
 
         result = Balance().evaluate(md)
         brightness_rows = result.classwise.filter(pl.col("factor_name") == "brightness")
@@ -317,7 +315,7 @@ class TestAddedImageFactorsWithODBias:
     def test_added_image_factor_data_aligned_with_class_labels(self, od_dataset_for_bias):
         """factor_data length should match class_labels after adding image-level factors."""
         md = Metadata(od_dataset_for_bias)
-        md.add_factors({"brightness": np.random.rand(5)}, level="image")
+        md.add_factors({"brightness": np.random.rand(5)}, level="unit")
 
         assert md.factor_data.shape[0] == len(md.class_labels)
 
