@@ -114,8 +114,10 @@ class Metadata(Array, FeatureExtractor):
     This class also implements the :class:`~dataeval.protocols.FeatureExtractor` protocol,
     allowing it to be used directly with drift detectors that accept feature extractors.
 
-    Rows are organized by *level*. Which levels exist depends on the task, which is
-    detected from the ``(item, target)`` types of the bound dataset:
+    Rows are organized by *level* — a granularity at which one row means one entity.
+    The dataframe holds rows at every level at once, each tagged by a ``level`` column.
+    Which levels exist depends on the task, which is detected from the
+    ``(item, target)`` types of the bound dataset:
 
     ======================================  ==========  ==============  ================================  =========
     Task                                    Item level  Instance level  Levels                            unit_type
@@ -126,49 +128,32 @@ class Metadata(Array, FeatureExtractor):
     ======================================  ==========  ==============  ================================  =========
 
     An *instance* is one labelled thing inside an item: a detection for object detection
-    or multi-object tracking, the image itself for classification. Every task therefore
-    shares one label level.
+    or multi-object tracking, the image itself for classification. The label level is
+    always distinct from the item level, so an item carrying no label — an unlabeled
+    image, or one with no detections — still has an item row and keeps every factor on
+    it. :attr:`levels` enumerates the names this instance accepts,
+    :data:`~dataeval.types.FactorLevel` types them, and :attr:`item_level`,
+    :attr:`label_level` and :attr:`unit_type` name what the schema singles out.
 
-    :attr:`unit_type` names what one ``unit`` row holds in the dataset's own
-    vocabulary — ``"image"``, ``"frame"``, and whatever a future modality calls its
-    own — without any of that entering the level vocabulary.
+    Factors are stored once, at their own level, and propagate *downwards* only; rows
+    above a factor's level, on a sibling branch of it, or with no ancestor at it carry
+    null values, and factors are never aggregated upwards. For multi-object tracking the
+    levels form a **diamond** rather than a chain — ``unit`` (a frame) and ``track`` are
+    siblings under ``sequence``, and an instance descends from both.
 
-    For multi-object tracking, a ``unit`` is a frame rather than a dataset item, which
-    :attr:`unit_type` reports as ``"frame"``, and the levels form a **diamond** rather than
-    a chain: ``unit`` (a frame) and ``track`` (one tracked object) are siblings under
-    ``sequence``, and an instance sits under *both* — a detection is one observation, of a
-    track, in a frame. Two things follow, and neither arises for ``IC``/``OD``:
-
-    - Siblings do not propagate to each other, so a per-frame factor cannot be read from
-      track rows, or a per-track factor from frame rows. Such a factor stays in
-      :attr:`dataframe` but is left out of factor analysis at that view.
-    - A detection no tracker linked (``track_id == -1``) has a frame but no track, so
-      per-track factors are null on it. See :attr:`factor_data`.
-
-    The label level is always distinct from the item level, so an item that carries no
-    label — an unlabeled image, or one with no detections — still has an item row and
-    keeps every factor on it. :attr:`levels` enumerates the names this instance accepts,
-    :data:`~dataeval.types.FactorLevel` types them, and :attr:`item_level` and
-    :attr:`label_level` name the two the schema singles out.
-
-    The dataframe always holds every level. Which rows the array-shaped accessors
-    project — :attr:`factor_data`, :attr:`factor_names`, :attr:`is_discrete`,
-    :attr:`shape` — is a separate, movable choice called the :attr:`view`. It defaults
-    to :attr:`label_level`, so that a projection lines up with :attr:`class_labels` out
-    of the box; :meth:`at` returns the same metadata read at another level, which is how
-    a unit-level factor is read once per image rather than once per detection.
-
-    Factors propagate *downwards* only (``unit`` to ``instance``); rows above a factor's level, on
-    a sibling branch of it, or with no ancestor at it carry null values, and factors are
-    never aggregated upwards.
+    Which rows the array-shaped accessors project — :attr:`factor_data`,
+    :attr:`factor_names`, :attr:`is_discrete`, :attr:`shape` — is a separate, movable
+    choice called the :attr:`view`. It defaults to :attr:`label_level`, so that a
+    projection lines up with :attr:`class_labels`; :meth:`at` returns the same metadata
+    read at another level.
 
     Each factor is **binned at its own level** — the level whose rows hold one value per
-    entity — and the resulting bins are then propagated downwards like any other value.
-    A unit-level factor is therefore binned over one value per image, not over one
-    value per detection, so its bin edges describe the images rather than the detections
-    that happen to sit inside them. A factor's bin assignment for a given entity is the
-    same number wherever it is read from, which is what makes results comparable across
-    levels. See :ref:`binning-levels` for a worked example.
+    entity — and the resulting bins propagate downwards like any other value. See
+    :ref:`binning-levels` for a worked example.
+
+    See :doc:`/concepts/MetadataLevels` for the model behind all of this: what follows
+    from the diamond, why binning at a factor's own level is what makes results
+    comparable across levels, and why the level vocabulary is modality-neutral.
 
     Parameters
     ----------
@@ -184,7 +169,7 @@ class Metadata(Array, FeatureExtractor):
         Mapping from continuous factor names to bin counts or explicit bin edges.
         When None, uses automatic discretization. A bin count is applied to the factor's
         values at its own level, so ``{"brightness": 10}`` on a unit-level factor means
-        ten bins over the images.
+        ten bins over the units.
     auto_bin_method : Literal["uniform_width", "uniform_count", "clusters"], default "uniform_width"
         Binning strategy for continuous factors without explicit bins. Default "uniform_width"
         provides intuitive equal-width intervals for most distributions. Every strategy reads
@@ -1218,7 +1203,7 @@ class Metadata(Array, FeatureExtractor):
         addresses is that a unit-level factor read from detection rows has its
         marginal distribution weighted by detections-per-image; dropping the factor
         answers that by discarding it, whereas ``md.at("unit")`` answers it by reading
-        the factor where there is one value per image. Reach for this only when the
+        the factor where there is one value per unit. Reach for this only when the
         goal really is "instance-native factors and nothing else".
 
         On a task where no factor is native to the view — image classification puts
@@ -1351,7 +1336,7 @@ class Metadata(Array, FeatureExtractor):
         level (see :ref:`binning-levels`) — but its marginal distribution here is
         weighted by how many descendants each entity has, so a unit-level factor on
         a detection dataset counts crowded images more heavily than sparse ones.
-        ``md.at("unit").factor_data`` reads it once per image instead.
+        ``md.at("unit").factor_data`` reads it once per unit instead.
 
         A factor the view's rows cannot *all* read is omitted from these columns, and from
         :attr:`factor_names`, rather than represented as a gap — a partly null column has no
@@ -2622,7 +2607,7 @@ class Metadata(Array, FeatureExtractor):
             Level at which to store the factors — one of :attr:`levels`, or
             ``"auto"`` to infer the level of each factor independently from its
             array length. This also fixes the level the factor is binned at, so a
-            factor stored at the ``unit`` level is discretized over one value per image
+            factor stored at the ``unit`` level is discretized over one value per unit
             (see :ref:`binning-levels`).
 
             Prefer naming the level. Inference reads the level off an array's length,
