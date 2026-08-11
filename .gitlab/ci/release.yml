@@ -1,9 +1,8 @@
 ### RELEASE STAGE JOBS ###
 
 coverage:
-  extends:
-    - .publish_merge_request_env
-    - .rules_main_mr
+  stage: release
+  extends: .rules_main_mr
   needs: [test]
   before_script:
     - uv pip install coverage --system
@@ -13,7 +12,6 @@ coverage:
     - coverage report -m --skip-empty --precision=2
     - coverage xml --skip-empty
     - coverage html --skip-empty
-    - mv htmlcov/ ./public/
   coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
   artifacts:
     reports:
@@ -22,21 +20,39 @@ coverage:
         path: coverage.xml
     paths:
       - coverage.xml
-      - public/
-  variables:
-    ENV_JOB: coverage
+      - htmlcov/
 
+# Single Pages deployment per merge request, published under a path prefix
+# (parallel deployments) rather than through the Pages artifacts proxy, which
+# GitLab 19 rejects with a 403. Serves a landing page linking to the docs build
+# and the coverage report.
 pages preview:
-  extends: 
-    - .publish_merge_request_env
-    - .rules_mr_docs
+  stage: release
+  extends: .rules_mr_preview
   needs:
     - job: docs
       artifacts: true
+      optional: true
+    - job: coverage
+      artifacts: true
+      optional: true
   script:
-    - mv output/docs/html/ ./public/
+    - .gitlab/scripts/build_preview_site.sh
+  pages:
+    publish: public
+    path_prefix: '$PAGES_PREFIX'
+    expire_in: 1 week
+  artifacts:
+    paths:
+      - public/
+  environment:
+    name: 'preview/$CI_MERGE_REQUEST_IID'
+    # Inside a Pages job, CI_PAGES_URL already includes the path prefix.
+    # Appending PAGES_PREFIX here would duplicate it.
+    url: '$CI_PAGES_URL'
+    auto_stop_in: '1 week'
   variables:
-    ENV_JOB: docs
+    PAGES_PREFIX: 'mr-$CI_MERGE_REQUEST_IID'
 
 pages:
   stage: release
@@ -49,7 +65,27 @@ pages:
   artifacts:
     paths:
       - public
-  
+
+# Coverage report for main, published as its own parallel deployment at
+# <pages url>/coverage so it refreshes independently of the root docs site.
+# `pages.publish` deploys straight from htmlcov/ so this job never competes
+# with the root deployment for public/.
+pages coverage:
+  stage: release
+  extends: .rules_main_only
+  needs:
+    - job: coverage
+      artifacts: true
+  script:
+    - echo "Publishing coverage report to $CI_PAGES_URL"
+  pages:
+    publish: htmlcov
+    path_prefix: coverage
+    expire_in: never
+  artifacts:
+    paths:
+      - htmlcov/
+
 validate release label:
   stage: release
   extends: .rules_mr_only
