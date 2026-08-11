@@ -1,14 +1,17 @@
 """Tests for dual-key (item_index, target_index) indexing in Metadata."""
 
 import logging
+import warnings
+from dataclasses import dataclass
 from typing import Any
+from unittest import mock
 
 import numpy as np
 import pytest
 
 from dataeval._metadata import Metadata
 from dataeval.exceptions import ShapeMismatchError
-from dataeval.types import SourceIndex
+from dataeval.types import FactorLevelSchema, SourceIndex
 from tests.embeddings.test_embeddings import MockDataset
 
 # compute_stats order for the 3-image / 2-1-3-detection fixture, both levels enabled.
@@ -25,16 +28,23 @@ SOURCE_INDEX_3_IMAGES_6_CROPS = [
 ]
 
 
+@dataclass
+class ODTarget:
+    """Stand-in for an object detection target, duck-typed the way the structurers select on."""
+
+    boxes: np.ndarray
+    labels: np.ndarray
+    scores: np.ndarray
+
+
+def _empty_targets(count: int) -> list[ODTarget]:
+    """Targets for a dataset whose every item is unlabelled, so the instance level is empty."""
+    empty = ODTarget(boxes=np.empty((0, 4)), labels=np.empty(0, dtype=int), scores=np.empty((0, 3)))
+    return [empty] * count
+
+
 def _od_targets():
     """Targets for a 3-image dataset with 2/1/3 detections."""
-    from dataclasses import dataclass
-
-    @dataclass
-    class ODTarget:
-        boxes: np.ndarray
-        labels: np.ndarray
-        scores: np.ndarray
-
     return [
         ODTarget(
             boxes=np.array([[0, 0, 10, 10], [20, 20, 30, 30]]),
@@ -67,16 +77,14 @@ def od_dataset_varied_pixels():
 
 
 @pytest.fixture
+def od_dataset_no_targets():
+    """An OD dataset whose every item has an empty target list, so the instance level is empty."""
+    return MockDataset(np.ones((3, 3, 32, 32)), _empty_targets(3), [{"weather": "sunny"} for _ in range(3)])
+
+
+@pytest.fixture
 def od_dataset_with_metadata():
     """Create a small OD dataset with metadata for testing."""
-    from dataclasses import dataclass
-
-    @dataclass
-    class ODTarget:
-        boxes: np.ndarray
-        labels: np.ndarray
-        scores: np.ndarray
-
     # 3 images with varying numbers of detections
     data = np.ones((3, 3, 32, 32))
     targets = [
@@ -403,6 +411,43 @@ class TestDualKeyIndexing:
                 source_index=[SourceIndex(i // 2, None, i % 2) for i in range(6)],
             )
 
+    def test_add_factors_source_index_rejects_a_duplicated_row(self, od_dataset_with_metadata):
+        """The count can be right while the rows named are wrong.
+
+        Naming item 0 twice and item 1 not at all has the right number of image entries, so
+        a count check passes and every value still lands somewhere — just not where the
+        caller said. Placing by label is the whole point of taking a source index, so this
+        has to be caught rather than silently scattered.
+        """
+        md = Metadata(od_dataset_with_metadata)
+
+        with pytest.raises(ValueError, match="names the same item-level row more than once"):
+            md.add_factors(
+                {"x": np.array([10.0, 20.0, 30.0])},
+                source_index=[SourceIndex(0, None), SourceIndex(0, None), SourceIndex(2, None)],
+            )
+        assert "x" not in md.dataframe.columns
+
+    def test_add_factors_source_index_rejects_rows_the_metadata_lacks(self, od_dataset_with_metadata):
+        """Right count, wrong rows: item 7 does not exist in a 3-image dataset."""
+        md = Metadata(od_dataset_with_metadata)
+
+        with pytest.raises(ValueError, match="rows this metadata does not have"):
+            md.add_factors(
+                {"x": np.array([10.0, 20.0, 30.0])},
+                source_index=[SourceIndex(0, None), SourceIndex(1, None), SourceIndex(7, None)],
+            )
+        assert "x" not in md.dataframe.columns
+
+    def test_add_factors_and_from_factors_reject_the_same_index(self, od_dataset_with_metadata):
+        """Both constructors validate a source index the same way, or one of them lies."""
+        bad = [SourceIndex(0, None), SourceIndex(0, None), SourceIndex(2, None)]
+
+        with pytest.raises(ValueError, match="more than once"):
+            Metadata(od_dataset_with_metadata).add_factors({"x": np.arange(3.0)}, source_index=bad)
+        with pytest.raises(ValueError, match="more than once"):
+            Metadata.from_factors({"x": np.arange(3.0)}, source_index=bad)
+
     def test_add_factors_source_index_and_level_are_exclusive(self, od_dataset_with_metadata):
         """source_index sets the level, so passing both is a contradiction."""
         md = Metadata(od_dataset_with_metadata)
@@ -613,29 +658,163 @@ class TestAddFactorsRobustness:
         assert "foo" not in md.factor_names
         assert "foo" not in md.dataframe.columns
 
-    def test_combined_level_splits_with_a_deprecation(self):
-        """v1.1's "combined" is not a level, but it still has to place the data it described."""
-        md = Metadata(MockDataset(np.ones((5, 3, 16, 16)), np.eye(3)[[0, 1, 0, 1, 0]], [{"w": i} for i in range(5)]))
+    def test_combined_level_splits_with_a_deprecation(self, od_dataset_with_metadata):
+        """v1.1's "combined" is not a level, but it still has to place the data it described.
+
+        A combined array is ordered the way compute_stats emits it — by (item, target) with
+        the image entry first — not as one image block followed by one instance block. The
+        two readings agree on nothing beyond the first value, so a positional split silently
+        scatters every statistic onto the wrong row.
+        """
+        md = Metadata(od_dataset_with_metadata)
 
         with pytest.warns(DeprecationWarning, match="level='combined'.*source_index"):
-            md.add_factors({"bright": np.arange(10.0)}, level="combined")
+            md.add_factors({"bright": np.arange(9.0)}, level="combined")
 
         # The image half and the instance half become separate factors, named the way a
         # source index spanning both levels names them.
         assert "unit_bright" in md.factor_names
         assert "instance_bright" in md.factor_names
-        assert md.rows_at("unit")["unit_bright"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0]
-        assert md.rows_at("instance")["instance_bright"].to_list() == [5.0, 6.0, 7.0, 8.0, 9.0]
+        # SOURCE_INDEX_3_IMAGES_6_CROPS positions: units at 0, 3, 5; instances at the rest.
+        assert md.rows_at("unit")["unit_bright"].to_list() == [0.0, 3.0, 5.0]
+        assert md.rows_at("instance")["instance_bright"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
 
-    def test_combined_level_rejects_a_wrong_length(self):
-        md = Metadata(MockDataset(np.ones((5, 3, 16, 16)), np.eye(3)[[0, 1, 0, 1, 0]], [{"w": i} for i in range(5)]))
+    def test_combined_level_matches_an_explicit_source_index(self, od_dataset_with_metadata):
+        """The retired spelling and its replacement must place identical data."""
+        values = np.arange(9.0) * 1.5
+
+        deprecated = Metadata(od_dataset_with_metadata)
+        with pytest.warns(DeprecationWarning, match="level='combined' is deprecated"):
+            deprecated.add_factors({"bright": values}, level="combined")
+
+        explicit = Metadata(od_dataset_with_metadata)
+        explicit.add_factors({"bright": values}, source_index=SOURCE_INDEX_3_IMAGES_6_CROPS)
+
+        for level in ("unit", "instance"):
+            column = f"{level}_bright"
+            assert deprecated.rows_at(level)[column].to_list() == explicit.rows_at(level)[column].to_list()
+
+    def test_combined_length_is_inferred_under_auto(self, od_dataset_with_metadata):
+        """An array as long as the two levels combined is placed, not rejected.
+
+        This is the default call — ``add_factors(compute_stats(...)["stats"])`` — for every
+        object detection dataset, so losing the inference makes that output unimportable.
+        """
+        md = Metadata(od_dataset_with_metadata)
+
+        md.add_factors({"bright": np.arange(9.0)})
+
+        assert md.rows_at("unit")["unit_bright"].to_list() == [0.0, 3.0, 5.0]
+        assert md.rows_at("instance")["instance_bright"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
+
+    def test_combined_level_rejected_on_a_schema_with_more_than_two_levels(self, od_dataset_with_metadata):
+        """ "combined" names the whole dataframe, which it can only do over two levels.
+
+        Every schema this release ships has exactly two, so the guard is exercised through
+        a stand-in. It is not hypothetical: the tracking schema puts ``unit`` and ``track``
+        between ``sequence`` and ``instance``, and without this the item/label split still
+        produces a plausible pair of factors while describing none of the rows between them.
+        """
+        md = Metadata(od_dataset_with_metadata)
+        md._structure()
+
+        with (
+            mock.patch.object(FactorLevelSchema, "__len__", return_value=4),
+            pytest.warns(DeprecationWarning, match="level='combined' is deprecated"),
+            pytest.raises(ValueError, match="exactly two levels"),
+        ):
+            md.add_factors({"bright": np.arange(9.0)}, level="combined")
+
+        assert "bright" not in md.dataframe.columns
+        assert "unit_bright" not in md.dataframe.columns
+
+    def test_combined_level_rejects_a_wrong_length(self, od_dataset_with_metadata):
+        md = Metadata(od_dataset_with_metadata)
 
         with (
             pytest.warns(DeprecationWarning, match="level='combined' is deprecated"),
-            pytest.raises(ShapeMismatchError, match="must have length 10"),
+            pytest.raises(ShapeMismatchError, match="must have length 9"),
         ):
-            md.add_factors({"bright": np.arange(9.0)}, level="combined")
+            md.add_factors({"bright": np.arange(8.0)}, level="combined")
         assert "bright" not in md.dataframe.columns
+
+    def test_combined_level_on_a_classification_dataset(self):
+        """A single-target task has two levels too, so "combined" still resolves there.
+
+        Kept on a classification dataset on purpose: the interleaving is what changed, and
+        on this shape — one label per image — the interleaved and blockwise readings differ
+        in every position but the first, so nothing else would catch a silent flip back.
+        """
+        md = Metadata(MockDataset(np.ones((5, 3, 16, 16)), np.eye(3)[[0, 1, 0, 1, 0]], [{"w": i} for i in range(5)]))
+
+        with pytest.warns(DeprecationWarning, match="level='combined' is deprecated"):
+            md.add_factors({"bright": np.arange(10.0)}, level="combined")
+
+        # (0,None) (0,0) (1,None) (1,0) ... — the unit entry of each item, then its label.
+        assert md.rows_at("unit")["unit_bright"].to_list() == [0.0, 2.0, 4.0, 6.0, 8.0]
+        assert md.rows_at("instance")["instance_bright"].to_list() == [1.0, 3.0, 5.0, 7.0, 9.0]
+
+    def test_combined_level_keeps_level_prefixes_when_a_level_is_empty(self, od_dataset_no_targets):
+        """The deprecation warning promises '<level>_<name>'; an empty level must not rename it."""
+        md = Metadata(od_dataset_no_targets)
+        assert md.level_counts["instance"] == 0
+
+        with pytest.warns(DeprecationWarning, match="level='combined' is deprecated"):
+            md.add_factors({"bright": np.arange(3.0)}, level="combined")
+
+        assert "unit_bright" in md.factor_names
+        assert "bright" not in md.factor_names
+
+    def test_inference_warnings_point_at_the_caller(self, od_dataset_with_metadata):
+        """A warning attributed to dataeval's own source tells the user nothing actionable."""
+        md = Metadata(od_dataset_with_metadata)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            md.add_factors({"bright": np.arange(9.0)})
+
+        assert caught, "combined inference must warn"
+        assert all(record.filename == __file__ for record in caught), [
+            (record.category.__name__, record.filename) for record in caught
+        ]
+
+    def test_ambiguity_warning_points_at_the_caller(self):
+        """The level-ambiguity warning shares a call depth with the combined one."""
+        rng = np.random.default_rng(0)
+
+        # 0/1/2 detections over 3 images: image and instance both hold 3 rows, but they do
+        # not correspond one-to-one, so a length-3 factor is genuinely ambiguous.
+        targets = [
+            *_empty_targets(1),
+            ODTarget(boxes=np.array([[0, 0, 8, 8]]), labels=np.array([0]), scores=np.array([[1.0, 0.0, 0.0]])),
+            ODTarget(
+                boxes=np.array([[0, 0, 8, 8], [1, 1, 9, 9]]),
+                labels=np.array([1, 2]),
+                scores=np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]),
+            ),
+        ]
+        md = Metadata(MockDataset(rng.random((3, 3, 32, 32)), targets, [{"w": i} for i in range(3)]))
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            md.add_factors({"amb": np.arange(3.0)})
+
+        ambiguity = [record for record in caught if record.category is UserWarning]
+        assert ambiguity, [record.category.__name__ for record in caught]
+        assert all(record.filename == __file__ for record in ambiguity)
+
+    def test_combined_length_is_not_inferred_without_targets(self):
+        """Inference must not read a combined array off a classification dataset.
+
+        v1.1 offered the combined length only when the dataset had targets. A
+        classification dataset has one label per image, so image count + instance count is
+        just twice the image count — a length far more likely to be a caller's mistake than
+        a deliberate two-level array, and there is no compute_stats output shaped like it.
+        """
+        md = Metadata(MockDataset(np.ones((5, 3, 16, 16)), np.eye(3)[[0, 1, 0, 1, 0]], [{"w": i} for i in range(5)]))
+
+        with pytest.raises(ShapeMismatchError, match="Expected one of"):
+            md.add_factors({"bright": np.arange(10.0)})
 
     def test_multidimensional_factors_are_reported_not_silently_dropped(self, od_dataset_with_metadata, caplog):
         """Vector-valued stats have no single-column form; the caller must be told they were skipped."""
@@ -714,14 +893,6 @@ class TestContinuitySample:
 
     @staticmethod
     def _od_dataset(n_images, detections_per_image, image_factor, target_factor=None):
-        from dataclasses import dataclass
-
-        @dataclass
-        class ODTarget:
-            boxes: np.ndarray
-            labels: np.ndarray
-            scores: np.ndarray
-
         data = np.ones((n_images, 3, 32, 32))
         targets = [
             ODTarget(

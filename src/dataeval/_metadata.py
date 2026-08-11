@@ -4,7 +4,7 @@ import copy
 import logging
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
-from typing import Any, Literal, cast
+from typing import Any, Literal, NoReturn, cast
 
 import numpy as np
 import polars as pl
@@ -14,6 +14,7 @@ from typing_extensions import Self
 from dataeval._structurers import (
     FactorsStructurer,
     RowLayout,
+    SourceIndexRows,
     StructuredData,
     Structurer,
     TaskOverride,
@@ -21,6 +22,7 @@ from dataeval._structurers import (
     select_structurer,
 )
 from dataeval.core._bin import bin_data, digitize_data, is_continuous
+from dataeval.core._compute_stats import StatsResult
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import (
     AnnotatedDataset,
@@ -34,6 +36,85 @@ from dataeval.utils._internal import as_numpy
 from dataeval.utils._validate import requires_maite_dataset
 
 _logger = logging.getLogger(__name__)
+
+
+def _is_stats_result(candidate: Any) -> bool:
+    """Whether a mapping is a :class:`~dataeval.core.StatsResult` rather than a factor mapping.
+
+    ``StatsResult`` is a :class:`~typing.TypedDict`, so at runtime it is an ordinary dict
+    and there is nothing to check with ``isinstance``. Both keys are required and both are
+    checked structurally: a caller's factor mapping could plausibly hold a factor named
+    ``stats`` or ``source_index``, but not one whose ``stats`` is itself a mapping *and*
+    whose ``source_index`` is a sequence of :class:`~dataeval.types.SourceIndex`. Being
+    strict here matters more than being permissive — a false positive silently discards
+    every factor the caller passed.
+
+    The first entry stands for the sequence. A stats result's index is homogeneous by
+    construction, and this runs on every ``add_factors`` call, including the common one
+    where the argument really is a factor mapping holding one entry per detection.
+    """
+    if not isinstance(candidate, Mapping) or not candidate.keys() >= {"stats", "source_index"}:
+        return False
+    source_index = candidate["source_index"]
+    return (
+        isinstance(candidate["stats"], Mapping)
+        and isinstance(source_index, Sequence)
+        and (not source_index or isinstance(source_index[0], SourceIndex))
+    )
+
+
+def _unpack_stats_result(
+    factors: Any,
+    source_index: Sequence[SourceIndex] | None,
+    *,
+    level: Any = None,
+) -> tuple[Mapping[str, Array1D[Any]], Sequence[SourceIndex] | None]:
+    """Accept a whole stats result wherever a factor mapping is accepted.
+
+    :func:`~dataeval.core.compute_stats` and :func:`~dataeval.core.compute_ratios` return
+    the statistics and the labels that place them in one object, and separating them again
+    at every call site is busywork that also invites passing one without the other. When
+    the result is recognised, its ``stats`` become the factors and its ``source_index``
+    the placement — unless the caller passed an explicit one, which wins so that a
+    hand-corrected index remains usable.
+
+    The bookkeeping keys — ``object_count``, ``invalid_box_count``, ``image_count`` —
+    describe the run rather than the images and are not factors, so they are dropped.
+
+    Raises
+    ------
+    ValueError
+        When a level is named as well. The result already says what each value describes,
+        and honouring one of the two silently would discard a real contradiction.
+    """
+    if not _is_stats_result(factors):
+        return factors, source_index
+    if level is not None and level != "auto":
+        raise ValueError(
+            f"`level` and the source_index carried by this stats result are mutually exclusive; "
+            f"the result already labels each value with what it describes. Pass the result's "
+            f"['stats'] mapping instead to place its values at level={level!r}.",
+        )
+    return factors["stats"], source_index if source_index is not None else factors["source_index"]
+
+
+def _reject_length_mismatch(factors: Mapping[str, Any], source_index: Sequence[SourceIndex]) -> None:
+    """Reject factors that do not hold exactly one value per source-index entry.
+
+    Shared by both constructors: the source index is the placement, so a factor that is
+    not as long as it names rows the caller never described, whichever spelling was used
+    to get here.
+    """
+    mismatched = {name: len(values) for name, values in factors.items() if len(values) != len(source_index)}
+    if mismatched:
+        raise ShapeMismatchError(
+            f"All factors must have one value per source_index entry ({len(source_index)}); got {mismatched}.",
+        )
+
+
+def _flatten_column_vector(values: NDArray[Any]) -> NDArray[Any]:
+    """Flatten an ``(N, 1)`` column of single values to ``(N,)``, leaving any other shape alone."""
+    return values.reshape(-1) if values.ndim == 2 and values.shape[1] == 1 else values
 
 
 def _binned(name: str) -> str:
@@ -319,12 +400,13 @@ class Metadata(Array, FeatureExtractor):
     @classmethod
     def from_factors(
         cls,
-        factors: Mapping[str, Array1D[Any]],
+        factors: Mapping[str, Array1D[Any]] | StatsResult,
         class_labels: Array1D[Any] | None = None,
         *,
         index2label: Mapping[int, str] | None = None,
         item_indices: Array1D[Any] | None = None,
         level: FactorLevel | Literal["image"] | None = None,
+        source_index: Sequence[SourceIndex] | None = None,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
         exclude: str | Sequence[str] | None = None,
@@ -350,10 +432,17 @@ class Metadata(Array, FeatureExtractor):
         factors : Mapping[str, ArrayLike]
             Mapping from factor name to a 1D array of that factor's raw (un-binned)
             values. Every array must have the same length ``N`` — one entry per
-            target/detection.
+            target/detection, or one per `source_index` entry when one is given.
+
+            A whole :class:`~dataeval.core.StatsResult` — the return of
+            :func:`~dataeval.core.compute_stats` or
+            :func:`~dataeval.core.compute_ratios` — may be passed here directly, in
+            which case its ``stats`` and ``source_index`` are used and its bookkeeping
+            keys ignored.
         class_labels : ArrayLike or None, default None
-            Integer class label per row, length ``N``. When None, a single class
-            (all zeros) is assumed; supply real labels for any class-aware analysis
+            Integer class label per row, length ``N`` — or one per label-level row when
+            `source_index` spans two levels. When None, a single class (all zeros) is
+            assumed; supply real labels for any class-aware analysis
             (e.g. :class:`~dataeval.bias.Parity`), which is otherwise degenerate.
         index2label : Mapping[int, str] or None, default None
             Optional mapping from integer class index to human-readable name. When
@@ -362,12 +451,23 @@ class Metadata(Array, FeatureExtractor):
             Optional array of length ``N`` mapping each row back to its source image
             index (used, e.g., for object-detection where multiple detections share
             an image). When None a 1:1 mapping is assumed (one factor row per image).
+            Mutually exclusive with `source_index`, which already carries an item index
+            per value.
         level : str or None, default None
             Level the supplied rows sit at, ``unit`` or ``instance``. When None the rows
             are treated as ``unit``-level, matching the historical behavior. A
-            factors-only instance has this single level and no separate item level, so an
-            unlabeled row is not representable here the way it is for a dataset-backed
-            instance.
+            factors-only instance built this way has this single level and no separate
+            item level, so an unlabeled row is not representable here the way it is for a
+            dataset-backed instance. Mutually exclusive with `source_index`, which sets
+            the level of each value itself.
+        source_index : Sequence[SourceIndex] or None, default None
+            Labels describing what each value in every factor array refers to, as
+            returned by :func:`~dataeval.core.compute_stats`. This is how object
+            detection statistics are imported without the dataset: an index carrying both
+            per-item entries (``target`` is None) and per-label entries builds two levels,
+            ``unit`` and ``instance``, and splits each factor into ``unit_<name>`` and
+            ``instance_<name>`` — the same names :meth:`add_factors` gives them. An index
+            carrying one kind builds the single level it describes.
         continuous_factor_bins : Mapping[str, int | Sequence[float]] or None, default None
             Bin counts or explicit edges for continuous factors. When None, uses
             automatic discretization via ``auto_bin_method``.
@@ -378,9 +478,10 @@ class Metadata(Array, FeatureExtractor):
         include : str or Sequence[str] or None, default None
             Factor names to include. Mutually exclusive with ``exclude``.
         inherited : bool, default True
-            Whether factors defined above the view count. A factors-only instance has a
-            single level and so nothing above it, which makes this a no-op here; it is
-            accepted so the two constructors stay interchangeable.
+            Whether factors defined above the view count. A no-op on a single-level
+            instance, which has nothing above its rows. It does apply when `source_index`
+            carries both kinds of entry: the ``unit``-level half of each factor is
+            readable from the ``instance`` rows only while this is True.
 
         Returns
         -------
@@ -393,7 +494,15 @@ class Metadata(Array, FeatureExtractor):
             When factor arrays (or ``class_labels`` / ``item_indices``) do not all
             share the same length.
         ValueError
-            When both ``exclude`` and ``include`` are specified.
+            When both ``exclude`` and ``include`` are specified, or when ``source_index``
+            is combined with ``level`` or ``item_indices``.
+
+        Notes
+        -----
+        Multi-dimensional values (vector-valued statistics such as ``histogram``,
+        ``percentiles`` or ``center``) have no single-column representation and are
+        skipped with a warning; the skipped names are recorded in
+        :attr:`dropped_factors`, exactly as :meth:`add_factors` records them.
 
         Example
         -------
@@ -407,7 +516,20 @@ class Metadata(Array, FeatureExtractor):
         >>> md.factor_data.shape
         (4, 2)
         >>> result = Balance().evaluate(md)
+
+        Import object detection statistics with no dataset bound. The source index the
+        stats carry splits them across the two levels it describes:
+
+        >>> from dataeval.core import compute_stats
+        >>> from dataeval.flags import ImageStats
+        >>> stats = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        >>> md = Metadata.from_factors(stats)
+        >>> md.levels
+        ('unit', 'instance')
+        >>> sorted(md.factor_names)
+        ['instance_mean', 'unit_mean']
         """
+        factors, source_index = _unpack_stats_result(factors, source_index, level=level)
         inst = cls(
             None,
             continuous_factor_bins=continuous_factor_bins,
@@ -422,10 +544,11 @@ class Metadata(Array, FeatureExtractor):
             index2label=index2label,
             item_indices=item_indices,
             level=level,
+            source_index=source_index,
         )
         return inst
 
-    def _load_factors(  # noqa: C901
+    def _load_factors(
         self,
         factors: Mapping[str, Array1D[Any]],
         class_labels: Array1D[Any] | None,
@@ -433,10 +556,57 @@ class Metadata(Array, FeatureExtractor):
         index2label: Mapping[int, str] | None,
         item_indices: Array1D[Any] | None,
         level: FactorLevel | Literal["image"] | None = None,
+        source_index: Sequence[SourceIndex] | None = None,
     ) -> None:
         """Populate structured state directly from raw factor arrays (see from_factors)."""
-        factor_arrays = {str(k): as_numpy(v).reshape(-1) for k, v in dict(factors).items()}
+        # Vector-valued statistics have no single-column form. Dropping them here rather
+        # than letting a flatten silently produce a wrong-length column keeps a mapping
+        # straight from compute_stats usable, and reports the same way add_factors reports
+        # it. Column vectors keep working: _split_by_dimensionality flattens them.
+        factor_arrays, skipped = self._split_by_dimensionality({str(k): v for k, v in factors.items()})
 
+        if source_index is not None:
+            self._load_factors_by_source_index(
+                factor_arrays,
+                class_labels,
+                index2label=index2label,
+                level=level,
+                item_indices=item_indices,
+                source_index=source_index,
+            )
+        else:
+            self._load_factors_by_length(
+                factor_arrays,
+                class_labels,
+                index2label=index2label,
+                level=level,
+                item_indices=item_indices,
+            )
+        # Recorded only once the structure exists, and only once every validation above has
+        # passed: recording is a mutation, and a rejected call must leave no trace of itself
+        # behind.
+        self._record_multidimensional(skipped)
+
+    def _load_factors_by_length(  # noqa: C901
+        self,
+        factor_arrays: Mapping[str, NDArray[Any]],
+        class_labels: Array1D[Any] | None,
+        *,
+        index2label: Mapping[int, str] | None,
+        level: FactorLevel | Literal["image"] | None,
+        item_indices: Array1D[Any] | None,
+    ) -> None:
+        """Populate structured state from factor arrays that all describe one level.
+
+        Nothing in bare arrays distinguishes an item from a label, so every factor sits at
+        the same level and the rows are numbered by position.
+
+        Raises
+        ------
+        ShapeMismatchError
+            When the factors, ``class_labels`` and ``item_indices`` do not agree on a
+            single row count.
+        """
         lengths = {len(v) for v in factor_arrays.values()}
         if len(lengths) > 1:
             raise ShapeMismatchError(f"All factor arrays must have the same length; got lengths {sorted(lengths)}.")
@@ -468,14 +638,69 @@ class Metadata(Array, FeatureExtractor):
         # structurer instance exists yet to resolve a retired spelling against — this
         # call is what builds one — so this resolves against the base Structurer's
         # alias map rather than a task-specific one.
+        # caller -> from_factors -> _load_factors -> here -> _resolve_legacy_level.
+        # test_from_factors_blames_caller pins this.
         requested = _resolve_legacy_level(
-            level or "unit", Structurer.legacy_level_aliases, stacklevel=4, unit_type=Structurer.unit_type
+            level or "unit", Structurer.legacy_level_aliases, stacklevel=5, unit_type=Structurer.unit_type
         )
         structurer = FactorsStructurer(requested)  # type: ignore[arg-type]
         data = structurer.build_from_arrays(factor_arrays, labels, srcidx)
 
         self._index2label = _build_index2label(index2label, np.unique(labels))
-        self._count = n
+        # Items, not rows, matching :attr:`item_count`'s contract and the source-index
+        # path. ``item_indices`` exists so that several rows can share one item, and a
+        # count of rows disagrees with it on exactly the tables it is for. It is also what
+        # tells :func:`~dataeval.data.split_dataset` an object detection table from a
+        # classification one — counted as rows, a table of detections never reaches the
+        # grouped split and two detections of one image can land in different folds.
+        self._count = int(len(np.unique(srcidx)))
+        self._adopt(structurer, data)
+
+    def _load_factors_by_source_index(
+        self,
+        factor_arrays: Mapping[str, NDArray[Any]],
+        class_labels: Array1D[Any] | None,
+        *,
+        index2label: Mapping[int, str] | None,
+        level: FactorLevel | Literal["image"] | None,
+        item_indices: Array1D[Any] | None,
+        source_index: Sequence[SourceIndex],
+    ) -> None:
+        """Populate structured state from factor arrays labelled by a source index.
+
+        The source index supplies what `level` and `item_indices` supply on the other
+        path — which level each value belongs to and which item it came from — so all
+        three together is a contradiction rather than a redundancy, and is rejected
+        instead of one silently winning.
+
+        Raises
+        ------
+        ValueError
+            When `level` or `item_indices` is given alongside the source index.
+        ShapeMismatchError
+            When a factor does not have one value per source-index entry.
+        """
+        for name, value in (("level", level), ("item_indices", item_indices)):
+            if value is not None:
+                raise ValueError(
+                    f"`{name}` and `source_index` are mutually exclusive; the source index already "
+                    f"says which level each value sits at and which item it came from.",
+                )
+
+        _reject_length_mismatch(factor_arrays, source_index)
+
+        rows = SourceIndexRows.parse(source_index)
+        structurer = FactorsStructurer(rows=rows)
+        labels = None if class_labels is None else as_numpy(class_labels, dtype=np.intp).reshape(-1)
+        data = structurer.build_from_source_index(factor_arrays, labels)
+
+        self._index2label = _build_index2label(index2label, np.unique(data.class_labels))
+        # Items, not rows: several labels can name the same item, and item_count that
+        # counted rows would disagree with item_indices on the very datasets — one item,
+        # several detections — this path exists to carry. Counted by adjacent change
+        # rather than np.unique, which would re-sort what parse already left sorted.
+        named_items = rows.item_ids if len(rows.item_positions) else rows.label_items
+        self._count = int(np.count_nonzero(np.diff(named_items))) + 1 if len(named_items) else 0
         self._adopt(structurer, data)
 
     def __repr__(self) -> str:  # noqa: C901
@@ -1941,24 +2166,57 @@ class Metadata(Array, FeatureExtractor):
             stacklevel=3,
         )
 
-    def _infer_factor_level(self, factor: Array1D[Any]) -> FactorLevel:
-        """Infer the level of a single factor array from its length.
+    def _combined_length(self) -> int | None:
+        """Length an *inferred* v1.1 ``"combined"`` array has here, or None when there is none.
+
+        Stricter than what :meth:`_resolve_combined` accepts, on purpose. Inference is a
+        guess made from a length alone, so it is offered only where the guess is worth
+        making: a two-level schema over a multi-target task. A classification dataset
+        carries one label per image, so its combined length is merely twice the image
+        count — far more likely a caller's mistake than a deliberate two-level array, and
+        v1.1 did not infer it there either. An explicit ``level="combined"`` is the caller
+        asserting the layout rather than the code guessing it, so that spelling is refused
+        only where the split is structurally impossible.
+
+        A schema with a third level, as tracking's frames and tracks are, has no combined
+        length under either spelling.
+        """
+        if len(self._levels) != 2 or not self.multi_target:
+            return None
+        counts = self._layout.counts
+        return counts.get(self._item_level, 0) + counts.get(self._label_level, 0)
+
+    def _reject_unmatched_length(self, factor_len: int, combined_len: int | None) -> NoReturn:
+        """Report a factor length that names neither a level nor a combined array."""
+        counts = self._layout.counts
+        expected = ", ".join(f"{level}={counts.get(level, 0)}" for level in self._levels)
+        if combined_len is not None:
+            expected += f", {self._item_level}+{self._label_level}={combined_len}"
+        raise ShapeMismatchError(
+            "The lists/arrays in the provided factors have a different length "
+            f"than any level of the current metadata. Expected one of ({expected}), got {factor_len}.",
+        )
+
+    def _infer_factor_level(self, factor: Array1D[Any]) -> FactorLevel | Literal["combined"]:
+        """Infer the destination of a single factor array from its length.
+
+        A level's own row count wins over the combined length, so a factor that could be
+        read either way lands on a level rather than being split.
 
         Raises
         ------
         ShapeMismatchError
-            When the length matches no level.
+            When the length matches no level and no combined length.
         """
         factor_len = len(factor)
         counts = self._layout.counts
         matches: list[FactorLevel] = [level for level in self._levels if counts.get(level, 0) == factor_len]
 
         if not matches:
-            expected = ", ".join(f"{level}={counts.get(level, 0)}" for level in self._levels)
-            raise ShapeMismatchError(
-                "The lists/arrays in the provided factors have a different length "
-                f"than any level of the current metadata. Expected one of ({expected}), got {factor_len}.",
-            )
+            combined_len = self._combined_length()
+            if combined_len is not None and factor_len == combined_len:
+                return "combined"
+            self._reject_unmatched_length(factor_len, combined_len)
         if len(matches) > 1:
             # Levels routinely coincide in size — a fully labelled classification dataset has
             # one label per image, and so does an object detection dataset with one
@@ -1972,6 +2230,10 @@ class Metadata(Array, FeatureExtractor):
                     f"the same number of rows but do not correspond one-to-one; storing it at the "
                     f"{chosen!r} level. Pass an explicit level= to add_factors to choose.",
                     UserWarning,
+                    # caller -> add_factors -> _resolve_factor_levels -> here. One frame
+                    # shallower than _warn_inferred_combined, which _resolve_destinations
+                    # reaches from _resolve_factor_levels rather than from the loop.
+                    # test_ambiguity_warning_points_at_the_caller pins this.
                     stacklevel=4,
                 )
             return chosen
@@ -1999,30 +2261,6 @@ class Metadata(Array, FeatureExtractor):
         if mismatched:
             raise ShapeMismatchError(
                 f"All {level}-level factors must have length {expected_len} ({level} row count); got {mismatched}.",
-            )
-
-    def _reject_unplaceable_source_index(self, source_index: Sequence[SourceIndex]) -> None:
-        """Reject source indices whose entries this metadata cannot place.
-
-        Both cases are about representability rather than about the values: a
-        per-channel entry has no single column to go in, and a schema whose items and
-        labels coincide has no way to keep the two kinds of entry apart.
-        """
-        if any(entry.channel is not None for entry in source_index):
-            raise ValueError(
-                "source_index contains per-channel entries, which have no single-column "
-                "representation. Reduce channel-wise statistics to one value per row "
-                "before adding them.",
-            )
-
-        # The two kinds are told apart only by which level they land on, so a schema
-        # whose items and labels coincide merges them into one over-long group, which
-        # then surfaces as a row-count mismatch. Say what actually happened instead.
-        if self._item_level == self._label_level and len({entry.target is None for entry in source_index}) > 1:
-            raise ValueError(
-                f"source_index mixes per-item entries (target=None) with per-label entries, but this "
-                f"metadata's items and its labels are both at the {self._item_level!r} level, so the "
-                "two cannot be placed apart. Add each kind in its own call with an explicit level=.",
             )
 
     def _split_source_index(self, source_index: Sequence[SourceIndex]) -> dict[FactorLevel, NDArray[np.intp]]:
@@ -2064,30 +2302,102 @@ class Metadata(Array, FeatureExtractor):
         added with an explicit ``level="unit"`` instead. Widening this means widening
         :class:`~dataeval.types.SourceIndex` first.
         """
-        self._reject_unplaceable_source_index(source_index)
+        # Parsing — sort order, per-channel rejection, duplicate-row rejection — is shared
+        # with the dataset-free constructor rather than reimplemented, so the two spellings
+        # of "place these values by their labels" cannot drift apart. Only the parts that
+        # need this metadata's own rows to check against live here.
+        rows = SourceIndexRows.parse(source_index)
 
-        grouped: dict[FactorLevel, list[tuple[tuple[int, int], int]]] = {}
-        for position, entry in enumerate(source_index):
-            level = self._item_level if entry.target is None else self._label_level
-            key = (entry.item, -1 if entry.target is None else entry.target)
-            grouped.setdefault(level, []).append((key, position))
+        # The two kinds are told apart only by which level they land on, so a schema whose
+        # items and labels coincide merges them into one over-long group, which then
+        # surfaces as a row-count mismatch. Say what actually happened instead. Read off the
+        # parse, which has already separated the two kinds, rather than rescanning.
+        if self._item_level == self._label_level and rows.spans_two_levels:
+            raise ValueError(
+                f"source_index mixes per-item entries (target=None) with per-label entries, but this "
+                f"metadata's items and its labels are both at the {self._item_level!r} level, so the "
+                "two cannot be placed apart. Add each kind in its own call with an explicit level=.",
+            )
 
-        counts = self._layout.counts
+        candidates: tuple[tuple[FactorLevel, NDArray[np.intp], NDArray[np.intp], NDArray[np.intp] | None], ...] = (
+            (self._item_level, rows.item_positions, rows.item_ids, None),
+            (self._label_level, rows.label_positions, rows.label_items, rows.label_targets),
+        )
         order: dict[FactorLevel, NDArray[np.intp]] = {}
-        for level, entries in grouped.items():
-            # Sorting rather than trusting the incoming order is the point of taking a
-            # source index at all: placement follows the labels, not a documented layout.
-            entries.sort()
-            expected_len = counts.get(level, 0)
-            if len(entries) != expected_len:
-                raise ShapeMismatchError(
-                    f"source_index describes {len(entries)} {level}-level values but the "
-                    f"metadata has {expected_len} {level} rows. Row counts are {dict(counts)}; "
-                    "note that a dataset item whose target was empty contributes no rows, so "
-                    "Metadata.item_indices, not range(item_count), lists the items that have them.",
-                )
-            order[level] = np.array([position for _, position in entries], dtype=np.intp)
+        for level, positions, items, targets in candidates:
+            if len(positions) == 0:
+                continue
+            self._reject_unmatched_rows(level, items, targets)
+            order[level] = positions
         return order
+
+    def _reject_unmatched_rows(
+        self,
+        level: FactorLevel,
+        items: NDArray[np.intp],
+        targets: NDArray[np.intp] | None,
+    ) -> None:
+        """Reject a source index whose entries do not name this level's rows exactly.
+
+        Counting the entries is not enough. An index that names one row twice and another
+        not at all has the right count and every value lands somewhere, just not where the
+        caller said — the failure mode a source index exists to prevent. Matching the keys
+        catches it, and costs one comparison per row.
+
+        Raises
+        ------
+        ShapeMismatchError
+            When the entry count does not match the level's row count.
+        ValueError
+            When the counts match but the entries name different rows.
+        """
+        counts = self._layout.counts
+        expected_len = counts.get(level, 0)
+        if len(items) != expected_len:
+            raise ShapeMismatchError(
+                f"source_index describes {len(items)} {level}-level values but the "
+                f"metadata has {expected_len} {level} rows. Row counts are {dict(counts)}; "
+                "note that a dataset item whose target was empty contributes no rows, so "
+                "Metadata.item_indices, not range(item_count), lists the items that have them.",
+            )
+
+        # The two key columns, not rows_at's whole frame: that widens with every factor the
+        # caller has already added, and none of them are compared here.
+        frame = (
+            self._dataframe
+            .lazy()
+            .filter(pl.col("level") == level)
+            # Null marks a row that is not a target, and -1 stands in for it exactly as it
+            # does in SourceIndexRows. Left null, an integer column comes back from
+            # to_numpy() as float NaN: the comparison below still reports the mismatch,
+            # but formatting it then raises "cannot convert float NaN to integer" in place
+            # of the error the caller needs.
+            .select("item_index", pl.col("target_index").fill_null(-1))
+            .collect()
+        )
+        actual_items = frame["item_index"].to_numpy()
+        actual_targets = None if targets is None else frame["target_index"].to_numpy()
+        mismatched = actual_items != items
+        if actual_targets is not None:
+            mismatched |= actual_targets != targets
+        if np.any(mismatched):
+            # Formatted from the first few alone, since only the first few are named: a
+            # rejected million-row index must not spend longer building its error than the
+            # call would have taken to succeed.
+            worst = np.flatnonzero(mismatched)[:5]
+            named = [(int(items[i]), None if targets is None else int(targets[i])) for i in worst]
+            expected = [
+                (
+                    int(actual_items[i]),
+                    None if actual_targets is None or actual_targets[i] < 0 else int(actual_targets[i]),
+                )
+                for i in worst
+            ]
+            raise ValueError(
+                f"source_index names {level}-level rows this metadata does not have. It has the right "
+                f"number of {level} entries, but {int(np.count_nonzero(mismatched))} of them name {named} "
+                f"where the metadata's rows are {expected}. Every row at a level must be named exactly once.",
+            )
 
     def has_targets(self) -> bool:
         """Check if the source dataset has targets.
@@ -2416,13 +2726,27 @@ class Metadata(Array, FeatureExtractor):
     def _split_by_dimensionality(
         factors: Mapping[str, Array1D[Any]],
     ) -> tuple[dict[str, NDArray[Any]], list[str]]:
-        """Separate the 1-D factors from those with no single-column form.
+        """Separate the factors with a single-column form from those without one.
+
+        A column vector has one: ``(N, 1)`` holds one value per row and is flattened to
+        it. That is what a dataframe column or a ``reshape(-1, 1)`` pipeline produces, so
+        rejecting it would drop real data over a shape carrying no extra information. Only
+        an array that is genuinely several values per row — a histogram, a percentile
+        vector, a centre coordinate — has nowhere to go.
+
+        A *leading* singleton axis is left alone rather than flattened, and a 1-D array is
+        passed through untouched however short it is. Both guard the same edge: on a
+        one-row dataset ``(1, K)`` reads equally as one row of K values and as K rows of
+        one value, and the first is what :func:`~dataeval.core.compute_stats` emits — so
+        flattening would import ``center`` and ``histogram`` as K rows of data on the very
+        dataset shape where they least resemble a real factor, while a blanket squeeze
+        would additionally collapse a legitimate one-row ``mean`` to a scalar and drop it.
 
         Pure: it decides what will be dropped without recording it, so that
         :meth:`add_factors` can still abandon the whole call on a later validation
         failure without having already written to :attr:`dropped_factors`.
         """
-        arrays = {name: as_numpy(values) for name, values in factors.items()}
+        arrays = {name: _flatten_column_vector(as_numpy(values)) for name, values in factors.items()}
         kept = {name: values for name, values in arrays.items() if values.ndim == 1}
         return kept, [name for name in arrays if name not in kept]
 
@@ -2431,7 +2755,7 @@ class Metadata(Array, FeatureExtractor):
         if not names:
             return
         _logger.warning(
-            "Skipping multi-dimensional factors %s; add_factors only accepts 1-D arrays. "
+            "Skipping multi-dimensional factors %s; a factor must be a 1-D array. "
             "Reduce vector-valued statistics to one value per row before adding them.",
             sorted(names),
         )
@@ -2445,20 +2769,49 @@ class Metadata(Array, FeatureExtractor):
         factors: Mapping[str, NDArray[Any]],
         source_index: Sequence[SourceIndex],
     ) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
-        """Place every value by its source-index label rather than by its position."""
-        mismatched = {k: len(v) for k, v in factors.items() if len(v) != len(source_index)}
-        if mismatched:
-            raise ShapeMismatchError(
-                f"All factors must have one value per source_index entry ({len(source_index)}); got {mismatched}.",
-            )
-        positions_by_level = self._split_source_index(source_index)
-        # A factor split across levels becomes one factor per level: a single column
-        # cannot hold a value per image *and* a value per instance, and each half is a
-        # distinct measurement anyway. Image-level values stay visible from instance rows
-        # by propagation, so both halves remain analysable.
-        qualify = len(positions_by_level) > 1
+        """Place every value by its source-index label rather than by its position.
+
+        Parameters
+        ----------
+        factors : Mapping[str, NDArray[Any]]
+            One value per source-index entry, per factor.
+        source_index : Sequence[SourceIndex]
+            Label for each value.
+        """
+        _reject_length_mismatch(factors, source_index)
+        return self._place(factors, self._split_source_index(source_index))
+
+    def _place(
+        self,
+        factors: Mapping[str, NDArray[Any]],
+        positions_by_level: Mapping[FactorLevel, NDArray[np.intp]],
+        qualify: bool = False,
+    ) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
+        """Gather each factor onto the rows its positions name, and name the columns.
+
+        Sole producer of the ``<level>_<name>`` rule, so every way of placing values by
+        label — an explicit source index, and the retired ``"combined"`` spelling that
+        defers to it — names its columns identically.
+
+        Parameters
+        ----------
+        factors : Mapping[str, NDArray[Any]]
+            One value per position, per factor.
+        positions_by_level : Mapping[str, NDArray[np.intp]]
+            For each level being written, the positions within each factor array that hold
+            that level's rows, ordered as those rows are.
+        qualify : bool, default False
+            Force the ``<level>_`` prefix even where only one level is being written.
+            Values spanning several levels are always prefixed — a single column cannot
+            hold a value per image *and* a value per instance, and each half is a distinct
+            measurement anyway. Pass True where the naming was promised to the caller
+            independently of what the values turned out to cover, as ``level="combined"``
+            promises it, so that a dataset whose label level happens to have no rows still
+            names its columns the documented way.
+        """
+        prefixed = qualify or len(positions_by_level) > 1
         return [
-            (f"{factor_level}_{name}" if qualify else name, factor_level, values[positions])
+            (f"{factor_level}_{name}" if prefixed else name, factor_level, values[positions])
             for name, values in factors.items()
             for factor_level, positions in positions_by_level.items()
         ]
@@ -2489,10 +2842,11 @@ class Metadata(Array, FeatureExtractor):
         if level == "combined":
             warnings.warn(
                 f"level='combined' is deprecated and will be removed in v1.2.0. It is not a level "
-                f"name; it described an array of every {self._item_level}-level value followed by "
-                f"every {self._label_level}-level one. Pass source_index= from compute_stats "
-                "instead, which labels each value with what it describes. Until then the array is "
-                f"split into '{self._item_level}_<name>' and '{self._label_level}_<name>' factors.",
+                f"name; it described an array ordered the way compute_stats emits one — by "
+                f"(item, target), each item's {self._item_level}-level value ahead of that item's "
+                f"{self._label_level}-level ones. Pass source_index= from compute_stats instead, "
+                "which labels each value with what it describes. Until then the array is split "
+                f"into '{self._item_level}_<name>' and '{self._label_level}_<name>' factors.",
                 DeprecationWarning,
                 stacklevel=3,
             )
@@ -2504,14 +2858,17 @@ class Metadata(Array, FeatureExtractor):
     def _resolve_combined(self, factors: Mapping[str, NDArray[Any]]) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
         """Split a v1.1 ``"combined"`` array into one factor per level.
 
-        ``"combined"`` was never a level. It was v1.1's name for an array holding every
-        item-level value followed by every label-level one — a positional convention
-        over exactly two levels, which is what `source_index` replaces with an explicit
-        label per value.
+        ``"combined"`` was never a level. It was v1.1's name for an array ordered by
+        ``(item, target)`` — each item's item-level value ahead of that item's label-level
+        ones, exactly as :func:`~dataeval.core.compute_stats` emits them — which is what
+        `source_index` replaces with an explicit label per value.
 
-        The split produces the same two factors, under the same ``<level>_<name>``
-        names, that the same data passed as `source_index` produces, so the deprecated
-        spelling and its replacement are interchangeable apart from the warning.
+        The order is interleaved, *not* one item-level block followed by one label-level
+        block. The two readings agree on nothing beyond the first value, so splitting
+        positionally silently scatters every value onto the wrong row. Ranking the rows in
+        that order and deferring the gather to :meth:`_place` keeps the deprecated
+        spelling and its replacement placing identical data, and keeps the naming rule in
+        one place rather than in two implementations that can drift apart.
 
         Raises
         ------
@@ -2527,6 +2884,20 @@ class Metadata(Array, FeatureExtractor):
                 f"are both at the {item_level!r} level, so there is no split to make. Add each "
                 "level's values in its own call, or pass source_index= to place them by label.",
             )
+        if len(self._levels) != 2:
+            # Two levels is not incidental to "combined": it was v1.1's name for an array
+            # over the whole dataframe, and v1.1 had no schema with a third level. On a
+            # schema that does — tracking puts ``image`` and ``track`` between ``sequence``
+            # and ``instance`` — splitting item/label still type-checks and still produces
+            # a plausible-looking pair of factors, while silently describing none of the
+            # rows in between. Refuse rather than half-cover the dataframe.
+            raise ValueError(
+                f"level='combined' describes an array over exactly two levels, but this metadata "
+                f"has {list(self._levels)}. An array of {item_level}-level values interleaved with "
+                f"{label_level}-level ones would say nothing about the rows at the levels between "
+                "them, so there is no array it can name here. Pass source_index= to place values by "
+                "label, or level= to name the one level they belong to.",
+            )
 
         counts = self._layout.counts
         head, tail = counts.get(item_level, 0), counts.get(label_level, 0)
@@ -2536,15 +2907,43 @@ class Metadata(Array, FeatureExtractor):
                 f"All combined-level factors must have length {head + tail} "
                 f"({item_level} count {head} + {label_level} count {tail}); got {mismatched}.",
             )
-        halves: tuple[tuple[FactorLevel, int, int], ...] = (
-            (item_level, 0, head),
-            (label_level, head, head + tail),
+        # qualify=True rather than letting the data decide: the deprecation warning has
+        # already promised '<item_level>_<name>' and '<label_level>_<name>', and a dataset
+        # whose label level happens to have no rows must not silently rename the columns
+        # out from under a caller following that warning.
+        return self._place(factors, self._combined_positions(), qualify=True)
+
+    def _combined_positions(self) -> dict[FactorLevel, NDArray[np.intp]]:
+        """Position within a v1.1 ``"combined"`` array of each row it described.
+
+        The array was ordered by ``(item, target)`` with an item's own value ahead of that
+        item's labels, so each row's position is simply its rank in that order — read off
+        the two key columns rather than rebuilt as :class:`~dataeval.types.SourceIndex`
+        objects and re-parsed, which would allocate one per row of the dataframe and sort
+        it three more times to arrive back here.
+
+        Every row of the dataframe is ranked, which is the whole of it: :meth:`_resolve_combined`
+        has already established that the schema is exactly the item level and the label
+        level, so there are no rows in between for a combined array not to describe.
+        """
+        frame = (
+            self._dataframe
+            .lazy()
+            .select(
+                "level",
+                "item_index",
+                # Null marks a per-item row. -1 both stands in for it and, sorting below
+                # every real target, puts an item's value ahead of that item's labels.
+                pl.col("target_index").fill_null(-1),
+            )
+            .collect()
         )
-        return [
-            (f"{level}_{name}", level, values[start:stop])
-            for name, values in factors.items()
-            for level, start, stop in halves
-        ]
+        order = np.lexsort((frame["target_index"].to_numpy(), frame["item_index"].to_numpy()))
+        rank = np.empty(len(order), dtype=np.intp)
+        rank[order] = np.arange(len(order), dtype=np.intp)
+
+        is_item = frame["level"].to_numpy() == self._item_level
+        return {self._item_level: rank[is_item], self._label_level: rank[~is_item]}
 
     def _resolve_factor_levels(
         self,
@@ -2577,14 +2976,61 @@ class Metadata(Array, FeatureExtractor):
         # instance-level arrays can be added in a single call. Written as a loop rather than
         # a comprehension so that the stacklevel of the ambiguity warning _infer_factor_level
         # may raise counts the same number of frames on every supported Python.
-        inferred: list[tuple[str, FactorLevel, NDArray[Any]]] = []
+        destinations: list[tuple[str, FactorLevel | Literal["combined"], NDArray[Any]]] = []
         for name, values in factors.items():
-            inferred.append((name, self._infer_factor_level(values), values))
-        return inferred
+            destinations.append((name, self._infer_factor_level(values), values))
+        return self._resolve_destinations(destinations)
+
+    def _resolve_destinations(
+        self,
+        destinations: Sequence[tuple[str, FactorLevel | Literal["combined"], NDArray[Any]]],
+    ) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
+        """Turn inferred destinations into columns, batching the combined ones.
+
+        Batched rather than resolved one at a time because :meth:`_resolve_combined` ranks
+        every row of the dataframe. The default call —
+        ``add_factors(compute_stats(...)["stats"])`` — brings ~20 statistics of the same
+        length, so per-factor resolution would repeat that ranking ~20 times.
+        """
+        resolved: list[tuple[str, FactorLevel, NDArray[Any]]] = [
+            (name, level, values) for name, level, values in destinations if level != "combined"
+        ]
+        combined = {name: values for name, level, values in destinations if level == "combined"}
+        if combined:
+            self._warn_inferred_combined(sorted(combined))
+            resolved.extend(self._resolve_combined(combined))
+        return resolved
+
+    def _warn_inferred_combined(self, names: Sequence[str]) -> None:
+        """Warn that factors were placed by the retired combined convention.
+
+        Inference reaching ``"combined"`` means the values were placed by their position
+        in an undeclared ordering rather than by a label. That is the same bet
+        ``level="combined"`` makes, so it earns the same warning — the caller has a
+        `source_index` available whenever the array came from
+        :func:`~dataeval.core.compute_stats`, and passing it removes the guess.
+
+        Raised once for the whole batch rather than once per factor: the call this fires
+        on is ``add_factors(compute_stats(...)["stats"])``, which brings ~20 statistics of
+        the same length, and twenty copies of one paragraph bury the one action it asks
+        for.
+        """
+        warnings.warn(
+            f"Factor(s) {list(names)} are as long as the {self._item_level} and {self._label_level} "
+            "levels combined, so their values were placed by the ordering compute_stats emits — by "
+            f"(item, target), each item's {self._item_level}-level value ahead of that item's "
+            f"{self._label_level}-level ones — and each was split into '{self._item_level}_<name>' "
+            f"and '{self._label_level}_<name>'. Inferring this is deprecated and will be removed in "
+            "v1.2.0; pass source_index= from compute_stats, which labels each value instead.",
+            DeprecationWarning,
+            # caller -> add_factors -> _resolve_factor_levels -> _resolve_destinations ->
+            # here. test_inference_warnings_point_at_the_caller pins this.
+            stacklevel=5,
+        )
 
     def add_factors(
         self,
-        factors: Mapping[str, Array1D[Any]],
+        factors: Mapping[str, Array1D[Any]] | StatsResult,
         level: FactorLevel | Literal["auto", "target", "combined", "image"] = "auto",
         overwrite: bool = False,
         append_string: str = "_added",
@@ -2603,6 +3049,13 @@ class Metadata(Array, FeatureExtractor):
             Mapping of factor names to their values. Factor length must match
             the row count of the specified level (see :attr:`level_counts`), or the
             length of `source_index` when one is given.
+
+            A whole :class:`~dataeval.core.StatsResult` — the return of
+            :func:`~dataeval.core.compute_stats` or
+            :func:`~dataeval.core.compute_ratios` — may be passed here directly, in
+            which case its ``stats`` become the factors and its ``source_index`` the
+            placement. Its bookkeeping keys (``object_count``, ``invalid_box_count``,
+            ``image_count``) describe the run rather than the images and are ignored.
         level : str, default "auto"
             Level at which to store the factors — one of :attr:`levels`, or
             ``"auto"`` to infer the level of each factor independently from its
@@ -2620,10 +3073,12 @@ class Metadata(Array, FeatureExtractor):
 
             .. deprecated::
                 ``level="combined"`` is accepted with a warning. It was never a level;
-                it described an array of every item-level value followed by every
-                label-level one. The array is split into ``<level>_<name>`` factors,
-                one per level. Pass `source_index` instead, which labels each value
-                rather than relying on the ordering.
+                it described an array ordered by ``(item, target)``, each item's
+                item-level value ahead of that item's label-level ones. The array is
+                split into ``<level>_<name>`` factors, one per level. Pass
+                `source_index` instead, which labels each value rather than relying on
+                the ordering. Inferring the same layout under ``level="auto"`` is
+                deprecated on the same terms.
 
             .. deprecated::
                 ``level="image"`` is accepted with a warning and resolves to the
@@ -2706,8 +3161,17 @@ class Metadata(Array, FeatureExtractor):
         ...     "iou": np.random.rand(93),  # One per detection
         ... }
         >>> metadata.add_factors(target_factors, level="instance")
+        >>>
+        >>> # Or hand the whole compute_stats result over, source index included
+        >>> from dataeval.core import compute_stats
+        >>> from dataeval.flags import ImageStats
+        >>> stats = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        >>> metadata.add_factors(stats)
+        >>> sorted(n for n in metadata.factor_names if n.endswith("mean"))
+        ['instance_mean', 'unit_mean']
         """
         self._structure()
+        factors, source_index = _unpack_stats_result(factors, source_index, level=level)
 
         # Early return for empty factors
         if not factors:
