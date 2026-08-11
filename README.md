@@ -65,6 +65,7 @@ Choose your preferred method of installation below or follow our
 [installation guide](docs/source/getting-started/installation.md).
 
 - [Installing with pip](#installing-with-pip)
+- [Installing with uv](#installing-with-uv)
 - [Installing with conda/mamba](#installing-with-conda)
 - [Installing from GitHub](#installing-from-github)
 
@@ -76,28 +77,57 @@ You can install DataEval directly from pypi.org using the following command.
 pip install dataeval
 ```
 
-By default, PyTorch is installed from PyPI which includes CUDA support on Linux.
-To install a specific PyTorch variant, use `--extra-index-url`:
+By default, PyTorch is installed from PyPI, which bundles CUDA support on Linux
+and is a much larger download than the CPU build. To choose a specific PyTorch
+variant, install `torch` from that variant's wheel index **first**, then install
+DataEval — it accepts the build already present in the environment:
 
 ```bash
-# CPU only
-pip install dataeval --extra-index-url https://download.pytorch.org/whl/cpu
+# 1. Pick your PyTorch build (cpu / cu118 / cu128)
+pip install torch --index-url https://download.pytorch.org/whl/cu128
 
-# CUDA 11.8
-pip install dataeval --extra-index-url https://download.pytorch.org/whl/cu118
+# 2. Install DataEval
+pip install dataeval
+```
 
-# CUDA 12.8
-pip install dataeval --extra-index-url https://download.pytorch.org/whl/cu128
+> **Use `--index-url`, not `--extra-index-url`, to pick a CUDA build.**
+> `--extra-index-url` *adds* an index instead of replacing PyPI, and pip then
+> takes the highest version across both. The CUDA indexes lag the latest PyTorch
+> release, so PyPI usually wins and you silently get the default CUDA-bundled
+> build — the install succeeds with no warning. `--index-url` replaces the index
+> outright, so it is reliable. (For CPU only,
+> `pip install dataeval --extra-index-url https://download.pytorch.org/whl/cpu`
+> does work, because the CPU index tracks the latest release.)
+>
+> **The `cpu` / `cu118` / `cu128` extras do not select a PyTorch variant under
+> pip.** All three declare the same requirements (`torch`, `torchvision`); what
+> distinguishes them is `[tool.uv.sources]`, which routes those packages to the
+> right wheel index. That is project metadata applied by uv when resolving **from
+> source** — it is not part of the published wheel. Select the variant with
+> `--index-url` under pip, `--torch-backend` under `uv pip`, and use the extras
+> only for source installs.
+
+### **Installing with uv**
+
+```bash
+uv pip install dataeval --torch-backend cpu   # or cu118 / cu128 / auto
 ```
 
 ### **Installing with conda**
 
-DataEval can be installed in a Conda/Mamba environment using the provided
-`environment.yml` file. As some dependencies are installed from the `pytorch`
-channel, the channel is specified in the below example.
+DataEval can be installed from conda-forge:
 
 ```bash
-micromamba create -f environment\environment.yml -c pytorch
+conda install -c conda-forge dataeval
+```
+
+Alternatively, create an environment from the provided `environment.yml` at the
+repository root. PyTorch is installed into that environment from PyPI via `pip`,
+so this path gives you the CPU/CUDA-bundled PyPI build rather than a specific
+variant.
+
+```bash
+micromamba create -f environment.yml
 ```
 
 ### **Installing from GitHub**
