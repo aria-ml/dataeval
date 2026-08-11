@@ -119,8 +119,11 @@ Balance().evaluate(metadata).balance[2]
 # Calculate pixel and visual statistics
 calc_results = compute_stats(cifar10, stats=ImageStats.PIXEL | ImageStats.VISUAL)
 
-# Append the factors to the metadata
-metadata.add_factors(calc_results["stats"])
+# Append the factors to the metadata. Handing over the whole result rather than its
+# "stats" mapping also hands over its source index, which places each value on the row
+# it describes -- the difference that matters on object detection, where a result spans
+# both the unit and instance levels.
+metadata.add_factors(calc_results)
 
 # %% [markdown]
 # Next you will add the `compute_stats` output to the metadata as factors, and exclude factors that are uniform or without

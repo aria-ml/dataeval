@@ -16,6 +16,7 @@ __all__ = [
     "ODImageStructurer",
     "RowBlock",
     "RowLayout",
+    "SourceIndexRows",
     "StructuredData",
     "Structurer",
     "TaskOverride",
@@ -26,6 +27,7 @@ __all__ = [
 
 import logging
 from abc import ABC, abstractmethod
+from collections import Counter
 from collections.abc import Callable, Container, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -34,6 +36,7 @@ from typing import Any, Literal, NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import (
     AnnotatedDataset,
     Array,
@@ -43,7 +46,7 @@ from dataeval.protocols import (
     SingleFrameObjectTrackingTarget,
     is_multiobject_tracking_target,
 )
-from dataeval.types import FactorLevel, FactorLevelSchema
+from dataeval.types import FactorLevel, FactorLevelSchema, SourceIndex
 from dataeval.utils._internal import as_numpy, merge_metadata
 
 _logger = logging.getLogger(__name__)
@@ -258,6 +261,32 @@ def _running_index(parents: NDArray[np.intp]) -> NDArray[np.intp]:
     starts = np.concatenate(([0], np.flatnonzero(parents[1:] != parents[:-1]) + 1))
     group_sizes = np.diff(np.append(starts, count))
     return np.arange(count, dtype=np.intp) - np.repeat(starts, group_sizes)
+
+
+def _index_within_parent(parents: NDArray[np.intp]) -> NDArray[np.intp]:
+    """Index each row within its parent group, whatever order the rows arrive in.
+
+    :func:`_running_index` requires its rows already grouped, which every dataset
+    structurer can promise because it builds them itself. Caller-supplied
+    ``item_indices`` cannot: ``[0, 1, 0, 1]`` is an ordinary way to write two items of two
+    rows each, and read as grouped it numbers every row 0 — leaving two pairs of rows
+    sharing an ``(item_index, target_index)`` identity, which is what a source index is
+    matched on later.
+
+    Parameters
+    ----------
+    parents : NDArray[np.intp]
+        Parent of each row, in row order and in any grouping.
+
+    Returns
+    -------
+    NDArray[np.intp]
+        0, 1, 2, ... within each parent, in the rows' own order.
+    """
+    order = np.argsort(parents, kind="stable")
+    within = np.empty(len(parents), dtype=np.intp)
+    within[order] = _running_index(parents[order])
+    return within
 
 
 @dataclass(frozen=True)
@@ -1400,25 +1429,192 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         )
 
 
-class FactorsStructurer(Structurer):
-    """Single-level structuring for instances built from raw factor arrays.
+@dataclass(frozen=True)
+class SourceIndexRows:
+    """The rows a :class:`~dataeval.types.SourceIndex` sequence describes.
+
+    A source index labels each value with what it measures rather than relying on a
+    positional convention, which is exactly the information needed to lay rows out when
+    there is no dataset to read them from. Parsing it once, here, keeps the placement
+    rule in a single implementation shared by both of
+    :class:`~dataeval.Metadata`'s constructors.
+
+    Attributes
+    ----------
+    item_positions : NDArray[np.intp]
+        Positions within the source index of the per-item entries (``target`` is None),
+        ordered as the item-level rows they describe.
+    label_positions : NDArray[np.intp]
+        Positions within the source index of the per-label entries, ordered as the
+        label-level rows they describe.
+    item_ids : NDArray[np.intp]
+        Source item index of each item-level row.
+    label_items : NDArray[np.intp]
+        Source item index of each label-level row.
+    label_targets : NDArray[np.intp]
+        Index of each label-level row within its item.
+    """
+
+    item_positions: NDArray[np.intp]
+    label_positions: NDArray[np.intp]
+    item_ids: NDArray[np.intp]
+    label_items: NDArray[np.intp]
+    label_targets: NDArray[np.intp]
+
+    @classmethod
+    def parse(cls, source_index: Sequence[SourceIndex]) -> "SourceIndexRows":
+        """Group a source index into item-level and label-level rows.
+
+        Raises
+        ------
+        ValueError
+            When an entry carries a channel, which has no single-column form, or when
+            two entries name the same row.
+        """
+        # Transposed in one C-level step and carried as arrays from there on. A source
+        # index from compute_stats holds one entry per detection, so every Python-level
+        # pass over it is paid per detection.
+        raw_items, raw_targets, raw_channels = zip(*source_index, strict=True) if source_index else ((), (), ())
+        if any(channel is not None for channel in raw_channels):
+            raise ValueError(
+                "source_index contains per-channel entries, which have no single-column "
+                "representation. Reduce channel-wise statistics to one value per row "
+                "before adding them.",
+            )
+
+        count = len(source_index)
+        items = np.fromiter(raw_items, dtype=np.intp, count=count)
+        # -1 stands in for the None that marks a per-item entry. It is both the flag that
+        # tells the two kinds apart and, sorting below every real target, the key that puts
+        # an item's own value ahead of that item's labels — the order compute_stats emits.
+        targets = np.fromiter((-1 if t is None else t for t in raw_targets), dtype=np.intp, count=count)
+
+        # Sorting rather than trusting the incoming order is the point of taking a source
+        # index at all: rows follow the labels, not the sequence they arrived in. Both
+        # sorts are stable, so entries that tie keep their incoming order.
+        item_positions = np.flatnonzero(targets < 0)
+        item_positions = item_positions[np.argsort(items[item_positions], kind="stable")]
+        label_positions = np.flatnonzero(targets >= 0)
+        label_positions = label_positions[np.lexsort((targets[label_positions], items[label_positions]))]
+
+        rows = cls(
+            item_positions=item_positions,
+            label_positions=label_positions,
+            item_ids=items[item_positions],
+            label_items=items[label_positions],
+            label_targets=targets[label_positions],
+        )
+        rows._reject_duplicate_rows()
+        return rows
+
+    def _reject_duplicate_rows(self) -> None:
+        """Reject a source index that names the same row twice.
+
+        Two values for one row have no resolution — silently keeping the last would make
+        the result depend on the input ordering, which is the very thing a source index
+        removes.
+
+        Both blocks leave :meth:`parse` sorted, so a repeat is adjacent and the common
+        case is settled by one vectorised comparison. The keys themselves are materialised
+        only to name the offenders in the message, where a second pass costs nothing.
+        """
+        keys_by_kind: tuple[tuple[str, tuple[NDArray[np.intp], ...]], ...] = (
+            ("item", (self.item_ids,)),
+            ("label", (self.label_items, self.label_targets)),
+        )
+        for kind, columns in keys_by_kind:
+            repeats = np.logical_and.reduce([np.diff(column) == 0 for column in columns])
+            if not np.any(repeats):
+                continue
+            keys = list(zip(*(column.tolist() for column in columns), strict=True))
+            repeated = sorted(key for key, total in Counter(keys).items() if total > 1)
+            raise ValueError(f"source_index names the same {kind}-level row more than once: {repeated}.")
+
+    @property
+    def spans_two_levels(self) -> bool:
+        """Whether both kinds of entry are present, and so both levels have rows."""
+        return len(self.item_positions) > 0 and len(self.label_positions) > 0
+
+    def parent_positions(self) -> NDArray[np.intp]:
+        """Position within the item-level block of each label-level row's own item.
+
+        Raises
+        ------
+        ValueError
+            When a label-level entry names an item that has no item-level entry, where
+            the label row has no parent to inherit from.
+        """
+        positions = np.searchsorted(self.item_ids, self.label_items)
+        orphaned = positions >= len(self.item_ids)
+        # Guarded rather than clamped unconditionally: with no per-item entries at all
+        # there is no last position to clamp to, and ``item_ids[-1]`` on an empty array
+        # raises IndexError in place of the ValueError this promises. Every label is
+        # orphaned there anyway, which the line above has already established.
+        if len(self.item_ids):
+            orphaned |= self.item_ids[np.minimum(positions, len(self.item_ids) - 1)] != self.label_items
+        if orphaned.any():
+            missing = sorted(set(self.label_items[orphaned].tolist()))
+            raise ValueError(
+                f"source_index has per-label entries for item(s) {missing} but no per-item entry "
+                "for them, so those labels have no item row to hang from. Give every labelled "
+                "item a target=None entry, or drop the per-item entries entirely.",
+            )
+        return positions.astype(np.intp)
+
+
+class FactorsStructurer(PropagationMixin, Structurer):
+    """Structuring for instances built from raw factor arrays rather than a dataset.
 
     :meth:`~dataeval.Metadata.from_factors` has no dataset to iterate, so this
     derives from :class:`Structurer` rather than :class:`DatasetStructurer` and
-    is driven by :meth:`build_from_arrays`. It still produces a
-    :class:`StructuredData`, which is what keeps the reserved column schema
+    is driven by :meth:`build_from_arrays` or :meth:`build_from_source_index`. It still
+    produces a :class:`StructuredData`, which is what keeps the reserved column schema
     identical to the dataset path.
+
+    One level or two, depending on what the caller can say about the rows. Bare factor
+    arrays describe a single level, since nothing in them distinguishes an item from a
+    label. A source index does distinguish them, and when it carries both kinds this
+    builds the same two-block ``unit``/``instance`` shape :class:`ODImageStructurer`
+    produces — which is what lets :func:`~dataeval.core.compute_stats` output over an
+    object detection dataset be imported without the dataset itself.
+
+    Parameters
+    ----------
+    level : str, default "unit"
+        Level the rows sit at when there is only one.
+    rows : SourceIndexRows or None, default None
+        Parsed source index, when the caller has one. Two levels are declared only when
+        it carries both kinds of entry.
     """
 
     task = "factors"
 
-    def __init__(self, level: FactorLevel = "unit") -> None:
+    def __init__(self, level: FactorLevel = "unit", rows: "SourceIndexRows | None" = None) -> None:
+        self._rows = rows
+        if rows is not None and rows.spans_two_levels:
+            # Items are units and labels are instances, the same pairing every task whose
+            # item *is* one unit declares; a source index cannot address any other, since
+            # it names a row by item and target alone and has no way to say which frame or
+            # which track. Copied from the declaration rather than restated so the two
+            # cannot drift — including the ``"target"`` alias, which a caller reaching this
+            # through imported OD stats has every reason to still spell. Borrowing a
+            # class-level declaration also borrows the __init_subclass__ check that already
+            # validated it. ``unit_type`` is deliberately left at the base default: a bare
+            # source index says nothing about the medium its items came from.
+            self.levels = ODImageStructurer.levels
+            self.item_level = ODImageStructurer.item_level
+            self.label_level = ODImageStructurer.label_level
+            self.multi_target = ODImageStructurer.multi_target
+            self.legacy_level_aliases = ODImageStructurer.legacy_level_aliases
+            return
         # One level, so it is both the item level and the target level; there is
         # no distinct target level here and hence no ``"target"`` alias, matching
         # image classification.
-        self.levels = FactorLevelSchema.of(level)
-        self.item_level = level
-        self.label_level = level
+        resolved = level if rows is None or len(rows.label_positions) == 0 else "instance"
+        self.levels = FactorLevelSchema.of(resolved)
+        self.item_level = resolved
+        self.label_level = resolved
+        self.multi_target = False
         # The ``"image"`` alias is unconditional on the base class because every *task*
         # has a unit level for it to resolve to. A factors-only instance need not: its
         # single level is whatever the caller asked for, and below the unit level the
@@ -1426,7 +1622,7 @@ class FactorsStructurer(Structurer):
         # ``"image"`` is now spelled ``"unit"`` on an instance holding no unit rows,
         # advice that can never apply and that turns ``rows_at("image")`` into a warning
         # followed by a failure to resolve.
-        self.legacy_level_aliases = Structurer.legacy_level_aliases if level == "unit" else MappingProxyType({})
+        self.legacy_level_aliases = Structurer.legacy_level_aliases if resolved == "unit" else MappingProxyType({})
 
     def build_from_arrays(
         self,
@@ -1451,18 +1647,158 @@ class FactorsStructurer(Structurer):
             One block at this structurer's level, with the same reserved columns
             the dataset path produces.
         """
+        return self._single_block(
+            factors,
+            class_labels,
+            item_indices,
+            # Derived rather than assumed to be 0, as the dataset structurers derive it.
+            # ``item_indices`` may name one item more than once — several detections
+            # sharing a unit is what it exists for — and a constant 0 would give every
+            # such row the same ``(item_index, target_index)`` key, which is the identity
+            # rows are matched on when a source index is placed against them later. Order-
+            # independent, unlike the dataset paths': nothing obliges a caller to hand over
+            # rows grouped by item. One row per item, the default, still indexes to 0
+            # throughout.
+            target_index=_index_within_parent(item_indices),
+        )
+
+    def _single_block(
+        self,
+        factors: Mapping[str, Any],
+        class_labels: NDArray[np.intp],
+        item_indices: NDArray[np.intp],
+        **keyed: Any,
+    ) -> StructuredData:
+        """Bundle one block's worth of already-gathered values into a :class:`StructuredData`.
+
+        Sole producer of this structurer's single-level shape, so the two ways of reaching
+        it — bare arrays and a single-kind source index — cannot disagree about the
+        reserved columns. Only the level-key columns differ between them, and those are
+        the caller's to supply.
+        """
         level = self.label_level
         size = len(class_labels)
-        columns = reserved_block_columns(
-            level,
-            size,
-            item_index=item_indices,
-            target_index=np.zeros(size, dtype=np.intp),
-            class_label=class_labels,
-        )
-        block = RowBlock(level, size, columns, {level: np.arange(size, dtype=np.intp)})
+        columns = reserved_block_columns(level, size, item_index=item_indices, class_label=class_labels, **keyed)
+        block = RowBlock(level, size, columns, {level: self._own_positions(size)})
         named = {safe_column_name(str(name)): values for name, values in factors.items()}
         return StructuredData([block], {level: named}, {}, [], class_labels, item_indices)
+
+    def build_from_source_index(
+        self,
+        factors: Mapping[str, NDArray[Any]],
+        class_labels: NDArray[np.intp] | None,
+    ) -> StructuredData:
+        """Lay out rows from the source index this structurer was built with.
+
+        Every factor array holds one value per source-index entry, and each value is
+        placed on the row its entry names. When the index carries both kinds of entry the
+        result has two blocks, and each factor is split into one column per level named
+        ``<level>_<name>`` — a single column cannot hold both a value per unit and a
+        value per instance, and each half is a distinct measurement anyway. The naming
+        matches :meth:`~dataeval.Metadata.add_factors`, so the same statistics carry the
+        same names whether or not a dataset is bound.
+
+        Parameters
+        ----------
+        factors : Mapping[str, NDArray[Any]]
+            Factor name to one value per source-index entry.
+        class_labels : NDArray[np.intp] or None
+            Class label per label-level row, or None for a single class.
+
+        Returns
+        -------
+        StructuredData
+            One block per level the source index covers.
+
+        Raises
+        ------
+        ShapeMismatchError
+            When ``class_labels`` does not have one entry per label-level row.
+        """
+        rows = self._rows
+        if rows is None:
+            raise ValueError("build_from_source_index requires a structurer built with a source index.")
+        if not rows.spans_two_levels:
+            return self._build_single_level(factors, class_labels, rows)
+        return self._build_two_levels(factors, class_labels, rows)
+
+    def _build_single_level(
+        self,
+        factors: Mapping[str, NDArray[Any]],
+        class_labels: NDArray[np.intp] | None,
+        rows: SourceIndexRows,
+    ) -> StructuredData:
+        """Lay out a source index that describes only items, or only labels.
+
+        Item-level rows leave ``target_index`` null rather than zero, matching
+        :meth:`_build_two_levels` and every dataset structurer. Downstream code still
+        reads that nullness as "this row is not a target" — see
+        :class:`~dataeval.quality.Outliers` — so a zero there would misreport a
+        per-item result as a per-target one.
+        """
+        labelled = len(rows.label_positions) > 0
+        positions = rows.label_positions if labelled else rows.item_positions
+        item_indices = rows.label_items if labelled else rows.item_ids
+        keyed: dict[str, Any] = (
+            {"target_index": rows.label_targets, "instance_index": rows.label_targets} if labelled else {}
+        )
+
+        labels = self._checked_labels(class_labels, len(positions), self.label_level)
+        gathered = {name: values[positions] for name, values in factors.items()}
+        return self._single_block(gathered, labels, item_indices, **keyed)
+
+    def _build_two_levels(
+        self,
+        factors: Mapping[str, NDArray[Any]],
+        class_labels: NDArray[np.intp] | None,
+        rows: SourceIndexRows,
+    ) -> StructuredData:
+        """Lay out a source index that describes both items and labels."""
+        unit_count, instance_count = len(rows.item_positions), len(rows.label_positions)
+        labels = self._checked_labels(class_labels, instance_count, "instance")
+        parents = rows.parent_positions()
+
+        unit_block = RowBlock(
+            "unit",
+            unit_count,
+            reserved_block_columns("unit", unit_count, item_index=rows.item_ids),
+            {"unit": self._own_positions(unit_count)},
+        )
+        instance_block = RowBlock(
+            "instance",
+            instance_count,
+            reserved_block_columns(
+                "instance",
+                instance_count,
+                item_index=rows.label_items,
+                target_index=rows.label_targets,
+                class_label=labels,
+                instance_index=rows.label_targets,
+            ),
+            {
+                **self._inherit(unit_block.ancestor_pos, parents),
+                "instance": self._own_positions(instance_count),
+            },
+        )
+        levelled: dict[FactorLevel, Mapping[str, Any]] = {
+            "unit": {safe_column_name(f"unit_{name}"): values[rows.item_positions] for name, values in factors.items()},
+            "instance": {
+                safe_column_name(f"instance_{name}"): values[rows.label_positions] for name, values in factors.items()
+            },
+        }
+        return StructuredData([unit_block, instance_block], levelled, {}, [], labels, rows.label_items)
+
+    @staticmethod
+    def _checked_labels(class_labels: NDArray[np.intp] | None, size: int, level: FactorLevel) -> NDArray[np.intp]:
+        """Validate class labels against the level they describe, defaulting to one class."""
+        if class_labels is None:
+            return np.zeros(size, dtype=np.intp)
+        if len(class_labels) != size:
+            raise ShapeMismatchError(
+                f"class_labels length {len(class_labels)} does not match the {size} {level}-level "
+                "rows the source index describes.",
+            )
+        return class_labels
 
 
 # ========== STRUCTURER SELECTION ==========
