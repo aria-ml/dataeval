@@ -2,8 +2,8 @@
 
 The core :class:`~dataeval.Metadata` engine is task agnostic: it consumes a
 :class:`StructuredData` bundle and never inspects the dataset itself. Everything
-that depends on what a dataset item is (e.g. image, or video sequence) and
-where the labels sit (e.g. image, or instance) lives in a :class:`Structurer`.
+that depends on what a dataset item is (e.g. one image, or a video sequence) and
+where the labels sit (e.g. ``unit``, or ``instance``) lives in a :class:`Structurer`.
 """
 
 __all__ = [
@@ -62,18 +62,18 @@ LEGACY_COLUMNS: tuple[str, ...] = ("item_index", "target_index", "class_label", 
 # columns a structurer actually writes belong here — a name reserved for a level
 # that does not exist yet costs a user their metadata key for nothing.
 #
-# ``image_index``, ``track_index`` and ``sequence_index`` exist for multi-object tracking,
-# the only task whose item level is not ``image``: there a frame's position within its
+# ``unit_index``, ``track_index`` and ``sequence_index`` exist for multi-object tracking,
+# the only task whose item level is not ``unit``: there a frame's position within its
 # sequence is not ``item_index`` (that identifies the video) and has nowhere else to go.
-# ``image_index`` and ``track_index`` are written on the tracking task's instance rows
+# ``unit_index`` and ``track_index`` are written on the tracking task's instance rows
 # too, naming the frame a detection was observed in and the track it belongs to — without
-# ``image_index``, ``(item_index, instance_index)`` repeats across the frames of one
-# sequence. ``track_index`` is ``-1`` on a detection no tracker linked. An image-item task
-# has no use for any of them, and writes none.
+# ``unit_index``, ``(item_index, instance_index)`` repeats across the frames of one
+# sequence. ``track_index`` is ``-1`` on a detection no tracker linked. A task whose
+# items are single units has no use for any of them, and writes none.
 LEVEL_COLUMNS: tuple[str, ...] = (
     "level",
     "instance_index",
-    "image_index",
+    "unit_index",
     "track_index",
     "sequence_index",
 )
@@ -282,7 +282,7 @@ class RowBlock:
         block-wide statement that no row here has such an ancestor. Both arise from the
         diamond in the level graph: an untracked detection has a frame but no track, so
         its ``track`` position is negative, while a frame row has no ``track`` key at all
-        because ``image`` and ``track`` are siblings.
+        because ``unit`` and ``track`` are siblings.
     """
 
     level: FactorLevel
@@ -489,14 +489,26 @@ class Structurer:
         Level whose rows carry ``class_label``.
     multi_target : bool
         Whether one dataset item can yield more than one labelled row.
+    unit_type : str
+        What one row at the unit level holds, e.g. ``"image"`` or ``"frame"``.
+        Descriptive only; it never affects structuring.
     """
 
     task: TASK = "unknown"
-    levels: FactorLevelSchema = FactorLevelSchema.of("image")
-    item_level: FactorLevel = "image"
-    label_level: FactorLevel = "image"
+    levels: FactorLevelSchema = FactorLevelSchema.of("unit")
+    item_level: FactorLevel = "unit"
+    label_level: FactorLevel = "unit"
     multi_target: bool = False
-    legacy_level_aliases: Mapping[str, FactorLevel] = MappingProxyType({})
+    # What one ``unit`` row holds, in the dataset's own vocabulary. Descriptive only:
+    # it is never consulted by structuring, binning or projection, and exists so that
+    # messages and reports can name the medium without the level vocabulary having to.
+    # A plain ``str`` on purpose — a new modality adds a value here and edits no type.
+    unit_type: str = "item"
+    # ``"image"`` was the media-unit level's name through v1.1 and is accepted, with a
+    # warning, until v1.2.0. Declared on the base rather than per subclass because every
+    # task had it; ``"target"`` stays an object-detection-only entry because only object
+    # detection ever reported it.
+    legacy_level_aliases: Mapping[str, FactorLevel] = MappingProxyType({"image": "unit"})
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Reject a subclass whose item or label level sits outside its own schema.
@@ -689,7 +701,7 @@ class InstanceBuildingMixin:
 class ICStructurer(PropagationMixin, DatasetStructurer):
     """Image classification: items are images, targets are the images themselves.
 
-    The instance level is separate from the image level even though a classification
+    The instance level is separate from the ``unit`` level even though a classification
     instance *is* the whole image, because the two answer different questions: an
     image row exists for every dataset item, an instance row only where there is a
     label to attach. Collapsing them would delete an unlabeled item — and all of its
@@ -701,9 +713,10 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
     """
 
     task = "IC"
-    levels = FactorLevelSchema.of("image", "instance")
-    item_level = "image"
+    levels = FactorLevelSchema.of("unit", "instance")
+    item_level = "unit"
     label_level = "instance"
+    unit_type = "image"
 
     def build(
         self,
@@ -735,29 +748,29 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
             if progress_callback:
                 progress_callback(i + 1, total=count)
 
-        image_of_instance = np.asarray(srcidx, dtype=np.intp)
+        unit_of_instance = np.asarray(srcidx, dtype=np.intp)
         class_labels = np.asarray(labels, dtype=np.intp)
         score_values = np.asarray(scores, dtype=np.float32) if scores else np.empty(0, dtype=np.float32)
-        instance_index = _running_index(image_of_instance)
-        instance_count = len(image_of_instance)
+        instance_index = _running_index(unit_of_instance)
+        instance_count = len(unit_of_instance)
 
-        instances_per_item = np.bincount(image_of_instance, minlength=count).astype(int).tolist()
+        instances_per_item = np.bincount(unit_of_instance, minlength=count).astype(int).tolist()
         instance_factors, dropped = self._merge_factors(
             raw,
             ignore_lists=False,
             targets_per_item=instances_per_item,
         )
-        image_factors, _ = self._merge_factors(raw, ignore_lists=True)
+        unit_factors, _ = self._merge_factors(raw, ignore_lists=True)
         # Same rule as object detection: a name both merges produced is item metadata
-        # replicated onto the target rows, so keep it once at the image level and let
+        # replicated onto the target rows, so keep it once at the ``unit`` level and let
         # propagation do the replicating.
-        instance_factors = {name: values for name, values in instance_factors.items() if name not in image_factors}
+        instance_factors = {name: values for name, values in instance_factors.items() if name not in unit_factors}
 
-        image_block = RowBlock(
-            "image",
+        unit_block = RowBlock(
+            "unit",
             count,
-            reserved_block_columns("image", count, item_index=list(range(count))),
-            {"image": self._own_positions(count)},
+            reserved_block_columns("unit", count, item_index=list(range(count))),
+            {"unit": self._own_positions(count)},
         )
         instance_block = RowBlock(
             "instance",
@@ -765,7 +778,7 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
             reserved_block_columns(
                 "instance",
                 instance_count,
-                item_index=image_of_instance,
+                item_index=unit_of_instance,
                 # One instance per image at most, so the index within the image is
                 # always 0 — but derive it rather than assume, as object detection does.
                 # ``instance_index`` is the instance level's own key column and is
@@ -777,7 +790,7 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
                 instance_index=instance_index,
             ),
             {
-                **self._inherit(image_block.ancestor_pos, image_of_instance),
+                **self._inherit(unit_block.ancestor_pos, unit_of_instance),
                 "instance": self._own_positions(instance_count),
             },
         )
@@ -785,12 +798,12 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
         _log_items_without_targets(unlabeled, "instance", count)
         _logger.info("%s dataset: %d items, %d classes", self.task, count, len(np.unique(class_labels)))
         return StructuredData(
-            [image_block, instance_block],
-            {"image": image_factors, "instance": instance_factors},
+            [unit_block, instance_block],
+            {"unit": unit_factors, "instance": instance_factors},
             dropped,
             raw,
             class_labels,
-            image_of_instance,
+            unit_of_instance,
         )
 
 
@@ -798,14 +811,16 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
     """Object detection over images: items are images, targets are instances."""
 
     task = "OD"
-    levels = FactorLevelSchema.of("image", "instance")
-    item_level = "image"
+    levels = FactorLevelSchema.of("unit", "instance")
+    item_level = "unit"
     label_level = "instance"
     multi_target = True
+    unit_type = "image"
 
     # Object detection called its target rows ``"target"`` through v1.1.0. It is the
-    # only task that ever did, so it is the only one that translates the name.
-    legacy_level_aliases = MappingProxyType({"target": "instance"})
+    # only task that ever did, so it is the only one that translates the name. This
+    # overrides rather than merges with the base map, so ``"image"`` is repeated here.
+    legacy_level_aliases = MappingProxyType({"target": "instance", "image": "unit"})
 
     def build(
         self,
@@ -844,30 +859,30 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
             if progress_callback:
                 progress_callback(i + 1, total=count)
 
-        image_of_instance = np.asarray(srcidx, dtype=np.intp)
+        unit_of_instance = np.asarray(srcidx, dtype=np.intp)
         class_labels = np.concatenate(labels).astype(np.intp) if labels else np.empty(0, dtype=np.intp)
         box_values = np.concatenate(boxes).astype(np.float32) if boxes else np.empty((0, 4), dtype=np.float32)
         score_values = np.concatenate(scores).astype(np.float32) if scores else np.empty(0, dtype=np.float32)
-        instance_index = _running_index(image_of_instance)
-        instances = len(image_of_instance)
+        instance_index = _running_index(unit_of_instance)
+        instances = len(unit_of_instance)
 
-        instances_per_item = np.bincount(image_of_instance, minlength=count).astype(int).tolist()
+        instances_per_item = np.bincount(unit_of_instance, minlength=count).astype(int).tolist()
         instance_factors, dropped = self._merge_factors(
             raw,
             ignore_lists=False,
             targets_per_item=instances_per_item,
         )
-        image_factors, _ = self._merge_factors(raw, ignore_lists=True)
+        unit_factors, _ = self._merge_factors(raw, ignore_lists=True)
         # Anything the target-level merge produced that the item-level merge also
-        # produced is item metadata replicated across instances; keep it at the image
+        # produced is item metadata replicated across instances; keep it at the ``unit``
         # level and let propagation replicate it instead of storing it twice.
-        instance_factors = {name: values for name, values in instance_factors.items() if name not in image_factors}
+        instance_factors = {name: values for name, values in instance_factors.items() if name not in unit_factors}
 
-        image_block = RowBlock(
-            "image",
+        unit_block = RowBlock(
+            "unit",
             count,
-            reserved_block_columns("image", count, item_index=list(range(count))),
-            {"image": self._own_positions(count)},
+            reserved_block_columns("unit", count, item_index=list(range(count))),
+            {"unit": self._own_positions(count)},
         )
         # ``instance_index`` is the instance level's own key component; ``target_index`` is the
         # legacy public spelling of "index within the item at whatever level the labels
@@ -879,14 +894,14 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
             reserved_block_columns(
                 "instance",
                 instances,
-                item_index=image_of_instance,
+                item_index=unit_of_instance,
                 target_index=instance_index,
                 class_label=class_labels,
                 score=score_values,
                 box=box_values,
                 instance_index=instance_index,
             ),
-            {**self._inherit(image_block.ancestor_pos, image_of_instance), "instance": self._own_positions(instances)},
+            {**self._inherit(unit_block.ancestor_pos, unit_of_instance), "instance": self._own_positions(instances)},
         )
 
         _log_items_without_targets(undetected, "instance", count)
@@ -897,12 +912,12 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
             instances,
         )
         return StructuredData(
-            [image_block, instance_block],
-            {"image": image_factors, "instance": instance_factors},
+            [unit_block, instance_block],
+            {"unit": unit_factors, "instance": instance_factors},
             dropped,
             raw,
             class_labels,
-            image_of_instance,
+            unit_of_instance,
         )
 
 
@@ -955,7 +970,7 @@ class _MOTAccumulator:
     instance_scores: list[NDArray[Any]] = field(default_factory=list)
     instance_track_ids: list[NDArray[Any]] = field(default_factory=list)
     instance_sequence: list[int] = field(default_factory=list)
-    instance_image_pos: list[int] = field(default_factory=list)
+    instance_unit_pos: list[int] = field(default_factory=list)
     instance_track_pos: list[int] = field(default_factory=list)
 
     def add_item(self, item: int, frames: Iterable[_FrameRows]) -> None:
@@ -974,7 +989,7 @@ class _MOTAccumulator:
                 self.instance_scores.append(rows.scores)
                 self.instance_track_ids.append(rows.track_ids)
                 self.instance_sequence.extend([item] * len(rows.labels))
-                self.instance_image_pos.extend([position] * len(rows.labels))
+                self.instance_unit_pos.extend([position] * len(rows.labels))
                 self._add_tracks(item, rows, registry)
 
     def _add_tracks(self, item: int, rows: _FrameRows, registry: dict[int, int]) -> None:
@@ -1046,15 +1061,15 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
     """Multi-object tracking over video: items are sequences, targets are instances.
 
     Four levels, and the only task whose graph is a diamond rather than a chain:
-    ``sequence`` is the item level (one dataset item is one video), ``image`` is a frame
+    ``sequence`` is the item level (one dataset item is one video), ``unit`` is a frame
     and ``track`` is one tracked object — siblings under the sequence — and ``instance``
     is the label level, one row per detection, which sits under *both*. A detection is one
     observation: of a track, in a frame.
 
-    Because ``image`` sits between the item level and the label level, an instance row
+    Because ``unit`` sits between the item level and the label level, an instance row
     needs its frame's key as well as its own to be uniquely identified: ``instance_index``
-    counts within the frame, so ``(item_index, image_index, instance_index)`` is the
-    compound key, and ``(item_index, image_index)`` joins instance rows to their frame's
+    counts within the frame, so ``(item_index, unit_index, instance_index)`` is the
+    compound key, and ``(item_index, unit_index)`` joins instance rows to their frame's
     row. ``target_index`` keeps counting within the whole item, as it does for every task.
 
     A track is a level rather than a column so that metadata can be organized *by track*:
@@ -1070,17 +1085,18 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
     a factor out of factor analysis at any view where some row is untracked, and
     ``md.at("track")`` still reads it in full — see :attr:`~dataeval.Metadata.factor_data`.
 
-    Per-frame metadata is merged at the ``image`` level, not the instance level. A video's
+    Per-frame metadata is merged at the ``unit`` level, not the instance level. A video's
     list-valued metadata is per frame — one timestamp per frame, not one per detection —
     so expanding it across detections would be wrong even where the counts happen to
     match. Instance-level factors therefore come only from the target data itself.
     """
 
     task = "MOT"
-    levels = FactorLevelSchema.of("sequence", "image", "track", "instance")
+    levels = FactorLevelSchema.of("sequence", "unit", "track", "instance")
     item_level = "sequence"
     label_level = "instance"
     multi_target = True
+    unit_type = "frame"
 
     @classmethod
     def _frames_of(
@@ -1143,7 +1159,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
 
     @staticmethod
     def _frame_factors(rows: _MOTAccumulator) -> dict[str, NDArray[Any]]:
-        """Per-frame timings, as image-level factors, when every frame supplies them.
+        """Per-frame timings, as ``unit``-level factors, when every frame supplies them.
 
         All-or-nothing rather than null-padded. A partially null numeric factor cannot be
         binned — sorting it compares None against a float — so a factor present for only
@@ -1244,17 +1260,17 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             rows.instance_track_ids,
         )
         sequence_of_instance = np.asarray(rows.instance_sequence, dtype=np.intp)
-        image_pos_of_instance = np.asarray(rows.instance_image_pos, dtype=np.intp)
+        unit_pos_of_instance = np.asarray(rows.instance_unit_pos, dtype=np.intp)
         track_pos_of_instance = np.asarray(rows.instance_track_pos, dtype=np.intp)
         n_instances = len(sequence_of_instance)
 
-        # Two distinct running indices, because an instance's direct parent (image) and
+        # Two distinct running indices, because an instance's direct parent (unit) and
         # its item (sequence) are no longer the same level, unlike object detection:
         # - instance_index: this level's own key, index within its own frame.
         # - target_index: the legacy public spelling, index within the whole item.
         # Instances were appended frame-by-frame within sequence-by-sequence order, so
         # both grouping arrays are already contiguous and _running_index applies directly.
-        instance_index = _running_index(image_pos_of_instance)
+        instance_index = _running_index(unit_pos_of_instance)
         instance_target_index = _running_index(sequence_of_instance)
         # Derived from the finished counts rather than tracked during the walk: a sequence
         # contributes no instance rows exactly when none of its frames held a detection.
@@ -1262,7 +1278,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         undetected = np.flatnonzero(instances_per_item == 0).tolist()
         # The parent frame's own key, carried onto the instance row so that the compound
         # key is unique: instance_index alone repeats across the frames of one sequence.
-        image_index_of_instance = frame_own_index_arr[image_pos_of_instance]
+        unit_index_of_instance = frame_own_index_arr[unit_pos_of_instance]
         # Dense within the sequence, in order of first observation. Tracks were opened
         # sequence-by-sequence, so the grouping array is already contiguous.
         track_index = _running_index(sequence_of_track)
@@ -1280,12 +1296,12 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         # coincide, and dropping it — which is what expanding across detections does
         # whenever they disagree — loses the per-frame factors entirely.
         frames_per_item = np.bincount(sequence_of_frame, minlength=count).astype(int).tolist()
-        image_factors, dropped = self._merge_factors(raw, ignore_lists=False, targets_per_item=frames_per_item)
+        unit_factors, dropped = self._merge_factors(raw, ignore_lists=False, targets_per_item=frames_per_item)
         sequence_factors, _ = self._merge_factors(raw, ignore_lists=True)
         # Same rule as the image-based tasks: a name both merges produced is item metadata
         # replicated onto the frame rows, so keep it once at the sequence level and let
         # propagation do the replicating.
-        image_factors = {name: values for name, values in image_factors.items() if name not in sequence_factors}
+        unit_factors = {name: values for name, values in unit_factors.items() if name not in sequence_factors}
 
         track_factors = self._track_factors(rows)
         frame_factors = self._frame_factors(rows)
@@ -1295,7 +1311,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         # per-item dictionary that happens to reuse the spelling.
         derived = {*track_factors, *frame_factors}
         sequence_factors = _without(sequence_factors, derived, "sequence")
-        image_factors = {**_without(image_factors, derived, "image"), **frame_factors}
+        unit_factors = {**_without(unit_factors, derived, "unit"), **frame_factors}
 
         sequence_block = RowBlock(
             "sequence",
@@ -1303,11 +1319,11 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             reserved_block_columns("sequence", count, item_index=list(range(count)), sequence_index=list(range(count))),
             {"sequence": self._own_positions(count)},
         )
-        image_block = RowBlock(
-            "image",
+        unit_block = RowBlock(
+            "unit",
             n_frames,
-            reserved_block_columns("image", n_frames, item_index=sequence_of_frame, image_index=frame_own_index_arr),
-            {**self._inherit(sequence_block.ancestor_pos, sequence_of_frame), "image": self._own_positions(n_frames)},
+            reserved_block_columns("unit", n_frames, item_index=sequence_of_frame, unit_index=frame_own_index_arr),
+            {**self._inherit(sequence_block.ancestor_pos, sequence_of_frame), "unit": self._own_positions(n_frames)},
         )
         track_block = RowBlock(
             "track",
@@ -1333,11 +1349,11 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
                 score=score_values,
                 box=box_values,
                 instance_index=instance_index,
-                image_index=image_index_of_instance,
+                unit_index=unit_index_of_instance,
                 track_index=track_index_of_instance,
                 track_id=track_id_values,
             ),
-            # The diamond: two parents, so two inherited maps. The image branch supplies
+            # The diamond: two parents, so two inherited maps. The ``unit`` branch supplies
             # ``sequence`` and is spread last, because the track branch would supply it too
             # and an untracked row's track position is a null marker rather than an index.
             # ``track`` is taken from the accumulator directly, negatives intact — the track
@@ -1345,7 +1361,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             # destroy the markers.
             {
                 "track": track_pos_of_instance,
-                **self._inherit(image_block.ancestor_pos, image_pos_of_instance),
+                **self._inherit(unit_block.ancestor_pos, unit_pos_of_instance),
                 "instance": self._own_positions(n_instances),
             },
         )
@@ -1370,10 +1386,10 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             n_instances,
         )
         return StructuredData(
-            [sequence_block, image_block, track_block, instance_block],
+            [sequence_block, unit_block, track_block, instance_block],
             {
                 "sequence": sequence_factors,
-                "image": image_factors,
+                "unit": unit_factors,
                 "track": track_factors,
                 "instance": {},
             },
@@ -1396,13 +1412,21 @@ class FactorsStructurer(Structurer):
 
     task = "factors"
 
-    def __init__(self, level: FactorLevel = "image") -> None:
+    def __init__(self, level: FactorLevel = "unit") -> None:
         # One level, so it is both the item level and the target level; there is
         # no distinct target level here and hence no ``"target"`` alias, matching
         # image classification.
         self.levels = FactorLevelSchema.of(level)
         self.item_level = level
         self.label_level = level
+        # The ``"image"`` alias is unconditional on the base class because every *task*
+        # has a unit level for it to resolve to. A factors-only instance need not: its
+        # single level is whatever the caller asked for, and below the unit level the
+        # alias is not merely unused but actively wrong — it would announce that
+        # ``"image"`` is now spelled ``"unit"`` on an instance holding no unit rows,
+        # advice that can never apply and that turns ``rows_at("image")`` into a warning
+        # followed by a failure to resolve.
+        self.legacy_level_aliases = Structurer.legacy_level_aliases if level == "unit" else MappingProxyType({})
 
     def build_from_arrays(
         self,
@@ -1507,7 +1531,7 @@ def select_structurer(  # noqa: C901
     -----
     An empty dataset carries no datum to inspect, so it falls back to image
     classification. This keeps the historical behavior, where an empty dataset
-    structured into an empty image-level dataframe rather than failing; pass an
+    structured into an empty unit-level dataframe rather than failing; pass an
     explicit ``task`` to structure an empty dataset any other way.
 
     The fallback is silent here. :class:`~dataeval.Metadata` warns about it instead,

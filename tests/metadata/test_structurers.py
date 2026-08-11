@@ -20,6 +20,7 @@ from dataeval._structurers import (
     reserved_block_columns,
     select_structurer,
 )
+from dataeval.types import FactorInfo, FactorLevelSchema
 from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
 
 
@@ -61,6 +62,8 @@ class _FrameTracks:
 
 @dataclass
 class _MOTTarget:
+    """One sequence's per-frame detections."""
+
     frame_tracks: list[_FrameTracks]
 
 
@@ -96,8 +99,6 @@ class TestStructurerSelection:
         """The whole pipeline runs without ever loading the item."""
         dataset = MockDataset(["/data/0.png", "/data/1.png"], [_od_target(), _od_target(1)])
         md = Metadata(dataset)
-        assert "image" == "image"
-        assert "instance" == "instance"
         assert md.target_data.height == 3
 
     def test_arbitrary_item_object_with_od_target(self):
@@ -172,24 +173,24 @@ class TestReservedBlockColumns:
     """One producer of the reserved column layout, so it cannot drift."""
 
     def test_unsupplied_legacy_columns_are_null(self):
-        columns = reserved_block_columns("image", 2, item_index=[0, 1])
+        columns = reserved_block_columns("unit", 2, item_index=[0, 1])
         assert set(columns) == {"level", *LEGACY_COLUMNS}
-        assert columns["level"] == ["image", "image"]
+        assert columns["level"] == ["unit", "unit"]
         assert columns["item_index"] == [0, 1]
         assert columns["box"] == [None, None]
 
     def test_level_key_columns_are_omitted_unless_supplied(self):
-        assert "instance_index" not in reserved_block_columns("image", 1, item_index=[0])
+        assert "instance_index" not in reserved_block_columns("unit", 1, item_index=[0])
         assert reserved_block_columns("instance", 1, instance_index=[0])["instance_index"] == [0]
 
     def test_ndarrays_are_normalized_to_python_scalars(self):
-        columns = reserved_block_columns("image", 2, class_label=np.array([3, 4], dtype=np.intp))
+        columns = reserved_block_columns("unit", 2, class_label=np.array([3, 4], dtype=np.intp))
         assert columns["class_label"] == [3, 4]
         assert all(type(value) is int for value in columns["class_label"])
 
     def test_non_reserved_name_raises(self):
         with pytest.raises(ValueError, match="are not reserved columns"):
-            reserved_block_columns("image", 1, brightness=[0.5])
+            reserved_block_columns("unit", 1, brightness=[0.5])
 
 
 @pytest.mark.required
@@ -225,25 +226,24 @@ class TestReservedColumnParity:
             assert from_factors.target_data[name].to_list() == from_dataset.target_data[name].to_list()
 
         # Each tags its rows with its own target level, which is what target_data filters on.
-        assert from_factors.target_data["level"].to_list() == ["image"] * 3
+        assert from_factors.target_data["level"].to_list() == ["unit"] * 3
         assert from_dataset.target_data["level"].to_list() == ["instance"] * 3
 
     def test_from_factors_at_instance_level_keeps_the_same_reserved_columns(self):
         md = Metadata.from_factors({"iou": np.array([0.1, 0.2])}, np.array([0, 1]), level="instance")
         assert self._reserved(md) == self._reserved(Metadata.from_factors({"a": np.array([1, 2])}))
-        assert "instance" == "instance"
 
 
 def _two_level_blocks() -> list[RowBlock]:
-    """An image block of 2 and an instance block of 3, wired for propagation."""
+    """A unit block of 2 and an instance block of 3, wired for propagation."""
     parents = np.array([0, 0, 1], dtype=np.intp)
     return [
-        RowBlock("image", 2, reserved_block_columns("image", 2, item_index=[0, 1]), {"image": np.arange(2)}),
+        RowBlock("unit", 2, reserved_block_columns("unit", 2, item_index=[0, 1]), {"unit": np.arange(2)}),
         RowBlock(
             "instance",
             3,
             reserved_block_columns("instance", 3, item_index=parents),
-            {"image": parents, "instance": np.arange(3)},
+            {"unit": parents, "instance": np.arange(3)},
         ),
     ]
 
@@ -253,26 +253,26 @@ class TestOneNameOneLevel:
     """A factor is one column, and a column belongs to exactly one level."""
 
     def test_a_name_at_two_levels_is_rejected(self):
-        with pytest.raises(ValueError, match="declared at both the 'image' and 'instance' levels"):
+        with pytest.raises(ValueError, match="declared at both the 'unit' and 'instance' levels"):
             StructuredData(
                 _two_level_blocks(),
-                {"image": {"timestamp": [0.0, 1.0]}, "instance": {"timestamp": [0.0, 0.0, 1.0]}},
+                {"unit": {"timestamp": [0.0, 1.0]}, "instance": {"timestamp": [0.0, 0.0, 1.0]}},
             )
 
     def test_the_error_suggests_qualified_names(self):
-        with pytest.raises(ValueError, match="'image_timestamp' and 'instance_timestamp'"):
+        with pytest.raises(ValueError, match="'unit_timestamp' and 'instance_timestamp'"):
             StructuredData(
                 _two_level_blocks(),
-                {"image": {"timestamp": [0.0, 1.0]}, "instance": {"timestamp": [0.0, 0.0, 1.0]}},
+                {"unit": {"timestamp": [0.0, 1.0]}, "instance": {"timestamp": [0.0, 0.0, 1.0]}},
             )
 
     def test_distinct_names_per_level_are_fine(self):
         data = StructuredData(
             _two_level_blocks(),
-            {"image": {"weather": ["sun", "rain"]}, "instance": {"iou": [0.1, 0.2, 0.3]}},
+            {"unit": {"weather": ["sun", "rain"]}, "instance": {"iou": [0.1, 0.2, 0.3]}},
         )
         rows = data.to_rows()
-        # The image factor propagates onto instance rows; the instance factor is null above.
+        # The unit factor propagates onto instance rows; the instance factor is null above.
         assert rows["weather"] == ["sun", "rain", "sun", "sun", "rain"]
         assert rows["iou"] == [None, None, 0.1, 0.2, 0.3]
 
@@ -283,7 +283,7 @@ class TestOneNameOneLevel:
         Metadata(MockDataset(np.zeros((3, 3, 16, 16)), [_od_target(2)] * 3, shared))._structure()
 
     def test_mot_does_not_trip_it_either(self):
-        """MOT runs the same two merges, at the sequence and image levels."""
+        """MOT runs the same two merges, at the sequence and unit levels."""
         shared = [{"weather": "sun"}, {"weather": "rain"}]
         Metadata(_mot_dataset([[2, 1], [1]], shared))._structure()
 
@@ -296,37 +296,37 @@ _SHAPES = [[2, 0, 1], [1, 3]]
 
 @pytest.mark.required
 class TestMOTStructurer:
-    """Tracking is the first task whose item level is not ``image``."""
+    """Tracking is the first task whose item level is not ``unit``."""
 
     def test_schema_is_four_levels_deep(self):
         structurer = MOTStructurer()
-        assert structurer.levels.levels == ("sequence", "image", "track", "instance")
+        assert structurer.levels.levels == ("sequence", "unit", "track", "instance")
         assert structurer.item_level == "sequence"
         assert structurer.label_level == "instance"
         assert structurer.multi_target is True
 
     def test_an_instance_hangs_off_both_its_frame_and_its_track(self):
-        assert MOTStructurer().levels.parents_of("instance") == ("image", "track")
-        assert MOTStructurer().levels.ancestors("instance") == ("image", "track", "sequence")
+        assert MOTStructurer().levels.parents_of("instance") == ("unit", "track")
+        assert MOTStructurer().levels.ancestors("instance") == ("unit", "track", "sequence")
 
     def test_row_counts_are_per_level(self):
         # Track ids restart at 0 in each frame, so sequence 0 spans tracks {0, 1} and
         # sequence 1 spans {0, 1, 2}: five tracks over seven detections.
         md = Metadata(_mot_dataset(_SHAPES))
-        assert md.level_counts == {"sequence": 2, "image": 5, "track": 5, "instance": 7}
+        assert md.level_counts == {"sequence": 2, "unit": 5, "track": 5, "instance": 7}
 
     def test_a_sequence_with_no_detections_keeps_its_rows(self):
         """Its frames and its item-level factors survive; only instance rows are absent."""
         md = Metadata(_mot_dataset([[2, 1], [0, 0]]))
-        assert md.level_counts == {"sequence": 2, "image": 4, "track": 2, "instance": 3}
+        assert md.level_counts == {"sequence": 2, "unit": 4, "track": 2, "instance": 3}
         assert md.rows_at("instance")["item_index"].to_list() == [0, 0, 0]
 
     def test_the_compound_key_is_unique(self):
         """instance_index counts within a frame, so it repeats across a sequence."""
         instances = Metadata(_mot_dataset(_SHAPES)).rows_at("instance")
-        key = instances.select("item_index", "image_index", "instance_index")
+        key = instances.select("item_index", "unit_index", "instance_index")
         assert key.n_unique() == instances.height
-        # Without image_index it would not be: sequence 0 has an instance 0 in two frames.
+        # Without unit_index it would not be: sequence 0 has an instance 0 in two frames.
         assert instances.select("item_index", "instance_index").n_unique() < instances.height
 
     def test_instance_index_counts_within_the_frame(self):
@@ -338,18 +338,18 @@ class TestMOTStructurer:
         instances = Metadata(_mot_dataset(_SHAPES)).rows_at("instance")
         assert instances["target_index"].to_list() == [0, 1, 2, 0, 1, 2, 3]
 
-    def test_image_index_joins_an_instance_to_its_frame(self):
+    def test_unit_index_joins_an_instance_to_its_frame(self):
         md = Metadata(_mot_dataset(_SHAPES))
-        instances, frames = md.rows_at("instance"), md.rows_at("image")
-        joined = instances.join(frames, on=["item_index", "image_index"], how="inner")
+        instances, frames = md.rows_at("instance"), md.rows_at("unit")
+        joined = instances.join(frames, on=["item_index", "unit_index"], how="inner")
         assert joined.height == instances.height
         # Sequence 0's third detection was observed in its third frame, not its second.
-        assert instances["image_index"].to_list() == [0, 0, 2, 0, 1, 1, 1]
+        assert instances["unit_index"].to_list() == [0, 0, 2, 0, 1, 1, 1]
 
     def test_frame_index_falls_back_to_decode_order(self):
         """A frame that does not declare frame_index still gets a usable key."""
-        frames = Metadata(_mot_dataset(_SHAPES, bare_frames=True)).rows_at("image")
-        assert frames["image_index"].to_list() == [0, 1, 2, 0, 1]
+        frames = Metadata(_mot_dataset(_SHAPES, bare_frames=True)).rows_at("unit")
+        assert frames["unit_index"].to_list() == [0, 1, 2, 0, 1]
 
     def test_track_id_is_a_reserved_column_not_a_factor(self):
         """A track number is an identifier; binning it into bias analysis is meaningless."""
@@ -357,7 +357,7 @@ class TestMOTStructurer:
         assert "track_id" not in md.factor_names
         assert md.rows_at("instance")["track_id"].to_list() == [0, 1, 0, 0, 0, 1, 2]
 
-    def test_per_frame_metadata_lands_at_the_image_level(self):
+    def test_per_frame_metadata_lands_at_the_unit_level(self):
         """A video's list-valued metadata is per frame, never per detection."""
         metadata = [
             {"id": 0, "weather": "sun", "temp": [10.0, 11.0, 12.0]},
@@ -366,7 +366,7 @@ class TestMOTStructurer:
         md = Metadata(_mot_dataset(_SHAPES, metadata))
 
         assert md.dropped_factors == {}
-        assert md.rows_at("image")["temp"].to_list() == [10.0, 11.0, 12.0, 20.0, 21.0]
+        assert md.rows_at("unit")["temp"].to_list() == [10.0, 11.0, 12.0, 20.0, 21.0]
         # And propagates down to the instances observed in each frame.
         assert md.rows_at("instance")["temp"].to_list() == [10.0, 10.0, 12.0, 20.0, 21.0, 21.0, 21.0]
 
@@ -391,7 +391,7 @@ class TestMOTStructurer:
 
     def test_a_dataset_with_no_detections_at_all_still_structures(self):
         md = Metadata(_mot_dataset([[0], [0, 0]]))
-        assert md.level_counts == {"sequence": 2, "image": 3, "track": 0, "instance": 0}
+        assert md.level_counts == {"sequence": 2, "unit": 3, "track": 0, "instance": 0}
         assert md.class_labels.tolist() == []
 
     def test_class_labels_align_with_the_instance_rows(self):
@@ -466,10 +466,10 @@ class TestTrackLevel:
     def test_frame_and_track_factors_are_invisible_to_each_other(self):
         """Siblings under the sequence, so neither propagates to the other."""
         md = Metadata(_mot_dataset([[[7, 12], [7], [12]]]))
-        assert "time_s" in md.at("image").factor_names
+        assert "time_s" in md.at("unit").factor_names
         assert "time_s" not in md.at("track").factor_names
         assert "track_length" in md.at("track").factor_names
-        assert "track_length" not in md.at("image").factor_names
+        assert "track_length" not in md.at("unit").factor_names
 
     def test_a_dataset_with_nothing_tracked_has_an_empty_track_level(self):
         md = Metadata(_mot_dataset([[[-1, -1], [-1]]]))
@@ -487,10 +487,10 @@ class TestTrackLevel:
         # And it reaches every observation of that track.
         assert md.rows_at("instance")["mean_iou"].to_list() == [0.8, 0.4, 0.8, 0.4]
 
-    def test_frame_timings_become_image_level_factors(self):
+    def test_frame_timings_become_unit_level_factors(self):
         md = Metadata(_mot_dataset(_TRACKED))
-        assert md.rows_at("image")["time_s"].to_list() == [0.0, 0.5, 1.0, 0.0]
-        assert md.rows_at("image")["pts"].to_list() == [0, 1000, 2000, 0]
+        assert md.rows_at("unit")["time_s"].to_list() == [0.0, 0.5, 1.0, 0.0]
+        assert md.rows_at("unit")["pts"].to_list() == [0, 1000, 2000, 0]
 
     def test_a_stream_without_timings_produces_no_timing_factors(self):
         """All-or-nothing: a partly populated numeric factor cannot be binned."""
@@ -507,3 +507,108 @@ class TestTrackLevel:
         md = Metadata(_mot_dataset(_TRACKED, metadata))
         assert md.rows_at("track")["track_length"].to_list() == [2, 2, 1]
         assert md.rows_at("sequence")["track_length"].to_list() == [None, None]
+
+
+@pytest.mark.required
+class TestUnitType:
+    """``unit_type`` names the medium one ``unit`` row holds."""
+
+    def test_ic_units_are_images(self):
+        dataset = MockDataset(np.zeros((4, 3, 16, 16)), np.eye(4, 2)[[0, 1, 0, 1]])
+        assert Metadata(dataset).unit_type == "image"
+
+    def test_od_units_are_images(self):
+        dataset = MockDataset(["/data/0.png", "/data/1.png"], [_od_target(), _od_target(1)])
+        assert Metadata(dataset).unit_type == "image"
+
+    def test_mot_units_are_frames(self):
+        assert Metadata(_mot_dataset(_SHAPES)).unit_type == "frame"
+
+    def test_factors_only_units_are_items(self):
+        md = Metadata.from_factors({"a": np.array([0, 1, 0])})
+        assert md.unit_type == "item"
+
+    def test_str_names_the_unit_type(self):
+        md = Metadata(_mot_dataset(_SHAPES))
+        md._structure()
+        assert "units=frame" in str(md)
+
+    def test_unit_type_is_a_plain_str(self):
+        """Not a Literal or Enum — a new modality must not require a type edit."""
+        assert type(Metadata(_mot_dataset(_SHAPES)).unit_type) is str
+
+
+@pytest.mark.required
+class TestUnitLevelVocabulary:
+    """The media-unit level is named ``unit``, on every task."""
+
+    def test_hierarchy_names_unit(self):
+        from dataeval.types._factors import _FACTOR_LEVEL_HIERARCHY
+
+        assert list(_FACTOR_LEVEL_HIERARCHY) == ["sequence", "unit", "track", "instance"]
+        assert _FACTOR_LEVEL_HIERARCHY["unit"] == ("sequence",)
+        assert _FACTOR_LEVEL_HIERARCHY["instance"] == ("unit", "track")
+
+    def test_ic_levels(self):
+        dataset = MockDataset(np.zeros((4, 3, 16, 16)), np.eye(4, 2)[[0, 1, 0, 1]])
+        md = Metadata(dataset)
+        assert md.levels == ("unit", "instance")
+        assert md.item_level == "unit"
+        assert md.label_level == "instance"
+
+    def test_od_levels(self):
+        dataset = MockDataset(["/data/0.png", "/data/1.png"], [_od_target(), _od_target(1)])
+        md = Metadata(dataset)
+        assert md.levels == ("unit", "instance")
+        assert md.item_level == "unit"
+
+    def test_mot_levels(self):
+        md = Metadata(_mot_dataset(_SHAPES))
+        assert md.levels == ("sequence", "unit", "track", "instance")
+        assert md.item_level == "sequence"
+        assert md.levels.__class__ is tuple
+
+    def test_mot_instance_parents_are_unit_and_track(self):
+        assert MOTStructurer().levels.parents_of("instance") == ("unit", "track")
+        assert MOTStructurer().levels.ancestors("instance") == ("unit", "track", "sequence")
+
+    def test_level_column_never_says_image(self):
+        md = Metadata(_mot_dataset(_SHAPES))
+        values = set(md.dataframe["level"].unique().to_list())
+        assert "unit" in values
+        assert "image" not in values
+
+    def test_rows_at_unit(self):
+        md = Metadata(_mot_dataset(_SHAPES))
+        assert md.rows_at("unit").height == md.level_counts["unit"]
+
+    def test_image_is_no_longer_a_schema_level(self):
+        with pytest.raises(ValueError, match="Unknown level"):
+            FactorLevelSchema.of("image")  # type: ignore[arg-type]
+
+    def test_factor_info_level_default_is_unit(self):
+        assert FactorInfo("categorical").level == "unit"
+
+
+@pytest.mark.required
+class TestUnitIndexColumn:
+    """The per-sequence frame position column is keyed to the unit level."""
+
+    def test_mot_unit_rows_carry_unit_index(self):
+        md = Metadata(_mot_dataset(_SHAPES))
+        units = md.rows_at("unit")
+        assert "unit_index" in units.columns
+        assert "image_index" not in md.dataframe.columns
+
+    def test_mot_instance_rows_carry_unit_index(self):
+        md = Metadata(_mot_dataset(_SHAPES))
+        instances = md.rows_at("instance")
+        assert instances["unit_index"].null_count() == 0
+
+    def test_unit_index_is_reserved(self):
+        from dataeval._structurers import RESERVED_COLUMNS, safe_column_name
+
+        assert "unit_index" in RESERVED_COLUMNS
+        assert "image_index" not in RESERVED_COLUMNS
+        assert safe_column_name("unit_index") == "metadata_unit_index"
+        assert safe_column_name("image_index") == "image_index"

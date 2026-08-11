@@ -215,7 +215,7 @@ class TestDualKeyIndexing:
 
         # Add image-level factors (3 values for 3 images)
         brightness = [0.5, 0.7, 0.3]
-        md.add_factors({"brightness": brightness}, level="image")
+        md.add_factors({"brightness": brightness}, level="unit")
 
         # Check that brightness is in image rows
         image_rows = md.image_data
@@ -270,8 +270,8 @@ class TestDualKeyIndexing:
             md.add_factors({"bad_factor": [1, 2]})  # Only 2 values, need 3 or 6
 
         # Wrong length with explicit level
-        with pytest.raises(ValueError, match="image row count"):
-            md.add_factors({"bad_factor": [1, 2]}, level="image")
+        with pytest.raises(ValueError, match="unit row count"):
+            md.add_factors({"bad_factor": [1, 2]}, level="unit")
 
         with pytest.raises(ValueError, match="instance row count"):
             md.add_factors({"bad_factor": [1, 2]}, level="instance")
@@ -282,20 +282,20 @@ class TestDualKeyIndexing:
 
         # Built-in factors from metadata: weather and time are image-level
         info = md.factor_info
-        assert info["weather"].level == "image"
-        assert info["time"].level == "image"
+        assert info["weather"].level == "unit"
+        assert info["time"].level == "unit"
 
     def test_factor_info_level_added_factors(self, od_dataset_with_metadata):
         """Test that added factors get the correct level in factor_info."""
         md = Metadata(od_dataset_with_metadata)
 
-        md.add_factors({"brightness": [0.5, 0.7, 0.3]}, level="image")
+        md.add_factors({"brightness": [0.5, 0.7, 0.3]}, level="unit")
         md.add_factors({"iou": [0.9, 0.8, 0.95, 0.85, 0.75, 0.92]}, level="instance")
 
         info = md.factor_info
-        assert info["brightness"].level == "image"
+        assert info["brightness"].level == "unit"
         # The target level reports its real name, not the retired "target".
-        assert info["iou"].level == "instance" == "instance"
+        assert info["iou"].level == "instance"
 
     def test_factor_info_level_ic_dataset(self):
         """Test that IC dataset factors default to image level."""
@@ -303,7 +303,7 @@ class TestDualKeyIndexing:
 
         md = to_metadata({"weather": ["sunny", "rainy"] * 25}, list(range(50)))
         info = md.factor_info
-        assert info["weather"].level == "image"
+        assert info["weather"].level == "unit"
 
     def test_add_factors_mixed_levels_od_dataset(self, od_dataset_with_metadata):
         """Test that we can add mixed-level factors in a single call with level='auto'."""
@@ -323,7 +323,7 @@ class TestDualKeyIndexing:
         )
 
         info = md.factor_info
-        assert info["added_brightness"].level == "image"
+        assert info["added_brightness"].level == "unit"
         assert info["added_iou"].level == "instance"
 
         # Values must land on the rows they describe, not merely be present.
@@ -350,14 +350,14 @@ class TestDualKeyIndexing:
         md.add_factors({"cs": np.arange(9.0)}, source_index=source_index)
 
         # Each level's half becomes its own factor, so neither is lost to analysis.
-        assert md.factor_info["image_cs"].level == "image"
+        assert md.factor_info["unit_cs"].level == "unit"
         assert md.factor_info["instance_cs"].level == "instance"
         assert "cs" not in md.dataframe.columns
 
-        assert md.image_data["image_cs"].to_list() == [0.0, 3.0, 5.0]
+        assert md.image_data["unit_cs"].to_list() == [0.0, 3.0, 5.0]
         assert md.target_data["instance_cs"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
         # The image-level half propagates down, so it is visible from the instance rows too.
-        assert md.target_data["image_cs"].to_list() == [0.0, 0.0, 3.0, 5.0, 5.0, 5.0]
+        assert md.target_data["unit_cs"].to_list() == [0.0, 0.0, 3.0, 5.0, 5.0, 5.0]
 
     def test_add_factors_source_index_ignores_input_ordering(self, od_dataset_with_metadata):
         """Placement follows the source-index labels, not the position of each value."""
@@ -380,7 +380,7 @@ class TestDualKeyIndexing:
             source_index=[index for index, _ in pairs],
         )
 
-        assert md.image_data["image_cs"].to_list() == [0.0, 3.0, 5.0]
+        assert md.image_data["unit_cs"].to_list() == [0.0, 3.0, 5.0]
         assert md.target_data["instance_cs"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
 
     def test_add_factors_source_index_single_level_keeps_bare_name(self, od_dataset_with_metadata):
@@ -410,7 +410,7 @@ class TestDualKeyIndexing:
         with pytest.raises(ValueError, match="mutually exclusive"):
             md.add_factors(
                 {"b": [1.0, 2.0, 3.0]},
-                level="image",
+                level="unit",
                 source_index=[SourceIndex(i, None) for i in range(3)],
             )
 
@@ -465,7 +465,7 @@ class TestDualKeyIndexing:
 
         md.add_factors(
             {
-                "image_mean": mean_img,
+                "unit_mean": mean_img,
                 "target_width": width_tgt,
                 "target_mean_ratio": mean_ratio,
             },
@@ -476,18 +476,20 @@ class TestDualKeyIndexing:
         md.add_factors({"mean": mean_both}, source_index=both_stats["source_index"])
 
         info = md.factor_info
-        assert info["image_mean"].level == "image"
+        assert info["unit_mean"].level == "unit"
         assert info["target_width"].level == "instance"
         assert info["target_mean_ratio"].level == "instance"
-        assert info["image_mean_added"].level == "image"
+        # The generated name collides with the pre-existing factor above, so the
+        # split's unit half lands under the deduplicated name.
+        assert info["unit_mean_added"].level == "unit"
         assert info["instance_mean"].level == "instance"
 
         # Each half must match the independently-computed image-only and target-only
         # stats. This is what catches a bad permutation.
-        assert md.image_data["image_mean_added"].to_numpy() == pytest.approx(mean_img)
+        assert md.image_data["unit_mean_added"].to_numpy() == pytest.approx(mean_img)
         assert md.target_data["instance_mean"].to_numpy() == pytest.approx(mean_tgt)
 
-        assert md.image_data["image_mean"].to_numpy() == pytest.approx(mean_img)
+        assert md.image_data["unit_mean"].to_numpy() == pytest.approx(mean_img)
         assert md.target_data["target_width"].to_numpy() == pytest.approx(width_tgt)
         assert md.target_data["target_mean_ratio"].to_numpy() == pytest.approx(mean_ratio)
 
@@ -522,10 +524,10 @@ class TestAddFactorsRobustness:
         """Overwriting an already-binned factor must re-bin it, not orphan it."""
         md = Metadata(od_dataset_with_metadata)
 
-        md.add_factors({"bright": [0.1, 0.5, 0.9]}, level="image")
+        md.add_factors({"bright": [0.1, 0.5, 0.9]}, level="unit")
         assert md.factor_info["bright"].factor_type is not None  # forces binning
 
-        md.add_factors({"bright": [9.9, 9.8, 9.7]}, level="image", overwrite=True)
+        md.add_factors({"bright": [9.9, 9.8, 9.7]}, level="unit", overwrite=True)
 
         # A leftover binned/digitized companion makes _bin() skip the factor, so it vanishes
         # from factor_info while still being counted in factor_names.
@@ -537,7 +539,7 @@ class TestAddFactorsRobustness:
         """A factor named after a reserved column is stored under a metadata_ prefix."""
         md = Metadata(od_dataset_with_metadata)
 
-        md.add_factors({"target_index": [1, 2, 3]}, level="image")
+        md.add_factors({"target_index": [1, 2, 3]}, level="unit")
 
         # Writing over target_index would collapse the image/target row split entirely.
         assert len(md.image_data) == 3
@@ -545,7 +547,7 @@ class TestAddFactorsRobustness:
         assert md.image_data["metadata_target_index"].to_list() == [1, 2, 3]
 
         # overwrite=True is not an escape hatch onto the reserved column either.
-        md.add_factors({"target_index": [4, 5, 6]}, level="image", overwrite=True)
+        md.add_factors({"target_index": [4, 5, 6]}, level="unit", overwrite=True)
         assert len(md.image_data) == 3
         assert md.image_data["metadata_target_index"].to_list() == [4, 5, 6]
 
@@ -554,7 +556,7 @@ class TestAddFactorsRobustness:
         md = Metadata(od_dataset_with_metadata, exclude=["weather"])
         assert "weather" not in md.factor_names
 
-        md.add_factors({"weather": ["a", "b", "c"]}, level="image")
+        md.add_factors({"weather": ["a", "b", "c"]}, level="unit")
 
         assert md.image_data["weather"].to_list() == ["sunny", "rainy", "cloudy"]
         assert md.image_data["weather_added"].to_list() == ["a", "b", "c"]
@@ -563,9 +565,9 @@ class TestAddFactorsRobustness:
         """Each add of a colliding name claims a fresh column, not the previous suffixed one."""
         md = Metadata(od_dataset_with_metadata)
 
-        md.add_factors({"b": [1.0, 2.0, 3.0]}, level="image")
-        md.add_factors({"b": [4.0, 5.0, 6.0]}, level="image")
-        md.add_factors({"b": [7.0, 8.0, 9.0]}, level="image")
+        md.add_factors({"b": [1.0, 2.0, 3.0]}, level="unit")
+        md.add_factors({"b": [4.0, 5.0, 6.0]}, level="unit")
+        md.add_factors({"b": [7.0, 8.0, 9.0]}, level="unit")
 
         images = md.image_data
         assert images["b"].to_list() == [1.0, 2.0, 3.0]
@@ -580,8 +582,8 @@ class TestAddFactorsRobustness:
         """
         md = Metadata(od_dataset_with_metadata, exclude=["b_added"])
 
-        md.add_factors({"b": [1.0, 2.0, 3.0]}, level="image")
-        md.add_factors({"b": [4.0, 5.0, 6.0], "b_added": [7.0, 8.0, 9.0]}, level="image")
+        md.add_factors({"b": [1.0, 2.0, 3.0]}, level="unit")
+        md.add_factors({"b": [4.0, 5.0, 6.0], "b_added": [7.0, 8.0, 9.0]}, level="unit")
 
         images = md.image_data
         assert images["b"].to_list() == [1.0, 2.0, 3.0]
@@ -592,8 +594,8 @@ class TestAddFactorsRobustness:
         """overwrite=True replaces in place instead of accumulating suffixed columns."""
         md = Metadata(od_dataset_with_metadata)
 
-        md.add_factors({"b": [1.0, 2.0, 3.0]}, level="image")
-        md.add_factors({"b": [4.0, 5.0, 6.0]}, level="image", overwrite=True)
+        md.add_factors({"b": [1.0, 2.0, 3.0]}, level="unit")
+        md.add_factors({"b": [4.0, 5.0, 6.0]}, level="unit", overwrite=True)
 
         assert "b_added" not in md.dataframe.columns
         assert md.image_data["b"].to_list() == [4.0, 5.0, 6.0]
@@ -620,9 +622,9 @@ class TestAddFactorsRobustness:
 
         # The image half and the instance half become separate factors, named the way a
         # source index spanning both levels names them.
-        assert "image_bright" in md.factor_names
+        assert "unit_bright" in md.factor_names
         assert "instance_bright" in md.factor_names
-        assert md.rows_at("image")["image_bright"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0]
+        assert md.rows_at("unit")["unit_bright"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0]
         assert md.rows_at("instance")["instance_bright"].to_list() == [5.0, 6.0, 7.0, 8.0, 9.0]
 
     def test_combined_level_rejects_a_wrong_length(self):
@@ -665,7 +667,7 @@ class TestAddFactorsRobustness:
         # The stats span both levels, so each scalar one arrives as an image- and a
         # instance-level factor rather than a single column shared between them.
         scalar_stats = {k for k, v in results["stats"].items() if np.asarray(v).ndim == 1}
-        assert {f"image_{k}" for k in scalar_stats} <= set(md.factor_names)
+        assert {f"unit_{k}" for k in scalar_stats} <= set(md.factor_names)
         assert {f"instance_{k}" for k in scalar_stats} <= set(md.factor_names)
         # histogram/percentiles are vector-valued and cannot become columns
         assert set(md.dropped_factors) >= {"histogram", "percentiles"} & set(results["stats"])
@@ -678,7 +680,7 @@ class TestAddFactorsRobustness:
         md.inherited = False
 
         assert "instance_cs" in md.factor_names
-        assert "image_cs" not in md.factor_names
+        assert "unit_cs" not in md.factor_names
         assert md.rows_at(md.label_level)["instance_cs"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
         assert md.factor_data.shape == (6, len(md.factor_names))
 
@@ -689,10 +691,10 @@ class TestAddFactorsRobustness:
         md.add_factors({"x": np.arange(6.0)}, level="instance")
         assert md.factor_info["x"].level == "instance"
 
-        md.add_factors({"x": np.arange(3.0)}, level="image", overwrite=True)
+        md.add_factors({"x": np.arange(3.0)}, level="unit", overwrite=True)
 
-        assert md.factor_info["x"].level == "image"
-        assert "x" in md._factors_by_level["image"]
+        assert md.factor_info["x"].level == "unit"
+        assert "x" in md._factors_by_level["unit"]
         assert "x" not in md._factors_by_level.get("instance", set())
         # Stale instance membership would silently drop "x" from view-native mode.
         md.inherited = False
