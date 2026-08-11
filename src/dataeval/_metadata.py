@@ -92,15 +92,29 @@ class Metadata(Array, FeatureExtractor):
     Rows are organized by *level*. Which levels exist depends on the task, which is
     detected from the ``(item, target)`` types of the bound dataset:
 
-    ==================================  ==========  ==============  =================================
-    Task                                Item level  Instance level  Levels
-    ==================================  ==========  ==============  =================================
-    ``IC``  image classification        image       instance        image, instance
-    ``OD``  object detection (image)    image       instance        image, instance
-    ==================================  ==========  ==============  =================================
+    ======================================  ==========  ==============  ================================
+    Task                                    Item level  Instance level  Levels
+    ======================================  ==========  ==============  ================================
+    ``IC``  image classification            image       instance        image, instance
+    ``OD``  object detection (image)        image       instance        image, instance
+    ``MOT`` multi-object tracking (video)   sequence    instance        sequence, image, track, instance
+    ======================================  ==========  ==============  ================================
 
-    An *instance* is one labelled thing inside an item: a detection for object detection,
-    the image itself for classification. Both tasks therefore share one schema.
+    An *instance* is one labelled thing inside an item: a detection for object detection
+    or multi-object tracking, the image itself for classification. Every task therefore
+    shares one label level.
+
+    For multi-object tracking, ``image`` means a frame rather than a dataset item, and the
+    levels form a **diamond** rather than a chain: ``image`` (a frame) and ``track`` (one
+    tracked object) are siblings under ``sequence``, and an instance sits under *both* —
+    a detection is one observation, of a track, in a frame. Two things follow, and neither
+    arises for ``IC``/``OD``:
+
+    - Siblings do not propagate to each other, so a per-frame factor cannot be read from
+      track rows, or a per-track factor from frame rows. Such a factor stays in
+      :attr:`dataframe` but is left out of factor analysis at that view.
+    - A detection no tracker linked (``track_id == -1``) has a frame but no track, so
+      per-track factors are null on it. See :attr:`factor_data`.
 
     The label level is always distinct from the item level, so an item that carries no
     label — an unlabeled image, or one with no detections — still has an item row and
@@ -115,8 +129,9 @@ class Metadata(Array, FeatureExtractor):
     of the box; :meth:`at` returns the same metadata read at another level, which is how
     an image-level factor is read once per image rather than once per detection.
 
-    Factors propagate *downwards* only (image to instance); rows above a factor's level carry null values for
-    it and factors are never aggregated upwards.
+    Factors propagate *downwards* only (image to instance); rows above a factor's level, on
+    a sibling branch of it, or with no ancestor at it carry null values, and factors are
+    never aggregated upwards.
 
     Each factor is **binned at its own level** — the level whose rows hold one value per
     entity — and the resulting bins are then propagated downwards like any other value.
@@ -133,7 +148,7 @@ class Metadata(Array, FeatureExtractor):
         creates an unbound instance that can be used as a reusable feature extractor.
         Use :meth:`bind` to attach a dataset later, or pass data directly to :meth:`__call__`.
     task : str or None, default None
-        Explicit task override, e.g. ``"IC"`` or ``"OD"``. When None the task is
+        Explicit task override, e.g. ``"IC"``, ``"OD"``, or ``"MOT"``. When None the task is
         inferred from the first datum. Supply this for datasets whose target protocol
         MAITE has not defined yet, or when inference would be ambiguous.
     continuous_factor_bins : Mapping[str, int | Sequence[float]] | None, default None
@@ -843,7 +858,7 @@ class Metadata(Array, FeatureExtractor):
         Returns
         -------
         bool
-            True for object detection, False for image classification.
+            True for object detection and multi-object tracking, False for image classification.
 
         Notes
         -----
@@ -1270,6 +1285,14 @@ class Metadata(Array, FeatureExtractor):
         weighted by how many descendants each entity has, so an image-level factor on
         a detection dataset counts crowded images more heavily than sparse ones.
         ``md.at("image").factor_data`` reads it once per image instead.
+
+        A factor the view's rows cannot *all* read is omitted from these columns, and from
+        :attr:`factor_names`, rather than represented as a gap — a partly null column has no
+        binning, since discretizing it would compare None against a number. Both cases come
+        from the tracking schema's diamond: a factor on a sibling branch (per-frame read
+        from track rows, or the reverse) and a per-track factor read from instance rows when
+        some detection is untracked. The factor stays in :attr:`dataframe` throughout, and
+        ``md.at`` on its own level reads it in full.
         """
         info_by_name = self._factor_info
         return self._project([_to_col(name, info) for name, info in info_by_name.items()], np.int64)
@@ -1742,6 +1765,36 @@ class Metadata(Array, FeatureExtractor):
                 self._factor_cache.pop(col, None)
         self._is_binned = False
 
+    def _unreadable_at(self, level: FactorLevel, view: FactorLevel) -> str | None:
+        """Why a factor defined at ``level`` cannot be read from ``view``'s rows, or None.
+
+        Sole arbiter of what enters factor analysis, so the two ways the level graph's
+        diamond can put a factor out of reach are decided together and phrased once.
+
+        Parameters
+        ----------
+        level : str
+            Level the factor is defined at.
+        view : str
+            Level whose rows would be projected.
+
+        Returns
+        -------
+        str or None
+            A reason suitable for a log line, or None when every ``view`` row can read it.
+        """
+        if not self._levels.propagates_to(level, view):
+            return (
+                f"{level!r} does not propagate to {view!r} — they are on separate branches of the "
+                "level graph, so these rows have no value for it"
+            )
+        if self._layout.partial_ancestry(level, view):
+            return (
+                f"not every {view!r} row has a {level!r} ancestor, so the column is partly null "
+                f"and cannot be binned; read it at {level!r} instead"
+            )
+        return None
+
     def _factor_level(self, name: str) -> FactorLevel:
         """Level a factor is defined at, or the item level when unknown.
 
@@ -1947,10 +2000,11 @@ class Metadata(Array, FeatureExtractor):
         A :class:`~dataeval.types.SourceIndex` distinguishes exactly two kinds of
         value — one per dataset item, where ``target`` is None, and one per label —
         so it can address :attr:`item_level` and :attr:`label_level` and no others.
-        That is a property of the type, not of this method: a schema with a third
-        level between them, as a video schema's frames would be, has no
-        representable form here, and values for such a level have to be added with an
-        explicit ``level=`` instead. Widening this means widening
+        That is a property of the type, not of this method: a schema with a third level
+        between them — multi-object tracking's ``image`` level sits between ``sequence``
+        (item) and ``instance`` (label) — has no representable form here, and per-frame
+        values (e.g. from :func:`~dataeval.core.compute_stats` run per frame) have to be
+        added with an explicit ``level="image"`` instead. Widening this means widening
         :class:`~dataeval.types.SourceIndex` first.
         """
         self._reject_unplaceable_source_index(source_index)
@@ -2026,23 +2080,29 @@ class Metadata(Array, FeatureExtractor):
         else:
             names = {name for level_names in self._factors_by_level.values() for name in level_names}
 
-        # A factor defined off the view's branch cannot be read from its rows at all,
-        # so it stays in the dataframe but out of factor analysis. Every level of the
-        # current two-level schema propagates to every other, so nothing is excluded
-        # today; this keeps the rule stated where it is enforced rather than leaving
-        # the next level to discover it.
+        # A factor the view's rows cannot all read stays in the dataframe but out of factor
+        # analysis, for either of two reasons the level graph's diamond makes real:
+        #
+        # - Off the branch entirely: ``image`` and ``track`` are siblings, so neither
+        #   propagates to the other and a per-frame factor has no value on a track row.
+        # - On the branch but not for every row: a detection no tracker linked has no track
+        #   ancestor, so a per-track factor is null there. Binning cannot represent that —
+        #   discretizing sorts the values, and None does not order against a float — so the
+        #   factor is excluded here rather than left to fail mid-analysis. It is still read
+        #   in full at its own level, via ``md.at("track")``.
         visible: set[str] = set()
         for name in names:
             level = self._factor_level(name)
-            if self._levels.propagates_to(level, view):
+            unreadable = self._unreadable_at(level, view)
+            if unreadable is None:
                 visible.add(name)
             else:
                 _logger.debug(
-                    "Factor %r is defined at level %r and is not visible at view level %r; "
-                    "excluded from factor analysis.",
+                    "Factor %r, defined at level %r, is excluded from factor analysis at view level %r: %s",
                     name,
                     level,
                     view,
+                    unreadable,
                 )
 
         # Purely derived: nothing is carried over from the outgoing set, because a
@@ -2549,8 +2609,10 @@ class Metadata(Array, FeatureExtractor):
         with a warning; the skipped names are recorded in :attr:`dropped_factors`.
 
         Factor names that would collide with a reserved dataframe column — ``level``,
-        ``item_index``, ``target_index``, ``class_label``, ``score``, ``box`` or
-        ``instance_index`` — are prefixed with ``metadata_``, matching how dataset
+        ``item_index``, ``target_index``, ``class_label``, ``score``, ``box``, a level's
+        own key column (``instance_index``, ``image_index``, ``track_index``,
+        ``sequence_index``) or the ``track_id`` identifier — are prefixed with
+        ``metadata_``, matching how dataset
         metadata keys are treated.
 
         Either every factor in `factors` is added or none is — a validation failure on any

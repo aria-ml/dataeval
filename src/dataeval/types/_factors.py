@@ -15,7 +15,7 @@ from typing import Literal, TypeAlias
 # enum-typed parameter would also reject the plain ``rows_at("image")`` spelling
 # that :class:`~dataeval.Metadata` is designed around, and ``enum.StrEnum`` is
 # unavailable on the supported 3.10 floor.
-FactorLevel: TypeAlias = Literal["image", "instance"]
+FactorLevel: TypeAlias = Literal["sequence", "image", "track", "instance"]
 
 # The level vocabulary and its edges — the single place both are declared.
 #
@@ -26,25 +26,52 @@ FactorLevel: TypeAlias = Literal["image", "instance"]
 # topological order of the edges below: every level after its parents.
 #
 # Values are each level's parents, empty for a root. Factors propagate *downwards*
-# along these edges (image -> instance) and never upwards; rows at a level above a
-# factor's own level simply carry null values for it.
+# along these edges (sequence -> image -> instance) and never upwards; rows at a level
+# above a factor's own level simply carry null values for it.
 #
-# This is a **directed acyclic graph, not a tree**: a level may declare more than one
-# parent, and today none does. Multi-object tracking is the case that needs it — a
-# per-frame detection sits inside both a frame and a track, which are themselves
-# siblings under a sequence — so the vocabulary is able to express a diamond before
-# anything declares one. :meth:`FactorLevelSchema.of` collapses edges through levels a task
-# omits, so a schema that keeps only part of the graph still sees the right parents.
+# This is a **directed acyclic graph, not a tree**: ``instance`` declares two parents.
+# A per-frame detection sits inside both a frame and a track, and those are siblings
+# under a sequence, so the graph is a diamond rather than a chain.
+# :meth:`FactorLevelSchema.of` collapses edges through levels a task omits, so a schema
+# that keeps only part of the graph still sees the right parents: an image-based task
+# keeps neither ``sequence`` nor ``track``, and its ``instance`` level correctly reports
+# ``image`` as its only parent.
 #
-# ``instance`` is one labelled thing inside an item: a detection for object
-# detection, the image itself for whole-image classification. Both tasks share it,
-# so the same object keeps one level name whichever view produced it — a detection
-# in an object detection dataset and the same detection seen through
-# :class:`~dataeval.data.DetectionCrops` are both instances.
+# Two consequences of the diamond, both load-bearing:
+#
+# - ``image`` and ``track`` are **siblings**, so neither propagates to the other. A
+#   per-frame factor is not readable from track rows and a per-track factor is not
+#   readable from frame rows; :meth:`FactorLevelSchema.propagates_to` is what says so,
+#   and :class:`~dataeval.Metadata` drops such a factor from factor analysis at that
+#   view rather than inventing a value for it.
+# - A row may be **missing** one parent while having the other. A detection that no
+#   tracker linked has a frame but no track, so factors defined at ``track`` have no
+#   value on it at all. That absence is carried positionally, as a negative parent
+#   position — see ``RowBlock.ancestor_pos`` in the structuring layer.
+#
+# ``instance`` is one labelled thing inside an item: a detection for object detection
+# or multi-object tracking, the image itself for whole-image classification. Every task
+# shares it, so the same object keeps one level name whichever view produced it — a
+# detection in an object detection dataset, the same detection seen through
+# :class:`~dataeval.data.DetectionCrops`, and a per-frame detection in a tracking
+# dataset are all instances.
+#
+# ``sequence`` is a video: one dataset item holding an ordered run of frames. It exists
+# so that ``image`` can mean "a frame" without also having to mean "a dataset item" —
+# for multi-object tracking the item level is ``sequence`` and ``image`` sits *between*
+# the item level and the label level, which no image-based task needs.
+#
+# ``track`` is one tracked object across a sequence: the identity a tracker assigns, of
+# which each instance is one observation. It is a level rather than a column so that
+# metadata can be organized *by track* — a per-track factor is stored once per track and
+# propagates down to every detection in it, and ``rows_at("track")`` reads it once per
+# track instead of once per detection.
 _FACTOR_LEVEL_HIERARCHY: Mapping[FactorLevel, tuple[FactorLevel, ...]] = MappingProxyType(
     {
-        "image": (),
-        "instance": ("image",),
+        "sequence": (),
+        "image": ("sequence",),
+        "track": ("sequence",),
+        "instance": ("image", "track"),
     },
 )
 
@@ -205,13 +232,25 @@ class FactorLevelSchema:
 
     Example
     -------
-    >>> schema = FactorLevelSchema.of("image", "instance")
+    >>> schema = FactorLevelSchema.of("sequence", "image", "track", "instance")
     >>> schema.parents_of("instance")
-    ('image',)
+    ('image', 'track')
     >>> schema.ancestors("instance")
+    ('image', 'track', 'sequence')
+
+    Siblings do not propagate to each other, so a per-frame factor cannot be read from
+    track rows:
+
+    >>> schema.propagates_to("image", "track")
+    False
+    >>> schema.propagates_to("image", "instance")
+    True
+
+    Omitting a level splices the graph rather than severing it, so an image-based task
+    still sees one parent:
+
+    >>> FactorLevelSchema.of("image", "instance").parents_of("instance")
     ('image',)
-    >>> schema.highest(["instance", "image"])
-    'image'
     """
 
     def __init__(
@@ -427,7 +466,7 @@ class FactorInfo:
         Whether a digitized companion column was generated for this factor.
     level : str, default "image"
         Level the factor is defined at, drawn from the bound dataset's level
-        schema (one of ``image``, ``instance``). This is also the level the factor
+        schema (one of ``sequence``, ``image``, ``track``, ``instance``). This is also the level the factor
         was binned at: its bin edges, its bin count and its continuous/discrete
         verdict all come from its values here, one per entity.
     """
