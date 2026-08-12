@@ -140,6 +140,13 @@ class PixelStatCalculator(Calculator[ImageStats]):
         return [m4 / (m2 * m2) - 3.0]
 
     def _entropy(self) -> list[float]:
+        # Data that is entirely NaN was not measured, and "not measured" is NaN — the
+        # same answer _mean, _skew, _kurtosis and the visual percentiles give. Falling
+        # through would instead read an all-zero histogram as a distribution with no
+        # spread and report 0.0, which is a legitimate-looking extreme rather than an
+        # absence: an outlier search would flag such an image as genuinely low-entropy.
+        if self.cache.is_all_nan:
+            return self._nan_list()
         if self.per_channel_mode:
             h = self.histogram.astype(np.float64)
             totals = h.sum(axis=1, keepdims=True)
@@ -168,6 +175,11 @@ class PixelStatCalculator(Calculator[ImageStats]):
         return [float(np.count_nonzero(self.cache.image == 0) / self.cache.image.size)]
 
     def _histogram(self) -> list[Any]:
+        # As _entropy: an all-zero histogram over unmeasured data would read as a real
+        # distribution rather than an absent one.
+        if self.cache.is_all_nan:
+            empty = [np.nan] * 256
+            return [empty] * self.cache.image.shape[0] if self.per_channel_mode else [empty]
         if self.per_channel_mode:
             return self.histogram.tolist()
         return [self.histogram.tolist()]

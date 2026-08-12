@@ -314,12 +314,18 @@ class TestSkewKurtosisEntropySciPyEquivalence:
         result = calc._entropy()
         assert result[0] == pytest.approx(0.0, abs=1e-10)
 
-    def test_entropy_all_nan_is_zero(self):
-        """An all-NaN image should produce zero entropy (empty histogram)."""
+    def test_entropy_all_nan_is_nan(self):
+        """An all-NaN image was not measured, so its entropy is NaN, not zero.
+
+        Zero is a legitimate-looking extreme — a perfectly flat image has zero entropy —
+        so returning it for unmeasured data makes an out-of-bounds box, or an image whose
+        boxes cover it entirely, indistinguishable from a real low-entropy sample. Every
+        other statistic here already answers NaN for all-NaN input.
+        """
         image = np.full((1, 10, 10), np.nan)
         calc = self._make_calculator(image)
-        result = calc._entropy()
-        assert result[0] == 0.0
+        assert np.isnan(calc._entropy()[0])
+        assert np.isnan(calc._histogram()[0]).all()
 
     # --- Edge cases applied across all three ---
 

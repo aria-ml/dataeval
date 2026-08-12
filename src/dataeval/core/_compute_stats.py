@@ -425,6 +425,13 @@ def compute_stats(  # noqa: C901
         Values were not comparable across regions before, which is what a per-target
         statistic exists to be. Whole-image results are unchanged.
 
+    .. versionchanged:: 1.2
+        ``entropy`` and ``histogram`` return NaN for a region that is entirely NaN — an
+        out-of-bounds box, or an image its boxes cover completely — where they previously
+        returned ``0.0`` and 256 zero bins. Every other statistic already answered NaN
+        for such a region; ``0.0`` entropy is indistinguishable from a genuinely flat
+        image and was reported as an outlier rather than skipped.
+
     Examples
     --------
     Compute all statistics:
