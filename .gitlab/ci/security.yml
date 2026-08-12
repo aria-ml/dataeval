@@ -21,7 +21,7 @@ gemnasium-python-dependency_scanning:
   needs: []
   variables:
     PIP_REQUIREMENTS_FILE: "requirements.cpu.txt"
-    DS_EXCLUDED_PATHS: "tests, docs, verification, output, .nox, prototype, uv.lock, poetry.lock, requirements.cu118.txt, requirements.cu128.txt, requirements.dev.txt"
+    DS_EXCLUDED_PATHS: "tests,docs,verification,output,.nox,prototype,uv.lock,poetry.lock,requirements.cu118.txt,requirements.cu128.txt,requirements.dev.txt"
   rules: *security_rules
   after_script:
     - python3 .gitlab/scripts/fix_unknown_licenses.py || echo "license patch failed; continuing"
@@ -29,4 +29,6 @@ gemnasium-python-dependency_scanning:
 semgrep-sast:
   stage: security
   needs: []
+  variables:
+    SAST_EXCLUDED_PATHS: "docs,output,tests,verification,.github,.gitlab,.nox,.venv"
   rules: *security_rules
