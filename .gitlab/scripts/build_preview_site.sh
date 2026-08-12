@@ -29,13 +29,29 @@ if [ -z "$links" ]; then
   exit 1
 fi
 
+# Title the page after the merge request so a tab full of previews stays
+# tellable apart. The title is author-supplied, so escape it before it lands
+# in the markup; it is unset outside merge request pipelines.
+html_escape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+
+mr_title=$(html_escape "${CI_MERGE_REQUEST_TITLE:-}")
+page_title="${CI_PROJECT_NAME} preview"
+mr_line="Merge request !${CI_MERGE_REQUEST_IID}"
+
+if [ -n "$mr_title" ]; then
+  page_title="${page_title} — ${mr_title}"
+  mr_line="${mr_line} &middot; ${mr_title}"
+fi
+
 cat > public/index.html <<EOF
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${CI_PROJECT_NAME} preview — MR !${CI_MERGE_REQUEST_IID}</title>
+<title>${page_title}</title>
 <style>
   :root {
     color-scheme: light dark;
@@ -81,7 +97,7 @@ cat > public/index.html <<EOF
 </head>
 <body>
 <h1>${CI_PROJECT_NAME} preview</h1>
-<p class="sub">Merge request !${CI_MERGE_REQUEST_IID} &middot; commit ${CI_COMMIT_SHORT_SHA}</p>
+<p class="sub">${mr_line} &middot; commit ${CI_COMMIT_SHORT_SHA}</p>
 <ul>
 ${links}
 </ul>
