@@ -117,6 +117,52 @@ def _flatten_column_vector(values: NDArray[Any]) -> NDArray[Any]:
     return values.reshape(-1) if values.ndim == 2 and values.shape[1] == 1 else values
 
 
+def _holds_no_values(values: NDArray[Any]) -> bool:
+    """Whether an array of a factor's values at one level holds no value at all.
+
+    An empty array is not "no values" in this sense: a level that has no rows holds
+    nothing for every factor alike, which says something about the dataset rather than
+    about this factor, and ``level="combined"`` promises its column names regardless.
+    """
+    if values.size == 0:
+        return False
+    if values.dtype.kind in "fc":
+        return bool(np.isnan(values).all())
+    if values.dtype.kind == "O":
+        return all(value is None or (isinstance(value, float) and np.isnan(value)) for value in values)
+    # Integer, boolean and fixed-width string arrays have no null to be made of.
+    return False
+
+
+def _drop_vacuous_splits(
+    columns: list[tuple[str, FactorLevel, NDArray[Any]]],
+) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
+    """Split one factor's level columns into those carrying values and those carrying none.
+
+    A statistic that only applies to some of the levels a source index spans still has
+    to be as long as the index to be placed at all, so it arrives padded with nulls at
+    the levels it does not describe — ``compute_stats(per_background=True)`` measures the
+    scene behind an image's annotations, which is a property of the image and of nothing
+    inside it, and so has nulls on every instance row. Splitting that array by level
+    yields one real column and one holding nothing. The empty one is not a factor: it
+    cannot be binned, and left in place it reaches every evaluator that reads
+    :attr:`~dataeval.Metadata.factor_names` — :class:`~dataeval.bias.Balance` reports it
+    as a row of zero mutual information rather than omitting it.
+
+    Only ever separates out a *part* of a split. A factor whose every level came back
+    empty is kept whole, so that a factor a caller passed in can never vanish entirely —
+    an all-null factor is then theirs to see in the frame rather than ours to hide.
+
+    Pure, and returns the discarded names rather than recording them, so that
+    :meth:`Metadata.add_factors` can still abandon the whole call on a later validation
+    failure without having already written to :attr:`~dataeval.Metadata.dropped_factors`.
+    """
+    kept = [column for column in columns if not _holds_no_values(column[2])]
+    if not kept:
+        return columns, []
+    return kept, [name for name, _, _ in columns if not any(name == kept_name for kept_name, _, _ in kept)]
+
+
 def _binned(name: str) -> str:
     return f"{name}↕"
 
@@ -1530,6 +1576,15 @@ class Metadata(Array, FeatureExtractor):
         -----
         Common removal reasons include incompatible data types, excessive
         missing values, or insufficient variation.
+
+        Two reasons are recorded by :meth:`add_factors` itself:
+
+        - ``"multi_dimensional"`` — the factor was not a 1-D array, so it has no
+          single-column form.
+        - ``"no_values_at_level"`` — a factor split across levels held nothing at one of
+          them, so that half was not written. The name recorded is the generated
+          ``<level>_<name>``, and the factor's other level(s) were kept. A factor whose
+          every level came back empty is kept whole rather than recorded here.
         """
         self._structure()
         return self._dropped_factors
@@ -2764,11 +2819,31 @@ class Metadata(Array, FeatureExtractor):
             if "multi_dimensional" not in reasons:
                 reasons.append("multi_dimensional")
 
+    def _record_vacuous(self, names: Sequence[str]) -> None:
+        """Record level splits that were discarded for holding no values at their level.
+
+        Reported rather than silent: the column is genuinely unusable — it cannot be
+        binned and carries nothing — but its absence is still a surprise to code that
+        expected the split to produce both halves, and :attr:`dropped_factors` is where
+        this metadata says what it did not keep and why.
+        """
+        if not names:
+            return
+        _logger.info(
+            "Skipping level splits %s; the factor has no value at that level, so the "
+            "column would be entirely null. Its other level(s) were kept.",
+            sorted(names),
+        )
+        for name in names:
+            reasons = self._dropped_factors.setdefault(name, [])
+            if "no_values_at_level" not in reasons:
+                reasons.append("no_values_at_level")
+
     def _resolve_by_source_index(
         self,
         factors: Mapping[str, NDArray[Any]],
         source_index: Sequence[SourceIndex],
-    ) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
+    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
         """Place every value by its source-index label rather than by its position.
 
         Parameters
@@ -2777,6 +2852,11 @@ class Metadata(Array, FeatureExtractor):
             One value per source-index entry, per factor.
         source_index : Sequence[SourceIndex]
             Label for each value.
+
+        Returns
+        -------
+        tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]
+            The columns to write, and any level splits discarded for holding no values.
         """
         _reject_length_mismatch(factors, source_index)
         return self._place(factors, self._split_source_index(source_index))
@@ -2786,7 +2866,7 @@ class Metadata(Array, FeatureExtractor):
         factors: Mapping[str, NDArray[Any]],
         positions_by_level: Mapping[FactorLevel, NDArray[np.intp]],
         qualify: bool = False,
-    ) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
+    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
         """Gather each factor onto the rows its positions name, and name the columns.
 
         Sole producer of the ``<level>_<name>`` rule, so every way of placing values by
@@ -2808,13 +2888,32 @@ class Metadata(Array, FeatureExtractor):
             independently of what the values turned out to cover, as ``level="combined"``
             promises it, so that a dataset whose label level happens to have no rows still
             names its columns the documented way.
+
+            Also suppresses the vacuous-split drop below, for the same reason and to the
+            same end: a caller told exactly which columns it will get must get them, even
+            where one of them turns out to hold nothing.
+
+        Returns
+        -------
+        tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]
+            The columns to write, and the names of any level splits discarded for holding
+            no values — for the caller to record, since this method stays pure.
         """
         prefixed = qualify or len(positions_by_level) > 1
-        return [
-            (f"{factor_level}_{name}" if prefixed else name, factor_level, values[positions])
-            for name, values in factors.items()
-            for factor_level, positions in positions_by_level.items()
-        ]
+        placed: list[tuple[str, FactorLevel, NDArray[Any]]] = []
+        vacuous: list[str] = []
+        for name, values in factors.items():
+            columns: list[tuple[str, FactorLevel, NDArray[Any]]] = [
+                (f"{factor_level}_{name}" if prefixed else name, factor_level, values[positions])
+                for factor_level, positions in positions_by_level.items()
+            ]
+            if qualify:
+                placed.extend(columns)
+                continue
+            kept, dropped = _drop_vacuous_splits(columns)
+            placed.extend(kept)
+            vacuous.extend(dropped)
+        return placed, vacuous
 
     def _resolve_requested_level(
         self,
@@ -2855,7 +2954,10 @@ class Metadata(Array, FeatureExtractor):
         # straight from the public method.
         return self._resolve_level(level, stacklevel=5)
 
-    def _resolve_combined(self, factors: Mapping[str, NDArray[Any]]) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
+    def _resolve_combined(
+        self,
+        factors: Mapping[str, NDArray[Any]],
+    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
         """Split a v1.1 ``"combined"`` array into one factor per level.
 
         ``"combined"`` was never a level. It was v1.1's name for an array ordered by
@@ -2909,8 +3011,9 @@ class Metadata(Array, FeatureExtractor):
             )
         # qualify=True rather than letting the data decide: the deprecation warning has
         # already promised '<item_level>_<name>' and '<label_level>_<name>', and a dataset
-        # whose label level happens to have no rows must not silently rename the columns
-        # out from under a caller following that warning.
+        # whose label level happens to have no rows — or whose values at one of them are
+        # all null — must not silently rename or remove the columns out from under a
+        # caller following that warning. It therefore keeps both halves unconditionally.
         return self._place(factors, self._combined_positions(), qualify=True)
 
     def _combined_positions(self) -> dict[FactorLevel, NDArray[np.intp]]:
@@ -2950,13 +3053,17 @@ class Metadata(Array, FeatureExtractor):
         factors: Mapping[str, NDArray[Any]],
         level: FactorLevel | Literal["combined"] | None,
         source_index: Sequence[SourceIndex] | None,
-    ) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
+    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
         """Work out the level and values of every column ``add_factors`` is about to write.
 
         Returns one entry per column as ``(name, level, values)``, where ``values`` holds
         one value per row at ``level``. ``level`` is None when it is to be inferred per
         factor. Both a source index spanning several levels and the retired
         ``"combined"`` spelling yield several columns per factor, named ``<level>_<name>``.
+
+        Alongside them, the names of any level splits discarded for holding no values, for
+        the caller to record. Only the multi-level paths can produce any: an explicit
+        `level` writes exactly the columns it was asked for, whatever they hold.
 
         The two arguments are mutually exclusive; :meth:`add_factors` rejects the
         combination before resolving either, so that the error names what the caller
@@ -2970,7 +3077,7 @@ class Metadata(Array, FeatureExtractor):
 
         if level is not None:
             self._validate_factor_lengths(factors, level)
-            return [(name, level, values) for name, values in factors.items()]
+            return [(name, level, values) for name, values in factors.items()], []
 
         # Each factor is inferred independently, so a mapping mixing unit-level and
         # instance-level arrays can be added in a single call. Written as a loop rather than
@@ -2984,7 +3091,7 @@ class Metadata(Array, FeatureExtractor):
     def _resolve_destinations(
         self,
         destinations: Sequence[tuple[str, FactorLevel | Literal["combined"], NDArray[Any]]],
-    ) -> list[tuple[str, FactorLevel, NDArray[Any]]]:
+    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
         """Turn inferred destinations into columns, batching the combined ones.
 
         Batched rather than resolved one at a time because :meth:`_resolve_combined` ranks
@@ -2995,11 +3102,13 @@ class Metadata(Array, FeatureExtractor):
         resolved: list[tuple[str, FactorLevel, NDArray[Any]]] = [
             (name, level, values) for name, level, values in destinations if level != "combined"
         ]
+        vacuous: list[str] = []
         combined = {name: values for name, level, values in destinations if level == "combined"}
         if combined:
             self._warn_inferred_combined(sorted(combined))
-            resolved.extend(self._resolve_combined(combined))
-        return resolved
+            placed, vacuous = self._resolve_combined(combined)
+            resolved.extend(placed)
+        return resolved, vacuous
 
     def _warn_inferred_combined(self, names: Sequence[str]) -> None:
         """Warn that factors were placed by the retired combined convention.
@@ -3187,7 +3296,8 @@ class Metadata(Array, FeatureExtractor):
 
         taken = set(self._dataframe.columns)
         resolved: list[tuple[str, FactorLevel, pl.Series]] = []
-        for name, factor_level, values in self._resolve_factor_levels(kept, resolved_level, source_index):
+        placed, vacuous = self._resolve_factor_levels(kept, resolved_level, source_index)
+        for name, factor_level, values in placed:
             # Rows at ``factor_level`` take their own value and descendant rows inherit
             # from their ancestor; rows at unrelated or higher levels get null.
             column = self._layout.expand(values, factor_level)
@@ -3202,6 +3312,7 @@ class Metadata(Array, FeatureExtractor):
             resolved.append((col_name, factor_level, pl.Series(name=col_name, values=column, dtype=dtype)))
 
         self._record_multidimensional(skipped)
+        self._record_vacuous(vacuous)
         self._commit_factors(resolved)
 
     def _commit_factors(self, resolved: Sequence[tuple[str, FactorLevel, pl.Series]]) -> None:

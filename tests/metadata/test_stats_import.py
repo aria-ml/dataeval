@@ -9,6 +9,8 @@ apart. Only real output pins the two together.
 The matrix is (IC, OD) x (per_image, per_target, both) x (add_factors, from_factors).
 """
 
+from typing import Any
+
 import numpy as np
 import pytest
 
@@ -42,9 +44,14 @@ def _boxes(labels: list[list[int]]) -> list[list[list[int]]]:
     return [[[j, j, 10 + j, 12 + j] for j, _ in enumerate(image_labels)] for image_labels in labels]
 
 
+def _od_dataset(labels: list[list[int]], boxes: list[list[list[int]]] | None = None) -> Any:
+    """Build a mock object detection dataset, typed as loosely as the fixtures are."""
+    return _get_mock_od_dataset(_images(len(labels)), labels, _boxes(labels) if boxes is None else boxes)
+
+
 @pytest.fixture
 def od_dataset():
-    return _get_mock_od_dataset(_images(len(OD_LABELS)), OD_LABELS, _boxes(OD_LABELS))
+    return _od_dataset(OD_LABELS)
 
 
 @pytest.fixture
@@ -444,3 +451,56 @@ class TestStatsResultIsAccepted:
     )
     def test_detection_requires_both_keys_and_both_value_types(self, candidate, expected):
         assert _is_stats_result(candidate) is expected
+
+
+class TestVacuousSplitsAreReported:
+    """A level split that holds nothing is dropped, but never silently."""
+
+    def test_a_pre_existing_all_null_split_is_recorded_too(self):
+        """Boxes that all miss their images make every instance statistic null.
+
+        Nothing about that is background-specific, and the column is as unusable as a
+        background one, so it is dropped the same way — and reported, so that code
+        expecting both halves of the split can find out where the other one went.
+        """
+        dataset = _od_dataset([[0], [1], [0]], [[[100, 100, 110, 110]]] * 3)
+        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+
+        md = Metadata(dataset)
+        md.add_factors(result)
+
+        assert "unit_mean" in md.factor_names
+        assert "instance_mean" not in md.factor_names
+        assert md.dropped_factors["instance_mean"] == ["no_values_at_level"]
+
+    def test_combined_keeps_both_halves_it_promised(self):
+        """``level="combined"`` names its columns up front, so it keeps them regardless.
+
+        The deprecation warning tells the caller exactly which two columns it will get.
+        Dropping one for holding nothing would rename the result out from under code
+        following that warning, which is the thing ``qualify=True`` exists to prevent.
+        """
+        md = Metadata(_od_dataset([[0], [1], [0]]))
+
+        # Three unit rows with values, three instance rows without.
+        values = np.concatenate([np.arange(3.0), np.full(3, np.nan)])
+        with pytest.deprecated_call():
+            md.add_factors({"foo": values}, level="combined")
+
+        assert "unit_foo" in md.factor_names
+        assert "instance_foo" in md.factor_names
+        assert md.dropped_factors == {}
+
+    def test_a_factor_empty_at_every_level_is_kept_whole(self):
+        """Dropping every half would make the factor vanish, which is never the answer."""
+        dataset = _od_dataset([[0], [1], [0]])
+        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+
+        md = Metadata(dataset)
+        md.add_factors(
+            {"all_null": np.full(len(result["source_index"]), np.nan)},
+            source_index=result["source_index"],
+        )
+
+        assert {"unit_all_null", "instance_all_null"} <= set(md.factor_names)
+        assert md.dropped_factors == {}
