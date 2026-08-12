@@ -450,16 +450,16 @@ flags remain valid.
 ## References
 
 1. [Birodkar, V., Mobahi, H., & Bengio, S. (2019). Semantic redundancy in image
-   classification datasets. _arXiv preprint arXiv:1901.11409._ [paper](https://arxiv.org/abs/1901.11409)]{#ref1}
+   classification datasets. *arXiv preprint arXiv:1901.11409.* [paper](https://arxiv.org/abs/1901.11409)]{#ref1}
 
 2. [Polyzotis, N., Roy, S., Whang, S. E., & Zinkevich, M. (2018). Data management
-   challenges in production machine learning. In _Proceedings of the 2017 ACM
-   SIGMOD International Conference on Management of Data_ (pp. 1723–1726). [paper](https://dl.acm.org/doi/10.1145/3035918.3054782)]{#ref2}
+   challenges in production machine learning. In *Proceedings of the 2017 ACM
+   SIGMOD International Conference on Management of Data* (pp. 1723–1726). [paper](https://dl.acm.org/doi/10.1145/3035918.3054782)]{#ref2}
 
 3. [Sculley, D., Holt, G., Golovin, D., Davydov, E., Phillips, T., Ebner, D.,
    Chaudhuri, V., Young, M., Crespo, J.-F., & Dennison, D. (2015). Hidden
-   technical debt in machine learning systems. In _Advances in Neural Information
-   Processing Systems_ (Vol. 28). [paper](https://proceedings.neurips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf)]{#ref3}
+   technical debt in machine learning systems. In *Advances in Neural Information
+   Processing Systems* (Vol. 28). [paper](https://proceedings.neurips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf)]{#ref3}
 
 4. [Zauner, C. (2010). Implementation and benchmarking of perceptual image hash
-   functions. _Bachelor's thesis, Upper Austria University of Applied Sciences._ [thesis](https://www.phash.org/docs/pubs/thesis_zauner.pdf)]{#ref4}
+   functions. *Bachelor's thesis, Upper Austria University of Applied Sciences.* [thesis](https://www.phash.org/docs/pubs/thesis_zauner.pdf)]{#ref4}
