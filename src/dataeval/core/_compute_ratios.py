@@ -7,7 +7,7 @@ from typing import Any, TypeAlias
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.core._compute_stats import StatsResult
+from dataeval.core._compute_stats import BACKGROUND_PREFIX, StatsResult
 from dataeval.types import SourceIndex
 from dataeval.utils._internal import EPSILON
 
@@ -222,10 +222,50 @@ def _validate_separate_inputs(  # noqa: C901
     return img_source_indices, box_source_indices
 
 
-def _validate_unified_input(source_indices: Sequence[SourceIndex]) -> None:
+def _ratio_keys(stats: Mapping[str, NDArray[Any]]) -> list[str]:
+    """Return the statistic names a ratio can be taken of.
+
+    Background statistics are excluded. They exist only on the image rows — a box has no
+    background of its own — so pairing one against "its" box value would divide a real
+    number by the null standing in for a measurement that was never made, and produce a
+    column of NaN under a name that reads like a result.
+    """
+    return [name for name in stats if not name.startswith(BACKGROUND_PREFIX)]
+
+
+def _measured_anywhere(values: NDArray[Any], positions: NDArray[np.intp]) -> bool:
+    """Whether any of ``positions`` holds a real value rather than a placeholder."""
+    if len(positions) == 0:
+        return False
+    taken = np.asarray(values)[positions]
+    if taken.dtype.kind in "fc":
+        return bool(np.isfinite(taken).any())
+    if taken.dtype.kind == "O":
+        return any(not (isinstance(v, float) and np.isnan(v)) for v in taken.ravel())
+    # Integer, boolean and fixed-width string arrays have no placeholder to hold.
+    return True
+
+
+def _validate_unified_input(source_indices: Sequence[SourceIndex], stats: Mapping[str, NDArray[Any]]) -> None:
     """Validate that unified stats output contains both image and box entries."""
     has_image_entries = any(si.target is None for si in source_indices)
     has_target_entries = any(si.target is not None for si in source_indices)
+
+    # `per_background=True` puts an item-level row on every image whether or not
+    # `per_image` asked for one, because that row is where a background value lives. Such
+    # a row carries background statistics and a null for every other name, so counting
+    # rows alone would read a background-only run as having image-level statistics and
+    # return a table of NaN instead of saying what was missing. Ask what the rows hold.
+    image_positions = np.array([i for i, si in enumerate(source_indices) if si.target is None], dtype=np.intp)
+    ratio_keys = _ratio_keys(stats)
+    if has_image_entries and not any(_measured_anywhere(stats[name], image_positions) for name in ratio_keys):
+        raise ValueError(
+            "stats_output has image-level entries, but every statistic on them is null — the rows "
+            "carry background values only. This is what compute_stats(per_image=False, "
+            "per_background=True) produces: the background needs an image-level row to live on, but "
+            "no image-level statistics were computed to fill it. A ratio needs an image-level value "
+            "to divide each box's value by, so pass per_image=True as well.",
+        )
 
     if not has_image_entries:
         raise ValueError(
@@ -367,7 +407,7 @@ def compute_ratios(  # noqa: C901
     else:
         # Pattern 1: Unified input
         source_indices: Sequence[SourceIndex] = stats_output[SOURCE_INDEX_KEY]
-        _validate_unified_input(source_indices)
+        _validate_unified_input(source_indices, stats_output["stats"])
         _logger.debug("Using unified input: %d total entries", len(source_indices))
         source_indices_for_lookup = source_indices
         source_indices_for_boxes = source_indices
@@ -381,7 +421,8 @@ def compute_ratios(  # noqa: C901
     img_lookup = _build_image_lookup(source_indices_for_lookup)
 
     # Calculate overlapping stats keys for ratio calculation
-    overlapping_keys = set(img_calc_result["stats"]) & set(box_calc_result["stats"])
+    # Background names are dropped here rather than divided: see _ratio_keys.
+    overlapping_keys = set(_ratio_keys(img_calc_result["stats"])) & set(_ratio_keys(box_calc_result["stats"]))
     _logger.debug("Computing ratios for %d overlapping stats: %s", len(overlapping_keys), sorted(overlapping_keys))
 
     # Find all box indices and their corresponding image indices

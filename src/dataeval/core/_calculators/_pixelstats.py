@@ -61,6 +61,10 @@ class PixelStatCalculator(Calculator[ImageStats]):
         """Return which flags this calculator handles."""
         return ImageStats.PIXEL
 
+    def supports_exclusion(self) -> bool:
+        """Pixel statistics are NaN-aware reductions, so a masked region is simply not counted."""
+        return True
+
     def _nan_list(self) -> list[float]:
         """Return NaN values matching the expected output shape for all-NaN data."""
         if self.per_channel_mode:
@@ -162,17 +166,36 @@ class PixelStatCalculator(Calculator[ImageStats]):
         with np.errstate(divide="ignore", invalid="ignore"):
             return [float(-np.nansum(h * np.log(np.where(h > 0, h, 1.0))) + 0.0)]
 
+    def _as_fraction(self, counted: Any) -> list[float]:
+        """Express a per-channel or whole-image count as a fraction of the pixels measured.
+
+        Pixels the cache excluded are in neither half of the ratio: they are not
+        measurements, and — although they are NaN in the image, since NaN is how the
+        exclusion is carried — they are not missing data either. Subtracting them from
+        both the count and the total is what keeps ``missing`` and ``zeros`` reporting
+        on the region actually being reduced over rather than on the mask's size.
+        """
+        if self.per_channel_mode:
+            total = self.cache.per_channel.shape[1] - self.cache.excluded_per_channel
+            if total <= 0:
+                return [np.nan] * self.cache.channel_count
+            return (np.asarray(counted, dtype=np.float64) / total).tolist()
+        total = self.cache.image.size - self.cache.excluded_total
+        if total <= 0:
+            return [np.nan]
+        return [float(counted / total)]
+
     def _missing(self) -> list[float]:
         if self.per_channel_mode:
-            return (
-                np.count_nonzero(np.isnan(self.cache.per_channel), axis=1) / self.cache.per_channel.shape[1]
-            ).tolist()
-        return [float(np.count_nonzero(np.isnan(self.cache.image)) / self.cache.image.size)]
+            nans = np.count_nonzero(np.isnan(self.cache.per_channel), axis=1) - self.cache.excluded_per_channel
+            return self._as_fraction(nans)
+        return self._as_fraction(np.count_nonzero(np.isnan(self.cache.image)) - self.cache.excluded_total)
 
     def _zeros(self) -> list[float]:
+        # Excluded pixels are NaN, never 0, so only the denominator needs correcting here.
         if self.per_channel_mode:
-            return (np.count_nonzero(self.cache.per_channel == 0, axis=1) / self.cache.per_channel.shape[1]).tolist()
-        return [float(np.count_nonzero(self.cache.image == 0) / self.cache.image.size)]
+            return self._as_fraction(np.count_nonzero(self.cache.per_channel == 0, axis=1))
+        return self._as_fraction(np.count_nonzero(self.cache.image == 0))
 
     def _histogram(self) -> list[Any]:
         # As _entropy: an all-zero histogram over unmeasured data would read as a real

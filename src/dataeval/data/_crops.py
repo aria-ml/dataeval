@@ -348,7 +348,15 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
     def _mask_box(
         self, crop: NDArray[Any], origin: tuple[int, int], x0: float, y0: float, x1: float, y1: float
     ) -> None:
-        """Mask the original box (in crop coordinates) to the fill value, in place."""
+        """Mask the original box (in crop coordinates) to the fill value, in place.
+
+        Rounds to nearest, matching the crop window this masks within rather than
+        :func:`~dataeval.utils.preprocessing.boxes_to_mask`, which rounds outwards to
+        guarantee it covers every pixel a box touches. The two therefore disagree by up
+        to a one-pixel ring, so a ``region="surround"`` crop and a
+        ``compute_stats(per_background=True)`` background are near but not identical
+        regions.
+        """
         ox, oy = origin
         mx0, my0 = max(int(round(x0)) - ox, 0), max(int(round(y0)) - oy, 0)
         mx1, my1 = min(int(round(x1)) - ox, crop.shape[-1]), min(int(round(y1)) - oy, crop.shape[-2])

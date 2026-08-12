@@ -10,6 +10,7 @@ from dataeval.utils.preprocessing import (
     BitDepth,
     BoundingBox,
     BoundingBoxFormat,
+    boxes_to_mask,
     clip_box,
     compute_iou,
     crop_with_fill,
@@ -287,6 +288,49 @@ class TestBoundingBoxUtilityFunctions:
 
     def test_is_valid_box_false_negative_dimensions(self):
         assert is_valid_box((30, 40, 10, 20)) is False
+
+
+@pytest.mark.required
+class TestBoxesToMask:
+    def test_shape_and_dtype_ignore_channels(self):
+        mask = boxes_to_mask((3, 8, 6), [(0, 0, 2, 2)])
+        assert mask.shape == (8, 6)
+        assert mask.dtype == np.bool_
+
+    def test_no_boxes_is_all_false(self):
+        assert not boxes_to_mask((3, 4, 4), []).any()
+
+    def test_covers_exactly_the_box(self):
+        mask = boxes_to_mask((3, 4, 4), [(1, 2, 3, 4)])
+        expected = np.zeros((4, 4), dtype=bool)
+        expected[2:4, 1:3] = True
+        np.testing.assert_array_equal(mask, expected)
+
+    def test_overlapping_boxes_union(self):
+        mask = boxes_to_mask((3, 4, 4), [(0, 0, 2, 2), (1, 1, 3, 3)])
+        assert mask.sum() == 7
+
+    def test_out_of_bounds_box_is_clipped(self):
+        mask = boxes_to_mask((2, 2), [(1, 1, 99, 99)])
+        np.testing.assert_array_equal(mask, np.array([[False, False], [False, True]]))
+
+    def test_box_entirely_outside_contributes_nothing(self):
+        assert not boxes_to_mask((4, 4), [(10, 10, 20, 20)]).any()
+
+    def test_degenerate_box_contributes_nothing(self):
+        assert not boxes_to_mask((4, 4), [(1, 1, 1, 3)]).any()
+
+    def test_fractional_box_rounds_outwards(self):
+        # Rounding outwards keeps the mask covering every pixel the box touches.
+        mask = boxes_to_mask((4, 4), [(0.6, 0.6, 2.2, 2.2)])
+        expected = np.zeros((4, 4), dtype=bool)
+        expected[0:3, 0:3] = True
+        np.testing.assert_array_equal(mask, expected)
+
+    def test_accepts_bounding_box_objects(self):
+        box = BoundingBox(0, 0, 2, 2, image_shape=(3, 4, 4))
+        mask = boxes_to_mask((3, 4, 4), [box])
+        assert mask.sum() == 4
 
 
 @pytest.mark.required

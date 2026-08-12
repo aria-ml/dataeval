@@ -1,3 +1,4 @@
+import warnings
 from unittest.mock import patch
 
 import numpy as np
@@ -14,6 +15,7 @@ from dataeval.core._calculators._hashstats import HashStatCalculator
 from dataeval.core._calculators._pixelstats import PixelStatCalculator
 from dataeval.core._calculators._visualstats import QUARTILES, VisualStatCalculator
 from dataeval.flags import ImageStats
+from dataeval.types import SourceIndex
 from dataeval.utils.preprocessing import BoundingBox, get_bitdepth, rescale
 
 
@@ -774,7 +776,7 @@ class TestPerImagePerBox:
         """Test that per_image=False and per_target=False raises ValueError."""
         images = [np.random.random((3, 10, 10))]
 
-        with pytest.raises(ValueError, match="At least one of 'per_image' or 'per_target' must be True"):
+        with pytest.raises(ValueError, match="At least one of 'per_image', 'per_target' or 'per_background'"):
             compute_stats(images, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=False, per_channel=False)
 
     def test_object_count_tracking(self):
@@ -1740,6 +1742,268 @@ class TestDependencyRemoval:
         assert "percentiles" not in result["stats"]
 
 
+class TestPerBackground:
+    """Test per_background: statistics over the pixels an image's boxes do not cover."""
+
+    @staticmethod
+    def _image_with_bright_box(shape=(3, 20, 20), box=(0, 0, 10, 10)):
+        """An image whose boxed region is brighter than everything around it."""
+        rng = np.random.default_rng(0)
+        image = (rng.random(shape) * 100).astype(np.uint8)
+        x0, y0, x1, y1 = box
+        image[:, y0:y1, x0:x1] = 250
+        return image
+
+    def test_background_stats_share_the_image_row(self):
+        """Background values land on the item's existing row, under prefixed names."""
+        images = [self._image_with_bright_box()]
+        boxes = [[(0, 0, 10, 10)]]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        # One row for the image, one for its box - the background added no row.
+        assert len(result["source_index"]) == 2
+        assert result["source_index"][0] == SourceIndex(0, None, None)
+        assert result["source_index"][1] == SourceIndex(0, 0, None)
+        assert set(result["stats"]) == {"mean", "background_mean", "background_fraction"}
+
+    def test_background_excludes_the_boxed_pixels(self):
+        """The background mean is taken over exactly the unboxed pixels."""
+        images = [self._image_with_bright_box()]
+        boxes = [[(0, 0, 10, 10)]]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            per_image=False,
+            normalize_pixel_values=False,
+        )
+
+        mask = np.zeros((20, 20), dtype=bool)
+        mask[0:10, 0:10] = True
+        expected = images[0][:, ~mask].mean()
+
+        assert result["stats"]["background_mean"][0] == pytest.approx(expected, abs=1e-3)
+        # The bright box is gone, so the background sits well below the whole image.
+        assert result["stats"]["background_mean"][0] < images[0].mean()
+
+    def test_background_fraction_counts_overlap_once(self):
+        """Overlapping boxes are unioned, so a twice-covered pixel is still one pixel."""
+        images = [np.zeros((3, 10, 10), dtype=np.uint8)]
+        boxes = [[(0, 0, 6, 6), (4, 4, 10, 10)]]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        # 36 + 36 - 4 overlapping = 68 covered of 100.
+        assert result["stats"]["background_fraction"][0] == pytest.approx(0.32)
+
+    def test_background_fraction_is_one_without_boxes(self):
+        """An image with no detections has a background equal to the whole image."""
+        images = [self._image_with_bright_box(), self._image_with_bright_box()]
+        boxes = [[(0, 0, 10, 10)], []]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        image_rows = [i for i, s in enumerate(result["source_index"]) if s.target is None]
+        empty = image_rows[1]
+        assert result["stats"]["background_fraction"][empty] == pytest.approx(1.0)
+        assert result["stats"]["background_mean"][empty] == pytest.approx(result["stats"]["mean"][empty], abs=1e-3)
+
+    def test_fully_covered_image_yields_nan(self):
+        """Boxes covering everything leave nothing to measure."""
+        images = [self._image_with_bright_box()]
+        boxes = [[(0, 0, 20, 20)]]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL | ImageStats.VISUAL,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        assert result["stats"]["background_fraction"][0] == pytest.approx(0.0)
+        for name in ("background_mean", "background_brightness", "background_missing", "background_zeros"):
+            assert np.isnan(result["stats"][name][0])
+        # The unmasked statistics on the same row are unaffected.
+        assert not np.isnan(result["stats"]["mean"][0])
+
+    def test_box_rows_carry_no_background_values(self):
+        """Background is a property of the image, so box rows hold nulls for it."""
+        images = [self._image_with_bright_box()]
+        boxes = [[(0, 0, 10, 10), (12, 12, 16, 16)]]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        # Every stat array stays one-to-one with the source index.
+        assert all(len(values) == len(result["source_index"]) for values in result["stats"].values())
+        for i, source in enumerate(result["source_index"]):
+            if source.target is not None:
+                assert np.isnan(result["stats"]["background_mean"][i])
+                assert np.isnan(result["stats"]["background_fraction"][i])
+
+    def test_missing_and_zeros_discount_the_mask(self):
+        """The mask is not missing data, and is in neither half of a fraction."""
+        images = [np.zeros((1, 10, 10), dtype=np.float64)]
+        images[0][:, 0:5, :] = np.nan  # half the image genuinely missing
+        boxes = [[(0, 0, 10, 5)]]  # ... and that same half is boxed out
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MISSING | ImageStats.PIXEL_ZEROS,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        # The whole image is half NaN and half zeros.
+        assert result["stats"]["missing"][0] == pytest.approx(0.5)
+        assert result["stats"]["zeros"][0] == pytest.approx(0.5)
+        # The background is the other half: no missing data, and all of it zeros.
+        assert result["stats"]["background_missing"][0] == pytest.approx(0.0)
+        assert result["stats"]["background_zeros"][0] == pytest.approx(1.0)
+
+    def test_per_channel_places_fraction_on_the_channel_none_row(self):
+        """A single-valued statistic keeps its channel=None row in per-channel mode."""
+        images = [self._image_with_bright_box()]
+        boxes = [[(0, 0, 10, 10)]]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            per_target=False,
+            per_channel=True,
+            normalize_pixel_values=False,
+        )
+
+        by_channel = {s.channel: i for i, s in enumerate(result["source_index"])}
+        assert set(by_channel) == {None, 0, 1, 2}
+        assert result["stats"]["background_fraction"][by_channel[None]] == pytest.approx(0.75)
+        for channel in (0, 1, 2):
+            assert not np.isnan(result["stats"]["background_mean"][by_channel[channel]])
+
+    def test_background_only_omits_the_unmasked_stats(self):
+        """per_image=False with per_background=True yields the background row alone."""
+        images = [self._image_with_bright_box()]
+        boxes = [[(0, 0, 10, 10)]]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=False,
+            per_target=False,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        assert set(result["stats"]) == {"background_mean", "background_fraction"}
+        assert len(result["source_index"]) == 1
+        assert result["source_index"][0] == SourceIndex(0, None, None)
+
+    def test_hash_and_dimension_stats_are_skipped_for_background(self):
+        """Statistics that cannot describe a masked region are not computed for it."""
+        images = [self._image_with_bright_box()]
+        boxes = [[(0, 0, 10, 10)]]
+
+        result = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.HASH_XXHASH | ImageStats.DIMENSION_WIDTH | ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        # Still computed for the image and its boxes...
+        assert "xxhash" in result["stats"]
+        assert "width" in result["stats"]
+        # ... but they have no background counterpart.
+        assert "background_xxhash" not in result["stats"]
+        assert "background_width" not in result["stats"]
+        assert "background_mean" in result["stats"]
+
+    def test_no_applicable_stats_warns(self):
+        """Asking only for statistics the background cannot carry is worth saying."""
+        images = [self._image_with_bright_box()]
+        boxes = [[(0, 0, 10, 10)]]
+
+        with pytest.warns(UserWarning, match="none of the requested statistics apply to a background region"):
+            result = compute_stats(
+                images,
+                boxes=boxes,
+                stats=ImageStats.DIMENSION_WIDTH,
+                per_background=True,
+                normalize_pixel_values=False,
+            )
+
+        assert set(result["stats"]) == {"width", "background_fraction"}
+
+    def test_two_dimensional_image_is_masked(self):
+        """A (H, W) image has no channel axis to reach the crop path by, but is still masked.
+
+        Regression test: the background row carries no box of its own, so a guard keyed
+        on "has a box, or has channels" let single-channel images through unmasked and
+        returned the whole image's statistics under the background's name.
+        """
+        image = np.zeros((20, 20), dtype=np.uint8)
+        image[0:10, 0:10] = 255
+
+        result = compute_stats(
+            [image],
+            boxes=[[(0, 0, 10, 10)]],
+            stats=ImageStats.PIXEL_MEAN | ImageStats.PIXEL_ZEROS,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        assert result["stats"]["mean"][0] == pytest.approx(63.75)
+        # Everything bright was boxed out, so the background is the zeros that remain.
+        assert result["stats"]["background_mean"][0] == pytest.approx(0.0)
+        assert result["stats"]["background_zeros"][0] == pytest.approx(1.0)
+        assert result["stats"]["background_fraction"][0] == pytest.approx(0.75)
+
+    def test_ignored_without_boxes(self):
+        """per_background is defined by the boxes, so it is inert without them."""
+        images = [np.random.random((3, 10, 10))]
+
+        result = compute_stats(
+            images,
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        assert set(result["stats"]) == {"mean"}
+
+
 class TestBitDepthAnchoring:
     """Every view of one datum is scaled and binned against the whole datum's range.
 
@@ -1801,6 +2065,33 @@ class TestBitDepthAnchoring:
         for name in ("mean", "entropy"):
             assert result["stats"][name][0] == pytest.approx(result["stats"][name][1], rel=1e-6)
 
+    def test_background_is_scaled_like_its_image(self):
+        """Masking removes the image's brightest pixels without changing the scale."""
+        image = self._dark_box_image()
+
+        result = compute_stats(
+            [image],
+            # Box out the bright region, leaving only the dark corner as background.
+            boxes=[[(0, 10, 20, 20)]],
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=True,
+        )
+        boxed_out = compute_stats(
+            [image],
+            boxes=[[(0, 10, 20, 20)]],
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=False,
+            normalize_pixel_values=True,
+        )
+
+        # Background and box are disjoint halves of one image, both divided by 4095, so
+        # their means average back to the whole image's.
+        whole = result["stats"]["mean"][0]
+        assert (result["stats"]["background_mean"][0] + boxed_out["stats"]["mean"][0]) / 2 == pytest.approx(
+            whole, rel=1e-4
+        )
+
 
 class TestRescaleAnchor:
     """`rescale` accepts the range to scale from, which is what the cache passes it."""
@@ -1814,3 +2105,55 @@ class TestRescaleAnchor:
         crop = np.array([[0, 1]], dtype=np.uint8)
         anchor = get_bitdepth(np.array([[0, 255]], dtype=np.uint8))
         np.testing.assert_allclose(rescale(crop, bitdepth=anchor), [[0.0, 1 / 255]])
+
+
+class TestBackgroundEdgeCases:
+    """Cases the background pass has to answer for rather than fall through."""
+
+    def test_fully_covered_image_has_no_zero_entropy(self):
+        """Regression: entropy and histogram once read an empty histogram as flat data."""
+        image = (np.random.default_rng(0).random((3, 20, 20)) * 255).astype(np.uint8)
+
+        result = compute_stats(
+            [image],
+            boxes=[[(0, 0, 20, 20)]],
+            stats=ImageStats.PIXEL,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        assert np.isnan(result["stats"]["background_entropy"][0])
+        assert np.isnan(np.asarray(result["stats"]["background_histogram"][0], dtype=float)).all()
+
+    def test_empty_datum_reports_no_fraction_and_stays_quiet(self):
+        """A datum with no pixels has no background to report, and nothing to warn about."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = compute_stats(
+                [np.zeros((3, 0, 0))],
+                boxes=[[(0, 0, 1, 1)]],
+                stats=ImageStats.PIXEL_MEAN,
+                per_background=True,
+                normalize_pixel_values=False,
+            )
+
+        assert np.isnan(result["stats"]["background_fraction"][0])
+
+    def test_maskable_calculators_come_from_the_calculators(self):
+        """Which statistics survive masking is each calculator's own answer."""
+        assert PixelStatCalculator.__new__(PixelStatCalculator).supports_exclusion() is True
+        assert VisualStatCalculator.__new__(VisualStatCalculator).supports_exclusion() is True
+        assert DimensionStatCalculator.__new__(DimensionStatCalculator).supports_exclusion() is False
+        assert HashStatCalculator.__new__(HashStatCalculator).supports_exclusion() is False
+
+    def test_a_new_calculator_defaults_to_not_maskable(self):
+        """The base class opts out, so a calculator is never masked before it is checked."""
+
+        class Unchecked(Calculator[ImageStats]):
+            def get_applicable_flags(self) -> ImageStats:
+                return ImageStats.PIXEL
+
+            def get_handlers(self):
+                return {}
+
+        assert Unchecked.__new__(Unchecked).supports_exclusion() is False

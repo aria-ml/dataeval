@@ -43,6 +43,32 @@ class Calculator(ABC, Generic[TFlag]):
             Typically a group flag like ImageStats.PIXEL or TextStats.SENTIMENT.
         """
 
+    def supports_exclusion(self) -> bool:
+        """
+        Whether this calculator's statistics survive part of the region being masked out.
+
+        A masked region reaches a calculator as NaN pixels, so only statistics computed
+        by NaN-aware reductions mean anything over one. Two kinds do not, and say so by
+        returning False:
+
+        - those that digest the pixel buffer itself, such as hashes, which are not stable
+          under NaN and which resize routines turn into noise;
+        - those that describe the region's geometry rather than its contents, which the
+          mask does not change and which would restate the unmasked values under a new
+          name.
+
+        Consulted by :func:`~dataeval.core.compute_stats` when ``per_background=True``,
+        which is the only caller that masks. Declared here rather than as a list of flags
+        elsewhere so that a new calculator answers for itself.
+
+        Returns
+        -------
+        bool
+            True if this calculator may be run over a partially masked region.
+            Defaults to False — a new calculator opts in once it has been checked.
+        """
+        return False
+
     @abstractmethod
     def get_handlers(self) -> dict[TFlag, tuple[str, Callable[[], list[Any]]]]:
         """

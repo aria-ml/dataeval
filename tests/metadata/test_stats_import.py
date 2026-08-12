@@ -453,8 +453,91 @@ class TestStatsResultIsAccepted:
         assert _is_stats_result(candidate) is expected
 
 
+class TestBackgroundStatsImport:
+    """``per_background`` output through ``add_factors``, which is how it gets analyzed."""
+
+    def test_background_lands_at_the_unit_level(self, od_dataset):
+        result = compute_stats(od_dataset, stats=SCALAR_STATS, per_background=True, normalize_pixel_values=False)
+
+        md = Metadata(od_dataset)
+        md.add_factors(result)
+
+        # One value per image, stored on the unit rows and inherited by the instances
+        # beneath them - which is what lets an object be compared against its own scene.
+        units = md.rows_at("unit")
+        assert units.height == len(OD_LABELS)
+        assert units["unit_background_mean"].null_count() == 0
+
+        by_item = dict(zip(units["item_index"], units["unit_background_mean"], strict=True))
+        instances = md.rows_at("instance")
+        for item, value in zip(instances["item_index"], instances["unit_background_mean"], strict=True):
+            assert value == pytest.approx(by_item[item])
+
+    def test_background_matches_the_source_index_row_for_row(self, od_dataset):
+        """The stored values are the computed ones, on the rows the source index named."""
+        result = compute_stats(
+            od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False
+        )
+        expected = {
+            source: value
+            for source, value in zip(result["source_index"], result["stats"]["background_mean"], strict=True)
+            if source.target is None
+        }
+        assert _distinct(list(expected.values()))
+
+        md = Metadata(od_dataset)
+        md.add_factors(result)
+
+        # Read the unit rows alone: the value is stored there and *inherited* by the
+        # instance rows beneath, so an unfiltered read returns each value once per
+        # detection as well as once per image.
+        units = md.rows_at("unit")
+        stored = {
+            SourceIndex(int(item), None): value
+            for item, value in zip(units["item_index"], units["unit_background_mean"], strict=True)
+        }
+        assert stored == pytest.approx(expected)
+
+    def test_instance_level_split_is_not_created(self, od_dataset):
+        """Background has no value on an instance row, so it gets no instance column."""
+        result = compute_stats(od_dataset, stats=SCALAR_STATS, per_background=True, normalize_pixel_values=False)
+
+        md = Metadata(od_dataset)
+        md.add_factors(result)
+
+        assert "unit_background_mean" in md.factor_names
+        assert "unit_background_fraction" in md.factor_names
+        # The unmasked statistics still split both ways, as they always did.
+        assert "instance_mean" in md.factor_names
+        assert "unit_mean" in md.factor_names
+        assert not [name for name in md.factor_names if name.startswith("instance_background")]
+
+    def test_fraction_is_stored_alongside(self, od_dataset):
+        """The coverage each background was measured over travels with it."""
+        result = compute_stats(
+            od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False
+        )
+
+        md = Metadata(od_dataset)
+        md.add_factors(result)
+
+        fractions = md.dataframe["unit_background_fraction"].drop_nulls().to_numpy()
+        assert ((fractions > 0.0) & (fractions <= 1.0)).all()
+
+
 class TestVacuousSplitsAreReported:
     """A level split that holds nothing is dropped, but never silently."""
+
+    def test_background_split_is_recorded_as_dropped(self, od_dataset):
+        result = compute_stats(
+            od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False
+        )
+
+        md = Metadata(od_dataset)
+        md.add_factors(result)
+
+        assert "instance_background_mean" not in md.factor_names
+        assert md.dropped_factors["instance_background_mean"] == ["no_values_at_level"]
 
     def test_a_pre_existing_all_null_split_is_recorded_too(self):
         """Boxes that all miss their images make every instance statistic null.

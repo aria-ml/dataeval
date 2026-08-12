@@ -298,6 +298,43 @@ produces per-channel breakdowns rather than aggregating across channels. The
 `source_index` field in the output identifies whether each row corresponds to
 a full image, a specific bounding box within an image, or a specific channel.
 
+Object detection datasets can also be measured on the pixels that *are not*
+annotated. `per_background=True` unions every box in an image into a mask,
+excludes those pixels, and reduces the requested statistics over what is left —
+the scene an image was captured in, rather than the things annotated inside it:
+
+```python
+stats = compute_stats(
+    dataset,
+    stats=ImageStats.PIXEL | ImageStats.VISUAL,
+    per_background=True,
+    normalize_pixel_values=False,
+)
+# One value per row, as every stats array is. With the default per_target=True the
+# rows are images *and* boxes, and a box has no background, so its entry is null.
+# `source_index` says which is which; `add_factors` uses it to place them.
+stats["stats"]["background_brightness"]
+```
+
+Background values are returned under `background_`-prefixed names on the same
+rows as the whole-image ones, because they describe the same thing a whole-image
+statistic describes — the image — and so belong at the `unit` level (see
+[Metadata Levels](MetadataLevels.md)). Three properties are worth knowing:
+
+- **`background_fraction` is always returned**, and should be read before the
+  rest. It is the share of the image left unmasked, and a background statistic
+  measured over a few percent of an image is noise wearing a measurement's
+  clothes. Where an image's boxes cover it entirely, every other background
+  statistic for that image is `NaN`.
+- **Only `PIXEL` and `VISUAL` statistics are computed for the background.** A
+  masked region has no meaningful hash and no geometry of its own, so `HASH` and
+  `DIMENSION` flags are computed for the image and its boxes as usual and skipped
+  for the background.
+- **Boxes are rounded outwards and unioned**, so the background excludes slightly
+  more than the annotations strictly cover. This is deliberate: a retained pixel
+  is background with high confidence, at the cost of discarding a boundary ring
+  of genuine background along with the object.
+
 The default configuration for {class}`.Outliers` uses `DIMENSION | PIXEL |
 VISUAL`, covering the full space of sensor-level integrity failures without
 hash computation (which belongs to {class}`.Duplicates`).

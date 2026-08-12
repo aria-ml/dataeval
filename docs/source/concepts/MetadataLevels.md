@@ -136,6 +136,40 @@ weighted by detections-per-image. What levels give you is the ability to *not*
 read it that way: {meth}`.Metadata.at` reads the same factor at its own level,
 once per image, and the weighting is gone.
 
+### Propagation is what lets levels be compared
+
+Downward propagation is not only a storage economy — it is what makes a factor at
+one level comparable against a factor at another, because both are readable from
+the finer level's rows.
+
+Background statistics are the clearest case. `compute_stats(per_background=True)`
+measures each image's pixels *outside* its bounding boxes: the scene an image was
+captured in. That is a property of the image and of nothing inside it, so it is
+stored once per image, at `unit`:
+
+```python
+stats = compute_stats(
+    dataset,
+    stats=ImageStats.VISUAL_BRIGHTNESS,
+    per_background=True,
+    normalize_pixel_values=False,
+)
+md.add_factors(stats)
+md.factor_names  # ['unit_background_brightness', 'unit_brightness', 'instance_brightness', ...]
+```
+
+Read at `instance`, `unit_background_brightness` gathers each detection's own
+image's background — so a single frame holds each object's brightness beside the
+brightness of the scene behind it, and "are these objects only ever annotated
+against dark backgrounds?" becomes a question about two columns of one table.
+Read at `unit`, via `md.at("unit")`, it is one value per image, unweighted by how
+many detections that image happened to contain.
+
+Note what does *not* happen. There is no `instance_background_brightness`: a
+detection has no background of its own, and DataEval will not invent one by
+copying its image's value into a new instance-level factor. The value stays at
+the level it was measured at, and propagation does the rest.
+
 ## The tracking diamond
 
 For image-based tasks the graph is a chain, and the rules above are all there is.

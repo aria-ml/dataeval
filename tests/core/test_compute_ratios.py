@@ -653,3 +653,39 @@ class TestCalculateRatiosEdgeCases:
         ratios = compute_ratios(stats)
 
         assert ratios["stats"]["channels"][0] == 1
+
+
+class TestBackgroundStatsAreNotRatioed:
+    """`per_background` output reaching `compute_ratios`, which has no ratio to take of it."""
+
+    @staticmethod
+    def _stats(**kwargs):
+        image = (np.random.default_rng(0).random((3, 20, 20)) * 255).astype(np.uint8)
+        return compute_stats(
+            [image, image],
+            boxes=[[(0, 0, 10, 10)], [(0, 0, 10, 10)]],
+            stats=ImageStats.DIMENSION | ImageStats.PIXEL_MEAN,
+            normalize_pixel_values=False,
+            **kwargs,
+        )
+
+    def test_background_keys_are_excluded_from_the_ratios(self):
+        """A box has no background, so there is nothing to divide its image's by."""
+        result = compute_ratios(self._stats(per_background=True))
+
+        assert not [name for name in result["stats"] if name.startswith("background_")]
+        # The ordinary ratios are unaffected by background having been requested.
+        assert result["stats"]["width"] == pytest.approx(compute_ratios(self._stats())["stats"]["width"])
+
+    def test_background_only_image_rows_are_rejected(self):
+        """Regression: the rows `per_background` adds are not image-level statistics.
+
+        `per_background=True` puts an item-level row on every image whether or not
+        `per_image` asked for one. Counting rows alone read that as image statistics
+        being present and returned a table of NaN instead of saying what was missing.
+        """
+        stats = self._stats(per_image=False, per_target=True, per_background=True)
+        assert any(si.target is None for si in stats["source_index"])
+
+        with pytest.raises(ValueError, match="carry background values only"):
+            compute_ratios(stats)

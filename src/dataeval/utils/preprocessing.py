@@ -8,6 +8,7 @@ __all__ = [
     "BoxLike",
     "FloatBox",
     "IntBox",
+    "boxes_to_mask",
     "clip_box",
     "compute_iou",
     "crop_with_fill",
@@ -346,6 +347,75 @@ def is_valid_box(box: Box) -> bool:
         True if box is valid, False otherwise
     """
     return box[2] > box[0] and box[3] > box[1]
+
+
+def boxes_to_mask(image_shape: tuple[int, ...], boxes: Iterable[BoxLike]) -> NDArray[np.bool_]:
+    r"""
+    Paint a set of bounding boxes into a boolean coverage mask.
+
+    Produces the union of the boxes as a per-pixel mask over the image's spatial
+    extent, which is what separates an image's annotated foreground from the rest
+    of the scene behind it.
+
+    Parameters
+    ----------
+    image_shape : tuple[int, ...]
+        Shape of the image the boxes belong to (supports CHW or HW format; only the
+        trailing two dimensions are read).
+    boxes : Iterable[BoxLike]
+        Boxes to paint. Each is converted with :func:`to_bounding_box`, rounded
+        outwards to whole pixels (:attr:`BoundingBox.xyxy_int`, matching how
+        :func:`crop_with_fill` windows a box) and clipped to the image. Boxes that
+        are degenerate or fall entirely outside the image contribute nothing.
+        Overlapping boxes are unioned, so a pixel covered twice is still one pixel.
+
+    Returns
+    -------
+    NDArray[np.bool\_]
+        A ``(H, W)`` array that is True wherever at least one box covers the pixel.
+        Channels are deliberately absent: box geometry is spatial, and a caller that
+        needs to apply the mask across channels broadcasts it.
+
+    Notes
+    -----
+    Rounding outwards means the mask covers *at least* every pixel a box touches, so
+    using it to exclude foreground over-excludes rather than under-excludes. That is
+    the conservative direction for background analysis — a retained pixel is
+    background with high confidence, at the cost of discarding a boundary ring of
+    genuine background along with the object.
+
+    That choice is not shared by :class:`~dataeval.data.DetectionCrops`, whose
+    ``region="surround"`` masks the object out with round-to-nearest instead, matching
+    the crop window it is masking within. The two therefore disagree by up to a
+    one-pixel ring: a background measured by ``compute_stats(per_background=True)`` and
+    one embedded from ``DetectionCrops(region="surround")`` are not the same region, and
+    a comparison between them carries that difference.
+
+    Examples
+    --------
+    Two overlapping boxes over a 4x4 image:
+
+    >>> mask = boxes_to_mask((3, 4, 4), [(0, 0, 2, 2), (1, 1, 3, 3)])
+    >>> mask.astype(int)
+    array([[1, 1, 0, 0],
+           [1, 1, 1, 0],
+           [0, 1, 1, 0],
+           [0, 0, 0, 0]])
+
+    A box reaching past the image edge is clipped rather than rejected:
+
+    >>> boxes_to_mask((2, 2), [(1, 1, 99, 99)]).astype(int)
+    array([[0, 0],
+           [0, 1]])
+    """
+    height, width = image_shape[-2], image_shape[-1]
+    mask = np.zeros((height, width), dtype=np.bool_)
+    for boxlike in boxes:
+        box = to_bounding_box(boxlike, image_shape=image_shape)
+        x0, y0, x1, y1 = clip_box(image_shape, box.xyxy_int)
+        if is_valid_box((x0, y0, x1, y1)):
+            mask[y0:y1, x0:x1] = True
+    return mask
 
 
 def compute_iou(boxes1: NDArray[Any], boxes2: NDArray[Any]) -> NDArray[np.float64]:

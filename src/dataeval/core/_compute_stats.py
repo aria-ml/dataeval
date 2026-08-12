@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
+from dataeval.core._calculators._base import Calculator
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.data import unzip_dataset
@@ -22,11 +23,40 @@ from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback
 from dataeval.types import SourceIndex, StatsMap
 from dataeval.utils._internal import PoolWrapper
-from dataeval.utils.preprocessing import BitDepth, BoundingBox, BoxLike, get_bitdepth, to_bounding_box
+from dataeval.utils.preprocessing import BitDepth, BoundingBox, BoxLike, boxes_to_mask, get_bitdepth, to_bounding_box
 
 _logger = logging.getLogger(__name__)
 
 SOURCE_INDEX = "source_index"
+
+BACKGROUND_PREFIX = "background_"
+"""Name prefix distinguishing a background statistic from the whole-image one beside it.
+
+Background values share a row with the full image's — both describe the same item and
+carry the same :class:`~dataeval.types.SourceIndex` — so they are told apart by name
+rather than by position. Adding a row instead is not available: a source index addresses
+exactly one item-level row per item, and naming it twice is rejected outright.
+"""
+
+
+def _maskable_calculators(
+    calculators: Sequence[tuple[type[Calculator[Any]], Flag]],
+) -> list[tuple[type[Calculator[Any]], Flag]]:
+    """Keep only the calculators whose statistics survive part of the region being masked.
+
+    Which those are is each calculator's own answer, via its ``supports_exclusion``,
+    rather than a list of flags maintained here: a new calculator would otherwise have to
+    be remembered in a module that knows nothing else about it, and would silently default
+    to being run over masked data. Queried the same way the registry queries
+    ``get_applicable_flags``.
+    """
+    maskable: list[tuple[type[Calculator[Any]], Flag]] = []
+    for calculator_cls, flags in calculators:
+        # __new__ rather than a real instance: the answer is a property of the class and
+        # the constructor wants a datum. Same trick, and the same reason, as the registry.
+        if calculator_cls.__new__(calculator_cls).supports_exclusion():
+            maskable.append((calculator_cls, flags))
+    return maskable
 
 
 class StatsResult(TypedDict):
@@ -81,6 +111,8 @@ def _collect_calculator_stats(
     box: BoundingBox | None,
     per_channel: bool,
     normalize_pixel_values: bool = False,
+    exclude: NDArray[np.bool_] | None = None,
+    prefix: str = "",
     bitdepth: BitDepth | None = None,
 ) -> tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
@@ -88,6 +120,12 @@ def _collect_calculator_stats(
 
     Parameters
     ----------
+    exclude : NDArray[np.bool_] or None, default None
+        Pixel mask of regions to leave out of every statistic, passed through to the
+        calculator cache, which NaNs them out of the region being reduced over.
+    prefix : str, default ""
+        Prepended to every stat name produced here, which is how a masked pass is kept
+        distinguishable from the unmasked one sharing its row.
     bitdepth : BitDepth or None, default None
         The datum's bit depth, already found. Every row of one datum shares it, so it is
         read once per datum and handed down rather than rediscovered per row — finding it
@@ -109,13 +147,14 @@ def _collect_calculator_stats(
         box,
         per_channel,
         normalize_pixel_values=normalize_pixel_values,
+        exclude=exclude,
         bitdepth=bitdepth,
     )
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor, per_channel)
-        stats_list.append(calculator.compute(flags))
+        stats_list.append({f"{prefix}{name}": values for name, values in calculator.compute(flags).items()})
         # Collect empty values from this calculator
-        empty_values_map.update(calculator.get_empty_values())
+        empty_values_map.update({f"{prefix}{name}": value for name, value in calculator.get_empty_values().items()})
         # Collect warnings from this calculator
         if hasattr(calculator, "warnings"):
             warnings.extend(calculator.warnings)
@@ -189,53 +228,89 @@ def _get_items(
     boxes: list[BoundingBox] | None,
     per_image: bool,
     per_target: bool,
-) -> list[tuple[int | None, BoundingBox | None]]:
-    """Determine what to process based on per_image and per_target flags."""
-    process_items: list[tuple[int | None, BoundingBox | None]] = []
+    per_background: bool = False,
+) -> list[tuple[int | None, BoundingBox | None, bool, bool]]:
+    """Determine what to process based on the per_image, per_target and per_background flags.
 
-    if boxes is None or len(boxes) == 0:
-        # No boxes provided - only process full image if per_image is True
-        if per_image:
-            process_items.append((None, None))
-    else:
-        # Boxes are provided
-        if per_image:
-            # Add full image processing
-            process_items.append((None, None))
+    Returns
+    -------
+    list[tuple[int | None, BoundingBox | None, bool, bool]]
+        One entry per row to emit, as ``(target_index, box, unmasked, background)``.
+        The last two say which passes that row carries: the whole-region statistics,
+        the background ones, or — when both `per_image` and `per_background` are set —
+        both, since the two share the item's single row.
+    """
+    process_items: list[tuple[int | None, BoundingBox | None, bool, bool]] = []
 
-        if per_target:
-            # Add per-box processing
-            process_items.extend((i_b, box) for i_b, box in enumerate(boxes))
+    # The item-level row exists if either pass wants it. Background rides on that row
+    # rather than adding one, so requesting it without per_image yields a row carrying
+    # background statistics alone.
+    if per_image or per_background:
+        process_items.append((None, None, per_image, per_background))
+
+    # Boxes are only processed when there are boxes to process.
+    if per_target and boxes:
+        process_items.extend((i_b, box, True, False) for i_b, box in enumerate(boxes))
 
     return process_items
 
 
-def _compute_batch(
+def _pad_missing_stats(results: list["DatumResult"], empty_values_map: dict[str, Any]) -> None:
+    """Give every row in a datum an entry for every stat name any of its rows carries.
+
+    Rows within one datum no longer all carry the same statistics: background values
+    exist on the item-level row and nowhere else. The aggregation downstream appends
+    each row's values to one array per name, so a name missing from a row would shorten
+    that name's array and silently misalign it against the source index. Filling the
+    gaps with each stat's empty value keeps every array one-to-one with the rows.
+    """
+    names = {name for result in results for name in result.stats}
+    for result in results:
+        entries = len(result.source_indices)
+        for name in names:
+            if name not in result.stats:
+                result.stats[name] = [empty_values_map.get(name, np.nan)] * entries
+
+
+def _compute_batch(  # noqa: C901
     args: tuple[int, NDArray[Any], list[BoundingBox] | None],
     calculators: Iterable[tuple[type[Any], Flag]],
     per_image: bool,
     per_target: bool,
     per_channel: bool,
     normalize_pixel_values: bool = False,
+    per_background: bool = False,
+    background_calculators: Iterable[tuple[type[Any], Flag]] = (),
 ) -> DatumBatchResult:
     i, datum, boxes = args
     results: list[DatumResult] = []
     box_count = 0
     invalid_box_count = 0
     warnings_list: list[str] = []
+    datum_empty_values: dict[str, Any] = {}
 
     # Determine the number of channels from the datum shape
     num_channels = datum.shape[-3] if len(datum.shape) >= 3 else 1
 
-    # Determine what to process based on per_image and per_target flags
-    items = _get_items(boxes, per_image, per_target)
+    # Determine what to process based on the per_image, per_target and per_background flags
+    items = _get_items(boxes, per_image, per_target, per_background)
 
     # Read once per datum rather than once per row: it is a property of the datum, every
     # view of it shares the value, and finding it costs a scan of the whole array.
     bitdepth = get_bitdepth(datum)
 
+    # The foreground mask: every annotated box painted into one array, so overlapping
+    # boxes count once. Built per datum rather than per row — the item-level row is the
+    # only one that uses it, but building it here keeps it out of the row loop.
+    exclude = boxes_to_mask(datum.shape, boxes or ()) if per_background else None
+    # `.all()` is vacuously True for a datum with no pixels, which is an absence of
+    # background rather than a full one; `.mean()` on it is NaN and warns. Neither is
+    # worth saying, so an empty datum takes neither path.
+    if exclude is not None and exclude.size and exclude.all():
+        warnings_list.append(f"{i}: Boxes cover the entire datum, leaving no background to measure")
+
     # Process each item (full image and/or boxes)
-    for i_b, box in items:
+    for i_b, box, unmasked, background in items:
         if box is not None:
             box_count += 1
             if not box.is_clippable():
@@ -243,10 +318,46 @@ def _compute_batch(
                 source = f"{i}[{i_b}]"
                 warnings_list.append(f"{source}: Bounding box {box} for datum shape {datum.shape} is invalid")
 
+        calculator_stats: list[dict[str, list[Any]]] = []
+        empty_values_map: dict[str, Any] = {}
+        calc_warnings: list[str] = []
+
         # Collect stats from all calculators
-        calculator_stats, empty_values_map, calc_warnings = _collect_calculator_stats(
-            calculators, datum, box, per_channel, normalize_pixel_values=normalize_pixel_values, bitdepth=bitdepth
-        )
+        if unmasked:
+            stats, empties, warns = _collect_calculator_stats(
+                calculators,
+                datum,
+                box,
+                per_channel,
+                normalize_pixel_values=normalize_pixel_values,
+                bitdepth=bitdepth,
+            )
+            calculator_stats.extend(stats)
+            empty_values_map.update(empties)
+            calc_warnings.extend(warns)
+
+        # The same calculators over the same region with the foreground masked out. Run
+        # into the same reconciliation as the unmasked pass, so both land on one row with
+        # a single channel layout resolved across the two.
+        if background and exclude is not None:
+            stats, empties, warns = _collect_calculator_stats(
+                background_calculators,
+                datum,
+                box,
+                per_channel,
+                normalize_pixel_values=normalize_pixel_values,
+                exclude=exclude,
+                prefix=BACKGROUND_PREFIX,
+                bitdepth=bitdepth,
+            )
+            calculator_stats.extend(stats)
+            empty_values_map.update(empties)
+            calc_warnings.extend(warns)
+            # Emitted whatever was requested, because every other background value is
+            # only as trustworthy as the share of the image it was measured over. A datum
+            # with no pixels has no share to report, so it reports NaN rather than 0/0.
+            uncovered = float(1.0 - exclude.mean()) if exclude.size else float("nan")
+            calculator_stats.append({f"{BACKGROUND_PREFIX}fraction": [uncovered]})
 
         # Thread calculator warnings with index context
         for w in calc_warnings:
@@ -258,12 +369,18 @@ def _compute_batch(
 
         # Reconcile stats into unified structure
         reconciled_stats = _reconcile_stats(calculator_stats, sorted_channels, empty_values_map)
+        datum_empty_values.update(empty_values_map)
 
         # Build index lists
         channel_indices = sorted_channels
         source = [SourceIndex(i, i_b if box is not None else None, c) for c in channel_indices]
 
         results.append(DatumResult(source_indices=source, stats=reconciled_stats))
+
+    # Background statistics exist on the item-level row alone, so the box rows need
+    # placeholders for them before the rows are flattened into per-name arrays.
+    if per_background:
+        _pad_missing_stats(results, datum_empty_values)
 
     return DatumBatchResult(results, box_count, invalid_box_count, warnings_list)
 
@@ -345,6 +462,7 @@ def compute_stats(  # noqa: C901
     stats: Flag = ImageStats.ALL,
     per_image: bool = True,
     per_target: bool = True,
+    per_background: bool = False,
     per_channel: bool = False,
     normalize_pixel_values: bool = _UNSET,  # type: ignore
     progress_callback: ProgressCallback | None = None,
@@ -369,8 +487,36 @@ def compute_stats(  # noqa: C901
         each box (if per_target=True).
     per_target : bool, default True
         If True and boxes are provided, compute statistics for each bounding box.
-        Has no effect when boxes is None. At least one of per_image or per_target
-        must be True.
+        Has no effect when boxes is None. At least one of per_image, per_target or
+        per_background must be True.
+    per_background : bool, default False
+        If True and boxes are provided, additionally compute statistics over each
+        image's background — every pixel the image's boxes do not cover — describing
+        the scene an item was captured in rather than the things annotated within it.
+
+        Background values are returned alongside the whole-image ones, on the same
+        rows, under names prefixed with ``background_`` (``background_brightness``).
+        They are therefore per-image values, and adding them to
+        :class:`~dataeval.Metadata` places them at the media-unit level like any other
+        per-image factor. ``background_fraction`` — the share of the image left
+        unmasked — is always among them, and should be read before the rest: a
+        background statistic measured over a few percent of an image is noise wearing
+        a measurement's clothes.
+
+        Only :attr:`~dataeval.flags.ImageStats.PIXEL` and
+        :attr:`~dataeval.flags.ImageStats.VISUAL` statistics are computed for the
+        background; any hash or dimension statistics in `stats` are computed for the
+        image and its boxes as usual and skipped for the background, which has no
+        meaningful hash and no geometry of its own.
+
+        Boxes are rounded outwards and unioned into the mask, so the background
+        excludes slightly more than the annotations strictly cover — a retained pixel
+        is background with high confidence. Where the boxes cover an image entirely,
+        every background statistic for it is NaN.
+
+        Has no effect when boxes is None.
+
+        .. versionadded:: 1.2
     per_channel : bool, default False
         If True, compute per-channel statistics. If False, statistics are
         aggregated across all channels.
@@ -459,6 +605,15 @@ def compute_stats(  # noqa: C901
     Compute statistics for both full images and boxes with per-channel breakdown:
 
     >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=True, per_channel=True)
+
+    Compute background statistics — the scene behind the annotations — alongside the
+    whole-image ones:
+
+    >>> stats = compute_stats(
+    ...     images, boxes=boxes, stats=ImageStats.VISUAL_BRIGHTNESS, per_background=True, normalize_pixel_values=False
+    ... )
+    >>> sorted(stats["stats"])
+    ['background_brightness', 'background_fraction', 'brightness']
     """
     if normalize_pixel_values is _UNSET:
         warnings.warn(
@@ -484,37 +639,59 @@ def compute_stats(  # noqa: C901
         if len(datum) == 3:
             is_object_detection_dataset = isinstance(datum[1], ObjectDetectionTarget)
 
-    # `per_target` is True only if boxes are provided or data is an ObjectDetectionDataset
-    per_target = per_target and (is_object_detection_dataset or boxes is not None)
+    # `per_target` and `per_background` are True only if boxes are provided or data is
+    # an ObjectDetectionDataset — both are defined by the boxes.
+    has_boxes = is_object_detection_dataset or boxes is not None
+    per_target = per_target and has_boxes
+    per_background = per_background and has_boxes
 
     # Validate parameters
-    if not per_image and not per_target:
-        raise ValueError("At least one of 'per_image' or 'per_target' must be True")
+    if not per_image and not per_target and not per_background:
+        raise ValueError("At least one of 'per_image', 'per_target' or 'per_background' must be True")
 
     # Get calculators from registry based on flags
     calculators = CalculatorRegistry.get_calculators(stats)
+
+    # The background reduces over a masked region, which only some statistics survive;
+    # the rest stay available to the image and its boxes, where they still mean something.
+    background_calculators: list[tuple[type[Any], Flag]] = []
+    if per_background:
+        background_calculators = _maskable_calculators(calculators)
+        if not background_calculators:
+            warnings.warn(
+                f"per_background=True but none of the requested statistics apply to a background region, "
+                f"so only '{BACKGROUND_PREFIX}fraction' will be returned. A background is a region with "
+                f"part of it masked out, which hash statistics are not stable under and which dimension "
+                f"statistics do not describe; request ImageStats.PIXEL or ImageStats.VISUAL for it.",
+                UserWarning,
+                stacklevel=2,
+            )
 
     # Log the individual flags that will be computed
     resolved_names = [
         f.name for f in type(stats) if f in stats and f.name and f.value and (f.value & (f.value - 1)) == 0
     ]
     _logger.info(
-        "Starting compute_stats: %d stats [%s], per_image=%s, per_target=%s, per_channel=%s",
+        "Starting compute_stats: %d stats [%s], per_image=%s, per_target=%s, per_background=%s, per_channel=%s",
         len(resolved_names),
         ", ".join(resolved_names),
         per_image,
         per_target,
+        per_background,
         per_channel,
     )
 
     total_images = len(data) if isinstance(data, Sized) else None
 
+    # Boxes have to be read off the dataset whenever anything is defined by them — the
+    # per-box rows, the background mask, or both.
+    needs_boxes = per_target or per_background
     images, boxes = (
         (data, boxes)
         if not isinstance(data, Dataset)
         else (unzip_dataset(data, per_target=False)[0], boxes)
         if boxes is not None
-        else unzip_dataset(data, per_target=per_target)
+        else unzip_dataset(data, per_target=needs_boxes)
     )
 
     # Build description for progress bar
@@ -530,6 +707,8 @@ def compute_stats(  # noqa: C901
                 per_target=per_target,
                 per_channel=per_channel,
                 normalize_pixel_values=normalize_pixel_values,
+                per_background=per_background,
+                background_calculators=background_calculators,
             ),
             _enumerate_datum(images, boxes),
         ):

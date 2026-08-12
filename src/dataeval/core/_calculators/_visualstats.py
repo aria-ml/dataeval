@@ -40,6 +40,10 @@ class VisualStatCalculator(Calculator[ImageStats]):
         """Return which flags this calculator handles."""
         return ImageStats.VISUAL
 
+    def supports_exclusion(self) -> bool:
+        """Visual statistics reduce over percentiles and edges, both taken NaN-aware."""
+        return True
+
     def _brightness(self) -> list[float]:
         if self.per_channel_mode:
             return self.percentiles[:, 1].tolist()
