@@ -440,7 +440,7 @@ def get_bitdepth(image: NDArray[Any]) -> BitDepth:
     return BitDepth(depth, 0, 2**depth - 1)
 
 
-def rescale(image: NDArray[Any], depth: int = 1) -> NDArray[Any]:
+def rescale(image: NDArray[Any], depth: int = 1, bitdepth: BitDepth | None = None) -> NDArray[Any]:
     """
     Rescales the image using the bit depth provided.
 
@@ -450,13 +450,34 @@ def rescale(image: NDArray[Any], depth: int = 1) -> NDArray[Any]:
         Input image array
     depth : int, default 1
         Target bit depth
+    bitdepth : BitDepth or None, default None
+        Source range to rescale *from*. Read off `image` itself when None.
+
+        Pass it to scale several views of one datum onto a common range. A crop, or a
+        region with part of it masked out, has its own extremes, and letting each infer
+        its own source range scales them against different denominators — which is
+        exactly what makes their statistics look different when the pixels do not. Hand
+        in ``get_bitdepth(whole_image)`` and every view lands on one scale.
 
     Returns
     -------
     NDArray
         Rescaled image
+
+    Examples
+    --------
+    A crop dark enough to read as 1-bit is left alone when it infers its own range:
+
+    >>> crop = np.array([[0, 1]], dtype=np.uint8)
+    >>> rescale(crop)
+    array([[0, 1]], dtype=uint8)
+
+    Anchored on the 8-bit image it was cut from, it stays dark:
+
+    >>> rescale(crop, bitdepth=get_bitdepth(np.array([[0, 255]], dtype=np.uint8)))
+    array([[0.   , 0.004]])
     """
-    bitdepth = get_bitdepth(image)
+    bitdepth = get_bitdepth(image) if bitdepth is None else bitdepth
     if bitdepth.depth == depth:
         return image
     normalized = (image - bitdepth.pmin) / (bitdepth.pmax - bitdepth.pmin)

@@ -22,7 +22,7 @@ from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback
 from dataeval.types import SourceIndex, StatsMap
 from dataeval.utils._internal import PoolWrapper
-from dataeval.utils.preprocessing import BoundingBox, BoxLike, to_bounding_box
+from dataeval.utils.preprocessing import BitDepth, BoundingBox, BoxLike, get_bitdepth, to_bounding_box
 
 _logger = logging.getLogger(__name__)
 
@@ -81,9 +81,17 @@ def _collect_calculator_stats(
     box: BoundingBox | None,
     per_channel: bool,
     normalize_pixel_values: bool = False,
+    bitdepth: BitDepth | None = None,
 ) -> tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
+
+    Parameters
+    ----------
+    bitdepth : BitDepth or None, default None
+        The datum's bit depth, already found. Every row of one datum shares it, so it is
+        read once per datum and handed down rather than rediscovered per row — finding it
+        costs a scan of the whole datum, which a per-row cache would repeat once per box.
 
     Returns
     -------
@@ -96,7 +104,13 @@ def _collect_calculator_stats(
     stats_list = []
     empty_values_map: dict[str, Any] = {}
     warnings: list[str] = []
-    processor = CalculatorCache(datum, box, per_channel, normalize_pixel_values=normalize_pixel_values)
+    processor = CalculatorCache(
+        datum,
+        box,
+        per_channel,
+        normalize_pixel_values=normalize_pixel_values,
+        bitdepth=bitdepth,
+    )
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor, per_channel)
         stats_list.append(calculator.compute(flags))
@@ -216,6 +230,10 @@ def _compute_batch(
     # Determine what to process based on per_image and per_target flags
     items = _get_items(boxes, per_image, per_target)
 
+    # Read once per datum rather than once per row: it is a property of the datum, every
+    # view of it shares the value, and finding it costs a scan of the whole array.
+    bitdepth = get_bitdepth(datum)
+
     # Process each item (full image and/or boxes)
     for i_b, box in items:
         if box is not None:
@@ -227,7 +245,7 @@ def _compute_batch(
 
         # Collect stats from all calculators
         calculator_stats, empty_values_map, calc_warnings = _collect_calculator_stats(
-            calculators, datum, box, per_channel, normalize_pixel_values=normalize_pixel_values
+            calculators, datum, box, per_channel, normalize_pixel_values=normalize_pixel_values, bitdepth=bitdepth
         )
 
         # Thread calculator warnings with index context
@@ -390,6 +408,22 @@ def compute_stats(  # noqa: C901
         `PIXEL_ENTROPY` or `VISUAL_PERCENTILES` for `VISUAL_BRIGHTNESS`) are cached at
         runtime and discarded afterwards. They are no longer returned in the final output
         by default unless they are explicitly requested.
+
+    .. versionchanged:: 1.2
+        Bit depth is now inferred from the whole image rather than from each region
+        separately, so every row of one image is scaled and binned against one range.
+        This changes two per-target results where a box's own extremes fell in a
+        different bit-depth bucket than its image's:
+
+        - ``entropy``'s histogram range, which previously narrowed to the box's own
+          maximum. A very dark box in an 8-bit image was binned over ``[0, 1]`` rather
+          than ``[0, 255]``.
+        - every statistic under ``normalize_pixel_values=True``, which previously scaled
+          each box by its own range. A box holding no pixel above 255 in a 12-bit image
+          was divided by 255 rather than 4095.
+
+        Values were not comparable across regions before, which is what a per-target
+        statistic exists to be. Whole-image results are unchanged.
 
     Examples
     --------

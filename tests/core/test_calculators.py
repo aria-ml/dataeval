@@ -14,7 +14,7 @@ from dataeval.core._calculators._hashstats import HashStatCalculator
 from dataeval.core._calculators._pixelstats import PixelStatCalculator
 from dataeval.core._calculators._visualstats import QUARTILES, VisualStatCalculator
 from dataeval.flags import ImageStats
-from dataeval.utils.preprocessing import BoundingBox
+from dataeval.utils.preprocessing import BoundingBox, get_bitdepth, rescale
 
 
 class TestPixelStats:
@@ -1732,3 +1732,79 @@ class TestDependencyRemoval:
         result = compute_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=False)
         assert "brightness" in result["stats"]
         assert "percentiles" not in result["stats"]
+
+
+class TestBitDepthAnchoring:
+    """Every view of one datum is scaled and binned against the whole datum's range.
+
+    A box's own extremes are not the image's, so letting each region infer its own bit
+    depth scales them by different denominators and bins them over different ranges —
+    which makes two regions' statistics differ when the pixels do not. Anchoring on the
+    datum is what makes a per-target statistic comparable against its image's.
+    """
+
+    @staticmethod
+    def _dark_box_image():
+        """A 12-bit image whose top-left box holds only values an 8-bit image could."""
+        image = np.full((1, 20, 20), 3000, dtype=np.uint16)
+        image[:, 0:10, 0:10] = np.arange(100, dtype=np.uint16).reshape(10, 10)
+        return image
+
+    def test_normalized_box_uses_the_image_range(self):
+        """A dark box is divided by the image's maximum, not its own."""
+        image = self._dark_box_image()
+
+        result = compute_stats(
+            [image],
+            boxes=[[(0, 0, 10, 10)]],
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=False,
+            normalize_pixel_values=True,
+        )
+
+        # The image is 12-bit (max 3000 < 4096), so every region scales by 4095.
+        assert result["stats"]["mean"][0] == pytest.approx(np.arange(100).mean() / 4095, rel=1e-4)
+
+    def test_box_entropy_is_binned_over_the_image_range(self):
+        """The box's histogram spans the image's range, so it is not spread over 256 bins."""
+        image = self._dark_box_image()
+
+        result = compute_stats(
+            [image],
+            boxes=[[(0, 0, 10, 10)]],
+            stats=ImageStats.PIXEL_ENTROPY,
+            per_image=False,
+            normalize_pixel_values=False,
+        )
+
+        # 100 distinct values inside [0, 4095] fall in far fewer than 100 of the 256 bins,
+        # so the entropy is well below the log(100) an own-range binning would give.
+        assert result["stats"]["entropy"][0] < np.log(100) - 0.5
+
+    def test_image_and_box_agree_when_the_box_is_the_image(self):
+        """A box covering the whole image must reproduce the image's own statistics."""
+        image = self._dark_box_image()
+
+        result = compute_stats(
+            [image],
+            boxes=[[(0, 0, 20, 20)]],
+            stats=ImageStats.PIXEL_MEAN | ImageStats.PIXEL_ENTROPY,
+            normalize_pixel_values=True,
+        )
+
+        for name in ("mean", "entropy"):
+            assert result["stats"][name][0] == pytest.approx(result["stats"][name][1], rel=1e-6)
+
+
+class TestRescaleAnchor:
+    """`rescale` accepts the range to scale from, which is what the cache passes it."""
+
+    def test_defaults_to_the_arrays_own_range(self):
+        # Dark enough to infer 1-bit, which is already the target depth, so unchanged.
+        crop = np.array([[0, 1]], dtype=np.uint8)
+        np.testing.assert_allclose(rescale(crop), [[0, 1]])
+
+    def test_explicit_bitdepth_anchors_elsewhere(self):
+        crop = np.array([[0, 1]], dtype=np.uint8)
+        anchor = get_bitdepth(np.array([[0, 255]], dtype=np.uint8))
+        np.testing.assert_allclose(rescale(crop, bitdepth=anchor), [[0.0, 1 / 255]])

@@ -43,9 +43,9 @@ class PixelStatCalculator(Calculator[ImageStats]):
     def _histogram_range(self) -> tuple[float, float]:
         if self.cache.normalize_pixel_values:
             return (0.0, 1.0)
-        from dataeval.utils.preprocessing import get_bitdepth
-
-        bitdepth = get_bitdepth(self.cache.scaled)
+        # The whole datum's bit depth, not this view's, so that a box's or a background's
+        # histogram is binned over the same range as the image it is compared against.
+        bitdepth = self.cache.bitdepth
         if bitdepth.depth == 0:
             return (0.0, 1.0)
         return (0.0, float(bitdepth.pmax))
