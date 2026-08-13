@@ -56,6 +56,22 @@ It contains an introduction to DataEval's main concepts.
 
 :::{grid-item-card}
 :text-align: center
+:link: ./getting-started/roles/index
+:link-type: doc
+:link-alt: "Roles Guide Link"
+:img-top: _static/images/icons/icon_roles.svg
+:class-header: sd-fs-4
+
+**Roles Guide**
+^^^
+Not sure how DataEval fits into your daily routine?
+Check out our Roles Guide which shows some of the ways
+in which we use DataEval.
+
+:::
+
+:::{grid-item-card}
+:text-align: center
 :link: ./tutorials/index
 :link-type: doc
 :link-alt: "Tutorial Page Link"
@@ -65,20 +81,6 @@ It contains an introduction to DataEval's main concepts.
 **Tutorials**
 ^^^
 Learn DataEval through guided end-to-end examples.
-
-:::
-
-:::{grid-item-card}
-:text-align: center
-:link: ./concepts/index
-:link-type: doc
-:img-top: _static/images/icons/icon_concept.svg
-:class-header: sd-fs-4
-
-**Explanations**
-^^^
-Learn about the key concepts related to using data
-in computer-vision AI applications.
 
 :::
 
@@ -98,6 +100,20 @@ Task-based instructions and workflow recipes.
 
 :::{grid-item-card}
 :text-align: center
+:link: ./concepts/index
+:link-type: doc
+:img-top: _static/images/icons/icon_concept.svg
+:class-header: sd-fs-4
+
+**Explanations**
+^^^
+Learn about the key concepts related to using data
+in computer-vision AI applications.
+
+:::
+
+:::{grid-item-card}
+:text-align: center
 :link: ./reference/autoapi/dataeval/index
 :link-type: doc
 :img-top: _static/images/icons/icon_api.svg
@@ -108,22 +124,6 @@ Task-based instructions and workflow recipes.
 The reference guide contains a detailed description the DataEval API.
 The reference describes how the methods work and which parameters can
 be used. It assumes that you have an understanding of the key concepts.
-
-:::
-
-:::{grid-item-card}
-:text-align: center
-:link: ./getting-started/roles/index
-:link-type: doc
-:link-alt: "Roles Guide Link"
-:img-top: _static/images/icons/icon_roles.svg
-:class-header: sd-fs-4
-
-**Roles Guide**
-^^^
-Not sure how DataEval fits into your daily routine?
-Check out our Roles Guide which shows some of the ways
-in which we use DataEval.
 
 :::
 ::::
