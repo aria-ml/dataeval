@@ -120,7 +120,7 @@ its maximum performance. They then perform an error analysis
 to determine what objects each model is struggling with. After performing the analysis,
 they discover that the models consistently fail on a specific type of truck.
 Again, they generate a report for the manager, this time detailing out how well
-each model is doing, how close each model is to it's theotrical maximum and
+each model is doing, how close each model is to its theoretical maximum and
 the images that each model is struggling to identify. They also recommend that
 a few additional images be gathered for the truck that all the models failed on.
 
