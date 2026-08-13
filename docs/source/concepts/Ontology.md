@@ -120,7 +120,8 @@ The ontology models exactly one relation between concepts — **is-a**
 family of query terms. CV practitioners and graph libraries use two
 interchangeable vocabularies for it: a _subsumption_ vocabulary
 (subclass/superclass) and a _graph_ vocabulary (ancestor/descendant). DataEval
-uses both and treats them as exact equivalents:
+uses both vocabularies for its own query names, and normalizes every source
+predicate into a single is-a relation carrying **RDFS semantics**:
 
 | DataEval term                    | is-a meaning                              | Standard / graph term              |
 | -------------------------------- | ----------------------------------------- | ---------------------------------- |
@@ -132,12 +133,36 @@ uses both and treats them as exact equivalents:
 | **sibling**                      | shares a parent                           | —                                  |
 | **depth**                        | longest is-a path from a root             | longest path length                |
 | **lowest common ancestor** (LCA) | deepest shared superclass of two concepts | DAG LCA                            |
+| **equivalent** = **alias**       | denotes the same class (collapsed)        | `owl:equivalentClass`              |
+
+That normalization is worth stating plainly, because the source vocabularies do
+not agree. `rdfs:subClassOf` is transitive and reflexive under RDFS entailment.
+SKOS deliberately declines transitivity on `skos:broader` — that is why
+`skos:broaderTransitive` exists as a separate super-property — and entails
+reflexivity for neither. DataEval reads `rdfs:subClassOf`, `skos:broader`, and
+`skos:broaderTransitive` into one `parents` relation and applies transitive and
+reflexive closure to all of them. For a CV taxonomy that is the useful reading;
+it is not a faithful reproduction of SKOS.
 
 So {meth}`ontology.is_a(a, b) <.Ontology.is_a>` ("a is a subclass of b") and
 "b is an ancestor (superclass) of a" describe the same fact;
 {meth}`ontology.ancestors(a) <.Ontology.ancestors>` returns concept `a`'s
 superclasses, {meth}`ontology.descendants(a) <.Ontology.descendants>` its
 subclasses.
+
+One asymmetry is deliberate: **subsumption is reflexive, the graph queries are
+not**. Every concept is its own subclass — RDFS/OWL entail `X rdfs:subClassOf X`
+— so `is_a(x, x)` is `True`, and a filter like "keep everything that is a
+`vehicle`" catches `vehicle` itself without the caller writing
+`a == b or ontology.is_a(a, b)`. The traversals stay _proper_: `ancestors(x)`
+and `descendants(x)` never contain `x`, which is what keeps `roots`, `leaves`,
+`depth`, and subtree listings meaning what they say. In short,
+`is_a(a, b)` is `b == a or b in ancestors(a)`; for the strict reading ("strictly
+below `b`"), test `a != b and ontology.is_a(a, b)`.
+
+Reflexivity is an entailment about _defined_ concepts, so it does not extend to
+external references — `is_a` still raises `KeyError` when `a` is not a defined
+concept, including `is_a(ext, ext)`.
 
 ### Defined vs. external concepts
 
@@ -156,6 +181,45 @@ label or further ancestors, so they mark the point where the is-a hierarchy is
 **truncated**. An external reference means "this concept's parent exists in the
 fuller ontology, but isn't included here." Earlier terminology called these
 "external boundary nodes"; the canonical term is _external reference_.
+
+### Canonical concepts and aliases
+
+Two ids can denote the same class. OWL says so with `owl:equivalentClass`, and a
+reasoner materializes it as mutual `rdfs:subClassOf` — each concept naming the
+other as a parent. Either form is _equivalence_, not a cycle, and DataEval
+collapses it: the group becomes one **canonical** concept, and the group's other
+ids become **aliases** of it.
+
+The canonical id is the lexicographically smallest _defined_ member of the
+group, which keeps the choice stable no matter what order the concepts arrive
+in. The merge is lossless for lookup — every member's label and synonyms are
+folded into the survivor, so {meth}`find <.Ontology.find>` still resolves an
+absorbed label — and aliases are transparent to `in`, indexing, and every graph
+query. Only iteration, {attr}`ids <.Ontology.ids>`, and `len()` are restricted
+to canonical concepts, because an alias is not a separate concept.
+
+{meth}`ontology.canonical(id) <.Ontology.canonical>` resolves any known id to
+its canonical form and {meth}`ontology.aliases(id) <.Ontology.aliases>` lists
+what was absorbed.
+
+An alias is not an external reference. An alias names a class this ontology
+_does_ define, under another id; an external reference names one it does not
+define at all. Aliases never appear in
+{attr}`external_ids <.Ontology.external_ids>`.
+
+Two boundaries are deliberate:
+
+- **A cycle carrying no equivalence signal is still an error.** Only an explicit
+  `owl:equivalentClass` or a direct mutual pair licenses a collapse. A longer
+  cycle with neither — `a → b → c → a` — remains an `OntologyCycleError`.
+  {meth}`from_hierarchy <.Ontology.from_hierarchy>` is stricter still: a nested
+  mapping has no syntax for equivalence, so _any_ cycle there is a typo,
+  including the two-node case.
+- **`skos:exactMatch` does not merge.** It is a _mapping_ property, for relating
+  concepts across schemes; treating it as identity inside one ontology would
+  conflate the two. Cross-vocabulary equivalence is an
+  [alignment](#alignment-relating-two-vocabularies) concern and is carried by
+  `Correspondence` with `relation="equivalent"`.
 
 ## Reconciliation: checking labels against the ontology
 

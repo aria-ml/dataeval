@@ -18,16 +18,26 @@ TargetVocabulary: TypeAlias = Ontology | Mapping[int, str] | Sequence[str]
 or an ordered sequence of class names."""
 
 
-def _resolve_target(target: TargetVocabulary) -> tuple[dict[str, int], dict[int, str]]:
+def _resolve_target(target: TargetVocabulary) -> tuple[dict[str, int], dict[int, str]]:  # noqa: C901
     """Normalize a target vocabulary into ``(key -> index, index -> label)``.
 
     The *key* is what a ``class_remap`` value must match: a concept id for an
     :class:`.Ontology` (ids equal labels for hand-built ontologies), otherwise the
     label itself.
+
+    An ontology's *alias* ids are accepted alongside its canonical ids and map to
+    the same index. Aliases are transparent everywhere else on
+    :class:`.Ontology`, and keying off :attr:`~.Ontology.ids` alone would make a
+    ``class_remap`` value naming an alias look out-of-vocabulary — silently
+    dropping the data under the default ``on_unmatched="drop"``.
     """
     if isinstance(target, Ontology):
         ids = target.ids
-        return {cid: i for i, cid in enumerate(ids)}, {i: target.concept(cid).label for i, cid in enumerate(ids)}
+        key2index = {cid: i for i, cid in enumerate(ids)}
+        for index, cid in enumerate(ids):
+            for alias in target.aliases(cid):
+                key2index[alias] = index
+        return key2index, {i: target.concept(cid).label for i, cid in enumerate(ids)}
     if isinstance(target, Mapping):
         index2label = {int(i): str(name) for i, name in target.items()}
         return {name: i for i, name in index2label.items()}, index2label

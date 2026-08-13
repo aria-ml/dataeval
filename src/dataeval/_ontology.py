@@ -37,11 +37,14 @@ class Ontology:
 
     The graph is built from a collection of concepts linked by their ``parents``
     (is-a edges). A concept may have more than one parent, so the graph is a DAG
-    rather than a tree; cycles are rejected. A concept listing *itself* as a
-    parent is not a cycle — that edge is trivially true and is dropped. Parent
-    ids referencing concepts not present in the collection are kept as
-    *external* references — they participate in ancestor/LCA queries but are not
-    themselves concepts.
+    rather than a tree. Concepts asserted to denote the same class — via
+    ``equivalent_to``, or by naming each other as parents — are collapsed into a
+    single *canonical* concept, and the group's remaining ids become **aliases**
+    that resolve to it; a concept naming *itself* is the degenerate case and is
+    simply dropped. Cycles carrying neither signal are rejected. Parent ids
+    referencing concepts not present in the collection are kept as *external*
+    references — they participate in ancestor/LCA queries but are not themselves
+    concepts.
 
     Once built, the graph is queryable for ancestors, descendants, siblings,
     lowest common ancestors, depth, and rooted subtrees, and resolves class
@@ -66,9 +69,9 @@ class Ontology:
     """
 
     def __init__(self, concepts: Iterable[OntologyConcept]) -> None:
-        self._concepts: dict[str, OntologyConcept] = {}
+        collected: dict[str, OntologyConcept] = {}
         for concept in concepts:
-            if concept.id in self._concepts:
+            if concept.id in collected:
                 raise OntologyError(f"Duplicate concept id: {concept.id!r}")
             # A concept is trivially its own superclass (RDFS/OWL entail it, and
             # reasoners materialize `X rdfs:subClassOf X`). The edge carries no
@@ -76,7 +79,22 @@ class Ontology:
             if concept.id in concept.parents:
                 _logger.debug("Dropping self-referential parent on concept %r", concept.id)
                 concept = concept.model_copy(update={"parents": tuple(p for p in concept.parents if p != concept.id)})
-            self._concepts[concept.id] = concept
+            # Likewise `X owl:equivalentClass X`: reflexive, entailed, and empty
+            # of information, so it is not an equivalence group of one.
+            if concept.id in concept.equivalent_to:
+                _logger.debug("Dropping self-referential equivalence on concept %r", concept.id)
+                concept = concept.model_copy(
+                    update={"equivalent_to": tuple(e for e in concept.equivalent_to if e != concept.id)}
+                )
+            collected[concept.id] = concept
+
+        # alias id -> canonical id, one entry per non-canonical equivalence member
+        self._alias: dict[str, str] = {}
+        self._concepts: dict[str, OntologyConcept] = self._merge_equivalents(collected)
+
+        # concept id -> insertion position, so subtrees can be ordered like the
+        # ontology they came from without rescanning every concept
+        self._position: dict[str, int] = {cid: i for i, cid in enumerate(self._concepts)}
 
         # children map keyed by parent id (external parents are valid keys)
         self._children: dict[str, list[str]] = {}
@@ -84,6 +102,34 @@ class Ontology:
         self._label_index: dict[str, list[str]] = {}
         self._build_indexes()
         self._check_acyclic()
+
+    def _merge_equivalents(self, collected: dict[str, OntologyConcept]) -> dict[str, OntologyConcept]:
+        """Collapse each equivalence group to one canonical concept, recording aliases."""
+        aliases_of: dict[str, list[str]] = {}
+        for group in _equivalence_groups(collected):
+            # An undefined id has no label, parents, or definition to survive as,
+            # so only defined members are eligible. Every group has one: unions
+            # only ever originate from a defined concept's own assertions, so an
+            # all-undefined group cannot form.
+            defined = sorted(member for member in group if member in collected)
+            # Among those, prefer a member carrying a real label. `from_rdflib`
+            # falls back to `label = str(subject)` for an unlabelled class, and
+            # electing that would demote the group's human label to a synonym and
+            # surface a raw IRI wherever `concept.label` is displayed. Smallest
+            # id still breaks the tie, so the choice stays order-independent.
+            labelled = [member for member in defined if collected[member].label != member]
+            canonical_id = (labelled or defined)[0]
+            alias_ids = sorted(member for member in group if member != canonical_id)
+            aliases_of[canonical_id] = alias_ids
+            for alias in alias_ids:
+                self._alias[alias] = canonical_id
+        if not self._alias:
+            return collected
+        return {
+            cid: _absorb(concept, aliases_of.get(cid, []), collected, self._alias)
+            for cid, concept in collected.items()
+            if cid not in self._alias
+        }
 
     def _build_indexes(self) -> None:
         for concept in self._concepts.values():
@@ -93,40 +139,11 @@ class Ontology:
                 self._label_index.setdefault(name.casefold(), []).append(concept.id)
 
     def _check_acyclic(self) -> None:
-        # Kahn's algorithm: peel off concepts whose (defined) parents are all
-        # resolved; any left over are part of, or downstream of, a cycle.
         # External parents are not concepts, so they don't count toward indegree.
-        indegree = {cid: sum(p in self._concepts for p in c.parents) for cid, c in self._concepts.items()}
-        queue = deque(cid for cid, deg in indegree.items() if deg == 0)
-        removed = 0
-        while queue:
-            for child in self._children.get(queue.popleft(), ()):
-                indegree[child] -= 1
-                if indegree[child] == 0:
-                    queue.append(child)
-            removed += 1
-        if removed != len(self._concepts):
-            stuck = {cid for cid, deg in indegree.items() if deg > 0}
-            cycle = self._find_cycle(stuck)
-            trace = " -> ".join(repr(cid) for cid in (*cycle, cycle[0]))
-            raise OntologyCycleError(f"Ontology contains a cycle (is-a edges): {trace}")
-
-    def _find_cycle(self, stuck: set[str]) -> list[str]:
-        """Return the ids of one concrete cycle within the unresolved set.
-
-        The unresolved set holds the cycle *and* everything downstream of it, so
-        reporting an arbitrary member points at concepts whose own edges are
-        fine. Every unresolved concept has an unresolved parent, so walking
-        parent-ward must revisit a node; that repeat delimits the real cycle.
-        """
-        path: list[str] = []
-        position: dict[str, int] = {}
-        current = min(stuck)  # deterministic entry point
-        while current not in position:
-            position[current] = len(path)
-            path.append(current)
-            current = next(p for p in self._concepts[current].parents if p in stuck)
-        return path[position[current] :]
+        parents_of = {cid: concept.parents for cid, concept in self._concepts.items()}
+        stuck = _unresolved_by_kahn(parents_of)
+        if stuck:
+            raise OntologyCycleError(f"Ontology contains a cycle (is-a edges): {_cycle_trace(parents_of, stuck)}")
 
     # --- mapping-like access ---
 
@@ -147,16 +164,62 @@ class Ontology:
         return iter(self._concepts.values())
 
     def __contains__(self, concept_id: str) -> bool:
-        """Return whether ``concept_id`` is a defined concept."""
-        return concept_id in self._concepts
+        """Return whether ``concept_id`` is a defined concept or an alias of one."""
+        return concept_id in self._concepts or concept_id in self._alias
 
     def __getitem__(self, concept_id: str) -> OntologyConcept:
         """Return the concept for ``concept_id`` (raises ``KeyError`` if absent)."""
-        return self._concepts[concept_id]
+        return self._concepts[self.canonical(concept_id)]
 
     def concept(self, concept_id: str) -> OntologyConcept:
         """Return the concept for ``concept_id`` (raises ``KeyError`` if absent)."""
-        return self._concepts[concept_id]
+        return self._concepts[self.canonical(concept_id)]
+
+    def canonical(self, concept_id: str) -> str:
+        """
+        Resolve any known id to the id of the concept that defines it.
+
+        Concepts asserted to denote the same class are collapsed at build time
+        into one *canonical* concept; the group's other ids become **aliases**.
+        Passing a canonical id returns it unchanged, passing an alias returns
+        its canonical.
+
+        An alias differs from an *external reference*: an alias names a class
+        this ontology defines (under another id), while an external reference
+        names one it does not define at all. Aliases never appear in
+        :attr:`external_ids`.
+
+        Parameters
+        ----------
+        concept_id : str
+            A canonical concept id or an alias of one.
+
+        Returns
+        -------
+        str
+            The canonical concept id.
+
+        Raises
+        ------
+        KeyError
+            If ``concept_id`` is neither a defined concept nor an alias.
+        """
+        if concept_id in self._concepts:
+            return concept_id
+        canonical_id = self._alias.get(concept_id)
+        if canonical_id is None:
+            raise KeyError(concept_id)
+        return canonical_id
+
+    def aliases(self, concept_id: str) -> tuple[str, ...]:
+        """
+        Return the ids absorbed into ``concept_id``'s concept, id-sorted.
+
+        Accepts a canonical id or any of its aliases; both return the same
+        tuple. Empty when the concept was not part of an equivalence group.
+        Raises ``KeyError`` if ``concept_id`` is not a known id.
+        """
+        return self.concept(concept_id).equivalent_to
 
     @property
     def ids(self) -> tuple[str, ...]:
@@ -210,7 +273,8 @@ class Ontology:
         Resolve a human-readable name (or exact id) to matching concept ids.
 
         Matching is case-insensitive over each concept's preferred label and
-        synonyms. An exact id match is also returned.
+        synonyms. An exact id match is also returned, resolved through any
+        alias, so only canonical ids come back.
 
         Parameters
         ----------
@@ -223,14 +287,11 @@ class Ontology:
             Matching concept ids. Empty if unmatched; length > 1 if ambiguous.
         """
         ids = list(self._label_index.get(name.casefold(), ()))
-        if name in self._concepts and name not in ids:
-            ids.append(name)
+        if name in self:
+            canonical_id = self.canonical(name)
+            if canonical_id not in ids:
+                ids.append(canonical_id)
         return tuple(dict.fromkeys(ids))
-
-    def _require(self, concept_id: str) -> None:
-        """Raise ``KeyError`` if ``concept_id`` is not a defined concept."""
-        if concept_id not in self._concepts:
-            raise KeyError(concept_id)
 
     def _parents(self, concept_id: str) -> tuple[str, ...]:
         concept = self._concepts.get(concept_id)
@@ -250,7 +311,7 @@ class Ontology:
         May include external reference ids. Raises ``KeyError`` if ``concept_id``
         is not a defined concept.
         """
-        self._require(concept_id)
+        concept_id = self.canonical(concept_id)
         return tuple(self._ancestors(concept_id))
 
     def children(self, concept_id: str) -> tuple[str, ...]:
@@ -262,7 +323,7 @@ class Ontology:
         :meth:`descendants` this is the immediate, non-transitive layer. Raises
         ``KeyError`` if ``concept_id`` is not a defined concept.
         """
-        self._require(concept_id)
+        concept_id = self.canonical(concept_id)
         return tuple(self._children.get(concept_id, ()))
 
     def descendants(self, concept_id: str) -> tuple[str, ...]:
@@ -272,18 +333,34 @@ class Ontology:
         Descendants are the concept's transitive *subclasses* (narrower concepts).
         Raises ``KeyError`` if ``concept_id`` is not a defined concept.
         """
-        self._require(concept_id)
+        concept_id = self.canonical(concept_id)
         return tuple(_traverse(concept_id, self._children_of))
 
     def is_a(self, a: str, b: str) -> bool:
-        """Return whether concept ``a`` is a (transitive) subclass of ``b``.
+        """Return whether concept ``a`` is a subclass of ``b``.
 
-        Equivalently, whether ``b`` is an ancestor (superclass) of ``a``.
+        Equivalently, whether ``b`` is ``a`` itself or one of its ancestors
+        (superclasses). Subsumption is *reflexive* — every concept is its own
+        subclass, as RDFS/OWL entail — so ``is_a(x, x)`` is true whether or not
+        the ontology spells the trivial edge out. For the strict form ("below
+        ``b``, not ``b``"), test ``a != b and onto.is_a(a, b)``.
+
+        Note this makes ``is_a`` slightly wider than :meth:`ancestors`, which
+        stays proper: ``is_a(a, b)`` is ``b == a or b in ancestors(a)``.
+
+        Equivalent concepts resolve to the same canonical id, so ``is_a`` is
+        symmetric across an equivalence group — which falls out of reflexivity
+        rather than needing a rule of its own. Either argument may be given as
+        an alias.
+
         Raises ``KeyError`` if ``a`` is not a defined concept; ``b`` may be any
         id, including an external reference.
         """
-        self._require(a)
-        return b in self._ancestors(a)
+        a = self.canonical(a)
+        # `b` resolves through the alias map but not through `canonical`: it may
+        # legitimately be an external reference, which must not start raising.
+        b = self._alias.get(b, b)
+        return b == a or b in self._ancestors(a)
 
     def lowest_common_ancestors(self, a: str, b: str) -> tuple[str, ...]:
         """
@@ -300,8 +377,8 @@ class Ontology:
 
         Raises ``KeyError`` if ``a`` or ``b`` is not a defined concept.
         """
-        self._require(a)
-        self._require(b)
+        a = self.canonical(a)
+        b = self.canonical(b)
         common = {a, *self._ancestors(a)} & {b, *self._ancestors(b)}
         if not common:
             return ()
@@ -337,7 +414,7 @@ class Ontology:
         parent are included, so this works on subset ontologies. Raises
         ``KeyError`` if ``concept_id`` is not a defined concept.
         """
-        self._require(concept_id)
+        concept_id = self.canonical(concept_id)
         ordered: list[str] = []
         seen: set[str] = {concept_id}
         for parent in self._concepts[concept_id].parents:
@@ -355,7 +432,7 @@ class Ontology:
         external reference has depth 1. Raises ``KeyError`` if ``concept_id``
         is not a defined concept.
         """
-        self._require(concept_id)
+        concept_id = self.canonical(concept_id)
         memo: dict[str, int] = {}
 
         def depth(cid: str) -> int:
@@ -375,6 +452,7 @@ class Ontology:
         disjointedness tests that do not need a full sub-ontology. Raises
         ``KeyError`` if ``concept_id`` is not a defined concept.
         """
+        concept_id = self.canonical(concept_id)
         return frozenset((concept_id, *self.descendants(concept_id)))
 
     def subtree(self, concept_id: str) -> "Ontology":
@@ -387,7 +465,11 @@ class Ontology:
         """
         node_ids = self.subtree_ids(concept_id)
         concepts = []
-        for nid in node_ids:
+        # Order by this ontology's own concept order, not the id *set*: set order
+        # varies with the hash seed, which would make the subtree's `ids`,
+        # `roots`, `leaves`, and iteration differ between runs. Sorting the
+        # subtree keeps this O(k log k) rather than rescanning all N concepts.
+        for nid in sorted(node_ids, key=self._position.__getitem__):
             concept = self._concepts[nid]
             pruned = tuple(p for p in concept.parents if p in node_ids)
             concepts.append(concept.model_copy(update={"parents": pruned}))
@@ -402,11 +484,22 @@ class Ontology:
 
         Concepts are collected from subjects typed ``owl:Class`` / ``rdfs:Class`` /
         ``skos:Concept`` and from any subject of ``rdfs:subClassOf`` /
-        ``skos:broader``. For each: ``label`` is ``skos:prefLabel`` (falling back
-        to ``rdfs:label``), ``synonyms`` are ``skos:altLabel`` (plus a differing
-        ``rdfs:label``), ``parents`` are the IRI objects of ``rdfs:subClassOf`` /
-        ``skos:broader``, and ``definition`` is ``skos:definition``. Blank-node
-        superclasses (e.g. ``owl:Restriction``) are ignored.
+        ``skos:broader`` / ``skos:broaderTransitive`` / ``owl:equivalentClass``.
+        For each: ``label`` is ``skos:prefLabel`` (falling back to ``rdfs:label``),
+        ``synonyms`` are ``skos:altLabel`` (plus a differing ``rdfs:label``),
+        ``parents`` are the IRI objects of ``rdfs:subClassOf`` / ``skos:broader``,
+        ``equivalent_to`` are the IRI objects of ``owl:equivalentClass``, and
+        ``definition`` is ``skos:definition``. Blank-node superclasses (e.g.
+        ``owl:Restriction``) are ignored.
+
+        ``skos:broaderTransitive`` is read only as a *fallback*, for a concept
+        that declares no direct parent — it is the transitive property, so a
+        materialized vocabulary asserts every ancestor with it, and taking those
+        as parents would record closure edges as direct is-a edges.
+
+        ``skos:exactMatch`` is deliberately *not* read: it is a cross-scheme
+        mapping property, and cross-vocabulary equivalence belongs to
+        :class:`~dataeval.types.Correspondence`, not to this graph.
 
         Parameters
         ----------
@@ -423,10 +516,13 @@ class Ontology:
         subjects: set[URIRef] = set()
         for rdf_class in (OWL.Class, RDFS.Class, SKOS.Concept):
             subjects.update(s for s in graph.subjects(RDF.type, rdf_class) if isinstance(s, URIRef))
-        for predicate in (RDFS.subClassOf, SKOS.broader):
+        for predicate in (RDFS.subClassOf, SKOS.broader, SKOS.broaderTransitive, OWL.equivalentClass):
             subjects.update(s for s in graph.subjects(predicate, None) if isinstance(s, URIRef))
 
-        concepts = [_concept_from_graph(graph, subject) for subject in subjects]
+        # Sorted, not set order: set iteration varies with the hash seed, which
+        # would make `ids` — and so the integer class indices :class:`.Relabel`
+        # derives from them — differ between processes for the same document.
+        concepts = [_concept_from_graph(graph, subject) for subject in sorted(subjects)]
         _logger.debug("Built ontology with %d concepts from rdflib graph", len(concepts))
         return cls(concepts)
 
@@ -522,6 +618,151 @@ def _traverse(start: str, neighbors: Callable[[str], Iterable[str]]) -> list[str
     return ordered
 
 
+def _unresolved_by_kahn(parents_of: "Mapping[str, Sequence[str]]") -> set[str]:  # noqa: C901
+    """Return the ids Kahn's algorithm cannot peel off: a cycle and its downstream.
+
+    ``parents_of`` maps each node to its parent ids. Parents absent from the
+    mapping are *external references*, and self-edges are trivial, so neither
+    counts toward indegree. An empty result means the graph is acyclic.
+    """
+    indegree = {nid: sum(1 for p in ps if p != nid and p in parents_of) for nid, ps in parents_of.items()}
+    children: dict[str, list[str]] = {}
+    for nid, parents in parents_of.items():
+        for parent in parents:
+            if parent != nid and parent in parents_of:
+                children.setdefault(parent, []).append(nid)
+    queue = deque(nid for nid, degree in indegree.items() if degree == 0)
+    removed = 0
+    while queue:
+        for child in children.get(queue.popleft(), ()):
+            indegree[child] -= 1
+            if indegree[child] == 0:
+                queue.append(child)
+        removed += 1
+    if removed == len(indegree):
+        return set()
+    return {nid for nid, degree in indegree.items() if degree > 0}
+
+
+def _cycle_trace(parents_of: "Mapping[str, Sequence[str]]", stuck: set[str]) -> str:
+    """Render one concrete cycle within the unresolved set as ``'a' -> 'b' -> 'a'``.
+
+    The unresolved set holds the cycle *and* everything downstream of it, so
+    reporting an arbitrary member points at nodes whose own edges are fine.
+    Every unresolved node has an unresolved non-self parent, so walking
+    parent-ward must revisit a node; that repeat delimits the real cycle.
+    """
+    path: list[str] = []
+    position: dict[str, int] = {}
+    current = min(stuck)  # deterministic entry point
+    while current not in position:
+        position[current] = len(path)
+        path.append(current)
+        current = next(p for p in parents_of[current] if p != current and p in stuck)
+    cycle = path[position[current] :]
+    return " -> ".join(repr(nid) for nid in (*cycle, cycle[0]))
+
+
+def _equivalence_groups(collected: dict[str, OntologyConcept]) -> list[set[str]]:  # noqa: C901
+    """Union-find over explicit equivalences and direct mutual subsumption.
+
+    Two edge sources, both licensed: an explicit ``equivalent_to`` assertion,
+    and a mutual pair (each side naming the other as a parent), which is how a
+    reasoner materializes ``owl:equivalentClass``. Grouping is transitive by
+    construction, which is the correct entailment. Longer cycles with neither
+    signal are *not* grouped — they reach the acyclic check and raise.
+
+    Mutual subsumption is detected between *groups*, iterated to a fixpoint,
+    because merging can entail further equivalence: given ``A ≡ B``, ``A ⊑ C``
+    and ``C ⊑ B``, the group ``{A, B}`` and ``C`` subsume each other even though
+    no two concepts formed a mutual pair in the input. Stopping after one pass
+    would leave that edge behind and manufacture a fresh cycle out of valid OWL.
+    """
+    parent: dict[str, str] = {}
+
+    def root(node: str) -> str:
+        parent.setdefault(node, node)
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]  # path compression
+            node = parent[node]
+        return node
+
+    def union(a: str, b: str) -> None:
+        root_a, root_b = root(a), root(b)
+        if root_a != root_b:
+            parent[root_b] = root_a
+
+    for cid, concept in collected.items():
+        root(cid)
+        for eid in concept.equivalent_to:
+            union(cid, eid)
+
+    # Group-level parent sets, recomputed after every round of merges.
+    def supersets() -> dict[str, set[str]]:
+        supers: dict[str, set[str]] = {}
+        for cid, concept in collected.items():
+            group = root(cid)
+            for pid in concept.parents:
+                parent_group = root(pid)
+                if parent_group != group:
+                    supers.setdefault(group, set()).add(parent_group)
+        return supers
+
+    merged = True
+    while merged:
+        merged = False
+        supers = supersets()
+        # Collect the whole round before unioning: a union invalidates `supers`.
+        mutual = [(g, pg) for g, pgs in supers.items() for pg in pgs if g in supers.get(pg, ())]
+        for group, parent_group in mutual:
+            if root(group) != root(parent_group):
+                union(group, parent_group)
+                merged = True
+
+    groups: dict[str, set[str]] = {}
+    for node in list(parent):
+        groups.setdefault(root(node), set()).add(node)
+    return [members for members in groups.values() if len(members) > 1]
+
+
+def _absorb(
+    canonical: OntologyConcept,
+    alias_ids: list[str],
+    collected: dict[str, OntologyConcept],
+    alias_map: dict[str, str],
+) -> OntologyConcept:
+    """Fold an equivalence group's members into its canonical concept.
+
+    Also used for concepts in no group at all (empty ``alias_ids``), but then it
+    rewrites *only* ``parents``: a non-member pointing at an alias id has to be
+    redirected or the edge is lost from the children map. Everything else is left
+    verbatim, so an equivalence between two concepts cannot change a third.
+    """
+    if not alias_ids:
+        redirected = tuple(
+            dict.fromkeys(r for pid in canonical.parents if (r := alias_map.get(pid, pid)) != canonical.id)
+        )
+        return canonical if redirected == canonical.parents else canonical.model_copy(update={"parents": redirected})
+
+    members = [canonical, *(collected[alias] for alias in alias_ids if alias in collected)]
+    synonyms: list[str] = []
+    parents: list[str] = []
+    definition = canonical.definition
+    for member in members:
+        synonyms.extend(name for name in (member.label, *member.synonyms) if name != canonical.label)
+        parents.extend(r for pid in member.parents if (r := alias_map.get(pid, pid)) != canonical.id)
+        if definition is None:
+            definition = member.definition
+    return canonical.model_copy(
+        update={
+            "synonyms": tuple(dict.fromkeys(synonyms)),
+            "parents": tuple(dict.fromkeys(parents)),
+            "definition": definition,
+            "equivalent_to": tuple(alias_ids),
+        }
+    )
+
+
 def _build_hierarchy(data: "Mapping[str, Any] | Sequence[Any]") -> list[OntologyConcept]:  # noqa: C901
     order: list[str] = []
     parents: dict[str, list[str]] = {}
@@ -551,12 +792,28 @@ def _build_hierarchy(data: "Mapping[str, Any] | Sequence[Any]") -> list[Ontology
             )
 
     walk(data, None)
+    _reject_hierarchy_cycles(parents)
     return [OntologyConcept(id=name, label=name, parents=tuple(parents[name])) for name in order]
+
+
+def _reject_hierarchy_cycles(parents: dict[str, list[str]]) -> None:
+    """Reject any cycle in a hand-authored hierarchy.
+
+    Stricter than :meth:`Ontology._check_acyclic`, deliberately. A nested
+    mapping has no syntax for equivalence, so a node reachable from itself is
+    always a typo — including the two-node ``a -> b -> a`` case, which from RDF
+    would be read as a materialized ``owl:equivalentClass`` and merged. A node
+    listed directly under *itself* stays legal: annotation schemas commonly list
+    a category among its own choices, and that edge is dropped as trivial.
+    """
+    stuck = _unresolved_by_kahn(parents)
+    if stuck:
+        raise OntologyCycleError(f"Hierarchy contains a cycle: {_cycle_trace(parents, stuck)}")
 
 
 def _concept_from_graph(graph: "rdflib.Graph", subject: "rdflib.URIRef") -> OntologyConcept:  # noqa: C901
     from rdflib import URIRef
-    from rdflib.namespace import RDFS, SKOS
+    from rdflib.namespace import OWL, RDFS, SKOS
 
     def first_literal(*predicates: URIRef) -> str | None:
         for predicate in predicates:
@@ -575,11 +832,21 @@ def _concept_from_graph(graph: "rdflib.Graph", subject: "rdflib.URIRef") -> Onto
     parents: list[str] = []
     for predicate in (RDFS.subClassOf, SKOS.broader):
         parents.extend(str(obj) for obj in graph.objects(subject, predicate) if isinstance(obj, URIRef))
+    if not parents:
+        # Fallback only. `skos:broaderTransitive` is the *transitive* property,
+        # so a materialized vocabulary states every ancestor with it, not just
+        # the direct one. Preferring the direct predicates keeps closure edges
+        # from being recorded as parents, which would corrupt children() and
+        # report a concept's own parent among its siblings.
+        parents.extend(str(obj) for obj in graph.objects(subject, SKOS.broaderTransitive) if isinstance(obj, URIRef))
+
+    equivalents = [str(obj) for obj in graph.objects(subject, OWL.equivalentClass) if isinstance(obj, URIRef)]
 
     return OntologyConcept(
         id=str(subject),
         label=label,
         synonyms=tuple(dict.fromkeys(synonyms)),
         parents=tuple(dict.fromkeys(parents)),
+        equivalent_to=tuple(dict.fromkeys(equivalents)),
         definition=first_literal(SKOS.definition),
     )

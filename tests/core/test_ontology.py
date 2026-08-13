@@ -35,6 +35,17 @@ def build_ontology() -> Ontology:
 
 
 @pytest.mark.required
+class TestOntologyConcept:
+    def test_equivalent_to_defaults_empty(self):
+        assert OntologyConcept(id="a", label="A").equivalent_to == ()
+
+    def test_equivalent_to_round_trips(self):
+        concept = OntologyConcept(id="a", label="A", equivalent_to=("b", "c"))
+        assert concept.equivalent_to == ("b", "c")
+        assert OntologyConcept(**concept.model_dump()) == concept
+
+
+@pytest.mark.required
 class TestOntologyModel:
     def test_len_contains_getitem(self):
         onto = build_ontology()
@@ -89,6 +100,42 @@ class TestOntologyModel:
         assert onto.is_a("amphibious", "water_vehicle")
         assert not onto.is_a("vehicle", "car")
         assert not onto.is_a("car", "water_vehicle")
+
+    def test_is_a_is_reflexive(self):
+        # subsumption is reflexive under RDFS/OWL, and the container already
+        # relies on that when it drops a self-referential parent as trivial.
+        # Without this, every caller filtering by concept writes `a == b or ...`.
+        onto = build_ontology()
+        assert onto.is_a("car", "car")
+        assert onto.is_a("vehicle", "vehicle")
+
+    def test_is_a_reflexive_without_a_declared_self_parent(self):
+        # the reflexive answer does not depend on the user having written the
+        # trivial edge (which the container drops on build anyway)
+        onto = Ontology([OntologyConcept(id="a", label="A", parents=("a",))])
+        assert onto.concept("a").parents == ()
+        assert onto.is_a("a", "a")
+
+    def test_is_a_reflexivity_requires_a_defined_concept(self):
+        # external ids and unknown ids are not concepts; no entailment for them
+        onto = build_ontology()
+        with pytest.raises(KeyError):
+            onto.is_a("ext:heavy", "ext:heavy")
+        with pytest.raises(KeyError):
+            onto.is_a("nope", "nope")
+
+    def test_is_a_agrees_with_lowest_common_ancestor_on_identity(self):
+        # LCA already counts a concept as its own ancestor; is_a must not disagree
+        onto = build_ontology()
+        assert onto.lowest_common_ancestor("car", "car") == "car"
+        assert onto.is_a("car", "car")
+
+    def test_ancestors_and_descendants_stay_proper(self):
+        # reflexivity belongs to the subsumption predicate only: self-inclusion
+        # in these would break roots, depth, siblings, and subtree listings
+        onto = build_ontology()
+        assert "car" not in onto.ancestors("car")
+        assert "vehicle" not in onto.descendants("vehicle")
 
     def test_dangling_parent_is_external_boundary(self):
         # references a parent not present in the ontology: kept, not an error
@@ -194,27 +241,32 @@ class TestOntologyModel:
             Ontology([OntologyConcept(id="x", label="X"), OntologyConcept(id="x", label="X2")])
 
     def test_cycle_raises(self):
+        # three-node cycle: no mutual pair, so nothing licenses reading it as
+        # equivalence (a two-node cycle is `owl:equivalentClass` and merges)
         with pytest.raises(OntologyCycleError, match="cycle"):
             Ontology([
                 OntologyConcept(id="a", label="A", parents=("b",)),
-                OntologyConcept(id="b", label="B", parents=("a",)),
+                OntologyConcept(id="b", label="B", parents=("c",)),
+                OntologyConcept(id="c", label="C", parents=("a",)),
             ])
 
     def test_cycle_error_names_the_cycle_not_its_descendants(self):
-        # "c" and "d" are merely downstream of the a<->b cycle; naming them sends
-        # the user looking at concepts whose own edges are fine.
+        # "x" and "y" are merely downstream of the a->b->c cycle; naming them
+        # sends the user looking at concepts whose own edges are fine.
         with pytest.raises(OntologyCycleError) as exc_info:
             Ontology([
                 OntologyConcept(id="a", label="A", parents=("b",)),
-                OntologyConcept(id="b", label="B", parents=("a",)),
+                OntologyConcept(id="b", label="B", parents=("c",)),
                 OntologyConcept(id="c", label="C", parents=("a",)),
-                OntologyConcept(id="d", label="D", parents=("c",)),
+                OntologyConcept(id="x", label="X", parents=("a",)),
+                OntologyConcept(id="y", label="Y", parents=("x",)),
             ])
         message = str(exc_info.value)
         assert "'a'" in message
         assert "'b'" in message
-        assert "'c'" not in message
-        assert "'d'" not in message
+        assert "'c'" in message
+        assert "'x'" not in message
+        assert "'y'" not in message
 
     def test_self_parent_is_not_a_cycle(self):
         # X is-a X is trivially true (and materialized by RDFS/OWL reasoners);
@@ -431,6 +483,60 @@ class TestRdfAdapters:
         onto = Ontology.from_rdflib(graph)
         assert onto.is_a("http://example.org/Dog", "http://example.org/Animal")
 
+    def test_equivalent_class_merges_concepts(self):
+        source = TURTLE + '\nex:Canid a owl:Class ; rdfs:label "Canid" ; owl:equivalentClass ex:Dog .\n'
+        onto = Ontology.from_rdf(source, format="turtle")
+        # "Canid" sorts before "Dog", so it wins the canonical election
+        assert onto.canonical("http://example.org/Dog") == "http://example.org/Canid"
+        assert onto.aliases("http://example.org/Canid") == ("http://example.org/Dog",)
+        assert onto.find("Dog") == ("http://example.org/Canid",)
+        # the absorbed concept's parent survives the merge
+        assert onto.concept("http://example.org/Dog").parents == ("http://example.org/Animal",)
+
+    def test_broader_transitive_builds_the_hierarchy(self):
+        # legal SKOS; without reading it a scheme that uses only this predicate
+        # loads flat, with every concept a root and no is-a edges at all.
+        # Here nothing is materialized, so it is the sole source of hierarchy.
+        source = """
+        @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+        @prefix ex: <http://example.org/> .
+        ex:Animal a skos:Concept ; skos:prefLabel "Animal" .
+        ex:Dog a skos:Concept ; skos:prefLabel "Dog" ; skos:broaderTransitive ex:Animal .
+        """
+        onto = Ontology.from_rdf(source, format="turtle")
+        assert onto.concept("http://example.org/Dog").parents == ("http://example.org/Animal",)
+        assert onto.is_a("http://example.org/Dog", "http://example.org/Animal")
+
+    def test_concept_order_is_independent_of_set_iteration(self):
+        # subjects are collected into a set, so without sorting the concept
+        # order (and therefore Relabel's integer class indices) varied per process
+        onto = Ontology.from_rdf(TURTLE, format="turtle")
+        assert onto.ids == ("http://example.org/Animal", "http://example.org/Dog")
+
+    def test_broader_transitive_is_a_fallback_not_a_direct_edge(self):
+        # a materialized closure states Dog broaderTransitive Mammal AND Animal.
+        # Reading both as direct parents made Animal a direct parent of Dog, so
+        # siblings(Dog) reported Dog's own parent Mammal as its sibling.
+        source = """
+        @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+        @prefix ex: <http://example.org/> .
+        ex:Animal a skos:Concept ; skos:prefLabel "Animal" .
+        ex:Mammal a skos:Concept ; skos:prefLabel "Mammal" ; skos:broader ex:Animal .
+        ex:Dog a skos:Concept ; skos:prefLabel "Dog" ; skos:broader ex:Mammal ;
+            skos:broaderTransitive ex:Mammal, ex:Animal .
+        """
+        onto = Ontology.from_rdf(source, format="turtle")
+        assert onto.concept("http://example.org/Dog").parents == ("http://example.org/Mammal",)
+        assert onto.children("http://example.org/Animal") == ("http://example.org/Mammal",)
+        assert onto.siblings("http://example.org/Dog") == ()
+
+    def test_exact_match_does_not_merge(self):
+        # skos:exactMatch is a cross-scheme mapping property; intra-ontology
+        # identity is owl:equivalentClass. Merging on it would conflate the two.
+        source = TURTLE + "\nex:Dog skos:exactMatch <http://other.org/dog> .\n"
+        onto = Ontology.from_rdf(source, format="turtle")
+        assert onto.aliases("http://example.org/Dog") == ()
+
 
 CV = "http://example.org/cv-ontology#"
 VEHICLE_ONTOLOGY = Path(__file__).parent / "vehicle_ontology.jsonld"
@@ -462,3 +568,327 @@ class TestVehicleOntologyFixture:
         assert res["matched"]["Submarine"] == f"{CV}Submarine"
         assert res["external_ancestors"] == {"Submarine": [f"{CV}UnderseaVessel"]}
         assert "Toyota Corolla" not in res["external_ancestors"]
+
+
+@pytest.mark.required
+class TestEquivalence:
+    def test_explicit_equivalence_merges_to_lexicographic_min(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        assert onto.ids == ("ex:Auto",)
+        assert len(onto) == 1
+        assert onto.concept("ex:Auto").equivalent_to == ("ex:Car",)
+
+    def test_mutual_subsumption_is_equivalence_not_a_cycle(self):
+        # a reasoner materializing EquivalentClasses(A B) emits exactly this
+        onto = Ontology([
+            OntologyConcept(id="a", label="A", parents=("b",)),
+            OntologyConcept(id="b", label="B", parents=("a",)),
+        ])
+        assert onto.ids == ("a",)
+        assert onto.concept("a").parents == ()
+        assert onto.roots == ("a",)
+
+    def test_canonical_election_is_order_independent(self):
+        # from_rdflib builds from a set, so input order is nondeterministic
+        forward = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        reverse = Ontology([
+            OntologyConcept(id="ex:Auto", label="Auto"),
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+        ])
+        assert forward.ids == reverse.ids == ("ex:Auto",)
+
+    def test_grouping_is_transitive(self):
+        onto = Ontology([
+            OntologyConcept(id="a", label="A", equivalent_to=("b",)),
+            OntologyConcept(id="b", label="B", equivalent_to=("c",)),
+            OntologyConcept(id="c", label="C"),
+        ])
+        assert onto.ids == ("a",)
+        assert onto.concept("a").equivalent_to == ("b", "c")
+
+    def test_shared_undefined_equivalent_merges_both_concepts(self):
+        # A = X and C = X entails A = C
+        onto = Ontology([
+            OntologyConcept(id="a", label="A", equivalent_to=("x",)),
+            OntologyConcept(id="c", label="C", equivalent_to=("x",)),
+        ])
+        assert onto.ids == ("a",)
+        assert onto.concept("a").equivalent_to == ("c", "x")
+
+    def test_undefined_equivalent_becomes_alias_not_external(self):
+        onto = Ontology([OntologyConcept(id="a", label="A", equivalent_to=("x",))])
+        assert onto.concept("a").equivalent_to == ("x",)
+        assert onto.external_ids == ()
+
+    def test_self_equivalence_is_dropped_as_trivial(self):
+        onto = Ontology([OntologyConcept(id="a", label="A", equivalent_to=("a",))])
+        assert onto.ids == ("a",)
+        assert onto.concept("a").equivalent_to == ()
+
+    def test_merge_unions_labels_and_synonyms_for_find(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", synonyms=("Motorcar",), equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto", synonyms=("Automobile",)),
+        ])
+        assert onto.find("Automobile") == ("ex:Auto",)
+        assert onto.find("Motorcar") == ("ex:Auto",)
+        assert onto.find("Car") == ("ex:Auto",)
+        assert "Auto" not in onto.concept("ex:Auto").synonyms  # the surviving label
+
+    def test_merge_falls_back_to_a_members_definition(self):
+        onto = Ontology([
+            OntologyConcept(id="a", label="A", equivalent_to=("b",)),
+            OntologyConcept(id="b", label="B", definition="A road vehicle."),
+        ])
+        assert onto.concept("a").definition == "A road vehicle."
+
+    def test_merge_prefers_the_canonical_members_definition(self):
+        onto = Ontology([
+            OntologyConcept(id="a", label="A", definition="Canonical.", equivalent_to=("b",)),
+            OntologyConcept(id="b", label="B", definition="Alias."),
+        ])
+        assert onto.concept("a").definition == "Canonical."
+
+    def test_merge_unions_parents_and_drops_intra_group_edges(self):
+        onto = Ontology([
+            OntologyConcept(id="a", label="A", parents=("top",), equivalent_to=("b",)),
+            OntologyConcept(id="b", label="B", parents=("a", "side")),
+        ])
+        assert onto.concept("a").parents == ("top", "side")
+
+    def test_non_member_parent_pointing_at_an_alias_is_redirected(self):
+        # without this the child is lost from children(canonical) and the alias
+        # degrades into a phantom external reference
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+            OntologyConcept(id="ex:Sedan", label="Sedan", parents=("ex:Car",)),
+        ])
+        assert onto.concept("ex:Sedan").parents == ("ex:Auto",)
+        assert onto.children("ex:Auto") == ("ex:Sedan",)
+        assert onto.external_ids == ()
+
+    def test_unlicensed_cycle_still_raises(self):
+        # no mutual pair and no equivalent_to: this is a typo, not equivalence
+        with pytest.raises(OntologyCycleError) as exc_info:
+            Ontology([
+                OntologyConcept(id="a", label="A", parents=("b",)),
+                OntologyConcept(id="b", label="B", parents=("c",)),
+                OntologyConcept(id="c", label="C", parents=("a",)),
+            ])
+        assert "'a'" in str(exc_info.value)
+
+    def test_from_hierarchy_cycle_still_raises(self):
+        with pytest.raises(OntologyCycleError):
+            Ontology.from_hierarchy({"a": {"b": {"a": None}}})
+
+    def test_ontology_without_equivalences_is_untouched(self):
+        onto = build_ontology()
+        assert onto.concept("car").parents == ("land_vehicle",)
+        assert onto.concept("car").equivalent_to == ()
+        assert onto.external_ids == ("ext:heavy",)
+
+    def test_canonical_resolves_aliases_and_canonicals(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        assert onto.canonical("ex:Car") == "ex:Auto"
+        assert onto.canonical("ex:Auto") == "ex:Auto"
+        with pytest.raises(KeyError):
+            onto.canonical("ex:Nope")
+
+    def test_aliases_lists_the_absorbed_ids(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        assert onto.aliases("ex:Auto") == ("ex:Car",)
+        assert onto.aliases("ex:Car") == ("ex:Car",)  # resolves through the alias first
+
+    def test_alias_ids_are_transparent_to_mapping_access(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        assert "ex:Car" in onto
+        assert onto["ex:Car"] is onto["ex:Auto"]
+        assert onto.concept("ex:Car").id == "ex:Auto"
+
+    def test_iteration_yields_canonicals_only(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        assert [c.id for c in onto] == ["ex:Auto"]
+        assert onto.ids == ("ex:Auto",)
+        assert onto.roots == ("ex:Auto",)
+        assert onto.leaves == ("ex:Auto",)
+
+    def test_find_resolves_an_alias_id_to_its_canonical(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        assert onto.find("ex:Car") == ("ex:Auto",)
+
+    def test_equivalent_labels_are_no_longer_a_collision(self):
+        # ex:Car and ex:Auto are not ambiguous - they are the same class
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Car"),
+        ])
+        assert onto.label_collisions == {}
+
+    @staticmethod
+    def merged_ontology():
+        # ex:Car is absorbed into ex:Auto; ex:Sedan is a child, ex:Vehicle a parent
+        return Ontology([
+            OntologyConcept(id="ex:Car", label="Car", parents=("ex:Vehicle",), equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+            OntologyConcept(id="ex:Vehicle", label="Vehicle"),
+            OntologyConcept(id="ex:Sedan", label="Sedan", parents=("ex:Car",)),
+        ])
+
+    def test_is_a_is_symmetric_across_equivalents(self):
+        onto = self.merged_ontology()
+        assert onto.is_a("ex:Car", "ex:Auto")
+        assert onto.is_a("ex:Auto", "ex:Car")
+
+    def test_is_a_accepts_alias_on_either_side(self):
+        onto = self.merged_ontology()
+        assert onto.is_a("ex:Sedan", "ex:Car")  # alias as the superclass
+        assert onto.is_a("ex:Car", "ex:Vehicle")  # alias as the subclass
+
+    def test_traversals_accept_an_alias_and_emit_canonicals(self):
+        onto = self.merged_ontology()
+        assert onto.ancestors("ex:Car") == ("ex:Vehicle",)
+        assert onto.descendants("ex:Car") == ("ex:Sedan",)
+        assert onto.children("ex:Car") == ("ex:Sedan",)
+        assert onto.depth_of("ex:Car") == 1
+        assert onto.subtree_ids("ex:Car") == frozenset({"ex:Auto", "ex:Sedan"})
+
+    def test_lowest_common_ancestor_accepts_an_alias(self):
+        onto = self.merged_ontology()
+        assert onto.lowest_common_ancestor("ex:Sedan", "ex:Car") == "ex:Auto"
+
+    def test_siblings_accepts_an_alias(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", parents=("ex:Vehicle",), equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+            OntologyConcept(id="ex:Vehicle", label="Vehicle"),
+            OntologyConcept(id="ex:Boat", label="Boat", parents=("ex:Vehicle",)),
+        ])
+        assert onto.siblings("ex:Car") == ("ex:Boat",)
+
+    def test_subtree_concept_order_follows_the_parent_ontology(self):
+        # subtree_ids() is a frozenset, so building from it directly made the
+        # subtree's ids/roots/leaves/iteration vary with the hash seed
+        onto = Ontology.from_hierarchy({"root": {"a": ["a1", "a2"], "b": ["b1", "b2"]}})
+        assert onto.subtree("root").ids == onto.ids  # the whole tree, same order
+        assert onto.subtree("a").ids == ("a", "a1", "a2")
+
+    def test_subtree_preserves_aliases(self):
+        # subtree() rebuilds an Ontology from pruned concepts; the alias map has
+        # to survive that round trip or canonical() breaks inside the subtree
+        onto = self.merged_ontology()
+        sub = onto.subtree("ex:Car")
+        assert sub.canonical("ex:Car") == "ex:Auto"
+        assert sub.aliases("ex:Auto") == ("ex:Car",)
+        assert sub.ids == ("ex:Auto", "ex:Sedan")
+
+    def test_merge_entailing_further_equivalence_reaches_a_fixpoint(self):
+        # A = B and A subclass-of C and C subclass-of B entails A = B = C.
+        # A single grouping pass sees only the A-B edge, then canonicalizing
+        # C's parent manufactures a fresh A -> C -> A cycle.
+        onto = Ontology([
+            OntologyConcept(id="A", label="A", equivalent_to=("B",), parents=("C",)),
+            OntologyConcept(id="B", label="B"),
+            OntologyConcept(id="C", label="C", parents=("B",)),
+        ])
+        assert onto.ids == ("A",)
+        assert onto.aliases("A") == ("B", "C")
+        assert onto.concept("A").parents == ()
+
+    def test_mutual_pair_with_a_cross_edge_collapses(self):
+        # a <-> b is licensed; b -> c -> a then closes over the merged group
+        onto = Ontology([
+            OntologyConcept(id="a", label="a", parents=("b",)),
+            OntologyConcept(id="b", label="b", parents=("a", "c")),
+            OntologyConcept(id="c", label="c", parents=("a",)),
+        ])
+        assert onto.ids == ("a",)
+        assert onto.aliases("a") == ("b", "c")
+
+    def test_fixpoint_does_not_swallow_unlicensed_cycles(self):
+        # still no mutual pair anywhere, so this stays a typo
+        with pytest.raises(OntologyCycleError):
+            Ontology([
+                OntologyConcept(id="a", label="A", parents=("b",)),
+                OntologyConcept(id="b", label="B", parents=("c",)),
+                OntologyConcept(id="c", label="C", parents=("a",)),
+            ])
+
+    def test_canonical_election_prefers_a_real_label_over_an_id(self):
+        # from_rdflib falls back to `label = str(subject)` for an unlabelled
+        # class; electing that as canonical would demote the human label to a
+        # synonym and surface a raw IRI everywhere concept.label is displayed
+        onto = Ontology([
+            OntologyConcept(id="http://ex/A0001", label="http://ex/A0001"),
+            OntologyConcept(id="http://ex/Dog", label="Dog", definition="A dog.", equivalent_to=("http://ex/A0001",)),
+        ])
+        assert onto.ids == ("http://ex/Dog",)
+        assert onto.concept("http://ex/A0001").label == "Dog"
+
+    def test_canonical_election_still_breaks_ties_by_smallest_id(self):
+        # when every member carries a real label the rule is unchanged
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        assert onto.ids == ("ex:Auto",)
+
+    def test_canonical_election_falls_back_when_no_member_is_labelled(self):
+        onto = Ontology([
+            OntologyConcept(id="ex:B", label="ex:B", equivalent_to=("ex:A",)),
+            OntologyConcept(id="ex:A", label="ex:A"),
+        ])
+        assert onto.ids == ("ex:A",)
+
+    def test_hierarchy_cycle_error_names_the_cycle_not_a_downstream_leaf(self):
+        # 'aaa_leaf' has one parent and no cycle; it merely sorts first among
+        # the unresolved set, which includes everything downstream of the cycle
+        with pytest.raises(OntologyCycleError) as exc_info:
+            Ontology.from_hierarchy({"mid1": {"mid2": {"mid3": {"mid1": None, "aaa_leaf": None}}}})
+        message = str(exc_info.value)
+        assert "'mid1'" in message
+        assert "'mid2'" in message
+        assert "'mid3'" in message
+        assert "aaa_leaf" not in message
+
+    def test_an_unrelated_equivalence_does_not_rewrite_other_concepts(self):
+        # _absorb ran over every concept whenever any group existed, so an
+        # unrelated concept's synonyms were silently deduplicated and stripped
+        alone = Ontology([OntologyConcept(id="x", label="L", synonyms=("L", "S", "S"))])
+        with_group = Ontology([
+            OntologyConcept(id="x", label="L", synonyms=("L", "S", "S")),
+            OntologyConcept(id="p", label="P", equivalent_to=("q",)),
+        ])
+        assert alone.concept("x").synonyms == ("L", "S", "S")
+        assert with_group.concept("x").synonyms == alone.concept("x").synonyms
+
+    def test_a_non_member_still_gets_its_parents_canonicalized(self):
+        # the one rewrite a non-member does need, or the edge is lost
+        onto = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+            OntologyConcept(id="ex:Sedan", label="Sedan", synonyms=("Sedan", "Saloon"), parents=("ex:Car",)),
+        ])
+        assert onto.concept("ex:Sedan").parents == ("ex:Auto",)
+        assert onto.concept("ex:Sedan").synonyms == ("Sedan", "Saloon")  # untouched
