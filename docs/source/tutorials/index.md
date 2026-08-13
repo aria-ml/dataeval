@@ -33,6 +33,7 @@ local checkout.
 ../notebooks/tt_identify_dataset_gaps.py
 ../notebooks/tt_identify_bias.py
 ../notebooks/tt_augmentation_duplicates.py
+../notebooks/tt_compare_objects_to_surroundings.py
 ```
 
 ```{list-table}
@@ -59,6 +60,10 @@ local checkout.
   - Learn how common torchvision augmentations like rotations, flips, and color
     jitter can be detected as near duplicates using D4 hashes and BoVW embeddings.
   - [![Open In Colab][colab-badge]][augs-colab]
+* - [](../notebooks/tt_compare_objects_to_surroundings.py)
+  - Compare detections against their surroundings and against each other
+    to find hard-to-see objects and background shortcuts.
+  - [![Open In Colab][colab-badge]][surr-colab]
 ```
 
 <!-- Ref links -->
@@ -70,6 +75,7 @@ local checkout.
 [gaps-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_identify_dataset_gaps.ipynb
 [bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_identify_bias.ipynb
 [augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_augmentation_duplicates.ipynb
+[surr-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_compare_objects_to_surroundings.ipynb
 
 <!-- markdownlint-enable MD053 -->
 
