@@ -2963,14 +2963,14 @@ yolo-models = ["boto3 (>=1.35)", "botocore (>=1.35)", "matplotlib (>=3.7.1)", "o
 
 [[package]]
 name = "maite-datasets"
-version = "0.0.15"
+version = "0.0.18"
 description = "A collection of Image Classification and Object Detection task datasets conforming to the MAITE protocol."
 optional = false
 python-versions = ">=3.10"
 groups = ["dev", "docs"]
 files = [
-    {file = "maite_datasets-0.0.15-py3-none-any.whl", hash = "sha256:457801ce34bc21572b8c4f53b60188399c5808e759c29fd5076546e82a1c3e5f"},
-    {file = "maite_datasets-0.0.15.tar.gz", hash = "sha256:21b27ac1d77229337426fcb875d2f128ce606fd336877debd2b1c266d4787136"},
+    {file = "maite_datasets-0.0.18-py3-none-any.whl", hash = "sha256:5a9d026f8b5247b82a9809759ee42a24c93ca2f054f36b7ebfc871b5d0404c1e"},
+    {file = "maite_datasets-0.0.18.tar.gz", hash = "sha256:b02d8dc53236926533e93f1fc22318b8717dedabf461d3386ff3280f14f7b1c9"},
 ]
 
 [package.dependencies]
@@ -2978,14 +2978,16 @@ defusedxml = ">=0.7.1"
 maite = ">=0.9.4"
 numpy = ">=1.24.2"
 pillow = ">=10.3.0"
+pyyaml = ">=6.0.3"
 requests = ">=2.32.3"
 scikit-image = ">=0.25.2"
 scipy = ">=1.15.3"
 typing-extensions = ">=4.12"
 
 [package.extras]
+all = ["av (>=12.0.0)", "huggingface-hub (>=1.23.0)", "imagecodecs (>=2024.12.30)", "tqdm (>=4.66)"]
 av = ["av (>=12.0.0)"]
-opencv = ["opencv-python-headless (>=4.10.0)"]
+hf = ["huggingface-hub (>=1.23.0)", "imagecodecs (>=2024.12.30)"]
 tqdm = ["tqdm (>=4.66)"]
 
 [[package]]
@@ -7378,6 +7380,33 @@ rich = ">=12.3.0"
 shellingham = ">=1.3.0"
 
 [[package]]
+name = "types-pyyaml"
+version = "6.0.12.20260724"
+description = "Typing stubs for PyYAML"
+optional = false
+python-versions = ">=3.10"
+groups = ["dev", "type"]
+files = [
+    {file = "types_pyyaml-6.0.12.20260724-py3-none-any.whl", hash = "sha256:d57db930a4b2efbc57cf430ec8882765d246929432fa253092f383902329a453"},
+    {file = "types_pyyaml-6.0.12.20260724.tar.gz", hash = "sha256:3c1ce1bb73cd5ec02e90390c2b1f00e810d241d8825fd73ff359696839271b6b"},
+]
+
+[[package]]
+name = "types-requests"
+version = "2.33.0.20260712"
+description = "Typing stubs for requests"
+optional = false
+python-versions = ">=3.10"
+groups = ["dev", "type"]
+files = [
+    {file = "types_requests-2.33.0.20260712-py3-none-any.whl", hash = "sha256:de027e28c171d3da529689cbfa023b0b4eab188c8dfa22fd834eebd2cee6e7bb"},
+    {file = "types_requests-2.33.0.20260712.tar.gz", hash = "sha256:2141b67ab534a5c5cd2dac5034f2a35f42e699c5bf185eee608c5246a069d7fb"},
+]
+
+[package.dependencies]
+urllib3 = ">=2"
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -7498,7 +7527,7 @@ version = "2.6.3"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
 python-versions = ">=3.9"
-groups = ["dev", "docs", "lock"]
+groups = ["dev", "docs", "lock", "type"]
 files = [
     {file = "urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4"},
     {file = "urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed"},
