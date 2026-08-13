@@ -306,7 +306,7 @@ class TestUnlabeledClassificationItems:
         assert md.factor_data.shape[0] == len(md.class_labels)
 
     def test_unlabeled_items_are_named_in_the_log(self, caplog):
-        with caplog.at_level(logging.INFO, logger="dataeval._structurers"):
+        with caplog.at_level(logging.INFO, logger="dataeval.metadata"):
             Metadata(self._partially_labeled())._structure()
 
         assert "[1]" in caplog.text
@@ -625,7 +625,7 @@ class TestInstanceLevelKeyColumn:
         assert "instance_index" in md.rows_at("instance").columns
 
     def test_od_logs_images_without_detections(self, caplog):
-        with caplog.at_level(logging.INFO, logger="dataeval._structurers"):
+        with caplog.at_level(logging.INFO, logger="dataeval.metadata"):
             Metadata(_od_dataset(counts=(2, 0, 1)))._structure()
 
         assert "carried no target" in caplog.text

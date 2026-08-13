@@ -25,7 +25,6 @@ __all__ = [
     "select_structurer",
 ]
 
-import logging
 from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Callable, Container, Iterable, Iterator, Mapping, Sequence, Sized
@@ -36,6 +35,7 @@ from typing import Any, Literal, NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import (
     AnnotatedDataset,
@@ -49,7 +49,7 @@ from dataeval.protocols import (
 from dataeval.types import FactorLevel, FactorLevelSchema, SourceIndex
 from dataeval.utils._internal import as_numpy, merge_metadata
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 # Task identifier of a structuring strategy.
 TASK = Literal["IC", "OD", "MOT", "factors", "unknown"]

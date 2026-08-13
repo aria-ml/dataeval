@@ -1,6 +1,5 @@
 __all__ = []
 
-import logging
 import warnings
 from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
@@ -14,6 +13,7 @@ from numpy.typing import NDArray
 
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
+from dataeval._log import get_logger
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._base import Calculator
 from dataeval.core._calculators._cache import CalculatorCache
@@ -25,7 +25,7 @@ from dataeval.types import SourceIndex, StatsMap
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import BitDepth, BoundingBox, BoxLike, boxes_to_mask, get_bitdepth, to_bounding_box
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 SOURCE_INDEX = "source_index"
 

@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
 #     display_name: dataeval
 #     language: python
@@ -70,6 +70,40 @@ from dataeval.core._ber import ber_knn, ber_mst
 # - **CRITICAL**: A very serious error
 #
 # DataEval primarily uses **DEBUG**, **INFO**, and **WARNING** levels for normal operation.
+
+# %% [markdown]
+# ## Logger namespaces
+#
+# Every DataEval log record is emitted on `dataeval` or one of its subsystem loggers, so
+# configuring `dataeval` alone -- as the rest of this notebook does -- captures everything.
+#
+# To narrow the output, set a level or attach a handler on a subsystem instead:
+#
+# | Namespace | Covers |
+# | --- | --- |
+# | `dataeval.core` | The stateless numerical routines |
+# | `dataeval.metadata` | `Metadata`, including automatic binning warnings |
+# | `dataeval.embeddings` | `Embeddings` batching and caching |
+# | `dataeval.data` | Dataset views, splits, and crops |
+# | `dataeval.bias`, `dataeval.shift`, `dataeval.scope`, `dataeval.quality` | The evaluators in each subpackage |
+# | `dataeval.extractors` | Feature extractors |
+# | `dataeval.utils` | Preprocessing and training helpers |
+#
+# For example, to quiet everything except metadata handling:
+#
+# ```python
+# logging.getLogger("dataeval").setLevel(logging.WARNING)
+# logging.getLogger("dataeval.metadata").setLevel(logging.DEBUG)
+# ```
+#
+# These names are chosen rather than derived from DataEval's file layout, so they are stable
+# across internal refactoring. A few -- `dataeval.metadata` and `dataeval.embeddings` among
+# them -- have no importable module of the same name; the logging namespace is independent of
+# the import namespace.
+#
+# Narrowing the namespace costs no detail, because each record carries its originating file
+# and line regardless of which logger it lands on. Include `%(filename)s:%(lineno)s` in your
+# formatter, as {func}`dataeval.log` does by default, to see it.
 
 # %% [markdown]
 # ## Logging to console

@@ -6,18 +6,18 @@
 
 __all__ = []
 
-import logging
 from typing import Any, Literal, TypedDict, overload
 
 import numpy as np
 from numpy.typing import NDArray
 from sklearn.neighbors import NearestNeighbors
 
+from dataeval._log import get_logger
 from dataeval.config import get_max_processes
 from dataeval.types import ArrayND
 from dataeval.utils._internal import as_numpy, flatten_samples
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class MSTResult(TypedDict):

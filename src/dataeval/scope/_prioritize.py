@@ -7,7 +7,6 @@ that handle dataset loading and embedding computation.
 
 __all__ = []
 
-import logging
 from collections.abc import Iterator
 from typing import Any, Literal, cast
 
@@ -17,6 +16,7 @@ from typing_extensions import Self
 
 from dataeval import Metadata
 from dataeval._embeddings import Embeddings
+from dataeval._log import get_logger
 from dataeval.core._rank import (
     RankResult,
     rank_hdbscan_complexity,
@@ -30,7 +30,7 @@ from dataeval.core._rank import (
 from dataeval.protocols import AnnotatedDataset, Array, FeatureExtractor
 from dataeval.types import Evaluator, EvaluatorConfig, Output, set_metadata
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 MethodType = Literal["knn", "kmeans_distance", "kmeans_complexity", "hdbscan_distance", "hdbscan_complexity"]

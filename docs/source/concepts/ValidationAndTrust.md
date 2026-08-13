@@ -345,7 +345,7 @@ called discrete.
   one that does not is about the binning. DataEval does not perform this check
   and will not warn you when a result is binning-sensitive.
 - **The automatic path announces itself only in logs.** Each auto-binned factor
-  emits a WARNING on the `dataeval._metadata` logger, and DataEval attaches a
+  emits a WARNING on the `dataeval.metadata` logger, and DataEval attaches a
   `NullHandler`, so nothing is printed unless you configure logging — call
   {func}`dataeval.log` with `logging.WARNING` to see them.
 - **Record the binning alongside the extractor.** Two runs with different

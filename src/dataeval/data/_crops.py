@@ -4,13 +4,13 @@ from __future__ import annotations
 
 __all__ = ["DetectionCrops"]
 
-import logging
 from collections.abc import Iterator, Mapping
 from typing import Any, Literal, TypeAlias
 
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._log import get_logger
 from dataeval.protocols import (
     AnnotatedDataset,
     DatasetMetadata,
@@ -21,7 +21,7 @@ from dataeval.utils._internal import as_numpy
 from dataeval.utils._validate import requires_maite_dataset
 from dataeval.utils.preprocessing import clip_box, crop_with_fill, normalize_image_shape
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 RegionType = Literal["object", "context", "surround"]
 SquareType = Literal["off", "expand", "pad"]

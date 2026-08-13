@@ -1,13 +1,13 @@
 __all__ = []
 
-import logging
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TypedDict
 
+from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class LabelStatsResult(TypedDict):

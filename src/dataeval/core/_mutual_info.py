@@ -1,6 +1,5 @@
 __all__ = []
 
-import logging
 from collections.abc import Iterable
 from typing import TypedDict
 
@@ -9,12 +8,13 @@ from numpy.typing import NDArray
 from scipy.stats import entropy
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
+from dataeval._log import get_logger
 from dataeval.config import get_max_processes, get_seed
 from dataeval.core._bin import is_continuous
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._internal import as_numpy, opt_as_numpy
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class MutualInfoResult(TypedDict):

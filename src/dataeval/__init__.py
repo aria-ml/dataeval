@@ -32,10 +32,11 @@ import logging
 
 from . import config, exceptions, flags, models, protocols, types
 from ._embeddings import Embeddings
+from ._log import _ROOT
 from ._metadata import Metadata
 from ._ontology import Ontology
 
-logging.getLogger(__name__).addHandler(logging.NullHandler())
+logging.getLogger(_ROOT).addHandler(logging.NullHandler())
 
 
 def log(level: int = logging.DEBUG, handler: logging.Handler | None = None) -> None:
@@ -57,7 +58,7 @@ def log(level: int = logging.DEBUG, handler: logging.Handler | None = None) -> N
     """
     import logging
 
-    _logger = logging.getLogger(__name__)
+    _logger = logging.getLogger(_ROOT)
     if handler is None:
         handler = logging.StreamHandler()
         handler.setFormatter(
@@ -68,4 +69,4 @@ def log(level: int = logging.DEBUG, handler: logging.Handler | None = None) -> N
     if handler not in _logger.handlers:
         _logger.addHandler(handler)
     _logger.setLevel(level)
-    _logger.debug("Added logging handler %s to logger: %s", handler, __name__)
+    _logger.debug("Added logging handler %s to logger: %s", handler, _ROOT)

@@ -30,7 +30,6 @@ below it are reported but left unassessed.
 
 __all__ = ["Coverage", "CoverageOutput"]
 
-import logging
 from collections.abc import Mapping
 from typing import Any, Literal, cast
 
@@ -39,13 +38,14 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval import Metadata
+from dataeval._log import get_logger
 from dataeval.core._completeness import completeness as _completeness
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import AnnotatedDataset, Array, ArrayLike, FeatureExtractor, MetadataLike
 from dataeval.types import DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 MethodType = Literal["naive", "adaptive"]
 

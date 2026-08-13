@@ -11,11 +11,12 @@ import polars as pl
 from numpy.typing import NDArray
 from scipy.optimize import basinhopping
 
+from dataeval._log import get_logger
 from dataeval.protocols import ArrayLike
 from dataeval.types import DictOutput
 from dataeval.utils._internal import as_numpy
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 LRU_CACHE_SIZE = 10
 

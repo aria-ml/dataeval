@@ -1,17 +1,17 @@
 __all__ = []
 
-import logging
 from collections.abc import Sequence
 from typing import NamedTuple, TypedDict, cast
 
 import numpy as np
 from scipy.stats import iqr, ks_2samp, wasserstein_distance
 
+from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._internal import as_numpy
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class KSType(NamedTuple):

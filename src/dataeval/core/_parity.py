@@ -1,6 +1,5 @@
 __all__ = []
 
-import logging
 from collections import defaultdict
 from collections.abc import Mapping
 from typing import TypedDict, cast
@@ -10,10 +9,11 @@ from numpy.typing import NDArray
 from scipy.stats.contingency import chi2_contingency, crosstab
 
 from dataeval._experimental import experimental
+from dataeval._log import get_logger
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._internal import as_numpy
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class ParityResult(TypedDict):

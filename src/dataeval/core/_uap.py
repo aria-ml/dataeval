@@ -6,15 +6,15 @@ Uses empirical mean precision to estimate the upper-bound average precision.
 
 __all__ = []
 
-import logging
 
 from sklearn.metrics import average_precision_score
 
 from dataeval._experimental import experimental
+from dataeval._log import get_logger
 from dataeval.protocols import ArrayLike
 from dataeval.utils._internal import as_numpy
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 @experimental

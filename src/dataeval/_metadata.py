@@ -1,7 +1,6 @@
 __all__ = ["Metadata"]
 
 import copy
-import logging
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
 from typing import Any, Literal, NoReturn, cast
@@ -11,6 +10,7 @@ import polars as pl
 from numpy.typing import NDArray
 from typing_extensions import Self
 
+from dataeval._log import get_logger
 from dataeval._structurers import (
     FactorsStructurer,
     RowLayout,
@@ -35,7 +35,7 @@ from dataeval.types import Array1D, FactorInfo, FactorLevel, FactorLevelSchema, 
 from dataeval.utils._internal import as_numpy
 from dataeval.utils._validate import requires_maite_dataset
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 def _is_stats_result(candidate: Any) -> bool:

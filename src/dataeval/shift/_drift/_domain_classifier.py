@@ -10,7 +10,6 @@ Licensed under Apache Software License (Apache 2.0)
 
 __all__ = []
 
-import logging
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
@@ -18,6 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import Self
 
+from dataeval._log import get_logger
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
@@ -25,7 +25,7 @@ from dataeval.shift._shared._domain_classifier import compute_auroc
 from dataeval.types import set_metadata
 from dataeval.utils.thresholds import ConstantThreshold
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class _DriftDomainClassifierStats(TypedDict):

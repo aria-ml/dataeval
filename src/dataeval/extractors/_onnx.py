@@ -2,7 +2,6 @@
 
 __all__ = []
 
-import logging
 from collections.abc import Sequence
 from pathlib import Path
 from types import ModuleType
@@ -11,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._log import get_logger
 from dataeval.extractors._resize import resize_chw
 from dataeval.protocols import Array, Transform
 from dataeval.types import ReprMixin
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 else:
     InferenceSession = Any
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 _ort_import_error = ImportError(
     "onnxruntime is required for OnnxExtractor. "

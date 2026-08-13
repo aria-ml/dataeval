@@ -1,16 +1,16 @@
 __all__ = []
 
-import logging
 from collections.abc import Sequence
 from typing import TypedDict
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
+from dataeval._log import get_logger
 from dataeval.protocols import Array
 from dataeval.utils._internal import ensure_embeddings
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class CompletenessResult(TypedDict):

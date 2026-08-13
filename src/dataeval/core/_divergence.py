@@ -6,16 +6,16 @@ Uses the Fast Nearest Neighbor and Minimum Spanning Tree algorithms.
 
 __all__ = []
 
-import logging
 from collections.abc import Callable
 from typing import TypedDict
 
 import numpy as np
 
+from dataeval._log import get_logger
 from dataeval.types import ArrayND
 from dataeval.utils._internal import as_numpy
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class DivergenceResult(TypedDict):

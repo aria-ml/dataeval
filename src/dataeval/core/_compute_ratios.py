@@ -1,17 +1,17 @@
 __all__ = []
 
-import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypeAlias
 
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._log import get_logger
 from dataeval.core._compute_stats import BACKGROUND_PREFIX, StatsResult
 from dataeval.types import SourceIndex
 from dataeval.utils._internal import EPSILON
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 SOURCE_INDEX_KEY = "source_index"
 

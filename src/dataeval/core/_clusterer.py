@@ -9,13 +9,14 @@ from numpy.typing import NDArray
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 
+from dataeval._log import get_logger
 from dataeval.config import get_seed
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import ArrayND
 from dataeval.utils._internal import flatten_samples, to_numpy
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class _Clusters:

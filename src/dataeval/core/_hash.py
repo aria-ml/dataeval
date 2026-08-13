@@ -2,7 +2,6 @@
 
 __all__ = []
 
-import logging
 from typing import Any
 
 import numpy as np
@@ -10,11 +9,12 @@ import xxhash as xxh
 from numpy.typing import NDArray
 from scipy.fftpack import dct
 
+from dataeval._log import get_logger
 from dataeval.types import Array3D
 from dataeval.utils._internal import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape, resize, to_canonical_grayscale
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 HASH_SIZE = 8
 MAX_FACTOR = 4

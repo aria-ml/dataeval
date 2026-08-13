@@ -2,7 +2,6 @@
 
 __all__ = []
 
-import logging
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -10,11 +9,12 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif
 
+from dataeval._log import get_logger
 from dataeval.config import get_max_processes, get_seed
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import SequenceLike
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 def _calc_median_deviations(reference: NDArray[Any], test: NDArray[Any]) -> NDArray[Any]:

@@ -12,11 +12,12 @@ from numpy.typing import NDArray
 from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 from sklearn.utils.multiclass import type_of_target
 
+from dataeval._log import get_logger
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.utils._internal import EPSILON
 from dataeval.utils._validate import validate_dataset
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)

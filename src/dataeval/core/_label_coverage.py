@@ -18,14 +18,14 @@ not here.
 
 __all__ = []
 
-import logging
 from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
+from dataeval._log import get_logger
 from dataeval._ontology import Ontology
 from dataeval.core._label_reconciliation import _resolve
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class LabelCoverageResult(TypedDict):

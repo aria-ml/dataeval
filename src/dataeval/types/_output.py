@@ -20,6 +20,7 @@ from typing import Any, Generic, ParamSpec, TypeVar, overload
 import numpy as np
 import polars as pl
 
+from dataeval._log import get_logger
 from dataeval.types._execution import ExecutionMetadata, __version__
 
 _T = TypeVar("_T", covariant=True)
@@ -256,7 +257,10 @@ def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | N
         name = f"{module}{class_prefix}{fn.__name__}"
         arguments = {k: v for k, v in arguments.items() if k != "self"}
 
-        _logger = logging.getLogger(module)
+        # Resolved from the decorated callable, so the trace lands on the subsystem
+        # that ran rather than on ``dataeval.types``. ``name`` keeps the full module
+        # path, so curating the logger costs no provenance.
+        _logger = get_logger(module)
         time = datetime.now(timezone.utc)
         _logger.log(logging.INFO, f">>> Executing '{name}': args={arguments} state={state} <<<")
 

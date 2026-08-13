@@ -4,16 +4,16 @@ from __future__ import annotations
 
 __all__ = ["TrackStatsResult", "track_stats"]
 
-import logging
 from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
 import numpy as np
 
+from dataeval._log import get_logger
 from dataeval.types import Track
 from dataeval.utils._internal import EPSILON
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class TrackStatsResult(TypedDict):

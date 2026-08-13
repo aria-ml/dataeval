@@ -1,16 +1,16 @@
 __all__ = []
 
-import logging
 from typing import Any, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import chisquare
 
+from dataeval._log import get_logger
 from dataeval.types import Array1D
 from dataeval.utils._internal import as_numpy
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class LabelParityResult(TypedDict):

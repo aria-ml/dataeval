@@ -1,12 +1,13 @@
 __all__ = []
 
-import logging
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import entropy
 
-_logger = logging.getLogger(__name__)
+from dataeval._log import get_logger
+
+_logger = get_logger(__name__)
 
 
 def diversity_shannon(

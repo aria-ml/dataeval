@@ -15,20 +15,20 @@ OWL reuses these rather than defining its own.
 
 __all__ = ["Ontology"]
 
-import logging
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Self
 
+from dataeval._log import get_logger
 from dataeval.exceptions import OntologyCycleError, OntologyError
 from dataeval.types import OntologyConcept
 
 if TYPE_CHECKING:
     import rdflib
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class Ontology:

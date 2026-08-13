@@ -297,7 +297,7 @@ class TestIsContinuousUnit:
         data = rng.normal(size=40)[groups]
         data[1] += 1e-9  # one entry out of place
 
-        with caplog.at_level(logging.DEBUG, logger="dataeval.core._bin"):
+        with caplog.at_level(logging.DEBUG, logger="dataeval.core"):
             assert is_continuous(data, groups) is False
         assert "not constant within every group" in caplog.text
 

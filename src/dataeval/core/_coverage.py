@@ -1,17 +1,17 @@
 __all__ = []
 
-import logging
 import math
 from typing import TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._log import get_logger
 from dataeval.core._mst import _compute_nearest_neighbors
 from dataeval.types import Array2D
 from dataeval.utils._internal import as_numpy, ensure_embeddings, flatten_samples
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class CoverageResult(TypedDict):

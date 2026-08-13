@@ -7,16 +7,16 @@ numpy arrays, independent of dataset abstractions.
 
 __all__ = []
 
-import logging
 from typing import Any, Literal, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._log import get_logger
 from dataeval.core._clusterer import _SORTER_MAP
 from dataeval.utils._internal import EPSILON
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class RankResult(TypedDict):

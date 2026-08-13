@@ -1,6 +1,5 @@
 __all__ = []
 
-import logging
 from collections.abc import Callable, Sequence
 from typing import Any, TypedDict
 
@@ -8,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import NotRequired
 
+from dataeval._log import get_logger
 from dataeval.protocols import ArrayLike
 from dataeval.types import Array1D
 from dataeval.utils._internal import as_numpy
@@ -150,7 +150,7 @@ def _calculate_localization_ap(
     return float(np_trapezoid(precisions, recalls))
 
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 ConfusionMatrix = tuple[np.floating[Any], np.floating[Any], np.floating[Any], np.floating[Any]]
 BinaryClassMetricFunction = Callable[[ConfusionMatrix], np.float64]

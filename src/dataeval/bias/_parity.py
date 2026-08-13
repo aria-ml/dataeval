@@ -1,6 +1,5 @@
 __all__ = []
 
-import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,11 +8,12 @@ import polars as pl
 from dataeval import Metadata
 from dataeval._experimental import experimental
 from dataeval._helpers import _get_index2label
+from dataeval._log import get_logger
 from dataeval.core._parity import parity
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 DEFAULT_PARITY_SCORE_THRESHOLD = 0.3
 DEFAULT_PARITY_P_VALUE_THRESHOLD = 0.05

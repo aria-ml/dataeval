@@ -2,7 +2,6 @@
 
 __all__ = ["Embeddings"]
 
-import logging
 import os
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
@@ -14,6 +13,7 @@ import xxhash as xxh
 from numpy.typing import NDArray
 from typing_extensions import Self
 
+from dataeval._log import get_logger
 from dataeval.config import resolve_batch_size
 from dataeval.exceptions import NotFittedError
 from dataeval.extractors import FlattenExtractor
@@ -28,7 +28,7 @@ from dataeval.protocols import (
 from dataeval.utils._internal import unwrap_image
 from dataeval.utils._validate import requires_maite_dataset
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class Embeddings(Array, FeatureExtractor):

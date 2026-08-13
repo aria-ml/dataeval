@@ -17,13 +17,13 @@ import torch
 from numpy.typing import ArrayLike, NDArray
 from typing_extensions import Self
 
-from dataeval._log import LogMessage
+from dataeval._log import LogMessage, get_logger
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import Array, Dataset, SequenceLike
 
 ImageOrItem = ArrayLike | tuple[ArrayLike, Any, Any]
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 EPSILON = 1e-12
 MODULE_CACHE = {}

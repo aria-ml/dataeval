@@ -23,7 +23,6 @@ __all__ = [
     "to_int_box",
 ]
 
-import logging
 import math
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -36,6 +35,7 @@ from scipy.ndimage import zoom
 from scipy.signal import convolve2d
 
 from dataeval._experimental import deprecated
+from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
 
 try:
@@ -43,7 +43,7 @@ try:
 except ImportError:
     Image = None
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 _EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
 _BIT_DEPTH = (1, 8, 12, 16, 32)

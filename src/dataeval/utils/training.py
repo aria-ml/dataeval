@@ -2,7 +2,6 @@
 
 __all__ = ["train", "predict"]
 
-import logging
 from collections.abc import Callable, Iterable, Sized
 from typing import Any, TypeAlias
 
@@ -11,10 +10,11 @@ import torch
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, TensorDataset
 
+from dataeval._log import get_logger
 from dataeval.config import DeviceLike, get_batch_size, get_device
 from dataeval.protocols import Array, ProgressCallback
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 PreprocessFn: TypeAlias = Callable[[torch.Tensor], torch.Tensor]

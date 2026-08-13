@@ -12,7 +12,6 @@ genuinely rare can assert a minimum share for it instead.
 
 __all__ = ["Representation", "RepresentationOutput"]
 
-import logging
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -21,13 +20,14 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval import Metadata
+from dataeval._log import get_logger
 from dataeval._ontology import Ontology
 from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
 from dataeval.core._label_stats import label_stats
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 _WORKLIST_SCHEMA: dict[str, pl.DataType] = {
     "concept": pl.String(),

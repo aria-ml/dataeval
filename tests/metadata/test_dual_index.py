@@ -820,7 +820,7 @@ class TestAddFactorsRobustness:
         """Vector-valued stats have no single-column form; the caller must be told they were skipped."""
         md = Metadata(od_dataset_with_metadata)
 
-        with caplog.at_level(logging.WARNING, logger="dataeval._metadata"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.metadata"):
             md.add_factors({"percentiles": np.random.rand(3, 5), "ok": [1.0, 2.0, 3.0]})
 
         assert "percentiles" in caplog.text
