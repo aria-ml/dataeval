@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
 #     display_name: dataeval
 #     language: python
@@ -268,7 +268,8 @@ for i, name in enumerate(names):
 
 ax.axvline(0, color=INK, linewidth=1, zorder=4)
 
-pad = 0.02 * (detections["separation"].max() - detections["separation"].min())
+separation = detections["separation"].to_numpy()
+pad = 0.02 * (separation.max() - separation.min())
 for i, (m, n) in enumerate(zip(means, counts, strict=True)):
     ax.text(
         m + (pad if m > 0 else -pad),
