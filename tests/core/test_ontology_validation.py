@@ -144,3 +144,21 @@ class TestEdgeCases:
         res = ontology_validation(onto)
         assert res["redundant_edges"] == []
         assert res["parent_count"]["amphibious"] == 2
+
+
+@pytest.mark.required
+class TestAliases:
+    def test_equivalence_merges_are_reported(self):
+        # a merge silently shrinks the vocabulary and removes a label collision,
+        # so without this the only evidence is a smaller len()
+        onto = Ontology([
+            OntologyConcept(id="ex:Auto", label="Auto"),
+            OntologyConcept(id="ex:Car", label="Auto", equivalent_to=("ex:Auto",)),
+        ])
+        result = ontology_validation(onto)
+        assert result["aliases"] == {"ex:Auto": ["ex:Car"]}
+        assert result["label_collisions"] == {}  # merged away, hence the need above
+
+    def test_aliases_empty_without_equivalences(self):
+        onto = Ontology.from_hierarchy({"vehicle": ["car", "truck"]})
+        assert ontology_validation(onto)["aliases"] == {}

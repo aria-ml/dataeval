@@ -51,10 +51,17 @@ class OntologyValidationResult(TypedDict):
     unary_parents : Sequence[str]
         Concept ids with exactly one child — a single-child link adds depth
         without discriminating, a candidate redundant intermediate.
+    aliases : Mapping[str, Sequence[str]]
+        Canonical concept id to the ids absorbed into it, for concepts asserted
+        to denote the same class (``owl:equivalentClass``, or mutual is-a edges).
+        A merge shrinks the vocabulary and removes any label collision between
+        the members, so it is the one construction-time rewrite whose effect is
+        otherwise invisible in this report. Empty when nothing was merged.
     label_collisions : Mapping[str, Sequence[str]]
         Normalized (case-folded) name to the more-than-one concept ids it resolves
         to over preferred labels and synonyms — the artifact-side cause of
-        reconciliation ``ambiguous`` results.
+        reconciliation ``ambiguous`` results. Members of an equivalence group do
+        not collide with each other: they are one concept by the time this runs.
     nonconforming_labels : Mapping[str, str]
         Concept id to its label, for labels that do not fully match
         ``label_pattern``. Always empty when ``label_pattern`` is ``None``.
@@ -75,6 +82,7 @@ class OntologyValidationResult(TypedDict):
     redundant_edges: Sequence[tuple[str, str]]
     ancestor_siblings: Sequence[tuple[str, str]]
     unary_parents: Sequence[str]
+    aliases: Mapping[str, Sequence[str]]
     label_collisions: Mapping[str, Sequence[str]]
     nonconforming_labels: Mapping[str, str]
     depth: Mapping[str, int]
@@ -157,7 +165,8 @@ def ontology_validation(ontology: Ontology, *, label_pattern: str | None = None)
     OntologyValidationResult
         Connectivity (``roots``/``leaves``/``isolated``/``external_ancestors``),
         redundancy/contradiction (``redundant_edges``/``ancestor_siblings``/
-        ``unary_parents``), naming (``label_collisions``/``nonconforming_labels``),
+        ``unary_parents``), equivalence (``aliases``), naming
+        (``label_collisions``/``nonconforming_labels``),
         and the per-concept shape profile (``depth``/``fan_out``/``parent_count``).
 
     See Also
@@ -188,6 +197,7 @@ def ontology_validation(ontology: Ontology, *, label_pattern: str | None = None)
         redundant_edges=_redundant_edges(ontology, ancestors),
         ancestor_siblings=_ancestor_siblings(ontology, ancestors),
         unary_parents=[cid for cid, children in fan_out.items() if children == 1],
+        aliases={c.id: list(c.equivalent_to) for c in ontology if c.equivalent_to},
         label_collisions=ontology.label_collisions,
         nonconforming_labels=_nonconforming_labels(ontology, label_pattern),
         depth={c.id: ontology.depth_of(c.id) for c in ontology},

@@ -32,6 +32,13 @@ class OntologyConcept(BaseModel):
         Parent ids that are not themselves defined concepts are treated as
         external references, not errors (ontologies are frequently
         distributed as subsets).
+    equivalent_to : tuple[str, ...]
+        Ids asserted to denote the same class (``owl:equivalentClass``).
+        :class:`dataeval.Ontology` collapses each equivalence group to one
+        canonical concept; the remaining ids become *aliases* that resolve to
+        it. Ids that are not themselves defined concepts are still recorded as
+        aliases. Cross-*vocabulary* equivalence is not this field — it belongs
+        to :class:`Correspondence` with ``relation="equivalent"``.
     definition : str or None
         Optional textual definition (``skos:definition``).
     """
@@ -42,6 +49,7 @@ class OntologyConcept(BaseModel):
     label: str
     synonyms: tuple[str, ...] = ()
     parents: tuple[str, ...] = ()
+    equivalent_to: tuple[str, ...] = ()
     definition: str | None = None
 
 

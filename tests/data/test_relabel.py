@@ -6,6 +6,7 @@ from dataeval.core import label_alignment
 from dataeval.data import Operation, Relabel, View
 from dataeval.data._relabel import _label_remap
 from dataeval.exceptions import OntologyError
+from dataeval.types import OntologyConcept
 
 
 def target_ontology() -> Ontology:
@@ -230,3 +231,20 @@ class TestRelabel:
         assert "index2label" in a.metadata
         assert "index2label" in b.metadata
         assert dict(a.metadata["index2label"]) == dict(b.metadata["index2label"])
+
+
+@pytest.mark.required
+class TestAliasTargets:
+    def test_class_remap_naming_an_alias_id_resolves_to_its_canonical(self):
+        # aliases are transparent everywhere else on Ontology; keying the target
+        # off ids alone made an alias look out-of-vocabulary and silently
+        # dropped every datum mapped to it
+        target = Ontology([
+            OntologyConcept(id="ex:Car", label="Car", equivalent_to=("ex:Auto",)),
+            OntologyConcept(id="ex:Auto", label="Auto"),
+        ])
+        assert target.canonical("ex:Car") == "ex:Auto"
+        mapping, index2label, dropped = _label_remap({0: "sedan"}, {"sedan": "ex:Car"}, target)
+        assert dropped == {}
+        assert mapping == {0: 0}
+        assert index2label == {0: "Auto"}
