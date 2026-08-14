@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["DetectionCrops"]
+__all__ = []
 
 from collections.abc import Iterator, Mapping
 from typing import Any, Literal, TypeAlias
@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._log import get_logger
+from dataeval.flags import ImageStats
 from dataeval.protocols import (
     AnnotatedDataset,
     DatasetMetadata,
@@ -26,6 +27,18 @@ _logger = get_logger(__name__)
 RegionType = Literal["object", "context", "surround"]
 SquareType = Literal["off", "expand", "pad"]
 FillType = Literal["mean", "zero"]
+
+
+def resolve_fill(pixels: NDArray[Any], channels: int, fill: FillType) -> NDArray[np.float64]:
+    """Per-channel fill value for a crop or pad canvas, from the real pixels available.
+
+    ``"zero"`` fills with zeros; ``"mean"`` fills with the per-channel mean of ``pixels``,
+    falling back to zeros when there are no real pixels to average. Shared with
+    :class:`~dataeval.data.Resize`, whose letterbox bars take the same two policies.
+    """
+    if fill == "zero" or pixels.size == 0:
+        return np.zeros(channels, dtype=np.float64)
+    return pixels.reshape(channels, -1).mean(axis=1)
 
 
 def _validate_params(region: str, padding: float, min_size: int, square: str, fill: str) -> None:  # noqa: C901
@@ -150,6 +163,14 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
     >>> emb = Embeddings(crops, extractor=extractor, batch_size=64)  # doctest: +SKIP
     >>> Coverage().evaluate(crops, embeddings=emb)  # per-class dispersion over OD classes  # doctest: +SKIP
     """
+
+    # Every datum is a re-framed sub-image — a crop, plus a resize to square unless
+    # square="off" — so every dimension statistic describes the crop policy rather than
+    # the source image. Channel count is the one dimension stat that survives. Declared
+    # as a class attribute, never set in __init__: View.__init__ copies a source's
+    # instance __dict__ onto itself, so instance state here would be misattributed to a
+    # wrapping View.
+    invalidates: ImageStats = ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS
 
     @requires_maite_dataset("dataset", expected="object_detection")
     def __init__(
@@ -374,6 +395,4 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
 
     def _fill_values(self, pixels: NDArray[Any], channels: int) -> NDArray[np.float64]:
         """Per-channel fill, computed from the real pixels available for this crop."""
-        if self._fill == "zero" or pixels.size == 0:
-            return np.zeros(channels, dtype=np.float64)
-        return pixels.reshape(channels, -1).mean(axis=1)
+        return resolve_fill(pixels, channels, self._fill)

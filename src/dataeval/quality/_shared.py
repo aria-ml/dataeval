@@ -2,9 +2,96 @@
 
 __all__ = []
 
+import warnings
 from collections.abc import Sequence
+from typing import Any
 
 import polars as pl
+
+from dataeval.core import StatsResult, compute_stats
+from dataeval.data._invalidates import invalidating_sources
+from dataeval.exceptions import StatsInvalidatedWarning
+from dataeval.flags import ImageStats
+
+
+def _stat_names(stats: ImageStats) -> str:
+    """Render a flag as the stat column names it produces, in declaration order.
+
+    Every ``ImageStats`` member is named ``<CATEGORY>_<STAT>``, and ``<STAT>`` lowercased
+    is the calculator's output name (``DIMENSION_ASPECT_RATIO`` -> ``aspect_ratio``), so
+    the mapping is derived rather than duplicated from ``dataeval.core._calculators``.
+
+    Walks the class's members rather than iterating ``stats`` itself: iterating a ``Flag``
+    *value* to yield its constituent members only exists on Python 3.11+, and this package
+    supports 3.10. Composite members (``PIXEL``, ``DIMENSION``, ...) are skipped by the
+    power-of-two test so only individual stat columns are named.
+    """
+    return ", ".join(
+        name.split("_", 1)[1].lower()
+        for name, member in ImageStats.__members__.items()
+        if name == member.name and member.value and not member.value & (member.value - 1) and member & stats
+    )
+
+
+def checked_compute_stats(
+    datasets: Sequence[Any],
+    *,
+    stats: ImageStats,
+    caller: str,
+    **kwargs: Any,
+) -> list[StatsResult]:
+    """Compute stats per dataset, warning first about any that a view operation invalidated.
+
+    Parameters
+    ----------
+    datasets : Sequence[Any]
+        The datasets to compute over, always a sequence — ``Dataset | Sequence[Dataset]``
+        is not discriminable at runtime, since a ``Dataset`` is itself sized and
+        indexable. Single-dataset callers pass ``[data]`` and take ``[0]``.
+    stats : ImageStats
+        The statistics to compute. This must be the *effective* flags — what actually
+        reaches :func:`~dataeval.core.compute_stats` — not what the evaluator was
+        configured with. ``Duplicates`` computes ``flags & ImageStats.HASH``, so
+        intersecting the invalidation against ``self.flags`` would warn about dimension
+        stats it never computes.
+    caller : str
+        Name of the evaluator, used in the warning message.
+    **kwargs : Any
+        Forwarded to :func:`~dataeval.core.compute_stats` unchanged.
+
+    Returns
+    -------
+    list[StatsResult]
+        One result per dataset, in order.
+
+    Warns
+    -----
+    StatsInvalidatedWarning
+        Once per invalidating operation whose declaration overlaps ``stats``, unioned
+        across ``datasets`` so N datasets sharing operations warn once, not N times.
+    """
+    invalidated: dict[str, ImageStats] = {}
+    for dataset in datasets:
+        for label, flags in invalidating_sources(dataset):
+            invalidated[label] = invalidated.get(label, ImageStats.NONE) | flags
+
+    for label, flags in invalidated.items():
+        overlap = flags & stats
+        if not overlap:
+            continue
+        warnings.warn(
+            f"{label} invalidates statistics requested by {caller}: {_stat_names(overlap)}. "
+            "These now describe the transform rather than the source data. "
+            "If this is model preprocessing, move it to the extractor's transforms=; "
+            "otherwise pass flags= to exclude them.",
+            StatsInvalidatedWarning,
+            # 1: here, 2: the evaluator's _evaluate_single/_evaluate_multi,
+            # 3: the evaluator's evaluate(), 4: the set_metadata wrapper,
+            # 5: the user's evaluate() call.
+            stacklevel=5,
+        )
+
+    return [compute_stats(ds, stats=stats, **kwargs) for ds in datasets]
 
 
 def get_dataset_step_from_idx(idx: int, dataset_steps: Sequence[int]) -> tuple[int, int]:
