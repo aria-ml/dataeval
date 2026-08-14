@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any, TypeVar
 
+from dataeval.flags import ImageStats
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
 from dataeval.utils._validate import DatasetKind, aggregate_required_kind, validate_dataset
@@ -53,6 +54,26 @@ class Operation(ReprMixin, ABC):
     """
 
     requires: DatasetKind | None = None
+
+    @property
+    def invalidates(self) -> ImageStats:
+        """The statistics this operation makes describe *the transform* rather than the data.
+
+        A resize, for example, invalidates ``DIMENSION_WIDTH`` (it now reports the resize
+        target) and ``VISUAL_SHARPNESS`` (it now measures the interpolation kernel). Quality
+        evaluators intersect this against the statistics they were asked to compute and warn
+        on the overlap; it never changes what is computed.
+
+        Unlike :attr:`requires`, which is a static class attribute, this is a read-only
+        property, and concrete operations override it as one — what a transform invalidates
+        depends on its constructor arguments (``Resize(size, mode="stretch")`` leaves the
+        pixel statistics alone; ``mode="pad"`` does not). Declaring it on a wrapper *dataset*
+        rather than an operation (see :class:`~dataeval.data.DetectionCrops`) must use a
+        class attribute and never set it in ``__init__``: :meth:`View.__init__` copies a
+        source's instance ``__dict__`` onto the view, so instance-level state would leak up
+        to the wrapper.
+        """
+        return ImageStats.NONE
 
     def apply_metadata(self, metadata: DatasetMetadata) -> DatasetMetadata:
         """Return possibly-updated dataset-level metadata (default: unchanged)."""

@@ -12,10 +12,10 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval import Embeddings
-from dataeval.core import ClusterResult, StatsResult, cluster, combine_stats_results, compute_stats
+from dataeval.core import ClusterResult, StatsResult, cluster, combine_stats_results
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor
-from dataeval.quality._shared import drop_null_index_columns, get_dataset_step_from_idx
+from dataeval.quality._shared import checked_compute_stats, drop_null_index_columns, get_dataset_step_from_idx
 from dataeval.types import (
     ClusterConfigMixin,
     DataFrameOutput,
@@ -1358,13 +1358,14 @@ class Duplicates(Evaluator):
 
         # Hash-based duplicate detection
         if self.flags & ImageStats.HASH:
-            self.stats = compute_stats(
-                data,
+            self.stats = checked_compute_stats(
+                [data],
                 stats=self.flags & ImageStats.HASH,
+                caller=type(self).__name__,
                 per_image=per_image,
                 per_target=per_target,
                 normalize_pixel_values=False,
-            )
+            )[0]
             (item_exact, item_near), (target_exact, target_near) = _detect_hash_duplicates(
                 self.stats["stats"], self.stats["source_index"]
             )
@@ -1424,16 +1425,14 @@ class Duplicates(Evaluator):
         # Hash-based: compute stats per dataset, delegate to from_stats
         calc_results: list[StatsResult] = []
         if has_hash_detection:
-            calc_results = [
-                compute_stats(
-                    ds,
-                    stats=self.flags & ImageStats.HASH,
-                    per_image=per_image,
-                    per_target=per_target,
-                    normalize_pixel_values=False,
-                )
-                for ds in datasets
-            ]
+            calc_results = checked_compute_stats(
+                datasets,
+                stats=self.flags & ImageStats.HASH,
+                caller=type(self).__name__,
+                per_image=per_image,
+                per_target=per_target,
+                normalize_pixel_values=False,
+            )
             self.stats = calc_results[-1]
 
         hash_stats, source_index, available_stats, dataset_steps = (

@@ -8,6 +8,7 @@ __all__ = [
     "OntologyCycleError",
     "OntologyError",
     "ShapeMismatchError",
+    "StatsInvalidatedWarning",
 ]
 
 
@@ -59,6 +60,22 @@ class OntologyCycleError(OntologyError):
 
     A taxonomy must be acyclic; a cycle (a concept that is its own ancestor)
     makes ancestor/descendant queries ill-defined.
+    """
+
+
+class StatsInvalidatedWarning(UserWarning):
+    """Issued when a view operation invalidates a statistic that was requested.
+
+    An operation that rewrites image content makes some statistics describe the
+    transform rather than the source data — a resize makes ``width``/``height``/
+    ``aspect_ratio`` report the resize target and makes ``sharpness`` measure the
+    interpolation kernel. Findings over those statistics are about the pipeline,
+    not the dataset.
+
+    Inherits from :class:`UserWarning` rather than :class:`FutureWarning`: this is a
+    statement about the meaning of the data, not about API lifecycle. Nothing is
+    deprecated and nothing changes in a future release — the computation proceeds
+    exactly as requested.
     """
 
 

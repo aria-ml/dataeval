@@ -17,11 +17,10 @@ from dataeval.core import (
     cluster,
     combine_stats_results,
     compute_cluster_stats,
-    compute_stats,
 )
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, MetadataLike, Threshold, ThresholdLike
-from dataeval.quality._shared import add_dataset_index, drop_null_index_columns
+from dataeval.quality._shared import add_dataset_index, checked_compute_stats, drop_null_index_columns
 from dataeval.types import (
     ArrayND,
     ClusterConfigMixin,
@@ -1653,9 +1652,14 @@ class Outliers(Evaluator):
         stored_cluster_stats: ClusterStats | None = None
 
         if self.flags != ImageStats.NONE:
-            self.stats = compute_stats(
-                data, stats=self.flags, per_image=per_image, per_target=per_target, normalize_pixel_values=True
-            )
+            self.stats = checked_compute_stats(
+                [data],
+                stats=self.flags,
+                caller=type(self).__name__,
+                per_image=per_image,
+                per_target=per_target,
+                normalize_pixel_values=True,
+            )[0]
             stats_result = self.stats
 
             class_ids: NDArray[np.intp] | None = None
@@ -1698,12 +1702,14 @@ class Outliers(Evaluator):
         # Stats-based: compute stats per dataset, then combine
         stats_results: list[StatsResult] = []
         if self.flags != ImageStats.NONE:
-            stats_results = [
-                compute_stats(
-                    ds, stats=self.flags, per_image=per_image, per_target=per_target, normalize_pixel_values=True
-                )
-                for ds in datasets
-            ]
+            stats_results = checked_compute_stats(
+                datasets,
+                stats=self.flags,
+                caller=type(self).__name__,
+                per_image=per_image,
+                per_target=per_target,
+                normalize_pixel_values=True,
+            )
             self.stats = stats_results[-1]
 
         outliers_dfs: list[pl.DataFrame] = []

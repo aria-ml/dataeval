@@ -68,6 +68,7 @@ datasets for machine learning.
 ../notebooks/h2_metadata_from_dataframe.py
 ../notebooks/h2_lazy_load_images.py
 ../notebooks/h2_build_dataset_views.py
+../notebooks/h2_place_transforms.py
 ../notebooks/h2_reconcile_labels_ontology.py
 ../notebooks/h2_align_label_spaces.py
 ../notebooks/h2_conform_and_merge_datasets.py
@@ -124,6 +125,11 @@ datasets for machine learning.
   - Filter, balance, reorder, and relabel a dataset by composing
     a {class}`.View` from {class}`.Operation` steps
   - [![Open In Colab][colab-badge]][view-colab]
+- - [](../notebooks/h2_place_transforms.py)
+  - Decide whether a transform belongs in a {class}`.View` or in an
+    extractor's `transforms=`, and what to do about a
+    {class}`~dataeval.exceptions.StatsInvalidatedWarning`
+  - [![Open In Colab][colab-badge]][xfrm-colab]
 - - [](../notebooks/h2_reconcile_labels_ontology.py)
   - Validate dataset class names against an ontology and
     recover their hierarchy
@@ -153,6 +159,7 @@ datasets for machine learning.
 [mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_metadata_from_dataframe.ipynb
 [lazy-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_lazy_load_images.ipynb
 [view-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_build_dataset_views.ipynb
+[xfrm-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_place_transforms.ipynb
 [onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_reconcile_labels_ontology.ipynb
 [algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_align_label_spaces.ipynb
 [cmrg-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_conform_and_merge_datasets.ipynb
