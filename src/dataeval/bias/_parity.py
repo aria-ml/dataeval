@@ -1,5 +1,6 @@
 __all__ = []
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -7,7 +8,7 @@ import polars as pl
 
 from dataeval import Metadata
 from dataeval._experimental import experimental
-from dataeval._helpers import _get_index2label
+from dataeval._helpers import factors_excluding, is_metadata_like, resolve_label_axis
 from dataeval._log import get_logger
 from dataeval.core._parity import parity
 from dataeval.protocols import AnnotatedDataset, MetadataLike
@@ -74,6 +75,12 @@ class Parity(Evaluator):
     p_value_threshold : float, default 0.05
         P-value threshold for statistical significance. Only factors with p-value
         below this threshold are considered for correlation flagging.
+    label : str or Sequence[str] or None, default None
+        Factor(s) to condition on instead of the class labels. None reads
+        :attr:`~dataeval.Metadata.class_labels`, which requires the metadata be viewed
+        at its label level; naming a factor is how the same question is asked at a
+        coarser view, where there is no single class label per row. Several names are
+        combined into one composite axis.
 
     Attributes
     ----------
@@ -83,6 +90,8 @@ class Parity(Evaluator):
         Threshold for identifying highly correlated factors
     p_value_threshold : float
         P-value threshold for statistical significance
+    label : str or Sequence[str] or None
+        Factor(s) conditioned on instead of the class labels
 
     Notes
     -----
@@ -130,25 +139,33 @@ class Parity(Evaluator):
             Threshold for identifying highly correlated factors.
         p_value_threshold : float, default 0.05
             P-value threshold for statistical significance.
+        label : str or Sequence[str] or None, default None
+            Factor(s) to condition on instead of the class labels. None reads
+            :attr:`~dataeval.Metadata.class_labels`, which requires the metadata be
+            viewed at its label level; naming a factor is how the same question is
+            asked at a coarser view, where there is no single class label per row.
         """
 
         score_threshold: float = DEFAULT_PARITY_SCORE_THRESHOLD
         p_value_threshold: float = DEFAULT_PARITY_P_VALUE_THRESHOLD
+        label: str | Sequence[str] | None = None
 
     metadata: MetadataLike
     score_threshold: float
     p_value_threshold: float
+    label: str | Sequence[str] | None
     config: Config
 
     def __init__(
         self,
         score_threshold: float | None = None,
         p_value_threshold: float | None = None,
+        label: str | Sequence[str] | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
 
-    @set_metadata(state=["score_threshold", "p_value_threshold"])
+    @set_metadata(state=["score_threshold", "p_value_threshold", "label"])
     def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> ParityOutput:
         """
         Compute chi-square statistics for the dataset.
@@ -189,22 +206,25 @@ class Parity(Evaluator):
         └─────────────┴──────────┴──────────┴────────────────┴───────────────────────┘
         """  # noqa: E501
         # Convert AnnotatedDataset to Metadata if needed
-        if isinstance(data, MetadataLike):
+        if is_metadata_like(data):
             self.metadata = data
         else:
             self.metadata = Metadata(data)
 
-        factor_names = self.metadata.factor_names
-        class_labels = self.metadata.class_labels
-        index2label = _get_index2label(self.metadata)
+        axis = resolve_label_axis(self.metadata, self.label)
+        factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
+        class_labels = axis.values
+        index2label = axis.names
 
         if not factor_names:
             raise ValueError("No factors found in provided metadata.")
 
-        output = parity(self.metadata.factor_data, class_labels)
+        output = parity(factor_data, class_labels)
 
         insufficient_data = {
-            factor_names[k]: {vk: {index2label[vvk]: vvv for vvk, vvv in vv.items()} for vk, vv in v.items()}
+            factor_names[k]: {
+                vk: {index2label.get(vvk, str(vvk)): vvv for vvk, vvv in vv.items()} for vk, vv in v.items()
+            }
             for k, v in output["insufficient_data"].items()
         }
 

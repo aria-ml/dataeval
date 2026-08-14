@@ -10,8 +10,8 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval._metadata import Metadata
-from dataeval._structurers import (
+from dataeval import Metadata
+from dataeval._metadata._structurers import (
     RESERVED_COLUMNS,
     ICStructurer,
     ODImageStructurer,

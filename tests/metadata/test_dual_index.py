@@ -9,7 +9,7 @@ from unittest import mock
 import numpy as np
 import pytest
 
-from dataeval._metadata import Metadata
+from dataeval import Metadata
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import FactorLevelSchema, SourceIndex
 from tests.embeddings.test_embeddings import MockDataset

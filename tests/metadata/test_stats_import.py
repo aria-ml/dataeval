@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from dataeval import Metadata
-from dataeval._metadata import _is_stats_result
+from dataeval._metadata._input import _is_stats_result
 from dataeval.core import compute_stats
 from dataeval.flags import ImageStats
 from dataeval.types import SourceIndex

@@ -369,6 +369,60 @@ class FactorLevelSchema:
         """
         return _closure(self.validate(level), self._parents)
 
+    def paths(self, level: FactorLevel, ancestor: FactorLevel) -> tuple[tuple[FactorLevel, ...], ...]:
+        """Every upward route from ``level`` to ``ancestor``, as sequences of edges.
+
+        A chain has one route and needs none of this. A diamond has two, and they can
+        disagree in exactly one way: a row may reach the meeting point along one branch
+        and not the other — a detection no tracker linked has a frame, and through it a
+        sequence, but no track. So "which route" is a real question with a real answer,
+        and it belongs to the graph rather than to whichever structurer last wrote a
+        dictionary literal.
+
+        Parameters
+        ----------
+        level : str
+            Level to walk upwards from.
+        ancestor : str
+            Level to reach.
+
+        Returns
+        -------
+        tuple[tuple[str, ...], ...]
+            One entry per route, each listing the levels stepped through *after*
+            ``level``, ending at ``ancestor``. Empty when ``ancestor`` is not above
+            ``level``. Routes are ordered by :meth:`parents_of` at each step, which is
+            canonical order, so the first route is the one to prefer where several are
+            total — see :meth:`~dataeval.Metadata` for how that preference is applied.
+
+        Raises
+        ------
+        ValueError
+            When either level is not part of this schema. A level this schema does not
+            have is a different question from a level it has but cannot reach: the first
+            is a caller error and raises, the second is a real answer and is the empty
+            tuple.
+
+        Examples
+        --------
+        >>> schema = FactorLevelSchema.of("sequence", "unit", "track", "instance")
+        >>> schema.paths("instance", "unit")
+        (('unit',),)
+        >>> schema.paths("instance", "sequence")
+        (('unit', 'sequence'), ('track', 'sequence'))
+        """
+        self.validate(level)
+        self.validate(ancestor)
+        if level == ancestor:
+            return ()
+        routes: list[tuple[FactorLevel, ...]] = []
+        for parent in self._parents[level]:
+            if parent == ancestor:
+                routes.append((parent,))
+                continue
+            routes.extend((parent, *rest) for rest in self.paths(parent, ancestor))
+        return tuple(routes)
+
     def descendants(self, level: FactorLevel) -> tuple[FactorLevel, ...]:
         """Levels that inherit from ``level``, in schema order."""
         self.validate(level)
@@ -474,9 +528,16 @@ class FactorInfo:
         schema (one of ``sequence``, ``unit``, ``track``, ``instance``). This is also the level the factor
         was binned at: its bin edges, its bin count and its continuous/discrete
         verdict all come from its values here, one per entity.
+    aggregated_from : str or None, default None
+        Level whose rows were rolled up to produce this factor, for one built by
+        :meth:`~dataeval.Metadata.agg`, and None for one measured directly. The level
+        only, not the operation: what distinguishes an aggregate from a measurement is
+        that its values describe a *set* of finer rows, which is what a reader has to
+        know before comparing it against a factor measured at ``level`` itself.
     """
 
     factor_type: Literal["categorical", "continuous", "discrete"]
     is_binned: bool = False
     is_digitized: bool = False
     level: FactorLevel = "unit"
+    aggregated_from: FactorLevel | None = None

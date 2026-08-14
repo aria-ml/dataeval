@@ -1,5 +1,6 @@
 __all__ = []
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -7,7 +8,7 @@ import numpy as np
 import polars as pl
 
 from dataeval import Metadata
-from dataeval._helpers import _get_index2label
+from dataeval._helpers import factors_excluding, is_metadata_like, resolve_label_axis
 from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.protocols import AnnotatedDataset, MetadataLike
@@ -72,6 +73,12 @@ class Diversity(Evaluator):
     threshold : float, default 0.5
         Threshold for identifying low diversity. Factors with diversity values
         at or below this threshold are flagged as having low diversity.
+    label : str or Sequence[str] or None, default None
+        Factor(s) to condition on instead of the class labels. None reads
+        :attr:`~dataeval.Metadata.class_labels`, which requires the metadata be viewed
+        at its label level; naming a factor is how the same question is asked at a
+        coarser view, where there is no single class label per row. Several names are
+        combined into one composite axis.
 
     Attributes
     ----------
@@ -81,6 +88,8 @@ class Diversity(Evaluator):
         The methodology used for defining diversity
     threshold : float
         Threshold for identifying low diversity factors
+    label : str or Sequence[str] or None
+        Factor(s) conditioned on instead of the class labels
 
     See Also
     --------
@@ -125,25 +134,33 @@ class Diversity(Evaluator):
             The methodology used for defining diversity.
         threshold : float, default 0.5
             Threshold for identifying low diversity.
+        label : str or Sequence[str] or None, default None
+            Factor(s) to condition on instead of the class labels. None reads
+            :attr:`~dataeval.Metadata.class_labels`, which requires the metadata be
+            viewed at its label level; naming a factor is how the same question is
+            asked at a coarser view, where there is no single class label per row.
         """
 
         method: Literal["simpson", "shannon"] = DEFAULT_DIVERSITY_METHOD
         threshold: float = DEFAULT_DIVERSITY_THRESHOLD
+        label: str | Sequence[str] | None = None
 
     metadata: MetadataLike
     method: Literal["simpson", "shannon"]
     threshold: float
+    label: str | Sequence[str] | None
     config: Config
 
     def __init__(
         self,
         method: Literal["simpson", "shannon"] | None = None,
         threshold: float | None = None,
+        label: str | Sequence[str] | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
 
-    @set_metadata(state=["method", "threshold"])
+    @set_metadata(state=["method", "threshold", "label"])
     def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> DiversityOutput:  # noqa: C901
         """
         Compute diversity and classwise diversity for the dataset.
@@ -206,7 +223,7 @@ class Diversity(Evaluator):
         └────────────┴─────────────┴─────────────────┴──────────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
-        if isinstance(data, MetadataLike):
+        if is_metadata_like(data):
             self.metadata = data
         else:
             self.metadata = Metadata(data)
@@ -218,10 +235,14 @@ class Diversity(Evaluator):
             raise ValueError(f"Invalid method '{self.method}'. Supported methods are '{list(_DIVERSITY_FN_MAP)}'.")
 
         diversity_fn = _DIVERSITY_FN_MAP[self.method]
-        factor_data = self.metadata.factor_data
-        factor_names = self.metadata.factor_names
-        class_lbl = self.metadata.class_labels
-        index2label = _get_index2label(self.metadata)
+        # The axis is whatever is being conditioned on: the class labels by default, or
+        # the named factor(s), which is the only way to ask this at a view above the
+        # label level. A factor serving as the axis is dropped from the factors measured
+        # against it.
+        axis = resolve_label_axis(self.metadata, self.label)
+        factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
+        class_lbl = axis.values
+        index2label = axis.names
 
         class_labels_with_binned_data = np.hstack((class_lbl[:, np.newaxis], factor_data))
         cnts = get_counts(class_labels_with_binned_data)
@@ -239,7 +260,7 @@ class Diversity(Evaluator):
         # Create factors DataFrame
         # diversity_index[0] is class_labels, [1:] are the metadata factors
         # Include class_label as the first factor (index 0), then all metadata factors
-        all_factor_names = ["class_label"] + list(factor_names)
+        all_factor_names = [axis.label] + list(factor_names)
         factors_df = pl.DataFrame(
             {
                 "factor_name": all_factor_names,

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import dataeval
-from dataeval._log import get_logger
+from dataeval._log import _NAMESPACES, get_logger
 from dataeval.types import Output, set_metadata
 
 # Matched against source text, so both patterns anchor on the assignment. A bare
@@ -68,7 +68,7 @@ class TestGetLogger:
 
     @pytest.mark.required
     def test_deeply_nested_module_resolves_to_the_subtree_root(self):
-        assert get_logger("dataeval._metadata._structurers._mot").name == "dataeval.metadata"
+        assert get_logger("dataeval._metadata._structurers._tracking").name == "dataeval.metadata"
 
     @pytest.mark.required
     def test_src_prefix_is_stripped(self):
@@ -131,6 +131,15 @@ class TestNamespaceCoverage:
             if CURATED_LOGGER.search(source) and get_logger(module).name == "dataeval"
         ]
         assert uncurated == [], f"{uncurated} fall back to the root logger; add a prefix to _log._NAMESPACES"
+
+    @pytest.mark.required
+    def test_no_namespace_prefix_is_stale(self):
+        """A prefix left behind by a refactor curates nothing and misleads the next reader."""
+        modules = {module for module, _ in self._source_modules()}
+        stale = sorted(
+            prefix for prefix in _NAMESPACES if not any(m == prefix or m.startswith(f"{prefix}.") for m in modules)
+        )
+        assert stale == [], f"{stale} match no module under src/dataeval; drop them from _log._NAMESPACES"
 
 
 class TestSetMetadataNamespace:

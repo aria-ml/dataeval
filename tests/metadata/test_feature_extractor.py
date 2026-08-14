@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from dataeval._metadata import Metadata
+from dataeval import Metadata
 from dataeval.exceptions import NotFittedError
 from tests.embeddings.test_embeddings import MockDataset
 

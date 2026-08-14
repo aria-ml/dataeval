@@ -94,11 +94,17 @@ No task uses all four. A task keeps the subset it needs, and the graph collapses
 edges through whatever it omits — so an image-based task, which has neither
 `sequence` nor `track`, correctly reports `unit` as `instance`'s only parent.
 
-| Task | Levels | Item level | Label level | `unit_type` |
-| --- | --- | --- | --- | --- |
-| `IC` — image classification | `unit`, `instance` | `unit` | `instance` | `image` |
-| `OD` — object detection | `unit`, `instance` | `unit` | `instance` | `image` |
-| `MOT` — multi-object tracking | `sequence`, `unit`, `track`, `instance` | `sequence` | `instance` | `frame` |
+| Task                                       | Levels                                  | Item level   | Label level          | `unit_type` |
+| ------------------------------------------ | --------------------------------------- | ------------ | -------------------- | ----------- |
+| `IC` — image classification                | `unit`, `instance`                      | `unit`       | `instance`           | `image`     |
+| `OD` — object detection                    | `unit`, `instance`                      | `unit`       | `instance`           | `image`     |
+| `MOT` — multi-object tracking              | `sequence`, `unit`, `track`, `instance` | `sequence`   | `instance`           | `frame`     |
+| `factors` — {meth}`.Metadata.from_factors` | as requested, `unit` by default         | as requested | *same as item level* | `item`      |
+
+The `factors` row describes the bare-array form. A `from_factors` call given a
+`source_index` that names both items and labels has a shape to copy after all, and
+takes object detection's exactly — `unit`, `instance`, labels at `instance` — which is
+what lets {func}`.compute_stats` output be reimported without its dataset.
 
 {attr}`.Metadata.levels` enumerates the names an instance accepts, in this order —
 coarsest first. {data}`.FactorLevel` types them, and {class}`.FactorLevelSchema`
@@ -218,16 +224,25 @@ because one dataset item is a whole video. This is a structural fact about the
 task, so it is read-only.
 
 **{attr}`.Metadata.label_level` — where the class labels live.**
-The rows {attr}`.Metadata.class_labels`, `score` and `box` describe. It is
-`instance` on every task. Note that it is always distinct from the item level,
-which is deliberate: an item carrying no label at all — an unlabeled image, or an
-image with no detections — still has an item row and keeps every factor on it.
-Had labels and items shared a level, unlabeled items would have to be dropped.
+
+The rows {attr}`.Metadata.class_labels`, `score`, and `box` describe. It is
+`instance` on every *dataset* task, and on those it is always distinct from the
+item level. That separation is deliberate: an item carrying no label at all — an
+unlabeled image, or an image with no detections — still has an item row and keeps
+every factor on it. Had labels and items shared a level, unlabeled items would
+have to be dropped.
+
+{meth}`.Metadata.from_factors` is the exception, because there is no dataset to
+impose a shape: it places both the item level and the label level at whichever
+level the caller asked for, which is `unit` by default. So a single-level
+`from_factors` metadata has `item_level == label_level == "unit"`, and its
+default view already *is* the label level. Read
+{attr}`.Metadata.label_level` rather than assuming `instance`.
 
 **{attr}`.Metadata.view` — which rows the array-shaped accessors project.**
 This is the movable one. {attr}`.Metadata.factor_data`,
-{attr}`.Metadata.factor_names`, {attr}`.Metadata.is_discrete` and
-{attr}`.Metadata.shape` — and `len()`, iteration and indexing — all describe the
+{attr}`.Metadata.factor_names`, {attr}`.Metadata.is_discrete`, and
+{attr}`.Metadata.shape` — and `len()`, iteration, and indexing — all describe the
 rows at the view. The dataframe is unaffected; it always holds every level.
 
 The view defaults to `label_level`, which is what keeps a projection aligned with
@@ -258,6 +273,151 @@ detections, or none — there is no single label to return, and silently returni
 one would hand an evaluator a label array that does not correspond to its factor
 rows.
 
+### The second axis: `inherited`
+
+The view chooses *which rows* are projected. `inherited` chooses *which factors*
+are analysed on them, and the two are independent axes of the same pivot.
+
+With `inherited=True`, the default, a view analyses every factor it can read —
+its own, plus everything propagated down from above. With `inherited=False` it
+analyses only the factors defined **at** the view itself.
+
+On an object detection dataset with image metadata plus per-image and
+per-detection brightness from {func}`.compute_stats`:
+
+| view                       | `inherited=True` (default)                                             | `inherited=False`     |
+| -------------------------- | ---------------------------------------------------------------------- | --------------------- |
+| `at("unit")` — 50 rows     | `angle`, `id`, `location`, `time_of_day`, `unit_brightness`, `weather` | *the same six*        |
+| `at("instance")` — 93 rows | all six above, plus `instance_brightness`                              | `instance_brightness` |
+
+Two things to read off it. The row count is set by the view alone — `inherited`
+never changes how many rows there are, only how many columns describe them. And
+at the coarsest level the two columns agree, because nothing sits above `unit`
+for it to inherit; the axis only bites below the root.
+
+`inherited=False` is how you ask a question about one level's own measurements,
+uncontaminated by replicated context: "do the detections in this dataset vary
+among themselves?" rather than "do detections vary, including by which image
+they came from?".
+
+## Aggregation: moving values up, deliberately
+
+Rule 2 above says values never propagate upwards and are never aggregated
+silently. {meth}`.Metadata.agg` is the way to do it **loudly** — you say which
+rows to roll up, into what, and by what summary, and the result becomes an
+ordinary factor at the coarser level:
+
+```python
+md = Metadata(dataset)
+md.add_factors(stats)
+
+rolled = md.agg(
+    "instance",
+    "unit",
+    pl.len().alias("n_detections"),
+    pl.col("instance_brightness").mean().alias("mean_bright"),
+)
+
+rolled.at("unit").factor_names
+# ['angle', 'id', 'location', 'mean_bright', 'n_detections',
+#  'time_of_day', 'unit_brightness', 'weather']
+```
+
+`n_detections` is now a per-image fact stored once per image, and every level
+rule applies to it unchanged — it bins at `unit`, propagates down to detections,
+and is analysed at `unit` with one vote per image.
+
+Two rules govern what `agg` will accept.
+
+**A row with no ancestor at the target level takes no part.** An untracked
+detection belongs to no track, so it is neither counted by one nor averaged into
+one. Conversely a target row with nothing beneath it answers **null, not zero** —
+nothing was measured there, which is a different statement from measuring zero.
+
+**Aggregating an inherited factor requires `unique_by=`.** This is the
+replication problem from the top of this page, arriving from the other direction.
+Averaging a *per-image* value over the detections in a track weights each image
+by how many detections it happened to contribute — almost never the intended
+question. Rather than guess, `agg` refuses an expression over a column defined
+above the source level unless you say what to count once:
+
+```python
+# Refused: unit_brightness repeats once per detection beneath its image.
+md.agg("instance", "track", pl.col("unit_brightness").mean())
+
+# Accepted: each frame contributes one reading to its track.
+md.agg("instance", "track", pl.col("unit_brightness").mean(), unique_by="unit")
+```
+
+Counting rows never trips this, because `pl.len()` reads no columns at all — so
+"how many detections are under this?" is always a question about the source
+level itself.
+
+## Narrowing the population: `where` and `having`
+
+{meth}`.Metadata.where` and {meth}`.Metadata.having` both take a predicate at
+some level and return a new metadata over fewer rows. They differ in **which
+direction the cut travels**, and the difference is easiest to see by giving both
+the same predicate:
+
+```python
+md.level_counts  # {'unit': 50, 'instance': 93}
+md.where(pl.col("class_label") == 0, "instance").level_counts  # {'unit': 50, 'instance': 20}
+md.having(pl.col("class_label") == 0, "instance").level_counts  # {'unit': 17, 'instance': 38}
+```
+
+`where` keeps **the matching rows**: the 20 detections of class 0, and every
+image, because `where` never filters upwards — an image is still an image
+whatever its detections turn out to be.
+
+`having` keeps **the entities that have a match**: the 17 images holding at
+least one class-0 detection, and then all 38 detections in those images, not
+just the class-0 ones. It is the "images containing a person" filter, and it
+travels up first and then back down.
+
+One rule decides everything that follows in both cases:
+
+```{important}
+**A row survives only if every ancestor it actually has survives.**
+
+Applied downwards from wherever the filter seeds it. A row with *no* ancestor at
+some level is not failing this test — it has nothing there to lose — which is why
+an untracked detection is not swept away by a filter over tracks.
+```
+
+Two consequences worth expecting. A filter can only ever **add** factors to the
+analysis, never remove one: dropping the rows that lacked an ancestor can turn a
+partly-null column into a total one, and a total column can be binned. And
+`where` at one level leaves that level's **siblings** untouched — filtering
+frames does not remove tracks, because a track is not beneath a frame.
+
+### A filtered metadata still holds its whole dataset
+
+This is the one thing about filtering that will bite silently if it is not
+stated. Filtering removes *rows*; it does not remove *items* from the dataset the
+metadata is bound to. So anything computed from that dataset — embeddings above
+all — still describes the original population, and pairing the two row-for-row is
+a misalignment that raises nothing.
+
+{attr}`.Metadata.is_filtered` is how to ask, and the evaluators that take both a
+metadata and something dataset-shaped refuse a filtered one outright rather than
+silently mispairing it.
+
+{meth}`.Metadata.selected_items` is how to bring the dataset side back into
+correspondence — it returns the surviving item indices, for use with a dataset
+view:
+
+```python
+narrowed = md.having(pl.col("class_label") == 0, "instance")
+narrowed.selected_items()  # 17 item indices
+```
+
+It succeeds only when the filter cut along item boundaries. The `where` above
+kept 20 of 93 detections while keeping all 50 images, so it has no item-level
+answer to give — a dataset can hand back an image, not three of its detections —
+and `selected_items` says so rather than returning a subset that does not
+correspond.
+
 ## Binning happens at a factor's own level
 
 {class}`.Metadata` discretizes continuous factors into bins so that categorical
@@ -287,6 +447,62 @@ distributed rather than only on their range.
 
 See {ref}`binning-levels` for a worked example with real numbers.
 
+## What gets saved is the level structure
+
+Building metadata reads every item of the dataset — decoding images, unpacking
+targets, accumulating tracks. Everything after that is arithmetic over the rows
+that walk produced, and those rows are small next to the dataset.
+{meth}`.Metadata.save` writes them so the walk is paid for once:
+
+```python
+Metadata(dataset).save("metadata.dem")
+md = Metadata.load("metadata.dem", dataset)
+```
+
+What the file holds is exactly this page's subject: the rows at each level, the
+links between them, and which factor is defined where. Three things it does
+**not** hold, and each is a consequence of a distinction made above:
+
+- **The dataset.** It cannot be serialized, so {meth}`.Metadata.load` takes a
+  live one and binds it — which is also what lets the item counts be checked
+  against each other rather than diverging silently.
+- **Binning.** Bin assignments are derived from the values, so the file keeps the
+  values and the binning configuration is supplied at load. One file therefore
+  serves any `continuous_factor_bins` you later want from it. For the same
+  reason `exclude`, `include`, and `view` are not stored: they are how a reader
+
+  asks its question, not what the rows are.
+
+- **The per-item metadata dicts** behind {attr}`.Metadata.raw`. They hold
+  whatever the dataset put there, of unbounded size, so {attr}`.Metadata.raw`
+  raises on a loaded instance rather than answering as though the dataset had
+  carried none.
+
+A filtered metadata saves and reloads as filtered, so
+{attr}`.Metadata.is_filtered` still reports `True` and the evaluators that refuse
+one still refuse it.
+
+```{warning}
+This is a **cache, not an interchange format.** The file holds DataEval's
+internal per-level layout, and that layout may change in any release. Each file
+records the format version and the level graph it was written against, and
+{meth}`.Metadata.load` refuses anything it does not recognize rather than
+restoring old rows against a new graph — which would raise nothing and answer
+wrongly. To keep metadata for anything other than a cache — a record, or another
+tool — write {attr}`.Metadata.dataframe` to a parquet file instead.
+```
+
+So {class}`.MetadataFormatError` is the *designed* outcome for a stale file
+rather than a bug to work around, and the shape of a cache built on it is:
+
+```python
+try:
+    md = Metadata.load(path, dataset)
+except MetadataFormatError:
+    md = Metadata(dataset)
+    md.save(path)
+```
+
 ## Units, not images
 
 The media-unit level is called `unit` rather than `image`, and this is the one
@@ -312,7 +528,7 @@ Metadata.from_factors(factors).unit_type  # 'item'
 ```
 
 {attr}`.Metadata.unit_type` is descriptive only. Nothing in structuring, binning
-or projection consults it; it exists so that error messages, reports and your own
+or projection consults it; it exists so that error messages, reports, and your own
 code can speak the caller's language. It is deliberately a plain string rather
 than part of {data}`.FactorLevel` — a new modality supplies a new value and edits
 no type, while the level vocabulary stays closed and task-independent.
@@ -363,6 +579,13 @@ level question.
   they came from.
 
 ## See this in practice
+
+### Tutorials
+
+- [Analyze a dataset across its levels](../notebooks/tt_analyze_across_levels.py) —
+  everything on this page worked end to end on an aerial detection dataset: the same
+  factor reporting two distributions, `at` and `inherited`, `agg`, `where` versus
+  `having`, and the bias question that can only be asked once a level is chosen.
 
 ### How-to guides
 

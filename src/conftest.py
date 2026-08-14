@@ -22,6 +22,7 @@ import torch
 from numpy.typing import NDArray
 from typing_extensions import Self
 
+from dataeval import Metadata
 from dataeval.config import _config, set_batch_size, set_device, set_seed
 from dataeval.protocols import DatasetMetadata, DatumMetadata, ObjectDetectionTarget
 
@@ -487,6 +488,12 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
     )
     doctest_namespace["dataset"] = dataset
 
+    # Somewhere for the Metadata.save/load examples to write to. Deliberately not called
+    # ``tmp_path``: that names a function-scoped pytest fixture, and this namespace is
+    # built once per session, so borrowing the name would promise a per-example directory
+    # that this is not.
+    doctest_namespace["save_dir"] = Path(tempfile.mkdtemp(prefix="dataeval-doctest-metadata-"))
+
     # -------------------------------------------------------------------------
     # MockMetadata matching the object detection dataset
     # -------------------------------------------------------------------------
@@ -515,6 +522,12 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
         item_indices=np.array(flat_item_indices, dtype=np.int64),
     )
     doctest_namespace["metadata"] = metadata
+    # The class itself, so that a doctest can build a real Metadata over `dataset`
+    # rather than only read the mock. Needed by any module whose examples do that
+    # without Metadata being one of its own globals — every module outside the
+    # _metadata package, and the modules inside it that cannot import the class at
+    # runtime without a cycle.
+    doctest_namespace["Metadata"] = Metadata
 
     # -------------------------------------------------------------------------
     # Train/test splits

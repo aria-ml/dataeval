@@ -1,5 +1,6 @@
 __all__ = []
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -7,7 +8,7 @@ import numpy as np
 import polars as pl
 
 from dataeval import Metadata
-from dataeval._helpers import _get_index2label
+from dataeval._helpers import factors_excluding, is_metadata_like, resolve_label_axis
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
@@ -75,6 +76,12 @@ class Balance(Evaluator):
     factor_correlation_threshold : float, default 0.5
         Threshold for identifying highly correlated metadata factors. Factor pairs
         with NMI above this threshold are considered highly correlated.
+    label : str or Sequence[str] or None, default None
+        Factor(s) to condition on instead of the class labels. None reads
+        :attr:`~dataeval.Metadata.class_labels`, which requires the metadata be viewed
+        at its label level; naming a factor is how the same question is asked at a
+        coarser view, where there is no single class label per row. Several names are
+        combined into one composite axis.
 
     Attributes
     ----------
@@ -86,6 +93,8 @@ class Balance(Evaluator):
         Threshold for identifying imbalanced classes
     factor_correlation_threshold : float
         Threshold for identifying highly correlated metadata factors
+    label : str or Sequence[str] or None
+        Factor(s) conditioned on instead of the class labels
 
     See Also
     --------
@@ -141,16 +150,23 @@ class Balance(Evaluator):
             Threshold for identifying imbalanced classes.
         factor_correlation_threshold : float, default 0.5
             Threshold for identifying highly correlated metadata factors.
+        label : str or Sequence[str] or None, default None
+            Factor(s) to condition on instead of the class labels. None reads
+            :attr:`~dataeval.Metadata.class_labels`, which requires the metadata be
+            viewed at its label level; naming a factor is how the same question is
+            asked at a coarser view, where there is no single class label per row.
         """
 
         num_neighbors: int = DEFAULT_BALANCE_NUM_NEIGHBORS
         class_imbalance_threshold: float = DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD
         factor_correlation_threshold: float = DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD
+        label: str | Sequence[str] | None = None
 
     metadata: MetadataLike
     num_neighbors: int
     class_imbalance_threshold: float
     factor_correlation_threshold: float
+    label: str | Sequence[str] | None
     config: Config
 
     def __init__(
@@ -158,11 +174,12 @@ class Balance(Evaluator):
         num_neighbors: int | None = None,
         class_imbalance_threshold: float | None = None,
         factor_correlation_threshold: float | None = None,
+        label: str | Sequence[str] | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
 
-    @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold"])
+    @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold", "label"])
     def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> BalanceOutput:  # noqa: C901
         """
         Compute normalized mutual information between factors and identify imbalanced classes.
@@ -247,7 +264,7 @@ class Balance(Evaluator):
         └────────────┴─────────────┴──────────┴───────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
-        if isinstance(data, MetadataLike):
+        if is_metadata_like(data):
             self.metadata = data
         else:
             self.metadata = Metadata(data)
@@ -255,26 +272,19 @@ class Balance(Evaluator):
         if not self.metadata.factor_names:
             raise ValueError("No factors found in provided metadata.")
 
-        is_discrete = list(self.metadata.is_discrete)
+        # The axis is whatever is being conditioned on: the class labels by default, or
+        # the named factor(s). A factor serving as the axis is dropped from the factors
+        # analysed against it, since it would otherwise report perfect correlation with
+        # itself.
+        axis = resolve_label_axis(self.metadata, self.label)
+        factor_data, factor_names, is_discrete = factors_excluding(self.metadata, axis.excluded)
 
-        mi = mutual_info(
-            self.metadata.class_labels,
-            self.metadata.factor_data,
-            is_discrete,
-            self.num_neighbors,
-        )
+        mi = mutual_info(axis.values, factor_data, is_discrete, self.num_neighbors)
 
         # Calculate classwise balance
-        classwise = mutual_info_classwise(
-            self.metadata.class_labels,
-            self.metadata.factor_data,
-            is_discrete,
-            self.num_neighbors,
-        )
+        classwise = mutual_info_classwise(axis.values, factor_data, is_discrete, self.num_neighbors)
 
-        # Grabbing factor names for plotting function
-        factor_names = list(self.metadata.factor_names)
-        index2label = _get_index2label(self.metadata)
+        index2label = axis.names
 
         # Create classwise DataFrame - build as columnar data
         # classwise is (num_classes, num_factors+1) where column 0 is class_label itself
@@ -283,10 +293,10 @@ class Balance(Evaluator):
         mi_value_col: list[float] = []
         is_imbalanced_col: list[bool] = []
 
-        # Include class_label as the first factor (index 0), then all metadata factors
-        all_factor_names = ["class_label"] + factor_names
+        # Include the label axis as the first factor (index 0), then all metadata factors
+        all_factor_names = [axis.label] + factor_names
 
-        u_classes = np.unique(self.metadata.class_labels)
+        u_classes = np.unique(axis.values)
         for class_idx in range(classwise.shape[0]):
             class_name = index2label.get(int(u_classes[class_idx]), str(u_classes[class_idx]))
             for factor_idx in range(classwise.shape[1]):
@@ -352,7 +362,7 @@ class Balance(Evaluator):
         # Include all values: class_label + metadata factors
         class_to_factor = mi["class_to_factor"]
         sorted_factor_names = sorted(factor_names)
-        all_factor_names = ["class_label"] + sorted_factor_names
+        all_factor_names = [axis.label] + sorted_factor_names
         # Map sorted factor names to their original indices in class_to_factor
         mi_values = [float(class_to_factor[0])] + [
             float(class_to_factor[factor_names.index(fn) + 1]) for fn in sorted_factor_names

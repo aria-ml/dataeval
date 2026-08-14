@@ -38,6 +38,7 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval import Metadata
+from dataeval._helpers import is_metadata_like, reject_filtered_metadata
 from dataeval._log import get_logger
 from dataeval.core._completeness import completeness as _completeness
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
@@ -305,7 +306,7 @@ class Coverage(Evaluator):
         # MetadataLike branch below covers it — no separate concrete-Metadata case needed.
         if isinstance(dataset, AnnotatedDataset):
             dataset = Metadata(dataset)
-        if isinstance(dataset, MetadataLike):
+        if is_metadata_like(dataset):
             index2label = getattr(dataset, "index2label", None) or {}
             return np.asarray(dataset.class_labels, dtype=np.intp), index2label
         if embeddings is None:
@@ -457,6 +458,8 @@ class Coverage(Evaluator):
         │ person ┆ 20    ┆ 1         ┆ 1.488841   │
         └────────┴───────┴───────────┴────────────┘
         """
+        reject_filtered_metadata(dataset, "Coverage")
+
         class_labels, index2label = self._resolve_labels(dataset, embeddings)
         emb = self._embeddings(dataset, embeddings)
         if len(emb) != len(class_labels):

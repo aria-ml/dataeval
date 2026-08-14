@@ -8,9 +8,11 @@ import pytest
 from numpy.random import Generator
 from numpy.typing import NDArray
 
-from dataeval._metadata import FactorInfo, Metadata
+from dataeval import Metadata
+from dataeval._metadata._store import LevelStore
 from dataeval.core._feature_distance import _calculate_drift, feature_distance
 from dataeval.exceptions import ShapeMismatchError
+from dataeval.types import FactorInfo, FactorLevelSchema
 
 
 def mock_metadata(
@@ -41,9 +43,17 @@ def mock_metadata(
     m.factor_info = _factors
     m._factor_info = _factors
     m.dataframe = pl.DataFrame(m.factor_data, schema=m.factor_names)
-    # Single-level stand-in: every row belongs to the view, so the level filter is a no-op.
+    # Single-level stand-in: every row belongs to the view, so there is nothing above it
+    # to gather from and the store is one frame with no edges.
     m._view_level = "unit"
     m.rows_at = lambda _level: m.dataframe
+    m._store = LevelStore(
+        schema=FactorLevelSchema.of("unit"),
+        frames={"unit": m.dataframe},
+        links={},
+        propagating={"unit": frozenset(m.factor_names)},
+        column_order=tuple(m.factor_names),
+    )
 
     m._project = lambda columns, dtype: Metadata._project(m, columns, dtype)
     m.filter_by_factor = lambda x: Metadata.filter_by_factor(m, x)

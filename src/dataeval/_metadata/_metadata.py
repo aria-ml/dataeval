@@ -1,9 +1,10 @@
-__all__ = ["Metadata"]
+__all__ = []
 
 import copy
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
-from typing import Any, Literal, NoReturn, cast
+from pathlib import Path
+from typing import Any, Literal, NamedTuple, cast
 
 import numpy as np
 import polars as pl
@@ -11,8 +12,31 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval._log import get_logger
-from dataeval._structurers import (
-    FactorsStructurer,
+from dataeval._metadata._aggregate import aggregate, validate
+from dataeval._metadata._columns import (
+    binned,
+    digitized,
+    drop_vacuous_splits,
+    float_col,
+    split_by_dimensionality,
+    to_col,
+)
+from dataeval._metadata._deprecated import DeprecatedMetadataAPI
+from dataeval._metadata._entry_legacy import infer_factor_level, resolve_combined, resolve_destinations
+from dataeval._metadata._filters import evaluate, report_orphaned_rows
+from dataeval._metadata._input import (
+    build_index2label,
+    reject_length_mismatch,
+    resolve_legacy_level,
+    unpack_stats_result,
+)
+from dataeval._metadata._keyed import resolve_keyed
+from dataeval._metadata._links import to_series
+from dataeval._metadata._loading import _load_factors
+from dataeval._metadata._serialize import restore as _restore
+from dataeval._metadata._serialize import save as _save
+from dataeval._metadata._store import LevelStore
+from dataeval._metadata._structurers import (
     RowLayout,
     SourceIndexRows,
     StructuredData,
@@ -32,207 +56,44 @@ from dataeval.protocols import (
     ProgressCallback,
 )
 from dataeval.types import Array1D, FactorInfo, FactorLevel, FactorLevelSchema, SourceIndex
-from dataeval.utils._internal import as_numpy
 from dataeval.utils._validate import requires_maite_dataset
 
 _logger = get_logger(__name__)
 
 
-def _is_stats_result(candidate: Any) -> bool:
-    """Whether a mapping is a :class:`~dataeval.core.StatsResult` rather than a factor mapping.
+class _ResolvedFactor(NamedTuple):
+    """One column :meth:`Metadata.add_factors` has resolved and is about to commit.
 
-    ``StatsResult`` is a :class:`~typing.TypedDict`, so at runtime it is an ordinary dict
-    and there is nothing to check with ``isinstance``. Both keys are required and both are
-    checked structurally: a caller's factor mapping could plausibly hold a factor named
-    ``stats`` or ``source_index``, but not one whose ``stats`` is itself a mapping *and*
-    whose ``source_index`` is a sequence of :class:`~dataeval.types.SourceIndex`. Being
-    strict here matters more than being permissive — a false positive silently discards
-    every factor the caller passed.
-
-    The first entry stands for the sequence. A stats result's index is homogeneous by
-    construction, and this runs on every ``add_factors`` call, including the common one
-    where the argument really is a factor mapping holding one entry per detection.
+    ``native`` holds one value per row at ``level`` — the only form, since descendant
+    rows read it through the store's gather rather than from a full-height copy.
     """
-    if not isinstance(candidate, Mapping) or not candidate.keys() >= {"stats", "source_index"}:
-        return False
-    source_index = candidate["source_index"]
-    return (
-        isinstance(candidate["stats"], Mapping)
-        and isinstance(source_index, Sequence)
-        and (not source_index or isinstance(source_index[0], SourceIndex))
-    )
+
+    name: str
+    level: FactorLevel
+    native: pl.Series
 
 
-def _unpack_stats_result(
-    factors: Any,
+def _reject_unusable_key(
+    key: str | None,
+    level: FactorLevel | Literal["auto", "target", "combined", "image"],
     source_index: Sequence[SourceIndex] | None,
-    *,
-    level: Any = None,
-) -> tuple[Mapping[str, Array1D[Any]], Sequence[SourceIndex] | None]:
-    """Accept a whole stats result wherever a factor mapping is accepted.
-
-    :func:`~dataeval.core.compute_stats` and :func:`~dataeval.core.compute_ratios` return
-    the statistics and the labels that place them in one object, and separating them again
-    at every call site is busywork that also invites passing one without the other. When
-    the result is recognised, its ``stats`` become the factors and its ``source_index``
-    the placement — unless the caller passed an explicit one, which wins so that a
-    hand-corrected index remains usable.
-
-    The bookkeeping keys — ``object_count``, ``invalid_box_count``, ``image_count`` —
-    describe the run rather than the images and are not factors, so they are dropped.
-
-    Raises
-    ------
-    ValueError
-        When a level is named as well. The result already says what each value describes,
-        and honouring one of the two silently would discard a real contradiction.
-    """
-    if not _is_stats_result(factors):
-        return factors, source_index
-    if level is not None and level != "auto":
+) -> None:
+    """Refuse a ``key=`` that cannot name rows: it needs a named level, and excludes ``source_index=``."""
+    if key is None:
+        return
+    if source_index is not None:
         raise ValueError(
-            f"`level` and the source_index carried by this stats result are mutually exclusive; "
-            f"the result already labels each value with what it describes. Pass the result's "
-            f"['stats'] mapping instead to place its values at level={level!r}.",
+            "key= and source_index= are two ways of saying which row each value belongs to; pass "
+            "one. key= matches values against a column, source_index= labels each value.",
         )
-    return factors["stats"], source_index if source_index is not None else factors["source_index"]
-
-
-def _reject_length_mismatch(factors: Mapping[str, Any], source_index: Sequence[SourceIndex]) -> None:
-    """Reject factors that do not hold exactly one value per source-index entry.
-
-    Shared by both constructors: the source index is the placement, so a factor that is
-    not as long as it names rows the caller never described, whichever spelling was used
-    to get here.
-    """
-    mismatched = {name: len(values) for name, values in factors.items() if len(values) != len(source_index)}
-    if mismatched:
-        raise ShapeMismatchError(
-            f"All factors must have one value per source_index entry ({len(source_index)}); got {mismatched}.",
+    if level in {"auto", "combined"}:
+        raise ValueError(
+            f"key={key!r} matches against a column of one level's rows, so that level has to be "
+            "named: pass level= as well.",
         )
 
 
-def _flatten_column_vector(values: NDArray[Any]) -> NDArray[Any]:
-    """Flatten an ``(N, 1)`` column of single values to ``(N,)``, leaving any other shape alone."""
-    return values.reshape(-1) if values.ndim == 2 and values.shape[1] == 1 else values
-
-
-def _holds_no_values(values: NDArray[Any]) -> bool:
-    """Whether an array of a factor's values at one level holds no value at all.
-
-    An empty array is not "no values" in this sense: a level that has no rows holds
-    nothing for every factor alike, which says something about the dataset rather than
-    about this factor, and ``level="combined"`` promises its column names regardless.
-    """
-    if values.size == 0:
-        return False
-    if values.dtype.kind in "fc":
-        return bool(np.isnan(values).all())
-    if values.dtype.kind == "O":
-        return all(value is None or (isinstance(value, float) and np.isnan(value)) for value in values)
-    # Integer, boolean and fixed-width string arrays have no null to be made of.
-    return False
-
-
-def _drop_vacuous_splits(
-    columns: list[tuple[str, FactorLevel, NDArray[Any]]],
-) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
-    """Split one factor's level columns into those carrying values and those carrying none.
-
-    A statistic that only applies to some of the levels a source index spans still has
-    to be as long as the index to be placed at all, so it arrives padded with nulls at
-    the levels it does not describe — ``compute_stats(per_background=True)`` measures the
-    scene behind an image's annotations, which is a property of the image and of nothing
-    inside it, and so has nulls on every instance row. Splitting that array by level
-    yields one real column and one holding nothing. The empty one is not a factor: it
-    cannot be binned, and left in place it reaches every evaluator that reads
-    :attr:`~dataeval.Metadata.factor_names` — :class:`~dataeval.bias.Balance` reports it
-    as a row of zero mutual information rather than omitting it.
-
-    Only ever separates out a *part* of a split. A factor whose every level came back
-    empty is kept whole, so that a factor a caller passed in can never vanish entirely —
-    an all-null factor is then theirs to see in the frame rather than ours to hide.
-
-    Pure, and returns the discarded names rather than recording them, so that
-    :meth:`Metadata.add_factors` can still abandon the whole call on a later validation
-    failure without having already written to :attr:`~dataeval.Metadata.dropped_factors`.
-    """
-    kept = [column for column in columns if not _holds_no_values(column[2])]
-    if not kept:
-        return columns, []
-    return kept, [name for name, _, _ in columns if not any(name == kept_name for kept_name, _, _ in kept)]
-
-
-def _binned(name: str) -> str:
-    return f"{name}↕"
-
-
-def _digitized(name: str) -> str:
-    return f"{name}#"
-
-
-def _to_col(name: str, info: FactorInfo, binned: bool = True) -> str:
-    if binned and info.is_binned:
-        return _binned(name)
-    if info.is_digitized:
-        return _digitized(name)
-    return name
-
-
-def _float_col(name: str, info: FactorInfo, schema: Mapping[str, pl.DataType]) -> str:
-    """Column holding a float-castable representation of a factor.
-
-    Raw values wherever they are numeric, so continuous factors keep their real
-    values. A categorical factor's raw column holds strings, which have no float
-    form at all, so it resolves to its digitized companion instead.
-    """
-    dtype = schema.get(name)
-    return name if dtype is not None and dtype.is_numeric() else _to_col(name, info, binned=False)
-
-
-def _build_index2label(
-    provided: Mapping[int, str] | None,
-    observed_labels: Iterable[Any],
-) -> dict[int, str]:
-    """Map each class index to a name, backfilling observed labels missing from ``provided``.
-
-    When ``provided`` is given it is the source of truth; any observed label without an
-    entry gets an ``UNDEFINED_CLASS_<i>`` placeholder. Otherwise labels name themselves.
-    """
-    if provided is not None:
-        index2label = {int(k): str(v) for k, v in provided.items()}
-        for lbl in observed_labels:
-            index2label.setdefault(int(lbl), f"UNDEFINED_CLASS_{int(lbl)}")
-        return index2label
-    return {int(lbl): str(int(lbl)) for lbl in observed_labels}
-
-
-def _resolve_legacy_level(level: str, aliases: Mapping[str, FactorLevel], stacklevel: int, unit_type: str) -> str:
-    """Translate a retired level spelling, warning at the caller's line.
-
-    Shared by the two paths that can be handed one: :meth:`Metadata._resolve_level`,
-    which has a structurer and so knows the task's full alias map, and
-    :meth:`Metadata._load_factors`, which is choosing the level a
-    :class:`FactorsStructurer` will be built with and so has only the base map. One
-    function so the two cannot word the deprecation differently.
-    """
-    alias = aliases.get(level)
-    if alias is None:
-        return level
-    # Naive "+ s" pluralization: correct for every current unit_type ("image",
-    # "frame", "item"). A future unit_type needing an irregular plural should be
-    # given one at its declaration site rather than inflected here.
-    warnings.warn(
-        f"Level {level!r} is deprecated and will stop resolving in a future "
-        f"release. It is no longer a level name; pass {alias!r} instead "
-        f"(this dataset's units are {unit_type}s).",
-        DeprecationWarning,
-        stacklevel=stacklevel,
-    )
-    return alias
-
-
-class Metadata(Array, FeatureExtractor):
+class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
     """Collection of binned metadata using Polars DataFrames.
 
     Processes dataset metadata by automatically binning continuous factors and digitizing
@@ -373,9 +234,7 @@ class Metadata(Array, FeatureExtractor):
         view: FactorLevel | Literal["image"] | None = None,
         inherited: bool = True,
     ) -> None:
-        self._class_labels: NDArray[np.intp]
         self._dropped_factors: dict[str, list[str]]
-        self._dataframe: pl.DataFrame
         self._raw: Sequence[Mapping[str, Any]]
 
         self._warned_level_rename = False
@@ -392,10 +251,8 @@ class Metadata(Array, FeatureExtractor):
 
         self._exclude = {exclude} if isinstance(exclude, str) else set(exclude or ())
         self._include = {include} if isinstance(include, str) else set(include or ())
-        # Validated lazily against the bound dataset's schema, since there is no schema
-        # to validate against until structuring; see _structure. A retired spelling like
-        # "image" may be sitting here transiently: the cast documents that _adopt
-        # resolves it (via _resolve_level) before anything treats this as a real level.
+        # Validated lazily: there is no schema until structuring. The cast covers a
+        # retired spelling sitting here until _adopt resolves it.
         self._view: FactorLevel | None = cast("FactorLevel | None", view)
         self._inherited = inherited
         self._target_factors_only = False
@@ -404,31 +261,36 @@ class Metadata(Array, FeatureExtractor):
 
     def _reset_structure(self) -> None:
         """Clear everything structuring produced, leaving an unstructured instance."""
-        # A bare Structurer, not None: its class defaults *are* what the level accessors
-        # should answer before there is a dataset to structure, so the unstructured
-        # answers stay declared in one place rather than restated as fallbacks here.
+        # A bare Structurer rather than None: its class defaults are what the level
+        # accessors should answer before there is a dataset to structure.
         self._structurer: Structurer = Structurer()
+        # Unread here; retained only because ``dataeval-flow`` reconstructs a cached
+        # Metadata by setting it (cache.py:1069). FE-7 retires it.
         self._layout: RowLayout = RowLayout(())
+        # Memoized flat frame, dropped by the ``_store`` setter on every rebind.
+        self._flat: pl.DataFrame | None = None
+        self._store = LevelStore.empty(self._structurer.levels)
         self._factors_by_level: dict[FactorLevel, set[str]] = {}
-        # Two containers answering two questions, deliberately not one.
-        #
-        # ``_factors`` is which factors the current view analyses. It is derived, and
-        # rebuilt from scratch by _build_factors whenever the view or the factor
-        # registry moves.
-        #
-        # ``_factor_cache`` is what binning has computed, keyed by name and independent
-        # of any view, because a factor is binned once at its own level and its
-        # companion column stays valid however the metadata is read.
-        #
-        # Holding the info on the visible set instead — the obvious single dict — loses
-        # a factor's info every time it leaves the visible set, while the companion
-        # column describing it stays in the dataframe. _bin() skips any factor that has
-        # a companion column, so that info is never recomputed: the factor comes back
-        # counted by factor_names and shape but absent from factor_data and is_discrete.
+        # Two containers, deliberately not one: ``_factors`` is what the current view
+        # analyses, ``_factor_cache`` what binning computed. Merging them would lose a
+        # factor's info whenever it left the visible set while its companion column
+        # stayed — and _bin() skips a factor that has one, so it would never be recomputed.
         self._factors: set[str] = set()
         self._factor_cache: dict[str, FactorInfo] = {}
         self._is_structured = False
         self._is_binned = False
+        # Set by where()/having() and never cleared: a filtered instance still holds its
+        # whole dataset, so anything pairing these rows with embeddings has to be able to ask.
+        self._is_filtered = False
+        # Whether a filter kept only part of an item's rows. Recorded as the filter runs,
+        # since answering later would need the rows it removed.
+        self._cut_below_items = False
+        # Which factors came from agg(), and the level each was rolled up from. Describes
+        # the factor rather than the column, so it survives a re-bin.
+        self._aggregated_from: dict[str, FactorLevel] = {}
+        # Set by load(): distinguishes "the dataset carried no metadata" from "this
+        # instance cannot say", since a saved file does not hold the raw dicts.
+        self._raw_omitted = False
 
     def _warn_if_task_unknowable(self) -> None:
         """Warn that an empty dataset will be structured as image classification."""
@@ -442,6 +304,25 @@ class Metadata(Array, FeatureExtractor):
                 UserWarning,
                 stacklevel=4,
             )
+
+    @property
+    def _store(self) -> LevelStore:
+        """The normalized store: each level's own rows, and the edges between them.
+
+        Immutable, so a view made by :meth:`at` shares one rather than copying it; every
+        writer rebinds this rather than mutating it.
+        """
+        return self._level_store
+
+    @_store.setter
+    def _store(self, store: LevelStore) -> None:
+        """Rebind the store, retiring the flat frame derived from the previous one.
+
+        A property rather than a plain field so the memoized frame — the largest object
+        either holds — cannot outlive the store it describes.
+        """
+        self._level_store = store
+        self._flat = None
 
     @classmethod
     def from_factors(
@@ -575,7 +456,7 @@ class Metadata(Array, FeatureExtractor):
         >>> sorted(md.factor_names)
         ['instance_mean', 'unit_mean']
         """
-        factors, source_index = _unpack_stats_result(factors, source_index, level=level)
+        factors, source_index = unpack_stats_result(factors, source_index, level=level)
         inst = cls(
             None,
             continuous_factor_bins=continuous_factor_bins,
@@ -584,7 +465,8 @@ class Metadata(Array, FeatureExtractor):
             include=include,
             inherited=inherited,
         )
-        inst._load_factors(
+        _load_factors(
+            inst,
             factors,
             class_labels,
             index2label=index2label,
@@ -594,160 +476,172 @@ class Metadata(Array, FeatureExtractor):
         )
         return inst
 
-    def _load_factors(
-        self,
-        factors: Mapping[str, Array1D[Any]],
-        class_labels: Array1D[Any] | None,
+    @classmethod
+    def load(
+        cls,
+        path: Path | str,
+        dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]] | None = None,
         *,
-        index2label: Mapping[int, str] | None,
-        item_indices: Array1D[Any] | None,
-        level: FactorLevel | Literal["image"] | None = None,
-        source_index: Sequence[SourceIndex] | None = None,
-    ) -> None:
-        """Populate structured state directly from raw factor arrays (see from_factors)."""
-        # Vector-valued statistics have no single-column form. Dropping them here rather
-        # than letting a flatten silently produce a wrong-length column keeps a mapping
-        # straight from compute_stats usable, and reports the same way add_factors reports
-        # it. Column vectors keep working: _split_by_dimensionality flattens them.
-        factor_arrays, skipped = self._split_by_dimensionality({str(k): v for k, v in factors.items()})
-
-        if source_index is not None:
-            self._load_factors_by_source_index(
-                factor_arrays,
-                class_labels,
-                index2label=index2label,
-                level=level,
-                item_indices=item_indices,
-                source_index=source_index,
-            )
-        else:
-            self._load_factors_by_length(
-                factor_arrays,
-                class_labels,
-                index2label=index2label,
-                level=level,
-                item_indices=item_indices,
-            )
-        # Recorded only once the structure exists, and only once every validation above has
-        # passed: recording is a mutation, and a rejected call must leave no trace of itself
-        # behind.
-        self._record_multidimensional(skipped)
-
-    def _load_factors_by_length(  # noqa: C901
-        self,
-        factor_arrays: Mapping[str, NDArray[Any]],
-        class_labels: Array1D[Any] | None,
-        *,
-        index2label: Mapping[int, str] | None,
-        level: FactorLevel | Literal["image"] | None,
-        item_indices: Array1D[Any] | None,
-    ) -> None:
-        """Populate structured state from factor arrays that all describe one level.
-
-        Nothing in bare arrays distinguishes an item from a label, so every factor sits at
-        the same level and the rows are numbered by position.
-
-        Raises
-        ------
-        ShapeMismatchError
-            When the factors, ``class_labels`` and ``item_indices`` do not agree on a
-            single row count.
+        continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
+        auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
+        exclude: str | Sequence[str] | None = None,
+        include: str | Sequence[str] | None = None,
+        view: FactorLevel | None = None,
+        inherited: bool = True,
+    ) -> Self:
         """
-        lengths = {len(v) for v in factor_arrays.values()}
-        if len(lengths) > 1:
-            raise ShapeMismatchError(f"All factor arrays must have the same length; got lengths {sorted(lengths)}.")
-        factor_len = next(iter(lengths)) if factor_arrays else None
+        Read metadata previously written by :meth:`save`, skipping the walk over the dataset.
 
-        if class_labels is not None:
-            labels = as_numpy(class_labels, dtype=np.intp).reshape(-1)
-            n = len(labels)
-            if factor_len is not None and factor_len != n:
-                raise ShapeMismatchError(f"class_labels length {n} does not match factor length {factor_len}.")
-        elif factor_len is not None:
-            n = factor_len
-            labels = np.zeros(n, dtype=np.intp)
-        else:
-            n = 0
-            labels = np.array([], dtype=np.intp)
+        Structuring reads every item of a dataset — decoding images, unpacking targets,
+        accumulating tracks — and is the expensive half of building metadata. A saved file
+        holds the rows that walk produced, so loading one gives back an instance that
+        behaves as though the dataset had been structured, without reading it.
 
-        if item_indices is None:
-            srcidx = np.arange(n, dtype=np.intp)
-        else:
-            srcidx = as_numpy(item_indices, dtype=np.intp).reshape(-1)
-            if len(srcidx) != n:
-                raise ShapeMismatchError(f"item_indices length {len(srcidx)} does not match row count {n}.")
+        The dataset is passed rather than stored, because it cannot be written to a file
+        and should not be. Supplying it makes the loaded instance bindable, lets the item
+        counts be checked against each other, and is what anything reading images
+        alongside the metadata needs; omitting it gives a working but unbound instance.
 
-        # A factors-only instance has a single level, which is therefore both the
-        # item level and the label level. Structuring goes through the same
-        # StructuredData bundle as the dataset path, so the reserved columns have
-        # exactly one producer and cannot drift between the two constructors. No
-        # structurer instance exists yet to resolve a retired spelling against — this
-        # call is what builds one — so this resolves against the base Structurer's
-        # alias map rather than a task-specific one.
-        # caller -> from_factors -> _load_factors -> here -> _resolve_legacy_level.
-        # test_from_factors_blames_caller pins this.
-        requested = _resolve_legacy_level(
-            level or "unit", Structurer.legacy_level_aliases, stacklevel=5, unit_type=Structurer.unit_type
-        )
-        structurer = FactorsStructurer(requested)  # type: ignore[arg-type]
-        data = structurer.build_from_arrays(factor_arrays, labels, srcidx)
+        Binning is **not** restored. The file holds each factor's values, and the binning
+        configuration given here is applied lazily on first read, so one file serves every
+        set of bins a caller might want from it.
 
-        self._index2label = _build_index2label(index2label, np.unique(labels))
-        # Items, not rows, matching :attr:`item_count`'s contract and the source-index
-        # path. ``item_indices`` exists so that several rows can share one item, and a
-        # count of rows disagrees with it on exactly the tables it is for. It is also what
-        # tells :func:`~dataeval.data.split_dataset` an object detection table from a
-        # classification one — counted as rows, a table of detections never reaches the
-        # grouped split and two detections of one image can land in different folds.
-        self._count = int(len(np.unique(srcidx)))
-        self._adopt(structurer, data)
+        Parameters
+        ----------
+        path : Path or str
+            File written by :meth:`save`.
+        dataset : ImageClassificationDataset, ObjectDetectionDataset or None, default None
+            The dataset the metadata was built from, bound to the loaded instance.
+            Its item count is checked against the file's.
+        continuous_factor_bins : Mapping[str, int or Sequence[float]] or None, default None
+            Bin counts or explicit edges per factor, applied when factors are first read.
+        auto_bin_method : {"uniform_width", "uniform_count", "clusters"}, default "uniform_width"
+            Binning strategy for continuous factors with no explicit bins.
+        exclude : str, Sequence[str] or None, default None
+            Factor names to exclude from analysis.
+        include : str, Sequence[str] or None, default None
+            Factor names to restrict analysis to. Mutually exclusive with ``exclude``.
+        view : str or None, default None
+            Level to read from. Defaults to the level carrying class labels.
+        inherited : bool, default True
+            Whether factors defined above the view are analysed at it.
 
-    def _load_factors_by_source_index(
-        self,
-        factor_arrays: Mapping[str, NDArray[Any]],
-        class_labels: Array1D[Any] | None,
-        *,
-        index2label: Mapping[int, str] | None,
-        level: FactorLevel | Literal["image"] | None,
-        item_indices: Array1D[Any] | None,
-        source_index: Sequence[SourceIndex],
-    ) -> None:
-        """Populate structured state from factor arrays labelled by a source index.
-
-        The source index supplies what `level` and `item_indices` supply on the other
-        path — which level each value belongs to and which item it came from — so all
-        three together is a contradiction rather than a redundancy, and is rejected
-        instead of one silently winning.
+        Returns
+        -------
+        Metadata
+            An instance holding the saved rows, configured as asked here.
 
         Raises
         ------
+        MetadataFormatError
+            When the file is not readable as this version's metadata format — including
+            when an older or newer dataeval wrote it. See the Notes.
         ValueError
-            When `level` or `item_indices` is given alongside the source index.
-        ShapeMismatchError
-            When a factor does not have one value per source-index entry.
+            When ``dataset`` holds a different number of items than the file was saved
+            for, or when both ``exclude`` and ``include`` are given.
+
+        See Also
+        --------
+        save
+
+        Notes
+        -----
+        **This is a cache, not an interchange format.** What is written is the library's
+        internal per-level layout, and that layout may change in any release. A file is
+        stamped with the format version and the level graph it was written against, and
+        loading refuses anything it does not recognize rather than guessing — so a stale
+        file raises :class:`~dataeval.exceptions.MetadataFormatError`, which a caching
+        caller is meant to catch and recompute from::
+
+            try:
+                metadata = Metadata.load(path, dataset)
+            except MetadataFormatError:
+                metadata = Metadata(dataset)
+                metadata.save(path)
+
+        Do not use it to move metadata between dataeval versions, and do not treat it as
+        a record: reach for :meth:`dataframe` and a parquet file for either.
+
+        The per-item dictionaries behind :attr:`raw` are not written — they hold whatever
+        the dataset put there, of unbounded size — so :attr:`raw` on a loaded instance
+        raises rather than answering as though the dataset carried none.
+
+        Example
+        -------
+        >>> md = Metadata(dataset)
+        >>> md.save(save_dir / "metadata.dem")
+        >>> reloaded = Metadata.load(save_dir / "metadata.dem", dataset)
+        >>> sorted(reloaded.factor_names) == sorted(md.factor_names)
+        True
+        >>> reloaded.item_count == md.item_count
+        True
+
+        The rows come back at every level, not just the one being read:
+
+        >>> reloaded.level_counts == md.level_counts
+        True
         """
-        for name, value in (("level", level), ("item_indices", item_indices)):
-            if value is not None:
-                raise ValueError(
-                    f"`{name}` and `source_index` are mutually exclusive; the source index already "
-                    f"says which level each value sits at and which item it came from.",
-                )
+        inst = cls(
+            dataset,
+            continuous_factor_bins=continuous_factor_bins,
+            auto_bin_method=auto_bin_method,
+            exclude=exclude,
+            include=include,
+            view=view,
+            inherited=inherited,
+        )
+        _restore(inst, path)
+        return inst
 
-        _reject_length_mismatch(factor_arrays, source_index)
+    def save(self, path: Path | str) -> None:
+        """
+        Write the structured rows to a file that :meth:`load` can read back.
 
-        rows = SourceIndexRows.parse(source_index)
-        structurer = FactorsStructurer(rows=rows)
-        labels = None if class_labels is None else as_numpy(class_labels, dtype=np.intp).reshape(-1)
-        data = structurer.build_from_source_index(factor_arrays, labels)
+        Structures first when it has to, so saving a freshly constructed instance writes
+        the dataset's rows rather than an empty file.
 
-        self._index2label = _build_index2label(index2label, np.unique(data.class_labels))
-        # Items, not rows: several labels can name the same item, and item_count that
-        # counted rows would disagree with item_indices on the very datasets — one item,
-        # several detections — this path exists to carry. Counted by adjacent change
-        # rather than np.unique, which would re-sort what parse already left sorted.
-        named_items = rows.item_ids if len(rows.item_positions) else rows.label_items
-        self._count = int(np.count_nonzero(np.diff(named_items))) + 1 if len(named_items) else 0
-        self._adopt(structurer, data)
+        What is written is the level rows, the positional links between them, and which
+        factor sits at which level. What is not written is the dataset itself, the binning
+        configuration and the columns derived from it, and the per-item dictionaries
+        behind :attr:`raw` — see :meth:`load` for what that means when reading back.
+
+        The file is written to a temporary name and renamed into place, so a reader sees
+        either the previous file or the new one, never a partial one.
+
+        Parameters
+        ----------
+        path : Path or str
+            Destination file. Parent directories are created if needed, and an existing
+            file is replaced.
+
+        Raises
+        ------
+        NotFittedError
+            When the instance has no bound dataset and no structured rows, so there is
+            nothing to write.
+
+        See Also
+        --------
+        load
+
+        Notes
+        -----
+        **This is a cache, not an interchange format** — it holds dataeval's internal
+        layout, and only the dataeval that wrote it promises to read it back. To keep
+        metadata for anything else, write :attr:`dataframe` to a parquet file.
+
+        A filtered instance saves and loads as filtered, so
+        :attr:`is_filtered` still reports True on the way back and the evaluators that
+        refuse a filtered metadata still refuse it.
+
+        Example
+        -------
+        >>> md = Metadata(dataset)
+        >>> md.save(save_dir / "od.dem")
+        >>> (save_dir / "od.dem").exists()
+        True
+        """
+        _save(self, path)
 
     def __repr__(self) -> str:  # noqa: C901
         bound = self._dataset is not None
@@ -932,9 +826,9 @@ class Metadata(Array, FeatureExtractor):
         if not self._is_fitted:
             raise NotFittedError("No dataset bound. Call bind() first.")
         self._structure()
-        # Counted rather than measured off factor_names, which would sort the names
-        # only to discard the sorted list; len() and ndim both route through here.
-        return (self._layout.counts.get(self._view_level, 0), sum(1 for name in self._factors if self._filter(name)))
+        # Counted rather than read off factor_names, which would sort the names only to
+        # discard the sorted list; len() and ndim both route through here.
+        return (self._store.height(self._view_level), sum(1 for name in self._factors if self._filter(name)))
 
     def __iter__(self) -> Iterator[NDArray[np.int64]]:
         """Iterate over rows of the binned metadata.
@@ -1057,14 +951,11 @@ class Metadata(Array, FeatureExtractor):
         if data is None:
             if self._dataset is None:
                 raise NotFittedError("No dataset bound. Provide data or call bind() first.")
-            # Return factors for bound dataset
             return self.factor_data
 
-        # Check if same as bound dataset (by identity)
         if self._dataset is not None and data is self._dataset:
             return self.factor_data
 
-        # Compute metadata for new data using this config
         return self.new(data).factor_data
 
     @property
@@ -1080,8 +971,20 @@ class Metadata(Array, FeatureExtractor):
             List of metadata dictionaries, one per dataset item, containing the original key-value
             pairs as provided in the source data
 
+        Raises
+        ------
+        ValueError
+            When the instance came from :meth:`load`. The dictionaries are not written to
+            a saved file, and an empty list here would read as a dataset that carried no
+            metadata rather than as an instance that cannot say.
         """
         self._structure()
+        if self._raw_omitted:
+            raise ValueError(
+                "This metadata was loaded from a file, which does not hold the per-item "
+                "metadata dictionaries — they are unbounded in size and hold arbitrary "
+                "values. Build the metadata from its dataset to read them: Metadata(dataset).raw",
+            )
         return self._raw
 
     @property
@@ -1114,7 +1017,7 @@ class Metadata(Array, FeatureExtractor):
             Mapping of level name to row count, in schema order.
         """
         self._structure()
-        return dict(self._layout.counts)
+        return dict(self._store.counts)
 
     @property
     def item_level(self) -> FactorLevel:
@@ -1141,6 +1044,15 @@ class Metadata(Array, FeatureExtractor):
             ``box`` describe. A structural fact about where the annotations sit,
             which is why it is read-only; :attr:`view` is the knob that decides
             which rows get projected.
+
+        Notes
+        -----
+        This is ``"instance"`` for every task built from a dataset, but **not** for
+        :meth:`from_factors`, which has no dataset to impose a shape and puts both the
+        item level and the label level at whichever level the caller asked for. A
+        single-level factors bundle therefore reports ``"unit"`` here. Code that gates
+        on where the labels sit should read this rather than compare against
+        ``"instance"``.
         """
         self._structure()
         return self._label_level
@@ -1297,41 +1209,379 @@ class Metadata(Array, FeatureExtractor):
         resolved = self._resolve_level(level)
 
         view = copy.copy(self)
-        # Everything mutable is copied out: a view that shares the factor dict with its
-        # source would have its FactorInfo overwritten the next time either one binned.
+        # ``_store`` is deliberately shared: it is immutable, so a writer on either side
+        # rebinds its own field. What is copied are the mutable containers describing how
+        # this instance *reads* the store, which a view must own or its FactorInfo is
+        # overwritten the next time either binned.
         view._factors = set(self._factors)
         view._factor_cache = dict(self._factor_cache)
         view._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
         view._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
-        view._dataframe = self._dataframe.clone()
+        view._aggregated_from = dict(self._aggregated_from)
         view._view = resolved
-        # The move can bring factors into the visible set that the source never binned —
-        # anything defined below its view. ``_is_binned`` is the source's claim that
-        # nothing is left to process, and it does not carry: without clearing it the copy
-        # reports those factors in factor_names and shape while factor_data and
-        # is_discrete, which read factor_info, silently omit them. Companion columns
-        # survive in the clone and _bin() skips a factor that has one, so this re-bins
-        # only what the move made visible.
+        # The move can expose factors the source never binned — anything below its view —
+        # so its "nothing left to process" claim does not carry. _bin() skips a factor
+        # that already has a companion column, so this re-bins only what the move exposed.
         view._is_binned = False
         # A copy is a fresh object in the user's hands, so it gets its own once-per-
-        # instance budget for the FactorInfo.level rename — the same reasoning as bind().
+        # instance budget for the FactorInfo.level rename, as bind() does.
         view._warned_level_rename = False
         view._build_factors()
         return view
 
+    def _filtered(self, keep: dict[FactorLevel, NDArray[np.intp]], level: FactorLevel) -> Self:
+        """Build the metadata over a set of surviving rows, sharing nothing mutable.
+
+        The same copy discipline as :meth:`at`, plus the restricted store. Clearing
+        ``_is_binned`` re-bins what the filter exposed: dropping rows that lacked an
+        ancestor can turn a partly-null column into a total one. Bin edges already
+        computed are kept — filtering is not re-structuring.
+        """
+        filtered = copy.copy(self)
+        filtered._factors = set(self._factors)
+        filtered._factor_cache = dict(self._factor_cache)
+        filtered._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
+        filtered._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
+        filtered._aggregated_from = dict(self._aggregated_from)
+        filtered._cut_below_items = self._cut_below_items or self._cuts_below_items(keep)
+        filtered._store = self._store.restrict(keep)
+        filtered._is_filtered = True
+        filtered._is_binned = False
+        filtered._warned_level_rename = False
+        # The surviving items, not the dataset's: this describes the rows the metadata
+        # holds, and __repr__ reporting the whole dataset's would name rows that are gone.
+        filtered._count = filtered._store.height(self._item_level)
+        report_orphaned_rows(self._store, filtered._store, keep, level)
+        filtered._build_factors()
+        return filtered
+
+    def where(self, predicate: pl.Expr, level: FactorLevel | Literal["target", "image"] | None = None) -> Self:
+        """Keep the rows at ``level`` that satisfy ``predicate``, and what depends on them.
+
+        Filters downwards: the rows that survive at ``level`` keep their descendants, and a
+        descendant whose parent was dropped goes with it. It does **not** filter upwards —
+        every sequence and every frame above the cut stays — and it does not filter that
+        level's siblings, which for tracking means ``md.where(..., level="unit")`` leaves
+        every track row in place, including tracks whose every observation was in a dropped
+        frame. Those rows are counted and reported on the ``dataeval`` logger.
+
+        Parameters
+        ----------
+        predicate : pl.Expr
+            A polars expression answering one boolean per row at ``level``, evaluated
+            against that level's resolved rows — so it may read any factor defined there or
+            at one of its ancestors, spelled as it is in :attr:`dataframe`.
+        level : str or None, default None
+            Level whose rows the predicate is answered for. Defaults to :attr:`view`.
+
+        Returns
+        -------
+        Metadata
+            A new metadata over the surviving rows. Neither this instance nor the copy can
+            see the other's later writes.
+
+        Raises
+        ------
+        ValueError
+            When the predicate names a column these rows have no value for, or does not
+            answer one boolean per row.
+
+        See Also
+        --------
+        :meth:`having` : Keep the rows that *have* a matching row below them
+        :meth:`at` : The same rows read at another level
+
+        Notes
+        -----
+        A filter can only add factors to :attr:`factor_data`, never silently remove them.
+        Dropping the rows that had no ancestor at a level can turn a partly-null factor
+        into a total one, which brings it into the analysis; nothing takes one out.
+
+        The bin edges are those computed before the filter, which is why this bins the
+        *unfiltered* rows on the way through rather than leaving it to the first read of
+        :attr:`factor_data` on the result. Deferring it would compute the edges from the
+        survivors, so the same filter would answer differently depending on whether anything
+        had happened to read the source's factors first. Re-structuring the filtered dataset
+        recomputes them deliberately, and so answers differently again — see
+        :meth:`selected_items` for the dataset-side counterpart.
+
+        Examples
+        --------
+        >>> import polars as pl
+        >>> metadata = Metadata(dataset)
+        >>> len(metadata.at("unit")), len(metadata)
+        (50, 93)
+        >>> # Keep the night-time images, and with them only their detections
+        >>> night = metadata.where(pl.col("time_of_day") == "night", level="unit")
+        >>> len(night.at("unit")), len(night)
+        (16, 32)
+        """
+        self._structure()
+        self._bin()
+        resolved = self._view_level if level is None else self._resolve_level(level)
+        mask = evaluate(self._store, resolved, predicate)
+        return self._filtered(self._store.surviving_where(resolved, mask), resolved)
+
+    def having(self, predicate: pl.Expr, level: FactorLevel | Literal["target", "image"] | None = None) -> Self:
+        """Keep the rows *above* ``level`` that have a row at ``level`` satisfying ``predicate``.
+
+        The upward filter, and the one that cuts across the level graph's diamond. Each
+        level above ``level`` keeps the rows some matching row points at; every other level,
+        including ``level`` itself, then keeps the rows whose parents all survived.
+
+        For tracking that has a consequence worth stating plainly: a detection whose frame
+        holds a match but whose *track* does not is dropped, because its track did not
+        survive. ``md.having(pl.col("class_label") == person, level="instance")`` therefore
+        keeps the tracks that contain a person and drops the car travelling through the
+        same frames.
+
+        Parameters
+        ----------
+        predicate : pl.Expr
+            A polars expression answering one boolean per row at ``level``, evaluated
+            against that level's resolved rows.
+        level : str or None, default None
+            Level whose rows are matched. Defaults to :attr:`view`.
+
+        Returns
+        -------
+        Metadata
+            A new metadata over the surviving rows.
+
+        Raises
+        ------
+        ValueError
+            When ``level`` has no ancestors, since the seed only travels upwards and there
+            would be nothing for it to reach; when the predicate names a column these rows
+            have no value for; or when it does not answer one boolean per row.
+
+        See Also
+        --------
+        :meth:`where` : Keep the matching rows themselves, and what depends on them
+
+        Notes
+        -----
+        The bin edges are those computed before the filter, for the reason
+        :meth:`where` gives.
+
+        Examples
+        --------
+        >>> import polars as pl
+        >>> metadata = Metadata(dataset)
+        >>> len(metadata.at("unit"))
+        50
+        >>> # The images holding at least one car, and every detection in them
+        >>> with_cars = metadata.having(pl.col("class_label") == 1, level="instance")
+        >>> len(with_cars.at("unit")), len(with_cars)
+        (21, 47)
+        """
+        self._structure()
+        self._bin()
+        resolved = self._view_level if level is None else self._resolve_level(level)
+        if not self._levels.ancestors(resolved):
+            raise ValueError(
+                f"having() keeps the rows above {resolved!r} that have a matching row at it, but "
+                f"{resolved!r} is the coarsest level of this dataset and has nothing above it. Use "
+                f"where(..., level={resolved!r}) to keep the matching rows themselves.",
+            )
+        mask = evaluate(self._store, resolved, predicate)
+        return self._filtered(self._store.surviving_having(resolved, mask), resolved)
+
+    def agg(
+        self,
+        from_level: FactorLevel | Literal["target", "image"],
+        to_level: FactorLevel | Literal["target", "image"],
+        *exprs: pl.Expr,
+        unique_by: FactorLevel | Literal["target", "image"] | None = None,
+    ) -> Self:
+        """Roll ``from_level``'s rows up into a new factor on each ``to_level`` row.
+
+        The counterpart to reading a coarse factor from a fine level. That direction
+        replicates a value downwards and loses nothing; this one collapses many rows into
+        one and has to be told what the fan-out means, which is what ``unique_by`` is for.
+
+        Rows with no ancestor at ``to_level`` take no part — an untracked detection belongs
+        to no track — and a ``to_level`` row with nothing beneath it answers null rather
+        than zero, since nothing was measured there.
+
+        Parameters
+        ----------
+        from_level : str
+            Level whose rows are rolled up.
+        to_level : str
+            Level receiving one value per row. Must sit strictly above ``from_level``.
+        *exprs : pl.Expr
+            Aggregating polars expressions, evaluated over the ``from_level`` rows beneath
+            each ``to_level`` row. Each contributes one factor, named by its output name.
+        unique_by : str or None, default None
+            Count each ``unique_by`` entity once within a group, keeping its first row in
+            row order. Required by any expression reading a column defined above
+            ``from_level``, and legal for ``from_level`` itself or any level above it —
+            including one that is not below ``to_level``, which is what makes
+            ``unique_by="unit"`` the answer for an instance-to-track roll-up.
+
+        Returns
+        -------
+        Metadata
+            A new metadata carrying the aggregated factors at ``to_level``. Neither this
+            instance nor the copy can see the other's later writes.
+
+        Raises
+        ------
+        ValueError
+            When ``to_level`` does not sit above ``from_level``; when ``unique_by`` is
+            neither ``from_level`` nor above it; when an expression reads a column defined
+            above ``from_level`` and no ``unique_by`` was given; or when no expression was
+            passed.
+
+        See Also
+        --------
+        :meth:`where` : Keep the rows matching a predicate
+        :meth:`having` : Keep the rows that have a matching row below them
+
+        Notes
+        -----
+        A resulting factor's :class:`~dataeval.types.FactorInfo` records
+        ``aggregated_from``, so a reader can tell a rolled-up value from one measured at
+        ``to_level`` directly before comparing the two.
+
+        Grouping is positional: a row's group is its parent's row position, so nothing is
+        hashed or joined and the result scatters straight into an array as long as
+        ``to_level`` has rows.
+
+        Examples
+        --------
+        >>> import polars as pl
+        >>> metadata = Metadata(dataset)
+        >>> counted = metadata.agg("instance", "unit", pl.len().alias("n_detections"))
+        >>> counted.at("unit").rows_at("unit")["n_detections"].sum()
+        93
+        """
+        self._structure()
+        if not exprs:
+            raise ValueError("agg needs at least one expression, e.g. agg(from, to, pl.len().alias('n')).")
+        source = self._resolve_level(from_level)
+        target = self._resolve_level(to_level)
+        unique = None if unique_by is None else self._resolve_level(unique_by)
+        validate(self._store, source, target, exprs, unique)
+
+        rolled = copy.copy(self)
+        rolled._factors = set(self._factors)
+        rolled._factor_cache = dict(self._factor_cache)
+        rolled._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
+        rolled._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
+        rolled._aggregated_from = dict(self._aggregated_from)
+
+        store = self._store
+        taken = set(store.columns)
+        added: list[tuple[str, FactorLevel]] = []
+        for series in aggregate(self._store, source, target, exprs, unique):
+            name = self._resolve_factor_name(series.name, taken, overwrite=False, append_string="_agg")
+            taken.add(name)
+            store = store.with_column(target, series.rename(name))
+            rolled._aggregated_from[name] = source
+            added.append((name, target))
+        rolled._store = store
+        rolled._register_factor_levels(added)
+        rolled._is_binned = False
+        rolled._warned_level_rename = False
+        rolled._build_factors()
+        return rolled
+
+    @property
+    def is_filtered(self) -> bool:
+        """Whether these rows are a subset produced by :meth:`where` or :meth:`having`.
+
+        Returns
+        -------
+        bool
+            True for a filtered instance, and for anything derived from one.
+
+        Notes
+        -----
+        A filtered instance still holds its **whole** dataset, so anything computed from
+        that dataset — embeddings above all — describes more rows than these. Pairing the
+        two is a silent misalignment rather than an error, which is why the evaluators
+        that take both refuse a filtered metadata outright. :meth:`selected_items` is how
+        to bring the dataset side into correspondence.
+        """
+        return self._is_filtered
+
+    def _cuts_below_items(self, keep: dict[FactorLevel, NDArray[np.intp]]) -> bool:
+        """Whether a filter kept only part of some surviving item's rows.
+
+        Asked here because it needs the pre-filter store. :meth:`selected_items` is the
+        consumer: a dataset item is indivisible, so no subset reproduces such a filter.
+        """
+        item = self._item_level
+        alive = np.zeros(self._store.height(item), dtype=np.bool_)
+        alive[keep[item]] = True
+        for level in self._store.frames:
+            if level == item or not self._levels.is_ancestor(item, level):
+                continue
+            positions = self._store.link(level, item).positions()
+            inherited = alive[np.maximum(positions, 0)] if alive.size else np.zeros(len(positions), dtype=np.bool_)
+            whole = np.flatnonzero((positions >= 0) & inherited)
+            if not np.array_equal(keep[level], whole):
+                return True
+        return False
+
+    def selected_items(self) -> NDArray[np.intp]:
+        """Dataset items these rows came from, for filtering the dataset to match.
+
+        Hand the result to :class:`~dataeval.data.Indices` to build a
+        :class:`~dataeval.data.View` over the same items, so that embeddings computed from
+        the view line up with this metadata's rows.
+
+        Returns
+        -------
+        NDArray[np.intp]
+            Source item indices, ascending, one per surviving row at :attr:`item_level`.
+
+        Raises
+        ------
+        ValueError
+            When the filter kept only part of some item — some frames of a video, or some
+            detections of an image. No dataset subset reproduces that, because an item is
+            indivisible, so there is no correspondence to hand back.
+
+        Notes
+        -----
+        This is for the *dataset* side, not for reproducing this metadata. Re-structuring
+        the filtered dataset builds a different :class:`Metadata`: bin edges are computed
+        from the values present, so a factor binned over the whole dataset and the same
+        factor binned over the subset do not agree, and a bin index means something
+        different in each. Keep this instance for the analysis; use the view for anything
+        that has to be recomputed from images.
+
+        Examples
+        --------
+        >>> import polars as pl
+        >>> from dataeval.data import Indices, View
+        >>> metadata = Metadata(dataset)
+        >>> night = metadata.where(pl.col("time_of_day") == "night", level="unit")
+        >>> items = night.selected_items()
+        >>> len(items)
+        16
+        >>> matching_dataset = View(dataset, Indices(items.tolist()))
+        """
+        self._structure()
+        if self._cut_below_items:
+            raise ValueError(
+                "This metadata was filtered below the item level, so no subset of the dataset "
+                f"reproduces it: some {self._item_level!r} row kept only part of its rows. A dataset "
+                "item is indivisible — it can hand back whole items only. Filter at "
+                f"{self._item_level!r}, or with having(..., level=...) so that whole items survive, if "
+                "the dataset and embeddings have to follow.",
+            )
+        return self._store.column(self._item_level, "item_index").to_numpy().astype(np.intp, copy=False)
+
     def _reset_view_dependent_state(self) -> None:
         """Rebuild the factor set after something moved which rows or factors are visible.
 
-        Only the visible set is rebuilt; bins are kept. A factor is binned once, at its
-        own level (see :ref:`binning-levels`), so its companion column stays valid
-        across a view move, and a factor that leaves the visible set and later returns
-        is restored from ``_factor_cache`` rather than re-binned.
-
-        ``_is_binned`` is cleared regardless, for the same reason :meth:`at` clears it:
-        the move can expose factors that have never been binned, and the flag means
-        "nothing left to process", which is no longer true. :meth:`_bin` skips any
-        factor that already has a companion column, so the re-bin covers only what
-        became visible.
+        Only the visible set is rebuilt; bins are kept, since a factor is binned once at
+        its own level. ``_is_binned`` is cleared to re-bin whatever the move exposed, as
+        :meth:`at` does.
         """
         self._is_binned = False
         self._build_factors()
@@ -1490,45 +1740,6 @@ class Metadata(Array, FeatureExtractor):
             self._reset_view_dependent_state()
 
     @property
-    def target_factors_only(self) -> bool:
-        """Whether factors above the target level are dropped, on multi-target tasks.
-
-        .. deprecated::
-            Two knobs in one, and neither of them this. Use ``md.at(level)`` to choose
-            which rows are read, and :attr:`inherited` to choose whether ancestor
-            factors count. Removed in v1.2.0.
-
-        Notes
-        -----
-        Retains its v1.1 semantics exactly, including the part that reads like a bug:
-        it is a no-op unless :attr:`multi_target`, so on image classification it has
-        never done anything. :attr:`inherited` does not carry that exemption over — it
-        means what it says on every task — which is why this is kept as its own flag
-        rather than forwarded to it.
-        """
-        warnings.warn(
-            "Metadata.target_factors_only is deprecated and will be removed in v1.2.0. "
-            "Use Metadata.at(level) to choose the rows and Metadata.inherited to choose "
-            "whether ancestor factors count.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self._target_factors_only
-
-    @target_factors_only.setter
-    def target_factors_only(self, value: bool) -> None:
-        warnings.warn(
-            "Metadata.target_factors_only is deprecated and will be removed in v1.2.0. "
-            "Use Metadata.at(level) to choose the rows and Metadata.inherited to choose "
-            "whether ancestor factors count.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if self._target_factors_only != value:
-            self._target_factors_only = value
-            self._reset_view_dependent_state()
-
-    @property
     def dataframe(self) -> pl.DataFrame:
         """Processed DataFrame containing rows at every level of the dataset.
 
@@ -1558,9 +1769,18 @@ class Metadata(Array, FeatureExtractor):
         dataset all unit rows precede all instance rows. The legacy ``item_index``
         and ``target_index`` columns are retained: ``target_index`` remains null
         on rows above :attr:`label_level`.
+
+        Derived, not stored: the store holds each level's rows once and this widens
+        every level to every column and stacks them, which is what makes a factor
+        defined once readable from each of its descendants. It is memoized until the
+        store is rebound, so repeated reads are free and any write rebuilds it. Reading
+        one level is :meth:`rows_at`, and reading a few columns of one level is cheaper
+        still — neither goes through this.
         """
         self._structure()
-        return self._dataframe
+        if self._flat is None:
+            self._flat = self._store.flat()
+        return self._flat
 
     @property
     def dropped_factors(self) -> Mapping[str, Sequence[str]]:
@@ -1627,7 +1847,7 @@ class Metadata(Array, FeatureExtractor):
         ``md.at`` on its own level reads it in full.
         """
         info_by_name = self._factor_info
-        return self._project([_to_col(name, info) for name, info in info_by_name.items()], np.int64)
+        return self._project([to_col(name, info) for name, info in info_by_name.items()], np.int64)
 
     @property
     def factor_names(self) -> Sequence[str]:
@@ -1650,22 +1870,15 @@ class Metadata(Array, FeatureExtractor):
     def _factor_info(self) -> Mapping[str, FactorInfo]:
         """:attr:`factor_info` without the rename warning, for internal callers.
 
-        Everything in this class that needs a factor's type or companion column
-        reads this. The warning belongs on the paths that put a
-        :class:`FactorInfo` in *user* hands — :attr:`factor_info` and
-        :meth:`filter_by_factor` — not on ``factor_data``, which every bias
-        evaluator calls and whose callers may never touch ``FactorInfo`` at all.
-
-        An instance with nothing visible to analyse answers without binning, so that
-        the array accessors can shape an empty projection off the row layout alone
-        rather than materializing a dataframe they have nothing to read from.
+        The warning belongs on the paths that put a :class:`FactorInfo` in *user* hands,
+        not on ``factor_data``, which every bias evaluator calls.
         """
         if not self.factor_names:
             return {}
         self._bin()
-        # Visible *and* processed: a factor is in ``_factors`` from the moment it is
-        # registered and in the cache only once it has a companion column, so the
-        # intersection is exactly the set factor_data can project.
+        # Visible *and* processed: a factor is in ``_factors`` from registration but in
+        # the cache only once it has a companion column, so the intersection is exactly
+        # what factor_data can project.
         return {name: self._factor_cache[name] for name in self.factor_names if name in self._factor_cache}
 
     @property
@@ -1711,36 +1924,6 @@ class Metadata(Array, FeatureExtractor):
         return [info.factor_type != "continuous" for info in self._factor_info.values()]
 
     @property
-    def raw_data(self) -> NDArray[Any]:
-        """Raw factor values before binning or digitization.
-
-        .. deprecated::
-            This is ``rows_at(md.view).select(factor_names).to_numpy()``, and going
-            through the dataframe keeps the per-factor dtypes that this array flattens
-            to ``object`` the moment factors of different types are mixed. Use
-            :meth:`rows_at` for raw values, or :meth:`filter_by_factor` for a float
-            array. Removed in v1.2.0.
-
-        Returns
-        -------
-        NDArray[Any]
-            Array with shape (n_samples, n_factors) containing original factor
-            values, taken at the :attr:`view` level. Returns empty array when no
-            factors are available.
-        """
-        warnings.warn(
-            "Metadata.raw_data is deprecated and will be removed in v1.2.0. Use "
-            "Metadata.rows_at(md.view).select(md.factor_names).to_numpy() instead, or "
-            "Metadata.filter_by_factor() for a float array.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not self.factor_names:
-            return np.array([], dtype=np.float64)
-
-        return self.rows_at(self._view_level).select(self.factor_names).to_numpy()
-
-    @property
     def class_labels(self) -> NDArray[np.intp]:
         """Class labels as integer indices, one per row at :attr:`label_level`.
 
@@ -1766,6 +1949,12 @@ class Metadata(Array, FeatureExtractor):
         one, this raises: the alternative is silently handing an evaluator a label
         array that does not correspond to its factor rows. Read the labels through
         :meth:`rows_at` when a coarser view genuinely needs them.
+
+        Read from the label level's own ``class_label`` column rather than kept
+        alongside it. The two were always equal, and holding the labels twice would
+        mean every relational operation has to subset the array in lockstep with the
+        frame — where the cost of forgetting is labels silently misaligned against
+        factor rows, which is the worst answer this class can give.
         """
         self._structure()
         view = self._view_level
@@ -1775,7 +1964,7 @@ class Metadata(Array, FeatureExtractor):
                 f"viewed at {view!r}, which has no label per row. Use md.at({self._label_level!r}) "
                 f'for the labels, or read them from rows_at({view!r})["class_label"].',
             )
-        return self._class_labels
+        return self._store.column(view, "class_label").to_numpy().astype(np.intp, copy=False)
 
     @property
     def index2label(self) -> Mapping[int, str]:
@@ -1803,7 +1992,9 @@ class Metadata(Array, FeatureExtractor):
         where :attr:`class_labels` raises for exactly that situation.
         """
         self._structure()
-        return self.rows_at(self._view_level)["item_index"].to_numpy().astype(np.intp, copy=False)
+        # One column off the store, not the view's whole widened frame: avoiding that
+        # widening is what the store exists for.
+        return self._store.column(self._view_level, "item_index").to_numpy().astype(np.intp, copy=False)
 
     @property
     def item_count(self) -> int:
@@ -1812,9 +2003,18 @@ class Metadata(Array, FeatureExtractor):
         Returns
         -------
         int
-            Count of unique items in the source dataset, regardless of
-            how many targets/detections each item contains.
+            Count of unique items these rows come from, regardless of how many
+            targets/detections each item contains. On a filtered instance this is the
+            items that survived, not the dataset's total: the count describes the rows
+            this metadata holds, and anything sizing an array by it — the multi-label
+            matrix in :func:`~dataeval.data.split_dataset`, above all — would otherwise
+            reserve room for items that contribute no row.
         """
+        # Deliberately not structured up front: a bound dataset already knows its item
+        # count, and answering that should not cost the whole extraction. A filtered
+        # instance is structured by construction — where()/having() both structure first.
+        if self._is_filtered:
+            return self._store.height(self._item_level)
         if self._count == 0:
             self._structure()
         return self._count
@@ -1849,230 +2049,28 @@ class Metadata(Array, FeatureExtractor):
         50
         """
         self._structure()
-        return self._dataframe.filter(pl.col("level") == self._resolve_level(level))
-
-    @property
-    def image_data(self) -> pl.DataFrame:
-        """Dataframe containing only image-level rows.
-
-        .. deprecated::
-            The name only tells the truth when a dataset item is an image, so it is
-            defined for image-based tasks alone and raises for every other task. Use
-            ``rows_at(md.item_level)``. Removed in v1.2.0.
-
-        Returns
-        -------
-        pl.DataFrame
-            Image-level metadata, exactly as previous releases returned it — which,
-            on image classification, means the *labelled* rows rather than the image
-            rows. See Notes.
-
-        Raises
-        ------
-        ValueError
-            When the bound dataset's items are not images.
-
-        Notes
-        -----
-        Bug-for-bug with v1.1, on purpose. There, a classification dataset had a
-        single block of rows and this property returned it; the level restructure
-        split that block into image rows and instance rows, and returning the image
-        rows here would silently hand existing callers nulls where ``class_label``,
-        ``score`` and ``target_index`` used to be. So it still returns the labelled
-        rows for a single-target task and the image rows for a multi-target one.
-        ``rows_at(md.item_level)`` is the spelling that means image rows on every task.
-
-        Examples
-        --------
-        >>> metadata = Metadata(dataset)
-        >>> metadata.rows_at(metadata.item_level).select("item_index", "time_of_day", "weather", "location").head(5)
-        shape: (5, 4)
-        ┌────────────┬─────────────┬─────────┬──────────┐
-        │ item_index ┆ time_of_day ┆ weather ┆ location │
-        │ ---        ┆ ---         ┆ ---     ┆ ---      │
-        │ i64        ┆ str         ┆ str     ┆ str      │
-        ╞════════════╪═════════════╪═════════╪══════════╡
-        │ 0          ┆ dawn        ┆ rainy   ┆ suburban │
-        │ 1          ┆ day         ┆ rainy   ┆ rural    │
-        │ 2          ┆ dawn        ┆ clear   ┆ maritime │
-        │ 3          ┆ dusk        ┆ rainy   ┆ maritime │
-        │ 4          ┆ dusk        ┆ clear   ┆ suburban │
-        └────────────┴─────────────┴─────────┴──────────┘
-        """
-        warnings.warn(
-            "Metadata.image_data is deprecated and will be removed in v1.2.0. Use "
-            "Metadata.rows_at(md.item_level) for image rows. Note that on a "
-            "single-target task this property returns the labelled rows, not the "
-            "image rows, to match what v1.1 returned.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._structure()
-        if self._item_level != "unit":
-            raise ValueError(
-                "Metadata.image_data is only defined for image-based tasks, but this dataset has "
-                f"items at the {self._item_level!r} level. "
-                'Use Metadata.rows_at("unit") for the image rows, '
-                "or Metadata.rows_at(md.item_level) for item-level rows.",
-            )
-        return self.rows_at(self._item_level if self.multi_target else self._label_level)
-
-    @property
-    def target_data(self) -> pl.DataFrame:
-        """Dataframe containing only label-level rows.
-
-        .. deprecated::
-            One spelling per level does not scale, and this one names a level that no
-            longer exists. Use ``rows_at(md.label_level)`` for the rows the labels are
-            on, or ``rows_at(md.view)`` for the rows the array accessors project.
-            Removed in v1.2.0.
-
-        Returns
-        -------
-        pl.DataFrame
-            Dataframe with label-level metadata. Each row represents a single
-            labelled thing with its associated class, score, and bounding box
-            information: a detection for object detection, the image itself for
-            classification.
-
-        Examples
-        --------
-        >>> metadata = Metadata(dataset)
-        >>> metadata.rows_at(metadata.label_level).select("item_index", "target_index", "class_label").head(5)
-        shape: (5, 3)
-        ┌────────────┬──────────────┬─────────────┐
-        │ item_index ┆ target_index ┆ class_label │
-        │ ---        ┆ ---          ┆ ---         │
-        │ i64        ┆ i64          ┆ i64         │
-        ╞════════════╪══════════════╪═════════════╡
-        │ 0          ┆ 0            ┆ 0           │
-        │ 1          ┆ 0            ┆ 3           │
-        │ 1          ┆ 1            ┆ 2           │
-        │ 1          ┆ 2            ┆ 1           │
-        │ 2          ┆ 0            ┆ 1           │
-        └────────────┴──────────────┴─────────────┘
-        """
-        warnings.warn(
-            "Metadata.target_data is deprecated and will be removed in v1.2.0. Use "
-            "Metadata.rows_at(md.label_level) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._structure()
-        return self.rows_at(self._label_level)
-
-    def get_image_factors(self, image_idx: int) -> dict[str, Any]:
-        """Get all factors for a specific image.
-
-        .. deprecated::
-            A single row lookup is one dataframe filter, and phrasing it as a method
-            per level does not scale past the two levels that happen to exist today.
-            Use ``rows_at("unit").filter(pl.col("item_index") == image_idx)``.
-            Removed in v1.2.0.
-
-        Parameters
-        ----------
-        image_idx : int
-            Index of the image to retrieve factors for
-
-        Returns
-        -------
-        dict[str, Any]
-            Dictionary mapping factor names to their values for the specified image
-
-        Examples
-        --------
-        >>> metadata = Metadata(dataset)
-        >>> factors = metadata.get_image_factors(0)
-        >>> factors["time_of_day"]
-        'dawn'
-        >>> factors["weather"]
-        'rainy'
-        >>> factors["location"]
-        'suburban'
-        """
-        warnings.warn(
-            "Metadata.get_image_factors() is deprecated and will be removed in v1.2.0. Use "
-            'Metadata.rows_at("unit").filter(pl.col("item_index") == image_idx) instead.',
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._structure()
-        row = self.rows_at(self._item_level).filter(pl.col("item_index") == image_idx)
-        if row.height == 0:
-            raise ValueError(f"No image found with index {image_idx}")
-        return row.to_dicts()[0]
-
-    def get_target_factors(self, image_idx: int, target_idx: int) -> dict[str, Any]:
-        """Get all factors for a specific target within an item.
-
-        .. deprecated::
-            A single row lookup is one dataframe filter, and phrasing it as a method
-            per level does not scale past the two levels that happen to exist today.
-            Use ``target_data.filter(...)``. Removed in v1.2.0.
-
-        Parameters
-        ----------
-        image_idx : int
-            Index of the item containing the target
-        target_idx : int
-            Index of the target within the item (0-indexed per item)
-
-        Returns
-        -------
-        dict[str, Any]
-            Dictionary mapping factor names to their values for the specified target
-
-        Examples
-        --------
-        >>> metadata = Metadata(dataset)
-        >>> factors = metadata.get_target_factors(1, 1)
-        >>> factors["item_index"]
-        1
-        >>> factors["target_index"]
-        1
-        >>> factors["class_label"]
-        2
-        """
-        warnings.warn(
-            "Metadata.get_target_factors() is deprecated and will be removed in v1.2.0. Use "
-            'Metadata.rows_at(md.label_level).filter((pl.col("item_index") == image_idx) & '
-            '(pl.col("target_index") == target_idx)) instead.',
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._structure()
-        rows = self.rows_at(self._label_level)
-        row = rows.filter((pl.col("item_index") == image_idx) & (pl.col("target_index") == target_idx))
-        if row.height == 0:
-            raise ValueError(f"No target found with item_index={image_idx}, target_index={target_idx}")
-        return row.to_dicts()[0]
+        return self._store.resolve(self._resolve_level(level))
 
     def _empty_projection(self, dtype: Any) -> NDArray[Any]:
         """Build a no-column projection that still has the view's row count.
 
-        Shaped, not bare. :func:`len`, :attr:`shape` and iteration all describe the
-        view's rows, and a dataset can perfectly well have rows and no usable factors;
-        returning ``array([])`` there makes those three disagree.
+        Shaped, not bare: a dataset can have rows and no usable factors, and returning
+        ``array([])`` there would make :func:`len`, :attr:`shape` and iteration disagree.
         """
         self._structure()
-        return np.empty((self._layout.counts.get(self._view_level, 0), 0), dtype=dtype)
+        return np.empty((self._store.height(self._view_level), 0), dtype=dtype)
 
     def _project(self, columns: Sequence[str], dtype: Any) -> NDArray[Any]:
         """Read the named columns off the view's rows as a dense array.
 
-        The one place that answers "which rows does an array-shaped accessor read, and
-        what does an empty one look like": the view's rows only — the dataframe also
-        holds rows at every other level, which align neither with these factors nor
-        with :attr:`class_labels` — and a shaped empty projection when there is nothing
-        to select, since selecting no columns leaves a frame with no arrays to stack,
-        which older polars cannot convert.
-
-        Callers must have binned first, since :meth:`_bin` replaces ``_dataframe``.
+        Sole answer to which rows an array-shaped accessor reads: the view's only, since
+        other levels align neither with these factors nor with :attr:`class_labels`.
+        Callers must have binned first — :meth:`_bin` writes the columns this selects.
         """
         if not columns:
             return self._empty_projection(dtype)
-        return self.rows_at(self._view_level).select(columns).to_numpy().astype(dtype, copy=False)
+        self._structure()
+        return self._store.select(self._view_level, columns).to_numpy().astype(dtype, copy=False)
 
     def _filter(self, factor: str | tuple[str, Any]) -> bool:
         factor = factor[0] if isinstance(factor, tuple) else factor
@@ -2081,51 +2079,36 @@ class Metadata(Array, FeatureExtractor):
     def _reset_bins(self, cols: Iterable[str] | None = None) -> None:
         """Drop the companion columns of ``cols`` (or of every factor) and their info.
 
-        Deliberately not guarded on ``_is_binned``. That flag says "there is nothing
-        left to process", which the include/exclude setters clear to force a re-bin
-        while leaving every companion column in place — so a guard on it would skip
-        exactly the calls that exist to remove those columns. :meth:`_bin` skips a
-        factor whose companion column is present, so a companion left behind is a
-        factor that never re-bins: ``continuous_factor_bins`` assignments are silently
-        ignored, and a factor replaced by :meth:`add_factors` keeps the old column's
-        digitization while its info reads ``None``.
+        Deliberately not guarded on ``_is_binned``: the include/exclude setters clear that
+        flag while leaving companion columns in place, so a guard would skip exactly the
+        calls that exist to remove them. A companion left behind never re-bins.
         """
-        columns = set(self._dataframe.columns)
-        for col in cols or self._dataframe.columns:
-            # Both spellings are checked because a factor that changes type between
-            # bins moves from one to the other and would otherwise leave the old behind.
-            for companion in {_binned(col), _digitized(col)} & columns:
-                self._dataframe.drop_in_place(companion)
-                # Dropping the column drops the info describing it. That pairing is the
-                # whole invariant: _bin() decides what to process by looking for the
-                # column, and factor_info answers by looking in the cache.
+        columns = set(self._store.columns)
+        companions: set[str] = set()
+        for col in cols or self._store.columns:
+            # Both spellings, since a factor changing type between bins moves from one to
+            # the other and would otherwise leave the old column behind.
+            if found := {binned(col), digitized(col)} & columns:
+                companions |= found
+                # Column and info are dropped together: _bin() decides what to process by
+                # looking for the column, and factor_info answers from the cache.
                 self._factor_cache.pop(col, None)
+        self._store = self._store.without_columns(companions)
         self._is_binned = False
 
     def _unreadable_at(self, level: FactorLevel, view: FactorLevel) -> str | None:
         """Why a factor defined at ``level`` cannot be read from ``view``'s rows, or None.
 
         Sole arbiter of what enters factor analysis, so the two ways the level graph's
-        diamond can put a factor out of reach are decided together and phrased once.
-
-        Parameters
-        ----------
-        level : str
-            Level the factor is defined at.
-        view : str
-            Level whose rows would be projected.
-
-        Returns
-        -------
-        str or None
-            A reason suitable for a log line, or None when every ``view`` row can read it.
+        diamond can put a factor out of reach are decided together. Returns a reason
+        suitable for a log line, or None when every ``view`` row can read it.
         """
         if not self._levels.propagates_to(level, view):
             return (
                 f"{level!r} does not propagate to {view!r} — they are on separate branches of the "
                 "level graph, so these rows have no value for it"
             )
-        if self._layout.partial_ancestry(level, view):
+        if self._store.partial_ancestry(level, view):
             return (
                 f"not every {view!r} row has a {level!r} ancestor, so the column is partly null "
                 f"and cannot be binned; read it at {level!r} instead"
@@ -2135,14 +2118,9 @@ class Metadata(Array, FeatureExtractor):
     def _factor_level(self, name: str) -> FactorLevel:
         """Level a factor is defined at, or the item level when unknown.
 
-        A factor is stored once, at its own level, and read from descendant rows by
-        propagation. That "once" is an enforced invariant rather than a convention:
-        :meth:`StructuredData.__post_init__` rejects a name declared at two levels, and
-        :meth:`_register_factor_levels` clears a name from every level before adding it
-        to one. So at most one level matches, and ``highest`` is picking from a
-        one-element list — kept because it is the safe answer if the invariant is ever
-        relaxed, values being visible from a coarse level's descendants but not the
-        other way round.
+        At most one level matches — ``StructuredData.__post_init__`` and
+        :meth:`_register_factor_levels` both enforce it — so ``highest`` picks from a
+        one-element list. Kept as the safe answer if that invariant is ever relaxed.
         """
         levels: list[FactorLevel] = [level for level, names in self._factors_by_level.items() if name in names]
         return self._levels.highest(levels) if levels else self._item_level
@@ -2150,63 +2128,29 @@ class Metadata(Array, FeatureExtractor):
     def _resolve_level(self, level: FactorLevel | Literal["target", "image"], stacklevel: int = 4) -> FactorLevel:
         """Validate a caller-supplied level name, translating any retired spelling.
 
-        Sole entry point for a level name that came from a caller: :meth:`rows_at` and
-        :meth:`add_factors` both route through here, so the two public spellings of the
-        deprecation cannot drift apart. Everything internal calls
-        ``self._levels.validate`` directly, which knows only about levels that exist.
-
-        Which retired names resolve is declared per task, by the structurer's
-        ``legacy_level_aliases``. A task that never used a retired spelling has no
-        entry for it, so the name falls through to ``validate`` and is rejected as
-        unknown in the same words as any other name that is not a level.
-
-        Parameters
-        ----------
-        level : str
-            Level name as the caller spelled it.
-        stacklevel : int, default 4
-            Frames between the warning and the user's line. The warning itself is
-            raised one level down, in :func:`_resolve_legacy_level`, so the default
-            counts their call, the public method, this helper, and that helper — right
-            for every caller that reaches this directly. :meth:`_resolve_requested_level`
-            passes one more, since it sits between :meth:`add_factors` and this.
-
-        Returns
-        -------
-        str
-            The level the caller named, or the level a retired spelling now resolves to.
-
-        Raises
-        ------
-        ValueError
-            When the level is not part of this dataset's schema.
+        Sole entry point for a level name from a caller, so the public spellings of the
+        deprecation cannot drift; internal callers use ``self._levels.validate`` directly.
+        ``stacklevel`` counts the frames to the user's line — one more from
+        :meth:`_resolve_requested_level`, which sits a call deeper than the rest.
         """
-        resolved = _resolve_legacy_level(
+        resolved = resolve_legacy_level(
             level, self._structurer.legacy_level_aliases, stacklevel, unit_type=self._structurer.unit_type
         )
         try:
             return self._levels.validate(resolved)
         except ValueError as exc:
             # FactorLevelSchema knows the level vocabulary but not the medium, so the
-            # unit-type clause is added here rather than pushed down into validate().
+            # unit-type clause is added here rather than inside validate().
             raise ValueError(f"{exc} (this dataset's units are {self._structurer.unit_type}s)") from None
 
     def _warn_level_rename(self) -> None:
         """Announce the ``FactorInfo.level`` rename, once per instance.
 
-        ``FactorInfo.level`` used to report a name that is no longer a level — the
-        structurer's ``legacy_level_aliases`` says which — and now reports the level's
-        real name. Nothing can intercept an
-        ``info.level == "target"`` comparison to warn at the point it silently
-        turns false, so the warning is raised where the ``FactorInfo`` objects are
-        handed to a caller instead. Only a task that declares a retired spelling
-        warns; one that never used one has nothing to announce.
-
-        Called directly by each such handout point rather than from
-        :attr:`_factor_info`, for two reasons: the once-per-instance budget must be
-        spent on a call the user actually made, not on an internal read from
-        ``factor_data``; and ``stacklevel=3`` then points at the user's line from
-        every one of them.
+        Nothing can intercept an ``info.level == "target"`` comparison at the point it
+        silently turns false, so the warning is raised where ``FactorInfo`` objects are
+        handed to a caller. Each such handout point calls this directly rather than going
+        through :attr:`_factor_info`, so the once-per-instance budget is spent on a call
+        the user made and ``stacklevel=3`` points at their line.
         """
         aliases = self._structurer.legacy_level_aliases
         if self._warned_level_rename or not aliases:
@@ -2221,97 +2165,9 @@ class Metadata(Array, FeatureExtractor):
             stacklevel=3,
         )
 
-    def _combined_length(self) -> int | None:
-        """Length an *inferred* v1.1 ``"combined"`` array has here, or None when there is none.
-
-        Stricter than what :meth:`_resolve_combined` accepts, on purpose. Inference is a
-        guess made from a length alone, so it is offered only where the guess is worth
-        making: a two-level schema over a multi-target task. A classification dataset
-        carries one label per image, so its combined length is merely twice the image
-        count — far more likely a caller's mistake than a deliberate two-level array, and
-        v1.1 did not infer it there either. An explicit ``level="combined"`` is the caller
-        asserting the layout rather than the code guessing it, so that spelling is refused
-        only where the split is structurally impossible.
-
-        A schema with a third level, as tracking's frames and tracks are, has no combined
-        length under either spelling.
-        """
-        if len(self._levels) != 2 or not self.multi_target:
-            return None
-        counts = self._layout.counts
-        return counts.get(self._item_level, 0) + counts.get(self._label_level, 0)
-
-    def _reject_unmatched_length(self, factor_len: int, combined_len: int | None) -> NoReturn:
-        """Report a factor length that names neither a level nor a combined array."""
-        counts = self._layout.counts
-        expected = ", ".join(f"{level}={counts.get(level, 0)}" for level in self._levels)
-        if combined_len is not None:
-            expected += f", {self._item_level}+{self._label_level}={combined_len}"
-        raise ShapeMismatchError(
-            "The lists/arrays in the provided factors have a different length "
-            f"than any level of the current metadata. Expected one of ({expected}), got {factor_len}.",
-        )
-
-    def _infer_factor_level(self, factor: Array1D[Any]) -> FactorLevel | Literal["combined"]:
-        """Infer the destination of a single factor array from its length.
-
-        A level's own row count wins over the combined length, so a factor that could be
-        read either way lands on a level rather than being split.
-
-        Raises
-        ------
-        ShapeMismatchError
-            When the length matches no level and no combined length.
-        """
-        factor_len = len(factor)
-        counts = self._layout.counts
-        matches: list[FactorLevel] = [level for level in self._levels if counts.get(level, 0) == factor_len]
-
-        if not matches:
-            combined_len = self._combined_length()
-            if combined_len is not None and factor_len == combined_len:
-                return "combined"
-            self._reject_unmatched_length(factor_len, combined_len)
-        if len(matches) > 1:
-            # Levels routinely coincide in size — a fully labelled classification dataset has
-            # one label per image, and so does an object detection dataset with one
-            # detection per image — so this cannot raise; that would break code that works on
-            # every other dataset. The coarsest level wins, matching what add_factors has
-            # always done.
-            chosen = self._levels.highest(matches)
-            if not all(self._rows_correspond(chosen, other) for other in matches if other != chosen):
-                warnings.warn(
-                    f"A factor length of {factor_len} matches the {matches} levels, which currently have "
-                    f"the same number of rows but do not correspond one-to-one; storing it at the "
-                    f"{chosen!r} level. Pass an explicit level= to add_factors to choose.",
-                    UserWarning,
-                    # caller -> add_factors -> _resolve_factor_levels -> here. One frame
-                    # shallower than _warn_inferred_combined, which _resolve_destinations
-                    # reaches from _resolve_factor_levels rather than from the loop.
-                    # test_ambiguity_warning_points_at_the_caller pins this.
-                    stacklevel=4,
-                )
-            return chosen
-        return matches[0]
-
-    def _rows_correspond(self, coarse: FactorLevel, fine: FactorLevel) -> bool:
-        """Whether each ``fine`` row has its own ``coarse`` row, in the same order.
-
-        When it does, the two levels are interchangeable as a destination: the values
-        land on the same target rows either way, so there is nothing for the caller to
-        disambiguate. When it does not — three detections spread 0/1/2 across three
-        images — the choice changes the data and has to be surfaced.
-        """
-        for level, size, ancestor_pos in self._layout.blocks:
-            if level != fine:
-                continue
-            positions = ancestor_pos.get(coarse)
-            return positions is not None and np.array_equal(positions, np.arange(size, dtype=np.intp))
-        return False
-
     def _validate_factor_lengths(self, factors: Mapping[str, Array1D[Any]], level: FactorLevel) -> None:
         """Validate that factor lengths match the specified level's row count."""
-        expected_len = self._layout.counts.get(level, 0)
+        expected_len = self._store.height(level)
         mismatched = {k: len(v) for k, v in factors.items() if len(v) != expected_len}
         if mismatched:
             raise ShapeMismatchError(
@@ -2321,52 +2177,19 @@ class Metadata(Array, FeatureExtractor):
     def _split_source_index(self, source_index: Sequence[SourceIndex]) -> dict[FactorLevel, NDArray[np.intp]]:
         """Group source-index positions by the level each entry describes.
 
-        :func:`~dataeval.core.compute_stats` labels every value it returns with a
-        :class:`~dataeval.types.SourceIndex`, so a factor array spanning several levels
-        is split by those labels rather than by a positional convention.
-
-        Parameters
-        ----------
-        source_index : Sequence[SourceIndex]
-            One entry per value in each factor array being added.
-
-        Returns
-        -------
-        dict[str, NDArray[np.intp]]
-            For each level the source index covers, the positions within it that
-            describe that level's rows, ordered as that level's rows are.
-
-        Raises
-        ------
-        ValueError
-            When the source index carries per-channel entries, which have no
-            single-column representation, or when the two kinds of entry cannot be
-            told apart because items and labels share a level.
-        ShapeMismatchError
-            When a level's entry count does not match that level's row count.
-
-        Notes
-        -----
-        A :class:`~dataeval.types.SourceIndex` distinguishes exactly two kinds of
-        value — one per dataset item, where ``target`` is None, and one per label —
-        so it can address :attr:`item_level` and :attr:`label_level` and no others.
-        That is a property of the type, not of this method: a schema with a third level
-        between them — multi-object tracking's ``unit`` level sits between ``sequence``
-        (item) and ``instance`` (label) — has no representable form here, and per-frame
-        values (e.g. from :func:`~dataeval.core.compute_stats` run per frame) have to be
-        added with an explicit ``level="unit"`` instead. Widening this means widening
-        :class:`~dataeval.types.SourceIndex` first.
+        A :class:`~dataeval.types.SourceIndex` distinguishes two kinds of value — per item
+        (``target`` is None) and per label — so it addresses :attr:`item_level` and
+        :attr:`label_level` and no others. A level between them, such as tracking's
+        ``unit``, needs an explicit ``level=`` instead.
         """
-        # Parsing — sort order, per-channel rejection, duplicate-row rejection — is shared
-        # with the dataset-free constructor rather than reimplemented, so the two spellings
-        # of "place these values by their labels" cannot drift apart. Only the parts that
-        # need this metadata's own rows to check against live here.
+        # Parsing is shared with the dataset-free constructor, so the two spellings of
+        # "place these values by their labels" cannot drift. Only the checks that need
+        # this metadata's own rows live here.
         rows = SourceIndexRows.parse(source_index)
 
         # The two kinds are told apart only by which level they land on, so a schema whose
-        # items and labels coincide merges them into one over-long group, which then
-        # surfaces as a row-count mismatch. Say what actually happened instead. Read off the
-        # parse, which has already separated the two kinds, rather than rescanning.
+        # items and labels coincide would merge them into one over-long group and surface
+        # as a row-count mismatch. Say what actually happened instead.
         if self._item_level == self._label_level and rows.spans_two_levels:
             raise ValueError(
                 f"source_index mixes per-item entries (target=None) with per-label entries, but this "
@@ -2394,19 +2217,11 @@ class Metadata(Array, FeatureExtractor):
     ) -> None:
         """Reject a source index whose entries do not name this level's rows exactly.
 
-        Counting the entries is not enough. An index that names one row twice and another
-        not at all has the right count and every value lands somewhere, just not where the
-        caller said — the failure mode a source index exists to prevent. Matching the keys
-        catches it, and costs one comparison per row.
-
-        Raises
-        ------
-        ShapeMismatchError
-            When the entry count does not match the level's row count.
-        ValueError
-            When the counts match but the entries name different rows.
+        Counting entries is not enough: an index naming one row twice and another not at
+        all has the right count and lands every value somewhere, just not where the caller
+        said. Matching the keys catches it for one comparison per row.
         """
-        counts = self._layout.counts
+        counts = self._store.counts
         expected_len = counts.get(level, 0)
         if len(items) != expected_len:
             raise ShapeMismatchError(
@@ -2416,19 +2231,14 @@ class Metadata(Array, FeatureExtractor):
                 "Metadata.item_indices, not range(item_count), lists the items that have them.",
             )
 
-        # The two key columns, not rows_at's whole frame: that widens with every factor the
-        # caller has already added, and none of them are compared here.
-        frame = (
-            self._dataframe
-            .lazy()
-            .filter(pl.col("level") == level)
-            # Null marks a row that is not a target, and -1 stands in for it exactly as it
-            # does in SourceIndexRows. Left null, an integer column comes back from
-            # to_numpy() as float NaN: the comparison below still reports the mismatch,
-            # but formatting it then raises "cannot convert float NaN to integer" in place
-            # of the error the caller needs.
-            .select("item_index", pl.col("target_index").fill_null(-1))
-            .collect()
+        # The two key columns, not rows_at's whole frame, which widens with every factor
+        # already added and compares none of them.
+        frame = self._store.select(level, ("item_index", "target_index")).select(
+            "item_index",
+            # -1 stands in for the null marking a non-target row, as in SourceIndexRows.
+            # Left null, to_numpy() yields float NaN and formatting the error below then
+            # raises "cannot convert float NaN to integer" instead.
+            pl.col("target_index").fill_null(-1),
         )
         actual_items = frame["item_index"].to_numpy()
         actual_targets = None if targets is None else frame["target_index"].to_numpy()
@@ -2436,9 +2246,8 @@ class Metadata(Array, FeatureExtractor):
         if actual_targets is not None:
             mismatched |= actual_targets != targets
         if np.any(mismatched):
-            # Formatted from the first few alone, since only the first few are named: a
-            # rejected million-row index must not spend longer building its error than the
-            # call would have taken to succeed.
+            # First few only: a rejected million-row index must not spend longer building
+            # its error than the call would have taken to succeed.
             worst = np.flatnonzero(mismatched)[:5]
             named = [(int(items[i]), None if targets is None else int(targets[i])) for i in worst]
             expected = [
@@ -2454,36 +2263,6 @@ class Metadata(Array, FeatureExtractor):
                 f"where the metadata's rows are {expected}. Every row at a level must be named exactly once.",
             )
 
-    def has_targets(self) -> bool:
-        """Check if the source dataset has targets.
-
-        .. deprecated::
-            Renamed for what it actually reports. Use :attr:`multi_target`.
-            Removed in v1.2.0.
-
-        Returns
-        -------
-        bool
-            True for object detection, False for image classification — unchanged
-            from v1.1.
-
-        Notes
-        -----
-        No expression over the row counts reproduces this, which is why the
-        replacement is a property and not one. ``level_counts["instance"] !=
-        level_counts["unit"]`` is False for a detection dataset with one detection
-        per image and True for a classification dataset with an unlabeled item, so it
-        gets the answer wrong in both directions. Nor is it ``label_level !=
-        item_level``: every task now names its labelled level ``instance`` and its
-        item level ``unit``, so that comparison is true even for classification.
-        """
-        warnings.warn(
-            "Metadata.has_targets() is deprecated and will be removed in v1.2.0. Use Metadata.multi_target instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.multi_target
-
     def _build_factors(self) -> None:
         """Build the set of factor names visible at the current view."""
         if not self._is_structured:
@@ -2492,10 +2271,8 @@ class Metadata(Array, FeatureExtractor):
 
         view = self._view_level
         # ``target_factors_only`` is the retired spelling and keeps its exemption for
-        # single-target tasks; ``inherited`` is the current one and has none. Either
-        # narrowing to the view's own factors is enough.
-        # Read off the structurer rather than through the ``multi_target`` property,
-        # which would re-enter _structure() from inside the tail of _structure().
+        # single-target tasks; ``inherited`` is the current one and has none. Read off the
+        # structurer, not the ``multi_target`` property, which would re-enter _structure().
         legacy_narrowing = self._target_factors_only and self._structurer.multi_target
         if not self._inherited or legacy_narrowing:
             names = set(self._factors_by_level.get(view, ()))
@@ -2503,15 +2280,8 @@ class Metadata(Array, FeatureExtractor):
             names = {name for level_names in self._factors_by_level.values() for name in level_names}
 
         # A factor the view's rows cannot all read stays in the dataframe but out of factor
-        # analysis, for either of two reasons the level graph's diamond makes real:
-        #
-        # - Off the branch entirely: ``unit`` and ``track`` are siblings, so neither
-        #   propagates to the other and a per-frame factor has no value on a track row.
-        # - On the branch but not for every row: a detection no tracker linked has no track
-        #   ancestor, so a per-track factor is null there. Binning cannot represent that —
-        #   discretizing sorts the values, and None does not order against a float — so the
-        #   factor is excluded here rather than left to fail mid-analysis. It is still read
-        #   in full at its own level, via ``md.at("track")``.
+        # analysis — either off the branch entirely, or null on some rows, which binning
+        # cannot represent. _unreadable_at decides which; md.at(level) still reads it whole.
         visible: set[str] = set()
         for name in names:
             level = self._factor_level(name)
@@ -2527,11 +2297,9 @@ class Metadata(Array, FeatureExtractor):
                     unreadable,
                 )
 
-        # Purely derived: nothing is carried over from the outgoing set, because a
-        # factor's binning lives in ``_factor_cache`` and survives the rebuild there.
-        self._factors = {
-            k for k in visible if not isinstance(self._dataframe.schema.get(k), pl.List | pl.Struct | pl.Array)
-        }
+        # Purely derived: nothing carries over from the outgoing set, since a factor's
+        # binning lives in ``_factor_cache`` and survives the rebuild there.
+        self._factors = {k for k in visible if not isinstance(self._store.dtype_of(k), pl.List | pl.Struct | pl.Array)}
 
     def _structure(
         self,
@@ -2551,13 +2319,13 @@ class Metadata(Array, FeatureExtractor):
         data = structurer.build(self._dataset, progress_callback=progress_callback)
 
         unique_labels = np.unique(data.class_labels) if len(data.class_labels) else np.array([], dtype=np.intp)
-        self._index2label = _build_index2label(self._dataset.metadata.get("index2label", None), unique_labels)
+        self._index2label = build_index2label(self._dataset.metadata.get("index2label", None), unique_labels)
         self._adopt(structurer, data)
 
         _logger.debug(
             "Metadata structured as %s: %s rows per level, %d factors, %d dropped",
             structurer.task,
-            self._layout.counts,
+            self._store.counts,
             sum(len(names) for names in self._factors_by_level.values()),
             sum(len(v) for v in self._dropped_factors.values()),
         )
@@ -2565,74 +2333,33 @@ class Metadata(Array, FeatureExtractor):
     def _adopt(self, structurer: Structurer, data: StructuredData) -> None:
         """Take on everything a :class:`StructuredData` describes.
 
-        The dataset path and the factors-only path build their bundle very
-        differently and then adopt it identically, so the field list lives here once:
-        a field added to :class:`StructuredData` is wired up in one place rather than
-        remembered in two. Each caller keeps only what is genuinely its own — where
-        ``index2label`` comes from, and the dataset item count.
+        The dataset path and the factors-only path build their bundle differently and adopt
+        it identically, so the field list lives here once. Each caller keeps only what is
+        its own — where ``index2label`` comes from, and the dataset item count.
         """
         self._structurer = structurer
         self._layout = data.layout
+        # The setter retires any memoized flat frame, so there is nothing to clear here.
+        self._store = LevelStore.of(self._levels, data)
         self._factors_by_level = {level: set(names) for level, names in data.factors.items()}
-        # A declared level that produced no factors still has to be a key, so that
-        # _factor_level and _build_factors can look any level up unconditionally.
+        # A declared level that produced no factors still has to be a key, so any level
+        # can be looked up unconditionally.
         for level in self._levels:
             self._factors_by_level.setdefault(level, set())
 
-        # A view chosen at construction is resolved here, at the first moment there is a
-        # schema to resolve it against — and before _build_factors below reads it. It
-        # goes through _resolve_level rather than validate() so that a retired spelling
-        # passed to the constructor deprecates rather than raises. The warning points at
-        # whatever first triggered structuring, not at the constructor call, because the
-        # constructor frame is long gone by then.
+        # A view chosen at construction is resolved at the first moment there is a schema
+        # to resolve it against, and before _build_factors reads it. Through _resolve_level
+        # rather than validate() so a retired spelling deprecates rather than raises.
         if self._view is not None:
             self._view = self._resolve_level(self._view, stacklevel=3)
 
         self._raw = data.raw
-        self._class_labels = data.class_labels
-        # ``data.item_indices`` is deliberately not stored: it is the label level's
-        # ``item_index`` column, which every block already carries, and :attr:`item_indices`
-        # reads it from the view's own rows so that it cannot disagree with factor_data.
+        # ``class_labels`` and ``item_indices`` are deliberately not stored: both are
+        # columns the store already holds, and the properties read them from there.
         self._dropped_factors = {name: list(reasons) for name, reasons in data.dropped_factors.items()}
-        self._dataframe = pl.DataFrame(data.to_rows())
         self._is_structured = True
 
-        # Reuse the canonical factor builder so List/Struct columns are filtered out
-        # identically on both paths.
         self._build_factors()
-
-    def _add_level_column(
-        self,
-        df: pl.DataFrame,
-        col_name: str,
-        values: NDArray[Any],
-        level: FactorLevel,
-    ) -> pl.DataFrame:
-        """Add a column defined at ``level``, propagated down and null above.
-
-        A binned column travels exactly as the raw factor it was derived from: it
-        is written once at the factor's own level and gathered onto descendant rows,
-        which is what keeps a factor's bin assignment identical however it is read.
-        :meth:`RowLayout.expand` is the same gather
-        the structuring layer applies to raw values,
-        so there is one propagation rule rather than two.
-
-        Parameters
-        ----------
-        df : pl.DataFrame
-            Frame to add the column to.
-        col_name : str
-            Name of the column to write.
-        values : NDArray[np.int64]
-            One bin or category index per row at ``level``, in that level's row order.
-        level : str
-            Level the values are defined at.
-        """
-        # Stated rather than inferred: every companion column is a bin or category
-        # index, and inferring the dtype from the expanded column would read it off a
-        # list that may lead with nulls.
-        expanded = self._layout.expand(values, level)
-        return df.with_columns(pl.Series(name=col_name, values=expanded, dtype=pl.Int64))
 
     def _classify_factor(
         self,
@@ -2642,9 +2369,8 @@ class Metadata(Array, FeatureExtractor):
     ) -> tuple[NDArray[np.int64], FactorInfo]:
         """Bin or digitize one factor's native values, and say which was done.
 
-        ``data`` holds the factor's values at its own level, one per entity, so
-        every decision made here — the bin edges, the number of bins, the
-        continuous/discrete verdict — is read off the factor's true distribution.
+        ``data`` holds one value per entity at the factor's own level, so every decision
+        here is read off the factor's true distribution.
         """
         if col in factor_bins:
             return digitize_data(data, factor_bins[col]).astype(np.int64), FactorInfo("continuous", is_binned=True)
@@ -2652,9 +2378,8 @@ class Metadata(Array, FeatureExtractor):
         _, ordinal = np.unique(data, return_inverse=True)
         if not np.issubdtype(data.dtype, np.number):
             return ordinal.astype(np.int64), FactorInfo("categorical", is_digitized=True)
-        # No de-duplication argument: ``data`` carries one value per entity at the
-        # factor's own level, so there are no propagated repeats for is_continuous
-        # to mistake for discrete support.
+        # No de-duplication argument: one value per entity means no propagated repeats
+        # for is_continuous to mistake for discrete support.
         if is_continuous(data):
             _logger.warning(
                 f"A user defined binning was not provided for {col}. "
@@ -2663,28 +2388,27 @@ class Metadata(Array, FeatureExtractor):
                 "bins using the continuous_factor_bins parameter.",
             )
             return bin_data(data, self.auto_bin_method).astype(np.int64), FactorInfo("continuous", is_binned=True)
-        # Digitize discrete numeric factors so that factor_data always
-        # contains non-negative integers (required by np.bincount in
-        # downstream bias evaluators).
+        # Digitized so factor_data holds non-negative integers, which np.bincount in the
+        # downstream bias evaluators requires.
         return ordinal.astype(np.int64), FactorInfo("discrete", is_digitized=True)
 
     def _process_factor(
         self,
-        df: pl.DataFrame,
         col: str,
         data: NDArray,
         factor_bins: Mapping[str, int | Sequence[float]],
         level: FactorLevel,
-    ) -> tuple[pl.DataFrame, FactorInfo]:
-        """Write one factor's companion column and return the info describing it.
+    ) -> tuple[pl.Series, FactorInfo]:
+        """Build one factor's companion column and the info describing it.
 
-        Which of the two companion spellings the column takes is not a fifth decision:
-        :func:`_to_col` reads it off the :class:`FactorInfo` that
-        :meth:`_classify_factor` just built, so the name and the flags cannot disagree.
+        The column name is read off the :class:`FactorInfo` :meth:`_classify_factor` just
+        built, so name and flags cannot disagree. The dtype is stated rather than
+        inferred: a companion column is always a bin or category index.
         """
         values, info = self._classify_factor(col, data, factor_bins)
         info.level = level
-        return self._add_level_column(df, _to_col(col, info), values, level), info
+        info.aggregated_from = self._aggregated_from.get(col)
+        return pl.Series(name=to_col(col, info), values=values, dtype=pl.Int64), info
 
     def _bin(
         self,
@@ -2693,58 +2417,52 @@ class Metadata(Array, FeatureExtractor):
     ) -> None:
         """Populate factor info and bin non-categorical factors.
 
-        Every factor is binned at its own level — the level whose rows hold one
-        value per entity — and the resulting column is then propagated downwards.
-        Binning at the view instead would read each factor's distribution
-        through however many descendants each entity happens to have, which moves
-        the bin edges, changes how many bins survive the low-count collapse in
-        the binner, and drops entities with no
-        descendants from the binner's input entirely.
+        Every factor is binned at its own level — one value per entity — and the companion
+        column is written there, reaching descendant rows by the same gather the raw values
+        do. Binning at the view instead would read each factor's distribution through
+        however many descendants each entity happens to have, moving the bin edges.
         """
         if self._is_binned:
             return
 
         factor_info: dict[str, FactorInfo] = {}
-        df = self.dataframe.clone()
         factor_bins = self.continuous_factor_bins
 
-        # Check for invalid keys
-        invalid_keys = set(factor_bins.keys()) - set(df.columns)
+        invalid_keys = set(factor_bins.keys()) - set(self._store.columns)
         if invalid_keys:
             _logger.warning(
                 f"The keys - {invalid_keys} - are present in the `continuous_factor_bins` dictionary "
                 "but are not columns in the metadata DataFrame. Unknown keys will be ignored.",
             )
 
-        column_set = set(df.columns)
-        factors_to_process = [col for col in self.factor_names if not {_binned(col), _digitized(col)} & column_set]
+        column_set = set(self._store.columns)
+        factors_to_process = [col for col in self.factor_names if not {binned(col), digitized(col)} & column_set]
         total_factors = len(factors_to_process)
 
-        # Resolved up front, and one filter per level rather than one per factor: a
-        # dataset has a handful of levels and may carry hundreds of factors.
+        # One frame lookup per level, not per factor: a dataset has a handful of levels
+        # and may carry hundreds of factors.
         levels: dict[str, FactorLevel] = {col: self._factor_level(col) for col in factors_to_process}
-        native_rows: dict[FactorLevel, pl.DataFrame] = {level: self.rows_at(level) for level in set(levels.values())}
+        native = {level: self._store.frame(level) for level in set(levels.values())}
 
+        store = self._store
         for i, col in enumerate(factors_to_process):
             level = levels[col]
-            data = native_rows[level][col].to_numpy()
-            df, info = self._process_factor(df, col, data, factor_bins, level)
+            companion, info = self._process_factor(col, native[level][col].to_numpy(), factor_bins, level)
+            store = store.with_column(level, companion)
             factor_info[col] = info
 
             if progress_callback:
                 progress_callback(i + 1, total=total_factors)
 
-        # Store the results
-        self._dataframe = df
+        self._store = store
         self._factor_cache.update(factor_info)
         self._is_binned = True
 
     def _resolve_factor_name(self, name: str, taken: set[str], overwrite: bool, append_string: str) -> str:
         """Pick the dataframe column a new factor should be written to.
 
-        Reserved columns are load-bearing — ``level`` in particular drives every level
-        filter — so a colliding factor is renamed the same way :meth:`_structure` renames
-        dataset metadata keys rather than allowed to overwrite one.
+        Reserved columns are load-bearing — ``level`` drives every level filter — so a
+        colliding factor is renamed rather than allowed to overwrite one.
         """
         safe = safe_column_name(name)
         if safe != name:
@@ -2763,47 +2481,28 @@ class Metadata(Array, FeatureExtractor):
             suffix += 1
         return candidate
 
+    def _store_native_factors(self, resolved: Sequence[_ResolvedFactor]) -> None:
+        """Write each added factor into its own level's frame, once, undigested.
+
+        A factor added after structuring lands here and nowhere else; the expanded column
+        the flat frame shows is derived from this one on the way out.
+        """
+        store = self._store
+        for factor in resolved:
+            store = store.with_column(factor.level, factor.native)
+        self._store = store
+
     def _register_factor_levels(self, factors: Sequence[tuple[str, FactorLevel]]) -> None:
         """Record which level each newly added factor is defined at.
 
-        A factor is stored once, at one level, so stale membership is cleared before
-        re-registering: overwriting at a new level must not leave it claimed by the old one.
-        Any cached binning is dropped for the same reason — the name now describes
-        different values, so info computed from the old ones does not carry.
+        A factor is stored once, at one level, so stale membership and any cached binning
+        are cleared first: the name now describes different values.
         """
         for name, level in factors:
             for names in self._factors_by_level.values():
                 names.discard(name)
             self._factors_by_level.setdefault(level, set()).add(name)
             self._factor_cache.pop(name, None)
-
-    @staticmethod
-    def _split_by_dimensionality(
-        factors: Mapping[str, Array1D[Any]],
-    ) -> tuple[dict[str, NDArray[Any]], list[str]]:
-        """Separate the factors with a single-column form from those without one.
-
-        A column vector has one: ``(N, 1)`` holds one value per row and is flattened to
-        it. That is what a dataframe column or a ``reshape(-1, 1)`` pipeline produces, so
-        rejecting it would drop real data over a shape carrying no extra information. Only
-        an array that is genuinely several values per row — a histogram, a percentile
-        vector, a centre coordinate — has nowhere to go.
-
-        A *leading* singleton axis is left alone rather than flattened, and a 1-D array is
-        passed through untouched however short it is. Both guard the same edge: on a
-        one-row dataset ``(1, K)`` reads equally as one row of K values and as K rows of
-        one value, and the first is what :func:`~dataeval.core.compute_stats` emits — so
-        flattening would import ``center`` and ``histogram`` as K rows of data on the very
-        dataset shape where they least resemble a real factor, while a blanket squeeze
-        would additionally collapse a legitimate one-row ``mean`` to a scalar and drop it.
-
-        Pure: it decides what will be dropped without recording it, so that
-        :meth:`add_factors` can still abandon the whole call on a later validation
-        failure without having already written to :attr:`dropped_factors`.
-        """
-        arrays = {name: _flatten_column_vector(as_numpy(values)) for name, values in factors.items()}
-        kept = {name: values for name, values in arrays.items() if values.ndim == 1}
-        return kept, [name for name in arrays if name not in kept]
 
     def _record_multidimensional(self, names: Sequence[str]) -> None:
         """Warn about factors that have no single-column form and record why they were dropped."""
@@ -2822,10 +2521,8 @@ class Metadata(Array, FeatureExtractor):
     def _record_vacuous(self, names: Sequence[str]) -> None:
         """Record level splits that were discarded for holding no values at their level.
 
-        Reported rather than silent: the column is genuinely unusable — it cannot be
-        binned and carries nothing — but its absence is still a surprise to code that
-        expected the split to produce both halves, and :attr:`dropped_factors` is where
-        this metadata says what it did not keep and why.
+        Reported rather than silent: the column is unusable, but its absence still
+        surprises code that expected the split to produce both halves.
         """
         if not names:
             return
@@ -2846,19 +2543,9 @@ class Metadata(Array, FeatureExtractor):
     ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
         """Place every value by its source-index label rather than by its position.
 
-        Parameters
-        ----------
-        factors : Mapping[str, NDArray[Any]]
-            One value per source-index entry, per factor.
-        source_index : Sequence[SourceIndex]
-            Label for each value.
-
-        Returns
-        -------
-        tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]
-            The columns to write, and any level splits discarded for holding no values.
+        Returns the columns to write, and any level splits discarded for holding no values.
         """
-        _reject_length_mismatch(factors, source_index)
+        reject_length_mismatch(factors, source_index)
         return self._place(factors, self._split_source_index(source_index))
 
     def _place(
@@ -2869,35 +2556,11 @@ class Metadata(Array, FeatureExtractor):
     ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
         """Gather each factor onto the rows its positions name, and name the columns.
 
-        Sole producer of the ``<level>_<name>`` rule, so every way of placing values by
-        label — an explicit source index, and the retired ``"combined"`` spelling that
-        defers to it — names its columns identically.
-
-        Parameters
-        ----------
-        factors : Mapping[str, NDArray[Any]]
-            One value per position, per factor.
-        positions_by_level : Mapping[str, NDArray[np.intp]]
-            For each level being written, the positions within each factor array that hold
-            that level's rows, ordered as those rows are.
-        qualify : bool, default False
-            Force the ``<level>_`` prefix even where only one level is being written.
-            Values spanning several levels are always prefixed — a single column cannot
-            hold a value per image *and* a value per instance, and each half is a distinct
-            measurement anyway. Pass True where the naming was promised to the caller
-            independently of what the values turned out to cover, as ``level="combined"``
-            promises it, so that a dataset whose label level happens to have no rows still
-            names its columns the documented way.
-
-            Also suppresses the vacuous-split drop below, for the same reason and to the
-            same end: a caller told exactly which columns it will get must get them, even
-            where one of them turns out to hold nothing.
-
-        Returns
-        -------
-        tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]
-            The columns to write, and the names of any level splits discarded for holding
-            no values — for the caller to record, since this method stays pure.
+        Sole producer of the ``<level>_<name>`` rule. Values spanning several levels are
+        always prefixed; ``qualify`` forces the prefix for a single level too and
+        suppresses the vacuous-split drop, so a caller promised exactly which columns it
+        will get — as ``level="combined"`` promises — gets them even where one holds
+        nothing. Returns the columns to write plus any discarded splits, staying pure.
         """
         prefixed = qualify or len(positions_by_level) > 1
         placed: list[tuple[str, FactorLevel, NDArray[Any]]] = []
@@ -2910,7 +2573,7 @@ class Metadata(Array, FeatureExtractor):
             if qualify:
                 placed.extend(columns)
                 continue
-            kept, dropped = _drop_vacuous_splits(columns)
+            kept, dropped = drop_vacuous_splits(columns)
             placed.extend(kept)
             vacuous.extend(dropped)
         return placed, vacuous
@@ -2922,17 +2585,9 @@ class Metadata(Array, FeatureExtractor):
     ) -> FactorLevel | Literal["combined"] | None:
         """Turn ``add_factors``' ``level=`` argument into a destination, or None to infer.
 
-        Both retired spellings a v1.1 caller can still pass are handled here —
-        ``"target"``, which named a level that has since been renamed, and
-        ``"combined"``, which never named a level at all — so that the vocabulary of
-        retired names lives in one place and every warning about one is raised at the
-        same depth below the user's call.
-
-        Raises
-        ------
-        ValueError
-            When both a level and a source index are given, or when the level is not
-            part of this dataset's schema.
+        Both retired spellings a v1.1 caller can still pass — ``"target"`` and
+        ``"combined"`` — are handled here, so the vocabulary of retired names lives in one
+        place and every warning is raised at the same depth below the user's call.
         """
         if source_index is not None and level != "auto":
             raise ValueError("`level` and `source_index` are mutually exclusive; source_index sets the level.")
@@ -2950,103 +2605,8 @@ class Metadata(Array, FeatureExtractor):
                 stacklevel=3,
             )
             return "combined"
-        # One frame deeper than the other callers of _resolve_level, which reach it
-        # straight from the public method.
+        # One frame deeper than callers reaching _resolve_level from the public method.
         return self._resolve_level(level, stacklevel=5)
-
-    def _resolve_combined(
-        self,
-        factors: Mapping[str, NDArray[Any]],
-    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
-        """Split a v1.1 ``"combined"`` array into one factor per level.
-
-        ``"combined"`` was never a level. It was v1.1's name for an array ordered by
-        ``(item, target)`` — each item's item-level value ahead of that item's label-level
-        ones, exactly as :func:`~dataeval.core.compute_stats` emits them — which is what
-        `source_index` replaces with an explicit label per value.
-
-        The order is interleaved, *not* one item-level block followed by one label-level
-        block. The two readings agree on nothing beyond the first value, so splitting
-        positionally silently scatters every value onto the wrong row. Ranking the rows in
-        that order and deferring the gather to :meth:`_place` keeps the deprecated
-        spelling and its replacement placing identical data, and keeps the naming rule in
-        one place rather than in two implementations that can drift apart.
-
-        Raises
-        ------
-        ValueError
-            When items and labels sit at the same level, where the split is ambiguous.
-        ShapeMismatchError
-            When a factor is not as long as the two levels' rows combined.
-        """
-        item_level, label_level = self._item_level, self._label_level
-        if item_level == label_level:
-            raise ValueError(
-                f"level='combined' describes two levels, but this metadata's items and its labels "
-                f"are both at the {item_level!r} level, so there is no split to make. Add each "
-                "level's values in its own call, or pass source_index= to place them by label.",
-            )
-        if len(self._levels) != 2:
-            # Two levels is not incidental to "combined": it was v1.1's name for an array
-            # over the whole dataframe, and v1.1 had no schema with a third level. On a
-            # schema that does — tracking puts ``image`` and ``track`` between ``sequence``
-            # and ``instance`` — splitting item/label still type-checks and still produces
-            # a plausible-looking pair of factors, while silently describing none of the
-            # rows in between. Refuse rather than half-cover the dataframe.
-            raise ValueError(
-                f"level='combined' describes an array over exactly two levels, but this metadata "
-                f"has {list(self._levels)}. An array of {item_level}-level values interleaved with "
-                f"{label_level}-level ones would say nothing about the rows at the levels between "
-                "them, so there is no array it can name here. Pass source_index= to place values by "
-                "label, or level= to name the one level they belong to.",
-            )
-
-        counts = self._layout.counts
-        head, tail = counts.get(item_level, 0), counts.get(label_level, 0)
-        mismatched = {name: len(values) for name, values in factors.items() if len(values) != head + tail}
-        if mismatched:
-            raise ShapeMismatchError(
-                f"All combined-level factors must have length {head + tail} "
-                f"({item_level} count {head} + {label_level} count {tail}); got {mismatched}.",
-            )
-        # qualify=True rather than letting the data decide: the deprecation warning has
-        # already promised '<item_level>_<name>' and '<label_level>_<name>', and a dataset
-        # whose label level happens to have no rows — or whose values at one of them are
-        # all null — must not silently rename or remove the columns out from under a
-        # caller following that warning. It therefore keeps both halves unconditionally.
-        return self._place(factors, self._combined_positions(), qualify=True)
-
-    def _combined_positions(self) -> dict[FactorLevel, NDArray[np.intp]]:
-        """Position within a v1.1 ``"combined"`` array of each row it described.
-
-        The array was ordered by ``(item, target)`` with an item's own value ahead of that
-        item's labels, so each row's position is simply its rank in that order — read off
-        the two key columns rather than rebuilt as :class:`~dataeval.types.SourceIndex`
-        objects and re-parsed, which would allocate one per row of the dataframe and sort
-        it three more times to arrive back here.
-
-        Every row of the dataframe is ranked, which is the whole of it: :meth:`_resolve_combined`
-        has already established that the schema is exactly the item level and the label
-        level, so there are no rows in between for a combined array not to describe.
-        """
-        frame = (
-            self._dataframe
-            .lazy()
-            .select(
-                "level",
-                "item_index",
-                # Null marks a per-item row. -1 both stands in for it and, sorting below
-                # every real target, puts an item's value ahead of that item's labels.
-                pl.col("target_index").fill_null(-1),
-            )
-            .collect()
-        )
-        order = np.lexsort((frame["target_index"].to_numpy(), frame["item_index"].to_numpy()))
-        rank = np.empty(len(order), dtype=np.intp)
-        rank[order] = np.arange(len(order), dtype=np.intp)
-
-        is_item = frame["level"].to_numpy() == self._item_level
-        return {self._item_level: rank[is_item], self._label_level: rank[~is_item]}
 
     def _resolve_factor_levels(
         self,
@@ -3056,86 +2616,28 @@ class Metadata(Array, FeatureExtractor):
     ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
         """Work out the level and values of every column ``add_factors`` is about to write.
 
-        Returns one entry per column as ``(name, level, values)``, where ``values`` holds
-        one value per row at ``level``. ``level`` is None when it is to be inferred per
-        factor. Both a source index spanning several levels and the retired
-        ``"combined"`` spelling yield several columns per factor, named ``<level>_<name>``.
-
-        Alongside them, the names of any level splits discarded for holding no values, for
-        the caller to record. Only the multi-level paths can produce any: an explicit
-        `level` writes exactly the columns it was asked for, whatever they hold.
-
-        The two arguments are mutually exclusive; :meth:`add_factors` rejects the
-        combination before resolving either, so that the error names what the caller
-        passed rather than what it resolved to.
+        Returns one ``(name, level, values)`` per column, plus the names of any level
+        splits discarded for holding no values. A ``level`` of None is inferred per factor;
+        a multi-level source index and the retired ``"combined"`` spelling both yield
+        several columns per factor, named ``<level>_<name>``.
         """
         if source_index is not None:
             return self._resolve_by_source_index(factors, source_index)
 
         if level == "combined":
-            return self._resolve_combined(factors)
+            return resolve_combined(self, factors)
 
         if level is not None:
             self._validate_factor_lengths(factors, level)
             return [(name, level, values) for name, values in factors.items()], []
 
-        # Each factor is inferred independently, so a mapping mixing unit-level and
-        # instance-level arrays can be added in a single call. Written as a loop rather than
-        # a comprehension so that the stacklevel of the ambiguity warning _infer_factor_level
-        # may raise counts the same number of frames on every supported Python.
+        # Each factor is inferred independently, so one call can mix levels. A loop rather
+        # than a comprehension, so the stacklevel of infer_factor_level's ambiguity warning
+        # counts the same number of frames on every supported Python.
         destinations: list[tuple[str, FactorLevel | Literal["combined"], NDArray[Any]]] = []
         for name, values in factors.items():
-            destinations.append((name, self._infer_factor_level(values), values))
-        return self._resolve_destinations(destinations)
-
-    def _resolve_destinations(
-        self,
-        destinations: Sequence[tuple[str, FactorLevel | Literal["combined"], NDArray[Any]]],
-    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
-        """Turn inferred destinations into columns, batching the combined ones.
-
-        Batched rather than resolved one at a time because :meth:`_resolve_combined` ranks
-        every row of the dataframe. The default call —
-        ``add_factors(compute_stats(...)["stats"])`` — brings ~20 statistics of the same
-        length, so per-factor resolution would repeat that ranking ~20 times.
-        """
-        resolved: list[tuple[str, FactorLevel, NDArray[Any]]] = [
-            (name, level, values) for name, level, values in destinations if level != "combined"
-        ]
-        vacuous: list[str] = []
-        combined = {name: values for name, level, values in destinations if level == "combined"}
-        if combined:
-            self._warn_inferred_combined(sorted(combined))
-            placed, vacuous = self._resolve_combined(combined)
-            resolved.extend(placed)
-        return resolved, vacuous
-
-    def _warn_inferred_combined(self, names: Sequence[str]) -> None:
-        """Warn that factors were placed by the retired combined convention.
-
-        Inference reaching ``"combined"`` means the values were placed by their position
-        in an undeclared ordering rather than by a label. That is the same bet
-        ``level="combined"`` makes, so it earns the same warning — the caller has a
-        `source_index` available whenever the array came from
-        :func:`~dataeval.core.compute_stats`, and passing it removes the guess.
-
-        Raised once for the whole batch rather than once per factor: the call this fires
-        on is ``add_factors(compute_stats(...)["stats"])``, which brings ~20 statistics of
-        the same length, and twenty copies of one paragraph bury the one action it asks
-        for.
-        """
-        warnings.warn(
-            f"Factor(s) {list(names)} are as long as the {self._item_level} and {self._label_level} "
-            "levels combined, so their values were placed by the ordering compute_stats emits — by "
-            f"(item, target), each item's {self._item_level}-level value ahead of that item's "
-            f"{self._label_level}-level ones — and each was split into '{self._item_level}_<name>' "
-            f"and '{self._label_level}_<name>'. Inferring this is deprecated and will be removed in "
-            "v1.2.0; pass source_index= from compute_stats, which labels each value instead.",
-            DeprecationWarning,
-            # caller -> add_factors -> _resolve_factor_levels -> _resolve_destinations ->
-            # here. test_inference_warnings_point_at_the_caller pins this.
-            stacklevel=5,
-        )
+            destinations.append((name, infer_factor_level(self, values), values))
+        return resolve_destinations(self, destinations)
 
     def add_factors(
         self,
@@ -3144,6 +2646,7 @@ class Metadata(Array, FeatureExtractor):
         overwrite: bool = False,
         append_string: str = "_added",
         source_index: Sequence[SourceIndex] | None = None,
+        key: str | None = None,
     ) -> None:
         """Add additional factors to metadata collection.
 
@@ -3166,15 +2669,23 @@ class Metadata(Array, FeatureExtractor):
             placement. Its bookkeeping keys (``object_count``, ``invalid_box_count``,
             ``image_count``) describe the run rather than the images and are ignored.
         level : str, default "auto"
-            Level at which to store the factors — one of :attr:`levels`, or
-            ``"auto"`` to infer the level of each factor independently from its
-            array length. This also fixes the level the factor is binned at, so a
-            factor stored at the ``unit`` level is discretized over one value per unit
-            (see :ref:`binning-levels`).
+            Level at which to store the factors — one of :attr:`levels`, or ``"auto"``
+            to infer it (deprecated, see below). This also fixes the level the factor is
+            binned at, so a factor stored at the ``unit`` level is discretized over one
+            value per unit (see :ref:`binning-levels`).
 
-            Prefer naming the level. Inference reads the level off an array's length,
-            and levels routinely hold the same number of rows, so a mapping that works
-            on one dataset can land somewhere else on the next.
+            **Name the level, or label the values with** `source_index`. Those are the
+            two supported ways to say where values belong, and between them they cover
+            everything the retired spellings did.
+
+            .. deprecated::
+                ``"auto"`` — the current default — infers each factor's level from its
+                array length, and warns when it does. A length identifies a level only
+                by coincidence: levels routinely hold the same number of rows, so a
+                mapping that lands correctly on one dataset can land somewhere else on
+                the next, and the inference cannot tell the difference. Removed in
+                v1.2.0, from when the destination has to be stated — by `level` or by
+                `source_index`, either one.
 
             .. deprecated::
                 ``level="target"`` is accepted with a warning and resolves to
@@ -3186,8 +2697,9 @@ class Metadata(Array, FeatureExtractor):
                 item-level value ahead of that item's label-level ones. The array is
                 split into ``<level>_<name>`` factors, one per level. Pass
                 `source_index` instead, which labels each value rather than relying on
-                the ordering. Inferring the same layout under ``level="auto"`` is
-                deprecated on the same terms.
+                an ordering nothing declares — it carries the same information for the
+                same two levels, and cannot place a value on the wrong row. Inferring
+                the same layout under ``"auto"`` is deprecated on the same terms.
 
             .. deprecated::
                 ``level="image"`` is accepted with a warning and resolves to the
@@ -3204,18 +2716,45 @@ class Metadata(Array, FeatureExtractor):
             returned by :func:`~dataeval.core.compute_stats`. Mutually exclusive with
             `level`, which it replaces: each value is placed by its label rather than by
             its position (see Notes).
+        key : str or None, default None
+            Column of the named level's rows to match values against, instead of taking
+            them in that level's row order. Requires `level`, and is mutually exclusive
+            with `source_index` — the three are the ways of saying which row a value
+            belongs to, and a call uses one.
+
+            This is what attaches :func:`~dataeval.core.track_stats` output, which is
+            indexed by sorted track id within one sequence while a metadata track row is
+            keyed ``(item_index, track_index)`` in order of first appearance. The two
+            orders coincide only by accident. Matching is on ``(item_index, key)``,
+            because a track id restarts in each sequence; supply an ``item_index`` entry
+            alongside the values when the dataset holds more than one item, which
+            ``track_stats`` requires since it describes one sequence at a time.
+
+            The key column itself is consumed rather than stored — it says which row a
+            value belongs to, not anything about the row. ``track_stats`` returns it as
+            ``track_ids``, and both that and the singular column name are accepted. A row
+            no incoming key names is null, so the column still has one value per row.
 
         Raises
         ------
         ShapeMismatchError
             When factor lengths do not match the specified level's row count, the
-            length of `source_index`, or the row counts `source_index` implies.
+            length of `source_index`, or the row counts `source_index` implies; or, under
+            `key`, when they do not match the number of keys.
         ValueError
             When the level is not part of the dataset's schema, when both `level` and
             `source_index` are given, or when `source_index` carries per-channel entries.
+            Under `key`: when it is not a column of that level's rows, when no values for
+            it were supplied, when the keys are not unique, or when the dataset holds
+            several items and the values do not say which they belong to.
 
         Warns
         -----
+        DeprecationWarning
+            When ``level="auto"`` — the default — infers a level from an array length,
+            raised once per call naming each factor with the level it reached. Also when
+            a retired `level` spelling is passed, or when inference reaches the retired
+            combined layout.
         UserWarning
             When ``level="auto"`` and an array length matches more than one level.
 
@@ -3280,58 +2819,55 @@ class Metadata(Array, FeatureExtractor):
         ['instance_mean', 'unit_mean']
         """
         self._structure()
-        factors, source_index = _unpack_stats_result(factors, source_index, level=level)
+        factors, source_index = unpack_stats_result(factors, source_index, level=level)
 
-        # Early return for empty factors
         if not factors:
             return
 
+        _reject_unusable_key(key, level, source_index)
+
         resolved_level = self._resolve_requested_level(level, source_index)
 
-        # Resolve, validate and materialize every column before touching any state, so that a
-        # bad factor anywhere in the mapping leaves this Metadata instance exactly as it was.
-        # That is also why the skipped names are only *recorded* after the resolve loop below:
-        # recording them is a mutation, and a validation failure must not leave it behind.
-        kept, skipped = self._split_by_dimensionality(factors)
+        # Resolve, validate and materialize every column before touching any state, so a bad
+        # factor anywhere in the mapping leaves this instance exactly as it was. The skipped
+        # names are likewise only recorded after the resolve loop, since recording mutates.
+        kept, skipped = split_by_dimensionality(factors)
 
-        taken = set(self._dataframe.columns)
-        resolved: list[tuple[str, FactorLevel, pl.Series]] = []
-        placed, vacuous = self._resolve_factor_levels(kept, resolved_level, source_index)
+        taken = set(self._store.columns)
+        resolved: list[_ResolvedFactor] = []
+        if key is not None:
+            # _reject_unusable_key has already refused "auto" and "combined", the only
+            # spellings resolving to something other than a level, so this is one.
+            placed, vacuous = resolve_keyed(self, kept, cast("FactorLevel", resolved_level), key), []
+        else:
+            placed, vacuous = self._resolve_factor_levels(kept, resolved_level, source_index)
         for name, factor_level, values in placed:
-            # Rows at ``factor_level`` take their own value and descendant rows inherit
-            # from their ancestor; rows at unrelated or higher levels get null.
-            column = self._layout.expand(values, factor_level)
             col_name = self._resolve_factor_name(name, taken, overwrite, append_string)
             taken.add(col_name)
-            # Anchored on the native values, exactly as _add_level_column does and for
-            # the same reason: the expanded column leads with nulls wherever the factor's
-            # level is not the first block, so inferring from it reads the dtype off
-            # those. A factor added at a level with no rows infers Null and comes back
-            # as a categorical; a narrow numeric one silently widens.
-            dtype = pl.Series(values=values).dtype
-            resolved.append((col_name, factor_level, pl.Series(name=col_name, values=column, dtype=dtype)))
+            # One value per entity at the factor's own level: descendant rows read them by
+            # the store's gather, so there is no expanded copy to build and no dtype to
+            # infer off one leading with nulls.
+            resolved.append(_ResolvedFactor(col_name, factor_level, to_series(col_name, values)))
 
         self._record_multidimensional(skipped)
         self._record_vacuous(vacuous)
         self._commit_factors(resolved)
 
-    def _commit_factors(self, resolved: Sequence[tuple[str, FactorLevel, pl.Series]]) -> None:
+    def _commit_factors(self, resolved: Sequence[_ResolvedFactor]) -> None:
         """Write resolved columns to the dataframe and register their levels.
 
-        The half of :meth:`add_factors` that mutates. Everything before it resolves,
-        validates and materializes without touching state, so that a bad factor
-        anywhere in the mapping leaves the instance exactly as it was — which only
-        holds while the two halves stay separated.
+        The half of :meth:`add_factors` that mutates. Its all-or-nothing guarantee holds
+        only while the two halves stay separated.
         """
         if not resolved:
             return
 
-        # Drop any stale binned/digitized companion columns of the factors being replaced,
-        # otherwise _bin() skips them and they disappear from factor_info.
-        self._reset_bins([name for name, _, _ in resolved])
+        # Stale companion columns of the factors being replaced, otherwise _bin() skips
+        # them and they disappear from factor_info.
+        self._reset_bins([factor.name for factor in resolved])
 
-        self._dataframe = self.dataframe.with_columns([series for _, _, series in resolved])
-        self._register_factor_levels([(name, factor_level) for name, factor_level, _ in resolved])
+        self._store_native_factors(resolved)
+        self._register_factor_levels([(factor.name, factor.level) for factor in resolved])
 
         self._is_binned = False
         self._build_factors()
@@ -3367,38 +2903,7 @@ class Metadata(Array, FeatureExtractor):
         info_by_name = self._factor_info
         self._warn_level_rename()
         selected = [(name, info) for name, info in info_by_name.items() if condition(name, info)]
-        schema = self.dataframe.schema if selected else {}
-        return self._project([_float_col(name, info, schema) for name, info in selected], np.float64)
-
-    def filter_by_factor_type(
-        self,
-        factor_type: Literal["categorical", "discrete", "continuous"],
-    ) -> NDArray[np.float64]:
-        """Filter metadata factors by factor type.
-
-        .. deprecated::
-            One predicate over :meth:`filter_by_factor` is the whole of this method, and
-            keeping a named wrapper per :class:`FactorInfo` field does not scale as the
-            class grows fields. Use
-            ``filter_by_factor(lambda _, fi: fi.factor_type == factor_type)``.
-
-        Parameters
-        ----------
-        factor_type : "categorical", "discrete" or "continuous"
-            The factor type to include in the output.
-
-        Returns
-        -------
-        NDArray[np.float64]
-            Array with shape (n_samples, n_factors) where the factors
-            are filtered by the user provided factor type. Rows are taken at
-            the ``instance`` level; see :meth:`filter_by_factor` for which
-            representation of each factor the values come from.
-        """
-        warnings.warn(
-            "Metadata.filter_by_factor_type() is deprecated and will be removed in v1.2.0. "
-            "Use Metadata.filter_by_factor(lambda _, fi: fi.factor_type == factor_type) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.filter_by_factor(lambda _, fi: fi.factor_type == factor_type)
+        # Read off the store: ``self.dataframe.schema`` would build the whole flat frame
+        # to answer "is this numeric" about a handful of names.
+        schema = {name: self._store.dtype_of(name) for name, _ in selected}
+        return self._project([float_col(name, info, schema) for name, info in selected], np.float64)

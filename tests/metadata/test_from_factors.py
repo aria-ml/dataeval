@@ -6,12 +6,14 @@ full MAITE image dataset.
 """
 
 import numpy as np
+import polars as pl
 import pytest
 
 from dataeval import Metadata
 from dataeval.bias import Balance, Diversity, Parity
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import MetadataLike
+from dataeval.types import SourceIndex
 
 
 class TestMetadataFromFactors:
@@ -95,3 +97,68 @@ class TestMetadataFromFactors:
         md = Metadata.from_factors(factors, labels)
         result = evaluator().evaluate(md)
         assert result is not None
+
+
+@pytest.mark.required
+class TestFromFactorsBuildsTheStore:
+    """FE-6 issue 6.2. ``from_factors`` is the entry point for tabular and array users,
+    and it must reach the same normalized store the dataset path does rather than a
+    stacked frame that happens to answer the same questions.
+    """
+
+    def test_bare_arrays_build_one_level(self):
+        """Nothing in bare arrays distinguishes an item from a label, so there is one level."""
+        metadata = Metadata.from_factors({"a": np.arange(6.0), "b": np.arange(6)})
+        assert metadata.levels == ("unit",)
+        assert dict(metadata._store.counts) == {"unit": 6}
+        assert not metadata._store.links, "a single level has no edges"
+
+    def test_a_source_index_builds_both_levels_and_the_edge(self):
+        """Values as well as shape: a placement that scatters them passes a count check."""
+        index = [
+            SourceIndex(0, None),
+            SourceIndex(1, None),
+            SourceIndex(0, 0),
+            SourceIndex(0, 1),
+            SourceIndex(1, 0),
+        ]
+        metadata = Metadata.from_factors({"m": np.arange(len(index), dtype=np.float64)}, source_index=index)
+        assert dict(metadata._store.counts) == {"unit": 2, "instance": 3}
+        assert ("instance", "unit") in metadata._store.links
+        assert metadata._store.positions_from("instance", "unit").tolist() == [0, 0, 1]
+        assert metadata._store.frame("unit")["unit_m"].to_list() == [0.0, 1.0]
+        assert metadata._store.frame("instance")["instance_m"].to_list() == [2.0, 3.0, 4.0]
+
+    def test_each_half_lands_at_its_own_level_only(self):
+        """Deliberately not one-to-one, so the downward gather has something to get wrong.
+
+        With one instance per unit the gather is the identity and any permutation of it
+        passes; two instances under the first unit and one under the second makes the
+        expected column a repeat that only a correct gather produces.
+        """
+        index = [SourceIndex(0, None), SourceIndex(1, None), SourceIndex(0, 0), SourceIndex(0, 1), SourceIndex(1, 0)]
+        metadata = Metadata.from_factors({"m": np.arange(len(index), dtype=np.float64)}, source_index=index)
+        assert "unit_m" in metadata._store.frame("unit").columns
+        assert "unit_m" not in metadata._store.frame("instance").columns
+        assert "instance_m" in metadata._store.frame("instance").columns
+        # Read from the finer rows by gather rather than from a stored copy: unit 0's value
+        # appears on both of its instances, unit 1's on its one.
+        assert metadata._store.column("instance", "unit_m").to_list() == [0.0, 0.0, 1.0]
+
+    def test_the_flat_frame_is_derived_from_the_store(self):
+        """Heights alone would pass for a frame built by concatenation independent of the
+        store, which is the implementation this class exists to rule out. Compare values,
+        and check that a write to the store shows up in the frame.
+        """
+        index = [SourceIndex(0, None), SourceIndex(0, 0), SourceIndex(0, 1)]
+        metadata = Metadata.from_factors({"m": np.arange(len(index), dtype=np.float64)}, source_index=index)
+        flat = metadata.dataframe
+        assert flat.height == sum(metadata._store.counts.values())
+        for level in metadata.levels:
+            rows = metadata.rows_at(level)
+            assert rows.height == metadata._store.height(level)
+            assert rows.equals(flat.filter(pl.col("level") == level)), level
+        # Derived, not stored: a later write reaches the frame without anything rebuilding it.
+        metadata.add_factors({"late": np.arange(metadata.level_counts["unit"], dtype=np.float64)}, level="unit")
+        assert "late" not in flat.columns
+        assert "late" in metadata.dataframe.columns

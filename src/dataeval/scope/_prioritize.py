@@ -16,6 +16,7 @@ from typing_extensions import Self
 
 from dataeval import Metadata
 from dataeval._embeddings import Embeddings
+from dataeval._helpers import reject_filtered_metadata
 from dataeval._log import get_logger
 from dataeval.core._rank import (
     RankResult,
@@ -805,6 +806,8 @@ class Prioritize(Evaluator):
         >>> prioritizer = Prioritize(extractor=extractor, method="knn", k=5, order="hard_first")
         >>> result = prioritizer.evaluate(unlabeled_data)
         """
+        reject_filtered_metadata(dataset, "Prioritize")
+
         # Validate stratified + complexity method combinations
         if self.policy == "stratified" and self.method in ("kmeans_complexity", "hdbscan_complexity"):
             raise ValueError(
