@@ -593,7 +593,7 @@ Mann-Whitney U Test
     or for outdoor vision systems with weather-induced variance and illumination extremes.
 
 Maximum Pooling
-    Method used in the {term}`pooling layer<Pooling Layer>` of a {term}`convolutional neural netwok<Convolutional Neural Network (CNN)>`.
+    Method used in the {term}`pooling layer<Pooling Layer>` of a {term}`convolutional neural network<Convolutional Neural Network (CNN)>`.
     It uses the maximum value in a group of pixel values (typically a 2 x 2 or 3 x 3 area) produced
     from the {term}`convolutional layer<Convolutional Layer>` to reduce the dimensionality of the
     result. An image of the operation is shown below.
@@ -617,7 +617,7 @@ Mean Average Precision
     (AUC) metric. It is the average precision for each class averaged over the number of classes.
 
 Minimum Pooling
-    Method used in the {term}`pooling layer<Pooling Layer>` of a {term}`convolutinal neural network<Convolutional Neural Network (CNN)>`.
+    Method used in the {term}`pooling layer<Pooling Layer>` of a {term}`convolutional neural network<Convolutional Neural Network (CNN)>`.
     It uses the minimum value in a group of pixel values (typically a 2 x 2 or 3 x 3 area) produced
     from the {term}`convolutional layer<Convolutional Layer>` to reduce the dimensionality of the result.
 
@@ -731,7 +731,7 @@ Pooling Layer
     using a similar kernel calculation to the output. A lot of information is lost in the pooling
     layer but they reduce complexity, improve efficiency and limit the risk of {term}`overfitting<Overfitting>`
     to the {term}`developmental dataset<Developmental Dataset>`. The functions include
-    {term}`minimul pooling<Minimum Pooling>`, {term}`maximum pooling<Maximum Pooling>` and
+    {term}`minimum pooling<Minimum Pooling>`, {term}`maximum pooling<Maximum Pooling>` and
     {term}`average pooling<Average Pooling>`.
 
 Precision

@@ -376,7 +376,7 @@ outlier_imgs.aggregate_by_class(md)
 # Zeros is a category unto itself but it is closely related to brightness, contrast, darkness, and mean. Zeros measures
 # the percentage of pixels with a zero value compared to the average image.
 #
-# Sharpness is also in it's own category and it measures the perceived edges in an image.
+# Sharpness is also in its own category and it measures the perceived edges in an image.
 
 # %% [markdown]
 # (questions)=
