@@ -6,13 +6,15 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval._metadata import FactorInfo, Metadata, _binned
+from dataeval import Metadata
+from dataeval._metadata._columns import binned
 from dataeval.core import compute_stats
 from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._label_stats import label_stats
 from dataeval.data import unzip_dataset
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.flags import ImageStats
+from dataeval.types import FactorInfo
 from tests.embeddings.test_embeddings import MockDataset
 
 
@@ -149,7 +151,6 @@ class TestMetadata:
 
     def test_add_empty_factors(self):
         md = Metadata(None)  # type: ignore
-        md._dataframe = pl.DataFrame()
         md._factors = set()
         md._count = 0
         md._is_structured = True
@@ -274,7 +275,6 @@ class TestMetadata:
 
     def test_contiguous_factor_bins_setter(self):
         md = Metadata(None)  # type: ignore
-        md._dataframe = pl.DataFrame()
         md._is_binned = True
         md.continuous_factor_bins = {"a": 10}
         assert not md._is_binned
@@ -282,7 +282,6 @@ class TestMetadata:
 
     def test_contiguous_factor_bins_setter_no_op(self):
         md = Metadata(None, continuous_factor_bins={"a": 10})  # type: ignore
-        md._dataframe = pl.DataFrame()
         md._is_binned = True
         md.continuous_factor_bins = {"a": 10}
         assert md._is_binned
@@ -290,7 +289,6 @@ class TestMetadata:
 
     def test_auto_bin_method_setter(self):
         md = Metadata(None)  # type: ignore
-        md._dataframe = pl.DataFrame()
         md._is_binned = True
         md.auto_bin_method = "clusters"
         assert not md._is_binned
@@ -298,7 +296,6 @@ class TestMetadata:
 
     def test_auto_bin_method_setter_no_op(self):
         md = Metadata(None, auto_bin_method="clusters")  # type: ignore
-        md._dataframe = pl.DataFrame()
         md._is_binned = True
         md.auto_bin_method = "clusters"
         assert md._is_binned
@@ -335,16 +332,16 @@ class TestMetadata:
     )
     def test_reset_bins(self, is_binned, exists):
         """The companion column and its cached info go together, whatever _is_binned says."""
-        md = Metadata(None)  # type: ignore
         col = "foo"
-        col_bn = _binned(col)
-        md._dataframe = pl.from_dict({col: [0], col_bn: [0]} if exists else {col: [0]})
-        md._factors = {col}
+        col_bn = binned(col)
+        md = Metadata.from_factors({col: np.array([0])})
+        if exists:
+            md._store = md._store.with_column("unit", pl.Series(col_bn, [0]))
         md._factor_cache = {col: FactorInfo("continuous", is_binned=exists)}
         md._is_binned = is_binned
         md._reset_bins()
         assert not md._is_binned
-        assert col_bn not in md._dataframe.columns
+        assert col_bn not in md._store.columns
         # Info survives only where there was no column to drop; the factor stays visible
         # either way, since _reset_bins clears binning and not the factor registry.
         assert (col in md._factor_cache) is not exists
@@ -394,7 +391,7 @@ class TestMetadata:
         )
         # A 2D factor (e.g. an embedding) sitting in the dataframe as a polars List column.
         # add_factors refuses to create one, so it is written directly.
-        md._dataframe = md.dataframe.with_columns(pl.Series("embedding_2d", RNG.random(size=(50, 10))))
+        md._store = md._store.with_column("unit", pl.Series("embedding_2d", RNG.random(size=(50, 10))))
         md._factors_by_level.setdefault("unit", set()).add("embedding_2d")
         md._build_factors()
 

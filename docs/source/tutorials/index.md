@@ -32,6 +32,7 @@ local checkout.
 ../notebooks/tt_assess_data_space.py
 ../notebooks/tt_identify_dataset_gaps.py
 ../notebooks/tt_identify_bias.py
+../notebooks/tt_analyze_across_levels.py
 ../notebooks/tt_augmentation_duplicates.py
 ../notebooks/tt_compare_objects_to_surroundings.py
 ```
@@ -56,6 +57,10 @@ local checkout.
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
   - [![Open In Colab][colab-badge]][bias-colab]
+* - [](../notebooks/tt_analyze_across_levels.py)
+  - Learn why a per-image factor read from detection rows is weighted by
+    detection count, and how to choose the population your question is about.
+  - [![Open In Colab][colab-badge]][levels-colab]
 * - [](../notebooks/tt_augmentation_duplicates.py)
   - Learn how common torchvision augmentations like rotations, flips, and color
     jitter can be detected as near duplicates using D4 hashes and BoVW embeddings.
@@ -74,6 +79,7 @@ local checkout.
 [dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_assess_data_space.ipynb
 [gaps-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_identify_dataset_gaps.ipynb
 [bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_identify_bias.ipynb
+[levels-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_analyze_across_levels.ipynb
 [augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_augmentation_duplicates.ipynb
 [surr-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/tt_compare_objects_to_surroundings.ipynb
 

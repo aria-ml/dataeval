@@ -20,6 +20,7 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval import Metadata
+from dataeval._helpers import is_metadata_like
 from dataeval._log import get_logger
 from dataeval._ontology import Ontology
 from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
@@ -275,7 +276,7 @@ class Representation(Evaluator):
         # A Metadata is a MetadataLike, so only AnnotatedDataset needs converting first.
         if isinstance(data, AnnotatedDataset):
             data = Metadata(data)
-        if isinstance(data, MetadataLike):
+        if is_metadata_like(data):
             return self._counts_from_labels(data.class_labels, getattr(data, "index2label", None) or index2label)
         # A raw label sequence: count it, then name the observed indices.
         return self._counts_from_labels(data, index2label)

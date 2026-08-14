@@ -641,3 +641,51 @@ class TestLevelDiamond:
     def test_hierarchy_is_read_only(self):
         with pytest.raises(TypeError):
             _FACTOR_LEVEL_HIERARCHY["frame"] = ()  # type: ignore[index]
+
+
+@pytest.mark.required
+class TestLevelPaths:
+    """Which route reaches an ancestor is a property of the graph, not of a structurer.
+
+    A chain has one route and never needs asking. A diamond has two, and they disagree
+    exactly where one branch stops short — an untracked detection reaches its sequence
+    through its frame but not through a track. Before this the answer lived in the order
+    a structurer merged two dictionaries.
+    """
+
+    def setup_method(self):
+        self.schema = FactorLevelSchema.of("sequence", "unit", "track", "instance")
+
+    def test_one_step_to_a_parent(self):
+        assert self.schema.paths("instance", "unit") == (("unit",),)
+
+    def test_a_chain_has_a_single_route(self):
+        assert self.schema.paths("unit", "sequence") == (("sequence",),)
+
+    def test_a_diamond_reports_both_branches(self):
+        assert self.schema.paths("instance", "sequence") == (("unit", "sequence"), ("track", "sequence"))
+
+    def test_routes_follow_canonical_parent_order(self):
+        """The unit branch comes first because parents_of does, which is the precedence
+        the structurers already had by merging the unit branch last."""
+        routes = self.schema.paths("instance", "sequence")
+        assert routes[0][0] == self.schema.parents_of("instance")[0] == "unit"
+
+    def test_a_level_that_is_not_above_has_no_route(self):
+        assert self.schema.paths("unit", "track") == ()
+        assert self.schema.paths("sequence", "instance") == ()
+
+    def test_a_level_has_no_route_to_itself(self):
+        assert self.schema.paths("unit", "unit") == ()
+
+    def test_an_image_task_collapses_the_diamond_to_one_route(self):
+        assert FactorLevelSchema.of("unit", "instance").paths("instance", "unit") == (("unit",),)
+
+    def test_unknown_levels_are_rejected(self):
+        with pytest.raises(ValueError, match="Unknown level"):
+            self.schema.paths("instance", "nope")  # type: ignore[arg-type]
+
+    def test_every_ancestor_is_reachable_by_at_least_one_route(self):
+        for level in self.schema.levels:
+            for ancestor in self.schema.ancestors(level):
+                assert self.schema.paths(level, ancestor), f"{level} -> {ancestor}"

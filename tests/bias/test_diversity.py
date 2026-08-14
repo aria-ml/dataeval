@@ -2,7 +2,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval._metadata import Metadata
+from dataeval import Metadata
 from dataeval.bias import Diversity
 from dataeval.types import ExecutionMetadata
 from tests.conftest import MockMetadata, to_metadata

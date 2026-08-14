@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 from sklearn.utils.multiclass import type_of_target
 
+from dataeval._helpers import is_metadata_like
 from dataeval._log import get_logger
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.utils._internal import EPSILON
@@ -662,6 +663,29 @@ def _split_ic(
     return tvs, tv_splits
 
 
+def _dense_item_positions(item_indices: NDArray[np.intp], n_images: int) -> NDArray[np.intp]:
+    """Renumber item indices onto the items actually present, if they are not already.
+
+    The multi-label matrix is sized by ``item_count`` and indexed by these, so the two have
+    to describe the same items. Metadata covering a whole dataset numbers its items against
+    that dataset, so every index is already a row of the matrix and is returned untouched —
+    *including* on a dataset whose items hold no detections at all. Those items contribute
+    no entry here and their matrix row is legitimately empty; compacting the indices onto
+    the items that do appear would slide every later item onto the wrong row.
+
+    Only indices that cannot be matrix rows are renumbered, which is the filtered case: a
+    filtered metadata keeps its surviving items' original — and so sparse — indices, and
+    those index past the end of a matrix sized by how many survived.
+
+    The renumbering assumes every surviving item contributes at least one row, which is all
+    the detection-level indices can say: an item whose every detection was filtered away is
+    indistinguishable from one that was dropped outright.
+    """
+    if not len(item_indices) or item_indices.max() < n_images:
+        return item_indices
+    return np.unique(item_indices, return_inverse=True)[1].astype(np.intp)
+
+
 def split_dataset(
     dataset: AnnotatedDataset[Any] | MetadataLike | Sequence[int] | NDArray[Any],
     num_folds: int = 1,
@@ -733,14 +757,14 @@ def split_dataset(
     total_partitions = num_folds + 1 if test_frac else num_folds
 
     # Import Metadata at runtime to avoid circular import
-    from dataeval._metadata import Metadata
+    from dataeval import Metadata
 
     # Dispatch on input kind. The isinstance checks below narrow `dataset` directly (rather
     # than via an intermediate flag) so the raw-label, MetadataLike, and MAITE-dataset paths
     # each see a correctly-typed value. Note a bare sequence/NDArray of class labels is neither
     # a MetadataLike nor a MAITE dataset; datasets that merely implement __getitem__/__len__ are
     # not registered collections.abc.Sequences, so they fall through to the dataset path.
-    if isinstance(dataset, MetadataLike):
+    if is_metadata_like(dataset):
         # MetadataLike instances are already pre-extracted.
         metadata: MetadataLike = dataset
     elif isinstance(dataset, np.ndarray) or (isinstance(dataset, Sequence) and not isinstance(dataset, (str, bytes))):
@@ -765,6 +789,7 @@ def split_dataset(
     # Detect OD datasets: more detections than images means multi-label
     item_indices: NDArray[np.intp] = getattr(metadata, "item_indices", np.arange(len(class_labels), dtype=np.intp))
     n_images: int = getattr(metadata, "item_count", len(class_labels))
+    item_indices = _dense_item_positions(item_indices, n_images)
     is_od = len(item_indices) > 0 and len(class_labels) > n_images
 
     n_classes = len(np.unique(class_labels))

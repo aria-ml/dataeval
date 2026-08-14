@@ -7,7 +7,8 @@ import warnings
 import numpy as np
 import pytest
 
-from dataeval._metadata import Metadata
+from dataeval import Metadata
+from dataeval.types import SourceIndex
 from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
 from tests.metadata.test_structurers import _SHAPES, _mot_dataset
 
@@ -461,3 +462,109 @@ class TestLevelMessagesNameTheUnitType:
         md = Metadata.from_factors(factors)
         with pytest.raises(ValueError, match="this dataset's units are items"):
             md.rows_at("bogus")  # type: ignore[arg-type]
+
+
+@pytest.mark.required
+class TestLevelInferenceIsDeprecated:
+    """FE-6 issue 6.1: the last silent guess on the factor-entry path.
+
+    ``level="combined"`` and inference *reaching* combined already warned. Inferring an
+    ordinary level from an array length did not, and it is the guess most likely to be
+    quietly wrong: levels routinely hold the same number of rows, so the same mapping
+    lands somewhere else on a differently shaped dataset and nothing says so.
+    """
+
+    def test_inferring_a_level_from_length_warns(self):
+        md = _od_metadata()
+        with pytest.warns(DeprecationWarning, match="inferred from their array length"):
+            md.add_factors({"a": np.arange(md.level_counts["unit"], dtype=np.float64)})
+
+    def test_the_warning_names_the_factors_and_the_level(self):
+        md = _od_metadata()
+        with pytest.warns(DeprecationWarning, match="inferred from their array length") as caught:
+            md.add_factors({"a": np.arange(md.level_counts["unit"], dtype=np.float64)})
+        # Selected by message rather than taken as caught[0]: pytest.warns records every
+        # warning raised in the block, and add_factors has others it can reach first.
+        message = next(str(w.message) for w in caught if "inferred from their array length" in str(w.message))
+        assert "'a'" in message
+        assert "unit" in message
+        assert "v1.2.0" in message
+
+    def test_one_warning_for_a_whole_batch(self):
+        """The call this fires on brings many statistics at once."""
+        md = _od_metadata()
+        height = md.level_counts["unit"]
+        factors = {f"s{i}": np.arange(height, dtype=np.float64) for i in range(5)}
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            md.add_factors(factors)
+        inferred = [w for w in caught if "inferred from their array length" in str(w.message)]
+        assert len(inferred) == 1, "one paragraph per factor buries the action it asks for"
+
+    def test_naming_the_level_does_not_warn(self):
+        md = _od_metadata()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            md.add_factors({"a": np.arange(md.level_counts["unit"], dtype=np.float64)}, level="unit")
+        assert not [w for w in caught if issubclass(w.category, DeprecationWarning)]
+
+    def test_source_index_does_not_warn(self):
+        md = _od_metadata()
+        index = [SourceIndex(item, None) for item in range(md.level_counts["unit"])]
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            md.add_factors({"a": np.arange(len(index), dtype=np.float64)}, source_index=index)
+        assert not [w for w in caught if issubclass(w.category, DeprecationWarning)]
+
+    def test_the_warning_blames_the_caller(self):
+        md = _od_metadata()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            md.add_factors({"a": np.arange(md.level_counts["unit"], dtype=np.float64)})
+        inferred = [w for w in caught if "inferred from their array length" in str(w.message)]
+        assert inferred, "the deprecation did not fire"
+        assert inferred[0].filename == __file__
+
+    def test_a_mixed_level_batch_names_each_factor_with_its_own_level(self):
+        """The shape the message can get wrong, and the one add_factors documents as supported.
+
+        Listing the names and the levels as two sequences reads as pairs however they are
+        ordered, so a batch spanning two levels must name each factor with the level it
+        actually reached.
+        """
+        md = _od_metadata()
+        units, instances = md.level_counts["unit"], md.level_counts["instance"]
+        assert units != instances, "fixture must distinguish the two levels by length"
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            md.add_factors({"x": np.arange(units, dtype=np.float64), "y": np.arange(instances, dtype=np.float64)})
+        message = next(str(w.message) for w in caught if "inferred from their array length" in str(w.message))
+        assert "'x' at 'unit'" in message
+        assert "'y' at 'instance'" in message
+        assert md._factors_by_level["unit"] & {"x"}
+        assert md._factors_by_level["instance"] & {"y"}
+
+    def test_a_mixed_level_batch_is_not_told_to_pass_one_level(self):
+        """`level=` names one destination; a batch spanning two cannot be restated that way."""
+        md = _od_metadata()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            md.add_factors(
+                {
+                    "x": np.arange(md.level_counts["unit"], dtype=np.float64),
+                    "y": np.arange(md.level_counts["instance"], dtype=np.float64),
+                },
+            )
+        message = next(str(w.message) for w in caught if "inferred from their array length" in str(w.message))
+        assert "each level's factors in its own call" in message
+
+    def test_a_single_level_metadata_is_not_told_about_coincidence(self):
+        """With one level the placement is forced, so the ambiguity rationale would be false."""
+        md = Metadata.from_factors({"w": np.arange(4.0)})
+        assert md.levels == ("unit",)
+        with pytest.warns(DeprecationWarning, match="inferred from their array length") as caught:
+            md.add_factors({"a": np.arange(4.0)})
+        message = next(str(w.message) for w in caught if "inferred from their array length" in str(w.message))
+        assert "coincidence" not in message
+        assert "placement is forced" in message
+        assert "v1.2.0" in message

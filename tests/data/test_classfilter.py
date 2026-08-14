@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from dataeval._metadata import Metadata
+from dataeval import Metadata
 from dataeval.data._classfilter import ClassFilter
 from dataeval.data._view import View
 from dataeval.protocols import ObjectDetectionTarget

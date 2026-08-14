@@ -9,8 +9,8 @@ import polars as pl
 import pytest
 from numpy.typing import NDArray
 
-from dataeval._metadata import Metadata
-from dataeval._structurers import (
+from dataeval import Metadata
+from dataeval._metadata._structurers import (
     LEGACY_COLUMNS,
     ICStructurer,
     MOTStructurer,
@@ -183,10 +183,16 @@ class TestReservedBlockColumns:
         assert "instance_index" not in reserved_block_columns("unit", 1, item_index=[0])
         assert reserved_block_columns("instance", 1, instance_index=[0])["instance_index"] == [0]
 
-    def test_ndarrays_are_normalized_to_python_scalars(self):
-        columns = reserved_block_columns("unit", 2, class_label=np.array([3, 4], dtype=np.intp))
+    def test_ndarrays_are_passed_through_untouched(self):
+        """Arrays reach polars as arrays; listifying them here is the cost we removed."""
+        supplied = np.array([3, 4], dtype=np.intp)
+        columns = reserved_block_columns("unit", 2, class_label=supplied)
+        assert columns["class_label"] is supplied
+        assert isinstance(columns["class_label"], np.ndarray)
+
+    def test_non_arrays_are_normalized_to_lists(self):
+        columns = reserved_block_columns("unit", 2, class_label=(3, 4))
         assert columns["class_label"] == [3, 4]
-        assert all(type(value) is int for value in columns["class_label"])
 
     def test_non_reserved_name_raises(self):
         with pytest.raises(ValueError, match="are not reserved columns"):
@@ -286,6 +292,111 @@ class TestOneNameOneLevel:
         """MOT runs the same two merges, at the sequence and unit levels."""
         shared = [{"weather": "sun"}, {"weather": "rain"}]
         Metadata(_mot_dataset([[2, 1], [1]], shared))._structure()
+
+
+@pytest.mark.required
+class TestToFrame:
+    """The levelled build must produce exactly the frame the flat builder did."""
+
+    @staticmethod
+    def _bundles():
+        shared = [{"weather": "sun"}, {"weather": "rain"}, {"weather": "sun"}]
+        images = np.zeros((3, 3, 16, 16))
+        return {
+            "IC": MockDataset(images, np.eye(3)[[0, 1, 0]], shared),
+            "OD": MockDataset(images, [_od_target(2)] * 3, shared),
+            "OD-no-detections": MockDataset(images, [_od_target(0)] * 3, shared),
+            "MOT": _mot_dataset(_SHAPES, shared[:2]),
+        }
+
+    def test_values_and_column_order_match_the_flat_builder(self):
+        for name, dataset in self._bundles().items():
+            data = select_structurer(dataset, None).build(dataset)
+            flat, frame = pl.DataFrame(data.to_rows()), data.to_frame()
+            assert frame.columns == flat.columns, name
+            assert frame.height == flat.height, name
+            for column in flat.columns:
+                assert frame[column].to_list() == flat[column].to_list(), f"{name}: {column}"
+
+    def test_column_order_is_reserved_then_factors(self):
+        data = StructuredData(
+            _two_level_blocks(),
+            {"unit": {"weather": ["sun", "rain"]}, "instance": {"iou": [0.1, 0.2, 0.3]}},
+        )
+        order = data.column_order
+        assert order[: len(LEGACY_COLUMNS) + 1] == ("level", *LEGACY_COLUMNS)
+        assert order[-2:] == ("weather", "iou")
+        assert data.to_frame().columns == list(order)
+
+    def test_a_column_null_at_every_level_survives_as_null(self):
+        """``box`` exists for classification only as a column of nothing."""
+        dataset = MockDataset(np.zeros((3, 3, 16, 16)), np.eye(3)[[0, 1, 0]], [{}] * 3)
+        frame = select_structurer(dataset, None).build(dataset).to_frame()
+        assert frame["box"].dtype == pl.Null
+        assert frame["box"].to_list() == [None] * frame.height
+
+    def test_arrays_keep_their_own_dtype(self):
+        """Reaching polars as arrays, not Python floats, keeps boxes and scores narrow."""
+        dataset = MockDataset(np.zeros((3, 3, 16, 16)), [_od_target(2)] * 3, [{}] * 3)
+        frame = select_structurer(dataset, None).build(dataset).to_frame()
+        assert frame["box"].dtype == pl.Array(pl.Float32, 4)
+
+    def test_factor_propagation_and_sibling_nulls_are_preserved(self):
+        data = StructuredData(
+            _two_level_blocks(),
+            {"unit": {"weather": ["sun", "rain"]}, "instance": {"iou": [0.1, 0.2, 0.3]}},
+        )
+        frame = data.to_frame()
+        assert frame["weather"].to_list() == ["sun", "rain", "sun", "sun", "rain"]
+        assert frame["iou"].to_list() == [None, None, 0.1, 0.2, 0.3]
+
+    def test_a_nested_factor_nulls_the_row_with_no_ancestor(self):
+        """polars cannot scatter into a List column, so the null has to come from the gather."""
+        unit, instance = _two_level_blocks()
+        orphaned = RowBlock(
+            "instance",
+            3,
+            instance.columns,
+            {"unit": np.array([0, -1, 1], dtype=np.intp), "instance": np.arange(3)},
+        )
+        data = StructuredData([unit, orphaned], {"unit": {"tags": [[1, 2], [3, 4]]}})
+        assert data.to_frame()["tags"].to_list() == pl.DataFrame(data.to_rows())["tags"].to_list()
+
+    def test_blocks_that_are_all_empty_stay_empty(self):
+        """Every column dropped leaves no height to broadcast a literal against."""
+        block = RowBlock("unit", 0, reserved_block_columns("unit", 0, item_index=[]), {"unit": np.empty(0, np.intp)})
+        assert StructuredData([block], {}).to_frame().height == 0
+
+
+@pytest.mark.required
+class TestOneBlockPerLevel:
+    """A level's rows are one block, because the layout is keyed by level."""
+
+    def test_two_blocks_at_one_level_are_rejected(self):
+        unit, instance = _two_level_blocks()
+        with pytest.raises(ValueError, match=r"Level\(s\) \['unit'\] have more than one row block"):
+            StructuredData([unit, unit, instance], {"unit": {}, "instance": {}})
+
+    def test_the_error_says_to_concatenate(self):
+        unit, instance = _two_level_blocks()
+        with pytest.raises(ValueError, match="one block per level"):
+            StructuredData([unit, unit, instance], {"unit": {}, "instance": {}})
+
+    def test_one_block_per_level_is_accepted(self):
+        data = StructuredData(_two_level_blocks(), {"unit": {}, "instance": {}})
+        assert list(data.layout.counts) == ["unit", "instance"]
+
+    def test_every_structurer_emits_one_block_per_level(self):
+        """The guard states an assumption the real structurers already satisfy."""
+        shared = [{"weather": "sun"}, {"weather": "rain"}, {"weather": "sun"}]
+        for metadata in (
+            Metadata(MockDataset(np.zeros((3, 3, 16, 16)), np.eye(3)[[0, 1, 0]], shared)),
+            Metadata(MockDataset(np.zeros((3, 3, 16, 16)), [_od_target(2)] * 3, shared)),
+            Metadata(_mot_dataset([[2, 1], [1]], shared[:2])),
+        ):
+            metadata._structure()
+            levels = [level for level, _, _ in metadata._layout.blocks]
+            assert len(levels) == len(set(levels))
 
 
 # Two videos: the first has three frames holding 2, 0 and 1 detections, the second two
@@ -606,7 +717,7 @@ class TestUnitIndexColumn:
         assert instances["unit_index"].null_count() == 0
 
     def test_unit_index_is_reserved(self):
-        from dataeval._structurers import RESERVED_COLUMNS, safe_column_name
+        from dataeval._metadata._structurers import RESERVED_COLUMNS, safe_column_name
 
         assert "unit_index" in RESERVED_COLUMNS
         assert "image_index" not in RESERVED_COLUMNS

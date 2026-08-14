@@ -11,8 +11,8 @@ from typing import Any
 import numpy as np
 import pytest
 
+from dataeval import Metadata
 from dataeval._embeddings import Embeddings
-from dataeval._metadata import Metadata
 from dataeval.data import ClassFilter, Limit, Operation, Shuffle, View, split_dataset, unzip_dataset
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import DatasetMetadata, DatumMetadata

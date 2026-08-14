@@ -4,7 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval._metadata import Metadata
+from dataeval import Metadata
 from dataeval.bias._parity import Parity
 from tests.conftest import MockICDataset, MockMetadata, to_metadata
 

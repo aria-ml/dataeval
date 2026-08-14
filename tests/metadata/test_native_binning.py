@@ -9,7 +9,8 @@ through however many descendants an entity happens to have.
 import numpy as np
 import pytest
 
-from dataeval._metadata import Metadata, _to_col
+from dataeval import Metadata
+from dataeval._metadata._columns import to_col
 from dataeval.core._bin import bin_data
 from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
 
@@ -36,7 +37,7 @@ def _od(counts, factors, **kwargs) -> Metadata:
 
 def _companion(md: Metadata, name: str) -> str:
     """The binned or digitized column backing a factor."""
-    return _to_col(name, md.factor_info[name])
+    return to_col(name, md.factor_info[name])
 
 
 @pytest.mark.required

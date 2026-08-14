@@ -22,7 +22,6 @@ _NAMESPACES: dict[str, str] = {
     "dataeval._embeddings": "dataeval.embeddings",
     "dataeval._metadata": "dataeval.metadata",
     "dataeval._ontology": "dataeval.ontology",
-    "dataeval._structurers": "dataeval.metadata",
     "dataeval.bias": "dataeval.bias",
     "dataeval.core": "dataeval.core",
     "dataeval.data": "dataeval.data",

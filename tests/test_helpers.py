@@ -37,3 +37,50 @@ class TestGetOverrides:
     def test_drops_ignored_and_none_values(self):
         overrides = get_overrides({"self": object(), "config": None, "a": 1, "b": None})
         assert overrides == {"a": 1}
+
+
+@pytest.mark.required
+class TestIsMetadataLike:
+    """Dispatch must recognize Metadata without touching its properties.
+
+    ``MetadataLike`` is a runtime_checkable protocol. Python 3.12+ resolves protocol
+    members with ``inspect.getattr_static``, but 3.10 and 3.11 use ``hasattr``, which
+    calls property getters — so a bare ``isinstance`` against the protocol structures
+    and bins the whole dataset inside a type check, and raises rather than returning
+    False at a view where ``class_labels`` is undefined. Both versions are supported,
+    so these assert the behavior that has to hold on all of them.
+    """
+
+    def test_metadata_is_recognized_without_structuring(self, get_od_dataset):
+        from dataeval import Metadata
+        from dataeval._helpers import is_metadata_like
+
+        metadata = Metadata(get_od_dataset(6, targets_per_image=2))
+        assert is_metadata_like(metadata)
+        assert not metadata._is_structured
+        assert not metadata._is_binned
+
+    def test_view_above_label_level_does_not_raise(self, get_od_dataset):
+        # class_labels raises above label_level by design; on 3.10/3.11 hasattr only
+        # swallows AttributeError, so that ValueError used to escape isinstance itself.
+        from dataeval import Metadata
+        from dataeval._helpers import is_metadata_like
+
+        assert is_metadata_like(Metadata(get_od_dataset(6, targets_per_image=2)).at("unit"))
+
+    def test_third_party_container_still_resolves(self):
+        from dataeval._helpers import is_metadata_like
+
+        class Simple:
+            factor_names = ["a"]
+            factor_data = [[0]]
+            class_labels = [0]
+            is_discrete = [True]
+
+        assert is_metadata_like(Simple())
+
+    def test_non_metadata_objects_are_rejected(self, get_od_dataset):
+        from dataeval._helpers import is_metadata_like
+
+        assert not is_metadata_like(object())
+        assert not is_metadata_like(get_od_dataset(2))

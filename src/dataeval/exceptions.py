@@ -4,6 +4,7 @@ __all__ = [
     "DeprecatedWarning",
     "ExperimentalWarning",
     "MaiteShapeError",
+    "MetadataFormatError",
     "NotFittedError",
     "OntologyCycleError",
     "OntologyError",
@@ -43,6 +44,29 @@ class ShapeMismatchError(ValueError):
     This error indicates that input arrays have incorrect dimensions,
     incompatible shapes, or mismatched lengths where they are expected
     to be consistent.
+    """
+
+
+class MetadataFormatError(ValueError):
+    """Raised when :meth:`dataeval.Metadata.load` cannot read a saved file.
+
+    Covers every way a file can fail to be a metadata archive this version can
+    restore: it is not the archive format at all, a member is missing or corrupt,
+    or it was written by a version whose layout has since changed.
+
+    The last of those is the ordinary case rather than an error condition. A saved
+    :class:`~dataeval.Metadata` is a **cache, not an interchange format**: it stores
+    the library's internal per-level layout, and that layout is free to change
+    between releases. This error is what a stale file is *supposed* to produce, so a
+    caching layer should catch it and recompute rather than treat it as a bug::
+
+        try:
+            metadata = Metadata.load(path, dataset)
+        except MetadataFormatError:
+            metadata = Metadata(dataset)
+            metadata.save(path)
+
+    Inherits from :class:`ValueError`, so a caller that catches that keeps working.
     """
 
 

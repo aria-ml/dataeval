@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval import Embeddings
-from dataeval._helpers import _get_index2label, _get_item_indices
+from dataeval._helpers import _get_index2label, _get_item_indices, reject_filtered_metadata
 from dataeval.core import (
     ClusterResult,
     ClusterStats,
@@ -1607,6 +1607,12 @@ class Outliers(Evaluator):
         >>> results = outliers.evaluate(train_ds, test_ds)
         >>> results = outliers.evaluate(train_ds_area1, train_ds_area2, train_ds_area3, test_ds)  # or more
         """
+        # Every input, not just the first: a filtered metadata among ``other`` misaligns
+        # the same way, and is the one an evaluator handed several datasets is likeliest
+        # to reach for.
+        for candidate in (metadata, data, *other):
+            reject_filtered_metadata(candidate, "Outliers")
+
         if other:
             return self._evaluate_multi(
                 [data, *other],
