@@ -58,7 +58,7 @@ predetermined number of clusters. The algorithm proceeds in stages:
 
 - if `n_clusters` is provided, `min_cluster_size = max(5, n_samples // (n_clusters * 3))`
   — smaller clusters are allowed when more clusters are expected;
-- if `n_clusters` is _not_ provided, the default is 5% of the dataset, capped at 100 —
+- if `n_clusters` is *not* provided, the default is 5% of the dataset, capped at 100 —
   `min_cluster_size = min(100, max(5, (n_samples * 0.05)))`
 
 HDBSCAN is the default because it handles irregular cluster shapes, varying

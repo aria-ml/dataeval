@@ -256,9 +256,9 @@ pl.DataFrame({
 # The above table shows that this dataset has a total of 20 classes.
 #
 # Of the classes, `person` is the class with the highest total object count followed by `chair` and `car`, while `person`,
-# `chair` and `dog` are the classes with the highest number of images.
+# `chair`, and `dog` are the classes with the highest number of images.
 #
-# `cow`, `sheep`, and `bus` are the classes with least number of objects, while `bus`, `train` and `cow` are the classes
+# `cow`, `sheep`, and `bus` are the classes with least number of objects, while `bus`, `train`, and `cow` are the classes
 # with the least number of images.
 #
 # This table helps point out the wide variation in
@@ -371,7 +371,7 @@ outlier_imgs.aggregate_by_class(md)
 # Entropy, variance, standard deviation, kurtosis, and skew all measure (in different ways) how much change there is
 # across the pixels in the image, and entropy will be the easiest to understand.
 #
-# Size, width, height and aspect ratio are all interrelated and size has the most extreme images from those.
+# Size, width, height, and aspect ratio are all interrelated and size has the most extreme images from those.
 #
 # Zeros is a category unto itself but it is closely related to brightness, contrast, darkness, and mean. Zeros measures
 # the percentage of pixels with a zero value compared to the average image.

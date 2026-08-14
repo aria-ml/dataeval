@@ -15,7 +15,7 @@ typically 128 to 2048 numbers. The dimensionality of these vectors affects
 their capabilities: higher-dimensional embeddings can capture more nuanced
 visual and semantic distinctions, while lower-dimensional embeddings are more
 efficient to compute and visualize but may lose subtle details. These vectors
-encode image content such that similar vectors represent _meaningfully_ similar
+encode image content such that similar vectors represent *meaningfully* similar
 images.
 
 ## Why are they important
@@ -152,16 +152,16 @@ variety of metrics and tasks.
 ## References
 
 1. Bengio, Y., Courville, A., & Vincent, P. (2013). Representation learning:
-   A review and new perspectives. _IEEE Transactions on Pattern Analysis
-   and Machine Intelligence_, 35(8), 1798–1828. [paper](https://arxiv.org/abs/1206.5538)
+   A review and new perspectives. *IEEE Transactions on Pattern Analysis
+   and Machine Intelligence*, 35(8), 1798–1828. [paper](https://arxiv.org/abs/1206.5538)
 
 2. Chen, T., Kornblith, S., Norouzi, M., & Hinton, G. (2020). A simple framework
-   for contrastive learning of visual representations. _Proceedings of the 37th
-   International Conference on Machine Learning (ICML)_, 1597–1607. [paper](https://arxiv.org/abs/2002.05709)
+   for contrastive learning of visual representations. *Proceedings of the 37th
+   International Conference on Machine Learning (ICML)*, 1597–1607. [paper](https://arxiv.org/abs/2002.05709)
 
 3. Beyer, K., Goldstein, J., Ramakrishnan, R., & Shaft, U. (1999). When is
-   "nearest neighbor" meaningful? _Proceedings of the 7th International Conference
-   on Database Theory (ICDT)_, 217–235. [paper](https://link.springer.com/chapter/10.1007/3-540-49257-7_15)
+   "nearest neighbor" meaningful? *Proceedings of the 7th International Conference
+   on Database Theory (ICDT)*, 217–235. [paper](https://link.springer.com/chapter/10.1007/3-540-49257-7_15)
 
-4. Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. _Proceedings
-   of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)_, 1521–1528. [paper](https://ieeexplore.ieee.org/document/5995347)
+4. Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. *Proceedings
+   of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 1521–1528. [paper](https://ieeexplore.ieee.org/document/5995347)

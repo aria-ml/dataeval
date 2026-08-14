@@ -15,7 +15,7 @@ and channel count (1+).
 :::{important}
 Some DataEval functions and classes apply only to image classification tasks, while
 others apply only to object detection tasks. For more information regarding when to use
-each function or class see the [Functional Overivew page](../reference/FunctionalOverview.md)
+each function or class see the [Functional Overview page](../reference/FunctionalOverview.md)
 for details.
 :::
 

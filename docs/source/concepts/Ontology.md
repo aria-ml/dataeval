@@ -3,7 +3,7 @@
 # Ontology
 
 A dataset's class names rarely stand alone — they belong to a domain
-_vocabulary_ with structure. "sedan" and "pickup truck" are both land vehicles;
+*vocabulary* with structure. "sedan" and "pickup truck" are both land vehicles;
 "fighter jet" is an aircraft, not a watercraft. Written down in a machine-readable
 form, that structure lets a team do three things it otherwise cannot:
 
@@ -31,8 +31,8 @@ reconciliation needs. DataEval uses the part that matters for a class vocabulary
 set of **concepts** arranged by a single relationship, **is-a** (subsumption).
 
 Strictly, a structure built from is-a alone is a **taxonomy** (a subsumption
-hierarchy) or, in the vocabulary of the W3C [SKOS](#ref4) standard, a _concept
-scheme_ related by `broader`/`narrower`. We nonetheless name the class
+hierarchy) or, in the vocabulary of the W3C [SKOS](#ref4) standard, a *concept
+scheme* related by `broader`/`narrower`. We nonetheless name the class
 {class}`.Ontology` deliberately, because **"ontology"** is the word the
 computer-vision annotation industry has settled on for exactly this artifact:
 the controlled set of classes (and their attributes and relationships) that
@@ -45,7 +45,7 @@ Concretely, an {class}`.Ontology` is an immutable, in-memory **directed acyclic
 graph** (DAG) of {class}`.OntologyConcept` nodes, queryable for ancestors,
 descendants, siblings, lowest common ancestors, and the like. It is a DAG rather
 than a strict tree because a concept may have **more than one parent** (an
-amphibious vehicle is-a land vehicle _and_ is-a watercraft) — multiple
+amphibious vehicle is-a land vehicle *and* is-a watercraft) — multiple
 inheritance is normal in real taxonomies. Cyclic inheritance, by contrast, is
 rejected: a concept cannot be its own ancestor, or subsumption becomes meaningless.
 
@@ -55,16 +55,16 @@ For a detection or tracking workload, the ontology is the reference a dataset's
 **label space** is judged against — and, when more than one label space is in
 play, the bridge between them.
 
-- **Reconciliation and conformance.** Detection datasets carry a _category set_
+- **Reconciliation and conformance.** Detection datasets carry a *category set*
   (COCO's `categories`, a TensorFlow `label_map`, a MAITE `index2label` map), and
   names drift across datasets and annotation passes: `"motorbike"` vs
-  `"motorcycle"`, `"car"` vs `"sedan"`, `"person"` vs `"pedestrian"`. _Reconciling_
+  `"motorcycle"`, `"car"` vs `"sedan"`, `"person"` vs `"pedestrian"`. *Reconciling*
   each name against the ontology answers whether it is a known concept, an unknown
   one, or an ambiguous one that matches several; a label set in which all names
-  reconcile unambiguously _conforms_ to the vocabulary.
+  reconcile unambiguously *conforms* to the vocabulary.
 
 - **Label space and granularity.** The ontology delimits what the model is
-  _supposed_ to recognize — its label space, $\mathcal{Y}$. A label outside it
+  *supposed* to recognize — its label space, $\mathcal{Y}$. A label outside it
   signals an unsanctioned class (one nobody agreed to) or a gap (a real concept the
   ontology hasn't captured yet). The is-a structure also lets you reason across
   granularity: a model trained on `"vehicle"` cannot be graded against `"sedan"`
@@ -91,10 +91,10 @@ standard it derives from, and the everyday CV term it corresponds to.
 
 **Concept** — the unit of an ontology: one class in the hierarchy
 ({class}`.OntologyConcept`). This is the canonical noun; prefer it over "node,"
-"class," or "category" when referring to an element _of the ontology_. It
+"class," or "category" when referring to an element *of the ontology*. It
 corresponds to `owl:Class` / `skos:Concept` in the standards, and to a "class,"
 "category," or "label" in CV usage. We reserve **class name** for the
-_dataset-side_ string being checked, to distinguish the thing being validated
+*dataset-side* string being checked, to distinguish the thing being validated
 (a dataset's label) from the thing it is validated against (an ontology concept).
 
 **Id** — a concept's unique, stable identifier (`OntologyConcept.id`), typically
@@ -108,7 +108,7 @@ per concept.
 **Synonyms** — a concept's alternate labels (`OntologyConcept.synonyms`;
 `skos:altLabel`), used so that `"motorbike"` can resolve to a concept whose
 preferred label is `"motorcycle"`. The WordNet tradition behind
-[ImageNet](#ref3) calls such an equivalence set a _synset_.
+[ImageNet](#ref3) calls such an equivalence set a *synset*.
 
 **Definition** — a concept's optional textual gloss
 (`OntologyConcept.definition`; `skos:definition`).
@@ -118,8 +118,8 @@ preferred label is `"motorcycle"`. The WordNet tradition behind
 The ontology models exactly one relation between concepts — **is-a**
 (subsumption: `rdfs:subClassOf` / `skos:broader`) — and exposes it through a
 family of query terms. CV practitioners and graph libraries use two
-interchangeable vocabularies for it: a _subsumption_ vocabulary
-(subclass/superclass) and a _graph_ vocabulary (ancestor/descendant). DataEval
+interchangeable vocabularies for it: a *subsumption* vocabulary
+(subclass/superclass) and a *graph* vocabulary (ancestor/descendant). DataEval
 uses both vocabularies for its own query names, and normalizes every source
 predicate into a single is-a relation carrying **RDFS semantics**:
 
@@ -154,13 +154,13 @@ One asymmetry is deliberate: **subsumption is reflexive, the graph queries are
 not**. Every concept is its own subclass — RDFS/OWL entail `X rdfs:subClassOf X`
 — so `is_a(x, x)` is `True`, and a filter like "keep everything that is a
 `vehicle`" catches `vehicle` itself without the caller writing
-`a == b or ontology.is_a(a, b)`. The traversals stay _proper_: `ancestors(x)`
+`a == b or ontology.is_a(a, b)`. The traversals stay *proper*: `ancestors(x)`
 and `descendants(x)` never contain `x`, which is what keeps `roots`, `leaves`,
 `depth`, and subtree listings meaning what they say. In short,
 `is_a(a, b)` is `b == a or b in ancestors(a)`; for the strict reading ("strictly
 below `b`"), test `a != b and ontology.is_a(a, b)`.
 
-Reflexivity is an entailment about _defined_ concepts, so it does not extend to
+Reflexivity is an entailment about *defined* concepts, so it does not extend to
 external references — `is_a` still raises `KeyError` when `a` is not a defined
 concept, including `is_a(ext, ext)`.
 
@@ -174,23 +174,23 @@ two kinds of id accordingly:
 and (optionally) synonyms, a definition, and parents. The `Ontology` container
 counts, iterates, and resolves only defined concepts.
 
-**External reference** — an id named as a _parent_ of some concept but not itself
+**External reference** — an id named as a *parent* of some concept but not itself
 defined in the ontology (`Ontology.external_ids`). Externals are kept, not
 rejected: they still participate in ancestor and LCA queries, but they have no
 label or further ancestors, so they mark the point where the is-a hierarchy is
 **truncated**. An external reference means "this concept's parent exists in the
 fuller ontology, but isn't included here." Earlier terminology called these
-"external boundary nodes"; the canonical term is _external reference_.
+"external boundary nodes"; the canonical term is *external reference*.
 
 ### Canonical concepts and aliases
 
 Two ids can denote the same class. OWL says so with `owl:equivalentClass`, and a
 reasoner materializes it as mutual `rdfs:subClassOf` — each concept naming the
-other as a parent. Either form is _equivalence_, not a cycle, and DataEval
+other as a parent. Either form is *equivalence*, not a cycle, and DataEval
 collapses it: the group becomes one **canonical** concept, and the group's other
 ids become **aliases** of it.
 
-The canonical id is the lexicographically smallest _defined_ member of the
+The canonical id is the lexicographically smallest *defined* member of the
 group, which keeps the choice stable no matter what order the concepts arrive
 in. The merge is lossless for lookup — every member's label and synonyms are
 folded into the survivor, so {meth}`find <.Ontology.find>` still resolves an
@@ -203,7 +203,7 @@ its canonical form and {meth}`ontology.aliases(id) <.Ontology.aliases>` lists
 what was absorbed.
 
 An alias is not an external reference. An alias names a class this ontology
-_does_ define, under another id; an external reference names one it does not
+*does* define, under another id; an external reference names one it does not
 define at all. Aliases never appear in
 {attr}`external_ids <.Ontology.external_ids>`.
 
@@ -213,9 +213,9 @@ Two boundaries are deliberate:
   `owl:equivalentClass` or a direct mutual pair licenses a collapse. A longer
   cycle with neither — `a → b → c → a` — remains an `OntologyCycleError`.
   {meth}`from_hierarchy <.Ontology.from_hierarchy>` is stricter still: a nested
-  mapping has no syntax for equivalence, so _any_ cycle there is a typo,
+  mapping has no syntax for equivalence, so *any* cycle there is a typo,
   including the two-node case.
-- **`skos:exactMatch` does not merge.** It is a _mapping_ property, for relating
+- **`skos:exactMatch` does not merge.** It is a *mapping* property, for relating
   concepts across schemes; treating it as identity inside one ontology would
   conflate the two. Cross-vocabulary equivalence is an
   [alignment](#alignment-relating-two-vocabularies) concern and is carried by
@@ -224,7 +224,7 @@ Two boundaries are deliberate:
 ## Reconciliation: checking labels against the ontology
 
 Checking a dataset's labels against an ontology is two distinct operations: the
-matching _operation_ (**reconciliation**) and the _property_ it establishes
+matching *operation* (**reconciliation**) and the *property* it establishes
 (**conformance**). The library's {func}`.label_reconciliation` performs both —
 reconciling each class name and reporting whether the label set conforms.
 
@@ -237,8 +237,8 @@ class name falls into one of three outcomes:
 
 - **matched** — reconciled to exactly one concept.
 - **unmatched** — reconciled to no concept. Note this is the **open-world**
-  reading: unmatched means _"not found in this ontology"_, i.e.
-  **out-of-vocabulary (OOV)**; it does not mean _"invalid"_. DataEval does exact
+  reading: unmatched means *"not found in this ontology"*, i.e.
+  **out-of-vocabulary (OOV)**; it does not mean *"invalid"*. DataEval does exact
   reconciliation, not fuzzy normalization — an unmatched label may be a genuine gap
   in the ontology, a typo, or simply outside the intended label space.
 - **ambiguous** — reconciled to more than one concept (e.g. a synonym shared by
@@ -252,14 +252,14 @@ gives "validation."
 
 **Induced sub-hierarchy** — given a set of matched classes spanning different
 levels, the minimal is-a tree connecting just those classes, with intermediate
-concepts collapsed (`induced_edges`; formally the _transitive reduction_ of the
+concepts collapsed (`induced_edges`; formally the *transitive reduction* of the
 hierarchy restricted to the matched set). This is what lets a mixed label set
 like `{"vehicle", "sedan", "fighter jet"}` be drawn as a clean parent/child
 structure.
 
 **Label space** — the set of concepts a dataset's labels are
 expected to fall within; the standard ML name for the class set $\mathcal{Y}$, and
-in formal terms the ontology's _domain of discourse_. An ontology _is_ a
+in formal terms the ontology's *domain of discourse*. An ontology *is* a
 declaration of the label space: reconciled labels are in-vocabulary; unmatched
 (OOV) labels and unexpected externals are where the label space and the dataset
 disagree. In open-set terms, the ontology specifies the **known** classes, against
@@ -268,8 +268,8 @@ which OOV labels stand out as **novel**.
 ## Alignment: relating two vocabularies
 
 Reconciliation checks one label set against one ontology. **Alignment**
-(equivalently _ontology matching_) is its generalization: relating a whole
-_source_ vocabulary to a _target_ one, so heterogeneous label spaces can be
+(equivalently *ontology matching*) is its generalization: relating a whole
+*source* vocabulary to a *target* one, so heterogeneous label spaces can be
 treated as one. Reconciliation is the special case of a structureless source,
 exact name matching, and equivalence alone; relax those restrictions and it
 becomes alignment. DataEval performs alignment with {func}`.label_alignment`,
@@ -294,7 +294,7 @@ scope, as they do from the model itself.
 
 A correspondence is not merely an assertion that two concepts are associated — it
 licenses a concrete **transformation of a label**. Equivalence licenses renaming a
-source label to its target; subsumption licenses rewriting a label _up_ the
+source label to its target; subsumption licenses rewriting a label *up* the
 hierarchy to a more general concept. Which rewrites an alignment permits, and which
 it must refuse, follows entirely from the relations it carries (see
 [Relations](#relations)) — which is what makes alignment the prerequisite for
@@ -302,8 +302,8 @@ relating or combining annotations across sources, rather than an end in itself.
 
 ### Source, target, and reference vocabulary
 
-The **source** is the vocabulary being mapped _from_ (another dataset's classes);
-the **target** is the reference vocabulary being mapped _to_. Equivalence is
+The **source** is the vocabulary being mapped *from* (another dataset's classes);
+the **target** is the reference vocabulary being mapped *to*. Equivalence is
 symmetric, but subsumption is directional, so an alignment has an orientation. When
 more than two sources must be related, aligning every pair is quadratic and yields
 no single result; the standard resolution is a **pivot** (reference) ontology —
@@ -331,7 +331,7 @@ specific label to a general one is always valid (every sedan is a vehicle), whil
 specializing a general label to a specific one is not (not every vehicle is a
 sedan). An alignment can therefore safely carry a source into a target by
 equivalence or coarsening, but a broader correspondence is evidence of a
-_granularity mismatch_ the relation alone cannot resolve — {func}`.label_alignment`
+*granularity mismatch* the relation alone cannot resolve — {func}`.label_alignment`
 emits these as diagnostics, not rewrites. (SKOS's `skos:closeMatch` denotes a
 weaker, not-quite-exact equivalence — the natural reading of a high-but-imperfect
 confidence.)
@@ -342,7 +342,7 @@ A **matcher** is a method for proposing correspondences. Ontology matching
 classifies them into families ([Euzenat & Shvaiko, 2013](#ref12)) by the evidence
 they use:
 
-- **Element-level, terminological** — compares concept _names_: exact match over
+- **Element-level, terminological** — compares concept *names*: exact match over
   labels, synonyms, and ids ({meth}`.Ontology.find`); approximate (fuzzy) string
   match for variants and typos; embedding similarity for synonyms with no shared
   surface form (`"automobile"` ↔ `"car"`).
@@ -352,10 +352,10 @@ they use:
   {meth}`descendant <.Ontology.descendants>` overlap. When several sibling targets
   score near-equally, the structural reading favors a **broader** correspondence to
   their shared parent over an arbitrary equivalence to one sibling.
-- **Extensional, instance-based** — compares the _instances_ that fall under each
+- **Extensional, instance-based** — compares the *instances* that fall under each
   concept rather than its name. When the concepts are dataset classes, the overlap
   of their distributions in an [embedding](Embeddings.md) space is direct evidence
-  for a correspondence, and the _direction_ of distributional containment is
+  for a correspondence, and the *direction* of distributional containment is
   evidence for subsumption versus equivalence — independent of, and complementary
   to, the name-based families.
 
@@ -380,16 +380,16 @@ unaligned set.
 When the purpose of an alignment is to express several sources in one vocabulary,
 two properties summarize it.
 
-**Mergeability** — the generalization of reconciliation's _conformance_. A source
-is _losslessly expressible_ in the reference if every class aligns by equivalence
-or coarsening; _lossily expressible_ if coarsening discards needed specificity; and
-only _partially expressible_ if some classes are broader, related, or unaligned and
+**Mergeability** — the generalization of reconciliation's *conformance*. A source
+is *losslessly expressible* in the reference if every class aligns by equivalence
+or coarsening; *lossily expressible* if coarsening discards needed specificity; and
+only *partially expressible* if some classes are broader, related, or unaligned and
 cannot be carried over without additional evidence. {func}`.label_alignment`
 reports this verdict alongside the safe label `class_remap`.
 
 **Common cut (frontier)** — to express several sources at a comparable granularity,
 each is projected onto a shared **antichain** of the reference hierarchy: the
-finest set of concepts that _every_ source can reach by equivalence or coarsening,
+finest set of concepts that *every* source can reach by equivalence or coarsening,
 a "cut" across the is-a graph. The cut fixes the effective granularity of the
 combined label space and makes the granularity/coverage trade-off explicit (see
 hierarchical classification, [Silla & Freitas, 2011](#ref14)).
@@ -401,7 +401,7 @@ sources that are the subject of [distribution shift](DistributionShift.md) and
 
 ## Validation: checking the ontology artifact
 
-Reconciliation and alignment judge data _against_ an ontology; both presume the
+Reconciliation and alignment judge data *against* an ontology; both presume the
 ontology itself is sound. {func}`.ontology_validation` turns the lens on the
 **artifact**, reporting the structural and naming facts that bear on its quality,
 independent of any dataset. An {class}`.Ontology` already guarantees the hard
@@ -421,7 +421,7 @@ ontology meant to be complete. The call records four families of fact:
   of its own ancestors, e.g. `car` placed next to `vehicle`), and `unary_parents` (a
   single-child link, which adds depth without discriminating).
 - **Naming** — `label_collisions`, names resolving to more than one concept (the
-  artifact-side cause of reconciliation _ambiguity_), and, when a `label_pattern` is
+  artifact-side cause of reconciliation *ambiguity*), and, when a `label_pattern` is
   supplied, `nonconforming_labels` that fail it (e.g. a `lowercase_snake_case` lint).
 - **Shape** — the per-concept `depth`, `fan_out`, and `parent_count`: the raw
   material for judging depth imbalance, over-broad parents, and multiple-inheritance
@@ -442,8 +442,8 @@ despite where annotation platforms file them.
 
 - **The taxonomic (semantic) core** (what {class}`.Ontology` models) — concepts
   related by is-a, carrying labels, synonyms, and definitions. This is what
-  {class}`.Ontology` _is_: a portable, format-neutral hierarchy you validate label
-  _names_ against and reason over (ancestor / descendant / sibling / LCA). It comes
+  {class}`.Ontology` *is*: a portable, format-neutral hierarchy you validate label
+  *names* against and reason over (ancestor / descendant / sibling / LCA). It comes
   from the OWL/RDF/SKOS tradition and is what COCO supercategories, WordNet, and the
   Open Images hierarchy express. Both reconciliation and alignment stay within this
   core.
@@ -462,10 +462,10 @@ despite where annotation platforms file them.
     must be present on every frame of a tracked sequence;
   - **naming conventions** (typically `lowercase_snake_case`), enforced as a lint.
 
-The taxonomic core validates _which concepts a dataset's labels denote and how
-they relate_ — what {func}`.label_reconciliation` and {func}`.label_alignment` do
-today, over class _names_ alone. The operational schema additionally validates _how
-each instance was annotated_: that a `tree` was drawn as a `polygon` and not a
+The taxonomic core validates *which concepts a dataset's labels denote and how
+they relate* — what {func}`.label_reconciliation` and {func}`.label_alignment` do
+today, over class *names* alone. The operational schema additionally validates *how
+each instance was annotated*: that a `tree` was drawn as a `polygon` and not a
 `bounding_box`, that a required `color` attribute is present and one of its allowed
 options, that every frame carries its scene classifications.
 
@@ -476,17 +476,17 @@ therefore **out of scope for the present taxonomy model** and would be a
 separate, schema-driven validator rather than an extension of {class}`.Ontology`.
 
 Two checks that annotation platforms bundle into the operational layer are
-nonetheless purely _taxonomic_, and DataEval performs them on the artifact in
+nonetheless purely *taxonomic*, and DataEval performs them on the artifact in
 {func}`.ontology_validation`:
 
 - **Naming / format linting** — flagging concept labels that mix separators or are
   not `lowercase_snake_case`, to keep the vocabulary uniform.
 - **Structural smells** — a concept and one of its own ancestors appearing as
-  _siblings_ (`car` placed alongside `vehicle`), redundant is-a edges, or
+  *siblings* (`car` placed alongside `vehicle`), redundant is-a edges, or
   single-child chains.
 
-One related check is _not_ artifact-only: over-specification — many leaf concepts
-carrying very few samples — needs a _dataset_ to judge, so it sits with
+One related check is *not* artifact-only: over-specification — many leaf concepts
+carrying very few samples — needs a *dataset* to judge, so it sits with
 reconciliation rather than with validation, which reports depth and breadth as
 metrics for an evaluator to weigh.
 
@@ -512,19 +512,19 @@ experts:
 - **Lexical hierarchies.** [WordNet](#ref2)'s synsets and hypernym (is-a) links
   are the model [ImageNet](#ref3) used to organize 1000+ visual categories into a
   hierarchy — the original large-scale "ontology for computer vision," and the
-  source of the _synset_ framing behind our synonyms.
+  source of the *synset* framing behind our synonyms.
 
 - **Detection dataset taxonomies.** [COCO](#ref6) groups its 80 `categories` under
   12 `supercategories` (a one-level is-a hierarchy), [Open Images](#ref7) ships an
   explicit multi-level hierarchy, and [nuScenes](#ref8) defines a driving taxonomy
-  _with attributes_ for detection and tracking. Relating these category sets is the
+  *with attributes* for detection and tracking. Relating these category sets is the
   concrete CV instance of ontology matching — and the case where structural and
   extensional evidence matter most, because the same surface name sits at different
   granularities across taxonomies.
 
 A note on the **open-world** framing: classical detection benchmarks are
-_closed-set_ (a fixed category list), and DataEval's exact reconciliation matches
-that — but the same vocabulary extends to _open-vocabulary detection_
+*closed-set* (a fixed category list), and DataEval's exact reconciliation matches
+that — but the same vocabulary extends to *open-vocabulary detection*
 ([ViLD](#ref9)), where the ontology becomes the controlled set of concept names a
 model is queried with rather than a fixed integer label map.
 
@@ -552,49 +552,49 @@ model is queried with rather than a fixed integer label map.
 ## References
 
 1. [Gruber, T. R. (1993). A translation approach to portable ontology
-   specifications. _Knowledge Acquisition_, 5(2), 199–220.
+   specifications. *Knowledge Acquisition*, 5(2), 199–220.
    doi: 10.1006/knac.1993.1008
    [paper](https://tomgruber.org/writing/ontolingua-kaj-1993.htm)]{#ref1}
 
 2. [Miller, G. A. (1995). WordNet: A lexical database for English.
-   _Communications of the ACM_, 38(11), 39–41.
+   *Communications of the ACM*, 38(11), 39–41.
    doi: 10.1145/219717.219748
    [paper](https://dl.acm.org/doi/10.1145/219717.219748)]{#ref2}
 
 3. [Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., & Fei-Fei, L. (2009).
-   ImageNet: A large-scale hierarchical image database. In _CVPR_ (pp. 248–255).
+   ImageNet: A large-scale hierarchical image database. In *CVPR* (pp. 248–255).
    doi: 10.1109/CVPR.2009.5206848
    [paper](https://ieeexplore.ieee.org/document/5206848)]{#ref3}
 
 4. [Miles, A., & Bechhofer, S. (2009). SKOS Simple Knowledge Organization System
-   Reference. _W3C Recommendation._
+   Reference. *W3C Recommendation.*
    [spec](https://www.w3.org/TR/skos-reference/) ·
    [mapping properties](https://www.w3.org/TR/skos-reference/#mapping)]{#ref4}
 
 5. [W3C OWL Working Group. (2012). OWL 2 Web Ontology Language Document Overview
-   (2nd ed.). _W3C Recommendation._
+   (2nd ed.). *W3C Recommendation.*
    [spec](https://www.w3.org/TR/owl2-overview/)]{#ref5}
 
 6. [Lin, T.-Y., Maire, M., Belongie, S., Hays, J., Perona, P., Ramanan, D.,
    Dollár, P., & Zitnick, C. L. (2014). Microsoft COCO: Common objects in context.
-   In _ECCV_ (pp. 740–755). doi: 10.1007/978-3-319-10602-1_48
+   In *ECCV* (pp. 740–755). doi: 10.1007/978-3-319-10602-1_48
    [paper](https://arxiv.org/abs/1405.0312)]{#ref6}
 
 7. [Kuznetsova, A., Rom, H., Alldrin, N., Uijlings, J., Krasin, I., Pont-Tuset, J.,
    Kamali, S., Popov, S., Malloci, M., Kolesnikov, A., Duerig, T., & Ferrari, V.
    (2020). The Open Images Dataset V4: Unified image classification, object
-   detection, and visual relationship detection at scale. _International Journal of
-   Computer Vision_, 128(7), 1956–1981. doi: 10.1007/s11263-020-01316-z
+   detection, and visual relationship detection at scale. *International Journal of
+   Computer Vision*, 128(7), 1956–1981. doi: 10.1007/s11263-020-01316-z
    [paper](https://arxiv.org/abs/1811.00982)]{#ref7}
 
 8. [Caesar, H., Bankiti, V., Lang, A. H., Vora, S., Liong, V. E., Xu, Q.,
    Krishnan, A., Pan, Y., Baldan, G., & Beijbom, O. (2020). nuScenes: A
-   multimodal dataset for autonomous driving. In _CVPR_ (pp. 11621–11631).
+   multimodal dataset for autonomous driving. In *CVPR* (pp. 11621–11631).
    doi: 10.1109/CVPR42600.2020.01164
    [paper](https://arxiv.org/abs/1903.11027)]{#ref8}
 
 9. [Gu, X., Lin, T.-Y., Kuo, W., & Cui, Y. (2022). Open-vocabulary object
-   detection via vision and language knowledge distillation (ViLD). In _ICLR._
+   detection via vision and language knowledge distillation (ViLD). In *ICLR.*
    [paper](https://arxiv.org/abs/2104.13921)]{#ref9}
 
 10. [Encord. Ontologies — platform documentation. Accessed 2026.
@@ -603,7 +603,7 @@ model is queried with rather than a fixed integer label map.
 11. [Avala. Annotation platform — schema/ontology documentation. Accessed 2026.
     [site](https://www.avala.ai/)]{#ref11}
 
-12. [Euzenat, J., & Shvaiko, P. (2013). _Ontology Matching_ (2nd ed.). Springer.
+12. [Euzenat, J., & Shvaiko, P. (2013). *Ontology Matching* (2nd ed.). Springer.
     doi: 10.1007/978-3-642-38721-0
     [book](https://link.springer.com/book/10.1007/978-3-642-38721-0)]{#ref12}
 
@@ -611,6 +611,6 @@ model is queried with rather than a fixed integer label map.
     evaluation campaigns. [site](http://oaei.ontologymatching.org/)]{#ref13}
 
 14. [Silla, C. N., & Freitas, A. A. (2011). A survey of hierarchical classification
-    across different application domains. _Data Mining and Knowledge Discovery_,
+    across different application domains. *Data Mining and Knowledge Discovery*,
     22(1–2), 31–72. doi: 10.1007/s10618-010-0175-9
     [paper](https://link.springer.com/article/10.1007/s10618-010-0175-9)]{#ref14}

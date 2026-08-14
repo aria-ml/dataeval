@@ -182,7 +182,7 @@ developers for a better metric in a Kaggle-style AI competition.
 * model training
   * training-data partitioning
   * training-data augmentation
-  * leakage, bias and label errors
+  * leakage, bias, and label errors
 * model evaluation
   * performance
   * calibration

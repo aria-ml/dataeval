@@ -40,7 +40,7 @@ a [Machine Learning (ML) Engineer](ml_engineer.md), and a
 the team generates a list of questions that will need to be answered to ensure
 a successful project.
 
-_Example Questions_:
+*Example Questions*:
 
 - "Is our initial dataset good enough to build on?"
 - "Are there hidden biases or correlations in the data?"
@@ -108,7 +108,7 @@ from phase 1. They [clean the data](../../notebooks/tt_clean_dataset.py),
 analyze the dataset for [bias or correlations](../../notebooks/tt_identify_bias.py),
 and [assess the data space](../../notebooks/tt_assess_data_space.py).
 After curating the dataset, they split the dataset
-into a training, validation and a hold out test set. Again, they generate a report
+into a training, validation, and a hold out test set. Again, they generate a report
 for the manager, this time showing the images removed and the potential lack of
 coverage for a specific type of truck.
 

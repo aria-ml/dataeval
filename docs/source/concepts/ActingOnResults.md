@@ -13,7 +13,7 @@ interact with another. Use this page as a reference: when a diagnostic produces
 a result you need to act on, find the relevant section and understand your
 options before committing to a course of action.
 
-One framing applies across all of it: DataEval finds _evidence_ of problems. The
+One framing applies across all of it: DataEval finds *evidence* of problems. The
 interpretation is always yours. A high BER upper bound is evidence that class
 overlap may be irreducible — it is not proof that your requirement is
 unachievable. A detected duplicate is evidence of potential redundancy — it is
@@ -34,7 +34,7 @@ nothing new to either training or evaluation. In training data, exact duplicates
 artificially inflate the effective weight of those samples during gradient
 updates. In test data, they introduce data leakage if the duplicate also appears
 in training. Remove all but one instance per exact-match group. The exception is
-when exact duplicates appear with _different labels_ — that is a label error,
+when exact duplicates appear with *different labels* — that is a label error,
 not a redundancy issue, and requires human review before any removal.
 
 **Near-duplicates** require judgment. A perceptual hash match means two images
@@ -160,7 +160,7 @@ high correlation between a metadata factor and class means the model can use
 that factor as a shortcut to predict class without learning the actual signal of
 interest.
 
-The action depends on whether the correlation is _removable_. Some correlations
+The action depends on whether the correlation is *removable*. Some correlations
 are collection artifacts — if all images of class A were collected in summer and
 all images of class B in winter, the seasonal metadata factor is spuriously
 correlated with class. The fix is to collect more data that breaks the confound:
@@ -238,7 +238,7 @@ the numerical rank, so the pair separates two different shortfalls (see
 
 - **Low completeness, high isotropy** — the data occupies a small subspace but
   fills it evenly. The missing variation is in factors the current collection
-  never varied at all. Collect along _new_ axes: new sites, sensors, seasons,
+  never varied at all. Collect along *new* axes: new sites, sensors, seasons,
   viewpoints.
 - **Low completeness, low isotropy** — a few directions dominate. Some factor is
   varying much more than the rest, often an incidental one (a single dominant
@@ -261,7 +261,7 @@ for guidance on embedding selection.
 
 ## Prioritization: acting on redundancy and coverage together
 
-{class}`.Prioritize` is the primary _remediation_ tool in DataEval — it does not
+{class}`.Prioritize` is the primary *remediation* tool in DataEval — it does not
 just diagnose, it returns a ranked list of sample indices you can act on
 directly. Where the other evaluators tell you what is wrong, Prioritize tells
 you which samples to include in a representative subset or which unlabeled
@@ -293,7 +293,7 @@ on embeddings:
 ### Selecting a policy
 
 The `PrioritizeOutput` returned by `evaluate()` stores the raw ranking and
-computes the final index order lazily based on a _policy_. Changing policy is
+computes the final index order lazily based on a *policy*. Changing policy is
 cheap — it reorders the stored result without re-running the embedding or
 ranking. Three policies are available:
 
@@ -323,8 +323,8 @@ across datasets; both outperformed random decimation on several datasets.
 
 ### Reference-based prioritization for new data
 
-A distinct and important use case is evaluating _new, unlabeled data_ against an
-_existing labeled dataset_. Pass the existing labeled dataset as the `reference`
+A distinct and important use case is evaluating *new, unlabeled data* against an
+*existing labeled dataset*. Pass the existing labeled dataset as the `reference`
 argument:
 
 ```python
@@ -357,7 +357,7 @@ clean the pool being prioritized.
 
 ## Class balance remediation
 
-{class}`.ClassBalance` is a _selection_ tool, not a diagnostic. It takes a
+{class}`.ClassBalance` is a *selection* tool, not a diagnostic. It takes a
 dataset with class frequency information and returns indices for a
 class-balanced subset, using one of two strategies:
 
@@ -375,7 +375,7 @@ original frequency information. Use `interclass` when you need strict balance
 for evaluation purposes or when extreme imbalance is creating a known
 performance problem.
 
-`ClassBalance` addresses _sampling_ imbalance — it helps you select a balanced
+`ClassBalance` addresses *sampling* imbalance — it helps you select a balanced
 subset from what you have. If the imbalance exists because certain classes are
 simply underrepresented in the dataset (not enough images of that class exist),
 `ClassBalance` cannot fix that. The only remedy for collection imbalance is
@@ -473,8 +473,8 @@ the domain classifier). A drift detection is a signal to investigate, not a
 signal to immediately retrain.
 
 **First response to drift detection**: characterize the drift before acting.
-{class}`.DriftUnivariate` identifies _which_ features drifted.
-{class}`.DriftDomainClassifier` provides feature importances indicating _which_
+{class}`.DriftUnivariate` identifies *which* features drifted.
+{class}`.DriftDomainClassifier` provides feature importances indicating *which*
 features most distinguish the operational batch from the reference. Use this
 information to understand what changed: a seasonal shift in lighting, a sensor
 hardware change, a change in the operational scenario, or a change in the target
@@ -502,7 +502,7 @@ lifecycle decision involving data collection, labeling, and model qualification.
 ### OOD detection results
 
 OOD detectors return per-sample scores and a binary flag. The actionable
-question is not just whether a sample is flagged, but _why_ it is distant from
+question is not just whether a sample is flagged, but *why* it is distant from
 the training distribution.
 
 **Isolated OOD samples in a batch** that drift detection did not flag (the batch
@@ -521,7 +521,7 @@ This is the scenario most likely to produce confident wrong predictions and most
 likely to warrant immediate retraining.
 
 **OOD detection with reconstruction-based methods** provides feature-level error
-maps that localize _where_ in the image the anomaly is. When per-sample OOD
+maps that localize *where* in the image the anomaly is. When per-sample OOD
 flags are reviewed, use the error maps to understand whether the anomaly is a
 foreground change (new target type, new object configuration) or a background
 change (new environmental condition). The former is usually more consequential
@@ -532,7 +532,7 @@ for model performance.
 ## Diagnosing findings with metadata
 
 When any DataEval evaluator flags samples — whether as outliers, OOD, drifted,
-or mislabeled — the immediate question is _why_. The flagged indices are a list
+or mislabeled — the immediate question is *why*. The flagged indices are a list
 of samples; the metadata attached to those samples is often the fastest path to
 understanding what they have in common.
 
@@ -543,8 +543,8 @@ object-level attributes) that were collected alongside the samples.
 
 ### Identifying what is unusual about flagged samples
 
-{func}`.factor_deviation` answers the question: _for each flagged sample, which
-metadata factors deviate most from the reference distribution?_
+{func}`.factor_deviation` answers the question: *for each flagged sample, which
+metadata factors deviate most from the reference distribution?*
 
 It computes the reference median for each factor, then measures how far each
 flagged sample deviates from that median. Deviations are scaled asymmetrically:
@@ -571,8 +571,8 @@ are available.
 
 ### Identifying which factors predict flagged samples
 
-{func}`.factor_predictors` answers the question: _which metadata factors are
-most associated with being flagged?_
+{func}`.factor_predictors` answers the question: *which metadata factors are
+most associated with being flagged?*
 
 It treats the flagged/not-flagged binary as a target variable and computes the
 normalized mutual information between each metadata factor and that target,
@@ -619,8 +619,8 @@ class, the `.factors` attribute provides this format directly.
 
 Where drift detectors return a binary signal — drifted or not — HP divergence
 ({func}`.divergence_mst`) returns a continuous score between 0 and 1. The two are
-complementary: drift detection tells you when to act; divergence tells you _how
-much_ the situation has changed, which is the information needed to calibrate
+complementary: drift detection tells you when to act; divergence tells you *how
+much* the situation has changed, which is the information needed to calibrate
 the urgency and scale of the response.
 
 **A divergence score near 0** between training and operational data confirms

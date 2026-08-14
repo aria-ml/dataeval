@@ -5,7 +5,7 @@
 {term}`Drift` detectors answer a binary question: has the [distribution shifted](DistributionShift.md)
 enough to reject the null hypothesis? That answer is appropriate for continuous
 monitoring, where you need a clear signal to act on. But it leaves a question
-unanswered: _how far apart_ are two datasets, and is the gap growing over time?
+unanswered: *how far apart* are two datasets, and is the gap growing over time?
 
 HP divergence answers that question. It is a nonparametric, quantitative
 measure of distributional distance — not a hypothesis test, but a number on a
@@ -29,8 +29,8 @@ decision logic.
 
 ## When to use it
 
-Use HP divergence when you need to _quantify_ distributional distance rather
-than _test_ for it. Specific situations where it is the right choice:
+Use HP divergence when you need to *quantify* distributional distance rather
+than *test* for it. Specific situations where it is the right choice:
 
 **Comparing training and operational distributions before deployment.** A
 divergence near 0 confirms that the operational data is well-covered by the
@@ -57,7 +57,7 @@ geographic region, time window, or sensor — can localize which subpopulation
 is driving the detected shift, without the multiple-testing burden of running
 individual drift tests on each subpopulation.
 
-HP divergence is _not_ the right tool when you need a formal statistical
+HP divergence is *not* the right tool when you need a formal statistical
 decision: use the {term}`drift <Drift>` detectors in {class}`.DriftUnivariate`,
 {class}`.DriftMMD`, or {class}`.DriftDomainClassifier` when you need a p-value
 or a defensible pass/fail determination.
@@ -123,8 +123,8 @@ operate at different levels of the same question:
 HP divergence is also closely related to {func}`.ber_mst` — both the MST and KNN
 estimators for HP divergence are derived from the same foundational papers as
 the BER estimators ([Renggli et al., 2021](#ref3)). Where BER estimates the irreducible classification error
-_within_ a dataset (overlap between classes), HP divergence estimates the
-distributional distance _between_ two datasets. The two metrics use shared
+*within* a dataset (overlap between classes), HP divergence estimates the
+distributional distance *between* two datasets. The two metrics use shared
 infrastructure and are natural companions in pre-deployment analysis.
 
 ## Limitations
@@ -165,13 +165,13 @@ samples are sparse relative to the dimensionality of the embedding space.
 ## References
 
 1. [Cover, T. & Hart, P. (1967). Nearest neighbor pattern classification.
-   _IEEE Transactions on Information Theory_, 13(1), 21–27.
+   *IEEE Transactions on Information Theory*, 13(1), 21–27.
    doi: 10.1109/TIT.1967.1053964 [paper](https://ieeexplore.ieee.org/document/1053964)]{#ref1}
 
 2. [Sekeh, S. Y., Oselio, B., & Hero, A. O. (2020). Learning to bound the
-   multi-class Bayes error. _IEEE Transactions on Signal Processing_, 68, 3793–3807.
+   multi-class Bayes error. *IEEE Transactions on Signal Processing*, 68, 3793–3807.
    doi: 10.1109/TSP.2020.2994807 [paper](https://arxiv.org/abs/1811.06419)]{#ref2}
 
 3. [Renggli, C., Rimanic, L., Hollenstein, N., & Zhang, C. (2021). Evaluating Bayes
-   Error Estimators on real-world datasets with FeeBee. _arXiv preprint arXiv:2108.13034_.
+   Error Estimators on real-world datasets with FeeBee. *arXiv preprint arXiv:2108.13034*.
    [paper](https://arxiv.org/abs/2108.13034)]{#ref3}

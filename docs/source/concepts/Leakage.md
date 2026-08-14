@@ -13,7 +13,7 @@ the gap appears only when the model meets genuinely new data.
 This page organizes leakage using the taxonomy of
 [Kapoor & Narayanan (2022)](#ref1) — three top-level categories (L1–L3)
 spanning eight specific failure modes. Several of these types are
-_methodological_: they are errors in how a pipeline is constructed rather than
+*methodological*: they are errors in how a pipeline is constructed rather than
 properties of the data; others are properties of the data itself. The aim here
 is to characterize each failure mode — what leaks, how it inflates the reported
 metric, and why it matters — as the taxonomy to build from.
@@ -24,7 +24,7 @@ Supervised learning rests on an assumption: that the training and test
 partitions are drawn independently from the same distribution $P(X, Y)$ — over
 an input space $\mathcal{X}$ and label space $\mathcal{Y}$ — and that this
 distribution matches the one the model will face in deployment, the
-_distribution of interest_. Every performance number a team reports —
+*distribution of interest*. Every performance number a team reports —
 validation accuracy, held-out mAP, a passing acceptance test — is only
 meaningful to the extent that this assumption holds.
 
@@ -59,7 +59,7 @@ modes; each is described in the sections that follow.
 
 ### L1 — Lack of clean separation of training and test data
 
-If the training set is not held fully apart from the test set through _every_
+If the training set is not held fully apart from the test set through *every*
 pre-processing, modeling, and evaluation step, the model gains access to test
 information before it is graded, and the reported metric reflects memorization
 rather than generalization ([Kapoor & Narayanan, 2022](#ref1)).
@@ -67,7 +67,7 @@ rather than generalization ([Kapoor & Narayanan, 2022](#ref1)).
 **L1.1 is purely methodological.** Evaluating a model on its own training data,
 with no held-out set, leaves no trace in the data itself; it is caught by code
 review and disciplined pipeline construction, where every fit happens inside the
-training fold. The practical guards are _provenance artifacts_ — data cards and
+training fold. The practical guards are *provenance artifacts* — data cards and
 model cards (or trained-model metadata) that record which samples a model was fit
 on — so that test-set membership can be audited against the training record. When
 the split is documented this way, the overlap that defines L1.1 becomes a check
@@ -114,9 +114,9 @@ collected without that display, so the measured performance will not reproduce i
 real use. Whether a feature is legitimate is a domain-knowledge judgment, which is
 why Kapoor & Narayanan give L2 no sub-categories.
 
-**Feasibility and sufficiency are _not_ leakage.** Two related conditions are easy
-to misfile here. A task may simply be _hard_ — the irreducible (Bayes) error is
-high given the features — or the training set may be too _small_, so that more
+**Feasibility and sufficiency are *not* leakage.** Two related conditions are easy
+to misfile here. A task may simply be *hard* — the irreducible (Bayes) error is
+high given the features — or the training set may be too *small*, so that more
 data would still help. Both are real and important, but neither involves
 information crossing a boundary it should not, so neither is leakage.
 
@@ -161,7 +161,7 @@ distribution they were assumed to represent.
 ## Leakage through repeated evaluation
 
 There is a form of leakage that none of the above captures and that no static
-analysis of a dataset can see, because it happens over _time_. A held-out test
+analysis of a dataset can see, because it happens over *time*. A held-out test
 set can stay sealed — its samples never inspected — and still leak, through the
 performance scores themselves. Each time a team evaluates a model against the
 same holdout and uses the score to choose the next model, a sliver of test-set
@@ -176,7 +176,7 @@ through the outcomes alone. Public leaderboards and long-lived benchmark test
 sets behave the same way ([Recht et al., 2019](#ref5)).
 
 No static analysis of a dataset can see adaptive overfitting — it is a property
-of the evaluation _process_, not the data. The mitigations are procedural: limit
+of the evaluation *process*, not the data. The mitigations are procedural: limit
 the number of evaluations against any fixed holdout, refresh test sets
 periodically, and budget test-set access deliberately, as in the reusable-holdout
 mechanism of [Dwork et al. (2015)](#ref4).
@@ -184,25 +184,25 @@ mechanism of [Dwork et al. (2015)](#ref4).
 ## References
 
 1. [Kapoor, S., & Narayanan, A. (2022). Leakage and the reproducibility crisis
-   in ML-based science. _arXiv preprint arXiv:2207.07048._
+   in ML-based science. *arXiv preprint arXiv:2207.07048.*
    [paper](https://arxiv.org/abs/2207.07048)]{#ref1}
 
 2. [Kaufman, S., Rosset, S., Perlich, C., & Stitelman, O. (2012). Leakage in
-   data mining: Formulation, detection, and avoidance. _ACM Transactions on
-   Knowledge Discovery from Data_, 6(4), 1–21.
+   data mining: Formulation, detection, and avoidance. *ACM Transactions on
+   Knowledge Discovery from Data*, 6(4), 1–21.
    doi: 10.1145/2382577.2382579 [paper](https://dl.acm.org/doi/10.1145/2382577.2382579)]{#ref2}
 
 3. [Geirhos, R., Jacobsen, J.-H., Michaelis, C., Zemel, R., Brendel, W., Bethge,
    M., & Wichmann, F. A. (2020). Shortcut learning in deep neural networks.
-   _Nature Machine Intelligence_, 2(11), 665–673.
+   *Nature Machine Intelligence*, 2(11), 665–673.
    doi: 10.1038/s42256-020-00257-z [paper](https://arxiv.org/abs/2004.07780)]{#ref3}
 
 4. [Dwork, C., Feldman, V., Hardt, M., Pitassi, T., Reingold, O., & Roth, A.
    (2015). The reusable holdout: Preserving validity in adaptive data analysis.
-   _Science_, 349(6248), 636–638.
+   *Science*, 349(6248), 636–638.
    doi: 10.1126/science.aaa9375 [paper](https://www.science.org/doi/10.1126/science.aaa9375)]{#ref4}
 
 5. [Recht, B., Roelofs, R., Schmidt, L., & Shankar, V. (2019). Do ImageNet
-   classifiers generalize to ImageNet? In _Proceedings of the 36th International
-   Conference on Machine Learning_ (pp. 5389–5400).
+   classifiers generalize to ImageNet? In *Proceedings of the 36th International
+   Conference on Machine Learning* (pp. 5389–5400).
    [paper](https://arxiv.org/abs/1902.10811)]{#ref5}

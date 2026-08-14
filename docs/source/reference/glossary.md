@@ -186,7 +186,7 @@ Confidence Level
     also true for the actual population.
 
 Confusion Matrix
-    A matrix made up of the following measurements: True Positives, True Negatives, False Positives
+    A matrix made up of the following measurements: True Positives, True Negatives, False Positives,
     and False Negatives. An image is shown below.
 
     See {term}`True Positive Rate (TP)`, {term}`True Negative Rate (TN)`, {term}`False Positive Rate (FP)`,
@@ -208,8 +208,8 @@ Convolutional Layer
 
 Convolutional Neural Network (CNN)
     A type of {term}`Deep Neural Network<Deep Neural Network (DNN)>` used in computer vision applications
-    such as image classification, image segmentation and image and video recognition. It uses at
-    a minimum of 3 layers; the convolutional layer, the pooling layer and the Fully Connected (FC) Layer.
+    such as image classification, image segmentation, and image and video recognition. It uses at
+    a minimum of 3 layers; the convolutional layer, the pooling layer, and the Fully Connected (FC) Layer.
     With each layer, the CNN increases its complexity, identifying greater portions of the input image.
 
 Coverage
@@ -237,7 +237,7 @@ Cross-Validation
 ```{glossary}
 Dataset Splits
     Dataset splits, also known as data splitting, is the process of dividing a data set into multiple
-    subsets to help train, test and evaluate {term}`machine learning<Machine Learning (ML)>` models.
+    subsets to help train, test, and evaluate {term}`machine learning<Machine Learning (ML)>` models.
 
 Deduplication
     The process of identifying and exact or extremely similar data or images from a data set.
@@ -257,7 +257,7 @@ Denoising Autoencoder (DAE)
 Developmental Dataset
     Dataset used in for {term}`machine learning<Machine Learning (ML)>` model development.
     It consists of several {term}`dataset splits<Dataset Splits>` that can include training,
-    validation and testing splits.
+    validation, and testing splits.
 
 Dimensionality Reduction
     Dimensionality reduction is a method for representing a given dataset using a lower number
@@ -613,7 +613,7 @@ Maximum Mean Discrepancy (MMD) Drift Detection
 Mean Average Precision
     A measure to evaluate the performance of object detection and segmentation systems over all
     classes covered by the system. It is calculated using the {term}`confusion matrix<Confusion Matrix>`,
-    {term}`precision<Precision>` and {term}`recall<Recall>` metrics and the Area Under the Curve
+    {term}`precision<Precision>` and {term}`recall<Recall>` metrics, and the Area Under the Curve
     (AUC) metric. It is the average precision for each class averaged over the number of classes.
 
 Minimum Pooling
@@ -651,7 +651,7 @@ Null Hypothesis
 
 NumPy
     NumPy is a Python Library used for working with arrays. It also has functions for working in linear
-    algebra, fourier transforms and matrices (used in convolution). NumPy was created in 2005 by Travis Oliphant.
+    algebra, fourier transforms, and matrices (used in convolution). NumPy was created in 2005 by Travis Oliphant.
 ```
 
 ## O
@@ -729,9 +729,9 @@ Pooling Layer
     known as *downsampling layers*. Similar to the {term}`convolutinal layer<Convolutional Layer>`,
     they typically sweep across the output of a convolutional layer and apply aggregation functions
     using a similar kernel calculation to the output. A lot of information is lost in the pooling
-    layer but they reduce complexity, improve efficiency and limit the risk of {term}`overfitting<Overfitting>`
+    layer but they reduce complexity, improve efficiency, and limit the risk of {term}`overfitting<Overfitting>`
     to the {term}`developmental dataset<Developmental Dataset>`. The functions include
-    {term}`minimum pooling<Minimum Pooling>`, {term}`maximum pooling<Maximum Pooling>` and
+    {term}`minimum pooling<Minimum Pooling>`, {term}`maximum pooling<Maximum Pooling>`, and
     {term}`average pooling<Average Pooling>`.
 
 Precision
@@ -763,7 +763,7 @@ Prediction Uncertainty
 
 Principal Component Analysis (PCA)
     Principal component analysis (PCA) is a linear {term}`dimensionality reduction<Dimensionality Reduction>`
-    technique with applications in exploratory data analysis, visualization and data preprocessing.
+    technique with applications in exploratory data analysis, visualization, and data preprocessing.
     The data is linearly transformed onto a new coordinate system such that the directions (principal
     components) capturing the largest variation in the data can be easily identified.
 
@@ -797,7 +797,7 @@ Receiver Operating Characteristic (ROC) Curve
 
 Regularized Autoencoder
     A type of {term}`autoencoder<Autoencoder>` used mostly in {term}`classification<Classification>`
-    tasks. Types include *Sparse*, *Denoising* and *Contractive*. Regularization is a method for
+    tasks. Types include *Sparse*, *Denoising*, and *Contractive*. Regularization is a method for
     constraining the model in order to prevent {term}`overfitting<Overfitting>` and improve its
     ability to generalize to new data.
 

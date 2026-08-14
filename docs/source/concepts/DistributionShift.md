@@ -76,8 +76,8 @@ because it identifies what has changed and therefore what can be done about it.
 
 ## Drift detection
 
-Drift detection answers a population-level question: _is this batch of incoming
-data drawn from the same distribution as my training data?_ All of DataEval's
+Drift detection answers a population-level question: *is this batch of incoming
+data drawn from the same distribution as my training data?* All of DataEval's
 drift detectors follow the same two-phase pattern: a **fit** phase on reference
 (training) data, followed by repeated **predict** calls on operational batches,
 each returning a p-value and a binary drift flag.
@@ -168,7 +168,7 @@ not a constraint.
 ### Multivariate tests
 
 Univariate tests examine features independently and can miss shift that
-manifests only in the _relationships_ between features — for example, a sensor
+manifests only in the *relationships* between features — for example, a sensor
 that now produces correlated noise across channels where noise was previously
 independent. Two multivariate approaches are available.
 
@@ -178,7 +178,7 @@ distribution mean embeddings in a reproducing kernel Hilbert space (RKHS):
 $$\text{MMD}^2(p, q) = \| \mu_p - \mu_q \|_\mathcal{F}^2$$
 
 With the RBF kernel $k(x,y) = \exp(-\|x-y\|^2 / 2\sigma^2)$, MMD can detect
-any distributional difference (it is a _universal_ kernel). Statistical
+any distributional difference (it is a *universal* kernel). Statistical
 significance is assessed by a permutation test: the reference and test samples
 are pooled, randomly split many times, and the observed MMD is compared to the
 permutation distribution. MMD is the natural choice for detecting shift in
@@ -293,7 +293,7 @@ directly predicts performance degradation.
 
 For object detectors, {class}`.ClasswiseUncertaintyExtractor` groups detections
 by their predicted class so uncertainty can be tracked per class rather than
-only in aggregate, revealing _which_ classes a shift most affects.
+only in aggregate, revealing *which* classes a shift most affects.
 
 This approach has a specific, important advantage: it is **insensitive to
 irrelevant shift**. A lighting change that modifies pixel values but does not
@@ -310,7 +310,7 @@ between the reference distribution and incoming data. Unlike a hypothesis test
 that returns a p-value, it compares this distance against a **calibrated
 baseline** to decide whether a shift is meaningful.
 
-That calibration is what sets it apart: `fit()` takes _two_ same-distribution
+That calibration is what sets it apart: `fit()` takes *two* same-distribution
 references — a training set and a validation set — and records the per-feature
 Wasserstein distance between them as the expected, benign amount of variation. At
 prediction time, the distance from training to the incoming data is divided by
@@ -322,7 +322,7 @@ $$\text{drift} \iff \max_j \frac{W_j(\text{train}, \text{test})}{W_j(\text{train
 Anchoring the decision to train-vs-validation variation makes the detector robust
 to benign sampling noise: it alarms only when incoming data is meaningfully more
 different from training than validation already was. Because the Wasserstein
-distance is sensitive to _how far_ probability mass moves (not just whether
+distance is sensitive to *how far* probability mass moves (not just whether
 distributions differ), it is well suited to low-dimensional features such as the
 {term}`prediction uncertainty<Prediction Uncertainty>` scores described above.
 
@@ -330,7 +330,7 @@ distributions differ), it is well suited to low-dimensional features such as the
 
 All the drift detectors above operate on input features $P(X)$ or model
 confidence scores. A separate but complementary question is whether the
-_class frequency distribution_ has changed between two datasets — training vs.
+*class frequency distribution* has changed between two datasets — training vs.
 operational, or one collection period vs. another. This is label shift in its
 simplest measurable form, and it is the specific question that
 {func}`.label_parity` addresses.
@@ -352,8 +352,8 @@ class prevalence — characteristic of covariate shift rather than label shift.
 
 ## Out-of-distribution detection
 
-While drift detection asks whether a _batch_ has shifted, OOD detection asks
-whether a _specific sample_ is anomalous relative to the training distribution.
+While drift detection asks whether a *batch* has shifted, OOD detection asks
+whether a *specific sample* is anomalous relative to the training distribution.
 The two capabilities are complementary: while a batch may pass drift detection,
 it might contain a handful of genuine anomalies whose effect is diluted below
 the detection threshold of a drift test, or contain instances that will cause
@@ -369,12 +369,12 @@ Reconstruction-based detection trains an autoencoder-family model on
 reference data and uses the model's failure to reconstruct a test sample as the
 anomaly signal.
 
-The core assumption: a model trained to compress and reconstruct _in-distribution_
+The core assumption: a model trained to compress and reconstruct *in-distribution*
 images learns the manifold of normal data. When it encounters an OOD sample —
 one that lies off that manifold — it cannot reconstruct it accurately, producing
 high reconstruction error. The per-pixel squared error serves as both an
 instance-level score (mean error across the image) and a **feature-level
-anomaly map** (the spatial distribution of error), which identifies _where_ in
+anomaly map** (the spatial distribution of error), which identifies *where* in
 the image the anomaly is located.
 
 DataEval supports three reconstruction architectures, selected automatically or
@@ -382,7 +382,7 @@ explicitly via `model_type`:
 
 **Autoencoder (AE)** learns a deterministic encoding. Each input maps to a
 single point in the latent space. The OOD score is mean squared error between
-input and reconstruction. AEs are most effective for _structural_ anomalies —
+input and reconstruction. AEs are most effective for *structural* anomalies —
 local defects, sensor corruption, image artifacts — where the abnormality is a
 specific localized departure from normal image structure.
 
@@ -390,7 +390,7 @@ specific localized departure from normal image structure.
 representation is a distribution (mean and variance) rather than a point. The
 training objective includes an Evidence Lower Bound (ELBO) term that penalizes
 latent distributions deviating from a standard Normal. VAEs are more effective
-for _statistical_ anomalies — samples that are structurally plausible but
+for *statistical* anomalies — samples that are structurally plausible but
 represent a rare or unlikely combination of features.
 
 **AE or VAE with Gaussian Mixture Model (GMM)** extends either architecture
@@ -542,7 +542,7 @@ manifests only in feature correlations. Multivariate tests address this but at
 higher computational cost and with reduced interpretability.
 
 Uncertainty-based detection is blind to shift that the model confidently
-mishandles. It detects _uncertain_ failure modes, not _confident wrong_
+mishandles. It detects *uncertain* failure modes, not *confident wrong*
 failure modes — the latter require performance monitoring with ground truth
 labels, which is a separate capability.
 
@@ -590,25 +590,25 @@ high-dimensional embeddings.
 ## References
 
 1. Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a
-   practical and powerful approach to multiple testing. _Journal of the Royal
-   Statistical Society: Series B_, 57(1), 289–300. [paper](https://rss.onlinelibrary.wiley.com/doi/10.1111/j.2517-6161.1995.tb02031.x)
+   practical and powerful approach to multiple testing. *Journal of the Royal
+   Statistical Society: Series B*, 57(1), 289–300. [paper](https://rss.onlinelibrary.wiley.com/doi/10.1111/j.2517-6161.1995.tb02031.x)
 
 2. Gretton, A., Borgwardt, K. M., Rasch, M. J., Schölkopf, B., & Smola, A.
-   (2012). A kernel two-sample test. _Journal of Machine Learning Research_,
+   (2012). A kernel two-sample test. *Journal of Machine Learning Research*,
    13(1), 723–773. [paper](https://jmlr.csail.mit.edu/papers/v13/gretton12a.html)
 
 3. Kuan, J., & Mueller, J. (2022). Back to the basics: Revisiting out-of-
-   distribution detection baselines. _arXiv preprint arXiv:2207.03061._ [paper](https://arxiv.org/abs/2207.03061)
+   distribution detection baselines. *arXiv preprint arXiv:2207.03061.* [paper](https://arxiv.org/abs/2207.03061)
 
 4. Lipton, Z., Wang, Y. X., & Smola, A. (2018). Detecting and correcting for
-   label shift with black box predictors. _Proceedings of ICML_, 3122–3130. [paper](https://arxiv.org/abs/1802.03916)
+   label shift with black box predictors. *Proceedings of ICML*, 3122–3130. [paper](https://arxiv.org/abs/1802.03916)
 
 5. Rabanser, S., Günnemann, S., & Lipton, Z. (2019). Failing loudly: An
-   empirical study of methods for detecting dataset shift. _Advances in Neural
-   Information Processing Systems_, 32. [paper](https://arxiv.org/abs/1810.11953)
+   empirical study of methods for detecting dataset shift. *Advances in Neural
+   Information Processing Systems*, 32. [paper](https://arxiv.org/abs/1810.11953)
 
 6. Sethi, T. S., & Kantardzic, M. (2017). On the reliable detection of concept
-   drift from streaming unlabeled data. _Expert Systems with Applications_, 82,
+   drift from streaming unlabeled data. *Expert Systems with Applications*, 82,
    77–99. [paper](https://arxiv.org/abs/1704.00023)
 
 7. Van Looveren, A., Klaise, J., Vacanti, G., Cobb, O., Scillitoe, A.,

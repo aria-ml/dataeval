@@ -20,7 +20,7 @@ Not sure where to begin? Pick the description that fits your situation:
 **New to DataEval**
 ^^^
 Never used DataEval before. The **Beginner's Guide** walks through the basics
-of downloading DataEval, setting up your dataset and checking your dataset
+of downloading DataEval, setting up your dataset, and checking your dataset
 for duplicates and outliers — no prior DataEval experience needed.
 :::
 
@@ -176,7 +176,7 @@ Definitions of key terms used throughout the documentation.
 
 DataEval is part of the [Joint AI Test Infrastructure Capability (JATIC)](https://cdao.pages.jatic.net/public/)
 product suite for AI Test & Evaluation. The goal of the program is to deliver a suite of tools that interoperate
-using a standardized interface that enables modular, reproducible assessments for ease-of-use, performance and reliability.
+using a standardized interface that enables modular, reproducible assessments for ease-of-use, performance, and reliability.
 
 - MAITE (Modular AI Trustworthy Engineering): Standardized protocols for AI T&E workflows. <https://mit-ll-ai-technology.github.io/maite/>
 

@@ -171,8 +171,8 @@ See the [monitor shift tutorial](../notebooks/tt_monitor_shift.py).
 ### How far has my operational data shifted from training, quantitatively?
 
 Use {func}`.divergence_fnn` or {func}`.divergence_mst` to compute HP divergence —
-a continuous score between 0 and 1. Drift detectors tell you _whether_ a shift
-occurred; divergence tells you _how much_. Tracking divergence over time reveals
+a continuous score between 0 and 1. Drift detectors tell you *whether* a shift
+occurred; divergence tells you *how much*. Tracking divergence over time reveals
 gradual drift that may never trigger a single-batch test but is nonetheless eroding
 the relevance of the training distribution.
 See the [Divergence concept page](../concepts/Divergence.md) and the
