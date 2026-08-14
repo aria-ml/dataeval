@@ -364,7 +364,7 @@
 
 👾 **Fixes**
 
-- `5682073c` - [fix] Restore missing submodules for documention
+- `5682073c` - [fix] Restore missing submodules for documentation
 
 📝 **Miscellaneous**
 
@@ -376,7 +376,7 @@
 
 👾 **Fixes**
 
-- `a6382915` - Changed stopping criterion when stepping trhough kNN graph and forming clusters.
+- `a6382915` - Changed stopping criterion when stepping through kNN graph and forming clusters.
 
 📝 **Miscellaneous**
 
@@ -637,7 +637,7 @@
 
 📝 **Miscellaneous**
 
-- `bf415bf8` - Update datatsets docstrings for completeness and move Transform type to typing module
+- `bf415bf8` - Update datasets docstrings for completeness and move Transform type to typing module
 
 ## v0.82.1
 
@@ -720,7 +720,7 @@
 - `bff82522` - Add collate function and convert packaged datasets to MAITE protocols
 
   - Changes all dataset utility classes to use `MAITE` protocol formats (`MNIST`, `CIFAR10`, and `VOCDetection`)
-  - Addes `collate` to aggregate (and encode) `MAITE`datasets into images/embeddings, targets, and metadata
+  - Adds `collate` to aggregate (and encode) `MAITE` datasets into images/embeddings, targets, and metadata
 
 🛠️ **Improvements and Enhancements**
 

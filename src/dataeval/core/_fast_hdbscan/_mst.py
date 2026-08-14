@@ -243,7 +243,7 @@ def _flatten_and_sort(
         Flattened neighbors array sorted by shortest distance
     flattened_sorted_distances : NDArray[float32]
         Flattened distances array sorted by shortest distance
-    flattened_sorted_indicies : NDArray[int64]
+    flattened_sorted_indices : NDArray[int64]
         Flattened row index array sorted by shortest distance
     """
     flat_nbrs = neighbors.flatten()

@@ -113,7 +113,7 @@ warnings.filterwarnings("ignore", message="The number of unique classes is great
 # ## Load the dataset
 #
 # SeaDrone is aerial drone footage over water, annotated with swimmers, boats, jetskis,
-# buoys and life-saving appliances. It is a good fit for this question because the
+# buoys, and life-saving appliances. It is a good fit for this question because the
 # objects are small and the background - open water - is both large and highly variable
 # in brightness, from dark swell to sun glare.
 
@@ -126,7 +126,7 @@ print(f"Image shape: {dataset[0][0].shape}")
 # %% [markdown]
 # ## Compute all three views in one pass
 #
-# `per_image`, `per_target` and `per_background` are independent. Enabling all three
+# `per_image`, `per_target`, and `per_background` are independent. Enabling all three
 # gives, for every image: the whole frame, each annotated box, and the frame with those
 # boxes masked out.
 #
@@ -236,7 +236,7 @@ print(by_class)
 # Two things fall out of this table.
 #
 # **Only one class is brighter than the water it sits on.** Boats read positive; swimmers,
-# buoys, jetskis and life-saving appliances all read negative - they are darker than their
+# buoys, jetskis, and life-saving appliances all read negative - they are darker than their
 # background. A detector tuned on bright-object contrast has the sign wrong for four of
 # the five classes.
 #

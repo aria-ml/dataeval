@@ -46,11 +46,11 @@ domain context the practitioner brings to interpreting the results.
 
 ### Bias
 
-Dataset bias occurs when a systematic property of _how data was collected or
-labeled_ causes the training distribution to diverge from the true operational
+Dataset bias occurs when a systematic property of *how data was collected or
+labeled* causes the training distribution to diverge from the true operational
 distribution in a way that will predictably harm model performance.
 
-The key word is _systematic_. Random noise in a large dataset averages out. Bias
+The key word is *systematic*. Random noise in a large dataset averages out. Bias
 does not — it pushes the model's decision boundaries in a consistent direction,
 producing a model that performs well on data that resembles the training set and
 fails on data that does not.
@@ -59,7 +59,7 @@ fails on data that does not.
 (inherited from social or institutional practice), technical bias (introduced by
 design choices in the system), and emergent bias (arising from deployment in a
 context the system was not designed for) — a useful framework for understanding
-the origins of bias. However, to better understand _where in the data pipeline_
+the origins of bias. However, to better understand *where in the data pipeline*
 the bias entered, a more actionable distinction is:
 
 **Sampling bias** arises when the mechanism of data collection systematically
@@ -152,7 +152,7 @@ would surface.
 {class}`.Balance` and {class}`.Diversity` both measure bias through the lens of
 metadata — the contextual variables attached to each sample (sensor platform,
 weather, time of day, location, annotator ID, and so on). The fundamental
-question they answer is: _are class labels independent of these factors?_
+question they answer is: *are class labels independent of these factors?*
 
 **Balance** measures the statistical dependence between class labels and
 metadata factors using
@@ -215,7 +215,7 @@ expected under independence. Treat low but nonzero NMI values with caution,
 particularly when sample counts per factor category are small.
 ```
 
-**Diversity** measures the _evenness_ of sampling across each metadata factor,
+**Diversity** measures the *evenness* of sampling across each metadata factor,
 independently of class labels. Where Balance asks "is class label correlated
 with this factor?", Diversity asks "are samples spread uniformly across this
 factor's values?"
@@ -291,7 +291,7 @@ observations $k$ per covered region:
 
 $$r = \frac{1}{\sqrt{\pi}} \left(\frac{2k\, \Gamma(d/2 + 1)}{n}\right)^{1/d}$$
 
-A sample is considered _uncovered_ if fewer than $k$ other samples fall within
+A sample is considered *uncovered* if fewer than $k$ other samples fall within
 radius $r$ of it. This radius is derived from the volume of a $d$-dimensional
 ball and assumes uniform distribution across the unit hypercube. It provides an
 absolute criterion: either a region of the space meets the minimum density
@@ -371,7 +371,7 @@ dimensionality $d_\text{eff} = e^H$, where $H$ is the Shannon entropy of the
 covariance eigenvalues normalized to sum to one. This estimator is novel in this
 exact form but not unprecedented: it is closely related to the **effective
 rank** of [Roy & Vetterli (2007)](#ref15), which applies the same $e^H$
-construction to the normalized _singular_ values. Taking the entropy over _eigenvalues_ instead
+construction to the normalized *singular* values. Taking the entropy over *eigenvalues* instead
 makes $d_\text{eff}$ the exponential of the von Neumann entropy of the
 trace-normalized covariance matrix — the form
 [Kim et al. (2023)](#ref17) use to regularize representation rank and isotropy,
@@ -498,7 +498,7 @@ more loosely than their true diversity warrants.
 through unsupervised pretraining encode human-like social biases, which can
 propagate silently into coverage and completeness assessments downstream.
 
-Balance and Diversity measure the _potential_ for shortcut learning and sampling
+Balance and Diversity measure the *potential* for shortcut learning and sampling
 bias. They do not measure whether a trained model has actually learned a
 shortcut. A high NMI between a metadata factor and a class label is a signal to
 investigate — not a guarantee that the model will exploit the correlation.
@@ -540,58 +540,58 @@ explicitly.
 ## References
 
 1. [Bergsma, W. (2013). A bias-correction for Cramér's V and Tschuprow's T.
-   _Journal of the Korean Statistical Society_, 42(3), 323–328.
+   *Journal of the Korean Statistical Society*, 42(3), 323–328.
    [paper](https://www.sciencedirect.com/science/article/abs/pii/S1226319212001032)]{#ref1}
 
 2. [Fabbrizzi, S., Papadopoulos, S., Ntoutsi, E., & Kompatsiaris, I. (2022). A
-   survey on bias in visual datasets. _Computer Vision and Image Understanding_,
+   survey on bias in visual datasets. *Computer Vision and Image Understanding*,
 
    223, 103552. [paper](https://doi.org/10.1016/j.cviu.2022.103552)]{#ref2}
 
-3. [Friedman, B., & Nissenbaum, H. (1996). Bias in computer systems. _ACM
-   Transactions on Information Systems_, 14(3), 330–347.]{#ref3}
+3. [Friedman, B., & Nissenbaum, H. (1996). Bias in computer systems. *ACM
+   Transactions on Information Systems*, 14(3), 330–347.]{#ref3}
 
 4. [Geirhos, R., Jacobsen, J.-H., Michaelis, C., Zemel, R., Brendel, W., Bethge,
    M., & Wichmann, F. A. (2020). Shortcut learning in deep neural networks.
-   _Nature Machine Intelligence_, 2(11), 665–673.
+   *Nature Machine Intelligence*, 2(11), 665–673.
    [paper](https://arxiv.org/abs/2004.07780)]{#ref4}
 
 5. [Heip, C. H. R., Herman, P. M. J., & Soetaert, K. (1998). Indices of
-   diversity and evenness. _Océanis_, 24(4), 61–87.]{#ref5}
+   diversity and evenness. *Océanis*, 24(4), 61–87.]{#ref5}
 
 6. [Hill, M. O. (1973). Diversity and evenness: A unifying notation and its
-   consequences. _Ecology_, 54(2), 427–432.]{#ref6}
+   consequences. *Ecology*, 54(2), 427–432.]{#ref6}
 
 7. [Kraskov, A., Stögbauer, H., & Grassberger, P. (2004). Estimating mutual
-   information. _Physical Review E_, 69(6), 066138.
+   information. *Physical Review E*, 69(6), 066138.
    [paper](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.69.066138)]{#ref7}
 
 8. [Merler, M., Ratha, N., Feris, R. S., & Smith, J. R. (2019). Diversity in
-   faces. _arXiv preprint arXiv:1901.10436_.
+   faces. *arXiv preprint arXiv:1901.10436*.
    [paper](https://arxiv.org/abs/1901.10436)]{#ref8}
 
 9. [Ross, B. C. (2014). Mutual information between discrete and continuous data
-   sets. _PLOS ONE_, 9(2), e87357.
+   sets. *PLOS ONE*, 9(2), e87357.
    [paper](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0087357)]{#ref9}
 
 10. [Steed, R., & Caliskan, A. (2021). Image representations learned with
-    unsupervised pretraining contain human-like biases. In _Proceedings of the
-    2021 ACM Conference on Fairness, Accountability, and Transparency_ (pp.
+    unsupervised pretraining contain human-like biases. In *Proceedings of the
+    2021 ACM Conference on Fairness, Accountability, and Transparency* (pp.
     701–713). ACM. [paper](https://doi.org/10.1145/3442188.3445932)]{#ref10}
 
 11. [Ting, K. M., Wells, J. R., & Washio, T. (2022). Isolation kernel: The X
     factor in efficient and effective large scale online kernel learning.
-    _Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and
-    Data Mining_, 1775–1784. [paper](https://arxiv.org/abs/1907.01104)]{#ref11}
+    *Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and
+    Data Mining*, 1775–1784. [paper](https://arxiv.org/abs/1907.01104)]{#ref11}
 
 12. [Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. In
-    _Proceedings of the IEEE Conference on Computer Vision and Pattern
-    Recognition_ (pp. 1521–1528).
+    *Proceedings of the IEEE Conference on Computer Vision and Pattern
+    Recognition* (pp. 1521–1528).
     [paper](https://ieeexplore.ieee.org/document/5995347)]{#ref12}
 
 13. [Vinh, N. X., Epps, J., & Bailey, J. (2010). Information theoretic measures
     for clusterings comparison: Variants, properties, normalization and
-    correction for chance. _Journal of Machine Learning Research_, 11,
+    correction for chance. *Journal of Machine Learning Research*, 11,
     2837–2854. [paper](https://jmlr.org/papers/v11/vinh10a.html)]{#ref13}
 
 14. [Linfoot, E.H. (1957). "An Informational Measure of Correlation."
@@ -599,22 +599,22 @@ explicitly.
     [paper]<https://www.sciencedirect.com/science/article/pii/S001999585790116X>]{#ref14}
 
 15. [Roy, O., & Vetterli, M. (2007). The effective rank: A measure of effective
-    dimensionality. _Proceedings of the 15th European Signal Processing
-    Conference (EUSIPCO)_, 606–610.
+    dimensionality. *Proceedings of the 15th European Signal Processing
+    Conference (EUSIPCO)*, 606–610.
     [paper](https://www.eurasip.org/Proceedings/Eusipco/Eusipco2007/Papers/a5p-h05.pdf)]{#ref15}
 
 16. [Gao, P., Trautmann, E., Yu, B., Santhanam, G., Ryu, S., Shenoy, K., &
     Ganguli, S. (2017). A theory of multineuronal dimensionality, dynamics and
-    measurement. _bioRxiv_, 214262.
+    measurement. *bioRxiv*, 214262.
     [paper](https://doi.org/10.1101/214262)]{#ref16}
 
 17. [Kim, J., Kang, S., Hwang, D., Shin, J., & Rhee, W. (2023). VNE: An effective
     method for improving deep representation by manipulating eigenvalue
-    distribution. _Proceedings of the IEEE/CVF Conference on Computer Vision and
-    Pattern Recognition (CVPR)_, 3799–3810.
+    distribution. *Proceedings of the IEEE/CVF Conference on Computer Vision and
+    Pattern Recognition (CVPR)*, 3799–3810.
     [paper](https://openaccess.thecvf.com/content/CVPR2023/html/Kim_VNE_An_Effective_Method_for_Improving_Deep_Representation_by_Manipulating_CVPR_2023_paper.html)]{#ref17}
 
 18. [Zhuo, Z., Wang, Y., Ma, J., & Wang, Y. (2023). Towards a unified theoretical
     understanding of non-contrastive learning via rank differential mechanism.
-    _International Conference on Learning Representations (ICLR)_.
+    *International Conference on Learning Representations (ICLR)*.
     [paper](https://arxiv.org/abs/2303.02387)]{#ref18}

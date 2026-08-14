@@ -1,3 +1,10 @@
 MD013:
   tables: false
   line_length: 120
+# Use * for emphasis/strong, never _. A dunder such as __init__ is itself a
+# well-formed strong-emphasis span in CommonMark and renders as bold "init",
+# whereas *args / **kwargs have no closing delimiter and survive as literals.
+MD049:
+  style: asterisk
+MD050:
+  style: asterisk

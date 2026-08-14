@@ -62,8 +62,8 @@ modes.
   threshold, a default distribution, a significance level, a ranking rule. The
   evaluator tables name the policy each one carries, because that policy — not
   the underlying math — is the most common source of results that do not transfer
-  between domains. The trust question is: **"is the math right, _and is the built-in
-  policy appropriate for my problem?_"**
+  between domains. The trust question is: **"is the math right, *and is the built-in
+  policy appropriate for my problem?*"**
 
 ## Feature extractors: a dependency of both layers
 
@@ -100,13 +100,13 @@ data itself, which is what every geometric metric in this library assumes.
     no fitted state — but pixel space is not semantic space. Distances are
     dominated by
     brightness, alignment, and background rather than content, and the
-    dimensionality is the pixel count, so coverage radii, completeness and
+    dimensionality is the pixel count, so coverage radii, completeness, and
     isotropy are being estimated in tens of thousands of dimensions from a few
     thousand samples. A baseline, not an assessment.
 - - {class}`.BoVWExtractor`
   - L2-normalized histogram of SIFT visual words, `(n_images, vocab_size)`.
     Requires the `opencv` extra.
-  - Invariant to rotation, scale and minor viewpoint change, which is why it is
+  - Invariant to rotation, scale, and minor viewpoint change, which is why it is
     the option for finding near-duplicates that survived a geometric transform.
     Two hazards: it is the **only stateful extractor** — `__call__` fits the
     vocabulary on the first data it sees and reuses it thereafter, so two
@@ -217,7 +217,7 @@ and classes that consume a {class}`.Metadata` class require factor discretizatio
 How the data is discretized matters, and **that discretization is a hidden
 policy choice: applied by default, decisive for the data, and recorded nowhere
 in the output.** A {class}`.Balance` score
-describes your factors _as binned_, not your factors. This is the metadata-side
+describes your factors *as binned*, not your factors. This is the metadata-side
 counterpart to the extractor problem above: where embeddings are the largest
 uncontrolled variable in the geometric half of the library, binning is the
 largest one in the metadata half.
@@ -250,7 +250,7 @@ factor on fewer than 20 images is always called discrete no matter how many
 detections those images carry.
 
 `"uniform_width"` does not use a fixed bin count. It starts from NumPy's
-`histogram(bins="auto")`, then _reduces_ the count — at most 20 times — while
+`histogram(bins="auto")`, then *reduces* the count — at most 20 times — while
 any non-empty bin holds fewer than 10 samples. That rule is aggressive: 500
 draws from a standard normal come out in **4 to 6 bins depending only on the
 draw**, because the tails keep tripping the 10-sample floor. There is no lower
@@ -384,7 +384,7 @@ implementation.
   - Verified against hand-computed or analytically known values on constructed
     inputs, plus behavioral tests. No second implementation is compared.
 - - **Internal only**
-  - Verified by unit and property tests (invariants, edge cases, shape and
+  - Verified by unit and property tests (invariants, edge cases, shape, and
     error handling) written against the intended behavior. Correctness relative
     to the cited derivation rests on code review.
 
@@ -521,7 +521,7 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for coverage, and
 - - {class}`.Coverage`
   - Coverage radius from
     [Asudeh et al. (2021)](https://dl.acm.org/doi/abs/10.1145/3448016.3457315);
-    the per-class dispersion, isotropy and near-duplicate signals it adds are
+    the per-class dispersion, isotropy, and near-duplicate signals it adds are
     DataEval's own. `isotropy` is {func}`.completeness`'s effective-dimension
     estimate applied per class — see that row below for its lineage. See
     [Measuring coverage](DatasetBias.md#measuring-coverage-geometry-in-embedding-space).
@@ -715,7 +715,7 @@ statistical and computational.
   - Validation evidence
   - Contraindications
 - - {func}`.ber_knn`, {func}`.ber_mst`
-  - _Learning to Bound the Multi-class Bayes Error_, Theorems 3 and 4
+  - *Learning to Bound the Multi-class Bayes Error*, Theorems 3 and 4
     ([arXiv:1811.06419](https://arxiv.org/abs/1811.06419)) — cited in both
     docstrings. See
     [BER estimation](PerformanceLimits.md#ber-estimation-mst-and-knn-bounds).
@@ -732,8 +732,8 @@ statistical and computational.
     classification over crops; ignores localization error entirely.
 - - {func}`.nullmodel_metrics` and the `nullmodel_*` family
   - Dummy-classifier baselines.
-  - Ground-truth checked (uniform, proportional and dominant-class accuracies
-    matched against `1/C`, `sum(p_i * q_i)` and `p[argmax(q)]`)
+  - Ground-truth checked (uniform, proportional, and dominant-class accuracies
+    matched against `1/C`, `sum(p_i * q_i)`, and `p[argmax(q)]`)
   - Baselines only: what a trivial model achieves on your class distribution,
     not what is achievable.
 
@@ -854,7 +854,7 @@ statistical and computational.
     {func}`.compute_ratios`
   - Image statistics vocabulary. See
     [Image statistics as a linting vocabulary](DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
-  - Cross-checked (skew, kurtosis and entropy verified against SciPy in CI)
+  - Cross-checked (skew, kurtosis, and entropy verified against SciPy in CI)
   - Descriptive only. A statistic being unusual is not evidence a sample is
     bad. Note `compute_stats` carries a deprecation notice on a parameter
     default that changed in v1.1.
@@ -1044,7 +1044,7 @@ Two mechanisms make stability observable rather than a matter of trust:
   a dedicated CI test (`tests/test_deprecated_docs.py`) fails the build if any
   deprecated public object lacks a `.. deprecated::` directive in its docstring.
   A deprecated symbol cannot ship silently. Transitional warnings for changed
-  _parameter defaults_ are a separate mechanism and use a plain `FutureWarning`
+  *parameter defaults* are a separate mechanism and use a plain `FutureWarning`
   — see [Changed defaults](#stability-status) below.
 
 ## Stability status
@@ -1142,7 +1142,7 @@ DataEval's evidentiary record, not a research frontier.
    benchmark suite (`tests/core/test_validation_benchmarks.py`) checks BER,
    divergence, and the null-model baselines against closed-form values on
    constructed distributions — those tests fail when an estimate is wrong, not
-   merely when it changes. What is missing is evidence on _real_ data: nothing
+   merely when it changes. What is missing is evidence on *real* data: nothing
    in CI demonstrates that DataEval's estimators reproduce published results on
    public datasets. The FeeBee BER benchmark
    ([Renggli et al., 2021](Divergence.md#references)) is the obvious candidate.
@@ -1221,56 +1221,56 @@ DataEval's evidentiary record, not a research frontier.
 Method-level citations live on the concept page for each method, linked from
 the tables above. The sources specific to this page are:
 
-1. Seldon Technologies Ltd. (2023). _alibi-detect v0.11.4._
+1. Seldon Technologies Ltd. (2023). *alibi-detect v0.11.4.*
    [repository](https://github.com/SeldonIO/alibi-detect/tree/v0.11.4)
    (Apache 2.0; origin of DataEval's MMD, univariate, and reconstruction-based
    detectors.)
 
 2. Virtanen, P., et al. (2020). SciPy 1.0: Fundamental algorithms for
-   scientific computing in Python. _Nature Methods_, 17, 261–272.
+   scientific computing in Python. *Nature Methods*, 17, 261–272.
    [paper](https://www.nature.com/articles/s41592-019-0686-2)
    (Provides the univariate drift test statistics and the reference values for
    DataEval's image statistics tests.)
 
 3. Pedregosa, F., et al. (2011). Scikit-learn: Machine learning in Python.
-   _Journal of Machine Learning Research_, 12, 2825–2830.
+   *Journal of Machine Learning Research*, 12, 2825–2830.
    [paper](https://www.jmlr.org/papers/v12/pedregosa11a.html)
    (Provides KMeans clustering and mutual information estimation.)
 
 4. Sekeh, S. Y., Oselio, B., & Hero, A. O. (2020). Learning to bound the
-   multi-class Bayes error. _IEEE Transactions on Signal Processing_, 68,
+   multi-class Bayes error. *IEEE Transactions on Signal Processing*, 68,
    3793–3807. doi: 10.1109/TSP.2020.2994807
    [paper](https://arxiv.org/abs/1811.06419)
    (Theorems 3 and 4 provide the MST and KNN bounds; cited directly in the
    {func}`.ber_knn` and {func}`.ber_mst` docstrings.)
 
 5. Bergsma, W. (2013). A bias-correction for Cramér's V and Tschuprow's T.
-   _Journal of the Korean Statistical Society_, 42(3), 323–328.
+   *Journal of the Korean Statistical Society*, 42(3), 323–328.
    [paper](https://stats.lse.ac.uk/bergsma/pdf/cramerV3.pdf)
    (Cited directly in the {func}`.parity` docstring.)
 
 6. Asudeh, A., Shahbazi, N., Jin, Z., & Jagadish, H. V. (2021). Identifying
    insufficient data coverage for ordinal continuous-valued attributes. In
-   _Proceedings of the 2021 International Conference on Management of Data_
+   *Proceedings of the 2021 International Conference on Management of Data*
    (SIGMOD '21). doi: 10.1145/3448016.3457315
    [paper](https://dl.acm.org/doi/abs/10.1145/3448016.3457315)
    (Source of the coverage radius; cited in the `coverage_*` docstrings.)
 
 7. Sorscher, B., Geirhos, R., Shekhar, S., Ganguli, S., & Morcos, A. S. (2022).
    Beyond neural scaling laws: beating power law scaling via data pruning.
-   _Advances in Neural Information Processing Systems_, 35.
+   *Advances in Neural Information Processing Systems*, 35.
    [paper](https://arxiv.org/abs/2206.14486)
    (Source of the distance-to-centroid prototypicality ranking.)
 
 8. Zheng, H., Liu, R., Lai, F., & Prakash, A. (2023). Coverage-centric coreset
-   selection for high pruning rates. _International Conference on Learning
-   Representations_. [paper](https://arxiv.org/abs/2210.15809)
+   selection for high pruning rates. *International Conference on Learning
+   Representations*. [paper](https://arxiv.org/abs/2210.15809)
    (Source of the score-bin stratification in
    {func}`.rank_result_stratified`.)
 
 9. Abbas, A., Rusak, E., Tirumala, K., Brendel, W., Chaudhuri, K., & Morcos,
    A. S. (2024). Effective pruning of web-scale datasets based on complexity of
-   concept clusters. _International Conference on Learning Representations_.
+   concept clusters. *International Conference on Learning Representations*.
    [paper](https://arxiv.org/abs/2401.04578)
    (Source of the cluster complexity measure used by the `*_complexity`
    ranking functions.)

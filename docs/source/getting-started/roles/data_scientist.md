@@ -115,7 +115,7 @@ to determine the best dataset for the problem.
 
 ### Create dataset splits
 
-Analyze the dataset to create a training, validation and testing subset. Ensure that
+Analyze the dataset to create a training, validation, and testing subset. Ensure that
 each split adequately represents the target operational environment and that there
 are no correlations between the splits.
 

@@ -165,7 +165,7 @@ metadata.raw[0]
 # %% [markdown]
 # :::{note}
 # `Metadata` is unable to process nested lists. For this dataset, _part_ is a factor that describes certain
-# parts of a _person_ object (such as _head_, _foot_ and _hand_), each with separate bounding box coordinates. You will
+# parts of a _person_ object (such as _head_, _foot_, and _hand_), each with separate bounding box coordinates. You will
 # ignore this information for this example.
 # :::
 

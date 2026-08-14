@@ -196,7 +196,7 @@ class TestIsContinuousFunctional:
         output = is_continuous(data)
         assert output is not True
 
-    def test_is_coninuous_warning(self, caplog):
+    def test_is_continuous_warning(self, caplog):
         # Six values, each replicated across a group of 15 rows, collapse under the floor.
         data = np.repeat([0, 4, 3, 5, 6, 8], 15)
         groups = np.repeat(np.arange(6), 15)

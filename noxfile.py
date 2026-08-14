@@ -201,6 +201,7 @@ def lint(session: nox.Session) -> None:
     session.run("ruff", "check", "--preview", "--show-fixes", "--exit-non-zero-on-fix", "--fix")
     session.run("ruff", "format", "--preview", "--check" if IS_CI else ".")
     session.run("codespell")
+    session.run("typos")
 
 
 @session(uv_groups=["test"], uv_extras=with_onnx(["cpu", "opencv"]))

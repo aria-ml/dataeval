@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
 #     display_name: dataeval
 #     language: python
@@ -185,7 +185,8 @@ print(f"Target-level results: {len(target_indices)}")
 # 1. **Custom Statistics Selection**: The {class}`.ImageStats` flags allow fine-grained control over which statistics to
 #    compute, optimizing performance by avoiding unnecessary calculations.
 #
-# 1. **Granular Analysis**: Using `per_image` and `per_target` parameters, we can analyze statistics at different levels:
+# 1. **Granular Analysis**: Using `per_image`, `per_target`, and `per_background`, we can analyze statistics over three
+#    different regions of the same dataset:
 #
 #    - Full images provide context about overall scene properties
 #    - Bounding boxes reveal properties of individual objects
@@ -197,7 +198,7 @@ print(f"Target-level results: {len(target_indices)}")
 # ## Conclusion
 #
 # This notebook demonstrated how to use {func}`.compute_stats` with custom {class}`.ImageStats` flags to perform flexible,
-# efficient analysis on object detection datasets.
+# efficient analysis on object detection datasets, over whole images, individual boxes, and the background behind them.
 #
 # These techniques are valuable for:
 #

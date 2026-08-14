@@ -96,8 +96,9 @@ lock = [
   "poetry==2.2.0; python_version<'3.14'",
 ]
 lint = [
-  "ruff>=0.11",
+  "ruff>=0.15",
   "codespell[toml]>=2.3",
+  "typos>=1.0",
 ]
 docsync = [
   "jupytext>=1.19.1",
@@ -371,8 +372,28 @@ line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
+[tool.typos.default]
+extend-ignore-re = [
+  "`[0-9a-fA-F]{7,40}`"
+]
+
+[tool.typos.default.extend-words]
+ND = "ND"
+strat = "strat"
+iy = "iy"
+fpr = "fpr"
+Pont = "Pont"
+setp = "setp"
+
+[tool.typos.files]
+extend-exclude = [
+  "requirements.*.txt",
+  "uv.lock",
+  "poetry.lock"
+]
+
 [tool.codespell]
-skip = './*env*,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.*.txt,*.html,*.lock,*.ipynb,./graphify-out'
+skip = 'pyproject.toml,./*env*,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.*.txt,*.html,*.lock,*.ipynb,./graphify-out'
 ignore-words-list = ["Hart","FPR", "MOT", "mot"]
 
 [build-system]
