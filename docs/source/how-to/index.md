@@ -205,6 +205,7 @@ shifts in deployed systems.
 ../notebooks/h2_measure_divergence.py
 ../notebooks/h2_measure_label_independence.py
 ../notebooks/h2_detect_uncertainty_drift.py
+../notebooks/h2_detect_drift_from_model_outputs.py
 ```
 
 :::{list-table}
@@ -221,12 +222,16 @@ shifts in deployed systems.
   - Detect distribution shift from a MAITE model's prediction
     uncertainty, with no custom decoding
   - [![Open In Colab][colab-badge]][unc-colab]
+- - [](../notebooks/h2_detect_drift_from_model_outputs.py)
+  - Detect distribution shift using only precomputed model outputs
+  - [![Open In Colab][colab-badge]][mdo-colab]
 
 :::
 
 [div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_measure_divergence.ipynb
 [lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_measure_label_independence.ipynb
 [unc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_detect_uncertainty_drift.ipynb
+[mdo-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_detect_drift_from_model_outputs.ipynb
 
 <!-- Google collab badge icon for all collab links -->
 
