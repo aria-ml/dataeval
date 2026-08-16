@@ -80,8 +80,10 @@ if not DATAEVAL_NOX_UV_EXTRAS_OVERRIDE:
 
 UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE]
 
-# Configure Numba disk caching
-os.environ.setdefault("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba"))
+# Configure Numba disk caching. The cache is kept in the checkout rather than in
+# a user-wide directory so it is scoped to this branch's sources and can be
+# cached by CI. Warming is handled by the test suite (tests/fixtures/numba_cache.py).
+os.environ.setdefault("NUMBA_CACHE_DIR", os.path.abspath(".numba-cache"))
 os.environ.setdefault("NUMBA_ENABLE_CACHING", "1")
 
 # Configure UV to always clear the venv
@@ -123,7 +125,7 @@ def test(session: nox.Session) -> None:
 
     # Handle clear-cache argument
     if "clear-cache" in session.posargs:
-        numba_cache_dir = Path(os.environ.get("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba")))
+        numba_cache_dir = Path(os.environ["NUMBA_CACHE_DIR"])
         if numba_cache_dir.exists():
             session.log(f"Clearing Numba cache at {numba_cache_dir}...")
             session.run("rm", "-rf", str(numba_cache_dir), external=True)
@@ -139,16 +141,6 @@ def test(session: nox.Session) -> None:
     cov_term_args = ["--cov-report", "term-missing"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
     cov_html_args = ["--cov-report", f"html:output/htmlcov.{python_version}"]
-
-    # Pre-warm Numba JIT cache only if cache doesn't exist or is empty
-    numba_cache_dir = Path(os.environ.get("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba")))
-    cache_exists = numba_cache_dir.exists() and any(numba_cache_dir.iterdir())
-
-    if not cache_exists:
-        session.log("Pre-warming Numba JIT compilation cache (no cache found)...")
-        session.run("python", "-m", "dataeval._warm_cache")
-    else:
-        session.log("Skipping cache pre-warm (cache already exists)")
 
     session.run(
         "pytest",

@@ -1,11 +1,14 @@
 variables:
-  PYTHON_LATEST_SUPPORTED_VERSION: '3.13'
+  PYTHON_LATEST_SUPPORTED_VERSION: '3.14'
   SAST_EXCLUDED_PATHS: docs,output,tests,verification,.github,.gitlab,.nox,.venv
   DOCS_RUNNER_TAG: single-gpu
   UV_CACHE_DIR: .uv-cache
   UV_LINK_MODE: copy
   UV_IMAGE: ghcr.io/astral-sh/uv
   UV_BASE_LAYER: bookworm
+  # Kept in the checkout so the test job can persist it via `cache:`. The test
+  # suite warms it; see tests/fixtures/numba_cache.py.
+  NUMBA_CACHE_DIR: .numba-cache
   FORCE_COLOR: '1'
   RELEASE_BRANCH_PATTERN: '/^release\/v.*/'
 
@@ -95,7 +98,7 @@ stages:
     - eval "$(micromamba shell hook --shell bash)"
     - micromamba create -f environment.yml -n dataeval python=$PYTHON_VERSION
     - micromamba activate dataeval
-    - micromamba install pytest pytest-xdist requests
+    - micromamba install pytest pytest-xdist filelock requests
     - pip install -e . --no-deps
     - micromamba list
   variables:

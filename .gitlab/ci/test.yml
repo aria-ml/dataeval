@@ -29,6 +29,19 @@ test:
     - .rules_main_mr
   script:
     - uvx nox -e test
+  cache:
+    # `extends` replaces list values, so the uv cache from .nox is repeated here.
+    - key:
+        files:
+          - uv.lock
+      paths:
+        - $UV_CACHE_DIR
+    # Numba compiles the ported HDBSCAN kernels in ~19s; persisting the cache
+    # turns that into a ~0.5s load. Keyed per interpreter so the matrix legs do
+    # not overwrite each other.
+    - key: numba-$PYTHON_VERSION
+      paths:
+        - $NUMBA_CACHE_DIR
   artifacts:
     reports:
       junit: output/junit.*.xml

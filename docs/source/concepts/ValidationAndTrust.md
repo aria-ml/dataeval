@@ -978,12 +978,11 @@ mutual information estimation uses scikit-learn's estimators.
 
 The suite is organized to mirror the package (`tests/core`, `tests/shift`,
 `tests/bias`, `tests/quality`, `tests/scope`, `tests/performance`, ...) and CI
-enforces a **90% coverage floor** (`fail_under = 90`). Two hand-written paths
-are excluded from that measurement — `core/_fast_hdbscan/*` and
-`_warm_cache.py` — alongside the generated `_version.py`. The ported HDBSCAN
-code therefore does not count toward the floor, which is worth knowing because
-`cluster_algorithm="hdbscan"` is the default in {class}`.Duplicates` and
-{class}`.Outliers`.
+enforces a **90% coverage floor** (`fail_under = 90`). One hand-written path is
+excluded from that measurement — `core/_fast_hdbscan/*` — alongside the
+generated `_version.py`. The ported HDBSCAN code therefore does not count
+toward the floor, which is worth knowing because `cluster_algorithm="hdbscan"`
+is the default in {class}`.Duplicates` and {class}`.Outliers`.
 
 The suite contains three kinds of evidence, and they are not equally strong:
 

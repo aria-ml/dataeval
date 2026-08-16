@@ -105,6 +105,7 @@ docsync = [
 ]
 test = [
   "coverage[toml]>=7.6",
+  "filelock>=3.20.3",
   "onnx>=1.14.0",
   "onnxscript>=0.6.0",
   "pytest>=8.3",
@@ -316,7 +317,6 @@ exclude_also = [
 include = ["*/src/dataeval/*"]
 omit = [
   "src/dataeval/core/_fast_hdbscan/*",
-  "src/dataeval/_warm_cache.py",
 ]
 fail_under = 90
 

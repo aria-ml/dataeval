@@ -1,4 +1,3 @@
-import contextlib
 import os
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -35,32 +34,6 @@ class MockMetadata:
     item_indices: NDArray[np.int64] | None = None
 
 
-def pytest_configure(config):
-    """Pre-import cached Numba modules at worker startup for consistent test timing.
-
-    This runs once per worker process. The cache warming script (run by nox before
-    pytest) compiles all JIT functions and writes them to disk. This hook loads
-    those cached functions in each worker, avoiding redundant compilation.
-
-    Import timing with disk cache:
-    - dataeval.core._fast_hdbscan._mst: ~0.1s (load from cache)
-    - dataeval.core._fast_hdbscan._cluster_trees: ~0.3s (load from cache)
-
-    Without this hook: The first test using these modules would pay the load cost,
-    appearing slower than others and creating timing variance.
-
-    With this hook: All workers load the cache upfront during initialization,
-    making all test times consistent and predictable.
-    """
-    with contextlib.suppress(Exception):
-        # Load our cached disjoint set functions
-        # Load cached cluster_trees functions
-        from dataeval.core._fast_hdbscan import (
-            _cluster_trees,  # noqa: F401
-            _mst,  # noqa: F401
-        )
-
-
 BoxLike = (
     NDArray[np.number] | Sequence[int] | Sequence[float] | tuple[int, int, int, int] | tuple[float, float, float, float]
 )
@@ -70,7 +43,12 @@ _TLabels = TypeVar("_TLabels", Sequence[int], Sequence[Sequence[int]])
 TEMP_CONTENTS = "ABCDEF1234567890"
 
 # Custom fixtures specific to functionality
-pytest_plugins = ["tests.fixtures.metadata", "tests.fixtures.models", "tests.fixtures.sufficiency"]
+pytest_plugins = [
+    "tests.fixtures.metadata",
+    "tests.fixtures.models",
+    "tests.fixtures.numba_cache",
+    "tests.fixtures.sufficiency",
+]
 
 set_seed(0, all_generators=True)
 

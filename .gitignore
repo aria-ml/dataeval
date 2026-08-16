@@ -30,6 +30,7 @@ output/
 
 .tox/
 .nox/
+.numba-cache/
 .python-version
 .cuda-version
 
