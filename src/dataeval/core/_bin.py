@@ -190,8 +190,10 @@ def bin_data(data: NDArray[Any], bin_method: str, max_bins: int | None = None) -
     """
     Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters.
 
-    Bin edges are placed using the finite values only. Infinities land in the end bins,
-    which the ±inf outer edges are there to absorb, and NaN is given a bin of its own.
+    Bin edges are placed using the finite values only. The -inf outer edge absorbs
+    negative infinity into the first bin, but digitizing is right-open, so positive
+    infinity falls past the +inf outer edge into a bin above the highest finite one.
+    NaN is then given a bin of its own above that.
 
     Parameters
     ----------
@@ -204,7 +206,8 @@ def bin_data(data: NDArray[Any], bin_method: str, max_bins: int | None = None) -
         here chooses its own count from the data, and a count chosen that way can still
         exceed what the sample supports; clusters that overrun the cap fall back to
         uniform edges, since merging clusters would place edges where the data says there
-        is a boundary. A NaN bin is added on top of this cap, not counted against it.
+        is a boundary. The bins above the finite range — one for positive infinity, one
+        for NaN — are added on top of this cap, not counted against it.
 
     Returns
     -------
@@ -297,9 +300,10 @@ def is_continuous(data: NDArray[np.number[Any]], groups: NDArray[Any] | None = N
     Parameters
     ----------
     data : NDArray[np.number]
-        1D array of numeric values, one entry per observation. NaN entries are dropped
-        before the test, since a missing value has no position on the line and so says
-        nothing about spacing.
+        1D array of numeric values, one entry per observation. Non-finite entries are
+        dropped before the test, since a missing value has no position on the line and an
+        infinity no finite distance to its neighbors, so neither says anything about
+        spacing. These are the same entries bin edges are placed on.
     groups : NDArray or None, default None
         Group identifier per entry of ``data``, of any comparable dtype. Entries sharing
         an identifier are repeated records of one underlying observation. Where the value
@@ -315,7 +319,8 @@ def is_continuous(data: NDArray[np.number[Any]], groups: NDArray[Any] | None = N
         True when the sample looks continuous, False when it looks discrete. Always False
         for fewer than 20 observations or fewer than 3 distinct values, neither of which
         supports the near-neighbor construction. Both counts are taken after grouping and
-        after dropping NaN, so either can put a sample under the 20-observation floor.
+        after dropping non-finite entries, so either can put a sample under the
+        20-observation floor.
 
     Raises
     ------
@@ -422,11 +427,14 @@ def is_continuous(data: NDArray[np.number[Any]], groups: NDArray[Any] | None = N
             raise ShapeMismatchError(f"groups length {groups.size} does not match data length {data.shape[0]}.")
         data = _collapse_replicated(data, groups)
 
-    # A missing value has no position on the line, so it says nothing about spacing.
-    # Left in, it propagates NaN through the near-neighbor arithmetic and decides the
-    # verdict by comparison semantics rather than by the data.
-    if np.issubdtype(data.dtype, np.inexact):
-        data = data[~np.isnan(data)]
+    # A missing value has no position on the line and an infinity has no finite distance
+    # to its neighbors, so neither says anything about spacing. Left in, an infinity at
+    # the low end makes both terms of the near-neighbor quotient infinite and the whole
+    # Wasserstein statistic NaN, at which point the threshold comparison fails open and
+    # the primary signal stops rejecting anything; one at the high end drives its windows
+    # to a fabricated zero. `_observed` is what bin edges are placed on too, so the
+    # verdict and the edges are read off the same values.
+    data = _observed(data)
 
     n_examples = len(data)
 

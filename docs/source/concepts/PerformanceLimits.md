@@ -279,9 +279,10 @@ represent the semantic distinctions relevant to the classification task. An
 embedding model that is poorly suited to the target domain may project
 separable classes into overlapping regions, producing an artificially high BER
 estimate, or may separate classes that are genuinely confusable at the pixel
-level, producing an artificially low estimate. Always pair BER results with a
-qualitative check that the embedding structure is meaningful for the task (see
-the [Embeddings](Embeddings.md) concept page).
+level, producing an artificially low estimate. A BER estimate is therefore a
+statement about the embedding as much as about the data, and it carries no
+signal about whether that embedding suited the task (see the
+[Embeddings](Embeddings.md) concept page).
 
 The MST and KNN estimators produce bounds, not point estimates. The gap
 between upper and lower bounds can be wide, particularly for small datasets or

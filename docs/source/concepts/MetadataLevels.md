@@ -150,18 +150,13 @@ the finer level's rows.
 
 Background statistics are the clearest case. `compute_stats(per_background=True)`
 measures each image's pixels *outside* its bounding boxes: the scene an image was
-captured in. That is a property of the image and of nothing inside it, so it is
-stored once per image, at `unit`:
+captured in. That is a property of the image and of nothing inside it, so
+{meth}`.Metadata.add_factors` reads the `source_index` those values arrive with
+and stores them once per image, at `unit`, beside the per-detection ones:
 
 ```python
-stats = compute_stats(
-    dataset,
-    stats=ImageStats.VISUAL_BRIGHTNESS,
-    per_background=True,
-    normalize_pixel_values=False,
-)
-md.add_factors(stats)
-md.factor_names  # ['unit_background_brightness', 'unit_brightness', 'instance_brightness', ...]
+md.factor_names
+# ['unit_background_brightness', 'unit_brightness', 'instance_brightness', ...]
 ```
 
 Read at `instance`, `unit_background_brightness` gathers each detection's own
@@ -236,8 +231,9 @@ have to be dropped.
 impose a shape: it places both the item level and the label level at whichever
 level the caller asked for, which is `unit` by default. So a single-level
 `from_factors` metadata has `item_level == label_level == "unit"`, and its
-default view already *is* the label level. Read
-{attr}`.Metadata.label_level` rather than assuming `instance`.
+default view already *is* the label level. So `label_level` is a property to be
+read rather than a constant: `instance` on every dataset task, and whatever was
+asked for on `from_factors`.
 
 **{attr}`.Metadata.view` — which rows the array-shaped accessors project.**
 This is the movable one. {attr}`.Metadata.factor_data`,
@@ -260,11 +256,13 @@ factors co-vary?"; the second asks "across all images". For a `unit`-level facto
 only the second gives it one vote per image.
 
 ```{important}
-Prefer {meth}`.Metadata.at` over assigning to {attr}`.Metadata.view`. Evaluators
-hold a reference to the metadata they were given, so mutating the view in place
-changes what an already-constructed evaluator will read. {meth}`.Metadata.at`
-returns an independent copy sharing the same structuring and binning work, which
-lets two evaluators read two levels of the same dataset at once.
+The two spellings of a view change differ in more than style. Assigning to
+{attr}`.Metadata.view` mutates the instance, and evaluators hold a reference to
+the metadata they were given rather than a snapshot of it — so a view assigned
+after construction changes what an already-built evaluator reads.
+{meth}`.Metadata.at` returns an independent copy that shares the structuring and
+binning work already done, which is what lets two evaluators read two levels of
+one dataset at once.
 ```
 
 Moving the view **up** has one hard limit: {attr}`.Metadata.class_labels` raises
@@ -308,9 +306,6 @@ rows to roll up, into what, and by what summary, and the result becomes an
 ordinary factor at the coarser level:
 
 ```python
-md = Metadata(dataset)
-md.add_factors(stats)
-
 rolled = md.agg(
     "instance",
     "unit",
@@ -399,13 +394,13 @@ metadata is bound to. So anything computed from that dataset — embeddings abov
 all — still describes the original population, and pairing the two row-for-row is
 a misalignment that raises nothing.
 
-{attr}`.Metadata.is_filtered` is how to ask, and the evaluators that take both a
-metadata and something dataset-shaped refuse a filtered one outright rather than
-silently mispairing it.
+{attr}`.Metadata.is_filtered` records that this happened, and the evaluators that
+take both a metadata and something dataset-shaped refuse a filtered one outright
+rather than silently mispairing it.
 
-{meth}`.Metadata.selected_items` is how to bring the dataset side back into
-correspondence — it returns the surviving item indices, for use with a dataset
-view:
+{meth}`.Metadata.selected_items` is what brings the dataset side back into
+correspondence: it returns the surviving item indices, which a dataset view can
+be built from.
 
 ```python
 narrowed = md.having(pl.col("class_label") == 0, "instance")
@@ -470,9 +465,7 @@ links between them, and which factor is defined where. Three things it does
   values and the binning configuration is supplied at load. One file therefore
   serves any `continuous_factor_bins` you later want from it. For the same
   reason `exclude`, `include`, and `view` are not stored: they are how a reader
-
   asks its question, not what the rows are.
-
 - **The per-item metadata dicts** behind {attr}`.Metadata.raw`. They hold
   whatever the dataset put there, of unbounded size, so {attr}`.Metadata.raw`
   raises on a loaded instance rather than answering as though the dataset had
@@ -493,15 +486,9 @@ tool — write {attr}`.Metadata.dataframe` to a parquet file instead.
 ```
 
 So {class}`.MetadataFormatError` is the *designed* outcome for a stale file
-rather than a bug to work around, and the shape of a cache built on it is:
-
-```python
-try:
-    md = Metadata.load(path, dataset)
-except MetadataFormatError:
-    md = Metadata(dataset)
-    md.save(path)
-```
+rather than a bug to work around. It carries exactly one piece of information:
+that these rows cannot be trusted against this version, and the dataset walk
+they stood in for has to be paid again.
 
 ## Units, not images
 
@@ -542,9 +529,10 @@ need no modality awareness at all.
 ```{note}
 `"image"` is still accepted wherever a level name is taken — `rows_at("image")`,
 `at("image")`, `view="image"` — and resolves to `"unit"` with a
-`DeprecationWarning`. It is removed in v1.2.0. Note that level names always read
-back as `"unit"`, so a comparison like `md.item_level == "image"` is `False`; use
-`md.unit_type == "image"` to ask about the medium.
+`DeprecationWarning`. It is removed in v1.2.0. Level names always read back as
+`"unit"`, so `md.item_level == "image"` is `False` even on an image dataset —
+the level names answer where a fact lives, and {attr}`.Metadata.unit_type`
+answers what the medium is called.
 ```
 
 ## Levels and ontologies are different graphs
@@ -569,6 +557,8 @@ level question.
 
 ## Related concept pages
 
+- [Binning](Binning.md) — what the discretization on this page's factors actually
+  does to them, and why the cut points are a choice rather than a detail.
 - [Dataset Bias and Coverage](DatasetBias.md) — the evaluators that consume
   {class}`.Metadata`, and where the choice of view changes what they measure.
 - [Ontology](Ontology.md) — the other graph, over label concepts rather than

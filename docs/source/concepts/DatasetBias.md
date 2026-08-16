@@ -557,6 +557,8 @@ explicitly.
 
 ## Related concept pages
 
+- [Binning](Binning.md) — Balance, Diversity and Parity all read binned factors,
+  so the cut points decide what these evaluators can see
 - [Embeddings](Embeddings.md) — understanding the representation space that
   coverage and completeness operate in
 - [Data Integrity](DataIntegrity.md) — when your data has sample-level quality
