@@ -14,6 +14,14 @@ _logger = get_logger(__name__)
 
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
 
+# Share of a sample that must be repeated values before ties count as evidence that the
+# support is discrete rather than finely recorded. See :func:`is_continuous`.
+DUPLICATE_SUPPORT_FRACTION = 0.1
+
+# Floor under the sqrt(n) level budget, so a small sample cannot push the budget below the
+# cardinality of an ordinary categorical factor. See :func:`level_budget`.
+MIN_LEVEL_BUDGET = 20
+
 
 def get_counts(data: NDArray[np.intp], min_num_bins: int | None = None) -> NDArray[np.intp]:
     """
@@ -98,19 +106,31 @@ def _observed(data: NDArray[Any]) -> NDArray[Any]:
     return data[np.isfinite(data)] if np.issubdtype(data.dtype, np.inexact) else data
 
 
-def _uniform_edges(observed: NDArray[Any], bin_method: str) -> NDArray[np.float64]:
+def _uniform_edges(observed: NDArray[Any], bin_method: str, max_bins: int | None = None) -> NDArray[np.float64]:
     """
     Place bin edges by equal width, then move them to quantiles for ``uniform_count``.
 
     The starting count comes from NumPy's ``bins="auto"`` and is then reduced while any
     non-empty bin holds fewer than 10 entries, so the count is a function of the data
-    rather than a setting.
+    rather than a setting. ``max_bins`` caps that count before the reduction runs, since
+    the reduction walks down one bin at a time and gives up after twenty steps, which
+    cannot bring a count chosen for a heavily peaked factor back within a budget set by
+    the sample size. NumPy chooses the starting count from the data's spread, so a
+    heavy-tailed factor can make ``bins="auto"`` itself expensive on NumPy 1.x, where the
+    rule is uncapped; the cap here applies to the result, not to that call.
+
+    The reduction never goes below two bins. One bin is a constant column: it carries no
+    entropy, so every bias statistic reports it as zero and the factor disappears from the
+    output rather than being reported coarsely.
     """
     counts, bin_edges = np.histogram(observed, bins="auto")
     n_bins = counts.size
+    if max_bins is not None and n_bins > max_bins:
+        n_bins = max(int(max_bins), 2)
+        counts, bin_edges = np.histogram(observed, bins=n_bins)
     if counts[counts > 0].min() < 10:
         counter = 20
-        while counts[counts > 0].min() < 10 and n_bins >= 2 and counter > 0:
+        while counts[counts > 0].min() < 10 and n_bins > 2 and counter > 0:
             counter -= 1
             n_bins -= 1
             counts, bin_edges = np.histogram(observed, bins=n_bins)
@@ -121,12 +141,75 @@ def _uniform_edges(observed: NDArray[Any], bin_method: str) -> NDArray[np.float6
     return np.asarray(bin_edges, dtype=np.float64)
 
 
-def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.intp]:
+def level_budget(n_samples: int) -> int:
+    """
+    Most distinct values a factor may carry into a contingency table over this many observations.
+
+    Discreteness is a fact about a factor's support; it is not a promise that the support
+    is small. An integer factor can be discrete and still take thousands of values --
+    pixel areas, epoch seconds, identifiers -- and a factor like that defeats anything read
+    off a contingency table: the table has more cells than the sample can fill, so the
+    counts are dominated by which cells happened to be hit. Binning a factor that overruns
+    this budget trades its exact values for cells the sample can actually support.
+
+    The budget is ``sqrt(n_samples)``, the square-root rule used for histogram bin counts,
+    floored at 20 so that a small sample cannot push it below the cardinality of an
+    ordinary categorical factor. Both are rules of thumb rather than derived quantities.
+
+    Parameters
+    ----------
+    n_samples : int
+        Observations the factor was measured over, at the factor's own level.
+
+    Returns
+    -------
+    int
+        Level budget for a sample of this size.
+
+    Examples
+    --------
+    A handful of categories over a large sample is comfortably within budget:
+
+    >>> level_budget(10000)
+    100
+
+    An integer measurement taking hundreds of values is not:
+
+    >>> level_budget(5717)
+    75
+
+    The floor keeps ordinary categorical factors intact when the sample is small:
+
+    >>> level_budget(100)
+    20
+    """
+    return int(max(MIN_LEVEL_BUDGET, np.sqrt(n_samples)))
+
+
+def bin_data(data: NDArray[Any], bin_method: str, max_bins: int | None = None) -> NDArray[np.intp]:
     """
     Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters.
 
     Bin edges are placed using the finite values only. Infinities land in the end bins,
     which the ±inf outer edges are there to absorb, and NaN is given a bin of its own.
+
+    Parameters
+    ----------
+    data : NDArray[Any]
+        Values to bin, one per entity.
+    bin_method : {"uniform_width", "uniform_count", "clusters"}
+        How the edges are placed.
+    max_bins : int or None, default None
+        Most bins the observed values may be placed into, or None for no cap. Every method
+        here chooses its own count from the data, and a count chosen that way can still
+        exceed what the sample supports; clusters that overrun the cap fall back to
+        uniform edges, since merging clusters would place edges where the data says there
+        is a boundary. A NaN bin is added on top of this cap, not counted against it.
+
+    Returns
+    -------
+    NDArray[np.intp]
+        Bin index per entry, with missing values in a bin of their own above the rest.
     """
     data = np.asarray(data)
     observed = _observed(data)
@@ -134,7 +217,12 @@ def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.intp]:
         # Nothing observed to place edges between, so every entry is the missing bin.
         return np.zeros(data.shape, dtype=np.intp)
 
-    bin_edges = _bin_by_clusters(observed) if bin_method == "clusters" else _uniform_edges(observed, bin_method)
+    if bin_method == "clusters":
+        bin_edges = _bin_by_clusters(observed)
+        if max_bins is not None and bin_edges.size - 1 > max_bins:
+            bin_edges = _uniform_edges(observed, "uniform_width", max_bins)
+    else:
+        bin_edges = _uniform_edges(observed, bin_method, max_bins)
     bin_edges[0] = -np.inf
     bin_edges[-1] = np.inf
     return _digitize_with_missing(data, bin_edges)
@@ -258,9 +346,14 @@ def is_continuous(data: NDArray[np.number[Any]], groups: NDArray[Any] | None = N
        n = 86.
 
     2. Duplicate fraction: truly continuous data drawn from a floating-point representation
-       has probability zero of producing exact duplicates. The presence of duplicates is a
-       strong signal of discrete support, and we use it to catch discrete distributions
-       with large support that would otherwise produce uniform-looking NNN values.
+       has probability zero of producing exact duplicates, so repeats point to discrete
+       support and catch distributions with large support that would otherwise produce
+       uniform-looking NNN values. The repeats have to account for a tenth of the sample
+       before they count. Below that they are as consistent with a quantity recorded on a
+       fine grid -- pixel counts, epoch seconds -- which collides now and then by luck
+       while taking nearly as many distinct values as there are observations; treating
+       those collisions as discrete support would send every integer-recorded measurement
+       down the discrete path however finely it resolves.
 
     3. GCD lattice test: discrete data on an integer or regular grid has gaps between
        unique values that are near-integer multiples of a base unit. Continuous data does
@@ -368,8 +461,16 @@ def is_continuous(data: NDArray[np.number[Any]], groups: NDArray[Any] | None = N
         return False  # NNN is too far from uniform, even accounting for sample size
 
     # WD says continuous. Check for contradicting evidence from duplicates and lattice structure.
+    #
+    # Ties are evidence of discrete support only when they are structural rather than
+    # incidental. A quantity recorded on a grid finer than its spread -- pixel areas,
+    # epoch seconds, prices in cents -- collides occasionally by luck, and reading those
+    # few collisions as discrete support forces every integer-recorded measurement down
+    # the unbinned path no matter how many distinct values it takes. Requiring repeats to
+    # account for a tenth of the sample separates the two: measurements of that kind sit
+    # near 0.05 and below, while a genuinely small support puts the fraction near 1.
     dup_frac = 1.0 - xu.size / n_examples
-    has_dups = dup_frac > 0.005  # tiny tolerance for floating-point artifacts
+    has_dups = dup_frac > DUPLICATE_SUPPORT_FRACTION
 
     on_lattice = _gcd_ratio(data) > 0.85
 

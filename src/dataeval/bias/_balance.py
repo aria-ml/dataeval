@@ -1,5 +1,6 @@
 __all__ = []
 
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -10,6 +11,7 @@ import polars as pl
 from dataeval import Metadata
 from dataeval._helpers import factors_excluding, is_metadata_like, resolve_label_axis
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
+from dataeval.exceptions import DeprecatedWarning
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
@@ -32,8 +34,11 @@ class BalanceOutput(DictOutput):
 
         - factor_name: str - Name of the metadata factor. Includes "class_label"
           which represents the self-information (always 1.0).
-        - mi_value: float - Normalized mutual information value between this
-          factor and class labels
+        - mi_value: float - Share of the class label's entropy this factor accounts
+          for, corrected for chance: 1.0 for a factor that determines the class
+          outright, 0.0 for one that explains no more than its own cardinality would
+          by chance. Ranks factors of comparable cardinality directly; a factor taking
+          several hundred values is scored conservatively by comparison.
     factors : pl.DataFrame
         DataFrame with inter-factor normalized mutual information correlations:
 
@@ -42,7 +47,9 @@ class BalanceOutput(DictOutput):
         - mi_value: float - Normalized mutual information value
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
     classwise : pl.DataFrame
-        DataFrame with per-class-to-factor normalized mutual information:
+        DataFrame with per-class-to-factor normalized mutual information. Unlike
+        ``balance``, this excludes "class_label", whose mutual information with a
+        single class is 1.0 by construction:
 
         - class_name: str - Name of the class
         - factor_name: str - Name of the metadata factor
@@ -69,7 +76,9 @@ class Balance(Evaluator):
     Parameters
     ----------
     num_neighbors : int, default 5
-        Number of points to consider as neighbors
+        Deprecated, removed in 1.2. Every factor reaching this evaluator holds bin
+        indices, which takes the discrete estimator path where a neighborhood size is
+        never consulted, so this value has no effect on the result. Setting it warns.
     class_imbalance_threshold : float, default 0.3
         Threshold for identifying imbalanced classes. Classes with NMI above this
         threshold with any metadata factor are considered imbalanced.
@@ -88,7 +97,7 @@ class Balance(Evaluator):
     metadata : MetadataLike
         Preprocessed metadata from the last evaluate() call.
     num_neighbors : int
-        Number of points to consider as neighbors
+        Deprecated, removed in 1.2. Has no effect; see Parameters.
     class_imbalance_threshold : float
         Threshold for identifying imbalanced classes
     factor_correlation_threshold : float
@@ -108,6 +117,14 @@ class Balance(Evaluator):
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
     seed. MI is computed differently for categorical and continuous variables, and
     in all cases normalized or transformed to [0, 1] prior to being returned.
+
+    All three DataFrames are corrected for the mutual information a factor's cardinality
+    alone would produce, and they differ in what that corrected value is divided by.
+    ``balance`` and ``classwise`` divide by the class entropy, so their factors can be
+    ranked against one another. ``factors`` compares two metadata factors, where neither
+    side is privileged, and divides by the smaller of the two entropies. Values are
+    therefore comparable within each DataFrame but not across them; see
+    :func:`~dataeval.core.mutual_info`.
 
     References
     ----------
@@ -134,7 +151,7 @@ class Balance(Evaluator):
 
     Using configuration:
 
-    >>> config = Balance.Config(num_neighbors=10, class_imbalance_threshold=0.2)
+    >>> config = Balance.Config(class_imbalance_threshold=0.2, factor_correlation_threshold=0.6)
     >>> balance = Balance(config=config)
     """
 
@@ -145,7 +162,7 @@ class Balance(Evaluator):
         Attributes
         ----------
         num_neighbors : int, default 5
-            Number of points to consider as neighbors.
+            Deprecated, removed in 1.2. Has no effect; see :class:`.Balance`.
         class_imbalance_threshold : float, default 0.3
             Threshold for identifying imbalanced classes.
         factor_correlation_threshold : float, default 0.5
@@ -178,6 +195,14 @@ class Balance(Evaluator):
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
+        if self.num_neighbors != DEFAULT_BALANCE_NUM_NEIGHBORS:
+            warnings.warn(
+                "Balance.num_neighbors is deprecated and will be removed in 1.2. It has no "
+                "effect: every factor reaching the estimator arrives already binned, which "
+                "takes the discrete path where a neighborhood size is never consulted.",
+                DeprecatedWarning,
+                stacklevel=2,
+            )
 
     @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold", "label"])
     def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> BalanceOutput:  # noqa: C901
@@ -208,6 +233,12 @@ class Balance(Evaluator):
 
         >>> balance = Balance()
         >>> result = balance.evaluate(metadata)
+
+        Reading the column as a ranking: where an image was taken accounts for a quarter of
+        what the class label tells you and when it was taken for a twelfth, while the
+        weather, the camera angle and the image's own id account for none of it. A model
+        trained here could reach for the location instead of the object.
+
         >>> result.balance
         shape: (6, 2)
         ┌─────────────┬──────────┐
@@ -216,11 +247,11 @@ class Balance(Evaluator):
         │ cat         ┆ f64      │
         ╞═════════════╪══════════╡
         │ class_label ┆ 1.0      │
-        │ angle       ┆ 0.029047 │
-        │ id          ┆ 0.575706 │
-        │ location    ┆ 0.024849 │
-        │ time_of_day ┆ 0.06278  │
-        │ weather     ┆ 0.023614 │
+        │ angle       ┆ 0.010253 │
+        │ id          ┆ 0.0      │
+        │ location    ┆ 0.244383 │
+        │ time_of_day ┆ 0.080863 │
+        │ weather     ┆ 0.015113 │
         └─────────────┴──────────┘
 
         >>> result.factors
@@ -230,37 +261,37 @@ class Balance(Evaluator):
         │ ---         ┆ ---         ┆ ---      ┆ ---           │
         │ cat         ┆ cat         ┆ f64      ┆ bool          │
         ╞═════════════╪═════════════╪══════════╪═══════════════╡
-        │ angle       ┆ id          ┆ 1.0      ┆ true          │
-        │ angle       ┆ location    ┆ 0.12422  ┆ false         │
-        │ angle       ┆ time_of_day ┆ 0.072422 ┆ false         │
-        │ angle       ┆ weather     ┆ 0.037279 ┆ false         │
-        │ id          ┆ angle       ┆ 1.0      ┆ true          │
+        │ angle       ┆ id          ┆ 0.017837 ┆ false         │
+        │ angle       ┆ location    ┆ 0.071866 ┆ false         │
+        │ angle       ┆ time_of_day ┆ 0.014648 ┆ false         │
+        │ angle       ┆ weather     ┆ 0.001868 ┆ false         │
+        │ id          ┆ angle       ┆ 0.017837 ┆ false         │
         │ …           ┆ …           ┆ …        ┆ …             │
-        │ time_of_day ┆ weather     ┆ 0.023866 ┆ false         │
-        │ weather     ┆ angle       ┆ 0.037279 ┆ false         │
-        │ weather     ┆ id          ┆ 1.0      ┆ true          │
-        │ weather     ┆ location    ┆ 0.047246 ┆ false         │
-        │ weather     ┆ time_of_day ┆ 0.023866 ┆ false         │
+        │ time_of_day ┆ weather     ┆ 0.007897 ┆ false         │
+        │ weather     ┆ angle       ┆ 0.001868 ┆ false         │
+        │ weather     ┆ id          ┆ 0.0      ┆ false         │
+        │ weather     ┆ location    ┆ 0.084927 ┆ false         │
+        │ weather     ┆ time_of_day ┆ 0.007897 ┆ false         │
         └─────────────┴─────────────┴──────────┴───────────────┘
 
         >>> result.classwise
-        shape: (24, 4)
+        shape: (20, 4)
         ┌────────────┬─────────────┬──────────┬───────────────┐
         │ class_name ┆ factor_name ┆ mi_value ┆ is_imbalanced │
         │ ---        ┆ ---         ┆ ---      ┆ ---           │
         │ cat        ┆ cat         ┆ f64      ┆ bool          │
         ╞════════════╪═════════════╪══════════╪═══════════════╡
-        │ boat       ┆ angle       ┆ 0.020807 ┆ false         │
-        │ boat       ┆ class_label ┆ 1.0      ┆ true          │
-        │ boat       ┆ id          ┆ 0.471488 ┆ true          │
-        │ boat       ┆ location    ┆ 0.009547 ┆ false         │
-        │ boat       ┆ time_of_day ┆ 0.04239  ┆ false         │
+        │ boat       ┆ angle       ┆ 0.0      ┆ false         │
+        │ boat       ┆ id          ┆ 0.0      ┆ false         │
+        │ boat       ┆ location    ┆ 0.123615 ┆ false         │
+        │ boat       ┆ time_of_day ┆ 0.064551 ┆ false         │
+        │ boat       ┆ weather     ┆ 0.003375 ┆ false         │
         │ …          ┆ …           ┆ …        ┆ …             │
-        │ plane      ┆ class_label ┆ 1.0      ┆ true          │
-        │ plane      ┆ id          ┆ 0.49531  ┆ true          │
-        │ plane      ┆ location    ┆ 0.033162 ┆ false         │
-        │ plane      ┆ time_of_day ┆ 0.040861 ┆ false         │
-        │ plane      ┆ weather     ┆ 0.000407 ┆ false         │
+        │ plane      ┆ angle       ┆ 0.0      ┆ false         │
+        │ plane      ┆ id          ┆ 0.0      ┆ false         │
+        │ plane      ┆ location    ┆ 0.194114 ┆ false         │
+        │ plane      ┆ time_of_day ┆ 0.033996 ┆ false         │
+        │ plane      ┆ weather     ┆ 0.0      ┆ false         │
         └────────────┴─────────────┴──────────┴───────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
@@ -277,32 +308,41 @@ class Balance(Evaluator):
         # analysed against it, since it would otherwise report perfect correlation with
         # itself.
         axis = resolve_label_axis(self.metadata, self.label)
-        factor_data, factor_names, is_discrete = factors_excluding(self.metadata, axis.excluded)
+        factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
 
-        mi = mutual_info(axis.values, factor_data, is_discrete, self.num_neighbors)
+        # Every column of factor_data holds discrete integer bins: MetadataLike requires a
+        # continuous factor to be binned before it reaches here, so what arrives is bin
+        # indices either way. The factor's *original* continuous/discrete nature is
+        # provenance, not a description of these values, and passing it as though it were
+        # would give a binned factor an infinite entropy. Its class-to-factor score would
+        # then be normalized by the class entropy rather than its own, holding it below
+        # H(factor)/H(class) no matter how strongly the class determines it.
+        binned = [True] * len(factor_names)
+
+        mi = mutual_info(axis.values, factor_data, binned, self.num_neighbors)
 
         # Calculate classwise balance
-        classwise = mutual_info_classwise(axis.values, factor_data, is_discrete, self.num_neighbors)
+        classwise = mutual_info_classwise(axis.values, factor_data, binned, self.num_neighbors)
 
         index2label = axis.names
 
         # Create classwise DataFrame - build as columnar data
-        # classwise is (num_classes, num_factors+1) where column 0 is class_label itself
+        # classwise is (num_classes, num_factors+1) where column 0 is the label axis
+        # measured against itself. That self-information is 1.0 for every class by
+        # construction, so it is dropped: it says nothing about the class and would
+        # trip the imbalance threshold for every row.
         class_name_col: list[str] = []
         factor_name_col: list[str] = []
         mi_value_col: list[float] = []
         is_imbalanced_col: list[bool] = []
 
-        # Include the label axis as the first factor (index 0), then all metadata factors
-        all_factor_names = [axis.label] + factor_names
-
         u_classes = np.unique(axis.values)
         for class_idx in range(classwise.shape[0]):
             class_name = index2label.get(int(u_classes[class_idx]), str(u_classes[class_idx]))
-            for factor_idx in range(classwise.shape[1]):
+            for factor_idx, factor_name in enumerate(factor_names, start=1):
                 mi_value = classwise[class_idx, factor_idx]
                 class_name_col.append(class_name)
-                factor_name_col.append(all_factor_names[factor_idx])
+                factor_name_col.append(factor_name)
                 mi_value_col.append(float(mi_value))
                 is_imbalanced_col.append(bool(mi_value > self.class_imbalance_threshold))
 

@@ -161,9 +161,8 @@ dep.plot(balance_output)
 dep.plot(balance_output, plot_classwise=True)
 
 # %% [markdown]
-# Classwise balance also indicates minimal correlation of image statistics and individual classes. Uniform mutual
-# information between individual classes and all class labels indicates balanced class representation in the subsampled
-# dataset.
+# Classwise balance also indicates minimal correlation of image statistics and individual classes, so no single
+# intrinsic factor separates one class from the rest of the subsampled dataset.
 
 # %%
 diversity_output = Diversity().evaluate(metadata)

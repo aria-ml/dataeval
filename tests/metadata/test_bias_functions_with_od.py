@@ -212,9 +212,9 @@ class TestBiasFunctionsWithOD:
             assert "is_correlated" in result.factors.columns
 
         # result.classwise is a DataFrame with class_name, factor_name, mi_value, is_imbalanced columns
-        # It contains one row per (class, factor + class_label) combination
+        # It contains one row per (class, factor) combination
         n_classes = len(md.index2label)
-        assert result.classwise.height == n_classes * (len(md.factor_names) + 1)
+        assert result.classwise.height == n_classes * len(md.factor_names)
         assert "class_name" in result.classwise.columns
         assert "factor_name" in result.classwise.columns
         assert "mi_value" in result.classwise.columns
