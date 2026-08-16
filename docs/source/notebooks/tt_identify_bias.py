@@ -236,14 +236,12 @@ dep.plot(bal)
 dep.plot(bal, plot_classwise=True)
 
 # %% [markdown]
-# The classwise heatmap shows that factors other than _class_ do not have any significant correlation with a specific
-# class.
+# The classwise heatmap takes each class against the rest and asks how much of that split every metadata factor
+# accounts for, so a bright cell names a factor that separates one class from the others. Here no factor does: the
+# metadata says little about any individual class beyond what its own cardinality would produce by chance.
 #
-# Classwise balance shows correlation of individual classes with all class labels, indicating relative class imbalance. In
-# this case the _person_ class is over-represented relative to most other classes.
-#
-# This means that a model might learn a bias towards the _person_ class label due to its frequency in the training set,
-# which becomes a problem if the test/operational dataset doesn't have the same imbalance.
+# The class label itself is not a column here — its mutual information with a single class is 1.0 by construction and
+# would say nothing. Read class frequency off {func}`.label_stats` instead.
 
 # %% [markdown]
 # ## Step 4: Assess dataset diversity

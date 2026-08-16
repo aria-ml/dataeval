@@ -144,7 +144,9 @@ class TestBalanceUnit:
 
         # Check classwise DataFrame
         assert isinstance(result.classwise, pl.DataFrame)
-        assert result.classwise.height == num_classes * (num_factors + 1)
+        # classwise covers metadata factors only - class_label is 1.0 by construction
+        assert result.classwise.height == num_classes * num_factors
+        assert "class_label" not in result.classwise["factor_name"].to_list()
 
         # Check classwise DataFrame schema
         assert set(result.classwise.schema.keys()) == {

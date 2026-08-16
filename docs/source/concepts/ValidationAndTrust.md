@@ -232,10 +232,15 @@ per column, without being asked:
   combining three signals: the Wasserstein distance of the normalized
   near-neighbor distribution from uniform (threshold `0.5 / sqrt(n)`), the
   fraction of exact duplicate values, and a GCD test for values sitting on a
-  regular lattice. Columns it judges discrete are ordinal-encoded like
-  categoricals; columns it judges continuous are binned by `auto_bin_method`,
-  default `"uniform_width"`. It is public, so you can run it on a factor and
-  see the call it will make before you build the {class}`.Metadata`.
+  regular lattice. Columns it judges continuous are binned by `auto_bin_method`,
+  default `"uniform_width"`. Columns it judges discrete are ordinal-encoded like
+  categoricals, unless they take more distinct values than the sample can fill
+  — more than `max(20, sqrt(n))` of them — in which case they are binned too,
+  since a contingency table with more cells than observations reports on which
+  cells were hit rather than on the factor. It is public, so you can run it on a
+  factor and see the call it will make before you build the {class}`.Metadata`.
+  The cardinality cap applies to numeric columns only; a non-numeric column
+  keeps one category per distinct value however many there are.
 - **Below 20 samples the heuristic returns "discrete" unconditionally**, so on
   a small dataset every distinct float becomes its own category and the
   resulting factor is nearly one-to-one with the sample index.
@@ -282,10 +287,11 @@ Two consequences worth knowing:
   the end bins, not the missing bin.
 - **The missing bin has a position but no meaning.** It sits above the highest
   observed bin because the codes have to be contiguous, not because missing is
-  large. Anything that treats a binned factor as ordinal — {class}`.Balance`
-  passes bin indices to `mutual_info_regression` — reads that position as a
-  value. Where the missing rate is material, check whether a finding is about
-  the factor or about its absence.
+  large. Anything that treats a binned factor as ordinal reads that position as
+  a value; {class}`.Balance` does not, since it declares every column discrete,
+  but {class}`.Parity` and anything reading the codes as magnitudes do. Where
+  the missing rate is material, check whether a finding is about the factor or
+  about its absence.
 
 The continuous/discrete test drops `NaN` before deciding, and the 20-sample
 floor then counts observed values only, so a factor that is mostly missing is
@@ -470,14 +476,17 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for what these measure.
     [Vinh et al., 2010](DatasetBias.md#references)). Estimators from
     scikit-learn.
   - Delegated (MI estimation); Internal only (normalization)
-  - `num_neighbors=5` sets the MI estimator's neighborhood.
-    `class_imbalance_threshold=0.3` and `factor_correlation_threshold=0.5`
-    decide what is reported as imbalanced or entangled.
-  - Runs on binned factors even though {func}`.mutual_info` does not require
-    it, so the result depends on a binning you may not have chosen — see
+  - `class_imbalance_threshold=0.3` and `factor_correlation_threshold=0.5`
+    decide what is reported as imbalanced or entangled. `num_neighbors=5` is
+    deprecated and will be removed in 1.2: it sets the MI estimator's
+    neighborhood, and every column arriving from a {class}`.Metadata` is already
+    binned and so never reaches the neighbor-based estimator. Setting it warns.
+  - Declares every factor discrete, so the result depends on a binning you may
+    not have chosen — see
     [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
-    MI is biased upward at small n, so small datasets look more entangled than
-    they are.
+    The class-to-factor values are corrected for chance; the factor-to-factor
+    block is not, so at small n, or with a factor binned into many more bins
+    than the sample supports, that block looks more entangled than it is.
 - - {class}`.Diversity`
   - Shannon and inverse-Simpson indices
     ([Hill, 1973](DatasetBias.md#references);
@@ -899,12 +908,15 @@ statistical and computational.
   - [Linfoot (1957)](https://www.sciencedirect.com/science/article/pii/S001999585790116X),
     cited in the docstring.
   - Delegated (estimators from scikit-learn)
-  - Handles continuous factors natively: {func}`.is_continuous` selects
-    `mutual_info_regression` per column and the Linfoot transform maps the
-    result to [0, 1], so binning is a {class}`.Metadata` convention, not a
-    requirement here — but {class}`.Balance` applies it anyway, see
-    [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
-    Upward-biased at small n.
+  - Handles continuous factors natively in the factor-to-factor block:
+    {func}`.is_continuous` selects `mutual_info_regression` per column and the
+    Linfoot transform maps the result to [0, 1], so binning is a
+    {class}`.Metadata` convention, not a requirement here — but
+    {class}`.Balance` applies it anyway, see
+    [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor). The
+    class-to-factor row instead divides by the class entropy and subtracts the
+    mutual information expected under a random assignment with the same
+    margins, so it is not biased upward at small n the way that block is.
 - - {func}`.is_continuous`
   - DataEval-original heuristic. Uses the Wasserstein distance from
     `scipy.stats`; the normalized near-neighbor construction and the two

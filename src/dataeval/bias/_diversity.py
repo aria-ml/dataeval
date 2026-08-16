@@ -195,11 +195,11 @@ class Diversity(Evaluator):
         │ cat         ┆ f64             ┆ bool             │
         ╞═════════════╪═════════════════╪══════════════════╡
         │ class_label ┆ 0.983706        ┆ false            │
-        │ angle       ┆ 0.99896         ┆ false            │
-        │ id          ┆ 0.832298        ┆ false            │
-        │ location    ┆ 0.949711        ┆ false            │
-        │ time_of_day ┆ 0.916342        ┆ false            │
-        │ weather     ┆ 0.992751        ┆ false            │
+        │ angle       ┆ 0.89455         ┆ false            │
+        │ id          ┆ 0.984866        ┆ false            │
+        │ location    ┆ 0.824033        ┆ false            │
+        │ time_of_day ┆ 0.903475        ┆ false            │
+        │ weather     ┆ 0.950688        ┆ false            │
         └─────────────┴─────────────────┴──────────────────┘
 
         >>> result.classwise
@@ -209,17 +209,17 @@ class Diversity(Evaluator):
         │ ---        ┆ ---         ┆ ---             ┆ ---              │
         │ cat        ┆ cat         ┆ f64             ┆ bool             │
         ╞════════════╪═════════════╪═════════════════╪══════════════════╡
-        │ person     ┆ angle       ┆ 0.888889        ┆ false            │
-        │ person     ┆ id          ┆ 0.293564        ┆ true             │
-        │ person     ┆ location    ┆ 0.836257        ┆ false            │
-        │ person     ┆ time_of_day ┆ 0.924528        ┆ false            │
+        │ person     ┆ angle       ┆ 0.575269        ┆ false            │
+        │ person     ┆ id          ┆ 0.912791        ┆ false            │
+        │ person     ┆ location    ┆ 0.034991        ┆ true             │
+        │ person     ┆ time_of_day ┆ 0.532468        ┆ false            │
         │ person     ┆ weather     ┆ 0.833333        ┆ false            │
         │ …          ┆ …           ┆ …               ┆ …                │
-        │ plane      ┆ angle       ┆ 0.987755        ┆ false            │
-        │ plane      ┆ id          ┆ 0.430427        ┆ true             │
-        │ plane      ┆ location    ┆ 0.938918        ┆ false            │
-        │ plane      ┆ time_of_day ┆ 0.84058         ┆ false            │
-        │ plane      ┆ weather     ┆ 0.987755        ┆ false            │
+        │ plane      ┆ angle       ┆ 0.797153        ┆ false            │
+        │ plane      ┆ id          ┆ 0.973154        ┆ false            │
+        │ plane      ┆ location    ┆ 0.683403        ┆ false            │
+        │ plane      ┆ time_of_day ┆ 0.875622        ┆ false            │
+        │ plane      ┆ weather     ┆ 0.918288        ┆ false            │
         └────────────┴─────────────┴─────────────────┴──────────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed

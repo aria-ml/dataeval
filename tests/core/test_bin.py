@@ -11,6 +11,7 @@ from dataeval.core._bin import (
     bin_data,
     digitize_data,
     is_continuous,
+    level_budget,
 )
 from dataeval.exceptions import ShapeMismatchError
 
@@ -610,3 +611,74 @@ class TestGcdRatioTolerance:
         result_large_tol = _gcd_ratio(data, tol=1e-3)
         assert result_default < 0.5
         assert result_large_tol == 1.0
+
+
+class TestLevelBudget:
+    """A factor may carry no more distinct values into a contingency table than the sample fills."""
+
+    @pytest.mark.parametrize(("n_samples", "expected"), [(100, 20), (400, 20), (10000, 100), (5717, 75)])
+    def test_budget_is_sqrt_n_floored_at_twenty(self, n_samples: int, expected: int) -> None:
+        assert level_budget(n_samples) == expected
+
+    def test_ordinary_categorical_factor_is_within_budget(self) -> None:
+        assert level_budget(10000) >= 5
+        assert level_budget(100) >= 20
+
+    def test_integer_measurement_exceeds_budget(self) -> None:
+        # An integer factor reads as discrete at any cardinality, so the budget is what
+        # stops a per-entity value from being scored one value at a time.
+        assert level_budget(5717) < 184
+        assert level_budget(10000) < 9998
+
+    @staticmethod
+    def _peaked_factor() -> np.ndarray:
+        rng = np.random.default_rng(0)
+        return np.where(rng.random(4000) < 0.8, 500.0, rng.integers(140, 500, 4000).astype(float))
+
+    @pytest.mark.parametrize("method", ["uniform_width", "uniform_count", "clusters"])
+    def test_bin_data_respects_max_bins(self, method: str) -> None:
+        data = self._peaked_factor()
+        binned = bin_data(data, method, max_bins=level_budget(data.size))
+        assert len(np.unique(binned)) <= level_budget(data.size)
+
+    def test_max_bins_binds_a_method_that_would_overrun(self) -> None:
+        # The bound above only proves anything where the method's own count overruns the
+        # cap, so that is asserted here rather than left incidentally satisfied. The cap
+        # is a fixed small number rather than the budget because how many bins
+        # ``bins="auto"`` picks for a peaked factor is a numpy build detail -- on this
+        # factor it has been seen as low as 13 and as high as 107, either side of the
+        # budget -- and the ceiling has to be shown binding on every one of them.
+        data = self._peaked_factor()
+        cap = 3
+        assert len(np.unique(bin_data(data, "uniform_width"))) > cap
+        assert len(np.unique(bin_data(data, "uniform_width", max_bins=cap))) <= cap
+
+    @pytest.mark.parametrize("method", ["uniform_width", "uniform_count"])
+    def test_binning_never_collapses_a_factor_to_one_bin(self, method: str) -> None:
+        # A factor whose mass sits in a couple of places with one far outlier drives the
+        # bin-count reduction all the way down. One bin is a constant column: it carries no
+        # entropy, so the factor would vanish from every bias statistic rather than be
+        # reported coarsely.
+        data = np.array([0.0] * 4 + list(range(1, 21)) + [1_000_000.0])
+        assert len(np.unique(bin_data(data, method, max_bins=level_budget(data.size)))) >= 2
+
+
+class TestIsContinuousOnIntegerValues:
+    """Ties count as discrete support only once they account for a real share of the sample."""
+
+    def test_incidental_ties_no_longer_veto_the_distance_test(self) -> None:
+        # A continuous quantity recorded on a grid far finer than its spread: 97% of the
+        # values are distinct, so the few collisions are luck, not a small support. Under
+        # the old tolerance any duplicate at all joined the lattice signal to force a
+        # discrete verdict outright; now the near-neighbor distance is still consulted.
+        rng = np.random.default_rng(0)
+        data = np.round(rng.normal(0, 1, 2000) * 1000 / 0.1) * 0.1
+        assert 0.005 < 1.0 - len(np.unique(data)) / data.size < 0.1
+        with patch("dataeval.core._bin.DUPLICATE_SUPPORT_FRACTION", 0.005):
+            assert not is_continuous(data)
+        assert is_continuous(data)
+
+    def test_small_support_is_still_discrete(self) -> None:
+        rng = np.random.default_rng(0)
+        assert not is_continuous(rng.integers(0, 100, size=2000).astype(float))
+        assert not is_continuous(np.round(rng.normal(size=2000), 1))

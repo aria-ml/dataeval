@@ -166,27 +166,63 @@ independent, $I(Y; M) = 0$. When knowing $M$ completely determines $Y$,
 $I(Y; M)$ equals the entropy of $Y$.
 
 Raw MI values are difficult to interpret, so DataEval provides normalized MI
-(NMI), a value guaranteed to be between 0 and 1. If both factors are discrete,
-DataEval normalizes by the smaller of the two marginal entropies:
+(NMI), a value guaranteed to be between 0 and 1. Which normalization applies
+depends on which of two questions the value answers.
 
-$$I_\text{norm}(Y; M) = \frac{I(Y; M)}{min(H(Y), H(M))}$$
+Between two metadata factors neither side is privileged, so DataEval divides
+by the smaller of the two marginal entropies:
 
-If one factor is discrete and the other continuous, DataEval normalizes by the
-entropy of the discrete variable. If neither variable is discrete, i.e. if both
-are continuous, the mutual information is not bounded and cannot be normalized,
-so DataEval returns a transformation of the MI onto the interval [0, 1]. (In the
-case of two random normal variables, this transformed MI is their correlation
-coefficient. See [Linfoot (1957)](#ref14)) In all cases DataEval returns NMI
-rather than raw MI.
+$$I_\text{norm}(M_1; M_2) = \frac{I(M_1; M_2)}{\min(H(M_1), H(M_2))}$$
+
+The mutual information can never exceed the smaller of the two discrete
+entropies, so dividing by the minimum keeps the result in $[0, 1]$ and reaches 1
+exactly when either factor determines the other. If one factor is discrete and
+the other continuous, DataEval normalizes by the entropy of the discrete
+variable. If neither variable is discrete, i.e. if both are continuous, the
+mutual information is not bounded and cannot be normalized, so DataEval returns
+a transformation of the MI onto the interval [0, 1]. (In the case of two random
+normal variables, this transformed MI is their correlation coefficient. See
+[Linfoot (1957)](#ref14))
+
+Between the class label and a factor the question is directed — how much of the
+class label does this factor account for — and every factor is measured against
+one common denominator, the class label's own entropy:
+
+$$I_\text{norm}(Y; M) = \frac{I(Y; M) - \mathbb{E}[I(Y; M)]}{H(Y) - \mathbb{E}[I(Y; M)]}$$
+
+Dividing every factor by the same class entropy is what makes these values
+comparable to each other, so the result can be read as a ranking of the factors.
+Dividing each factor by its own entropy instead would reward a factor for having
+few categories rather than for being informative: a coarse grouping of the class
+label reaches 1.0 under the minimum while accounting for only a fraction of what
+the class label tells you, and would outrank a factor that explains more.
+
+The correction below is subtracted from the denominator as well, and it grows
+with a factor's cardinality, so the denominator is not identical across factors.
+The effect is small over the range a binned factor occupies and grows from
+there, which means the ranking is dependable between factors of comparable width
+and scores a very wide factor conservatively rather than generously.
+
+$\mathbb{E}[I(Y; M)]$ is the mutual information expected under a random
+assignment holding the same margins, and subtracting it corrects for chance.
+Mutual information estimated from a contingency table grows with the number of
+categories even when the two variables are independent — every extra category is
+another opportunity for the counts to line up by luck, and with finite data some
+of them do. Uncorrected, an identifier column taking a distinct value per sample
+can outrank a genuine effect. With the correction an unrelated factor scores
+near zero whatever its cardinality, while a genuinely informative one is barely
+touched. The same correction is applied between two metadata factors, over the
+smaller of their two entropies rather than the class entropy — without it, a
+factor binned finely enough reports a correlation with everything it is measured
+against. [Vinh et al. (2010)](#ref13) provide a comprehensive analysis of
+normalization schemes for information-theoretic association measures, including
+their behavior under chance and the conditions under which each is most
+appropriate.
 
 Values close to 1 indicate high dependence; values close to 0 indicate near-
-independence. The mutual information can never exceed the smallest discrete
-entropy, thus using the min to normalizes is appropriate. When one variable has
-zero entropy (a degenerate factor that takes a single value), DataEval correctly
-sets the mutual info and its normalized value to zero as well.
-[Vinh et al. (2010)](#ref13) provide a comprehensive analysis of normalization
-schemes for information-theoretic association measures, including their behavior
-under chance and the conditions under which each is most appropriate.
+independence. When one variable has zero entropy (a degenerate factor that takes
+a single value), DataEval correctly sets the mutual info and its normalized
+value to zero as well.
 
 {class}`.Balance` computes NMI at two levels. The **global** output measures the
 dependence between each metadata factor and the class labels across the full
@@ -206,13 +242,23 @@ continuous. For categorical class labels, DataEval uses `mutual_info_classif`
 from scikit-learn for both discrete and continuous metadata factors, falling
 back to KNN-based estimation ([Kraskov et al., 2004](#ref7);
 [Ross, 2014](#ref9)) for continuous variables. DataEval infers discreteness from
-the proportion of unique values in a factor.
+the proportion of unique values in a factor. Discreteness is a statement about a
+factor's support rather than a promise that the support is small, so a numeric
+factor that reads as discrete but takes more distinct values than the sample can
+fill — pixel areas, timestamps, identifiers — is binned as well, against the same
+budget a histogram would use. Without that, the contingency table would hold
+more cells than there are observations to fill them. A non-numeric factor has no
+line to place edges on, so it keeps one category per distinct value however many
+there are; a string identifier column is best dropped from the metadata rather
+than measured.
 
 ```{note}
-NMI is not adjusted for chance. For small datasets or factors with
-many unique values, NMI estimates can be inflated relative to what would be
-expected under independence. Treat low but nonzero NMI values with caution,
-particularly when sample counts per factor category are small.
+Both directions are adjusted for chance, so a factor with many unique values no
+longer reports inflated association simply for being wide. What the correction
+cannot do is put the two directions on one scale: a class-to-factor value is a
+share of the class entropy and an inter-factor value is a share of the smaller
+of two factor entropies, so compare values within a table rather than between
+them.
 ```
 
 **Diversity** measures the *evenness* of sampling across each metadata factor,

@@ -45,7 +45,7 @@ from dataeval._metadata._structurers import (
     safe_column_name,
     select_structurer,
 )
-from dataeval.core._bin import bin_data, digitize_data, is_continuous
+from dataeval.core._bin import bin_data, digitize_data, is_continuous, level_budget
 from dataeval.core._compute_stats import StatsResult
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import (
@@ -1314,7 +1314,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         >>> # Keep the night-time images, and with them only their detections
         >>> night = metadata.where(pl.col("time_of_day") == "night", level="unit")
         >>> len(night.at("unit")), len(night)
-        (16, 32)
+        (16, 33)
         """
         self._structure()
         self._bin()
@@ -2375,11 +2375,13 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         if col in factor_bins:
             return digitize_data(data, factor_bins[col]).astype(np.int64), FactorInfo("continuous", is_binned=True)
 
-        _, ordinal = np.unique(data, return_inverse=True)
+        distinct, ordinal = np.unique(data, return_inverse=True)
         if not np.issubdtype(data.dtype, np.number):
             return ordinal.astype(np.int64), FactorInfo("categorical", is_digitized=True)
         # No de-duplication argument: one value per entity means no propagated repeats
         # for is_continuous to mistake for discrete support.
+        # No factor carries more levels than the sample can fill, whichever path bins it.
+        budget = level_budget(data.shape[0])
         if is_continuous(data):
             _logger.warning(
                 f"A user defined binning was not provided for {col}. "
@@ -2387,7 +2389,22 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
                 "It is recommended that the user rerun and supply the desired "
                 "bins using the continuous_factor_bins parameter.",
             )
-            return bin_data(data, self.auto_bin_method).astype(np.int64), FactorInfo("continuous", is_binned=True)
+            binned = bin_data(data, self.auto_bin_method, max_bins=budget)
+            return binned.astype(np.int64), FactorInfo("continuous", is_binned=True)
+        # Discrete, but not necessarily coarse: an integer factor can take a value per
+        # entity and still read as discrete, and scoring one value at a time is what makes
+        # such a factor report a correlation with anything it is measured against. Bin it
+        # against the same budget a histogram would use.
+        levels = int(distinct.size)
+        if levels > budget:
+            _logger.warning(
+                f"Factor {col} reads as discrete but takes {levels} distinct values over "
+                f"{data.shape[0]} entities, too many to score one value at a time. "
+                f"Binning it with the {self.auto_bin_method} method. Supply explicit bins "
+                "using the continuous_factor_bins parameter to control this.",
+            )
+            binned = bin_data(data, self.auto_bin_method, max_bins=budget)
+            return binned.astype(np.int64), FactorInfo("discrete", is_binned=True)
         # Digitized so factor_data holds non-negative integers, which np.bincount in the
         # downstream bias evaluators requires.
         return ordinal.astype(np.int64), FactorInfo("discrete", is_digitized=True)

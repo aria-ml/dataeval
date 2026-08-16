@@ -4,8 +4,13 @@ This module provides unified, reusable fixtures for all doctests.
 The fixtures are designed around a consistent computer vision dataset
 with object detection annotations and rich metadata.
 
-Classes: person, car, van, boat, plane
+Classes: person, car, boat, plane
 Metadata: time_of_day, weather, angle, location
+
+The metadata is not independent of the class label. ``location`` tracks it closely,
+``time_of_day`` loosely, and ``weather`` and ``angle`` not at all, so that examples of the
+bias evaluators have a factor to find, a factor to hint at, and factors to rule out. See
+:func:`_generate_metadata`.
 """
 
 import json
@@ -137,17 +142,42 @@ def _generate_labels(boxes: list[list[list[int]]], n_classes: int = NUM_CLASSES,
     return labels
 
 
-def _generate_metadata(n_images: int, seed: int = 42) -> list[dict[str, Any]]:
-    """Generate per-image metadata with CV-relevant factors."""
+# Where each class tends to be photographed, and when. Drawn on for most images so that
+# the bias evaluators have something real to find: a dataset whose every factor is independent
+# of the class label gives Balance nothing to report but zeros, which demonstrates the
+# evaluator only in the sense that a blank page demonstrates a pen.
+_CLASS_LOCATION = {"person": "urban", "car": "suburban", "boat": "maritime", "plane": "rural"}
+_CLASS_TIME_OF_DAY = {"person": "day", "car": "night", "boat": "dawn", "plane": "dusk"}
+_LOCATION_AGREEMENT = 0.8
+_TIME_OF_DAY_AGREEMENT = 0.6
+
+
+def _generate_metadata(labels: list[list[int]], seed: int = 42) -> list[dict[str, Any]]:
+    """Generate per-image metadata with CV-relevant factors.
+
+    ``location`` tracks the image's most common class closely and ``time_of_day`` loosely,
+    while ``weather`` and ``angle`` are drawn independently of it. That spread is what lets
+    one set of examples show a factor that gives the class away, one that hints at it, and
+    ones that say nothing.
+    """
     rng = np.random.default_rng(seed)
     metadata = []
 
-    for i in range(n_images):
+    for i, img_labels in enumerate(labels):
+        dominant = CLASSES[max(set(img_labels), key=img_labels.count)] if img_labels else CLASSES[0]
         meta = {
-            "time_of_day": rng.choice(METADATA_FACTORS["time_of_day"]),
+            "time_of_day": (
+                _CLASS_TIME_OF_DAY[dominant]
+                if rng.random() < _TIME_OF_DAY_AGREEMENT
+                else rng.choice(METADATA_FACTORS["time_of_day"])
+            ),
             "weather": rng.choice(METADATA_FACTORS["weather"]),
             "angle": rng.choice(METADATA_FACTORS["angle"]),
-            "location": rng.choice(METADATA_FACTORS["location"]),
+            "location": (
+                _CLASS_LOCATION[dominant]
+                if rng.random() < _LOCATION_AGREEMENT
+                else rng.choice(METADATA_FACTORS["location"])
+            ),
             "id": i,
         }
         metadata.append(meta)
@@ -461,7 +491,7 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
     images = _generate_images(n_images=n_images, shape=(3, 64, 64), seed=42)
     boxes = _generate_boxes(n_images=n_images, seed=42)
     labels = _generate_labels(boxes, seed=42)
-    image_metadata = _generate_metadata(n_images=n_images, seed=42)
+    image_metadata = _generate_metadata(labels=labels, seed=42)
 
     # Class labels for each image (use first detection's label or random)
     rng = np.random.default_rng(42)

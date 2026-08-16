@@ -193,17 +193,17 @@ class Parity(Evaluator):
         >>> result = parity.evaluate(metadata)
         >>> result.factors
         shape: (5, 5)
-        ┌─────────────┬──────────┬──────────┬────────────────┬───────────────────────┐
-        │ factor_name ┆ score    ┆ p_value  ┆ is_significant ┆ has_insufficient_data │
-        │ ---         ┆ ---      ┆ ---      ┆ ---            ┆ ---                   │
-        │ cat         ┆ f64      ┆ f64      ┆ bool           ┆ bool                  │
-        ╞═════════════╪══════════╪══════════╪════════════════╪═══════════════════════╡
-        │ angle       ┆ 0.0      ┆ 0.43066  ┆ false          ┆ true                  │
-        │ id          ┆ 0.0      ┆ 0.466239 ┆ false          ┆ true                  │
-        │ location    ┆ 0.0      ┆ 0.707677 ┆ false          ┆ true                  │
-        │ time_of_day ┆ 0.157489 ┆ 0.07135  ┆ false          ┆ true                  │
-        │ weather     ┆ 0.0      ┆ 0.567789 ┆ false          ┆ false                 │
-        └─────────────┴──────────┴──────────┴────────────────┴───────────────────────┘
+        ┌─────────────┬──────────┬────────────┬────────────────┬───────────────────────┐
+        │ factor_name ┆ score    ┆ p_value    ┆ is_significant ┆ has_insufficient_data │
+        │ ---         ┆ ---      ┆ ---        ┆ ---            ┆ ---                   │
+        │ cat         ┆ f64      ┆ f64        ┆ bool           ┆ bool                  │
+        ╞═════════════╪══════════╪════════════╪════════════════╪═══════════════════════╡
+        │ angle       ┆ 0.123336 ┆ 0.183186   ┆ false          ┆ true                  │
+        │ id          ┆ 0.0      ┆ 0.912633   ┆ false          ┆ true                  │
+        │ location    ┆ 0.475116 ┆ 1.5062e-11 ┆ true           ┆ true                  │
+        │ time_of_day ┆ 0.275172 ┆ 0.000526   ┆ false          ┆ true                  │
+        │ weather     ┆ 0.147734 ┆ 0.123125   ┆ false          ┆ true                  │
+        └─────────────┴──────────┴────────────┴────────────────┴───────────────────────┘
         """  # noqa: E501
         # Convert AnnotatedDataset to Metadata if needed
         if is_metadata_like(data):

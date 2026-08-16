@@ -172,11 +172,11 @@ class DeprecatedMetadataAPI:
         │ ---        ┆ ---         ┆ ---     ┆ ---      │
         │ i64        ┆ str         ┆ str     ┆ str      │
         ╞════════════╪═════════════╪═════════╪══════════╡
-        │ 0          ┆ dawn        ┆ rainy   ┆ suburban │
-        │ 1          ┆ day         ┆ rainy   ┆ rural    │
-        │ 2          ┆ dawn        ┆ clear   ┆ maritime │
-        │ 3          ┆ dusk        ┆ rainy   ┆ maritime │
-        │ 4          ┆ dusk        ┆ clear   ┆ suburban │
+        │ 0          ┆ dusk        ┆ cloudy  ┆ urban    │
+        │ 1          ┆ night       ┆ rainy   ┆ suburban │
+        │ 2          ┆ night       ┆ cloudy  ┆ urban    │
+        │ 3          ┆ dawn        ┆ clear   ┆ maritime │
+        │ 4          ┆ dusk        ┆ cloudy  ┆ urban    │
         └────────────┴─────────────┴─────────┴──────────┘
         """
         warnings.warn(
@@ -265,11 +265,11 @@ class DeprecatedMetadataAPI:
         >>> metadata = Metadata(dataset)
         >>> factors = metadata.get_image_factors(0)
         >>> factors["time_of_day"]
-        'dawn'
+        'dusk'
         >>> factors["weather"]
-        'rainy'
+        'cloudy'
         >>> factors["location"]
-        'suburban'
+        'urban'
         """
         warnings.warn(
             "Metadata.get_image_factors() is deprecated and will be removed in v1.2.0. Use "

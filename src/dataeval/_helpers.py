@@ -161,6 +161,30 @@ def _binned_names(codes: NDArray[Any], raw: Sequence[Any], uniques: NDArray[Any]
     }
 
 
+def _one_value_per_code(metadata: MetadataLike, names: Sequence[str], indices: Sequence[int]) -> list[bool]:
+    """Say, per named factor, whether one code stands for one value rather than a range.
+
+    Not the same question as :attr:`~dataeval.Metadata.is_discrete`: a factor can be
+    discrete and still be binned, which :class:`~dataeval.Metadata` does for one taking
+    more distinct values than the sample can fill. Its codes then cover ranges, and naming
+    a group after one of its members reads as an exact value most of the group does not
+    have — the very thing :func:`_binned_names` exists to avoid. A concrete
+    :class:`~dataeval.Metadata` answers through ``factor_info``; a bare
+    :class:`~dataeval.protocols.MetadataLike` has only ``is_discrete`` to offer, the same
+    optional-member degradation :func:`_raw_factor_columns` makes.
+    """
+    info = getattr(metadata, "factor_info", None)
+    discrete = list(metadata.is_discrete)
+    resolved: list[bool] = []
+    for name, index in zip(names, indices, strict=True):
+        entry = info.get(name) if isinstance(info, Mapping) else None
+        if entry is not None:
+            resolved.append(not entry.is_binned)
+        else:
+            resolved.append(bool(discrete[index]) if index < len(discrete) else True)
+    return resolved
+
+
 def _code_names(codes: NDArray[Any], raw: Sequence[Any] | None, *, discrete: bool) -> dict[int, str]:
     """Map each distinct bin of one factor to a display name.
 
@@ -244,19 +268,14 @@ def resolve_label_axis(metadata: MetadataLike, label: str | Sequence[str] | None
 
     indices = tuple(factor_names.index(name) for name in requested)
     data = np.asarray(metadata.factor_data)[:, indices]
-    # Discreteness decides how a group is named: a discrete factor's code stands for one
-    # value, a continuous one's for a range. Read positionally off the same order
-    # ``factor_names`` is in, and defaulted for a container that declares fewer flags than
-    # factors rather than failing the whole resolution over a display detail.
-    discrete = list(metadata.is_discrete)
+    # How a group is named turns on whether its code stands for one value or a range, not
+    # on the factor's discrete/continuous kind — a binned factor covers a range whichever
+    # kind it is. See :func:`_one_value_per_code`.
+    single_valued = _one_value_per_code(metadata, requested, indices)
     raw_columns = _raw_factor_columns(metadata, requested)
     lookups = [
-        _code_names(
-            data[:, position],
-            raw_columns.get(name),
-            discrete=bool(discrete[index]) if index < len(discrete) else True,
-        )
-        for position, (name, index) in enumerate(zip(requested, indices, strict=True))
+        _code_names(data[:, position], raw_columns.get(name), discrete=single_valued[position])
+        for position, name in enumerate(requested)
     ]
     if len(indices) == 1:
         # Renumbered densely rather than used as-is: the downstream counters index by
