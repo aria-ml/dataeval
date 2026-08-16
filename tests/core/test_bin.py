@@ -1,4 +1,5 @@
 import logging
+import warnings
 from unittest.mock import patch
 
 import numpy as np
@@ -113,6 +114,34 @@ class TestMissingValueBinning:
         data = np.full(100, np.nan)
         data[:18] = rng.normal(size=18)
         assert is_continuous(data) is False
+
+    @pytest.mark.parametrize("sentinel", [np.inf, -np.inf, [np.inf, -np.inf]])
+    def test_is_continuous_ignores_infinity(self, sentinel):
+        """An infinity carries no spacing, so it cannot decide the verdict.
+
+        The near-neighbor step divides one gap by another. An infinity at the low end
+        makes both terms infinite, so the quotient is NaN, the Wasserstein statistic is
+        NaN, and the comparison against the threshold fails open -- the primary signal
+        stops rejecting anything. One at the high end drives its windows to a fabricated
+        zero instead. Neither is a statement about the factor's support.
+        """
+        rng = np.random.default_rng(0)
+        # Five tight modes: the near-neighbor test rejects this, and neither the duplicate
+        # nor the lattice signal fires, so the verdict rests on that test alone.
+        lumpy = np.concatenate([rng.normal(100.0 * k, 0.1, 40) for k in range(5)])
+        assert is_continuous(lumpy) is False
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            assert is_continuous(np.append(lumpy, sentinel)) is False
+
+    def test_is_continuous_matches_finite_only_verdict(self):
+        """Appending infinities leaves the verdict where the finite values put it."""
+        rng = np.random.default_rng(0)
+        for data in (rng.normal(size=200), rng.integers(0, 100, size=200).astype(np.float64)):
+            expected = is_continuous(data)
+            for sentinel in (np.inf, -np.inf, [np.inf, -np.inf]):
+                assert is_continuous(np.append(data, sentinel)) is expected
 
 
 @pytest.mark.optional

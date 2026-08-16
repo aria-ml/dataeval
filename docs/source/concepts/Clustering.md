@@ -136,22 +136,22 @@ for details on how cluster distance and complexity scores translate to sample ra
 
 **Embedding dimension should be below 500.** Clustering in very high-dimensional
 spaces suffers from the curse of dimensionality — distances become increasingly
-uniform, making density estimation unreliable. If your embedding model produces
-high-dimensional representations, apply PCA or another dimensionality reduction
-step before clustering.
+uniform, making density estimation unreliable. An embedding above that range
+needs a reduction step — PCA or equivalent — ahead of clustering for the density
+estimate to mean anything.
 
 **HDBSCAN's `min_cluster_size` controls granularity.** A large value produces
 fewer, larger clusters; a small value produces many small clusters with more
-samples classified as boundary points (low membership strength). For datasets
-with many fine-grained categories, setting `n_clusters` to approximately the
-number of classes is a reasonable starting hint.
+samples classified as boundary points (low membership strength). On datasets
+with many fine-grained categories, an `n_clusters` hint near the number of
+classes lands in the range where cluster granularity tracks class granularity.
 
-**KMeans requires fixing the seed for reproducibility.** If reproducible
-cluster assignments matter for your workflow (for example, if you are using
-cluster assignments as input to a downstream analysis), call
-`dataeval.config.set_seed(your_seed)` before running KMeans. See the
+**KMeans cluster assignments are not reproducible without a fixed seed.**
+Initialization is random, so the same embeddings cluster differently between
+runs, and anything consuming the assignments downstream inherits that. The
+global seed set by `dataeval.config.set_seed` is what pins them; the
 [Configuring the seed](../notebooks/h2_configure_defaults.py#configuring-the-global-seed)
-how-to for an example.
+how-to covers doing it.
 
 **Clustering is embedding-dependent.** The clusters discovered by either
 algorithm reflect the structure of the embedding space, not ground truth

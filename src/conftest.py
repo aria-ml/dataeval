@@ -191,6 +191,21 @@ def _generate_metadata(labels: list[list[int]], seed: int = 42) -> list[dict[str
 
 
 @dataclass
+class DetectionTarget:
+    """Simple ObjectDetectionTarget implementation for doctests.
+
+    Deliberately a real object rather than a ``MagicMock``: the target protocols are
+    ``runtime_checkable``, and a mock answers to every attribute, so it satisfies
+    :class:`~dataeval.protocols.SegmentationTarget` as readily as this one — enough for the
+    view transforms to take the segmentation branch and refuse the datum.
+    """
+
+    boxes: NDArray[np.float32]
+    labels: NDArray[np.intp]
+    scores: NDArray[np.float32]
+
+
+@dataclass
 class MockMetadata:
     """Simple Metadata implementation for doctests."""
 
@@ -288,18 +303,20 @@ class ObjectDetectionDataset:
 
     def _get_target(self, idx: int) -> ObjectDetectionTarget:
         """Create target object with labels, boxes, and scores."""
-        target = MagicMock()
-        target.labels = np.array(self._labels[idx], dtype=np.intp)
-        target.boxes = np.array(self._boxes[idx], dtype=np.float32)
-
         # Create one-hot scores
         n_detections = len(self._labels[idx])
         scores = np.zeros((n_detections, len(self._classes)), dtype=np.float32)
         for i, label in enumerate(self._labels[idx]):
             scores[i, label] = 1.0
-        target.scores = scores
 
-        return target
+        return cast(
+            ObjectDetectionTarget,
+            DetectionTarget(
+                boxes=np.array(self._boxes[idx], dtype=np.float32).reshape(n_detections, 4),
+                labels=np.array(self._labels[idx], dtype=np.intp),
+                scores=scores,
+            ),
+        )
 
     def __getitem__(self, key: int) -> tuple[Any, ObjectDetectionTarget, DatumMetadata]:
         """Return datum at given index or slice."""

@@ -8,6 +8,7 @@ Each page may cover several evaluators that work together to answer questions ab
 - [Data Integrity](DataIntegrity.md)
 - [Ontology](Ontology.md)
 - [Metadata Levels](MetadataLevels.md)
+- [Binning](Binning.md)
 - [Embeddings](Embeddings.md)
 - [Clustering](Clustering.md)
 - [Dataset Bias and Coverage](DatasetBias.md)
@@ -24,6 +25,7 @@ Each page may cover several evaluators that work together to answer questions ab
 DataIntegrity
 Ontology
 MetadataLevels
+Binning
 Embeddings
 Clustering
 DatasetBias

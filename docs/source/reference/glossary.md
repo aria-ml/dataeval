@@ -112,6 +112,17 @@ Binary Classification
     Binary classification is a fundamental task in {term}`machine learning<Machine Learning (ML)>`,
     where the goal is to categorize data into one of two classes or categories.
 
+Binning
+    The reduction of a {term}`continuous variable<Continuous Variable>` to a finite set of
+    categories by cutting its range into intervals and replacing each value with the index of
+    the interval containing it. Binning is required because estimators such as
+    {term}`entropy<Entropy>` and the {term}`chi-square test<Chi-Square Test of Independence>`
+    are defined only over a finite alphabet. It is a *lossy* transformation — many values map
+    to one index and the original cannot be recovered — which distinguishes it from
+    {term}`digitization<Digitization>`. Where the interval boundaries fall is a choice with no
+    answer that is correct independent of the question being asked, so it affects every result
+    computed downstream. See [Binning](../concepts/Binning.md).
+
 Black-box Shift Estimation (BBSE)
     A method for measuring {term}`label shift<Label Shift>` on machine learning datasets. It is calculated
     using a {term}`confusion matrix<Confusion Matrix>` and only requires that the matrix be invertible.
@@ -194,6 +205,15 @@ Confusion Matrix
 
     ![Confusion Matrix](../_static/images/reference/confusion_matrix.png)
 
+Continuous Variable
+    A variable whose values can fall anywhere within a range, so that between any two
+    observations another value is possible and no two observations need ever coincide.
+    Brightness, altitude and bounding box area are continuous. Continuity is a property of the
+    variable rather than of how it is stored: a continuous quantity rounded for storage lands
+    on a lattice and becomes a {term}`discrete variable<Discrete Variable>`. Contrast
+    {term}`categorical<Categorical Variable>` and {term}`discrete<Discrete Variable>`
+    variables.
+
 Contractive Autoencoder (CAE)
     A type of {term}`autoencoder<Autoencoder>` which is designed to be sensitive to small changes in
     the training dataset. It attempts to increase the robustness of the model by emphasizing the
@@ -259,11 +279,35 @@ Developmental Dataset
     It consists of several {term}`dataset splits<Dataset Splits>` that can include training,
     validation, and testing splits.
 
+Digitization
+    The assignment of one integer code to each distinct value of a
+    {term}`discrete<Discrete Variable>` or {term}`categorical<Categorical Variable>` variable.
+    Unlike {term}`binning<Binning>`, digitization is *lossless* and involves no choice: the
+    mapping is one-to-one and the original values can be recovered from the codes. Both
+    operations produce integers, which is why the two are easily confused, but only binning
+    discards information. See [Binning](../concepts/Binning.md).
+
 Dimensionality Reduction
     Dimensionality reduction is a method for representing a given dataset using a lower number
     of features (i.e. dimensions) while still capturing the original data’s meaningful properties.
     This amounts to removing irrelevant or redundant features, or simply noisy data, or combining
     features into a reduced number of new features to create a model with a lower number of variables.
+
+Discrete Variable
+    A variable whose values land on a countable set, usually a regular lattice — a count of
+    people, an ISO setting, a year. A discrete variable is numerical and supports arithmetic,
+    but already has a finite alphabet, so it needs no {term}`binning<Binning>` and is
+    {term}`digitized<Digitization>` instead. "Discrete" and "non-numerical" are independent
+    properties: a {term}`categorical variable<Categorical Variable>` is discrete and
+    non-numerical, while a count is discrete and numerical.
+
+Discretization
+    The umbrella term for reducing any variable to integer codes, covering both
+    {term}`binning<Binning>` of {term}`continuous<Continuous Variable>` variables and
+    {term}`digitization<Digitization>` of {term}`discrete<Discrete Variable>` and
+    {term}`categorical<Categorical Variable>` ones. {class}`.Metadata` discretizes every factor
+    on construction, so the bias and diversity evaluators read integer codes rather than the
+    values supplied. See [Binning](../concepts/Binning.md).
 
 Divergence
     Divergence is a kind of statistical distance: a function which establishes the separation from

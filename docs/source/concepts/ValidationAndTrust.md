@@ -224,78 +224,41 @@ largest one in the metadata half.
 
 ### What the default does
 
-With `continuous_factor_bins=None` — the default — {class}`.Metadata` decides
-per column, without being asked:
+[Binning](Binning.md) explains the mechanism in full — the {func}`.is_continuous`
+heuristic and its tuned constants, the three `auto_bin_method` strategies and
+what each trades away, and the treatment of missing values. The properties that
+bear on trusting a result:
 
-- **Non-numeric columns** are ordinal-encoded, one category per distinct value.
-- **Numeric columns** are classified by {func}`.is_continuous`, a heuristic
-  combining three signals: the Wasserstein distance of the normalized
-  near-neighbor distribution from uniform (threshold `0.5 / sqrt(n)`), the
-  fraction of exact duplicate values, and a GCD test for values sitting on a
-  regular lattice. Columns it judges continuous are binned by `auto_bin_method`,
-  default `"uniform_width"`. Columns it judges discrete are ordinal-encoded like
-  categoricals, unless they take more distinct values than the sample can fill
-  — more than `max(20, sqrt(n))` of them — in which case they are binned too,
-  since a contingency table with more cells than observations reports on which
-  cells were hit rather than on the factor. It is public, so you can run it on a
-  factor and see the call it will make before you build the {class}`.Metadata`.
-  The cardinality cap applies to numeric columns only; a non-numeric column
-  keeps one category per distinct value however many there are.
-- **Below 20 samples the heuristic returns "discrete" unconditionally**, so on
-  a small dataset every distinct float becomes its own category and the
-  resulting factor is nearly one-to-one with the sample index.
-
-On object detection metadata, a factor recorded at the **image** level is
-classified on its per-image values rather than on the copy held by each
-detection, so a continuous factor is not mistaken for a discrete one by its own
-repetition. A factor recorded at the **target** level is classified on every
-detection, because there the repeats are real observations. The 20-sample floor
-applies to whichever of the two the factor is judged on, so an image-level
-factor on fewer than 20 images is always called discrete no matter how many
-detections those images carry.
-
-`"uniform_width"` does not use a fixed bin count. It starts from NumPy's
-`histogram(bins="auto")`, then *reduces* the count — at most 20 times — while
-any non-empty bin holds fewer than 10 samples. That rule is aggressive: 500
-draws from a standard normal come out in **4 to 6 bins depending only on the
-draw**, because the tails keep tripping the 10-sample floor. There is no lower
-guard, so a small or lopsided
-factor can be reduced to a **single bin**, at which point it is constant and
-carries no information into any metric that reads it — silently.
-
-The count is therefore a function of the data, not a setting: **the same factor
-measured on two datasets can be cut into different numbers of bins**, so binned
-factor values are not comparable across runs. `"uniform_count"` keeps that same
-count but moves the edges to quantiles; `"clusters"` derives edges from
-DataEval's HDBSCAN port and inherits its behavior. All three set the outermost
-edges to ±∞, so the tails are absorbed into the end bins instead of forming
-their own.
-
-Passing an explicit entry in `continuous_factor_bins` overrides all of this —
-and also marks that factor continuous downstream regardless of what it actually
-contains.
-
-### Missing values
-
-A `NaN` is not a small value, a large value, or a value between two edges, so
-it is **given a bin of its own** above the bins holding observed values, on
-every path: automatic or explicit binning, classification or object detection.
-Two consequences worth knowing:
-
-- **Edges are placed on the observed values alone**, so a missing value does
-  not shift where the cuts fall. Infinities are observed extremes and land in
-  the end bins, not the missing bin.
-- **The missing bin has a position but no meaning.** It sits above the highest
-  observed bin because the codes have to be contiguous, not because missing is
-  large. Anything that treats a binned factor as ordinal reads that position as
+- **The bin count is a function of the data, not a setting.** `"uniform_width"`
+  derives its count from the draw, so 500 samples from a standard normal come
+  out in anywhere from 3 to 10 bins. **The same factor measured on two datasets
+  can be cut into different numbers of bins**, so binned factor values are not
+  comparable across runs.
+- **A factor can collapse to two bins.** The reduction floors there, so a factor
+  cannot come back constant, but a small sample with a far-off tail reaches that
+  floor reliably and arrives as a binary split with nothing in the output saying
+  so.
+- **The continuous/discrete verdict is a heuristic**, reporting no p-value and
+  no error rate, resting on five tuned constants. Below 20 observations it
+  returns "discrete" unconditionally, so on a small dataset every distinct float
+  becomes its own category and the factor is nearly one-to-one with the sample
+  index.
+- **A discrete verdict does not mean the factor is left as it was.** No numeric
+  factor carries more levels than `max(20, sqrt(n))`, the budget a histogram
+  would use, so a discrete column taking more distinct values than that is
+  binned rather than ordinal-encoded — a contingency table with more cells than
+  observations reports on which cells were hit rather than on the factor. The
+  cap applies to numeric columns only; a non-numeric column keeps one category
+  per distinct value however many there are.
+- **Missing values get a bin above the observed ones**, whose position is an
+  artifact of keeping the codes contiguous rather than a statement that missing
+  is large. Anything treating a binned factor as ordinal reads that position as
   a value; {class}`.Balance` does not, since it declares every column discrete,
   but {class}`.Parity` and anything reading the codes as magnitudes do. Where
   the missing rate is material, check whether a finding is about the factor or
   about its absence.
-
-The continuous/discrete test drops `NaN` before deciding, and the 20-sample
-floor then counts observed values only, so a factor that is mostly missing is
-called discrete.
+- **An explicit `continuous_factor_bins` entry marks a factor continuous**
+  downstream regardless of what it actually contains.
 
 ### Which results depend on it
 
@@ -316,18 +279,19 @@ called discrete.
     cost of resolution.
 - - {class}`.Balance`
   - **A convention**
-  - {func}`.mutual_info` handles continuous factors natively — `is_continuous`
-    selects `mutual_info_regression` per column and the Linfoot transform maps
-    the result to [0, 1]. But `Balance` always passes
-    `Metadata.factor_data`, which is already binned, so the estimator receives
-    bin indices rather than raw values even for factors it has labeled
-    continuous. The information lost at the binning step cannot be recovered
-    downstream, and nothing in the output says it happened.
+  - {func}`.mutual_info` handles continuous factors natively — given
+    `discrete_features=None` it calls `is_continuous` per column and routes
+    continuous ones to `mutual_info_regression`. But `Balance` never takes that
+    path: it passes `Metadata.factor_data`, which is already binned, and declares
+    every column discrete rather than forwarding `Metadata.is_discrete`, since
+    what arrives is bin indices whatever the factor once was. The information
+    lost at the binning step cannot be recovered downstream, and nothing in the
+    output says it happened.
 - - {func}`.split_dataset` with `split_on`
-  - **Applied**
+  - **Required**
   - Groups are formed from binned factor values, so grouping granularity is the
-    binning's. A factor the automatic path reduced to one bin puts every sample
-    in a single group, quietly weakening the split constraint you asked for.
+    binning's. A factor the automatic path reduced to two bins gives you two
+    groups, quietly weakening the split constraint you asked for.
 - - Anything reading `Metadata.factor_data`
   - **Applied**
   - `factor_data` is the binned, integer-valued view and is what the bias
@@ -341,21 +305,20 @@ called discrete.
 
 :::
 
-### Working with it
+### What no output records
 
-- **Set `continuous_factor_bins` explicitly** for any factor you intend to
-  report on. It is the difference between a binning you chose and one chosen
-  for you.
-- **Re-run at a second setting** — a different bin count, or `"uniform_width"`
-  against `"uniform_count"`. A conclusion that survives both is about the data;
-  one that does not is about the binning. DataEval does not perform this check
-  and will not warn you when a result is binning-sensitive.
+- **Neither the binning nor the extractor appears in a result.** Two runs with
+  different binning are no more comparable than two runs with different
+  extractors, and no result object carries either, so comparability rests
+  entirely on what was recorded outside DataEval.
 - **The automatic path announces itself only in logs.** Each auto-binned factor
   emits a WARNING on the `dataeval.metadata` logger, and DataEval attaches a
-  `NullHandler`, so nothing is printed unless you configure logging — call
-  {func}`dataeval.log` with `logging.WARNING` to see them.
-- **Record the binning alongside the extractor.** Two runs with different
-  binning are no more comparable than two runs with different extractors.
+  `NullHandler` to that logger, so the default is silence.
+
+[Binning](Binning.md#what-the-choice-determines) covers the rest: what
+{attr}`.Metadata.factor_info` reports and what it does not, the thresholds no
+automatic method can find, and the sense in which a conclusion can be about the
+cut rather than about the data.
 
 ## Validation evidence levels
 
@@ -1194,8 +1157,9 @@ DataEval's evidentiary record, not a research frontier.
      10-samples-per-bin target are all tuned constants. None records who chose
      the value or on what data, and no test establishes the misclassification
      rate of the heuristic on known-continuous and known-discrete factors. The
-     bin-reduction loop also has no lower guard, so it can collapse a factor to
-     one bin and report nothing about it.
+     same holds for the `max(20, sqrt(n))` level budget above which a discrete
+     factor is binned rather than left alone, and for the two-bin floor the
+     reduction stops at, which a small lopsided factor reaches without comment.
    - **No sensitivity analysis exists.** Nothing in DataEval re-runs a bias
      metric across binnings or reports how much of a score is attributable to
      the cut, so a user cannot distinguish a finding from an artifact without

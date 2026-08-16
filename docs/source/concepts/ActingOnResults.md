@@ -44,8 +44,9 @@ Whether to remove one depends on whether the variation is meaningful for your
 task. A slightly brighter version of the same image adds little; the same scene
 from a marginally different angle may add enough viewpoint diversity to keep. In
 evaluation datasets, near-duplicates between train and test are the primary
-concern — they degrade the validity of held-out metrics. Check the
-near-duplicate groups for cross-split contamination before deciding on removals.
+concern — they degrade the validity of held-out metrics, while a near-duplicate
+group sitting entirely within one split does not. Which of the two a group is
+does not appear in the result; only the grouping does.
 
 **Semantic clusters** (from cluster-based detection) identify images that are
 different in appearance but close in embedding space — similar scene
@@ -324,20 +325,13 @@ across datasets; both outperformed random decimation on several datasets.
 ### Reference-based prioritization for new data
 
 A distinct and important use case is evaluating *new, unlabeled data* against an
-*existing labeled dataset*. Pass the existing labeled dataset as the `reference`
-argument:
-
-```python
-prioritizer = Prioritize.knn(extractor, k=10, reference=labeled_data)
-result = prioritizer.evaluate(new_unlabeled_data)
-most_novel = result.hard_first().indices
-```
-
-In hard-first order, the top-ranked samples are those most unlike the reference
-— the candidates that would add the most new information to the dataset. This is
-the labeling budget allocation problem: given limited annotation resources,
-which unlabeled samples are worth labeling? Prioritize with a reference answers
-that question directly.
+*existing labeled dataset*. The `reference` argument is what changes the frame of
+the scoring: without one, difficulty is measured against the pool being ranked
+itself, and with one, against the reference set instead. In hard-first order the
+top-ranked samples are then those most unlike the reference — the candidates that
+would add the most new information to the dataset. This is the labeling budget
+allocation problem: given limited annotation resources, which unlabeled samples
+are worth labeling? Prioritize with a reference answers that question directly.
 
 ### What Prioritize does not do
 
@@ -350,8 +344,8 @@ ordering; the threshold is a program decision.
 Prioritize also does not account for label quality, metadata correctness, or
 class distribution in its scoring (unless `class_balanced` policy is used). A
 prioritized subset of a dataset with label errors will still contain label
-errors. Run {class}`.Duplicates` and {class}`.Outliers` before prioritizing to
-clean the pool being prioritized.
+errors. Cleaning the pool and ranking it are separate concerns, addressed by
+{class}`.Duplicates` and {class}`.Outliers` rather than by the ranking.
 
 ---
 
@@ -587,33 +581,24 @@ there a systematic metadata reason why these samples were flagged?" This is most
 useful when there are many flagged samples and you want to understand the
 population-level pattern rather than inspect each sample individually.
 
-**Example workflow after drift detection:**
-
-```python
-# drift_result.drifted is True; flagged_indices are samples in the drifted batch
-flagged = [i for i, score in enumerate(ood_scores) if score > threshold]
-
-# Which factors predict OOD membership?
-predictors = factor_predictors(operational_metadata.factors, flagged)
-# {'time_of_day': 0.84, 'sensor_id': 0.61, 'altitude': 0.02, ...}
-# → time_of_day and sensor_id are the likely drivers
-
-# For the top flagged samples, what specifically is different?
-top_flagged = flagged[:20]
-deviations = factor_deviation(reference_metadata.factors, operational_metadata.factors, top_flagged)
-# deviations[0] → {'time_of_day': 4.2, 'sensor_id': 1.8, 'altitude': 0.3}
-# → first flagged sample is 4.2 scaled deviations from reference in time_of_day
-```
+The two compose in one direction. Given the same flagged set,
+`factor_predictors` describes the population — `time_of_day` at 0.84 and
+`sensor_id` at 0.61 against `altitude` at 0.02 points at collection conditions
+rather than at any one image — and `factor_deviation` then says, per flagged
+sample, how far that sample sits from the reference on each factor. Population
+first, then sample: the second is only interpretable once the first has narrowed
+which factors are worth reading.
 
 **Mutual information is association, not causation.** A high normalized MI (NMI)
 score means the factor correlates with being flagged. It does not mean the
 factor caused the problem, nor does it mean other factors with lower scores are
-irrelevant. Always interpret NMI scores alongside domain knowledge about what
-the factors represent and how data was collected.
+irrelevant. An NMI score is only as meaningful as the domain knowledge read
+alongside it — what the factors represent, and how the data was collected.
 
-Both functions require factors to be provided as dictionaries mapping factor
-names to arrays. If your metadata is stored in DataEval's {class}`.Metadata`
-class, the `.factors` attribute provides this format directly.
+Both functions take a plain mapping of factor name to array rather than a
+{class}`.Metadata`, which is also why neither is subject to DataEval's binning:
+they read the values as measured. See [Binning](Binning.md) for what that
+exempts them from.
 
 ## Divergence scores
 
