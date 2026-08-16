@@ -112,13 +112,22 @@ from dataeval.flags import ImageStats
 # If this data is already on your computer, change `"./data"` to wherever it is stored and set `download` to `False`.
 #
 # You will construct a [dataset view](h2_build_dataset_views.py) using {class}`.View` with the {class}`.Shuffle` and
-# {class}`.Limit` operations to sample 400 of its images so the tutorial runs quickly. They are drawn with a seeded
-# shuffle rather than taken from the front of the split: SeaDrone is ordered by capture, so the first 400 images come
+# {class}`.Limit` operations to sample 200 of its images so the tutorial runs quickly. They are drawn with a seeded
+# shuffle rather than taken from the front of the split: SeaDrone is ordered by capture, so the first 200 images come
 # from only a couple of sorties and are not representative of the collection. The seed keeps everyone's sample
-# identical. Everything below holds at any size.
+# identical.
+#
+# ```{note}
+# **200 is a deliberately small sample, chosen so this page rebuilds in a couple of minutes rather than ten.** It is
+# not a recommended analysis size. Every effect this tutorial demonstrates — the gap between a per-image and a
+# per-detection mean, the sharpness difference between objects and background, the correlation between altitude and
+# object count — is a structural property of how levels work, not an artifact of the sample, and each one holds (and
+# generally sharpens) on the full split. Raise or drop the `Limit` to check for yourself; the exact figures quoted
+# below will move, but every conclusion drawn from them will not.
+# ```
 
 # %%
-dataset = View(SeaDrone(root="./data", image_set="val", download=True), [Shuffle(seed=0), Limit(400)])
+dataset = View(SeaDrone(root="./data", image_set="val", download=True), [Shuffle(seed=0), Limit(200)])
 metadata = Metadata(dataset)
 
 print("levels      :", metadata.levels)
@@ -130,7 +139,7 @@ print("level counts:", metadata.level_counts)
 # instead of leaving the text quietly describing numbers you are not seeing.
 
 # %%
-EXPECTED_COUNTS = {"unit": 400, "instance": 2585}
+EXPECTED_COUNTS = {"unit": 200, "instance": 1305}
 
 if dict(metadata.level_counts) != EXPECTED_COUNTS:
     raise AssertionError(
@@ -140,7 +149,7 @@ if dict(metadata.level_counts) != EXPECTED_COUNTS:
     )
 
 # %% [markdown]
-# This metadata holds **two levels at once**: 400 rows where one row is one image, and 2585 rows where one row is one
+# This metadata holds **two levels at once**: 200 rows where one row is one image, and 1305 rows where one row is one
 # detection. This is not one table filtered two ways, but one table holding two different things — an altitude is a
 # fact about a flight, an object size is a fact about a swimmer.
 #
@@ -158,7 +167,7 @@ print(metadata.rows_at("instance").select("item_index", "class_label", "object_s
 
 # %% [markdown]
 # Notice the difference between the two `item_index` columns. The first three detections all come from image 0,
-# because one image may hold many detections. Across these 400 images there are 2585 detections, so an image holds
+# because one image may hold many detections. Across these 200 images there are 1305 detections, so an image holds
 # about six on average. That spreading out from images to detections is what the rest of this tutorial is about.
 
 # %% [markdown]
@@ -262,8 +271,8 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 #
 # | view | `inherited=True` (default) | `inherited=False` |
 # | --- | --- | --- |
-# | `at("unit")` — 400 rows | 18 image factors | *the same 18* |
-# | `at("instance")` — 2585 rows | those 18 **+** `object_id`, `object_size` | `object_id`, `object_size` |
+# | `at("unit")` — 200 rows | 18 image factors | *the same 18* |
+# | `at("instance")` — 1305 rows | those 18 **+** `object_id`, `object_size` | `object_id`, `object_size` |
 #
 # The row count remains unaffected by `inherited`. At the coarsest level (`unit`), the two configurations yield
 # identical results because there is no higher level from which to inherit factors.
@@ -286,8 +295,8 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 # - `per_background` computes statistics over all pixels *outside* the bounding boxes (the scene minus the objects).
 #
 # ```{note}
-# This cell reads and measures 400 4K frames and takes roughly five minutes. It is the only expensive step in the
-# tutorial, and Step 10 shows you how to pay for it once.
+# This cell reads and measures 200 4K frames and takes a couple of minutes. It is by far the most expensive step in
+# the tutorial — and the reason the sample is capped at 200 — so Step 10 shows you how to pay for it once.
 # ```
 
 # %%
@@ -391,7 +400,7 @@ sharper = units.select((pl.col("unit_sharpness") > pl.col("unit_background_sharp
 print(f"images sharper as a whole than their own background: {sharper} / {len(units)}")
 
 # %% [markdown]
-# In 396 out of 400 images, the whole-image sharpness score exceeds the background-only score. Even though the
+# In 197 out of 200 images, the whole-image sharpness score exceeds the background-only score. Even though the
 # annotations occupy a median of only 0.5% of the total pixel area, they carry enough high-frequency edges to drag the
 # whole-image number measurably upward.
 #
@@ -411,7 +420,7 @@ print(f"           background : {units['unit_background_brightness'].mean():.1f}
 print(f"largest gap on any single image: {units.select(gap.max()).item():.1f}")
 
 # %% [markdown]
-# The difference is negligible. Across all 400 images, the two brightness readings never diverge by more than
+# The difference is negligible. Across all 200 images, the two brightness readings never diverge by more than
 # 2 grey levels.
 #
 # This occurs because brightness is an average over pixels. Masking out 0.5% of them leaves the mean virtually
@@ -446,7 +455,7 @@ print(enriched.rows_at("unit").select("item_index", "altitude", "n_objects", "me
 
 # %% [markdown]
 # The factor `n_objects` is now an explicit, per-image factor capturing object density. All level-based rules apply to
-# it normally: it bins over 400 distinct image values rather than 2585 detection values, it propagates back down to
+# it normally: it bins over 200 distinct image values rather than 1305 detection values, it propagates back down to
 # detections when accessed from the `instance` view, and it carries exactly one unit of weight per image.
 #
 # This upward aggregation unlocks analyses that were previously impossible.
@@ -501,7 +510,11 @@ print(
 
 # %%
 per_object = Balance().evaluate(metadata)
-print(per_object.balance.sort("mi_value", descending=True).head(5))
+ranked = per_object.balance.sort("mi_value", descending=True)
+print(ranked.head(5))
+
+print("\nobject_size, for comparison:")
+print(ranked.filter(pl.col("factor_name") == "object_size"))
 
 # %% [markdown]
 # As demonstrated in Step 3, evaluating at the image (`unit`) level yields an error because images lack a single class
@@ -516,13 +529,15 @@ print(per_image_balance.balance.sort("mi_value", descending=True).head(5))
 # %% [markdown]
 # **The two evaluations produce distinct profiles, and both are correct.**
 #
-# At the object level, `object_size` is the dominant indicator. Given the difference in size between a boat and a
-# swimmer, this correlation is effectively a tautology derived from the annotations.
+# At the object level, the ranking is led by `storage`, `object_id` and `image_id` — identifiers recording which
+# sortie and which frame an object was annotated in. Which class you are looking at is largely a function of which
+# flight you are looking at. Note where `object_size` lands by comparison: near the bottom of the table, well under a
+# tenth of `storage`'s score. The intuitive guess — that a boat and a swimmer are told apart by how big the box is —
+# is not what this dataset reports.
 #
-# At the image level, the strongest signals are `date_time`, `frame`, `latitude`, and `longitude` — which record
-# *when and where the drone was flying*. Object crowding is fundamentally a property of the specific flight sortie,
-# not of the individual objects. This insight is entirely obscured when analyzing at the detection level, where it is
-# diluted across every individual object in the dataset.
+# At the image level, those same sortie identifiers lead again, now joined by `longitude`, which records *where the
+# drone was flying*. Object crowding is fundamentally a property of the specific flight sortie, not of the individual
+# objects. At the detection level that signal is diluted across every individual object in the dataset.
 #
 # This demonstrates the core utility of metadata levels: running the exact same evaluator over the exact same dataset
 # while isolating completely different populations. The image-level analysis is impossible until you choose the `unit`
@@ -571,8 +586,8 @@ print("altitude > 60 m:", high.level_counts)
 # ## Step 9: Synchronize metadata with the dataset
 #
 # Filtering metadata only purges *rows* from the internal dataframes; it does not remove the underlying *items* from
-# the dataset object that the metadata is bound to. Consequently, all 400 original images remain in the dataset, and
-# anything subsequently computed from that dataset — embeddings above all — still describes the original 400.
+# the dataset object that the metadata is bound to. Consequently, all 200 original images remain in the dataset, and
+# anything subsequently computed from that dataset — embeddings above all — still describes the original 200.
 #
 # Pairing a filtered metadata object with an unfiltered dataset would be a silent misalignment. To prevent this,
 # DataEval flags filtered metadata instances. Evaluators that pair metadata with embeddings — {class}`.Outliers`,
@@ -599,7 +614,7 @@ print("matching dataset:", len(matching_dataset))
 # metadata instance.
 #
 # This synchronization succeeds only because the `high` filter was applied cleanly along item boundaries (the image
-# level). Conversely, the `where` filter in Step 8 kept 1692 of 2585 detections while preserving all 400 images. A
+# level). Conversely, the `where` filter in Step 8 kept 907 of 1305 detections while preserving all 200 images. A
 # dataset can only return full images; it cannot selectively return "three out of four" detections from a single
 # frame. Rather than build a dataset slice that cannot correspond to its metadata, `selected_items` enforces this
 # boundary and raises when you ask it for one.
@@ -614,7 +629,7 @@ except ValueError as error:
 # ## Step 10: Cache the metadata structure
 #
 # Constructing the initial `Metadata` object was cheap because it parsed telemetry and annotation files, not pixel
-# data. Step 5 introduced the true bottleneck: reading all 400 high-resolution frames off disk, decoding them, and
+# data. Step 5 introduced the true bottleneck: reading all 200 high-resolution frames off disk, decoding them, and
 # measuring pixel statistics across three regions apiece. Every operation since has been arithmetic over the resulting
 # tabular rows.
 #
@@ -631,7 +646,7 @@ print("agg factors:", sorted(set(reloaded.at("unit").factor_names) - set(metadat
 
 # %% [markdown]
 # The full structure survives serialization: both levels, the links between them, the intrinsic factors measured by
-# `compute_stats`, and the upward derivations generated by `agg`. The five minutes of pixel measurement is now a file
+# `compute_stats`, and the upward derivations generated by `agg`. The minutes of pixel measurement are now a file
 # you can reload in well under a second.
 #
 # Notably, binning parameters are *not* baked into the serialization. The file stores raw factor values, so one file
