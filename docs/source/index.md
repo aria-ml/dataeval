@@ -243,6 +243,7 @@ Beginner's Guide <getting-started/quickstart>
 getting-started/installation
 getting-started/where-to-go-next
 getting-started/which-tool
+Migration <migration/index>
 Roles Guide <getting-started/roles/index>
 :::
 

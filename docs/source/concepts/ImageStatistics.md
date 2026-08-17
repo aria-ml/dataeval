@@ -1,8 +1,9 @@
 # Image Statistics
 
-`compute_stats` measures four families of things about an image, and two of them
-answer fundamentally different kinds of question. Knowing which is which is the
-difference between a number you can compare across a dataset and one you cannot.
+`compute_stats` measures four families of statistics about an image (pixel, visual,
+dimension, and hash), and two of them—pixel and visual—answer fundamentally different
+kinds of questions. Knowing which is which is the difference between a number you can
+compare across a dataset and one you cannot.
 
 ## Pixel is the data, visual is the picture
 
