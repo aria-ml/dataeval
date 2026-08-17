@@ -292,8 +292,10 @@ for a complete walkthrough, including how to choose which sample to keep.
 Not sure what to evaluate first? Use the [Which tool should I use?](which-tool.md)
 guide to find the right evaluator for your situation.
 
-Know which tool to use, then check out the [Functional Overview](../reference/FunctionalOverview.md)
-for a quick-reference table of each algorithm's inputs, outputs, and task applicability.
+Know which tool to use, then check out
+[What data does each tool need?](input-requirements.md) for a quick-reference
+table of every algorithm's inputs, and the
+[Functional Overview](../reference/FunctionalOverview.md) for task applicability.
 
 If you prefer to learn by doing, start with the
 [data cleaning tutorial](../notebooks/tt_clean_dataset.py). It walks through

@@ -40,16 +40,18 @@ organized by the question you're trying to answer.
 
 :::{grid-item-card}
 :text-align: center
-:link: ../reference/FunctionalOverview
+:link: input-requirements
 :link-type: doc
-:link-alt: "DataEval Functional Overview Tables"
+:link-alt: "DataEval Input Requirements Table"
 :img-top: ../_static/images/icons/icon_tool.svg
 :class-header: sd-fs-5
 
-**Know what tool you need**
+**Know what data you have**
 ^^^
-Go straight to the **Functional Overview** for a quick-reference table of each
-algorithm's inputs, outputs, and task applicability.
+Use the **Input Requirements** table to see what every evaluator consumes —
+images, labels, metadata, embeddings, or a model — and which tools your data
+can already run. For task applicability, see the
+[Functional Overview](../reference/FunctionalOverview.md).
 :::
 
 ::::

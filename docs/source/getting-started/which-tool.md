@@ -2,8 +2,10 @@
 
 # Which DataEval tool should I use?
 
-If you already know which metric or class you need, see the
-[Functional Overview](../reference/FunctionalOverview.md) or the
+If you already know which metric or class you need, see
+[What data does each tool need?](input-requirements.md) for its inputs, the
+[Functional Overview](../reference/FunctionalOverview.md) for task
+applicability, or the
 [API reference](../reference/autoapi/dataeval/index.rst). This page is for
 practitioners who know where they are in the
 [machine learning lifecycle](../getting-started/roles/ML_Lifecycle.md) and

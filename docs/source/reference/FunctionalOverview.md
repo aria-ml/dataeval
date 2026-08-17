@@ -1,9 +1,13 @@
 # Functional Overview
 
-The following tables summarize the advised use cases and technical
-requirements for the algorithms provided by the DataEval library.
-Each algorithm targets different types of data or problem domains.
-Refer to the method-specific pages by clicking the algorithms for more detailed information.
+The following tables summarize which computer vision tasks each algorithm in
+the DataEval library supports. Each algorithm targets different types of data
+or problem domains. Refer to the method-specific pages by clicking the
+algorithms for more detailed information.
+
+For what data each algorithm consumes — images, labels, metadata, embeddings,
+or a model — see
+[What data does each tool need?](../getting-started/input-requirements.md).
 
 ## Computer Vision Task Compatibility
 
@@ -85,7 +89,7 @@ DataEval's public API.
   - ✔
   - ✔
   - 
-* - {class}`.Parity`
+* - {func}`Parity <.parity>`
   - Detects if there is a significant relationship between the factor values and class labels
   - ✔
   - ✔
@@ -117,6 +121,16 @@ DataEval's public API.
   - ✔
   - ✔
   - 
+* - {class}`Chunked Drift <.ChunkedDrift>`
+  - Wraps any drift detector to report drift per chunk over a stream
+  - ✔
+  - ✔
+  - ✔
+* - {class}`.Coverage`
+  - Measures per-class coverage and dispersion of a dataset's embedding space
+  - ✔
+  - ✔
+  - 
 * - {class}`.Diversity`
   - Measures the distribution of metadata factors in the dataset
   - ✔
@@ -127,6 +141,7 @@ DataEval's public API.
 {class}`Drift MMD <.DriftMMD>`  
 {class}`Drift Reconstruction <.DriftReconstruction>`  
 {class}`Drift Univariate <.DriftUnivariate>`  
+{class}`Drift Wasserstein <.DriftWasserstein>`  
   - Detects data distribution shifts from training data
   - ✔
   - ✔
@@ -148,11 +163,21 @@ DataEval's public API.
   - ✔
   - ✔
   - ✔
+* - {class}`.Parity`
+  - Detects if there is a significant relationship between the factor values and class labels
+  - ✔
+  - ✔
+  - 
 * - {class}`Prioritization <.Prioritize>`
   - Orders samples based on embeddings
   - ✔
   - ✔
   - ✔
+* - {class}`.Representation`
+  - Measures how well a dataset's labels cover an ontology's concept space
+  - ✔
+  - ✔
+  - 
 
 ```
 
@@ -239,322 +264,3 @@ DataEval's public API.
 ````
 
 `````
-
-## Input Requirements
-
-The following table shows the input parameters used by each of DataEval's core functionalities.
-
-:::{note}
-DataEval imposes no restrictions on image type. It accepts any image modality
-(RGB, IR, EO, multispectral, greyscale, and others) at any bit depth (8-bit, 16-bit, 32-bit, etc.)
-and channel count (1+).
-:::
-
-`````{tab-set}
-:sync-group: func
-
-````{tab-item} Metrics
-:sync: metrics
-
-For more information on a specific algorithm, click the name in the table.  
-
-```{list-table}
-:widths: 50 8 8 8 8 8 10
-:header-rows: 1
-:class: table-text
-
-* - Algorithm
-  - Images
-  - Labels
-  - Bounding Boxes
-  - Metadata
-  - Scores
-  - Model/Extractor
-* - {func}`Bayes error rate (KNN) <.ber_knn>`  
-{func}`Bayes error rate (MST) <.ber_mst>`
-  - ***Required***{sup}`1`
-  - ***Required***
-  - 
-  - 
-  - 
-  - 
-* - {func}`Box to Image Ratio statistics <.compute_ratios>`
-  - ***Required***{sup}`2`
-  - 
-  - ***Required***
-  - 
-  - 
-  - 
-* - {func}`Completeness <.completeness>`
-  - ***Required***{sup}`1`
-  - 
-  - 
-  - 
-  - 
-  - 
-* - {func}`Coverage (Adaptive) <.coverage_adaptive>`  
-{func}`Coverage (Naive) <.coverage_naive>`
-  - ***Required***{sup}`1`
-  - 
-  - 
-  - 
-  - 
-  - 
-* - {func}`Divergence (FNN) <.divergence_fnn>`  
-{func}`Divergence (MST) <.divergence_mst>`
-  - ***Required***{sup}`1`
-  - 
-  - 
-  - 
-  - 
-  - 
-* - {func}`Feature distance <.feature_distance>`
-  - ***Required***{sup}`1`
-  - 
-  - 
-  - 
-  - 
-  - 
-* - {func}`Image and Target statistics <.compute_stats>`
-  - ***Required***{sup}`2`
-  - 
-  - 
-  - 
-  - 
-  - 
-* - {func}`Label errors <.label_errors>`
-  - ***Required***{sup}`1`
-  - ***Required***
-  - 
-  - 
-  - 
-  - 
-* - {func}`Label parity <.label_parity>`
-  - 
-  - ***Required***
-  - 
-  - 
-  - 
-  - 
-* - {func}`Label stats <.label_stats>`
-  - 
-  - ***Required***
-  - 
-  - 
-  - 
-  - 
-* - {func}`Null model metrics <.nullmodel_metrics>`
-  - 
-  - ***Required***
-  - 
-  - 
-  - 
-  - 
-* - {func}`Parity <.parity>`
-  - 
-  - ***Required***
-  - 
-  - ***Required***
-  - 
-  - 
-* - {func}`UAP <.uap>`
-  - 
-  - ***Required***
-  - 
-  - 
-  - ***Required***{sup}`4`
-  - 
-
-```
-
-````
-
-````{tab-item} Evaluators
-:sync: evaluators
-
-For more information on a specific algorithm, click the name in the table.  
-
-```{list-table}
-:widths: 50 8 8 8 8 8 10
-:header-rows: 1
-:class: table-text
-
-* - Algorithm
-  - Images
-  - Labels
-  - Bounding Boxes
-  - Metadata
-  - Scores
-  - Model/Extractor
-* - {class}`.Balance`
-  - 
-  - ***Required***
-  - 
-  - ***Required***
-  - 
-  - 
-* - {class}`.Diversity`
-  - 
-  - ***Required***
-  - 
-  - ***Required***
-  - 
-  - 
-* - {class}`Drift Domain Classifier <.DriftDomainClassifier>`  
-{class}`Drift K-Nearest Neighbors <.DriftKNeighbors>`  
-{class}`Drift MMD <.DriftMMD>`  
-{class}`Drift Reconstruction <.DriftReconstruction>`  
-{class}`Drift Univariate <.DriftUnivariate>`  
-  - ***Required***
-  -
-  - 
-  - 
-  - 
-  - ***Required*** (Reconstruction)  
-  *Optional* (Univariate)
-* - {class}`Duplicate Detection <.Duplicates>`
-  - ***Required***{sup}`2`
-  -
-  - 
-  - 
-  - 
-  - *Optional*
-* - {class}`Out-of-Distribution Domain Classifier <.OODDomainClassifier>`  
-{class}`Out-of-Distribution K-Nearest Neighbors <.OODKNeighbors>`  
-{class}`Out-of-Distribution Reconstruction <.OODReconstruction>`
-  - ***Required***
-  -
-  - 
-  - 
-  - 
-  - ***Required*** (Reconstruction)
-* - {class}`.Outliers`
-  - ***Required***
-  -
-  - 
-  - 
-  - 
-  - *Optional*
-* - {class}`Prioritization <.Prioritize>`
-  - ***Required***
-  -
-  - 
-  - 
-  - 
-  - *Optional*
-
-```
-
-````
-
-````{tab-item} Metadata
-:sync: metadata
-
-For more information on a specific algorithm, click the name in the table.  
-
-```{list-table}
-:widths: 50 8 8 8 8 8 10
-:header-rows: 1
-:class: table-text
-
-* - Algorithm
-  - Images
-  - Labels
-  - Bounding Boxes
-  - Metadata{sup}`3`
-  - Scores{sup}`5`
-  - Model/Extractor
-* - {func}`Factor Deviation <.factor_deviation>`
-  - 
-  -
-  - 
-  - ***Required***
-  - ***Required***
-  - 
-* - {func}`Factor Predictors <.factor_predictors>`
-  - 
-  -
-  - 
-  - ***Required***
-  - ***Required***
-  - 
-
-```
-
-````
-
-````{tab-item} Workflows
-:sync: workflows
-
-For more information on a specific algorithm, click the name in the table.  
-
-```{list-table}
-:widths: 50 8 8 8 8 8 10
-:header-rows: 1
-:class: table-text
-
-* - Algorithm
-  - Images
-  - Labels
-  - Bounding Boxes
-  - Metadata
-  - Scores
-  - Model/Extractor
-* - {class}`.Sufficiency`{sup}`2`
-  - ***Required***
-  - ***Required***
-  - *OD Only*
-  - 
-  - 
-  - [*Task specific*](../concepts/Embeddings.md#creating-embeddings)
-
-```
-
-````
-
-````{tab-item} Data Selection
-:sync: data_selection
-
-For more information on a specific algorithm, click the name in the table.  
-
-```{list-table}
-:widths: 50 8 8 8 8 8 10
-:header-rows: 1
-:class: table-text
-
-* - Algorithm
-  - Images
-  - Labels
-  - Bounding Boxes
-  - Metadata
-  - Scores
-  - Model/Extractor
-* - {func}`Dataset Splitter <.split_dataset>`{sup}`2`
-  - 
-  - *Optional*
-  - 
-  - *Optional*{sup}`3`
-  - 
-  -
-* - {class}`.View`{sup}`2`
-  - *Optional*
-  - *Optional*
-  - 
-  - *Optional*
-  - 
-  - 
-
-```
-
-````
-
-`````
-
-```{note}
-{sup}`1` It is highly recommended to give [embeddings](../concepts/Embeddings.md)
-over raw images using {class}`.Embeddings`.  
-{sup}`2` Input data must be wrapped together in a `Dataset`.  
-{sup}`3` When using only metadata, it must be wrapped in DataEval's {class}`.Metadata` class.  
-{sup}`4` These scores are the raw outputs of a model.  
-{sup}`5` These scores are retrieved by DataEval's Out Of Distribution (OOD) functions.  
-```
