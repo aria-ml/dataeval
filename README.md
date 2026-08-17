@@ -107,6 +107,25 @@ pip install dataeval
 > `--index-url` under pip, `--torch-backend` under `uv pip`, and use the extras
 > only for source installs.
 
+### **torchvision (optional)**
+
+`torchvision` is not a DataEval dependency, and nothing imports it until you reach
+for `TorchvisionTransform` — the escape hatch for running a torchvision v2
+transform across a dataset view. If you want that class, install torchvision
+yourself, from the **same index as your torch build**:
+
+```bash
+pip install torchvision --index-url https://download.pytorch.org/whl/cu128
+```
+
+> **Do not mix indexes.** A `torchvision` from PyPI alongside a torch installed
+> from a wheel index resolves and installs cleanly, then fails on
+> `import torchvision` with
+> `RuntimeError: operator torchvision::nms does not exist`. torchvision's compiled
+> ops are built against one specific torch build, so both packages must come from
+> the same index — which is also why `pip install dataeval[cpu]` is the wrong way
+> to obtain it.
+
 ### **Installing with uv**
 
 ```bash
@@ -139,6 +158,11 @@ change to the DataEval project directory.
 git clone https://github.com/aria-ml/dataeval.git
 cd dataeval
 ```
+
+> **Contributing rather than just installing?** Use
+> `uvx --with nox-uv nox -s dev` to build a full development environment — tests,
+> linting, type checking and docs tooling included. See
+> [Development Setup](./CONTRIBUTING.md#development-setup) for the options it takes.
 
 #### **Using Poetry**
 

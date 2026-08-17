@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from dataeval.data import Shuffle, TorchvisionTransform, View
+from dataeval.data._torchvision import _install_hint
 from dataeval.flags import ImageStats
 from dataeval.protocols import DatasetMetadata
 
@@ -82,6 +83,22 @@ class TestLazyImport:
         view = View(_ODDataset(), [op])
         with pytest.raises(ImportError, match="torchvision"):
             _ = view[0]
+
+    @pytest.mark.parametrize(
+        ("version", "expected"),
+        [
+            # A wheel-index build names the index it came from in its local version.
+            ("2.13.0+cpu", "https://download.pytorch.org/whl/cpu"),
+            ("2.11.0+cu128", "https://download.pytorch.org/whl/cu128"),
+            # A PyPI build has no local version, so PyPI's torchvision is the match.
+            ("2.13.0", "`pip install torchvision`"),
+            # An exotic tag cannot be turned into an index URL, so do not invent one.
+            ("2.11.0+cu128.with.pypi.cudnn", "published alongside it"),
+        ],
+    )
+    def test_install_hint_points_at_the_matching_index(self, monkeypatch, version, expected):
+        monkeypatch.setattr(torch, "__version__", version)
+        assert expected in _install_hint()
 
 
 class TestGeometry:

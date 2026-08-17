@@ -55,11 +55,36 @@ variant with pip. All three declare exactly the same requirements (`torch` and
 `pyproject.toml`, which routes those two packages to the right wheel index. That
 routing is project metadata — uv applies it when resolving **from a source
 checkout**, and it is not part of the published wheel. Installing
-`dataeval[cu128]` from PyPI therefore only adds `torchvision`, and PyTorch still
-resolves from whichever index pip is pointed at.
+`dataeval[cu128]` from PyPI therefore only adds `torchvision` — and adds it from
+PyPI, which will *not* match a torch you installed from a wheel index — while
+PyTorch still resolves from whichever index pip is pointed at.
 
 Select the variant with `--index-url` under pip, `--torch-backend` under
 `uv pip`, and use the extras only when installing from source.
+:::
+
+### torchvision (optional)
+
+`torchvision` is not a DataEval dependency, and nothing in the library imports it
+until you reach for {class}`.TorchvisionTransform` — the escape hatch for running
+a torchvision v2 transform across a dataset view. If you want that class, install
+torchvision yourself, from the **same index as your torch build**:
+
+```bash
+pip install torchvision --index-url https://download.pytorch.org/whl/cu128
+```
+
+:::{warning}
+Do not install `torchvision` from PyPI alongside a torch that came from a wheel
+index. The pair resolves and installs cleanly, then fails on `import torchvision`:
+
+```text
+RuntimeError: operator torchvision::nms does not exist
+```
+
+torchvision's compiled ops are built against one specific torch build, so both
+packages have to come from the same index. This is also why `pip install
+dataeval[cpu]` is the wrong way to obtain torchvision — see the note above.
 :::
 
 ## Installing DataEval

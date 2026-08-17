@@ -38,5 +38,5 @@
     }
   },
 
-  "postCreateCommand": [ "./init" ]
+  "postCreateCommand": [ "uvx", "--with", "nox-uv", "nox", "-s", "dev" ]
 }

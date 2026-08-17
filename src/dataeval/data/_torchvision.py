@@ -22,6 +22,31 @@ from dataeval.utils.preprocessing import normalize_image_shape
 _CONTENT_HASH_STRIDE = 7
 
 
+def _install_hint() -> str:
+    """Name the torchvision install that matches the torch build already in the environment."""
+    try:
+        import torch
+    except ImportError:
+        return (
+            "Install both from one wheel index, e.g. `pip install torch torchvision "
+            "--index-url https://download.pytorch.org/whl/cpu` (or cu118/cu128)."
+        )
+    # A wheel-index build tags its local version with the index name ("2.13.0+cu128"); a
+    # PyPI build has no tag, and anything else is too unusual to turn into a URL.
+    _, _, build = torch.__version__.partition("+")
+    if not build:
+        return "Your torch came from PyPI, so `pip install torchvision` will match it."
+    if not build.isalnum():
+        return (
+            f"Your torch is a '{build}' build, so install the torchvision published alongside it "
+            "rather than the one on PyPI."
+        )
+    return (
+        f"Your torch is a '{build}' build, so install torchvision from that same index: "
+        f"`pip install torchvision --index-url https://download.pytorch.org/whl/{build}`."
+    )
+
+
 def _import_torchvision() -> tuple[Any, Any]:
     """Import torchvision lazily, so ``import dataeval.data`` stays torchvision-free."""
     try:
@@ -29,8 +54,9 @@ def _import_torchvision() -> tuple[Any, Any]:
         from torchvision import tv_tensors
     except ImportError as error:
         raise ImportError(
-            "TorchvisionTransform requires torchvision, which is not installed. Install it with "
-            "`pip install dataeval[cpu]` (or the cu118/cu128 extra matching your CUDA version)."
+            f"TorchvisionTransform requires torchvision, which is not installed. {_install_hint()} "
+            "torchvision's compiled ops are built against one specific torch build, so a mismatched "
+            "pair installs cleanly and then fails on import."
         ) from error
     return torch, tv_tensors
 

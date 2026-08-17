@@ -1,9 +1,11 @@
+import argparse
 import functools
 import glob
 import os
 import re
+import shutil
+import sys
 from pathlib import Path
-from sys import version_info
 
 import nox
 
@@ -66,17 +68,22 @@ def session(**kwargs):
     return decorator
 
 
-PYTHON_VERSION = f"{version_info[0]}.{version_info[1]}"
+PYTHON_VERSION = f"{sys.version_info[0]}.{sys.version_info[1]}"
 PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
+PYTHON_DEFAULT = "3.11"
 PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
+DEVICE_VARIANTS = ["cpu", "cu118", "cu128"]
+DEVICE_DEFAULT = "cu128"
+VENV_DEFAULT = ".venv"
+CUDA_VERSION_FILE = ".cuda-version"
 IS_CI = bool(os.environ.get("CI"))
 DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = os.environ.get("DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "")
 if not DATAEVAL_NOX_UV_EXTRAS_OVERRIDE:
-    if os.path.exists(".cuda-version"):
-        with open(".cuda-version") as f:
+    if os.path.exists(CUDA_VERSION_FILE):
+        with open(CUDA_VERSION_FILE) as f:
             DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = f.read().strip()
-    if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE not in ["cpu", "cu118", "cu128"]:
-        DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = "cu118"
+    if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE not in DEVICE_VARIANTS:
+        DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = DEVICE_DEFAULT
 
 UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE]
 
@@ -113,6 +120,97 @@ def with_onnx(extras: list[str]) -> list[str]:
     if any(extra.startswith("cu") for extra in extras):
         return extras + ["onnx-gpu"]
     return extras
+
+
+def resolve_option(session: nox.Session, label: str, provided: "str | None", allowed: list[str], default: str) -> str:
+    """Validate an option value, prompting for it when it was not supplied on the command line.
+
+    A value typed at the prompt falls back to `default` when unrecognized, but a value passed
+    as a flag is an error, so that a typo such as `-d cu126` cannot silently install cu128.
+    """
+    value = provided
+    interactive = value is None
+    if interactive:
+        prompt = f"Enter desired {label} [supported: {' '.join(allowed)}] [default: {default}]: "
+        value = input(prompt).strip() if sys.stdin.isatty() else ""
+    if not value:
+        return default
+    # Accept a full patch version such as "3.11.4" for a "3.11" option (a no-op for device names).
+    value = ".".join(value.split(".")[:2])
+    if value not in allowed:
+        if not interactive:
+            session.error(f"Unrecognized {label} '{value}' (supported: {', '.join(allowed)})")
+        session.warn(f"Unrecognized {label} '{value}', defaulting to {default}")
+        return default
+    return value
+
+
+# Declared with nox.session rather than the nox-uv shim: this session builds the project
+# environment itself, so it must not ask nox to create one first.
+@nox.session(venv_backend="none")
+def dev(session: nox.Session) -> None:
+    """Create a local development environment. Prompts for any option not passed on a terminal.
+
+    Usage: `uvx --with nox-uv nox -s dev -- [-p VERSION] [-d DEVICE] [-n NAME]`
+
+    Bootstrap this one with `uvx`, not `uv run nox -s dev` -- nox itself lives in the
+    environment the session rebuilds. `--with nox-uv` is not needed here (this session
+    creates no nox environment of its own) but is what every other session wants, so it
+    is the invocation worth keeping in muscle memory.
+    """
+    parser = argparse.ArgumentParser(prog="nox -s dev --", add_help=False)
+    parser.add_argument("-p", "--python", dest="python")
+    parser.add_argument("-d", "--device", dest="device")
+    parser.add_argument("-n", "--name", dest="name", default=VENV_DEFAULT)
+    try:
+        args = parser.parse_args(session.posargs)
+    except SystemExit:
+        session.error("Usage: nox -s dev -- [-p|--python VERSION] [-d|--device DEVICE] [-n|--name NAME]")
+
+    if shutil.which("uv") is None:
+        session.error("Install uv to continue: https://docs.astral.sh/uv/")
+
+    python_version = resolve_option(session, "version of python", args.python, PYTHON_VERSIONS, PYTHON_DEFAULT)
+    device = resolve_option(session, "CUDA version", args.device, DEVICE_VARIANTS, DEVICE_DEFAULT)
+    venv_path = Path(args.name).resolve()
+
+    # `uv sync` recreates the environment, which would pull the interpreter out from under a
+    # nox running inside it.
+    if Path(sys.prefix).resolve() == venv_path:
+        session.error(
+            f"Refusing to rebuild '{args.name}' while running from it. "
+            "Use `uvx --with nox-uv nox -s dev` instead of `uv run nox -s dev`."
+        )
+    if venv_path.exists():
+        if not (venv_path / "pyvenv.cfg").exists():
+            session.error(f"'{args.name}' exists but is not a virtual environment; refusing to remove it.")
+        session.log(f"Removing existing virtual environment at {args.name}...")
+        shutil.rmtree(venv_path)
+
+    session.log(f"Installing Python {python_version}+{device} to {args.name}...")
+    extras: list[str] = []
+    for extra in with_onnx([device]):
+        extras += ["--extra", extra]
+    session.run(
+        "uv",
+        "sync",
+        "-p",
+        python_version,
+        *extras,
+        external=True,
+        env={"UV_PROJECT_ENVIRONMENT": str(venv_path)},
+    )
+    # Recorded for DATAEVAL_NOX_UV_EXTRAS_OVERRIDE so later sessions pick up the same device.
+    Path(CUDA_VERSION_FILE).write_text(f"{device}\n")
+
+    session.log(f"Finished installing dataeval for python {python_version} to {args.name}")
+    if os.environ.get("REMOTE_CONTAINERS"):
+        session.log(f"Activate the environment (e.g. `source {args.name}/bin/activate`) before proceeding.")
+    else:
+        session.log(
+            "It is now safe to reload the window ('Developer: Reload Window') and select a Python "
+            "interpreter ('Python: Select Interpreter') from the Command Palette."
+        )
 
 
 @session(uv_groups=["test"], uv_extras=["cpu", "onnx", "opencv"])
@@ -280,16 +378,13 @@ def docs(session: nox.Session) -> None:
         session.run("python", "../../docs/check_notebook_cache.py", "--clean")
 
 
-EXTRA_VARIANTS = ("cpu", "cu118", "cu128")
-
-
 @session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"], uv_sync_locked=False)
 def lock(session: nox.Session) -> None:
     """Lock dependencies in "uv.lock". Update dependencies by calling `nox -e lock -- upgrade`."""
     upgrade_args = ["--upgrade"] if "upgrade" in session.posargs else []
     session.run("uv", "lock", *upgrade_args)
 
-    for variant in EXTRA_VARIANTS:
+    for variant in DEVICE_VARIANTS:
         out = Path(f"requirements.{variant}.txt")
         session.run(
             "uv",
