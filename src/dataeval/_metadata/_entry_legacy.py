@@ -10,7 +10,7 @@ This module is the whole of that machinery, gathered so that retiring it is dele
 file rather than unpicking a class. Nothing outside factor entry reaches in here, and
 nothing in here is reachable except through a deprecated spelling.
 
-.. deprecated::
+.. deprecated:: 1.1
     Removed in v1.2.0 along with ``level="combined"``. Pass ``level=`` or
     ``source_index=``.
 """

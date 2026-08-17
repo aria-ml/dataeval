@@ -58,6 +58,13 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
       This column is omitted when all outliers are item-level (all target_index values would be None).
     - channel_index: int | None - Index of the image channel (None for aggregated stats).
       This column is omitted when all stats are aggregated across channels.
+
+      .. deprecated:: 1.1
+         Removed in v1.2 with the per-channel row path that populates it. Name band
+         groups with ``compute_stats(channels=...)`` instead: the band is then part of
+         ``metric_name`` (``nir_mean`` rather than ``mean`` on channel 3), and each band
+         is thresholded against its own distribution rather than one pooled across every
+         band of every image.
     - metric_name: str - Name of the metric that flagged this image/target
     - metric_value: float - Value of the metric for this image/target
 
@@ -839,6 +846,27 @@ def _detect_outliers(  # noqa: C901
     -------
     pl.DataFrame
         DataFrame with columns: item_index, target_index, metric_name, metric_value.
+
+    Notes
+    -----
+    Columns holding NaN follow one rule: **a NaN is never an outlier.** It records a
+    measurement that was not made, not an unusual value, and the two must not be
+    conflated — an absent band would otherwise read as the most anomalous thing in the
+    dataset.
+
+    Three cases follow from it:
+
+    - **Entirely NaN** — no outliers. Named band groups make this ordinary rather than
+      pathological: a group no datum can satisfy is measured over an all-NaN slice, so
+      ``compute_stats(channels={"nir": 3})`` against 3-channel data yields a full
+      ``nir_mean`` column of NaN.
+    - **Partly NaN** — thresholded over the values it does have. Every statistical
+      threshold reduces NaN-aware, so the surviving values set the bounds and the NaN
+      entries are excluded from the result rather than compared against them.
+    - **Too few real values to have a spread** — no outliers. One or two surviving
+      values give bounds that coincide with the values themselves, and
+      :class:`~dataeval.utils.thresholds.AdaptiveThreshold` declines below three
+      outright, so nothing is flagged off a sample too small to describe a distribution.
     """
     item_ids: list[int] = []
     target_ids: list[int | None] = []
@@ -1595,9 +1623,9 @@ class Outliers(Evaluator):
         ╞════════════╪═════════════╪══════════════╡
         │ 0          ┆ zeros       ┆ 0.000081     │
         │ 2          ┆ zeros       ┆ 0.000081     │
-        │ 7          ┆ brightness  ┆ 0.98         │
+        │ 7          ┆ brightness  ┆ 249.900009   │
         │ 7          ┆ contrast    ┆ 0.0          │
-        │ 7          ┆ darkness    ┆ 0.98         │
+        │ 7          ┆ darkness    ┆ 249.900009   │
         │ 7          ┆ entropy     ┆ 0.0          │
         └────────────┴─────────────┴──────────────┘
 

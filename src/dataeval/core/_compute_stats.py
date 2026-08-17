@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Flag
 from functools import partial
 from itertools import zip_longest
-from typing import Any, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast, get_args
 
 import numpy as np
 from numpy.typing import NDArray
@@ -15,15 +15,27 @@ from numpy.typing import NDArray
 import dataeval.core._calculators._register  # noqa: F401
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes
-from dataeval.core._calculators._base import Calculator
+from dataeval.core._calculators._base import Calculator, ViewKind
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.data import unzip_dataset
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback
-from dataeval.types import SourceIndex, StatsMap
+from dataeval.types import FactorLevel, SourceIndex, StatsMap
 from dataeval.utils._internal import PoolWrapper
-from dataeval.utils.preprocessing import BitDepth, BoundingBox, BoxLike, boxes_to_mask, get_bitdepth, to_bounding_box
+from dataeval.utils.preprocessing import (
+    BoundingBox,
+    BoxLike,
+    ChannelGroup,
+    ChannelGroupLike,
+    ValueRange,
+    _validate_declared_range,
+    boxes_to_mask,
+    get_value_range,
+    normalize_image_shape,
+    to_bounding_box,
+    to_channel_group,
+)
 
 _logger = get_logger(__name__)
 
@@ -39,24 +51,73 @@ exactly one item-level row per item, and naming it twice is rejected outright.
 """
 
 
-def _maskable_calculators(
-    calculators: Sequence[tuple[type[Calculator[Any]], Flag]],
-) -> list[tuple[type[Calculator[Any]], Flag]]:
-    """Keep only the calculators whose statistics survive part of the region being masked.
+def _flag_list(flags: Flag) -> list[str]:
+    """List the single-bit members of `flags`, leaving out the composite aliases.
 
-    Which those are is each calculator's own answer, via its ``supports_exclusion``,
-    rather than a list of flags maintained here: a new calculator would otherwise have to
-    be remembered in a module that knows nothing else about it, and would silently default
-    to being run over masked data. Queried the same way the registry queries
-    ``get_applicable_flags``.
+    Iterating a Flag class yields the composites declared in its body as well — on Python
+    3.10 in particular — so a group like ``VISUAL`` would list itself beside each of the
+    statistics it stands for.
     """
-    maskable: list[tuple[type[Calculator[Any]], Flag]] = []
+    return [f.name for f in type(flags) if f in flags and f.name and f.value and (f.value & (f.value - 1)) == 0]
+
+
+def _flag_names(flags: Flag) -> str:
+    """Render :func:`_flag_list` for a message."""
+    return ", ".join(_flag_list(flags))
+
+
+def _calculators_for_view(
+    calculators: Sequence[tuple[type[Calculator[Any]], Flag]],
+    view: ViewKind,
+) -> list[tuple[type[Calculator[Any]], Flag]]:
+    """Narrow a calculator list to the statistics that are defined over one view.
+
+    Which those are is each *statistic's* own answer, declared beside its handler, rather
+    than a list of flags maintained here: a new statistic would otherwise have to be
+    remembered in a module that knows nothing else about it, and would silently default to
+    being computed over every view. Narrows the flags rather than dropping whole
+    calculators, because one calculator's statistics need not agree — dimension geometry
+    is band-invariant while the bit depth beside it is not.
+    """
+    narrowed: list[tuple[type[Calculator[Any]], Flag]] = []
     for calculator_cls, flags in calculators:
-        # __new__ rather than a real instance: the answer is a property of the class and
-        # the constructor wants a datum. Same trick, and the same reason, as the registry.
-        if calculator_cls.__new__(calculator_cls).supports_exclusion():
-            maskable.append((calculator_cls, flags))
-    return maskable
+        kept = calculator_cls.flags_for_view(flags, view)
+        if kept:
+            narrowed.append((calculator_cls, kept))
+    return narrowed
+
+
+def _band_view(datum: NDArray[Any], indices: tuple[int, ...]) -> NDArray[Any]:
+    """Narrow the datum to a group's bands, or stand in an all-NaN slice where it cannot be.
+
+    A group the datum cannot fully supply is *substituted*, never skipped. Skipping means
+    the calculators never run, so the column is never produced for that datum — and the
+    aggregation appends each datum's values to one array per name, so a name missing from
+    one datum silently shortens its array and misaligns it against the source index.
+    ``_pad_missing_stats`` cannot repair it either, since it learns the name set from one
+    datum's own results. Handing the calculators NaN pixels instead produces the right
+    column, at the right length, holding the right answer: absent.
+
+    All-or-nothing rather than reduced over whichever bands are present. A group spanning
+    bands 2-5 would otherwise mean "bands 2-3" on a 4-band image and "bands 2-5" on an
+    8-band one, under one column name, silently incomparable to everything downstream.
+    """
+    if datum.ndim < 2:
+        # Non-spatial data has no band axis, so no group is satisfiable.
+        return _absent_band(len(indices), (1, 1))
+    image = normalize_image_shape(datum)
+    if max(indices) < image.shape[0]:
+        return image[list(indices)]
+    return _absent_band(len(indices), image.shape[-2:])
+
+
+def _absent_band(count: int, hw: tuple[int, ...]) -> NDArray[np.float64]:
+    """Return the all-NaN stand-in for a band group the datum cannot supply.
+
+    float64 for the same reason `CalculatorCache.nan_like` is: the calculators' reductions
+    and `edge_filter` behave differently on a narrower or object dtype.
+    """
+    return np.full((count, *hw), np.nan, dtype=np.float64)
 
 
 class StatsResult(TypedDict):
@@ -95,6 +156,38 @@ class DatumResult:
     stats: dict[str, list[Any]]
 
 
+@dataclass(frozen=True)
+class BatchPlan:
+    """Everything about a `compute_stats` call that is the same for every datum.
+
+    Each field is a pure function of the call's arguments, resolved once before any image
+    is read. Threading them individually left `_compute_batch` with thirteen parameters,
+    four of them calculator lists that must agree with the `ViewKind` passed beside them —
+    an invariant that could only be documented, never enforced. Resolving them together
+    makes that agreement a property of how the plan is built, in one place, and adding a
+    fourth view costs one field rather than two more positional arguments.
+
+    No field carries a default. There is one construction site and it states all of them,
+    so a default would only ever hide a field someone forgot to thread — and a mutable one
+    is rejected outright by `dataclasses` on Python 3.11, which is the single version where
+    ``mappingproxy`` is both unhashable and caught by that check.
+    """
+
+    calculators: Sequence[tuple[type[Any], Flag]]
+    per_image: bool
+    per_target: bool
+    per_channel: bool
+    normalize_pixel_values: bool
+    per_background: bool
+    background_calculators: Sequence[tuple[type[Any], Flag]]
+    declared_range: tuple[float, float] | None
+    channel_groups: Mapping[str, ChannelGroup]
+    band_calculators: Sequence[tuple[type[Any], Flag]]
+    background_band_calculators: Sequence[tuple[type[Any], Flag]]
+    wide_band_names: str
+    unmeasurable_names: str
+
+
 @dataclass
 class DatumBatchResult:
     """Output from processing multiple images."""
@@ -113,7 +206,9 @@ def _collect_calculator_stats(
     normalize_pixel_values: bool = False,
     exclude: NDArray[np.bool_] | None = None,
     prefix: str = "",
-    bitdepth: BitDepth | None = None,
+    value_range: ValueRange | None = None,
+    view: ViewKind = ViewKind.WHOLE,
+    bands: tuple[int, ...] | None = None,
 ) -> tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
@@ -126,10 +221,15 @@ def _collect_calculator_stats(
     prefix : str, default ""
         Prepended to every stat name produced here, which is how a masked pass is kept
         distinguishable from the unmasked one sharing its row.
-    bitdepth : BitDepth or None, default None
-        The datum's bit depth, already found. Every row of one datum shares it, so it is
-        read once per datum and handed down rather than rediscovered per row — finding it
-        costs a scan of the whole datum, which a per-row cache would repeat once per box.
+    value_range : ValueRange or None, default None
+        The datum's value range, already established. Every row of one datum shares it, so
+        it is read once per datum and handed down rather than rediscovered per row —
+        establishing it costs a scan of the whole datum, which a per-row cache would
+        repeat once per box.
+    view : ViewKind, default ViewKind.WHOLE
+        Which view of the datum `datum` is, so that statistics undefined over it are
+        skipped. `calculators` is expected to have been narrowed to the same view already;
+        passing it here keeps the two from drifting apart.
 
     Returns
     -------
@@ -148,11 +248,13 @@ def _collect_calculator_stats(
         per_channel,
         normalize_pixel_values=normalize_pixel_values,
         exclude=exclude,
-        bitdepth=bitdepth,
+        value_range=value_range,
+        bands=bands,
     )
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor, per_channel)
-        stats_list.append({f"{prefix}{name}": values for name, values in calculator.compute(flags).items()})
+        computed = calculator.compute(flags, view)
+        stats_list.append({f"{prefix}{name}": values for name, values in computed.items()})
         # Collect empty values from this calculator
         empty_values_map.update({f"{prefix}{name}": value for name, value in calculator.get_empty_values().items()})
         # Collect warnings from this calculator
@@ -160,6 +262,69 @@ def _collect_calculator_stats(
             warnings.extend(calculator.warnings)
         del calculator
     return stats_list, empty_values_map, warnings
+
+
+def _band_ranges(
+    datum: NDArray[Any],
+    channel_groups: Mapping[str, ChannelGroup],
+    declared_range: tuple[float, float] | None,
+) -> dict[str, ValueRange]:
+    """Return the interval each named group is measured against, read off the whole datum.
+
+    Established per datum rather than per row, for the reason the whole-datum `value_range`
+    is: the answer is the same for every box the datum carries, and finding it costs a scan.
+    Anchored on the datum rather than on a row's crop so that a box, its background and the
+    whole image all land on one scale.
+
+    Established per *group* rather than inherited from the datum, because bands of one cube
+    are different measurements. An RGB+NIR image stored as ``uint16`` with the visible bands
+    in 0-255 has a whole-datum range of 65535, which would divide every visible pixel by 257
+    times too much and bin the lot into one histogram bucket.
+
+    Only the range is kept. The slice it is read from is a full-resolution copy of the
+    selected bands, and no row wants that — each takes its own box's worth through
+    `CalculatorCache`, which narrows the band axis after cropping.
+    """
+    return {
+        name: get_value_range(_band_view(datum, group.indices), declared=group.value_range or declared_range)
+        for name, group in channel_groups.items()
+    }
+
+
+def _collect_band_stats(
+    calculators: Sequence[tuple[type[Calculator[Any]], Flag]],
+    datum: NDArray[Any],
+    bands: tuple[int, ...],
+    band_range: ValueRange,
+    box: BoundingBox | None,
+    name: str,
+    per_channel: bool,
+    *,
+    normalize_pixel_values: bool,
+    exclude: NDArray[np.bool_] | None,
+    prefix: str,
+    view: ViewKind = ViewKind.BAND,
+) -> tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]:
+    """Run one named band group as its own view of the datum.
+
+    The same calculators over the same region, reading a slice of the channel axis
+    instead of all of it, with the group's name prefixed onto every column — the band
+    counterpart of what `per_background` does to the spatial axes. Composes with it:
+    a group run over a masked region yields ``background_nir_brightness``, and `view`
+    then carries both so a statistic undefined over either is still skipped.
+    """
+    return _collect_calculator_stats(
+        calculators,
+        datum,
+        box,
+        per_channel,
+        normalize_pixel_values=normalize_pixel_values,
+        exclude=exclude,
+        prefix=f"{prefix}{name}_",
+        value_range=band_range,
+        view=view,
+        bands=bands,
+    )
 
 
 def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], num_channels: int) -> list[int | None]:
@@ -274,14 +439,24 @@ def _pad_missing_stats(results: list["DatumResult"], empty_values_map: dict[str,
 
 def _compute_batch(  # noqa: C901
     args: tuple[int, NDArray[Any], list[BoundingBox] | None],
-    calculators: Iterable[tuple[type[Any], Flag]],
-    per_image: bool,
-    per_target: bool,
-    per_channel: bool,
-    normalize_pixel_values: bool = False,
-    per_background: bool = False,
-    background_calculators: Iterable[tuple[type[Any], Flag]] = (),
+    plan: BatchPlan,
 ) -> DatumBatchResult:
+    # Bound to locals rather than read through `plan.` at each use: this body runs once per
+    # datum in a worker process, and the names below are what the rest of it is written in.
+    calculators = plan.calculators
+    per_image = plan.per_image
+    per_target = plan.per_target
+    per_channel = plan.per_channel
+    normalize_pixel_values = plan.normalize_pixel_values
+    per_background = plan.per_background
+    background_calculators = plan.background_calculators
+    declared_range = plan.declared_range
+    channel_groups = plan.channel_groups
+    band_calculators = plan.band_calculators
+    background_band_calculators = plan.background_band_calculators
+    wide_band_names = plan.wide_band_names
+    unmeasurable_names = plan.unmeasurable_names
+
     i, datum, boxes = args
     results: list[DatumResult] = []
     box_count = 0
@@ -297,17 +472,48 @@ def _compute_batch(  # noqa: C901
 
     # Read once per datum rather than once per row: it is a property of the datum, every
     # view of it shares the value, and finding it costs a scan of the whole array.
-    bitdepth = get_bitdepth(datum)
+    value_range = get_value_range(datum, declared=declared_range)
+
+    # The unnamed view means *the image as a picture*, which is only defined for mono or
+    # RGB. Averaged over RGB+NIR a brightness is not a brightness, and the grayscale
+    # conversion a hash runs reaches a CMYK-versus-RGBA guess at four channels. Said
+    # rather than enforced: existing callers who tolerate today's answer keep it, and a
+    # cap would take the dimension statistics — well defined at any band count — with it.
+    # Not an error: the caller may have declared ranges for the band groups they care
+    # about and never asked for this view at all, and one unmeasurable datum should not
+    # end a run over a hundred thousand. Said rather than silent, because an all-NaN
+    # column is otherwise easy to miss.
+    if unmeasurable_names and not value_range.is_known:
+        warnings_list.append(
+            f"{i}: no value range could be established, so {unmeasurable_names} are NaN. Float data spanning "
+            f"more than [0, 255], and any data holding negative values, carries no encoding to decode "
+            f"— pass value_range=(low, high) to state the interval these values occupy."
+        )
+
+    if wide_band_names and num_channels > 3:
+        warnings_list.append(
+            f"{i}: {num_channels} bands measured as a single picture for {wide_band_names}; these "
+            f"describe visible imagery and have no meaning averaged across a band this wide. Name band groups "
+            f"with channels= to measure them separately."
+        )
 
     # The foreground mask: every annotated box painted into one array, so overlapping
     # boxes count once. Built per datum rather than per row — the item-level row is the
     # only one that uses it, but building it here keeps it out of the row loop.
-    exclude = boxes_to_mask(datum.shape, boxes or ()) if per_background else None
+    # Non-spatial data takes no mask. `boxes_to_mask` reads `shape[-2:]`, and a background
+    # is a region of an image plane — a 1-D datum has none to carve out. `CalculatorCache`
+    # already documents `exclude` as ignored below three dimensions, so this only stops
+    # the mask being built at all rather than changing what any statistic answers.
+    exclude = boxes_to_mask(datum.shape, boxes or ()) if per_background and datum.ndim >= 2 else None
     # `.all()` is vacuously True for a datum with no pixels, which is an absence of
     # background rather than a full one; `.mean()` on it is NaN and warns. Neither is
     # worth saying, so an empty datum takes neither path.
     if exclude is not None and exclude.size and exclude.all():
         warnings_list.append(f"{i}: Boxes cover the entire datum, leaving no background to measure")
+
+    # Read once per datum for the same reason `value_range` is: a group's interval is a
+    # property of the datum, and every row below is measured against the same one.
+    band_ranges = _band_ranges(datum, channel_groups, declared_range) if channel_groups else {}
 
     # Process each item (full image and/or boxes)
     for i_b, box, unmasked, background in items:
@@ -330,11 +536,32 @@ def _compute_batch(  # noqa: C901
                 box,
                 per_channel,
                 normalize_pixel_values=normalize_pixel_values,
-                bitdepth=bitdepth,
+                value_range=value_range,
             )
             calculator_stats.extend(stats)
             empty_values_map.update(empties)
             calc_warnings.extend(warns)
+
+            # One further pass per named band group, landing as prefixed columns on this
+            # same row. The unnamed view above is always computed alongside them: the
+            # band-invariant statistics need a pass to be emitted from, and a caller
+            # adding channels= to a pipeline reading `brightness` must not lose it.
+            for name, band_range in band_ranges.items():
+                stats, empties, warns = _collect_band_stats(
+                    band_calculators,
+                    datum,
+                    channel_groups[name].indices,
+                    band_range,
+                    box,
+                    name,
+                    per_channel,
+                    normalize_pixel_values=normalize_pixel_values,
+                    exclude=None,
+                    prefix="",
+                )
+                calculator_stats.extend(stats)
+                empty_values_map.update(empties)
+                calc_warnings.extend(warns)
 
         # The same calculators over the same region with the foreground masked out. Run
         # into the same reconciliation as the unmasked pass, so both land on one row with
@@ -348,7 +575,8 @@ def _compute_batch(  # noqa: C901
                 normalize_pixel_values=normalize_pixel_values,
                 exclude=exclude,
                 prefix=BACKGROUND_PREFIX,
-                bitdepth=bitdepth,
+                value_range=value_range,
+                view=ViewKind.MASK,
             )
             calculator_stats.extend(stats)
             empty_values_map.update(empties)
@@ -358,6 +586,27 @@ def _compute_batch(  # noqa: C901
             # with no pixels has no share to report, so it reports NaN rather than 0/0.
             uncovered = float(1.0 - exclude.mean()) if exclude.size else float("nan")
             calculator_stats.append({f"{BACKGROUND_PREFIX}fraction": [uncovered]})
+
+            # Region first, then band: `background_nir_brightness` — is the unannotated
+            # scene hot in near-infrared — is a real quantity, and the two views compose
+            # rather than competing for one parameter.
+            for name, band_range in band_ranges.items():
+                stats, empties, warns = _collect_band_stats(
+                    background_band_calculators,
+                    datum,
+                    channel_groups[name].indices,
+                    band_range,
+                    box,
+                    name,
+                    per_channel,
+                    normalize_pixel_values=normalize_pixel_values,
+                    exclude=exclude,
+                    prefix=BACKGROUND_PREFIX,
+                    view=ViewKind.MASK | ViewKind.BAND,
+                )
+                calculator_stats.extend(stats)
+                empty_values_map.update(empties)
+                calc_warnings.extend(warns)
 
         # Thread calculator warnings with index context
         for w in calc_warnings:
@@ -383,6 +632,56 @@ def _compute_batch(  # noqa: C901
         _pad_missing_stats(results, datum_empty_values)
 
     return DatumBatchResult(results, box_count, invalid_box_count, warnings_list)
+
+
+def _produced_stat_names(calculators: Sequence[tuple[type[Calculator[Any]], Flag]]) -> set[str]:
+    """Every column name the requested flags will produce, known before any datum is read."""
+    names: set[str] = set()
+    for calculator_cls, flags in calculators:
+        names |= calculator_cls.stat_names(flags)
+    return names
+
+
+def _resolve_channel_groups(
+    channels: Mapping[str, ChannelGroupLike],
+    calculators: Sequence[tuple[type[Calculator[Any]], Flag]],
+) -> dict[str, ChannelGroup]:
+    """Validate a channel mapping at the call, where the mistake is.
+
+    Every input to this check is known before any image is read, so a bad group name fails
+    here rather than as a confusing rename several layers downstream: a group called
+    ``instance`` would produce ``instance_brightness``, indistinguishable from the
+    level-qualified column :class:`~dataeval.Metadata` produces for a per-target
+    statistic, and would be silently renamed with an ``_added`` suffix instead of
+    reported against its cause.
+    """
+    produced = _produced_stat_names(calculators)
+    reserved = {BACKGROUND_PREFIX.rstrip("_"), *get_args(FactorLevel)}
+    groups: dict[str, ChannelGroup] = {}
+
+    for name, group in channels.items():
+        if not isinstance(name, str) or not name.isidentifier():
+            raise ValueError(f"channel group names must be valid identifiers; got {name!r}.")
+        if name in reserved or name.startswith(BACKGROUND_PREFIX):
+            # The prefix and not just the bare word: a group named ``background_x`` would
+            # produce ``background_x_mean``, which is also what group ``x`` produces for
+            # the masked region — the same column written twice on one row, the second
+            # silently overwriting the first.
+            raise ValueError(
+                f"channel group name {name!r} is reserved. Statistics are named "
+                f"'<group>_<statistic>', and this one would be indistinguishable from a "
+                f"region prefix or a metadata level qualifier. Reserved: {sorted(reserved)}, "
+                f"and any name beginning with '{BACKGROUND_PREFIX}'."
+            )
+        collisions = sorted(f"{name}_{stat}" for stat in produced if f"{name}_{stat}" in produced)
+        if collisions:
+            raise ValueError(
+                f"channel group name {name!r} would produce {collisions}, which already "
+                f"name statistics you requested. Choose another group name."
+            )
+        groups[name] = to_channel_group(group)
+
+    return groups
 
 
 def _enumerate_datum(
@@ -464,7 +763,9 @@ def compute_stats(  # noqa: C901
     per_target: bool = True,
     per_background: bool = False,
     per_channel: bool = False,
+    channels: Mapping[str, ChannelGroupLike] | Literal[True] | None = None,
     normalize_pixel_values: bool = _UNSET,  # type: ignore
+    value_range: tuple[float, float] | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> StatsResult:
     """
@@ -514,21 +815,103 @@ def compute_stats(  # noqa: C901
         is background with high confidence. Where the boxes cover an image entirely,
         every background statistic for it is NaN.
 
-        Has no effect when boxes is None.
+        An image with nothing annotated has all of itself as background, so its
+        ``background_fraction`` is 1.0 and its background statistics equal its
+        whole-image ones. That holds whether the image is an unannotated member of an
+        object-detection dataset or the whole dataset carries no boxes at all — the
+        columns produced depend on this argument, not on the data, which is what lets
+        results from two such datasets be combined.
 
-        .. versionadded:: 1.2
+        .. versionadded:: 1.1
     per_channel : bool, default False
-        If True, compute per-channel statistics. If False, statistics are
-        aggregated across all channels.
-    normalize_pixel_values : bool, default False
-        If True, pixel values are normalized to [0, 1] based on each image's
-        inferred bit depth before any statistic is computed. This makes results
-        comparable across images with different bit depths (8-bit, 16-bit, etc.).
-        If False, statistics are computed on raw pixel values.
+        If True, compute per-channel statistics on a third source-index axis. If False,
+        statistics are aggregated across all channels.
 
-        .. deprecated::
+        .. deprecated:: 1.1
+            Use `channels` instead, which names band groups and returns them as columns
+            that reach :class:`~dataeval.Metadata`. Per-channel rows cannot: a source
+            index addresses an item and a target, and a channel is a third axis with no
+            level to land on, so balance, diversity and parity cannot see a per-channel
+            statistic at all. Will be removed in v1.2.
+    channels : Mapping[str, ChannelGroupLike] or True or None, default None
+        Named groups of bands to measure separately, alongside the whole image.
+
+        Each group becomes a set of columns named ``<group>_<statistic>`` on the same rows
+        the unprefixed statistics occupy — the band-axis counterpart of `per_background`,
+        which does the same thing to the spatial axes. The two compose, giving
+        ``background_nir_brightness``.
+
+        A group is measured **jointly**: ``{"rgb": [0, 1, 2]}`` reduces over the three
+        visible bands together, which is the ordinary all-channel behavior restricted to a
+        subset. That is what scales to hyperspectral data — a 224-band cube is asked about
+        as a handful of band groups rather than 224 columns::
+
+            channels = {"visible": range(0, 30), "nir": range(30, 70), "swir": range(100, 150)}
+
+        Values may be an index, a sequence of indices, a range, or a
+        :class:`~dataeval.utils.preprocessing.ChannelGroup` where the group needs its own
+        `value_range`. Group names must not collide with a statistic name, with
+        ``background``, or with a :data:`~dataeval.types.FactorLevel`.
+
+        The unprefixed statistics are always computed as well, so adding `channels` to an
+        existing call never removes a column it already returned. Where an image cannot
+        supply every band a group names, that group's statistics are NaN for it rather
+        than reduced over the bands present — one column name means one thing, and a datum
+        missing bands is a defect that should read as absent.
+
+        ``channels=True`` is a deprecated spelling of ``per_channel=True`` and returns
+        rows rather than columns; it is removed in v1.2 along with the row path. A
+        mapping cannot be combined with ``per_channel=True``
+        and raises: a per-channel row layout is indexed by the datum's own channel count,
+        which a narrower group has no row to land on.
+
+        Has no effect on statistics that describe geometry rather than values: a band
+        subset does not move a bounding box, so ``rgb_width`` is not produced.
+
+        See :doc:`/notebooks/h2_measure_channel_groups` for a worked example.
+
+        .. versionadded:: 1.1
+    normalize_pixel_values : bool, default False
+        If True, :attr:`~dataeval.flags.ImageStats.PIXEL` statistics are computed on
+        values normalized to [0, 1] against each image's range rather than on the raw
+        values. This makes a *distribution* comparable across images stored at different
+        bit depths — an 8-bit and a 16-bit copy of one picture otherwise report means
+        differing by a factor of 257.
+
+        Affects the pixel family only, and within it only `PIXEL_MEAN`, `PIXEL_STD` and
+        `PIXEL_VAR`; the rest are already scale-free.
+        :attr:`~dataeval.flags.ImageStats.VISUAL` statistics ignore it entirely — they
+        always report against the display range, so they are comparable across encodings
+        either way. Prefer `VISUAL_BRIGHTNESS` over a normalized `PIXEL_MEAN` when the
+        question is how an image looks rather than how its values are distributed.
+
+        .. deprecated:: 1.0
             The default changed to False in v1.1. Pass explicitly to silence
             the deprecation warning. This warning will be removed in v1.2.
+    value_range : tuple[float, float] or None, default None
+        The interval every image's values should be measured against, as ``(low, high)``.
+
+        Leave as None for ordinary imagery. An integer image's range is *decoded* from
+        its encoding, and the two conventional float spellings of an image — normalized
+        to ``[0, 1]``, or 8-bit values held in a float array — are recognized, so
+        ``uint8``, ``uint16`` and ``ToTensor``-style data all need nothing here.
+
+        Declare it for data whose dynamic range is a property of the sensor rather than
+        of a file format: elevation below sea level, mean-centred reflectance,
+        temperature in Celsius, a 16-bit band holding physical units. Such data carries
+        no encoding to decode, so :attr:`~dataeval.flags.ImageStats.DIMENSION_DEPTH`
+        reports NaN for it, as does any statistic that needs an interval —
+        :attr:`~dataeval.flags.ImageStats.PIXEL_HISTOGRAM`,
+        :attr:`~dataeval.flags.ImageStats.PIXEL_ENTROPY`, and under
+        `normalize_pixel_values` the rest of the pixel family — rather than deriving one
+        from an arbitrary maximum. A warning names this argument when it happens.
+
+        A statistic that does not need an interval is unaffected: an unnormalized mean of
+        physical values is a perfectly good mean.
+
+        A declaration applies to every image in `data` and implies no bit depth.
+
+        .. versionadded:: 1.1
     progress_callback : ProgressCallback or None, default None
         Callback to report progress during calculation. Called after each image is processed
         with the current image count and total number of images (if known).
@@ -555,9 +938,32 @@ def compute_stats(  # noqa: C901
         runtime and discarded afterwards. They are no longer returned in the final output
         by default unless they are explicitly requested.
 
-    .. versionchanged:: 1.2
+    .. versionchanged:: 1.1
         Bit depth is now inferred from the whole image rather than from each region
         separately, so every row of one image is scaled and binned against one range.
+
+    .. versionchanged:: 1.1
+        ``VISUAL`` statistics are now always read against the 0–255 display range, so the
+        same picture stored as 8-bit, 16-bit or float reports one brightness rather than
+        three. They no longer consult `normalize_pixel_values`, which now scopes to
+        ``PIXEL`` alone. 8-bit input is unaffected; ``VISUAL`` values from a previous
+        ``normalize_pixel_values=True`` run are scaled up by 255 uniformly, which moves no
+        threshold that is computed from the data.
+
+    .. versionchanged:: 1.1
+        ``VISUAL_SHARPNESS`` previously read raw pixel values, so it alone was comparable
+        across encodings under no setting. It now reads the same display range as the rest
+        of its family.
+
+    .. versionchanged:: 1.1
+        A bit depth is no longer implied for float data spanning more than [0, 255], nor
+        for data holding negative values — neither carries an encoding to decode.
+        ``DIMENSION_DEPTH`` reports NaN for such data, as do ``PIXEL_HISTOGRAM``,
+        ``PIXEL_ENTROPY`` and — under `normalize_pixel_values` — the rest of the pixel
+        family, with a warning naming `value_range`.
+        Previously a depth was derived from the observed maximum, and data holding
+        negative values was binned over [0, 1] regardless of where its values lay.
+        ``uint8``, ``uint16``, ``[0, 1]`` float and float-boxed 8-bit data are unaffected.
         This changes two per-target results where a box's own extremes fell in a
         different bit-depth bucket than its image's:
 
@@ -571,12 +977,24 @@ def compute_stats(  # noqa: C901
         Values were not comparable across regions before, which is what a per-target
         statistic exists to be. Whole-image results are unchanged.
 
-    .. versionchanged:: 1.2
-        ``entropy`` and ``histogram`` return NaN for a region that is entirely NaN — an
-        out-of-bounds box, or an image its boxes cover completely — where they previously
-        returned ``0.0`` and 256 zero bins. Every other statistic already answered NaN
-        for such a region; ``0.0`` entropy is indistinguishable from a genuinely flat
-        image and was reported as an outlier rather than skipped.
+    .. versionchanged:: 1.1
+        Every statistic over a region that was never measured — an out-of-bounds box, an
+        image its boxes cover completely, or a band group the datum cannot supply — now
+        answers absence rather than a number that reads like an observation:
+
+        - ``entropy`` and ``histogram`` return NaN, where they returned ``0.0`` and 256
+          zero bins. ``0.0`` entropy is indistinguishable from a genuinely flat image and
+          was reported as an outlier rather than skipped.
+        - ``zeros`` returns NaN, where it returned ``0.0``. Its denominator counts pixels
+          rather than measurements, so an absent region read as "none of these values are
+          zero" — a claim about values there were none of.
+        - the hashes return ``""``, where they digested whatever the grayscale conversion
+          substituted for NaN. That digest is the same every time, which made every
+          unmeasured region a duplicate of every other.
+
+        ``missing`` is the deliberate exception and still answers ``1.0``: it measures the
+        presence of data rather than the data, so it is the one statistic that has an
+        answer when nothing was measured.
 
     Examples
     --------
@@ -592,7 +1010,10 @@ def compute_stats(  # noqa: C901
     Use convenience groups:
 
     >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
-    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL_BASIC, per_channel=True)
+
+    Measure named groups of bands as their own columns:
+
+    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL_BASIC, channels={"rgb": [0, 1, 2]})
 
     Compute statistics only for bounding boxes (not full images):
 
@@ -602,7 +1023,8 @@ def compute_stats(  # noqa: C901
 
     >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=False)
 
-    Compute statistics for both full images and boxes with per-channel breakdown:
+    Compute statistics for both full images and boxes with per-channel breakdown
+    (``per_channel`` is deprecated — prefer ``channels`` above):
 
     >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=True, per_channel=True)
 
@@ -625,6 +1047,29 @@ def compute_stats(  # noqa: C901
         )
         normalize_pixel_values = False
 
+    # Checked here rather than in a worker: a malformed declaration is a mistake in the
+    # call, and surfacing it out of a pool process names the wrong frame.
+    if value_range is not None:
+        _validate_declared_range(value_range)
+
+    # `channels=True` keeps the shape that can express all-bands-separately rather than
+    # being rebuilt as columns. Column names discovered per datum cannot be reconciled
+    # across ragged data — the aggregation appends by name, so a name absent from one
+    # datum shortens its array and misaligns it — whereas the row path is correct by
+    # construction for a mix of 1- and 3-channel images.
+    if channels is True:
+        channels = None
+        per_channel = True
+    if per_channel:
+        warnings.warn(
+            "Per-channel rows are deprecated since v1.1 and will be removed in v1.2: they cannot reach "
+            "Metadata, so balance, diversity and parity cannot see them. Name the bands instead — for "
+            "RGB, channels={'r': 0, 'g': 1, 'b': 2} — which returns columns that work everywhere the "
+            "rows did not.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
     object_count: dict[int, int] = {}
@@ -639,11 +1084,14 @@ def compute_stats(  # noqa: C901
         if len(datum) == 3:
             is_object_detection_dataset = isinstance(datum[1], ObjectDetectionTarget)
 
-    # `per_target` and `per_background` are True only if boxes are provided or data is
-    # an ObjectDetectionDataset — both are defined by the boxes.
+    # Per-box rows only exist where there are boxes to make them from, so `per_target`
+    # still degrades. `per_background` does not: an image with nothing annotated has a
+    # perfectly well-defined background — all of it — and that is already the answer an
+    # unannotated image inside an object-detection dataset gets. Degrading it at the
+    # dataset level made the *column set* a function of the data rather than of the
+    # arguments, so two datasets run with identical arguments could not be combined.
     has_boxes = is_object_detection_dataset or boxes is not None
     per_target = per_target and has_boxes
-    per_background = per_background and has_boxes
 
     # Validate parameters
     if not per_image and not per_target and not per_background:
@@ -656,7 +1104,7 @@ def compute_stats(  # noqa: C901
     # the rest stay available to the image and its boxes, where they still mean something.
     background_calculators: list[tuple[type[Any], Flag]] = []
     if per_background:
-        background_calculators = _maskable_calculators(calculators)
+        background_calculators = _calculators_for_view(calculators, ViewKind.MASK)
         if not background_calculators:
             warnings.warn(
                 f"per_background=True but none of the requested statistics apply to a background region, "
@@ -667,10 +1115,62 @@ def compute_stats(  # noqa: C901
                 stacklevel=2,
             )
 
+    channel_groups = _resolve_channel_groups(channels or {}, calculators)
+    if channel_groups and per_channel:
+        # Rejected rather than reconciled: a per-channel row layout is indexed by the
+        # datum's own channel count, and a group narrower than that produces a row per
+        # band it names, which the reconciliation cannot place. Caught here because
+        # otherwise it surfaces out of a worker as an unexplained value-count mismatch.
+        raise ValueError(
+            "channels= and per_channel=True cannot be combined: one returns band groups as columns, "
+            "the other returns every channel as its own row, and a group narrower than the datum has "
+            "no row to land on. Use channels= alone — it is what per_channel is deprecated in favor of."
+        )
+    band_calculators = _calculators_for_view(calculators, ViewKind.BAND) if channel_groups else []
+    background_band_calculators = _calculators_for_view(background_calculators, ViewKind.BAND) if channel_groups else []
+    if channel_groups and not band_calculators:
+        warnings.warn(
+            f"channels={{{', '.join(repr(name) for name in channel_groups)}}} was given but none of the "
+            f"requested statistics vary with a band subset, so no band columns will be returned. Geometry "
+            f"does not narrow when channels are dropped; request ImageStats.PIXEL, VISUAL or HASH for it.",
+            UserWarning,
+            stacklevel=2,
+        )
+        # Dropped once it is known no column can come of them, so the workers do not slice
+        # every group off every datum and scan each slice for a range nothing will read.
+        channel_groups = {}
+
+    # Said once per datum that trips it, aggregated with the rest. Only the unnamed view
+    # is at risk: a caller who named their bands has already answered the question.
+    # Rendered here rather than in the worker: the answer is the same for every datum.
+    # Silent for `per_channel` too, not just for named groups: the row path already measures
+    # each band separately, so nothing was averaged into a single picture and the warning
+    # would describe the opposite of what happened — while pointing at `channels=`, which
+    # cannot be combined with it.
+    wide_band_names = (
+        "" if channel_groups or per_channel else _flag_names(stats & (ImageStats.VISUAL | ImageStats.HASH))
+    )
+
+    # Statistics that need an interval, and so go NaN when none can be established. The
+    # histogram and its entropy always do; so does the whole visual family, which resolves
+    # the display range, and `depth`, which reports the encoding it decoded. The remaining
+    # pixel statistics only when they are being normalized against it.
+    # A declared range is always known, so nothing can go unmeasurable for want of one.
+    unmeasurable_flags = ImageStats(0)
+    if value_range is None:
+        unmeasurable_flags = stats & (
+            ImageStats.PIXEL_HISTOGRAM | ImageStats.PIXEL_ENTROPY | ImageStats.VISUAL | ImageStats.DIMENSION_DEPTH
+        )
+        if normalize_pixel_values:
+            unmeasurable_flags |= stats & ImageStats.PIXEL
+        # `missing` is the exception in both halves: it measures the *presence* of data
+        # rather than the data, reads off the raw view, and so still answers when nothing
+        # could be measured. Naming it here would promise a NaN column that never arrives.
+        unmeasurable_flags &= ~ImageStats.PIXEL_MISSING
+    unmeasurable_names = _flag_names(unmeasurable_flags)
+
     # Log the individual flags that will be computed
-    resolved_names = [
-        f.name for f in type(stats) if f in stats and f.name and f.value and (f.value & (f.value - 1)) == 0
-    ]
+    resolved_names = _flag_list(stats)
     _logger.info(
         "Starting compute_stats: %d stats [%s], per_image=%s, per_target=%s, per_background=%s, per_channel=%s",
         len(resolved_names),
@@ -684,8 +1184,11 @@ def compute_stats(  # noqa: C901
     total_images = len(data) if isinstance(data, Sized) else None
 
     # Boxes have to be read off the dataset whenever anything is defined by them — the
-    # per-box rows, the background mask, or both.
-    needs_boxes = per_target or per_background
+    # per-box rows, the background mask, or both. Gated on their availability separately
+    # from whether they were asked for: `unzip_dataset` validates the dataset as
+    # object-detection shaped when asked for targets, so requesting a background over a
+    # plain image dataset must not send it looking for boxes that cannot be there.
+    needs_boxes = (per_target or per_background) and has_boxes
     images, boxes = (
         (data, boxes)
         if not isinstance(data, Dataset)
@@ -702,13 +1205,21 @@ def compute_stats(  # noqa: C901
         for result in p.imap_unordered(
             partial(
                 _compute_batch,
-                calculators=calculators,
-                per_image=per_image,
-                per_target=per_target,
-                per_channel=per_channel,
-                normalize_pixel_values=normalize_pixel_values,
-                per_background=per_background,
-                background_calculators=background_calculators,
+                plan=BatchPlan(
+                    calculators=calculators,
+                    per_image=per_image,
+                    per_target=per_target,
+                    per_channel=per_channel,
+                    normalize_pixel_values=normalize_pixel_values,
+                    per_background=per_background,
+                    background_calculators=background_calculators,
+                    declared_range=value_range,
+                    channel_groups=channel_groups,
+                    band_calculators=band_calculators,
+                    background_band_calculators=background_band_calculators,
+                    wide_band_names=wide_band_names,
+                    unmeasurable_names=unmeasurable_names,
+                ),
             ),
             _enumerate_datum(images, boxes),
         ):
@@ -745,6 +1256,59 @@ def compute_stats(  # noqa: C901
         invalid_box_count=[invalid_box_count.get(i, 0) for i in range(image_count)],
         image_count=image_count,
         stats=sorted_aggregated_stats,
+    )
+
+
+def require_same_stat_names(
+    left: Iterable[str],
+    right: Iterable[str],
+    *,
+    left_label: str,
+    right_label: str,
+    summary: str,
+    remedy: str,
+) -> None:
+    """Refuse to pair two results that do not describe the same statistics.
+
+    Silently keeping the intersection was harmless while the requested flags fixed the name
+    set, since two results could only disagree if the caller had asked for different flags.
+    Naming band groups makes the name set a call-site argument: two runs given different
+    ``channels=`` mappings differ in exactly the columns the caller cared enough to name,
+    and dropping them leaves a result that looks complete.
+
+    Shared by every place that pairs two stat maps, so the rule and the shape of the report
+    stay together. Callers filter the names first where their own pairing tolerates a
+    difference — `compute_ratios` drops the background columns, which legitimately exist on
+    the image side alone.
+    """
+    only_left = sorted(set(left) - set(right))
+    only_right = sorted(set(right) - set(left))
+    if not only_left and not only_right:
+        return
+    detail = ", ".join(
+        part
+        for part in (
+            f"only in {left_label}: {only_left}" if only_left else "",
+            f"only in {right_label}: {only_right}" if only_right else "",
+        )
+        if part
+    )
+    raise ValueError(f"{summary} ({detail}). {remedy}")
+
+
+def _reject_stat_name_mismatch(combined: StatsMap, stats: StatsMap, position: int) -> None:
+    """Refuse to combine results computed over different statistics."""
+    require_same_stat_names(
+        combined,
+        stats,
+        left_label="the results so far",
+        right_label=f"result {position}",
+        summary="Cannot combine results computed over different statistics",
+        remedy=(
+            "Every result must be computed with the same 'stats' flags and the same "
+            "'channels' mapping; otherwise the combined arrays would describe different "
+            "things under one name."
+        ),
     )
 
 
@@ -792,12 +1356,23 @@ def combine_stats_results(  # noqa: C901
     dataset_steps: list[int] = []
     offset = 0
 
-    for r in results:
+    for position, r in enumerate(results):
         stats = r["stats"]
-        if not combined_stats:
-            combined_stats = stats
+        if not stats:
+            # A result with no rows carries no columns, so there is nothing to concatenate
+            # and nothing to disagree about. An empty split — a filter or a selection that
+            # matched nothing — must not read as "computed with different flags", which is
+            # what comparing its empty name set against a populated one would say.
+            #
+            # Skipped only for the statistics; it still contributes a `dataset_steps`
+            # boundary below, so the boundaries stay one-per-result and a later dataset's
+            # index is not silently attributed to this one.
+            pass
+        elif not combined_stats:
+            combined_stats = dict(stats)
         else:
-            combined_stats = {k: np.concatenate([combined_stats[k], stats[k]]) for k in combined_stats if k in stats}
+            _reject_stat_name_mismatch(combined_stats, stats, position)
+            combined_stats = {k: np.concatenate([combined_stats[k], stats[k]]) for k in combined_stats}
 
         combined_source_index.extend(
             SourceIndex(item=s.item + offset, target=s.target, channel=s.channel) for s in r["source_index"]

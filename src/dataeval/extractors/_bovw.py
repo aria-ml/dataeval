@@ -14,7 +14,7 @@ from dataeval.config import get_max_processes, get_seed
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array
 from dataeval.utils._internal import PoolWrapper, as_numpy, unwrap_image
-from dataeval.utils.preprocessing import rescale, to_canonical_grayscale
+from dataeval.utils.preprocessing import ValueRange, rescale, to_canonical_grayscale
 
 
 def _extract_single(args: tuple[int, Any]) -> tuple[int, NDArray[np.float32]]:
@@ -24,7 +24,10 @@ def _extract_single(args: tuple[int, Any]) -> tuple[int, NDArray[np.float32]]:
     idx, img = args
     img = as_numpy(unwrap_image(img))
     if img.dtype != np.uint8:
-        img = rescale(img, depth=8)
+        # Each image against its own extremes, deliberately: SIFT reads contrast rather
+        # than absolute level, so a per-image stretch is what the descriptor wants — and
+        # it is the one case where an unknown range is not a reason to stop.
+        img = rescale(img, depth=8, value_range=ValueRange.observed(img))
     gray = to_canonical_grayscale(img)
     sift = cv2.SIFT.create()
     _, des = sift.detectAndCompute(gray, None)

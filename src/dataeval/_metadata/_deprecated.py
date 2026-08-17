@@ -65,7 +65,7 @@ class DeprecatedMetadataAPI:
     def target_factors_only(self) -> bool:
         """Whether factors above the target level are dropped, on multi-target tasks.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             Two knobs in one, and neither of them this. Use ``md.at(level)`` to choose
             which rows are read, and :attr:`~dataeval.Metadata.inherited` to choose whether
             ancestor factors count. Removed in v1.2.0.
@@ -104,7 +104,7 @@ class DeprecatedMetadataAPI:
     def raw_data(self) -> NDArray[Any]:
         """Raw factor values before binning or digitization.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             This is ``rows_at(md.view).select(factor_names).to_numpy()``, and going
             through the dataframe keeps the per-factor dtypes that this array flattens
             to ``object`` the moment factors of different types are mixed. Use
@@ -135,7 +135,7 @@ class DeprecatedMetadataAPI:
     def image_data(self) -> pl.DataFrame:
         """Dataframe containing only image-level rows.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             The name only tells the truth when a dataset item is an image, so it is
             defined for image-based tasks alone and raises for every other task. Use
             ``rows_at(md.item_level)``. Removed in v1.2.0.
@@ -201,7 +201,7 @@ class DeprecatedMetadataAPI:
     def target_data(self) -> pl.DataFrame:
         """Dataframe containing only label-level rows.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             One spelling per level does not scale, and this one names a level that no
             longer exists. Use ``rows_at(md.label_level)`` for the rows the labels are
             on, or ``rows_at(md.view)`` for the rows the array accessors project.
@@ -244,7 +244,7 @@ class DeprecatedMetadataAPI:
     def get_image_factors(self, image_idx: int) -> dict[str, Any]:
         """Get all factors for a specific image.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             A single row lookup is one dataframe filter, and phrasing it as a method
             per level does not scale past the two levels that happen to exist today.
             Use ``rows_at("unit").filter(pl.col("item_index") == image_idx)``.
@@ -286,7 +286,7 @@ class DeprecatedMetadataAPI:
     def get_target_factors(self, image_idx: int, target_idx: int) -> dict[str, Any]:
         """Get all factors for a specific target within an item.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             A single row lookup is one dataframe filter, and phrasing it as a method
             per level does not scale past the two levels that happen to exist today.
             Use ``target_data.filter(...)``. Removed in v1.2.0.
@@ -331,7 +331,7 @@ class DeprecatedMetadataAPI:
     def has_targets(self) -> bool:
         """Check if the source dataset has targets.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             Renamed for what it actually reports. Use
             :attr:`~dataeval.Metadata.multi_target`. Removed in v1.2.0.
 
@@ -364,7 +364,7 @@ class DeprecatedMetadataAPI:
     ) -> NDArray[np.float64]:
         """Filter metadata factors by factor type.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             One predicate over :meth:`~dataeval.Metadata.filter_by_factor` is the whole of
             this method, and keeping a named wrapper per :class:`FactorInfo` field does not
             scale as the class grows fields. Use

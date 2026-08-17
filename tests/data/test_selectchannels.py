@@ -206,3 +206,30 @@ class TestSelectChannelsInvalidates:
     def test_override_reaches_the_invalidation_walk(self):
         view = View(_images(), [SelectChannels("gray", invalidates=ImageStats.HASH_PHASH)])
         assert invalidated_stats(view) is ImageStats.HASH_PHASH
+
+
+@pytest.mark.required
+class TestSharedIndexValidation:
+    """SelectChannels and ChannelGroup share what an index is, not what a selection may be."""
+
+    def test_selection_may_repeat_and_reorder(self):
+        """A view transform duplicates and reorders bands deliberately."""
+        assert SelectChannels([0, 0, 1]).channels == [0, 0, 1]
+        assert SelectChannels([2, 1, 0]).channels == [2, 1, 0]
+
+    def test_group_may_not_repeat(self):
+        """A group is reduced over jointly, so a repeat would double-weight a band."""
+        from dataeval.utils.preprocessing import ChannelGroup
+
+        with pytest.raises(ValueError, match="must not repeat"):
+            ChannelGroup([0, 0, 1])
+
+    def test_both_reject_the_same_non_indices(self):
+        """The shared half: bools are a mask to numpy, and negatives name nothing."""
+        from dataeval.utils.preprocessing import ChannelGroup
+
+        for bad in ([True, False, True], [-1], []):
+            with pytest.raises(ValueError, match="non-negative ints"):
+                SelectChannels(bad)
+            with pytest.raises(ValueError, match="non-negative ints"):
+                ChannelGroup(bad)

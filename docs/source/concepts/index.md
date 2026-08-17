@@ -6,6 +6,7 @@ They are organized by the major themes in DataEval rather than individual tools.
 Each page may cover several evaluators that work together to answer questions about your data.
 
 - [Data Integrity](DataIntegrity.md)
+- [Image Statistics](ImageStatistics.md)
 - [Ontology](Ontology.md)
 - [Metadata Levels](MetadataLevels.md)
 - [Binning](Binning.md)
@@ -23,6 +24,7 @@ Each page may cover several evaluators that work together to answer questions ab
 :hidden:
 
 DataIntegrity
+ImageStatistics
 Ontology
 MetadataLevels
 Binning

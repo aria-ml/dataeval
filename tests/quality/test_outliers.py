@@ -94,18 +94,32 @@ class TestOutliers:
         # For object detection with per_target=True, we should have some target_ids
         # (either None for image-level or int for target-level)
 
-    def test_outliers_with_multiple_stats(self):
+    def test_outliers_with_multiple_datasets(self):
         dataset1 = np.zeros((50, 3, 16, 16))
         dataset2 = np.zeros((50, 3, 16, 16))
         dataset2[0] = 1
         stats1 = compute_stats(dataset1, stats=ImageStats.PIXEL)
         stats2 = compute_stats(dataset2, stats=ImageStats.PIXEL)
-        stats3 = compute_stats(dataset1, stats=ImageStats.DIMENSION)
         outliers = Outliers()
-        results = outliers.from_stats((stats1, stats2, stats3))
+        results = outliers.from_stats((stats1, stats2))
         assert results is not None
         assert isinstance(results.data(), pl.DataFrame)
         assert "dataset_index" in results.data().columns
+
+    def test_outliers_refuses_results_describing_different_statistics(self):
+        """Combining stacks datasets; it cannot merge statistic families.
+
+        Results computed over different flags share no column set, so concatenating them
+        would describe different things under one name. Previously the mismatched names
+        were silently dropped, which for PIXEL against DIMENSION left *nothing* — an
+        outlier search over zero statistics, reported as a normal empty result.
+        """
+        dataset = np.zeros((50, 3, 16, 16))
+        pixel = compute_stats(dataset, stats=ImageStats.PIXEL)
+        dimension = compute_stats(dataset, stats=ImageStats.DIMENSION)
+
+        with pytest.raises(ValueError, match="different statistics"):
+            Outliers().from_stats((pixel, dimension))
 
     def test_outliers_with_invalid_stats_type(self):
         outliers = Outliers()
@@ -888,6 +902,72 @@ class TestOutliersEdgeCases:
         result = outliers.evaluate(dataset)
         assert result is not None
         assert isinstance(result.data(), pl.DataFrame)
+
+
+@pytest.mark.required
+class TestOutliersNaNColumns:
+    """A NaN is never an outlier — it records a measurement that was not made.
+
+    Named band groups make NaN-heavy columns ordinary rather than pathological: a group
+    no datum can satisfy is measured over an all-NaN slice, so the column exists and is
+    entirely NaN. Pins the three cases documented on ``_detect_outliers``.
+    """
+
+    def test_all_nan_column_yields_no_outliers(self):
+        """An absent measurement is not an anomaly, so nothing is flagged."""
+        detector = Outliers(outlier_threshold=ZScoreThreshold(1.0))
+        mock_stats = {
+            "stats": {"nir_mean": np.full(6, np.nan)},
+            "source_index": [SourceIndex(i, None, None) for i in range(6)],
+        }
+
+        output = detector.from_stats(mock_stats)  # type: ignore
+
+        assert len(output) == 0
+
+    def test_partly_nan_column_thresholds_over_survivors(self):
+        """The values that exist set the bounds; the NaN entries are simply not compared."""
+        detector = Outliers(outlier_threshold=IQRThreshold(1.5))
+        values = np.array([10.0, 10.1, 9.9, 10.2, 9.8, 10.05, np.nan, np.nan, 1000.0])
+        mock_stats = {
+            "stats": {"nir_mean": values},
+            "source_index": [SourceIndex(i, None, None) for i in range(len(values))],
+        }
+
+        output = detector.from_stats(mock_stats)  # type: ignore
+        flagged = output.data()["item_index"].to_list()
+
+        # The real outlier is found, and neither NaN row is reported.
+        assert flagged == [8]
+
+    def test_too_few_real_values_yields_no_outliers(self):
+        """One or two survivors cannot describe a distribution, so nothing is flagged."""
+        detector = Outliers(outlier_threshold=ModifiedZScoreThreshold(1.0))
+        for real in ([5.0], [5.0, 500.0]):
+            values = np.array(real + [np.nan] * (8 - len(real)))
+            mock_stats = {
+                "stats": {"nir_mean": values},
+                "source_index": [SourceIndex(i, None, None) for i in range(len(values))],
+            }
+
+            output = detector.from_stats(mock_stats)  # type: ignore
+
+            assert len(output) == 0, f"{real} should not produce an outlier"
+
+    def test_unsatisfiable_band_group_yields_no_outliers(self):
+        """End to end: a band group no datum can satisfy contributes no flags."""
+        images = [np.random.default_rng(i).random((3, 32, 32)) for i in range(6)]
+        stats = compute_stats(
+            images,
+            stats=ImageStats.PIXEL,
+            normalize_pixel_values=False,
+            channels={"nir": 3},  # 3-channel data has no band 3
+        )
+
+        assert np.isnan(stats["stats"]["nir_mean"]).all()
+
+        output = Outliers(outlier_threshold=ZScoreThreshold(1.0)).from_stats(stats)
+        assert all(name != "nir_mean" for name in output.data()["metric_name"].to_list())
 
 
 @pytest.mark.required

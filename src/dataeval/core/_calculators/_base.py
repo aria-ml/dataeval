@@ -2,10 +2,69 @@ __all__ = []
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from enum import Flag
-from typing import Any, Generic, TypeVar
+from enum import Flag, auto
+from typing import Any, Generic, NamedTuple, TypeVar
 
 TFlag = TypeVar("TFlag", bound=Flag)
+
+
+class ViewKind(Flag):
+    """Which view of a datum a statistic is defined over.
+
+    A datum is measured more than once per row. The whole thing, the scene behind its
+    annotations, a named group of its bands — each is a *view*, and not every statistic
+    means something over every one. A width does not change when bands are dropped; a
+    hash is not stable when pixels are masked to NaN. Declaring which views a statistic
+    answers for is what keeps ``rgb_width`` and ``background_xxhash`` from being emitted.
+
+    Attributes
+    ----------
+    WHOLE : ViewKind
+        The datum as given — the default pass, over the full image or one of its boxes.
+        Every statistic answers here.
+    MASK : ViewKind
+        A region with part of it masked out to NaN, which is how ``per_background``
+        measures the scene behind the annotations. Only NaN-aware reductions survive it.
+    BAND : ViewKind
+        A named subset of the channel axis. Statistics that reduce over pixel values
+        answer differently per band and so belong here; pure geometry restates the
+        unprefixed value under a new name and does not.
+    """
+
+    WHOLE = auto()
+    MASK = auto()
+    BAND = auto()
+
+
+#: Every view, for a statistic that is a NaN-aware reduction over the values themselves —
+#: a masked region is simply not counted and a band subset is a different set to reduce.
+ALL_VIEWS = ViewKind.WHOLE | ViewKind.MASK | ViewKind.BAND
+
+
+class Handler(NamedTuple):
+    """One statistic: its output name, how to compute it, and the views it is defined over.
+
+    The views are declared here, beside the callable, rather than as a property of the
+    calculator. A calculator is not the right granularity for the question — a dimension
+    calculator emits both band-invariant geometry and a band-*variant* bit depth, and a
+    single answer for the pair produces either a meaningless ``rgb_width`` or a whole-cube
+    depth contradicting the group it sits beside.
+
+    Attributes
+    ----------
+    name : str
+        The statistic's name in the output, before any view prefix is applied.
+    compute : Callable[[], list[Any]]
+        Computes the statistic, returning one value per row the calculator emits.
+    views : ViewKind, default ViewKind.WHOLE
+        Views this statistic is defined over, combined with ``|``. ``WHOLE`` alone —
+        the default — means it describes the datum as given and is not recomputed for
+        any masked region or band group.
+    """
+
+    name: str
+    compute: Callable[[], list[Any]]
+    views: ViewKind = ViewKind.WHOLE
 
 
 class Calculator(ABC, Generic[TFlag]):
@@ -43,45 +102,61 @@ class Calculator(ABC, Generic[TFlag]):
             Typically a group flag like ImageStats.PIXEL or TextStats.SENTIMENT.
         """
 
-    def supports_exclusion(self) -> bool:
+    @classmethod
+    def flags_for_view(cls, flags: TFlag, view: ViewKind) -> TFlag:
         """
-        Whether this calculator's statistics survive part of the region being masked out.
+        Narrow `flags` to those this calculator's statistics are defined over for `view`.
 
-        A masked region reaches a calculator as NaN pixels, so only statistics computed
-        by NaN-aware reductions mean anything over one. Two kinds do not, and say so by
-        returning False:
+        Asked once per view before any datum is read, so that a view runs only the
+        statistics that mean something over it. An empty result means the calculator has
+        nothing to say about this view and can be skipped entirely.
 
-        - those that digest the pixel buffer itself, such as hashes, which are not stable
-          under NaN and which resize routines turn into noise;
-        - those that describe the region's geometry rather than its contents, which the
-          mask does not change and which would restate the unmasked values under a new
-          name.
-
-        Consulted by :func:`~dataeval.core.compute_stats` when ``per_background=True``,
-        which is the only caller that masks. Declared here rather than as a list of flags
-        elsewhere so that a new calculator answers for itself.
+        Parameters
+        ----------
+        flags : Flag
+            The requested flags, already narrowed to this calculator by the registry.
+        view : ViewKind
+            The view about to be measured.
 
         Returns
         -------
-        bool
-            True if this calculator may be run over a partially masked region.
-            Defaults to False — a new calculator opts in once it has been checked.
+        Flag
+            The subset of `flags` defined over `view`; falsy if there is none.
         """
-        return False
+        kept = type(flags)(0)
+        for flag, handler in cls._handlers_for(flags).items():
+            if view in handler.views:
+                kept |= flag
+        return kept
+
+    @classmethod
+    def _handlers_for(cls, flags: TFlag) -> dict[TFlag, Handler]:
+        """Return the handlers `flags` selects, without constructing the calculator.
+
+        ``__new__`` rather than a real instance: the answer is a property of the class and
+        the constructor wants a datum. Kept here so that the trick — and the assumption it
+        rests on, that ``get_handlers`` reads no instance state — lives beside the class it
+        is a fact about, rather than being reproduced by every module that wants to ask.
+        """
+        blank = cls.__new__(cls)
+        return {flag: handler for flag, handler in blank.get_handlers().items() if flag in flags}
+
+    @classmethod
+    def stat_names(cls, flags: TFlag) -> set[str]:
+        """Return the statistic names `flags` would produce from this calculator."""
+        return {handler.name for handler in cls._handlers_for(flags).values()}
 
     @abstractmethod
-    def get_handlers(self) -> dict[TFlag, tuple[str, Callable[[], list[Any]]]]:
+    def get_handlers(self) -> dict[TFlag, Handler]:
         """
-        Return a mapping of flags to their corresponding stat names and handler functions.
-
-        Each handler function should compute and return the statistic as a list of values.
+        Return a mapping of flags to the statistic each one produces.
 
         Returns
         -------
-        dict[Flag, tuple[str, Callable[[], list[Any]]]]
-            A dictionary mapping each flag this calculator can handle to a tuple:
-            - stat name (str): The name of the statistic (e.g., "mean", "std").
-            - handler (Callable): A function that computes and returns the statistic as a list.
+        dict[Flag, Handler]
+            A dictionary mapping each flag this calculator can handle to a
+            :class:`Handler` carrying the statistic's output name, the callable that
+            computes it, and the views it is defined over.
         """
 
     def get_empty_values(self) -> dict[str, Any]:
@@ -109,7 +184,7 @@ class Calculator(ABC, Generic[TFlag]):
         """
         return {}
 
-    def compute(self, flags: TFlag) -> dict[str, list[Any]]:
+    def compute(self, flags: TFlag, view: ViewKind = ViewKind.WHOLE) -> dict[str, list[Any]]:
         """
         Compute statistics for the requested flags.
 
@@ -118,6 +193,9 @@ class Calculator(ABC, Generic[TFlag]):
         flags : Flag
             The specific flags to compute. This will be a subset of the flags
             returned by get_applicable_flags(), representing what the user requested.
+        view : ViewKind, default ViewKind.WHOLE
+            Which view of the datum the cache is presenting. Statistics not defined over
+            it are skipped — see :class:`Handler`.
 
         Returns
         -------
@@ -130,10 +208,9 @@ class Calculator(ABC, Generic[TFlag]):
             The processor framework will reconcile outputs from multiple calculators.
         """
         stats: dict[str, list[Any]] = {}
-        handlers = self.get_handlers()
 
-        for flag, (stat_name, handler) in handlers.items():
-            if flag in flags:
-                stats[stat_name] = handler()
+        for flag, handler in self.get_handlers().items():
+            if flag in flags and view in handler.views:
+                stats[handler.name] = handler.compute()
 
         return stats
