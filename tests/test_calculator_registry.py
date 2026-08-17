@@ -1,9 +1,8 @@
 """Tests for CalculatorRegistry."""
 
 from enum import Flag, auto
-from typing import Any
 
-from dataeval.core._calculators._base import Calculator
+from dataeval.core._calculators._base import Calculator, Handler
 from dataeval.core._calculators._registry import CalculatorRegistry
 
 
@@ -32,8 +31,8 @@ class MockCalculatorA1(Calculator[MockFlagA]):
     def get_applicable_flags(self) -> MockFlagA:
         return MockFlagA.FLAG_1
 
-    def get_handlers(self) -> dict[MockFlagA, tuple[str, Any]]:
-        return {MockFlagA.FLAG_1: ("stat1", lambda: [1.0])}
+    def get_handlers(self) -> dict[MockFlagA, Handler]:
+        return {MockFlagA.FLAG_1: Handler("stat1", lambda: [1.0])}
 
 
 class MockCalculatorA2(Calculator[MockFlagA]):
@@ -42,10 +41,10 @@ class MockCalculatorA2(Calculator[MockFlagA]):
     def get_applicable_flags(self) -> MockFlagA:
         return MockFlagA.FLAG_2 | MockFlagA.FLAG_3
 
-    def get_handlers(self) -> dict[MockFlagA, tuple[str, Any]]:
+    def get_handlers(self) -> dict[MockFlagA, Handler]:
         return {
-            MockFlagA.FLAG_2: ("stat2", lambda: [2.0]),
-            MockFlagA.FLAG_3: ("stat3", lambda: [3.0]),
+            MockFlagA.FLAG_2: Handler("stat2", lambda: [2.0]),
+            MockFlagA.FLAG_3: Handler("stat3", lambda: [3.0]),
         }
 
 
@@ -55,20 +54,26 @@ class MockCalculatorB(Calculator[MockFlagB]):
     def get_applicable_flags(self) -> MockFlagB:
         return MockFlagB.FLAG_X
 
-    def get_handlers(self) -> dict[MockFlagB, tuple[str, Any]]:
-        return {MockFlagB.FLAG_X: ("statX", lambda: ["x"])}
+    def get_handlers(self) -> dict[MockFlagB, Handler]:
+        return {MockFlagB.FLAG_X: Handler("statX", lambda: ["x"])}
 
 
 class TestCalculatorRegistry:
     """Tests for CalculatorRegistry class."""
 
     def setup_method(self):
-        """Clear registry before each test."""
+        """Give each test an empty registry, remembering the real one."""
+        # The registry is process-global and holds every real calculator, registered at
+        # import. Clearing without restoring leaves it empty for whatever runs next in the
+        # same process, so `compute_stats` silently returns no statistics at all — masked
+        # only by this file sorting after `tests/core/` in pytest's default order.
+        self._registry = {flag_type: list(entries) for flag_type, entries in CalculatorRegistry._registry.items()}
         CalculatorRegistry.clear()
 
     def teardown_method(self):
-        """Clear registry after each test."""
+        """Put the real registry back."""
         CalculatorRegistry.clear()
+        CalculatorRegistry._registry.update(self._registry)
 
     def test_register_single_calculator(self):
         """Test registering a single calculator."""
@@ -196,7 +201,7 @@ class TestCalculatorRegistry:
             def get_applicable_flags(self) -> MockFlagA:
                 return MockFlagA.FLAG_1
 
-            def get_handlers(self) -> dict[MockFlagA, tuple[str, Any]]:
+            def get_handlers(self) -> dict[MockFlagA, Handler]:
                 return {}
 
         calculators = CalculatorRegistry.get_all_calculators(MockFlagA)

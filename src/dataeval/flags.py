@@ -13,9 +13,17 @@ class ImageStats(Flag):
     during image processing. Flags can be combined using bitwise OR (|) to
     select multiple statistics.
 
+    Pixel statistics describe the *data* and visual statistics describe the *picture*.
+    A pixel statistic reduces the values as they were stored, in their own units. A visual
+    statistic reports where those values sit between black and white, so it always resolves
+    a full-scale reference and reads against the 0-255 display range — which makes one
+    picture answer identically whether it arrived as 8-bit, 16-bit or float, and makes the
+    answer NaN for data with no such reference, such as an elevation or temperature band.
+    See :doc:`/concepts/ImageStatistics`.
+
     Individual Stats
     ----------------
-    Pixel Statistics (computed on pixel values):
+    Pixel Statistics (reduced over the values as stored):
 
     - `PIXEL_MEAN` : Mean pixel value
     - `PIXEL_STD` : Standard deviation of pixel values
@@ -27,13 +35,14 @@ class ImageStats(Flag):
     - `PIXEL_ZEROS` : Fraction of zero pixels
     - `PIXEL_HISTOGRAM` : 256-bin histogram of pixel values
 
-    Visual Statistics (computed on visual properties):
+    Visual Statistics (read against the 0-255 display range; NaN without a reference):
 
-    - `VISUAL_BRIGHTNESS` : Brightness measure (depends on `VISUAL_PERCENTILES`)
-    - `VISUAL_CONTRAST` : Contrast measure (depends on `VISUAL_PERCENTILES`)
-    - `VISUAL_DARKNESS` : Darkness measure (depends on `VISUAL_PERCENTILES`)
-    - `VISUAL_SHARPNESS` : Sharpness measure using edge detection
-    - `VISUAL_PERCENTILES` : Percentiles (0, 25, 50, 75, 100)
+    - `VISUAL_BRIGHTNESS` : Lower-quartile display value (depends on `VISUAL_PERCENTILES`)
+    - `VISUAL_CONTRAST` : Spread of the quartiles relative to their mean, so already
+      scale-free (depends on `VISUAL_PERCENTILES`)
+    - `VISUAL_DARKNESS` : Upper-quartile display value (depends on `VISUAL_PERCENTILES`)
+    - `VISUAL_SHARPNESS` : Spread of edge magnitudes, via a 3x3 edge kernel
+    - `VISUAL_PERCENTILES` : Display-range percentiles (0, 25, 50, 75, 100)
 
     Dimension Statistics (computed on image/box dimensions):
 

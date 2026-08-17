@@ -36,7 +36,7 @@ class Select(View[_TDatum]):
         selections: Operation | Sequence[Operation] | None = None,
     ) -> None:
         warnings.warn(
-            "Select is deprecated and will be removed in a future release; use "
+            "Select is deprecated and will be removed in v1.2.0; use "
             "dataeval.data.View(dataset, operations=...) instead.",
             DeprecationWarning,
             stacklevel=2,
@@ -62,8 +62,8 @@ def __getattr__(name: str) -> Any:
         return getattr(dataeval.data, name)
     if name in ("Selector", "Selection"):
         warnings.warn(
-            f"dataeval.selection.{name} is deprecated; subclass dataeval.data.Operation and "
-            "implement apply(view) instead.",
+            f"dataeval.selection.{name} is deprecated and will be removed in v1.2.0; subclass "
+            "dataeval.data.Operation and implement apply(view) instead.",
             DeprecationWarning,
             stacklevel=2,
         )

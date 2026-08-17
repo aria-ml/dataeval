@@ -1,16 +1,14 @@
 __all__ = []
 
-from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.core._calculators._base import Calculator
+from dataeval.core._calculators._base import Calculator, Handler, ViewKind
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
-from dataeval.utils.preprocessing import get_bitdepth
 
 
 @CalculatorRegistry.register(ImageStats)
@@ -69,8 +67,11 @@ class DimensionStatCalculator(Calculator[ImageStats]):
         mult, divisor, dividend = (-1, box.width, box.height) if box.height > box.width else (1, box.height, box.width)
         return [float("nan") if dividend == 0 else mult * (1 - (divisor / dividend))]
 
-    def _depth(self) -> list[int]:
-        return [get_bitdepth(self.cache.raw).depth]
+    def _depth(self) -> list[float]:
+        # Through the cache rather than off `raw` directly, so a declared range is honored
+        # and the answer is the same one `scaled` and the histogram were computed against.
+        # NaN where the data carries no encoding to read — see `ValueRange`.
+        return [self.cache.value_range.depth]
 
     def _center(self) -> list[list[float]]:
         # Center only makes sense for spatial data
@@ -122,19 +123,30 @@ class DimensionStatCalculator(Calculator[ImageStats]):
             "center": [np.nan, np.nan],  # 2D coordinate array
         }
 
-    def get_handlers(self) -> dict[ImageStats, tuple[str, Callable[[], list[Any]]]]:
-        """Return mapping of flags to (stat_name, handler_function)."""
+    def get_handlers(self) -> dict[ImageStats, Handler]:
+        """Return mapping of flags to the statistic each produces.
+
+        This is the calculator that makes the declaration belong per statistic rather than
+        per class. Geometry is invariant under both other views — masking pixels does not
+        move a box and dropping bands does not narrow one, so ``background_width`` and
+        ``rgb_width`` would restate the plain value under a new name. ``depth`` is not:
+        bands of one cube can carry different encodings, so a group's depth is genuinely
+        its own and must be reported beside the group's other statistics rather than
+        contradicted by the whole cube's. ``channels`` stays whole-only by the same logic
+        in reverse — a group's size is a property of the caller's own argument.
+        """
         return {
-            ImageStats.DIMENSION_OFFSET_X: ("offset_x", self._offset_x),
-            ImageStats.DIMENSION_OFFSET_Y: ("offset_y", self._offset_y),
-            ImageStats.DIMENSION_WIDTH: ("width", self._width),
-            ImageStats.DIMENSION_HEIGHT: ("height", self._height),
-            ImageStats.DIMENSION_CHANNELS: ("channels", self._channels),
-            ImageStats.DIMENSION_SIZE: ("size", self._size),
-            ImageStats.DIMENSION_ASPECT_RATIO: ("aspect_ratio", self._aspect_ratio),
-            ImageStats.DIMENSION_DEPTH: ("depth", self._depth),
-            ImageStats.DIMENSION_CENTER: ("center", self._center),
-            ImageStats.DIMENSION_DISTANCE_CENTER: ("distance_center", self._distance_center),
-            ImageStats.DIMENSION_DISTANCE_EDGE: ("distance_edge", self._distance_edge),
-            ImageStats.DIMENSION_INVALID_BOX: ("invalid_box", self._invalid_box),
+            # Geometry takes `Handler`'s default of WHOLE alone; only depth opts into BAND.
+            ImageStats.DIMENSION_OFFSET_X: Handler("offset_x", self._offset_x),
+            ImageStats.DIMENSION_OFFSET_Y: Handler("offset_y", self._offset_y),
+            ImageStats.DIMENSION_WIDTH: Handler("width", self._width),
+            ImageStats.DIMENSION_HEIGHT: Handler("height", self._height),
+            ImageStats.DIMENSION_CHANNELS: Handler("channels", self._channels),
+            ImageStats.DIMENSION_SIZE: Handler("size", self._size),
+            ImageStats.DIMENSION_ASPECT_RATIO: Handler("aspect_ratio", self._aspect_ratio),
+            ImageStats.DIMENSION_DEPTH: Handler("depth", self._depth, ViewKind.WHOLE | ViewKind.BAND),
+            ImageStats.DIMENSION_CENTER: Handler("center", self._center),
+            ImageStats.DIMENSION_DISTANCE_CENTER: Handler("distance_center", self._distance_center),
+            ImageStats.DIMENSION_DISTANCE_EDGE: Handler("distance_edge", self._distance_edge),
+            ImageStats.DIMENSION_INVALID_BOX: Handler("invalid_box", self._invalid_box),
         }

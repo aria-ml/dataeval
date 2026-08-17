@@ -2,7 +2,6 @@
 
 __all__ = []
 
-import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Generic, Literal, TypeVar, overload
 
@@ -415,12 +414,20 @@ def _find_exact_groups(
     indices: list[int],
     key_fn: Any,
 ) -> list[list[Any]]:
-    """Group indices by xxhash and return groups with more than one member."""
+    """Group indices by xxhash and return groups with more than one member.
+
+    Empty hashes are skipped, as they are for near duplicates. An empty digest is how a
+    calculator reports a region it could not measure — an out-of-bounds box, an image its
+    boxes cover completely, or a band group the datum cannot supply — and grouping those
+    together would call every unmeasured region an exact duplicate of every other.
+    """
     if "xxhash" not in stats:
         return []
     d: dict[str, list[Any]] = {}
     for i in indices:
-        d.setdefault(stats["xxhash"][i], []).append(key_fn(i))
+        value = stats["xxhash"][i]
+        if value:
+            d.setdefault(value, []).append(key_fn(i))
     return [sorted(v) for v in d.values() if len(v) > 1]
 
 
@@ -547,19 +554,6 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         self.cluster_sensitivity = cluster_sensitivity
         self.merge_near_duplicates = merge_near_duplicates
         self.flags = flags
-
-    _COLUMN_ALIASES = {"dataset_index": "dataset_indices"}
-
-    def __getitem__(self, item: Any) -> Any:
-        if isinstance(item, str) and item in self._COLUMN_ALIASES:
-            new_name = self._COLUMN_ALIASES[item]
-            warnings.warn(
-                f"Column '{item}' was renamed to '{new_name}'. Access via '{item}' will be removed in v1.1.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            item = new_name
-        return self.data()[item]
 
     def __len__(self) -> int:
         """Return the number of duplicate groups."""

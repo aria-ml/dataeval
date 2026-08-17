@@ -568,6 +568,74 @@ class TestCalculateRatiosSeparateInputs:
         with pytest.raises(ValueError, match="Channel mismatch"):
             compute_ratios(img_stats, target_stats_output=tgt_stats)
 
+    def test_separate_inputs_mismatched_channel_groups(self):
+        """Two different `channels=` mappings must raise rather than ratio the overlap.
+
+        Both sides carry the always-on unnamed view, so the intersection is never empty
+        and the band columns would otherwise be dropped from the result with no warning.
+        """
+        images = [np.random.random((4, 50, 50)) for _ in range(2)]
+        boxes = [[[10, 10, 30, 30]] for _ in range(2)]
+
+        img_stats = compute_stats(
+            images, boxes=boxes, stats=ImageStats.PIXEL, per_image=True, per_target=False, channels={"nir": 3}
+        )
+        tgt_stats = compute_stats(
+            images, boxes=boxes, stats=ImageStats.PIXEL, per_image=False, per_target=True, channels={"rgb": [0, 1, 2]}
+        )
+
+        with pytest.raises(ValueError, match="Statistic mismatch") as exc:
+            compute_ratios(img_stats, target_stats_output=tgt_stats)
+
+        # The message must name both sides' orphans, not just report a disagreement.
+        assert "nir_mean" in str(exc.value)
+        assert "rgb_mean" in str(exc.value)
+
+    def test_separate_inputs_matching_channel_groups(self):
+        """The same mapping on both sides ratios band columns like any other column."""
+        images = [np.random.random((4, 50, 50)) for _ in range(2)]
+        boxes = [[[10, 10, 30, 30]] for _ in range(2)]
+
+        img_stats = compute_stats(
+            images, boxes=boxes, stats=ImageStats.PIXEL, per_image=True, per_target=False, channels={"nir": 3}
+        )
+        tgt_stats = compute_stats(
+            images, boxes=boxes, stats=ImageStats.PIXEL, per_image=False, per_target=True, channels={"nir": 3}
+        )
+
+        result = compute_ratios(img_stats, target_stats_output=tgt_stats)
+
+        assert "nir_mean" in result["stats"]
+        assert len(result["stats"]["nir_mean"]) == len(boxes)
+
+    def test_separate_inputs_mismatched_stats_flags(self):
+        """Differing flags leave columns without a partner to divide by."""
+        images = [np.random.random((3, 50, 50))]
+        boxes = [[[10, 10, 30, 30]]]
+
+        img_stats = compute_stats(
+            images, boxes=boxes, stats=ImageStats.PIXEL | ImageStats.DIMENSION, per_image=True, per_target=False
+        )
+        tgt_stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL, per_image=False, per_target=True)
+
+        with pytest.raises(ValueError, match="Statistic mismatch"):
+            compute_ratios(img_stats, target_stats_output=tgt_stats)
+
+    def test_separate_inputs_background_only_on_image_side(self):
+        """`per_background` is not a mismatch — a box has no background by construction."""
+        images = [np.random.random((3, 50, 50)) for _ in range(2)]
+        boxes = [[[10, 10, 30, 30]] for _ in range(2)]
+
+        img_stats = compute_stats(
+            images, boxes=boxes, stats=ImageStats.PIXEL, per_image=True, per_target=False, per_background=True
+        )
+        tgt_stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL, per_image=False, per_target=True)
+
+        result = compute_ratios(img_stats, target_stats_output=tgt_stats)
+
+        assert "mean" in result["stats"]
+        assert not any(name.startswith("background_") for name in result["stats"])
+
     def test_separate_inputs_with_box_in_img_stats(self):
         """Test error when stats_output contains box entries."""
         images = [np.random.random((3, 50, 50))]
@@ -689,3 +757,50 @@ class TestBackgroundStatsAreNotRatioed:
 
         with pytest.raises(ValueError, match="carry background values only"):
             compute_ratios(stats)
+
+
+class TestBandColumnsUseTheOverrideMap:
+    """The override map is keyed by bare statistic name; band groups prefix the column."""
+
+    def test_band_depth_is_passed_through_not_divided(self):
+        """`depth` is a pass-through override, and `<group>_depth` must be too.
+
+        The band range is anchored on the whole datum, so image and box report the same
+        depth. Falling through to plain division returns 1.0 under a name that reads like a
+        measurement rather than like the arithmetic artefact it is.
+        """
+        cube = (np.random.default_rng(0).random((4, 16, 16)) * 4095).astype(np.uint16)
+
+        stats = compute_stats(
+            [cube],
+            boxes=[[[2, 2, 12, 12]]],
+            stats=ImageStats.DIMENSION_DEPTH,
+            per_image=True,
+            per_target=True,
+            normalize_pixel_values=False,
+            channels={"rgb": [0, 1, 2]},
+        )
+        ratios = compute_ratios(stats)["stats"]
+
+        assert ratios["depth"][0] == ratios["rgb_depth"][0]
+        assert ratios["rgb_depth"][0] != 1.0, "a divided depth is the bug this pins"
+
+    def test_ordinary_band_statistics_still_divide(self):
+        """Only the pass-through names are overridden; a band mean is still a ratio."""
+        cube = np.random.default_rng(0).random((4, 16, 16))
+
+        stats = compute_stats(
+            [cube],
+            boxes=[[[2, 2, 12, 12]]],
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=True,
+            per_target=True,
+            normalize_pixel_values=False,
+            channels={"rgb": [0, 1, 2]},
+        )
+        ratios = compute_ratios(stats)["stats"]
+
+        assert "rgb_mean" in ratios
+        box_mean = stats["stats"]["rgb_mean"][1]
+        img_mean = stats["stats"]["rgb_mean"][0]
+        assert ratios["rgb_mean"][0] == pytest.approx(box_mean / img_mean, rel=1e-5)

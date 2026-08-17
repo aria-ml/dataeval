@@ -566,19 +566,20 @@ class TestDuplicatesMultiDataset:
 
 @pytest.mark.required
 class TestDuplicatesBackwardsCompat:
-    def test_dataset_index_alias_warns_and_redirects(self):
-        """Accessing 'dataset_index' should warn and return 'dataset_indices' column."""
+    def test_dataset_index_alias_is_removed(self):
+        """The 'dataset_index' alias was deprecated in v1.0 and removed in v1.1.
+
+        It redirected to 'dataset_indices' under a DeprecationWarning. Pinned as gone so
+        the alias is not reintroduced by accident: the column has one name now.
+        """
         data1 = np.zeros((3, 1, 16, 16))
         data2 = np.zeros((2, 1, 16, 16))
 
         result = Duplicates(ImageStats.HASH_XXHASH).evaluate(data1, data2)
         assert "dataset_indices" in result.data().columns
 
-        with pytest.warns(DeprecationWarning, match="renamed to 'dataset_indices'.*removed in v1.1"):
-            old_col = result["dataset_index"]
-
-        new_col = result["dataset_indices"]
-        assert old_col.to_list() == new_col.to_list()
+        with pytest.raises(pl.exceptions.ColumnNotFoundError):
+            result["dataset_index"]
 
 
 @pytest.mark.required
@@ -892,3 +893,46 @@ class TestDuplicatesOutputAPI:
                 assert isinstance(indices, list)
                 assert isinstance(methods, list)
                 assert all(isinstance(m, str) for m in methods)
+
+
+@pytest.mark.required
+class TestUnmeasuredRegionsAreNotDuplicates:
+    """An empty digest reports a region that could not be measured, not a picture.
+
+    The hash calculator answers with the empty string for a view that holds no data — an
+    out-of-bounds box, an image its boxes cover completely, or a band group the datum
+    cannot supply. Grouping those together would call every unmeasured region an exact
+    duplicate of every other, which is the failure the empty string exists to avoid, so
+    exact grouping skips them exactly as near grouping already does.
+    """
+
+    def test_out_of_bounds_boxes_are_not_exact_duplicates(self):
+        rng = np.random.default_rng(0)
+        images = [rng.integers(0, 255, (3, 16, 16), dtype=np.uint8) for _ in range(4)]
+        boxes = [[[100, 100, 110, 110]] for _ in range(4)]
+
+        stats = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.HASH_DUPLICATES_BASIC,
+            per_image=True,
+            per_target=True,
+            normalize_pixel_values=False,
+        )
+        assert all(value == "" for value in stats["stats"]["xxhash"][1::2]), "boxes should be unmeasured"
+
+        result = Duplicates().from_stats(stats, per_target=True)
+
+        assert len(result) == 0
+
+    def test_real_duplicates_are_still_found(self):
+        """The skip must not swallow a genuine exact duplicate."""
+        rng = np.random.default_rng(0)
+        image = rng.integers(0, 255, (3, 16, 16), dtype=np.uint8)
+        images = [image, image.copy(), rng.integers(0, 255, (3, 16, 16), dtype=np.uint8)]
+
+        result = Duplicates().from_stats(
+            compute_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
+        )
+
+        assert result.data()["item_indices"].to_list() == [[0, 1]]

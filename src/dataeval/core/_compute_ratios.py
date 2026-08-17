@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._log import get_logger
-from dataeval.core._compute_stats import BACKGROUND_PREFIX, StatsResult
+from dataeval.core._compute_stats import BACKGROUND_PREFIX, StatsResult, require_same_stat_names
 from dataeval.types import SourceIndex
 from dataeval.utils._internal import EPSILON
 
@@ -101,6 +101,30 @@ def _build_image_lookup(source_indices: Sequence[SourceIndex]) -> dict[tuple[int
     return lookup
 
 
+def _resolve_override(stat_name: str, override_map: OverrideFunctionMap) -> Any:
+    """Find the override for a statistic, band-group prefix and all.
+
+    The map is keyed by bare statistic name, but a named channel group produces
+    ``<group>_<statistic>`` — so a lookup on the literal column name misses every band
+    column and falls through to plain division. For `depth` that is silently meaningless:
+    the band range is anchored on the whole datum, so image and box report the same depth
+    and the ratio comes back as 1.0 under a name that reads like a measurement.
+
+    Matched on the suffix after the first underscore rather than by stripping a known
+    prefix, since the group names are a call-site argument this function never sees. A
+    group cannot be named after a statistic — `_resolve_channel_groups` rejects that at the
+    call — so the split is unambiguous.
+    """
+    if stat_name in override_map:
+        return override_map[stat_name]
+    _, _, suffix = stat_name.partition("_")
+    while suffix:
+        if suffix in override_map:
+            return override_map[suffix]
+        _, _, suffix = suffix.partition("_")
+    return None
+
+
 def _calculate_ratio_for_stat(  # noqa: C901
     stat_name: str,
     box_value: Any,
@@ -132,9 +156,10 @@ def _calculate_ratio_for_stat(  # noqa: C901
     Any
         The calculated ratio value
     """
-    if stat_name in override_map:
+    override = _resolve_override(stat_name, override_map)
+    if override is not None:
         # Use custom calculation
-        return override_map[stat_name](box_stats_context, img_stats_context)
+        return override(box_stats_context, img_stats_context)
     # Default: simple division with error handling for non-numeric types
     try:
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -197,7 +222,10 @@ def _validate_separate_inputs(  # noqa: C901
             f"Found {sum(1 for si in box_source_indices if si.target is None)} image entries.",
         )
 
-    # Validate channel compatibility
+    # Validate channel compatibility. This covers the deprecated row path only, where the
+    # two sides differ in row *count* rather than in column names — `per_channel=True`
+    # spells its statistics exactly as `per_channel=False` does. It stays until the row
+    # path goes in v1.2; the structural check below is what covers the mapping path.
     img_has_channels = any(si.channel is not None for si in img_source_indices)
     box_has_channels = any(si.channel is not None for si in box_source_indices)
     if img_has_channels != box_has_channels:
@@ -206,17 +234,36 @@ def _validate_separate_inputs(  # noqa: C901
             "per_channel settings (both True or both False).",
         )
 
-    # Validate that stats dictionaries have overlapping keys
-    img_stats_keys = set(stats_output["stats"].keys())
-    box_stats_keys = set(box_stats_output["stats"].keys())
-    overlapping_keys = img_stats_keys & box_stats_keys
+    # Validate that the two inputs measure the same things. A ratio pairs a box column
+    # against the image column of the same name, so a name on one side and not the other
+    # has nothing to divide by — and intersecting silently, as this once did, drops it
+    # with no warning at all. Two runs given different `channels=` mappings are what makes
+    # that reachable: both sides carry the always-on unnamed view, so the intersection is
+    # never empty and the band columns simply vanish from the result.
+    #
+    # Compared over `_ratio_keys` rather than the raw names, since background columns
+    # legitimately exist on the image side alone.
+    img_ratio_keys = set(_ratio_keys(stats_output["stats"]))
+    box_ratio_keys = set(_ratio_keys(box_stats_output["stats"]))
 
-    if not overlapping_keys:
+    require_same_stat_names(
+        img_ratio_keys,
+        box_ratio_keys,
+        left_label="stats_output",
+        right_label="box_stats_output",
+        summary="Statistic mismatch between stats_output and box_stats_output",
+        remedy=(
+            "A ratio pairs columns of the same name, so these have no partner to divide "
+            "by. Compute both with the same `stats` flags and the same `channels` mapping."
+        ),
+    )
+
+    if not img_ratio_keys:
         raise ValueError(
-            "No overlapping statistics found between stats_output and box_stats_output. "
-            f"stats_output has keys: {sorted(img_stats_keys)}, "
-            f"box_stats_output has keys: {sorted(box_stats_keys)}. "
-            "Ensure both outputs were computed with the same statistics flags.",
+            "No statistics to take a ratio of. Both stats_output and box_stats_output "
+            f"hold only background statistics: {sorted(stats_output['stats'])}. "
+            "Background statistics exist on the image rows alone, so a box has no "
+            "counterpart to divide against.",
         )
 
     return img_source_indices, box_source_indices
@@ -330,8 +377,11 @@ def compute_ratios(  # noqa: C901
     Raises
     ------
     ValueError
-        If inputs don't contain the required image and box statistics, or if
-        the two inputs are incompatible (different image counts, mismatched channels).
+        If inputs don't contain the required image and box statistics, or if the two
+        inputs are incompatible: different image counts, mismatched ``per_channel``
+        settings, or a different set of statistics on each side. The last covers
+        mismatched ``channels`` mappings, whose band columns would otherwise be dropped
+        from the result without warning.
     KeyError
         If stats_output doesn't contain required 'source_index' key.
 

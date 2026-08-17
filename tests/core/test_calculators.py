@@ -1,3 +1,4 @@
+import logging
 import warnings
 from unittest.mock import patch
 
@@ -7,8 +8,8 @@ from scipy.stats import entropy as scipy_entropy
 from scipy.stats import kurtosis as scipy_kurtosis
 from scipy.stats import skew as scipy_skew
 
-from dataeval.core import compute_stats
-from dataeval.core._calculators._base import Calculator
+from dataeval.core import combine_stats_results, compute_stats
+from dataeval.core._calculators._base import Calculator, Handler, ViewKind
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._dimensionstats import DimensionStatCalculator
 from dataeval.core._calculators._hashstats import HashStatCalculator
@@ -16,7 +17,7 @@ from dataeval.core._calculators._pixelstats import PixelStatCalculator
 from dataeval.core._calculators._visualstats import QUARTILES, VisualStatCalculator
 from dataeval.flags import ImageStats
 from dataeval.types import SourceIndex
-from dataeval.utils.preprocessing import BoundingBox, get_bitdepth, rescale
+from dataeval.utils.preprocessing import BoundingBox, get_value_range, rescale
 
 
 class TestPixelStats:
@@ -1990,8 +1991,12 @@ class TestPerBackground:
         assert result["stats"]["background_zeros"][0] == pytest.approx(1.0)
         assert result["stats"]["background_fraction"][0] == pytest.approx(0.75)
 
-    def test_ignored_without_boxes(self):
-        """per_background is defined by the boxes, so it is inert without them."""
+    def test_an_unannotated_image_is_all_background(self):
+        """Nothing annotated means nothing masked, so the background is the whole image.
+
+        Already the answer an unannotated image inside an object-detection dataset gets;
+        a dataset carrying no boxes at all is the same situation, one level up.
+        """
         images = [np.random.random((3, 10, 10))]
 
         result = compute_stats(
@@ -1999,9 +2004,34 @@ class TestPerBackground:
             stats=ImageStats.PIXEL_MEAN,
             per_background=True,
             normalize_pixel_values=False,
-        )
+        )["stats"]
 
-        assert set(result["stats"]) == {"mean"}
+        assert set(result) == {"mean", "background_mean", "background_fraction"}
+        assert result["background_fraction"][0] == pytest.approx(1.0)
+        assert result["background_mean"][0] == pytest.approx(result["mean"][0])
+
+    def test_the_column_set_follows_the_arguments_not_the_data(self):
+        """What makes two datasets combinable: identical arguments, identical columns.
+
+        While `per_background` degraded on box-less data, a boxed and an unboxed dataset
+        run with the same call produced different column sets, and combining them either
+        dropped columns silently or — once that was made an error — refused outright.
+        """
+        images = np.random.default_rng(0).integers(0, 256, (4, 3, 8, 8), np.uint8)
+        kwargs = {
+            "stats": ImageStats.PIXEL_MEAN,
+            "per_background": True,
+            "per_target": False,
+            "normalize_pixel_values": False,
+        }
+
+        boxed = compute_stats(images, boxes=[[(0, 0, 4, 4)]] * 4, **kwargs)
+        unboxed = compute_stats(images, **kwargs)
+
+        assert set(boxed["stats"]) == set(unboxed["stats"])
+        stats, source_index, _ = combine_stats_results([boxed, unboxed])
+        assert len(source_index) == 8
+        assert set(stats) == {"mean", "background_mean", "background_fraction"}
 
 
 class TestBitDepthAnchoring:
@@ -2093,6 +2123,229 @@ class TestBitDepthAnchoring:
         )
 
 
+class TestPerceptualVisualStatistics:
+    """`PIXEL` reports the data; `VISUAL` reports the picture.
+
+    A visual statistic stands in for how an image looks to a person, which is a position
+    between black and white rather than a value in whatever units the sensor wrote. So it
+    resolves a full-scale reference always — independently of `normalize_pixel_values`,
+    which scopes to the pixel family — and reports NaN where no such reference exists.
+    """
+
+    _VISUAL = ImageStats.VISUAL & ~ImageStats.VISUAL_PERCENTILES
+
+    @staticmethod
+    def _encodings():
+        """One picture, in the four spellings a caller might hand over."""
+        u8 = np.random.default_rng(0).integers(0, 256, (3, 32, 32), dtype=np.uint8)
+        return {
+            "uint8": u8,
+            "uint16": u8.astype(np.uint16) * 257,
+            "float01": u8 / 255.0,
+            "float255": u8.astype(np.float64),
+        }
+
+    @pytest.mark.parametrize("normalize", [True, False])
+    def test_one_picture_reads_the_same_at_every_encoding(self, normalize):
+        results = {
+            name: compute_stats([image], stats=self._VISUAL, normalize_pixel_values=normalize)["stats"]
+            for name, image in self._encodings().items()
+        }
+
+        reference = results["uint8"]
+        for name, result in results.items():
+            for stat in reference:
+                assert result[stat][0] == pytest.approx(reference[stat][0], rel=1e-5), (
+                    f"{stat} differs between uint8 and {name}"
+                )
+
+    def test_normalize_pixel_values_does_not_reach_them(self):
+        """The flag scopes to the pixel family; a visual statistic already has its own scale."""
+        image = self._encodings()["uint8"]
+
+        normalized = compute_stats([image], stats=self._VISUAL, normalize_pixel_values=True)["stats"]
+        raw = compute_stats([image], stats=self._VISUAL, normalize_pixel_values=False)["stats"]
+
+        for stat in raw:
+            assert normalized[stat][0] == pytest.approx(raw[stat][0], rel=1e-6)
+
+    def test_eight_bit_input_takes_the_identity_path(self):
+        """The display range *is* 8-bit's range, so the common case is not touched at all."""
+        cache = CalculatorCache(self._encodings()["uint8"])
+
+        assert cache.perceptual is cache.image, "an 8-bit image should not be copied to be read"
+
+    def test_data_with_no_reference_has_no_reading(self):
+        """A band carrying elevation has values, but 'how bright is it' has no answer."""
+        elevation = np.random.default_rng(0).normal(0, 500, (1, 16, 16))
+
+        result = compute_stats([elevation], stats=self._VISUAL | ImageStats.PIXEL_MEAN, normalize_pixel_values=False)[
+            "stats"
+        ]
+
+        assert all(np.isnan(result[stat][0]) for stat in ("brightness", "contrast", "darkness", "sharpness"))
+        assert not np.isnan(result["mean"][0]), "pixel statistics are unaffected by the absent reference"
+
+    def test_a_declared_range_restores_the_reading(self):
+        elevation = np.random.default_rng(0).normal(0, 500, (1, 16, 16))
+
+        result = compute_stats(
+            [elevation], stats=self._VISUAL, normalize_pixel_values=False, value_range=(-2000.0, 2000.0)
+        )["stats"]
+
+        assert all(np.isfinite(result[stat][0]) for stat in ("brightness", "contrast", "darkness", "sharpness"))
+        # Values sat well inside the declared interval, so they land mid-range rather than
+        # pinned to either end of it.
+        assert 0.0 < result["brightness"][0] < 255.0
+
+    def test_outlier_flags_do_not_move(self):
+        """The 255x uniform scale-up is invisible to any threshold computed from the data."""
+        rng = np.random.default_rng(0)
+        images = [rng.integers(0, 256, (3, 32, 32), dtype=np.uint8) for _ in range(20)]
+        images[7] = np.full((3, 32, 32), 250, dtype=np.uint8)  # a conspicuously bright one
+
+        result = compute_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=True)["stats"]
+        brightness = np.asarray(result["brightness"], dtype=np.float64)
+
+        # Standardizing is what every non-constant threshold does first, and it is exactly
+        # what a uniform rescale cancels out of.
+        z = (brightness - brightness.mean()) / brightness.std()
+        assert int(np.argmax(np.abs(z))) == 7
+        assert np.abs(z[7]) > 3.0
+
+
+class TestValueRangeAnchor:
+    """A depth is decoded where the data was encoded, and withheld where it was measured.
+
+    The two conventional float spellings of visible imagery worked by accident before the
+    split — a ``[0, 1]`` image inferred ``depth=1, pmax=1``, so ``rescale`` divided by 1 and
+    the histogram spanned ``(0, 1)``: right answers from wrong reasoning. Making the
+    reasoning explicit must not move either number.
+    """
+
+    @staticmethod
+    def _image():
+        return np.random.default_rng(0).integers(0, 256, (3, 16, 16), dtype=np.uint8)
+
+    _STATS = ImageStats.PIXEL_MEAN | ImageStats.PIXEL_ENTROPY | ImageStats.DIMENSION_DEPTH
+
+    @pytest.mark.parametrize("normalize", [True, False])
+    def test_normalized_float_is_unchanged(self, normalize):
+        """`ToTensor`-style [0, 1] float: interval [0, 1], and the depth it always reported."""
+        result = compute_stats([self._image() / 255.0], stats=self._STATS, normalize_pixel_values=normalize)["stats"]
+
+        assert result["depth"][0] == 1
+        # Already normalized, so normalizing again is the identity either way.
+        assert result["mean"][0] == pytest.approx(self._image().mean() / 255.0, rel=1e-5)
+
+    @pytest.mark.parametrize("normalize", [True, False])
+    def test_float_boxed_8bit_matches_the_integer_it_holds(self, normalize):
+        """An 8-bit image handed over in a float array reads as the 8-bit image it is."""
+        boxed = compute_stats([self._image().astype(np.float64)], stats=self._STATS, normalize_pixel_values=normalize)[
+            "stats"
+        ]
+        native = compute_stats([self._image()], stats=self._STATS, normalize_pixel_values=normalize)["stats"]
+
+        for name in ("depth", "mean", "entropy"):
+            assert boxed[name][0] == pytest.approx(native[name][0], rel=1e-6)
+
+    def test_interpolated_8bit_float_still_reads_as_8bit(self):
+        """A resize leaves 8-bit values non-integral; that does not stop them being 8-bit."""
+        result = compute_stats(
+            [self._image() * 0.7861], stats=ImageStats.DIMENSION_DEPTH, normalize_pixel_values=False
+        )["stats"]
+
+        assert result["depth"][0] == 8
+
+    def test_undeclared_float_reports_no_depth(self):
+        """A band whose range is the sensor's rather than a file format's has no depth to report."""
+        elevation = np.random.default_rng(0).normal(0, 500, (1, 16, 16))
+
+        result = compute_stats([elevation], stats=ImageStats.DIMENSION_DEPTH, normalize_pixel_values=False)["stats"]
+
+        assert np.isnan(result["depth"][0]), "a fabricated depth is a wrong answer, not an imprecise one"
+
+    @pytest.mark.parametrize(
+        ("stats", "name", "normalize"),
+        [
+            (ImageStats.PIXEL_ENTROPY, "entropy", False),
+            (ImageStats.PIXEL_HISTOGRAM, "histogram", False),
+            (ImageStats.PIXEL_MEAN, "mean", True),
+        ],
+    )
+    def test_statistics_needing_an_interval_refuse_to_guess(self, stats, name, normalize, caplog):
+        """Previously such data was binned over [0, 1] with every value outside it.
+
+        NaN rather than an error, matching every other unmeasurable view: the caller may
+        have declared ranges for the band groups they care about and never asked for this
+        one, and a single unmeasurable datum should not end a run over the rest. Said out
+        loud, though, because an all-NaN column is easy to miss.
+        """
+        signed = np.random.default_rng(0).normal(0, 10, (1, 16, 16))
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+            result = compute_stats([signed], stats=stats, normalize_pixel_values=normalize)["stats"]
+
+        assert np.all(np.isnan(result[name][0]))
+        assert any("no value range could be established" in r.getMessage() for r in caplog.records)
+        assert any("value_range=(low, high)" in r.getMessage() for r in caplog.records)
+
+    def test_an_unmeasurable_datum_does_not_end_the_run(self):
+        """The reason this is a warning: one bad image must not lose the other 99."""
+        rng = np.random.default_rng(0)
+        images = [rng.integers(0, 256, (1, 16, 16), np.uint8).astype(np.float64) for _ in range(3)]
+        images[1] = rng.normal(0, 10, (1, 16, 16))
+
+        result = compute_stats(images, stats=ImageStats.PIXEL_ENTROPY, normalize_pixel_values=False)["stats"]
+
+        assert np.isfinite(result["entropy"][0])
+        assert np.isnan(result["entropy"][1])
+        assert np.isfinite(result["entropy"][2])
+
+    def test_a_group_range_rescues_only_its_own_group(self):
+        """The gap that made the raise untenable.
+
+        A caller declaring `value_range` per group had their run ended by the always-on
+        unnamed view, which they never asked for and cannot declare a range for when the
+        bands genuinely disagree.
+        """
+        from dataeval.utils.preprocessing import ChannelGroup
+
+        rng = np.random.default_rng(0)
+        cube = np.stack([rng.normal(0, 500, (16, 16)), rng.normal(0, 50, (16, 16))])
+
+        result = compute_stats(
+            [cube],
+            stats=ImageStats.PIXEL_MEAN | ImageStats.PIXEL_ENTROPY,
+            normalize_pixel_values=False,
+            channels={"tight": ChannelGroup(1, value_range=(-200.0, 200.0))},
+        )["stats"]
+
+        assert np.isfinite(result["tight_entropy"][0]), "the group declared an interval"
+        assert np.isnan(result["entropy"][0]), "the unnamed view has none, and says so"
+        assert np.isfinite(result["mean"][0]), "an unnormalized mean never needed one"
+
+    def test_a_declared_range_is_what_they_are_measured_against(self):
+        signed = np.random.default_rng(0).normal(0, 10, (1, 16, 16))
+
+        result = compute_stats(
+            [signed],
+            stats=ImageStats.PIXEL_MEAN | ImageStats.PIXEL_ENTROPY | ImageStats.DIMENSION_DEPTH,
+            normalize_pixel_values=True,
+            value_range=(-50.0, 50.0),
+        )["stats"]
+
+        # Every value lands inside the declared interval, so normalizing puts them in [0, 1]
+        # around the midpoint rather than pinning them all into one histogram bin.
+        assert result["mean"][0] == pytest.approx((signed.mean() + 50.0) / 100.0, rel=1e-4)
+        assert result["entropy"][0] > 0.0
+        assert np.isnan(result["depth"][0]), "a declaration is a measurement, not an encoding"
+
+    def test_a_malformed_declaration_fails_at_the_call(self):
+        with pytest.raises(ValueError, match="value range must be"):
+            compute_stats([self._image()], stats=ImageStats.PIXEL_MEAN, value_range=(1.0, 0.0))
+
+
 class TestRescaleAnchor:
     """`rescale` accepts the range to scale from, which is what the cache passes it."""
 
@@ -2101,10 +2354,10 @@ class TestRescaleAnchor:
         crop = np.array([[0, 1]], dtype=np.uint8)
         np.testing.assert_allclose(rescale(crop), [[0, 1]])
 
-    def test_explicit_bitdepth_anchors_elsewhere(self):
+    def test_explicit_range_anchors_elsewhere(self):
         crop = np.array([[0, 1]], dtype=np.uint8)
-        anchor = get_bitdepth(np.array([[0, 255]], dtype=np.uint8))
-        np.testing.assert_allclose(rescale(crop, bitdepth=anchor), [[0.0, 1 / 255]])
+        anchor = get_value_range(np.array([[0, 255]], dtype=np.uint8))
+        np.testing.assert_allclose(rescale(crop, value_range=anchor), [[0.0, 1 / 255]])
 
 
 class TestBackgroundEdgeCases:
@@ -2139,21 +2392,762 @@ class TestBackgroundEdgeCases:
 
         assert np.isnan(result["stats"]["background_fraction"][0])
 
-    def test_maskable_calculators_come_from_the_calculators(self):
-        """Which statistics survive masking is each calculator's own answer."""
-        assert PixelStatCalculator.__new__(PixelStatCalculator).supports_exclusion() is True
-        assert VisualStatCalculator.__new__(VisualStatCalculator).supports_exclusion() is True
-        assert DimensionStatCalculator.__new__(DimensionStatCalculator).supports_exclusion() is False
-        assert HashStatCalculator.__new__(HashStatCalculator).supports_exclusion() is False
+    def test_maskable_statistics_come_from_the_statistics(self):
+        """Which statistics survive masking is each statistic's own declaration."""
+        assert PixelStatCalculator.flags_for_view(ImageStats.PIXEL, ViewKind.MASK) == ImageStats.PIXEL
+        assert VisualStatCalculator.flags_for_view(ImageStats.VISUAL, ViewKind.MASK) == ImageStats.VISUAL
+        # Hashes are not stable under NaN; geometry is unchanged by a mask.
+        assert not HashStatCalculator.flags_for_view(ImageStats.HASH, ViewKind.MASK)
+        assert not DimensionStatCalculator.flags_for_view(ImageStats.DIMENSION, ViewKind.MASK)
 
-    def test_a_new_calculator_defaults_to_not_maskable(self):
-        """The base class opts out, so a calculator is never masked before it is checked."""
+    def test_one_calculator_can_disagree_with_itself(self):
+        """The reason the declaration is per statistic rather than per class.
+
+        Dropping bands does not narrow a bounding box, so ``rgb_width`` would restate the
+        plain width under a new name. It does change which encoding is being read, so a
+        group's depth is genuinely its own.
+        """
+        banded = DimensionStatCalculator.flags_for_view(ImageStats.DIMENSION, ViewKind.BAND)
+
+        assert banded == ImageStats.DIMENSION_DEPTH
+
+    def test_hashes_are_band_variant_but_not_maskable(self):
+        """The pairing the old per-calculator predicate could not express."""
+        assert HashStatCalculator.flags_for_view(ImageStats.HASH, ViewKind.BAND) == ImageStats.HASH
+        assert not HashStatCalculator.flags_for_view(ImageStats.HASH, ViewKind.MASK)
+
+    def test_a_new_statistic_defaults_to_the_whole_view_only(self):
+        """A statistic is never computed over a derived view before it has been checked."""
 
         class Unchecked(Calculator[ImageStats]):
             def get_applicable_flags(self) -> ImageStats:
                 return ImageStats.PIXEL
 
             def get_handlers(self):
-                return {}
+                return {ImageStats.PIXEL_MEAN: Handler("mean", lambda: [0.0])}
 
-        assert Unchecked.__new__(Unchecked).supports_exclusion() is False
+        assert Unchecked.flags_for_view(ImageStats.PIXEL, ViewKind.WHOLE) == ImageStats.PIXEL_MEAN
+        assert not Unchecked.flags_for_view(ImageStats.PIXEL, ViewKind.MASK)
+        assert not Unchecked.flags_for_view(ImageStats.PIXEL, ViewKind.BAND)
+
+
+@pytest.mark.required
+class TestChannelGroups:
+    """Named band groups are a *view* of an item, so they land as columns on its row.
+
+    The band-axis counterpart of `per_background`, which does the same thing to the spatial
+    axes. Rows would need a third source-index level to land on, and there is none — which
+    is why per-channel statistics reach nothing downstream.
+    """
+
+    @staticmethod
+    def _cube():
+        """RGB in 0-255 and NIR in 30000-40000, stacked into one uint16 array.
+
+        The case the design exists for, and the one that breaks a whole-datum range anchor:
+        the visible bands are 8-bit data inside a 16-bit container.
+        """
+        rng = np.random.default_rng(0)
+        cube = np.empty((4, 32, 32), np.uint16)
+        cube[:3] = rng.integers(0, 256, (3, 32, 32))
+        cube[3] = rng.integers(30000, 40000, (32, 32))
+        return cube
+
+    _GROUPS = {"rgb": [0, 1, 2], "nir": 3}
+
+    def test_groups_land_as_prefixed_columns(self):
+        result = compute_stats(
+            [self._cube()],
+            stats=ImageStats.PIXEL_MEAN,
+            normalize_pixel_values=False,
+            channels=self._GROUPS,
+        )["stats"]
+
+        assert set(result) == {"mean", "rgb_mean", "nir_mean"}
+        assert len(result["mean"]) == len(result["rgb_mean"]) == 1
+
+    def test_each_group_is_anchored_on_its_own_range(self):
+        """Bands of one cube are different measurements, so they cannot share a denominator."""
+        result = compute_stats(
+            [self._cube()],
+            stats=ImageStats.DIMENSION_DEPTH,
+            normalize_pixel_values=False,
+            channels=self._GROUPS,
+        )["stats"]
+
+        assert result["rgb_depth"][0] == 8, "the visible bands are 8-bit data in a 16-bit container"
+        assert result["nir_depth"][0] == 16
+        assert result["depth"][0] == 16, "the cube as a whole still reports its container"
+
+    def test_a_group_is_reduced_over_jointly(self):
+        """`rgb_mean` is one number over three bands, not three numbers."""
+        cube = self._cube()
+
+        result = compute_stats(
+            [cube], stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False, channels={"rgb": [0, 1, 2]}
+        )["stats"]
+
+        assert result["rgb_mean"][0] == pytest.approx(cube[:3].mean(), rel=1e-4)
+
+    def test_geometry_is_not_banded(self):
+        """Dropping bands does not narrow a bounding box, so `rgb_width` would restate `width`."""
+        result = compute_stats(
+            [self._cube()],
+            stats=ImageStats.DIMENSION_WIDTH | ImageStats.DIMENSION_CHANNELS,
+            normalize_pixel_values=False,
+            channels=self._GROUPS,
+        )["stats"]
+
+        assert set(result) == {"width", "channels"}
+
+    def test_hashes_are_band_variant(self):
+        """The fix for `Duplicates` on multispectral data.
+
+        Hashing the whole cube runs a grayscale conversion that guesses between CMYK and
+        RGBA at four channels; `rgb_xxhash` is the digest a caller actually wants.
+        """
+        result = compute_stats(
+            [self._cube()], stats=ImageStats.HASH_XXHASH, normalize_pixel_values=False, channels=self._GROUPS
+        )["stats"]
+
+        assert len({result["xxhash"][0], result["rgb_xxhash"][0], result["nir_xxhash"][0]}) == 3
+
+    def test_the_unnamed_view_survives_a_mapping(self):
+        """Adding channels= to a pipeline reading `brightness` must not remove `brightness`."""
+        without = compute_stats([self._cube()], stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)["stats"]
+        with_groups = compute_stats(
+            [self._cube()], stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False, channels=self._GROUPS
+        )["stats"]
+
+        assert with_groups["mean"][0] == without["mean"][0]
+
+    def test_a_group_range_overrides_the_call_level_one(self):
+        """Bands of one cube are different measurements, so a group may need its own interval."""
+        from dataeval.utils.preprocessing import ChannelGroup
+
+        rng = np.random.default_rng(0)
+        # Band 0 spans roughly [-1500, 1500]; band 1 is an order of magnitude tighter.
+        cube = np.stack([rng.normal(0, 500, (16, 16)), rng.normal(0, 50, (16, 16))])
+
+        result = compute_stats(
+            [cube],
+            stats=ImageStats.PIXEL_ENTROPY,
+            normalize_pixel_values=False,
+            value_range=(-2000.0, 2000.0),
+            channels={"tight": ChannelGroup(1, value_range=(-200.0, 200.0))},
+        )["stats"]
+
+        # Binned over its own interval the tight band fills the histogram; over the cube's
+        # it would collapse into the middle few bins and read as near-zero entropy.
+        assert result["tight_entropy"][0] > result["entropy"][0]
+
+    def test_a_group_inherits_the_call_level_range_when_it_declares_none(self):
+        rng = np.random.default_rng(0)
+        cube = np.stack([rng.normal(0, 500, (16, 16))] * 2)
+
+        result = compute_stats(
+            [cube],
+            stats=ImageStats.PIXEL_ENTROPY,
+            normalize_pixel_values=False,
+            value_range=(-2000.0, 2000.0),
+            channels={"first": 0},
+        )["stats"]
+
+        assert np.isfinite(result["first_entropy"][0])
+
+
+@pytest.mark.required
+class TestUnsatisfiableChannelGroups:
+    """A group the datum cannot supply is NaN'd whole, and its column still exists.
+
+    All-or-nothing: a group spanning bands 2-5 must not mean "bands 2-3" on a 4-band image
+    and "bands 2-5" on an 8-band one under one column name. And it must be *substituted*
+    rather than skipped, or the column vanishes for that datum and every later array
+    misaligns against the source index.
+    """
+
+    @staticmethod
+    def _ragged():
+        """One 4-band image and one 2-band image, in that order."""
+        rng = np.random.default_rng(0)
+        return [rng.integers(0, 256, (4, 8, 8), np.uint8), rng.integers(0, 256, (2, 8, 8), np.uint8)]
+
+    def test_a_missing_group_is_nan_not_a_missing_column(self):
+        result = compute_stats(
+            self._ragged(), stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False, channels={"nir": 3}
+        )
+
+        assert "nir_mean" in result["stats"]
+        assert np.isfinite(result["stats"]["nir_mean"][0])
+        assert np.isnan(result["stats"]["nir_mean"][1]), "the 2-band image has no band 3"
+
+    def test_every_column_stays_aligned_with_the_source_index(self):
+        """The failure mode substitution exists to prevent: a short array, silently offset."""
+        result = compute_stats(
+            self._ragged(),
+            stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS,
+            normalize_pixel_values=False,
+            channels={"nir": 3, "rgb": [0, 1, 2]},
+        )
+
+        rows = len(result["source_index"])
+        for name, values in result["stats"].items():
+            assert len(values) == rows, f"{name} is {len(values)} long against {rows} rows"
+
+    def test_partial_coverage_is_all_or_nothing(self):
+        """Not reduced over the bands that happen to be present."""
+        result = compute_stats(
+            self._ragged(),
+            stats=ImageStats.PIXEL_MEAN,
+            normalize_pixel_values=False,
+            channels={"wide": [0, 1, 2, 3]},
+        )["stats"]
+
+        assert np.isfinite(result["wide_mean"][0])
+        assert np.isnan(result["wide_mean"][1]), "bands 0-1 are present but the group named four"
+
+    def test_an_unsatisfiable_group_has_no_hash(self):
+        """Hashing NaN yields the same digest every time, making every absence a duplicate."""
+        result = compute_stats(
+            self._ragged(), stats=ImageStats.HASH_XXHASH, normalize_pixel_values=False, channels={"nir": 3}
+        )["stats"]
+
+        assert result["nir_xxhash"][0] != ""
+        assert result["nir_xxhash"][1] == ""
+
+    def test_a_vector_valued_statistic_keeps_its_shape(self):
+        """`histogram` must come back as 256 NaN bins, not a scalar NaN.
+
+        A padding path would look up the unprefixed `histogram` for a column named
+        `nir_histogram`, miss, and substitute a scalar — producing a ragged object array.
+        Running the real calculators over NaN pixels sidesteps the whole class of problem.
+        """
+        result = compute_stats(
+            self._ragged(), stats=ImageStats.PIXEL_HISTOGRAM, normalize_pixel_values=False, channels={"nir": 3}
+        )["stats"]
+
+        assert result["nir_histogram"].shape == (2, 256)
+        assert np.isnan(result["nir_histogram"][1]).all()
+
+
+@pytest.mark.required
+class TestChannelGroupComposition:
+    """Region first, then band: `background_nir_brightness` is a real quantity."""
+
+    def test_groups_compose_with_the_background(self):
+        rng = np.random.default_rng(0)
+        image = rng.integers(0, 256, (4, 16, 16), np.uint8)
+
+        result = compute_stats(
+            [image],
+            boxes=[[(0, 0, 8, 8)]],
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+            channels={"nir": 3},
+        )["stats"]
+
+        assert "background_nir_mean" in result
+        assert np.isfinite(result["background_nir_mean"][0])
+
+    def test_the_background_keeps_its_own_unbanded_column(self):
+        rng = np.random.default_rng(0)
+        image = rng.integers(0, 256, (4, 16, 16), np.uint8)
+
+        result = compute_stats(
+            [image],
+            boxes=[[(0, 0, 8, 8)]],
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+            channels={"nir": 3},
+        )["stats"]
+
+        assert {"mean", "nir_mean", "background_mean", "background_nir_mean"} <= set(result)
+
+    def test_a_masked_region_still_has_no_hash(self):
+        """MASK and BAND intersect: a hash answers for a band group but not for a mask."""
+        rng = np.random.default_rng(0)
+        image = rng.integers(0, 256, (4, 16, 16), np.uint8)
+
+        result = compute_stats(
+            [image],
+            boxes=[[(0, 0, 8, 8)]],
+            stats=ImageStats.HASH_XXHASH,
+            per_background=True,
+            normalize_pixel_values=False,
+            channels={"nir": 3},
+        )["stats"]
+
+        assert "nir_xxhash" in result
+        assert not any(name.startswith("background_") for name in result if name != "background_fraction")
+
+
+@pytest.mark.required
+class TestChannelGroupValidation:
+    """Group names are checked at the call, where the mistake is.
+
+    Every input to the check is known before an image is read, so a bad name fails here
+    rather than as a confusing rename several layers downstream.
+    """
+
+    _IMAGE = [np.zeros((4, 8, 8), np.uint8)]
+
+    @pytest.mark.parametrize("name", ["unit", "instance", "sequence", "track", "background"])
+    def test_reserved_names_are_rejected(self, name):
+        """`instance_brightness` would be indistinguishable from a level-qualified column."""
+        with pytest.raises(ValueError, match="reserved"):
+            compute_stats(self._IMAGE, stats=ImageStats.PIXEL_MEAN, channels={name: 0}, normalize_pixel_values=False)
+
+    def test_a_name_that_would_collide_with_a_statistic_is_rejected(self):
+        """`distance` + `center` is `distance_center`, which already names a statistic."""
+        with pytest.raises(ValueError, match="already name statistics"):
+            compute_stats(
+                self._IMAGE,
+                stats=ImageStats.DIMENSION_CENTER | ImageStats.DIMENSION_DISTANCE_CENTER,
+                channels={"distance": 0},
+                normalize_pixel_values=False,
+            )
+
+    @pytest.mark.parametrize("name", ["", "not an identifier", "3bands"])
+    def test_names_must_be_identifiers(self, name):
+        with pytest.raises(ValueError, match="valid identifiers"):
+            compute_stats(self._IMAGE, stats=ImageStats.PIXEL_MEAN, channels={name: 0}, normalize_pixel_values=False)
+
+    def test_a_mapping_with_no_band_variant_statistic_warns(self):
+        """Naming bands and asking only for geometry returns no band columns at all."""
+        with pytest.warns(UserWarning, match="none of the requested statistics vary"):
+            compute_stats(
+                self._IMAGE,
+                stats=ImageStats.DIMENSION_WIDTH,
+                channels={"nir": 3},
+                normalize_pixel_values=False,
+            )
+
+
+@pytest.mark.required
+class TestPerChannelDeprecation:
+    """The row shape is kept and deprecated rather than rebuilt badly.
+
+    Column names discovered per datum cannot be reconciled across ragged data — the
+    aggregation appends by name, so a name absent from one datum shortens its array. The
+    row path has no such problem, so it survives until the shape goes.
+    """
+
+    _IMAGE = [np.zeros((3, 8, 8), np.uint8)]
+
+    def test_channels_true_is_the_row_path(self):
+        with pytest.warns(DeprecationWarning, match="Per-channel rows are deprecated"):
+            result = compute_stats(
+                self._IMAGE, stats=ImageStats.PIXEL_MEAN, channels=True, normalize_pixel_values=False
+            )
+
+        assert any(s.channel is not None for s in result["source_index"])
+
+    def test_per_channel_warns_and_is_unchanged(self):
+        with pytest.warns(DeprecationWarning, match="Per-channel rows are deprecated"):
+            old = compute_stats(
+                self._IMAGE, stats=ImageStats.PIXEL_MEAN, per_channel=True, normalize_pixel_values=False
+            )
+        with pytest.warns(DeprecationWarning, match="Per-channel rows are deprecated"):
+            shim = compute_stats(self._IMAGE, stats=ImageStats.PIXEL_MEAN, channels=True, normalize_pixel_values=False)
+
+        assert [s.channel for s in old["source_index"]] == [s.channel for s in shim["source_index"]]
+
+    def test_the_message_carries_the_migration(self):
+        with pytest.warns(DeprecationWarning, match=r"channels=\{'r': 0, 'g': 1, 'b': 2\}"):
+            compute_stats(self._IMAGE, stats=ImageStats.PIXEL_MEAN, per_channel=True, normalize_pixel_values=False)
+
+
+@pytest.mark.required
+class TestWideBandWarning:
+    """The unnamed view means *the image as a picture*, only defined for mono or RGB.
+
+    Said rather than enforced: a cap would take the dimension statistics — well defined at
+    any band count — down with it, and existing 4-band callers keep today's answer.
+    """
+
+    @staticmethod
+    def _warned(caplog):
+        return any("measured as a single picture" in record.getMessage() for record in caplog.records)
+
+    def test_visual_statistics_on_a_wide_datum_warn(self, caplog):
+        image = np.zeros((6, 8, 8), np.uint8)
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+            compute_stats([image], stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=False)
+
+        assert self._warned(caplog)
+
+    def test_naming_the_bands_answers_the_question(self, caplog):
+        """A caller who named their groups has already said which bands are a picture."""
+        image = np.zeros((6, 8, 8), np.uint8)
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+            compute_stats(
+                [image],
+                stats=ImageStats.VISUAL_BRIGHTNESS,
+                normalize_pixel_values=False,
+                channels={"rgb": [0, 1, 2]},
+            )
+
+        assert not self._warned(caplog)
+
+    def test_three_band_data_never_warns(self, caplog):
+        image = np.zeros((3, 8, 8), np.uint8)
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+            compute_stats([image], stats=ImageStats.VISUAL | ImageStats.HASH, normalize_pixel_values=False)
+
+        assert not self._warned(caplog)
+
+    def test_dimension_statistics_are_never_capped(self, caplog):
+        """Warn, do not cap — a cap would take geometry down with the visual statistics."""
+        image = np.zeros((6, 8, 8), np.uint8)
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+            result = compute_stats([image], stats=ImageStats.DIMENSION_WIDTH, normalize_pixel_values=False)
+
+        assert result["stats"]["width"][0] == 8.0
+        assert not self._warned(caplog)
+
+
+@pytest.mark.required
+class TestCommonCaseUnaffected:
+    """1- and 3-channel callers must notice nothing: no argument, no warning, no change.
+
+    This feature is for power users with special image formats. Every element of it is
+    measured against this.
+    """
+
+    @pytest.mark.parametrize("channels", [1, 3])
+    def test_results_are_identical_to_before_the_feature(self, channels, recwarn):
+        image = np.random.default_rng(0).integers(0, 256, (channels, 16, 16), dtype=np.uint8)
+
+        result = compute_stats(
+            [image],
+            stats=ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.DIMENSION,
+            normalize_pixel_values=False,
+        )
+
+        assert not any(name.count("_") and name.split("_")[0] in ("rgb", "nir") for name in result["stats"])
+        assert not result.get("warnings")
+        assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning | UserWarning)]
+
+
+@pytest.mark.required
+class TestUnmeasuredViewsAnswerConsistently:
+    """One rule for a view that holds no data: NaN, except for the statistic about absence.
+
+    Every statistic here is a claim about values, and there are no values to make it about
+    — so NaN. `missing` is the exception by construction: it measures the *presence* of
+    data rather than the data, so it is precisely the one that still has an answer, and
+    1.0 is the signal a reader needs. Hashes answer with the empty string for the same
+    reason they cannot answer at all — see `TestUnsatisfiableChannelGroups`.
+    """
+
+    _STATS = (
+        ImageStats.PIXEL_MEAN
+        | ImageStats.PIXEL_STD
+        | ImageStats.PIXEL_ENTROPY
+        | ImageStats.PIXEL_ZEROS
+        | ImageStats.PIXEL_MISSING
+        | ImageStats.VISUAL_BRIGHTNESS
+    )
+
+    def test_an_absent_band_group(self):
+        ragged = [np.zeros((4, 8, 8), np.uint8), np.zeros((2, 8, 8), np.uint8)]
+
+        result = compute_stats(ragged, stats=self._STATS, normalize_pixel_values=False, channels={"nir": 3})["stats"]
+
+        for name in ("nir_mean", "nir_std", "nir_entropy", "nir_zeros", "nir_brightness"):
+            assert np.isnan(result[name][1]), f"{name} claims something about values that are not there"
+        assert result["nir_missing"][1] == pytest.approx(1.0), "absence is what `missing` is for"
+
+    def test_an_out_of_bounds_box(self):
+        """The same rule, reached by a different route — and `zeros` was wrong here too."""
+        images = [np.zeros((3, 8, 8), np.uint8)]
+
+        result = compute_stats(
+            images,
+            boxes=[[(100, 100, 110, 110)]],
+            stats=self._STATS,
+            per_image=False,
+            normalize_pixel_values=False,
+        )["stats"]
+
+        assert np.isnan(result["zeros"][0]), "an all-zero image would report 1.0; a box off it reported 0.0"
+        assert result["missing"][0] == pytest.approx(1.0)
+        for name in ("mean", "std", "entropy", "brightness"):
+            assert np.isnan(result[name][0])
+
+    def test_a_measured_view_still_reports_zeros(self):
+        """The guard must not swallow a real all-zero measurement."""
+        result = compute_stats(
+            [np.zeros((3, 8, 8), np.uint8)], stats=ImageStats.PIXEL_ZEROS, normalize_pixel_values=False
+        )["stats"]
+
+        assert result["zeros"][0] == pytest.approx(1.0)
+
+
+@pytest.mark.required
+class TestPresenceStatisticsReadTheRawView:
+    """`missing` and `zeros` are claims about the stored values, not about the scaled copy.
+
+    Both are counted over `CalculatorCache.image` in the aggregate path and so must be
+    counted over the same view per channel. `scaled` cannot answer either: it is all-NaN
+    where no interval could be established, and it shifts by `pmin`, which moves a raw zero
+    off zero for any range that does not start there.
+    """
+
+    def test_missing_is_zero_for_present_but_unmeasurable_data(self):
+        """Data with no readable range is still present, so nothing is missing."""
+        images = np.random.default_rng(0).random((2, 3, 8, 8)) * 1000.0  # float beyond [0, 255]
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            per_channel = compute_stats(
+                images, stats=ImageStats.PIXEL_MISSING, normalize_pixel_values=True, per_channel=True
+            )["stats"]
+            aggregate = compute_stats(
+                images, stats=ImageStats.PIXEL_MISSING, normalize_pixel_values=True, per_channel=False
+            )["stats"]
+
+        assert np.all(np.asarray(per_channel["missing"]) == 0.0), "an unreadable range is not missing data"
+        assert np.all(np.asarray(aggregate["missing"]) == 0.0)
+
+    def test_zeros_agrees_across_layouts_under_a_declared_range(self):
+        """A declared range starting below zero must not move which pixels count as zero."""
+        images = np.zeros((1, 3, 4, 4))
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            per_channel = compute_stats(
+                images,
+                stats=ImageStats.PIXEL_ZEROS,
+                normalize_pixel_values=True,
+                value_range=(-100.0, 100.0),
+                per_channel=True,
+            )["stats"]
+            aggregate = compute_stats(
+                images,
+                stats=ImageStats.PIXEL_ZEROS,
+                normalize_pixel_values=True,
+                value_range=(-100.0, 100.0),
+                per_channel=False,
+            )["stats"]
+
+        assert np.all(np.asarray(per_channel["zeros"]) == pytest.approx(1.0))
+        assert np.all(np.asarray(aggregate["zeros"]) == pytest.approx(1.0))
+
+
+class TestRegressionsAgainstV1_0:
+    """Calls that worked before this branch and must keep working.
+
+    Each of these passed on v1.0.6 and on `main`, broke somewhere in the channel-views
+    work, and was found only after the fact — the full suite stayed green through all
+    three. Pinned here so the next refactor of the view machinery has to answer for them.
+    """
+
+    def test_per_background_on_non_spatial_data(self):
+        """`per_background=True` over 1-D data must not reach the mask builder.
+
+        Phase 1 dropped `per_background = per_background and has_boxes` deliberately, so
+        an unannotated image would still report a background. That reasoning covers
+        box-less *image* data; 1-D data has no image plane to carve a background out of,
+        and `boxes_to_mask` reads `shape[-2:]` unconditionally.
+        """
+        result = compute_stats(
+            [np.random.default_rng(0).random(32)],
+            stats=ImageStats.PIXEL_MEAN,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+
+        assert "mean" in result["stats"]
+        assert not np.isnan(result["stats"]["mean"]).all()
+
+    def test_two_dimensional_data_reports_one_channel(self):
+        """A NaN fallback must be sized by the channel count, not by `image.shape[0]`.
+
+        For 2-D data `shape[0]` is the height. The fallbacks only ran on all-NaN input
+        before the value-range work, which reshapes to one channel first; the new
+        unmeasurable-range gates made them reachable for ordinary 2-D input, where
+        emitting H values for a 1-channel datum fails reconciliation outright.
+        """
+        image = np.linspace(-50.0, 50.0, 64).reshape(8, 8)  # 2-D, negative, so no readable range
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pixel = compute_stats([image], stats=ImageStats.PIXEL_MEAN, per_channel=True, normalize_pixel_values=True)[
+                "stats"
+            ]
+            visual = compute_stats(
+                [image], stats=ImageStats.VISUAL_BRIGHTNESS, per_channel=True, normalize_pixel_values=False
+            )["stats"]
+
+        # One value per datum, not one per row of pixels.
+        assert len(pixel["mean"]) == 1
+        assert len(visual["brightness"]) == 1
+
+    def test_empty_result_combines_without_a_name_mismatch(self):
+        """A split that matched nothing has no columns, which is not a disagreement.
+
+        `combine_stats_results` raises on differing statistic names so band groups cannot
+        be silently dropped. A zero-row result carries an empty name set, which is not the
+        caller having asked for different flags.
+        """
+
+        def stats_for(n: int):
+            return compute_stats(np.zeros((n, 1, 8, 8)), stats=ImageStats.HASH_XXHASH, normalize_pixel_values=False)
+
+        stats, source_index, steps = combine_stats_results([stats_for(3), stats_for(0), stats_for(2)])
+
+        # The empty result contributes a boundary but no rows, so later items stay put.
+        assert steps == [3, 3, 5]
+        assert len(source_index) == 5
+        assert len(stats["xxhash"]) == 5
+
+    def test_empty_result_does_not_erase_the_statistics(self):
+        """Regression on the *older* behavior: intersecting away every column.
+
+        Before the raise, an empty result intersected the name set to nothing, so the
+        combined map held no statistics at all and every downstream search ran over an
+        empty table and reported a normal-looking empty answer.
+        """
+        stats, _, _ = combine_stats_results([
+            compute_stats(np.zeros((3, 1, 8, 8)), stats=ImageStats.HASH_XXHASH, normalize_pixel_values=False),
+            compute_stats(np.zeros((0, 1, 8, 8)), stats=ImageStats.HASH_XXHASH, normalize_pixel_values=False),
+        ])
+
+        assert "xxhash" in stats, "the populated result's statistics must survive an empty sibling"
+        assert len(stats["xxhash"]) == 3
+
+    def test_unreadable_range_warns_for_every_family_it_nans(self, caplog):
+        """The warning must name every statistic it makes NaN, not just the pixel ones.
+
+        `VISUAL` resolves the display range and `DIMENSION_DEPTH` reports the decoded
+        encoding, so both answer NaN without an interval — and both were silent, which the
+        concepts page explicitly promises against.
+        """
+        image = np.random.default_rng(0).uniform(-2000.0, 2000.0, (1, 8, 8))
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
+            result = compute_stats(
+                [image],
+                stats=ImageStats.VISUAL_BRIGHTNESS | ImageStats.DIMENSION_DEPTH,
+                normalize_pixel_values=False,
+            )
+
+        assert np.isnan(result["stats"]["brightness"]).all()
+        assert np.isnan(result["stats"]["depth"]).all()
+        assert "VISUAL_BRIGHTNESS" in caplog.text
+        assert "DIMENSION_DEPTH" in caplog.text
+
+    def test_missing_is_never_named_as_unmeasurable(self, caplog):
+        """`missing` reads the raw view, so it always answers and must not be promised NaN."""
+        image = np.random.default_rng(0).random((1, 8, 8)) * 1000.0
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
+            result = compute_stats([image], stats=ImageStats.PIXEL, normalize_pixel_values=True)
+
+        assert np.all(np.asarray(result["stats"]["missing"]) == 0.0)
+        assert "PIXEL_MISSING" not in caplog.text
+
+
+class TestReviewFindings:
+    """Defects found by adversarial review of this branch, each verified before fixing."""
+
+    def test_visual_statistics_stay_on_the_display_range(self):
+        """A declared interval narrower than the data must not push a reading past 255.
+
+        `edge_filter` clips at 0-255 internally, so without this `sharpness` saturated
+        while `brightness` and `darkness` ran free — the family disagreeing about the scale
+        it documents itself as being on.
+        """
+        image = np.linspace(0.0, 1000.0, 192).reshape(3, 8, 8)
+
+        stats = compute_stats(
+            [image],
+            stats=ImageStats.VISUAL_BRIGHTNESS | ImageStats.VISUAL_DARKNESS | ImageStats.VISUAL_PERCENTILES,
+            normalize_pixel_values=False,
+            value_range=(0.0, 100.0),
+        )["stats"]
+
+        for name in ("brightness", "darkness"):
+            assert 0.0 <= float(stats[name][0]) <= 255.0, f"{name} left the display range"
+        assert np.nanmax(np.asarray(stats["percentiles"], dtype=np.float64)) <= 255.0
+
+    def test_eight_bit_perceptual_view_is_still_the_identity(self):
+        """Clipping must not cost the common case a copy."""
+        image = (np.random.default_rng(0).random((3, 8, 8)) * 255).astype(np.uint8)
+        cache = CalculatorCache(image)
+
+        assert cache.perceptual is cache.image
+
+    def test_wide_band_warning_is_silent_under_per_channel(self, caplog):
+        """`per_channel=True` already measures each band, so nothing was averaged.
+
+        The warning describes the opposite of what happened and points at `channels=`,
+        which cannot be combined with `per_channel` anyway.
+        """
+        image = (np.random.default_rng(0).random((4, 16, 16)) * 255).astype(np.uint8)
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"), warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            compute_stats([image], stats=ImageStats.VISUAL_BRIGHTNESS, per_channel=True, normalize_pixel_values=False)
+        assert "single picture" not in caplog.text
+
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
+            compute_stats([image], stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=False)
+        assert "single picture" in caplog.text, "it must still fire for an unnamed wide-band view"
+
+    def test_channel_indices_accept_a_numpy_array(self):
+        """`np.arange(3)` is an ordinary way to spell a band selection."""
+        from dataeval.utils.preprocessing import ChannelGroup
+
+        assert ChannelGroup(np.arange(3)).indices == (0, 1, 2)
+        assert ChannelGroup([np.int64(0), np.int64(2)]).indices == (0, 2)
+
+        with pytest.raises(ValueError, match="must be 1-D and of integer dtype"):
+            ChannelGroup(np.array([[0, 1]]))
+        with pytest.raises(ValueError, match="must be 1-D and of integer dtype"):
+            ChannelGroup(np.array([0.5, 1.5]))
+
+
+class TestHistogramRangeCoverage:
+    """`np.histogram` drops values outside its range; that must not pass unremarked."""
+
+    def test_declared_range_narrower_than_the_data_is_reported(self, caplog):
+        """The bins give no sign of it, and the entropy derived from them reads as whole."""
+        image = np.arange(400.0).reshape(1, 20, 20)
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
+            result = compute_stats(
+                [image],
+                stats=ImageStats.PIXEL_HISTOGRAM | ImageStats.PIXEL_ENTROPY,
+                normalize_pixel_values=False,
+                value_range=(0.0, 100.0),
+            )
+
+        counted = int(np.asarray(result["stats"]["histogram"]).sum())
+        assert counted < 400, "the setup must actually truncate for this to be testing anything"
+        assert "fall outside the histogram range" in caplog.text
+        assert f"{400 - counted} of 400" in caplog.text
+
+    @pytest.mark.parametrize(
+        "image",
+        [
+            (np.random.default_rng(0).random((3, 16, 16)) * 255).astype(np.uint8),
+            (np.random.default_rng(0).random((3, 16, 16)) * 4095).astype(np.uint16),
+            np.random.default_rng(0).random((3, 16, 16)),
+        ],
+        ids=["uint8", "uint16", "float_unit"],
+    )
+    def test_ordinary_imagery_never_reports_truncation(self, image, caplog):
+        """A decoded range covers its data by construction, so this must stay silent."""
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
+            compute_stats([image], stats=ImageStats.PIXEL_HISTOGRAM, normalize_pixel_values=False)
+
+        assert "fall outside the histogram range" not in caplog.text

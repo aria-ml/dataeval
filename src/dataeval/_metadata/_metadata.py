@@ -1107,11 +1107,11 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         iteration and indexing. The dataframe itself is unaffected: it always holds
         every level, and :meth:`rows_at` reaches any of them regardless of the view.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             ``"target"`` is accepted with a warning and resolves to the
-            ``"instance"`` level.
+            ``"instance"`` level. Removed in v1.2.0.
 
-        .. deprecated::
+        .. deprecated:: 1.1
             ``"image"`` is accepted with a warning and resolves to the ``"unit"``
             level. Removed in v1.2.0.
 
@@ -1169,11 +1169,11 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         level : FactorLevel
             Level to project, one of :attr:`levels`.
 
-            .. deprecated::
+            .. deprecated:: 1.1
                 ``"target"`` is accepted with a warning and resolves to the
-                ``"instance"`` level.
+                ``"instance"`` level. Removed in v1.2.0.
 
-            .. deprecated::
+            .. deprecated:: 1.1
                 ``"image"`` is accepted with a warning and resolves to the
                 ``"unit"`` level. Removed in v1.2.0.
 
@@ -2027,7 +2027,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         level : str
             Level to filter to, one of :attr:`levels`.
 
-            .. deprecated::
+            .. deprecated:: 1.1
                 ``"image"`` is accepted with a warning and resolves to the
                 ``"unit"`` level. Removed in v1.2.0.
 
@@ -2695,7 +2695,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             two supported ways to say where values belong, and between them they cover
             everything the retired spellings did.
 
-            .. deprecated::
+            .. deprecated:: 1.1
                 ``"auto"`` — the current default — infers each factor's level from its
                 array length, and warns when it does. A length identifies a level only
                 by coincidence: levels routinely hold the same number of rows, so a
@@ -2704,11 +2704,11 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
                 v1.2.0, from when the destination has to be stated — by `level` or by
                 `source_index`, either one.
 
-            .. deprecated::
+            .. deprecated:: 1.1
                 ``level="target"`` is accepted with a warning and resolves to
                 the ``"instance"`` level.
 
-            .. deprecated::
+            .. deprecated:: 1.1
                 ``level="combined"`` is accepted with a warning. It was never a level;
                 it described an array ordered by ``(item, target)``, each item's
                 item-level value ahead of that item's label-level ones. The array is
@@ -2718,7 +2718,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
                 same two levels, and cannot place a value on the wrong row. Inferring
                 the same layout under ``"auto"`` is deprecated on the same terms.
 
-            .. deprecated::
+            .. deprecated:: 1.1
                 ``level="image"`` is accepted with a warning and resolves to the
                 ``"unit"`` level. Removed in v1.2.0.
         overwrite : bool, default False

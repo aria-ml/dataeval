@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from unittest.mock import patch
 
 import numpy as np
@@ -10,12 +11,14 @@ from dataeval.utils.preprocessing import (
     BitDepth,
     BoundingBox,
     BoundingBoxFormat,
+    ValueRange,
     boxes_to_mask,
     clip_box,
     compute_iou,
     crop_with_fill,
     edge_filter,
     get_bitdepth,
+    get_value_range,
     is_valid_box,
     normalize_image_shape,
     rescale,
@@ -334,6 +337,86 @@ class TestBoxesToMask:
 
 
 @pytest.mark.required
+class TestValueRange:
+    """Encoding depth is decoded where there is an encoding, and withheld where there is not.
+
+    The split exists because ``BitDepth`` derived a depth from an observed maximum for
+    every input, which is a decode for integer imagery and arithmetic on an arbitrary
+    number for anything else.
+    """
+
+    @pytest.mark.parametrize(
+        ("image", "expected"),
+        [
+            # Integer encodings are genuinely power-of-two, so reading one off is a decode.
+            (np.array([[0, 255]], dtype=np.uint8), ValueRange(8, 0.0, 255.0)),
+            (np.array([[0, 1]], dtype=np.uint8), ValueRange(1, 0.0, 1.0)),
+            (np.array([[0, 3000]], dtype=np.uint16), ValueRange(12, 0.0, 4095.0)),
+            (np.array([[0, 60000]], dtype=np.uint16), ValueRange(16, 0.0, 65535.0)),
+            (np.array([[True, False]]), ValueRange(1, 0.0, 1.0)),
+            # The two conventional float spellings of an ordinary image.
+            (np.array([[0.0, 1.0]]), ValueRange(1, 0.0, 1.0)),
+            (np.array([[0.0, 255.0]]), ValueRange(8, 0.0, 255.0)),
+            # Interpolation leaves 8-bit data non-integral; it is still 8-bit data.
+            (np.array([[0.0, 200.5]]), ValueRange(8, 0.0, 255.0)),
+        ],
+    )
+    def test_known_encodings_are_decoded(self, image, expected):
+        assert get_value_range(image) == expected
+
+    @pytest.mark.parametrize(
+        ("image", "why"),
+        [
+            (np.array([[0.0, 40000.0]]), "float beyond 255 has no encoding to decode"),
+            (np.array([[-50.0, 50.0]]), "a signed span matches no convention"),
+            (np.array([[-50, 50]], dtype=np.int16), "nor does a signed integer one"),
+            (np.array([]), "nothing to read"),
+            (np.array([[np.nan, np.nan]]), "nothing measured"),
+        ],
+    )
+    def test_unmeasurable_data_has_no_range(self, image, why):
+        value_range = get_value_range(image)
+        assert not value_range.is_known, why
+        assert math.isnan(value_range.depth)
+
+    def test_binary_float_mask_reads_as_normalized(self):
+        """Order matters: [0, 1] is tested before [0, 255], so a mask is not a degenerate 8-bit image."""
+        assert get_value_range(np.array([[0.0, 1.0, 0.0]])) == ValueRange(1, 0.0, 1.0)
+
+    def test_declaration_wins_and_implies_no_depth(self):
+        declared = get_value_range(np.array([[-50.0, 50.0]]), declared=(-100.0, 100.0))
+        assert (declared.pmin, declared.pmax) == (-100.0, 100.0)
+        assert math.isnan(declared.depth), "a declaration is a measurement, not an encoding"
+        assert declared.is_known
+
+    def test_declaration_overrides_an_inferable_encoding(self):
+        """A caller who says these uint16 values are physical units is believed."""
+        declared = get_value_range(np.array([[0, 3000]], dtype=np.uint16), declared=(0.0, 3000.0))
+        assert (declared.pmin, declared.pmax) == (0.0, 3000.0)
+
+    @pytest.mark.parametrize("declared", [(1.0, 0.0), (0.0, 0.0), (0.0, np.inf), (np.nan, 1.0), "nope", (1.0,)])
+    def test_malformed_declarations_are_rejected(self, declared):
+        with pytest.raises(ValueError, match="value range must be"):
+            get_value_range(np.zeros((2, 2)), declared=declared)
+
+    def test_observed_is_an_explicit_per_array_stretch(self):
+        observed = ValueRange.observed(np.array([[-50.0, 50.0]]))
+        assert (observed.pmin, observed.pmax) == (-50.0, 50.0)
+        assert math.isnan(observed.depth)
+
+    def test_observed_of_nothing_is_unknown(self):
+        assert not ValueRange.observed(np.array([[np.nan]])).is_known
+
+    def test_rescale_refuses_an_unknown_range(self):
+        with pytest.raises(ValueError, match="no value range could be established"):
+            rescale(np.array([[-50.0, 50.0]]))
+
+    def test_rescale_stretches_when_the_caller_asks_for_it(self):
+        image = np.array([[-50.0, 50.0]])
+        np.testing.assert_allclose(rescale(image, value_range=ValueRange.observed(image)), [[0.0, 1.0]])
+
+
+@pytest.mark.required
 class TestImageUtils:
     def test_get_bitdepth_negatives(self):
         image = np.random.random((3, 28, 28)) - 0.5
@@ -508,3 +591,29 @@ class TestResize:
         result = resize(image, 64, use_pil=False)
         assert result.shape == (64, 64)
         assert result.dtype == np.uint8
+
+
+class TestRescaleZeroSpan:
+    """A constant array normalizes to zero, but a hole in it is not a value."""
+
+    def test_nan_survives_a_constant_array(self):
+        """`ValueRange.observed` skips NaN when reading extremes, so this case is reachable.
+
+        Flattening the hole to 0.0 hands a real measurement to whatever reads the result —
+        `_bovw` takes exactly this path before handing the array to SIFT.
+        """
+        image = np.full((2, 2), 7.0)
+        image[0, 0] = np.nan
+
+        result = rescale(image, depth=8, value_range=ValueRange.observed(image))
+
+        assert np.isnan(result[0, 0]), "an absent measurement must not become a zero"
+        assert np.array_equal(result[~np.isnan(result)], np.zeros(3))
+
+    def test_constant_array_without_nan_is_all_zero(self):
+        """The ordinary constant case is unchanged."""
+        image = np.full((2, 2), 7.0)
+
+        result = rescale(image, depth=8, value_range=ValueRange.observed(image))
+
+        assert np.array_equal(result, np.zeros((2, 2)))

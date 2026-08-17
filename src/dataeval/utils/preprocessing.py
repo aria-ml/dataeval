@@ -6,25 +6,30 @@ __all__ = [
     "BoundingBoxFormat",
     "Box",
     "BoxLike",
+    "ChannelGroup",
+    "ChannelGroupLike",
     "FloatBox",
     "IntBox",
+    "ValueRange",
     "boxes_to_mask",
     "clip_box",
     "compute_iou",
     "crop_with_fill",
     "edge_filter",
     "get_bitdepth",
+    "get_value_range",
     "is_valid_box",
     "normalize_image_shape",
     "rescale",
     "resize",
     "to_bounding_box",
     "to_canonical_grayscale",
+    "to_channel_group",
     "to_int_box",
 ]
 
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -47,6 +52,7 @@ _logger = get_logger(__name__)
 
 _EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
 _BIT_DEPTH = (1, 8, 12, 16, 32)
+_EIGHT_BIT_MAX = 255
 
 
 # ===========================
@@ -472,6 +478,10 @@ class BitDepth:
     """
     Dataclass representing image bit depth information.
 
+    .. deprecated:: 1.1
+        Use :class:`ValueRange`, which separates the interval statistics are computed
+        against from the encoding depth it was decoded from. Will be removed in v1.2.
+
     Attributes
     ----------
     depth : int
@@ -487,9 +497,99 @@ class BitDepth:
     pmax: float | int
 
 
+@dataclass(frozen=True)
+class ValueRange:
+    """
+    The interval a datum's values occupy, and the encoding depth that interval was decoded from.
+
+    Two separate things, which :class:`BitDepth` conflated. **Encoding depth** is how the
+    data was stored, and only exists where there is an encoding to decode — integer image
+    formats genuinely are power-of-two, so reading one off is a decode rather than a
+    guess. **Value range** is the interval :func:`rescale` divides by and a histogram bins
+    over, and is what every consumer actually needs.
+
+    Floating point data has no encoding to decode, so outside the two conventional float
+    spellings of an ordinary image its depth is ``nan`` and its interval must be declared
+    — see :func:`get_value_range`.
+
+    Attributes
+    ----------
+    depth : float
+        Bit depth the interval was decoded from — one of 1, 8, 12, 16 or 32 — or ``nan``
+        where the values carry no encoding to read. Reported as
+        :attr:`~dataeval.flags.ImageStats.DIMENSION_DEPTH`.
+    pmin : float
+        Lower bound of the interval, or ``nan`` when no interval could be established.
+    pmax : float
+        Upper bound of the interval, or ``nan`` when no interval could be established.
+
+    See Also
+    --------
+    get_value_range : establish the range for an array
+    rescale : the interval's principal consumer
+
+    Examples
+    --------
+    An 8-bit image's interval is its encoding's, not the pixels' own extremes:
+
+    >>> get_value_range(np.array([[0, 100]], dtype=np.uint8))
+    ValueRange(depth=8, pmin=0.0, pmax=255.0)
+
+    Float data outside the conventional spellings has neither:
+
+    >>> get_value_range(np.array([[-50.0, 50.0]]))
+    ValueRange(depth=nan, pmin=nan, pmax=nan)
+    """
+
+    depth: float
+    pmin: float
+    pmax: float
+
+    @property
+    def is_known(self) -> bool:
+        """Whether an interval was established, and statistics needing one can be computed."""
+        return not (math.isnan(self.pmin) or math.isnan(self.pmax))
+
+    @classmethod
+    def observed(cls, values: NDArray[Any]) -> "ValueRange":
+        """
+        Read the interval the values themselves span, carrying no encoding depth.
+
+        An explicit request for a per-array stretch. Use it where each array is meant to
+        be normalized against its own extremes — as a feature extractor does, since a
+        descriptor reads contrast rather than absolute level — and *not* where arrays are
+        to be compared against each other, which is what an inferred or declared range
+        exists for.
+
+        Parameters
+        ----------
+        values : NDArray
+            Array to read the extremes off. NaNs are skipped.
+
+        Returns
+        -------
+        ValueRange
+            The observed interval with ``depth`` of ``nan``, or an unknown range when
+            `values` is empty or entirely NaN.
+        """
+        if values.size == 0 or np.isnan(values).all():
+            return cls(np.nan, np.nan, np.nan)
+        return cls(np.nan, float(np.nanmin(values)), float(np.nanmax(values)))
+
+
+#: The answer where no interval could be established — see :func:`get_value_range` Notes.
+_UNKNOWN_RANGE = ValueRange(np.nan, np.nan, np.nan)
+
+
+@deprecated(since="1.1", removal="1.2", alternative="get_value_range")
 def get_bitdepth(image: NDArray[Any]) -> BitDepth:
     """
     Approximates the bit depth of the image using the min and max pixel values.
+
+    .. deprecated:: 1.1
+        Use :func:`get_value_range`, which does not fabricate a depth for float data and
+        does not discard the observed range of data holding negative values. Will be
+        removed in v1.2.
 
     Parameters
     ----------
@@ -510,9 +610,311 @@ def get_bitdepth(image: NDArray[Any]) -> BitDepth:
     return BitDepth(depth, 0, 2**depth - 1)
 
 
-def rescale(image: NDArray[Any], depth: int = 1, bitdepth: BitDepth | None = None) -> NDArray[Any]:
+def get_value_range(values: NDArray[Any], *, declared: tuple[float, float] | None = None) -> ValueRange:
     """
-    Rescales the image using the bit depth provided.
+    Establish the interval an array's values are measured against.
+
+    Parameters
+    ----------
+    values : NDArray
+        Array to establish the range for. NaNs are skipped.
+    declared : tuple[float, float] or None, default None
+        The interval, stated by the caller as ``(low, high)``. Takes precedence over
+        every inference below: a declaration is the caller saying these are physical
+        values with a known span, not an encoded image, so no depth is implied from it.
+
+    Returns
+    -------
+    ValueRange
+        The interval and — where the data was encoded rather than measured — the depth it
+        was decoded from. An unknown range (every field ``nan``) where none could be
+        established; see Notes.
+
+    Raises
+    ------
+    ValueError
+        If `declared` is not an ordered pair of finite numbers.
+
+    Notes
+    -----
+    Resolved in order, first match winning:
+
+    1. `declared`, if given. Depth is ``nan`` — a declaration carries no encoding.
+    2. Empty or all-NaN input: unknown.
+    3. Non-negative integer dtype: the power-of-two encoding is **decoded** from the
+       maximum. This is what makes two images comparable — every 8-bit image divides by
+       255 rather than by its own brightest pixel.
+    4. Float within ``[0, 1]``: already normalized, so the interval is ``[0, 1]``.
+    5. Float within ``[0, 255]``: the float spelling of an 8-bit image — what a
+       ``ToTensor``-style pipeline or a resize leaves behind — so the interval is
+       ``[0, 255]``.
+    6. Anything else: **unknown**. Float data spanning more than 255, and any data
+       holding negative values, carries no encoding to decode and no convention to
+       fall back on.
+
+    Cases 4 and 5 are the two ordinary float spellings of visible imagery and are
+    deliberately not fabrications: both are conventions with one reading. Their order
+    matters — testing ``[0, 1]`` first means a binary mask reads as normalized rather
+    than as a degenerate 8-bit image.
+
+    Case 6 is the honest answer for elevation below sea level, mean-centred reflectance,
+    temperature in Celsius, or any band whose dynamic range is a property of the sensor
+    rather than of a file format. Declare the interval for these; the alternative is a
+    number derived from an arbitrary maximum, which looks like a measurement and is not.
+
+    Examples
+    --------
+    An integer encoding is decoded, so a dark image still scales by its format's range:
+
+    >>> get_value_range(np.array([[0, 3000]], dtype=np.uint16))
+    ValueRange(depth=12, pmin=0.0, pmax=4095.0)
+
+    A declaration wins, and implies no depth:
+
+    >>> get_value_range(np.array([[-50.0, 50.0]]), declared=(-100.0, 100.0))
+    ValueRange(depth=nan, pmin=-100.0, pmax=100.0)
+    """
+    if declared is not None:
+        low, high = _validate_declared_range(declared)
+        return ValueRange(np.nan, low, high)
+
+    if values.size == 0 or np.isnan(values).all():
+        return _UNKNOWN_RANGE
+
+    pmin, pmax = float(np.nanmin(values)), float(np.nanmax(values))
+    if pmin < 0:
+        # Neither a power-of-two decode nor either float convention covers a signed span.
+        return _UNKNOWN_RANGE
+    return _decode_range(values.dtype, pmax)
+
+
+def _decode_range(dtype: DTypeLike, pmax: float) -> ValueRange:
+    """Read the encoding off non-negative values, or answer unknown where there is none."""
+    if np.issubdtype(dtype, np.integer) or np.issubdtype(dtype, np.bool_):
+        depth = ([x for x in _BIT_DEPTH if 2**x > pmax] or [max(_BIT_DEPTH)])[0]
+        return ValueRange(depth, 0.0, float(2**depth - 1))
+    # Float: the two conventional spellings of an ordinary image, [0, 1] first so a
+    # binary mask reads as normalized rather than as a degenerate 8-bit image.
+    if pmax <= 1.0:
+        return ValueRange(1, 0.0, 1.0)
+    if pmax <= _EIGHT_BIT_MAX:
+        return ValueRange(8, 0.0, float(_EIGHT_BIT_MAX))
+    return _UNKNOWN_RANGE
+
+
+def _validate_declared_range(declared: tuple[float, float]) -> tuple[float, float]:
+    """Check a caller-declared interval, which nothing downstream can sanity-check for itself.
+
+    Unpacked rather than indexed so that a longer sequence is rejected rather than
+    silently truncated to its first two entries — ``(0, 1, 99)`` is a caller who meant
+    something this function cannot represent, not a ``(0, 1)`` with a typo after it.
+    """
+    try:
+        low_raw, high_raw = declared
+        low, high = (float(low_raw), float(high_raw))
+    except (TypeError, ValueError, IndexError, KeyError) as e:
+        raise ValueError(f"value range must be a (low, high) pair of numbers; got {declared!r}.") from e
+    if not (math.isfinite(low) and math.isfinite(high)) or low >= high:
+        raise ValueError(f"value range must be a finite, ordered (low, high) pair; got {declared!r}.")
+    return low, high
+
+
+class ChannelGroup:
+    """
+    A named set of an image's bands, measured jointly.
+
+    The unit a band-wise statistic is computed over. ``ChannelGroup([0, 1, 2])`` on an
+    RGB+NIR image reduces over the three visible bands *together* — the ordinary
+    all-channel behavior, restricted to a subset — so the group's mean is one number
+    describing the visible part rather than three describing each band. That is what makes
+    it scale: a 224-band cube is asked about as three band groups, not 224 columns.
+
+    Most callers never construct one. A bare index, sequence or range passed to
+    :func:`~dataeval.core.compute_stats`'s ``channels`` is converted automatically;
+    reach for the class when a group needs `value_range`.
+
+    Parameters
+    ----------
+    indices : int or Sequence[int] or range
+        Which bands belong to the group, as zero-based indices into the channel axis.
+        Order is irrelevant — a group is a set being reduced over, not a rearrangement,
+        so the indices are stored ascending however they were written — and repeats are
+        rejected, since a repeated index would silently double-weight that band in every
+        reduction.
+    value_range : tuple[float, float] or None, default None
+        The interval this group's values should be measured against, as ``(low, high)``.
+
+        Bands of one cube are different measurements with different dynamic ranges, and
+        stacking them into a single array leaves the dtype describing none of them
+        individually. So a group whose values carry no encoding to decode — a reflectance,
+        elevation or temperature band — declares its interval here, independently of its
+        neighbours. Leave as None for bands that are ordinary image data; see
+        :func:`get_value_range`.
+
+    Raises
+    ------
+    ValueError
+        If `indices` is empty, holds a repeat, or holds anything but non-negative
+        integers; or if `value_range` is not a finite, ordered pair.
+
+    See Also
+    --------
+    :class:`~dataeval.data.SelectChannels` : narrow a whole dataset to chosen bands
+
+    Notes
+    -----
+    Deliberately not the same type as ``SelectChannels``' channel selection, which shares
+    the spelling but not the semantics. That one permits repeats, accepts ``"gray"`` as a
+    luminance *mix* rather than a slice, and rejects any channel count but 1 or 3 — all
+    correct for producing a transformed image, all wrong for naming a set of bands to
+    reduce over.
+
+    A group is all-or-nothing. Where an image cannot supply every index the group names,
+    every statistic for that group is NaN rather than reduced over the bands that are
+    present — one column name has to mean one thing, and a datum missing bands it should
+    have is a defect that should read as absent.
+
+    Examples
+    --------
+    >>> ChannelGroup(3)
+    ChannelGroup((3,))
+
+    >>> ChannelGroup(range(30, 70))
+    ChannelGroup((30, 31, ..., 69))
+
+    A band whose range is the sensor's rather than a file format's:
+
+    >>> ChannelGroup([4], value_range=(-40.0, 60.0))
+    ChannelGroup((4,), value_range=(-40.0, 60.0))
+    """
+
+    def __init__(
+        self,
+        indices: int | Sequence[int | np.integer] | range | NDArray[Any],
+        *,
+        value_range: tuple[float, float] | None = None,
+    ) -> None:
+        self.indices: tuple[int, ...] = _validate_channel_indices(indices)
+        self.value_range: tuple[float, float] | None = (
+            None if value_range is None else _validate_declared_range(value_range)
+        )
+
+    def __repr__(self) -> str:
+        """Render the group, eliding a long index run to its endpoints."""
+        indices = (
+            f"({self.indices[0]}, {self.indices[1]}, ..., {self.indices[-1]})"
+            if len(self.indices) > 4
+            else repr(self.indices)
+        )
+        suffix = "" if self.value_range is None else f", value_range={self.value_range!r}"
+        return f"{type(self).__name__}({indices}{suffix})"
+
+    def __eq__(self, other: object) -> bool:
+        """Compare by bands and declared range; order of the indices is not part of identity."""
+        if not isinstance(other, ChannelGroup):
+            return NotImplemented
+        return self.indices == other.indices and self.value_range == other.value_range
+
+    def __hash__(self) -> int:
+        """Hash the bands and declared range, matching :meth:`__eq__`."""
+        return hash((self.indices, self.value_range))
+
+
+ChannelGroupLike = int | Sequence[int | np.integer] | range | NDArray[Any] | ChannelGroup
+"""What a channel group may be written as. Coerced by :func:`to_channel_group`."""
+
+
+def _is_index(value: Any) -> bool:
+    """Whether a value names a band.
+
+    ``bool`` is rejected despite being an ``int`` subclass: numpy reads a list of bools as
+    a mask rather than as indices, so ``[True, False, True]`` would silently select bands
+    0 and 2 instead of the requested 1, 0, 1. ``np.bool_`` is rejected for the same reason,
+    while ``np.integer`` is accepted — ``list(np.arange(3))`` holds ``np.int64``, and that
+    is an ordinary way to spell a band selection.
+    """
+    return isinstance(value, int | np.integer) and not isinstance(value, bool | np.bool_)
+
+
+def _normalize_index_candidates(indices: Any) -> Any:
+    """Bring the accepted spellings of a band selection to one sequence form.
+
+    A bare index becomes a one-element tuple, and a numpy array becomes a list —
+    `np.arange(3)` and `np.where(...)[0]` are ordinary ways to spell a selection in a
+    numpy-first library, and neither is a `Sequence`. Only a 1-D integer array names a set
+    of bands; a float or 2-D array is a mistake worth reporting as one rather than coercing.
+    """
+    if _is_index(indices):
+        return (indices,)
+    if isinstance(indices, np.ndarray):
+        if indices.ndim != 1 or indices.dtype.kind not in "iu":
+            raise ValueError(
+                f"channel indices given as an array must be 1-D and of integer dtype; got "
+                f"{indices.ndim}-D {indices.dtype}."
+            )
+        return indices.tolist()
+    return indices
+
+
+def _validate_index_selection(indices: Any) -> tuple[int, ...]:
+    """Check that a value names bands, and narrow it to built-in ints.
+
+    The half two callers share. Repeats and order are *left alone* here, because the two
+    disagree about them: `SelectChannels` reorders and duplicates bands deliberately, while
+    a `ChannelGroup` is reduced over jointly and can do neither. Only what counts as an
+    index at all is common, which is the part worth having one answer to.
+
+    Narrowed to built-in ints so a group's stored tuple hashes and reprs the same however
+    the caller spelled it — ``np.int64(3)`` and ``3`` name one band, not two groups.
+    """
+    candidates = _normalize_index_candidates(indices)
+    if not isinstance(candidates, Sequence | range) or isinstance(candidates, str):
+        raise ValueError(f"channel indices must be an int, a sequence of ints, or a range; got {indices!r}.")
+    if not candidates or not all(_is_index(i) and i >= 0 for i in candidates):
+        raise ValueError(f"channel indices must be a non-empty selection of non-negative ints; got {indices!r}.")
+    return tuple(int(i) for i in candidates)
+
+
+def _validate_channel_indices(indices: Any) -> tuple[int, ...]:
+    """Check a band selection for a group, which nothing downstream can sanity-check itself."""
+    resolved = _validate_index_selection(indices)
+    if len(set(resolved)) != len(resolved):
+        raise ValueError(
+            f"channel indices must not repeat; got {indices!r}. A group is reduced over jointly, so a "
+            "repeated band would be weighted twice in every statistic."
+        )
+    # Canonicalized so that order really is irrelevant, as the class documents. Kept as
+    # written, the order would reach the band slice and so change the answer: a hash runs
+    # a grayscale conversion over the bands in the order given, and equality and hashing
+    # would call ``[0, 1, 2]`` and ``[2, 1, 0]`` two different groups.
+    return tuple(sorted(resolved))
+
+
+def to_channel_group(group: ChannelGroupLike) -> ChannelGroup:
+    """
+    Convert a band selection to a :class:`ChannelGroup`.
+
+    Parameters
+    ----------
+    group : int or Sequence[int] or range or ChannelGroup
+        The selection. A `ChannelGroup` is returned unchanged.
+
+    Returns
+    -------
+    ChannelGroup
+        The selection as a group.
+
+    Examples
+    --------
+    >>> to_channel_group([0, 1, 2])
+    ChannelGroup((0, 1, 2))
+    """
+    return group if isinstance(group, ChannelGroup) else ChannelGroup(group)
+
+
+def rescale(image: NDArray[Any], depth: int = 1, value_range: ValueRange | None = None) -> NDArray[Any]:
+    """
+    Rescales the image using the value range provided.
 
     Parameters
     ----------
@@ -520,19 +922,27 @@ def rescale(image: NDArray[Any], depth: int = 1, bitdepth: BitDepth | None = Non
         Input image array
     depth : int, default 1
         Target bit depth
-    bitdepth : BitDepth or None, default None
-        Source range to rescale *from*. Read off `image` itself when None.
+    value_range : ValueRange or None, default None
+        Source range to rescale *from*. Read off `image` itself with
+        :func:`get_value_range` when None.
 
         Pass it to scale several views of one datum onto a common range. A crop, or a
         region with part of it masked out, has its own extremes, and letting each infer
         its own source range scales them against different denominators — which is
         exactly what makes their statistics look different when the pixels do not. Hand
-        in ``get_bitdepth(whole_image)`` and every view lands on one scale.
+        in ``get_value_range(whole_image)`` and every view lands on one scale.
 
     Returns
     -------
     NDArray
         Rescaled image
+
+    Raises
+    ------
+    ValueError
+        If the range is unknown — see :func:`get_value_range`. There is no interval to
+        divide by, so scaling would be arithmetic on an arbitrary maximum. Declare one,
+        or ask for :meth:`ValueRange.observed` if a per-array stretch is what you want.
 
     Examples
     --------
@@ -544,13 +954,31 @@ def rescale(image: NDArray[Any], depth: int = 1, bitdepth: BitDepth | None = Non
 
     Anchored on the 8-bit image it was cut from, it stays dark:
 
-    >>> rescale(crop, bitdepth=get_bitdepth(np.array([[0, 255]], dtype=np.uint8)))
+    >>> rescale(crop, value_range=get_value_range(np.array([[0, 255]], dtype=np.uint8)))
     array([[0.   , 0.004]])
     """
-    bitdepth = get_bitdepth(image) if bitdepth is None else bitdepth
-    if bitdepth.depth == depth:
+    value_range = get_value_range(image) if value_range is None else value_range
+    if not value_range.is_known:
+        raise ValueError(
+            "Cannot rescale: no value range could be established for this data. Float data spanning "
+            "more than [0, 255], and any data holding negative values, carries no encoding to decode. "
+            "Declare the range it should be scaled against, or pass "
+            "value_range=ValueRange.observed(image) to stretch this array's own extremes."
+        )
+    if value_range.depth == depth:
         return image
-    normalized = (image - bitdepth.pmin) / (bitdepth.pmax - bitdepth.pmin)
+    span = value_range.pmax - value_range.pmin
+    if span == 0:
+        # A zero-width interval only reaches here from `ValueRange.observed` of a constant
+        # array — every decoded or declared range is ordered. Dividing by it would answer
+        # NaN with a RuntimeWarning, which reads as unmeasured data rather than as the
+        # uniform array it is; 0 is min-max normalization's answer for a constant.
+        #
+        # NaN is carried through rather than flattened to 0. `observed` skips NaN when it
+        # reads the extremes, so a constant array with holes in it reaches here, and a hole
+        # is an absent measurement rather than a value equal to the constant.
+        return np.where(np.isnan(image), np.nan, 0.0).astype(np.float64)
+    normalized = (image - value_range.pmin) / span
     return normalized * (2**depth - 1)
 
 

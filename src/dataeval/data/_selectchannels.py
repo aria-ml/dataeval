@@ -13,7 +13,7 @@ from numpy.typing import NDArray
 from dataeval.data._view import Operation, View
 from dataeval.flags import ImageStats
 from dataeval.utils._internal import as_numpy
-from dataeval.utils.preprocessing import normalize_image_shape
+from dataeval.utils.preprocessing import _validate_index_selection, normalize_image_shape
 
 ChannelSelection: TypeAlias = "Sequence[int] | Literal['gray', 'rgb']"
 
@@ -25,17 +25,17 @@ _REC601 = np.array([0.299, 0.587, 0.114], dtype=np.float64)
 def _validate_indices(channels: Any) -> None:
     """Validate an explicit channel-index selection.
 
-    ``bool`` is rejected explicitly even though it is an ``int`` subclass: numpy reads a
-    list of bools as a mask rather than as indices, so ``[True, False, True]`` would
-    silently select channels 0 and 2 instead of the requested 1, 0, 1.
+    Defers to ``_validate_index_selection``, which asks what `ChannelGroup` asks of the
+    same value — a non-empty selection of non-negative ints, with ``bool`` rejected because
+    numpy reads a list of bools as a mask. Only that half is shared: a selection here may
+    repeat and reorder bands, which a group reduced over jointly may not.
     """
-    valid = isinstance(channels, Sequence) and all(
-        isinstance(index, int) and not isinstance(index, bool) and index >= 0 for index in channels
-    )
-    if not valid or not len(channels):
+    try:
+        _validate_index_selection(channels)
+    except ValueError as e:
         raise ValueError(
             f"channels must be a non-empty sequence of non-negative ints, 'gray', or 'rgb'; got {channels!r}."
-        )
+        ) from e
 
 
 def _validate_params(channels: Any) -> None:

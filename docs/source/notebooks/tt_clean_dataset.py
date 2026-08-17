@@ -562,7 +562,7 @@ display(duplicates)
 # %% [markdown]
 # As shown above, the `Duplicates` class identified all images from the second dataset as exact or near duplicates. The
 # results are returned as a DataFrame where each row is a duplicate group with columns for group_id, level, dup_type
-# (exact/near), item_indices, methods, orientation, and dataset_index (for cross-dataset results).
+# (exact/near), item_indices, methods, orientation, and dataset_indices (for cross-dataset results).
 #
 # - **Exact duplicates**: Images 23 and 46 from dataset 0 are identified as exact duplicates of images 0 and 1 from
 #   dataset 1 respectively.

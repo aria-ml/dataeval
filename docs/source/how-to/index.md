@@ -60,6 +60,7 @@ datasets for machine learning.
 ../notebooks/h2_deduplicate.py
 ../notebooks/h2_visualize_cleaning_issues.py
 ../notebooks/h2_custom_image_stats_object_detection.py
+../notebooks/h2_measure_channel_groups.py
 ../notebooks/h2_add_intrinsic_factors.py
 ../notebooks/h2_bin_factors_by_level.py
 ../notebooks/h2_detect_undersampling.py
@@ -96,6 +97,9 @@ datasets for machine learning.
 - - [](../notebooks/h2_custom_image_stats_object_detection.py)
   - Customize calculation of image stats on an object detection dataset
   - [![Open In Colab][colab-badge]][calc-colab]
+- - [](../notebooks/h2_measure_channel_groups.py)
+  - Measure named groups of bands separately on multispectral imagery
+  - [![Open In Colab][colab-badge]][band-colab]
 - - [](../notebooks/h2_add_intrinsic_factors.py)
   - Apply DataEval's statistical outputs to
     DataEval's {class}`.Metadata` object for bias analysis
@@ -151,6 +155,7 @@ datasets for machine learning.
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_deduplicate.ipynb
 [clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_visualize_cleaning_issues.ipynb
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_custom_image_stats_object_detection.ipynb
+[band-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_measure_channel_groups.ipynb
 [imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_add_intrinsic_factors.ipynb
 [bin-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_bin_factors_by_level.ipynb
 [cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc3/notebooks/h2_detect_undersampling.ipynb
