@@ -1,6 +1,53 @@
-[//]: # (fa9acf4fc716649b735d17b17c74b137fe048b13)
+[//]: # (3b042c1db92ce0f3159f42f6313e295c20d891b0)
 
 # DataEval Change Log
+
+## v1.1.0-rc4
+
+🌟 **Feature Release**
+
+- `b0ea258b` - [impr] Allow compute_stats to handle extended channel information
+- `08620fe4` - [feat] Restructure metadata to support multiple modalities
+- `53780702` - [feat] Add new view transform operations
+- `dfe08764` - [feat] Add per_background statistics measuring the scene behind an image's boxes
+- `dffc4ccf` - [impr] Generalize metadata levels to allow for modalities other than vision
+
+🛠️ **Improvements and Enhancements**
+
+- `2bf18e2d` - Fix some spelling errors
+- `a380758f` - [impr] Normalize logging namespaces to public API
+- `3a5550da` - [feat] Handle equivalence concepts in Ontology
+- `8e4b5f18` - Fix add factors to work with multi-level stats
+- `3d1eedd2` - [feat] Add MOTStructurer and sequence level
+
+👾 **Fixes**
+
+- `577fd466` - [fix] Balance chance correction
+- `2287c08f` - [fix] Typecheck issue in docs
+- `1be1935c` - [fix] Drop and report level splits that hold no values at their level
+- `f4d4a281` - [fix] Return NaN, not zero entropy, for a region that was never measured
+- `94a00d1f` - [fix] Anchor bit depth on the whole datum so a box scales like its image
+
+📝 **Miscellaneous**
+
+- `ce9f14a7` - [docs] Add an input requirements page
+- `3b042c1d` - [docs] Add migration/upgrade guide from v1.0 to v1.1
+- `16d7ff36` - [docs] Shrink execution cost for tutorial
+- `2bce5393` - [devsecops] Return numba cache warm script and move to test
+- `540c55cf` - [docs] Add binning concept page
+- `6d392d69` - [docs] Add how-to guide for detecting drift from model outputs
+- `253a9dc5` - [docs] Enable more robust spellcheck, asterisk emphasis enforcement, and fix oxford commas
+- `e165466a` - [docs] Tweak the grid item card ordering
+- `b0db53db` - [deps] Bump maite-datasets and add typing stubs for typecheck
+- `70969bb9` - [docs] Add background comparison how-to
+- `b690ae10` - [devsecops] Show MR title in preview page
+- `07c5298d` - [docs] Fix markdownlint errors
+- `7e3402cc` - [devsecops] Fix SAST exclusion paths
+- `9ad91d62` - [docs] Add metadata levels concept page
+- `baf6900e` - [docs] Tweak installation notes for better pytorch instructions
+- `857ca296` - [docs] Improve execution time and add more concepts to tutorial
+- `3c0455c2` - [devsecops] Fix pre-release duplicate run
+- `f29117bd` - Pre-release v1.1.0-rc3
 
 ## v1.1.0-rc3
 
