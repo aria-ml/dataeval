@@ -2,21 +2,21 @@
 
 # Metadata Levels
 
-A dataset's metadata is not one table. Brightness is a property of an image; a
+A dataset's metadata does not fit cleanly in one table. Brightness is a property of an image; a
 bounding box is a property of one detection inside that image; a frame rate is a
 property of the whole video the image came from. Each of those facts is recorded
-once, about a different kind of thing, and they are not interchangeable.
+once, about a different kind of thing.
 
-Flattening them into a single table forces a choice, and both options are lossy.
+Flattening them into a single table forces a choice, and neither option is perfect.
 Replicate the coarse values down — copy an image's brightness onto each of its
 detections — and an image holding twelve detections now contributes twelve
 brightness readings while an image holding one contributes a single reading. Any
 statistic computed over that column is silently weighted by detection count.
 Aggregate the fine values up instead — average the box areas per image — and the
-individual detections stop existing as units of analysis at all.
+individual detections stop existing as units of analysis at all, reducing 'resolution'.
 
 {class}`.Metadata` avoids the choice. It keeps every fact at the granularity it
-was actually measured, in one dataframe with rows of several kinds at once, and
+was actually measured, in one dataframe with rows of several kinds, and
 records how those kinds relate. Those kinds are called **levels**, and this page
 explains what they are, the graph that connects them, and why nearly everything
 {class}`.Metadata` does is a consequence of that graph.
@@ -87,10 +87,9 @@ name has one job:
   detection.
 - **`instance`** — one labelled thing. A detection for object detection and
   tracking; the image itself for whole-image {term}`classification <Classification>`.
-  Every task has this level, so the same object keeps the same level name whichever
-  task produced it.
+  Every supervised task has this level.
 
-No task uses all four. A task keeps the subset it needs, and the graph collapses
+Each task keeps the subset of the four levels that it needs, and the graph collapses
 edges through whatever it omits — so an image-based task, which has neither
 `sequence` nor `track`, correctly reports `unit` as `instance`'s only parent.
 
@@ -214,50 +213,43 @@ questions. Confusing them is the most common source of surprise.
 
 **{attr}`.Metadata.item_level` — where one row is one dataset item.**
 `md.rows_at(md.item_level)` is the task-generic spelling of "one row per thing the
-dataset yields". For image tasks that is `unit`; for tracking it is `sequence`,
-because one dataset item is a whole video. This is a structural fact about the
-task, so it is read-only.
+dataset yields". For image tasks that is `unit` (image); for tracking it is `sequence` (video).
+This is a structural fact about the task, so it is read-only.
 
 **{attr}`.Metadata.label_level` — where the class labels live.**
 
 The rows {attr}`.Metadata.class_labels`, `score`, and `box` describe. It is
 `instance` on every *dataset* task, and on those it is always distinct from the
 item level. That separation is deliberate: an item carrying no label at all — an
-unlabeled image, or an image with no detections — still has an item row and keeps
-every factor on it. Had labels and items shared a level, unlabeled items would
-have to be dropped.
+unlabeled image, or an image with no detections — still has an item row, but no instance rows.
 
 {meth}`.Metadata.from_factors` is the exception, because there is no dataset to
 impose a shape: it places both the item level and the label level at whichever
 level the caller asked for, which is `unit` by default. So a single-level
-`from_factors` metadata has `item_level == label_level == "unit"`, and its
-default view already *is* the label level. So `label_level` is a property to be
-read rather than a constant: `instance` on every dataset task, and whatever was
-asked for on `from_factors`.
+`from_factors` metadata has `item_level == label_level == "unit"`.
+
+Like {attr}`.Metadata.item_level`, {attr}`.Metadata.lavel_level` is read-only.
 
 **{attr}`.Metadata.view` — which rows the array-shaped accessors project.**
-This is the movable one. {attr}`.Metadata.factor_data`,
+This changes based on the level of data currently being accessed. The view defaults to `label_level`,
+which keeps the projection aligned with {attr}`.Metadata.class_labels` row for row. {attr}`.Metadata.factor_data`,
 {attr}`.Metadata.factor_names`, {attr}`.Metadata.is_discrete`, and
 {attr}`.Metadata.shape` — and `len()`, iteration, and indexing — all describe the
 rows at the view. The dataframe is unaffected; it always holds every level.
 
-The view defaults to `label_level`, which is what keeps a projection aligned with
-{attr}`.Metadata.class_labels` row for row. Moving it is how you change the
-question you are asking:
+Changing the view of the data allows DataEval's tools to answer different questions
+about the dataset. The first view below directs inquiries towards variations across detections (e.g.
+"across all detections, how do these factors co-vary?"). The second invites analysis
+"accross all images" instead.
 
 ```python
 md.factor_data.shape[0]  # 93 — one row per detection
 md.at("unit").factor_data.shape[0]  # 50 — one row per image
 ```
 
-Those two arrays answer genuinely different questions about the same data, and
-neither is more correct. The first asks "across all detections, how do these
-factors co-vary?"; the second asks "across all images". For a `unit`-level factor,
-only the second gives it one vote per image.
-
 ```{important}
-The two spellings of a view change differ in more than style. Assigning to
-{attr}`.Metadata.view` mutates the instance, and evaluators hold a reference to
+The two spellings of a view change differ in mutability. Assigning to
+{attr}`.Metadata.view` mutates the instance, and evaluators reading it hold a reference to
 the metadata they were given rather than a snapshot of it — so a view assigned
 after construction changes what an already-built evaluator reads.
 {meth}`.Metadata.at` returns an independent copy that shares the structuring and
@@ -265,20 +257,13 @@ binning work already done, which is what lets two evaluators read two levels of
 one dataset at once.
 ```
 
-Moving the view **up** has one hard limit: {attr}`.Metadata.class_labels` raises
-above the label level rather than inventing an answer. An image has several
-detections, or none — there is no single label to return, and silently returning
-one would hand an evaluator a label array that does not correspond to its factor
-rows.
+### Choosing which factors to analyze: `inherited`
 
-### The second axis: `inherited`
+The view chooses *which rows* are projected. `inherited` chooses *which factors* are analysed on them.
 
-The view chooses *which rows* are projected. `inherited` chooses *which factors*
-are analysed on them, and the two are independent axes of the same pivot.
-
-With `inherited=True`, the default, a view analyses every factor it can read —
-its own, plus everything propagated down from above. With `inherited=False` it
-analyses only the factors defined **at** the view itself.
+With `inherited=True`, the default, a view analyzes every factor it can read —
+its own, plus everything propagated down from more granular levels. With `inherited=False` it
+analyzes only the factors defined **at** the view itself.
 
 On an object detection dataset with image metadata plus per-image and
 per-detection brightness from {func}`.compute_stats`:
@@ -288,17 +273,17 @@ per-detection brightness from {func}`.compute_stats`:
 | `at("unit")` — 50 rows     | `angle`, `id`, `location`, `time_of_day`, `unit_brightness`, `weather` | *the same six*        |
 | `at("instance")` — 93 rows | all six above, plus `instance_brightness`                              | `instance_brightness` |
 
-Two things to read off it. The row count is set by the view alone — `inherited`
+Two observations about this example: The row count is set by the view alone — `inherited`
 never changes how many rows there are, only how many columns describe them. And
 at the coarsest level the two columns agree, because nothing sits above `unit`
-for it to inherit; the axis only bites below the root.
+for it to inherit.
 
 `inherited=False` is how you ask a question about one level's own measurements,
 uncontaminated by replicated context: "do the detections in this dataset vary
 among themselves?" rather than "do detections vary, including by which image
 they came from?".
 
-## Aggregation: moving values up, deliberately
+## Aggregation: moving values up
 
 Rule 2 above says values never propagate upwards and are never aggregated
 silently. {meth}`.Metadata.agg` is the way to do it **loudly** — you say which
@@ -420,8 +405,7 @@ analyses can consume them. **Each factor is binned at its own level** — over t
 rows that hold one value per entity — and the resulting bin assignments then
 propagate downwards like any other value.
 
-This is not an implementation detail; it is what makes results comparable across
-levels. Consider altitude, recorded once per image, on a detection dataset:
+Consider altitude, recorded once per image, on a detection dataset:
 
 - Binned at `unit`, its cut points are computed over 50 altitude readings — the
   real distribution of altitudes across the images.
@@ -442,7 +426,7 @@ distributed rather than only on their range.
 
 See {ref}`binning-levels` for a worked example with real numbers.
 
-## What gets saved is the level structure
+## Saving and reading Metadata
 
 Building metadata reads every item of the dataset — decoding images, unpacking
 targets, accumulating tracks. Everything after that is arithmetic over the rows
@@ -454,9 +438,8 @@ Metadata(dataset).save("metadata.dem")
 md = Metadata.load("metadata.dem", dataset)
 ```
 
-What the file holds is exactly this page's subject: the rows at each level, the
-links between them, and which factor is defined where. Three things it does
-**not** hold, and each is a consequence of a distinction made above:
+This file holds the rows at each level, the
+links between them, and which factor is defined where. It does **not** hold the three following things:
 
 - **The dataset.** It cannot be serialized, so {meth}`.Metadata.load` takes a
   live one and binds it — which is also what lets the item counts be checked
@@ -490,23 +473,18 @@ rather than a bug to work around. It carries exactly one piece of information:
 that these rows cannot be trusted against this version, and the dataset walk
 they stood in for has to be paid again.
 
-## Units, not images
+## Level names
 
 The media-unit level is called `unit` rather than `image`, and this is the one
 piece of the vocabulary chosen for what it enables rather than for what it
 describes today.
 
 Every level name in the graph describes a *structural role*: `sequence` is "an
-ordered run", `instance` is "one labelled thing", `track` is "one identity across
-time". `image` was the exception — it named a medium. That was harmless while
-every dataset was a computer-vision dataset, and became a problem the moment it
-was not. A tabular dataset has exactly the same structure as an image
-classification dataset: one row per record, one label per record. It should reuse
-the graph unchanged. Being told its records live at the `image` level is, at best,
-a lie you learn to ignore.
+ordered run" of `units`, `instance` is "one labelled thing", and `track` is "one identity across
+time", or "an ordered run" of `instances`.
 
-So the level is `unit`, and the medium's own word for it is carried separately, as
-data, by {attr}`.Metadata.unit_type`:
+Each medium will have a familiar/colloquial term for the thing at each level.
+This is carried separately, and can be referenced by {attr}`.Metadata.unit_type`:
 
 ```python
 Metadata(image_dataset).unit_type  # 'image'
@@ -527,6 +505,7 @@ the same way, and {class}`.Balance`, {class}`.Diversity` and {class}`.Parity`
 need no modality awareness at all.
 
 ```{note}
+Previous versions were image-dataset-centric, and used the terms "image" and "target".
 `"image"` is still accepted wherever a level name is taken — `rows_at("image")`,
 `at("image")`, `view="image"` — and resolves to `"unit"` with a
 `DeprecationWarning`. It is removed in v1.2.0. Level names always read back as
@@ -559,6 +538,8 @@ level question.
 
 - [Binning](Binning.md) — what the discretization on this page's factors actually
   does to them, and why the cut points are a choice rather than a detail.
+- [Image Statistics](ImageStatistics.md) - more factors that can be calculated from raw data
+  and added to Metadata on demand.
 - [Dataset Bias and Coverage](DatasetBias.md) — the evaluators that consume
   {class}`.Metadata`, and where the choice of view changes what they measure.
 - [Ontology](Ontology.md) — the other graph, over label concepts rather than
