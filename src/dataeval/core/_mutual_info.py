@@ -159,6 +159,8 @@ def _adjusted_association(
     second: NDArray[Any],
     first_bound: float,
     second_bound: float,
+    first_entropy: float,
+    second_entropy: float,
 ) -> float:
     """
     Association between two tabulable factors, corrected for chance.
@@ -176,11 +178,27 @@ def _adjusted_association(
     infinite bound contributes no ceiling, because a binned factor's entropy measures the
     cut rather than the variable: it grows with the bin count, so dividing by it makes the
     reported association shrink as the same data is cut more finely. When neither factor
-    offers a real bound the pair is scored by the Linfoot transformation instead, which
-    maps mutual information onto [0, 1] without reference to an alphabet size, so the
+    offers a real bound the pair is scored by the Linfoot transformation instead, so the
     denominator no longer moves with the bin count. The numerator still does: cutting the
     same values more finely changes what the contingency table captures. See
     :func:`mutual_info` for the measurements.
+
+    Dropping the denominator does not make the branch scale-free, which is what
+    ``first_entropy`` and ``second_entropy`` are for. Mutual information is capped by the
+    smaller of the two entropies however the codes arose, so the largest value the
+    transformation can return is ``1 - exp(-2 * min(H1, H2))``: 0.75 for a pair of two-level
+    factors, 0.99 by sixteen levels, and lower again where the levels are unevenly filled --
+    0.47 for a binary split holding 90% of the rows on one side. Left as is, a coarsely cut
+    pair is scored against a lower reachable maximum than a finely cut one, so a duplicated
+    binary factor reads 0.75 while a duplicated sixteen-bin factor reads 0.996, and a fixed
+    correlation threshold means something different for each.
+
+    Dividing by that reachable maximum is what puts them back on one scale, and it is the
+    same move the entropy branch makes -- both divide by the most the pair could have
+    shared. It leaves a duplicate at 1.0 whatever the cut, and leaves the ceiling's
+    *growth* with bin count removed, which is what the infinite bound is for. What it does
+    not do, and must not, is restore resolution: a coarse cut genuinely shares less, and the
+    numerator still says so. See :doc:`/concepts/Binning` for the measurements.
     """
     contingency = contingency_matrix(first, second, sparse=True)
     observed = float(mutual_info_score(None, None, contingency=contingency))
@@ -192,7 +210,13 @@ def _adjusted_association(
 
     ceiling = min(first_bound, second_bound)
     if np.isinf(ceiling):
-        return float(np.clip(1.0 - np.exp(-2.0 * adjusted), 0.0, 1.0))
+        # The most this pair could have shared, on the same scale the value is reported on.
+        # Subtracting the expectation matches the entropy branch below: the numerator is
+        # chance-corrected, so the maximum it can reach is chance-corrected too.
+        reachable = min(first_entropy, second_entropy) - expected
+        if reachable <= min(first_entropy, second_entropy) * 1e-6:
+            return 0.0
+        return float(np.clip((1.0 - np.exp(-2.0 * adjusted)) / (1.0 - np.exp(-2.0 * reachable)), 0.0, 1.0))
     denominator = ceiling - expected
     # A constant factor has no entropy to share, and a pair of near-identifier columns
     # collapses both sides of the ratio to rounding error; see ``_adjusted_share``.
@@ -396,12 +420,21 @@ def mutual_info(  # noqa: C901
     declared to have no alphabet of its own contributes no ceiling, because its entropy
     describes the cut rather than the variable: it grows with the bin count, so a ratio
     against it shrinks as the same data is cut more finely. On a bivariate normal pair with
-    a true dependence of 0.81, dividing by a binned factor's entropy reports 0.40 at four
-    bins falling to 0.14 at 128 -- on identical data, with only the cut changed. Where
+    a true dependence of 0.81, dividing by a binned factor's entropy reports 0.39 at four
+    bins falling to 0.09 at 128 -- on identical data, with only the cut changed. Where
     neither factor offers a real ceiling the pair is scored by the Linfoot transformation,
-    which stays between 0.67 and 0.80 over that same range: still short of the truth at four bins,
-    because binning genuinely destroyed the information, but no longer moving with a
-    choice the caller did not make.
+    which reads 0.70 at four bins and peaks at 0.79 by sixteen: still short of the truth at
+    the coarse end, because binning genuinely destroyed the information, but no longer
+    moving with a choice the caller did not make. It falls away again past 64 bins, where
+    the sample can no longer fill the table and the chance correction has little left to
+    keep.
+
+    Whichever denominator applies, it is the most the pair could have shared rather than a
+    fixed 1.0. For the entropy branch that is the smaller entropy; for the Linfoot branch it
+    is that same entropy carried through the transformation, ``1 - exp(-2 * min(H1, H2))``,
+    which is 0.75 for a two-level pair and 0.996 by sixteen levels. Without it a duplicated
+    binary factor would read 0.75 and a duplicated sixteen-bin factor 0.996, and a fixed
+    correlation threshold would mean something different for each.
 
     Both halves are corrected for chance wherever a contingency table exists. Mutual
     information read off one rises with the number of categories even when the factor and
@@ -482,9 +515,17 @@ def mutual_info(  # noqa: C901
     # its entropy is a legitimate ceiling. One whose values came out of a binning does not:
     # that entropy measures the cut and grows with the bin count, so it is left infinite
     # and contributes no ceiling at all.
+    # `entropies` keeps what `norm_factor` throws away. A binned factor's entropy is not a
+    # legitimate ceiling to divide by -- that is the whole point of the infinite bound -- but
+    # it still caps what the pair can share, and the Linfoot branch needs it to report on a
+    # scale a coarse cut and a fine one can both reach. Held per column rather than derived
+    # per pair, which would be quadratic in the factors.
     norm_factor = np.zeros(num_columns)
+    entropies = np.full(num_columns, np.inf)
     for i in range(num_columns):
-        norm_factor[i] = _entropy_of(data[:, i]) if declared_list[i] else np.inf
+        if coded_list[i] or declared_list[i]:
+            entropies[i] = _entropy_of(data[:, i])
+        norm_factor[i] = entropies[i] if declared_list[i] else np.inf
 
     # The estimator is consulted only where a column cannot be tabulated. With every column
     # holding codes -- which is every call arriving from :class:`~dataeval.bias.Balance`,
@@ -515,7 +556,11 @@ def mutual_info(  # noqa: C901
             elif norm_factor[j] == 0 or norm_factor[idx] == 0:
                 mi[idx, j] = 0.0
             else:
-                mi[idx, j] /= min(norm_factor[j], norm_factor[idx])
+                # Clipped like every other branch. The neighbor estimator is not bounded by
+                # the entropy it is divided by here -- it reads a measured column, whose
+                # ceiling is not the coded partner's -- so a near-deterministic pair can
+                # overshoot and report above 1.0 on a scale documented as [0, 1].
+                mi[idx, j] = np.clip(mi[idx, j] / min(norm_factor[j], norm_factor[idx]), 0.0, 1.0)
 
     full_matrix = 0.5 * (mi + mi.T).astype(np.float64)
     interfactor = full_matrix[1:, 1:]
@@ -534,7 +579,9 @@ def mutual_info(  # noqa: C901
         for j in range(i + 1, num_columns):
             if not coded_list[j]:
                 continue
-            adjusted = _adjusted_association(data[:, i], data[:, j], norm_factor[i], norm_factor[j])
+            adjusted = _adjusted_association(
+                data[:, i], data[:, j], norm_factor[i], norm_factor[j], entropies[i], entropies[j]
+            )
             interfactor[i - 1, j - 1] = interfactor[j - 1, i - 1] = adjusted
 
     # A factor shares all of itself with itself, whatever it is made of. Stated rather than

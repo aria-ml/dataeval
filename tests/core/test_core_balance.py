@@ -244,18 +244,63 @@ class TestBalanceFunctional:
 
     @pytest.mark.parametrize("cardinality", [2, 8, 40])
     def test_identical_factors_with_their_own_alphabet_score_one(self, cardinality):
-        """A factor whose alphabet is its own keeps the entropy ceiling, so a duplicate is 1.0.
-
-        The Linfoot transformation would report 0.75 for a duplicated binary factor, since
-        a two-letter alphabet cannot carry enough mutual information to reach its ceiling.
-        That is why the ceiling is dropped per factor rather than globally.
-        """
+        """A factor whose alphabet is its own keeps the entropy ceiling, so a duplicate is 1.0."""
         rng = np.random.default_rng(4)
         n = 20000
         values = rng.integers(0, cardinality, size=n)
         factors = np.column_stack([values, values])
         score = mutual_info(rng.integers(0, 2, size=n), factors, discrete_features=[True, True])["interfactor"][0, 1]
         assert score == pytest.approx(1.0, abs=1e-6)
+
+    @pytest.mark.parametrize("bin_count", [2, 3, 8, 32])
+    def test_identical_binned_factors_also_score_one(self, bin_count):
+        """A duplicate reads 1.0 on the Linfoot branch too, however coarse the cut.
+
+        Mutual information is capped by the smaller of the two entropies whatever produced
+        the codes, so the transformation alone tops out at ``1 - exp(-2 * min(H1, H2))`` --
+        0.75 for a binary pair. Dividing by that reachable maximum is what puts a coarsely
+        cut pair and a finely cut one on one scale, and is why a fixed correlation threshold
+        can mean the same thing for both.
+        """
+        rng = np.random.default_rng(4)
+        n = 20000
+        codes = self._quantile_bins(rng.normal(size=n), bin_count)
+        factors = np.column_stack([codes, codes])
+        score = mutual_info(rng.integers(0, 2, size=n), factors, discrete_features=[False, False])
+        assert score["interfactor"][0, 1] == pytest.approx(1.0, abs=1e-6)
+
+    def test_lopsided_binary_split_is_not_penalized_for_its_shape(self):
+        """The reachable maximum follows occupancy, not just level count.
+
+        A 90/10 split carries far less entropy than an even one, so the transformation alone
+        caps it near 0.47. Reading the ceiling off the observed counts rather than off the
+        number of levels is what keeps a duplicate at 1.0 here as well.
+        """
+        rng = np.random.default_rng(7)
+        n = 20000
+        codes = np.digitize(rng.normal(size=n), [1.2816])
+        assert 0.05 < codes.mean() < 0.15  # the split really is lopsided
+        factors = np.column_stack([codes, codes])
+        score = mutual_info(rng.integers(0, 2, size=n), factors, discrete_features=[False, False])
+        assert score["interfactor"][0, 1] == pytest.approx(1.0, abs=1e-6)
+
+    def test_a_coarse_cut_still_reports_less_than_a_fine_one(self):
+        """Normalizing the ceiling must not hand back the resolution the cut destroyed.
+
+        The reachable maximum is a property of the alphabet; what the pair actually shares is
+        a property of the data. Only the first is divided out, so a binary cut of a strongly
+        correlated pair still reports well below a sixteen-bin cut of the same values.
+        """
+        labels, first, second = self._correlated_pair()
+        scores = {
+            k: mutual_info(
+                labels,
+                np.column_stack([self._quantile_bins(first, k), self._quantile_bins(second, k)]),
+                discrete_features=[False, False],
+            )["interfactor"][0, 1]
+            for k in (2, 16)
+        }
+        assert scores[2] < 0.75 < scores[16]
 
     def test_class_row_is_unmoved_by_the_declaration(self):
         """`discrete_features` reaches the factor block only; the class row divides by H(class).
@@ -284,6 +329,23 @@ class TestBalanceFunctional:
         # Tabulating a column of 3000 distinct floats would give every row its own cell and
         # score it at zero; the estimator recovers the relationship instead.
         assert score > 0.4
+
+    def test_mixed_pair_does_not_exceed_one(self):
+        """A coded factor against a measured near-copy stays on the documented [0, 1] scale.
+
+        This pair takes neither of the branches that clip. It is not tabulable, so the
+        chance-corrected path skips it; and only one side offers an entropy, so it is
+        divided by that rather than falling through to Linfoot. The neighbor estimator that
+        produced the numerator is not bounded by the coded partner's entropy, so a
+        near-deterministic pair overshoots -- 1.0011 on this data before the clip.
+        """
+        rng = np.random.default_rng(0)
+        n = 2000
+        codes = rng.integers(0, 12, size=n).astype(np.float64)
+        jittered = codes + rng.normal(0, 0.01, size=n)
+        factors = np.column_stack([codes, jittered])
+        score = mutual_info(rng.integers(0, 2, size=n), factors, discrete_features=[True, False])
+        assert score["interfactor"][0, 1] <= 1.0
 
     def test_omitting_discrete_features_warns(self):
         """Auto-detection cannot see binning, so leaving the declaration off is on its way out.

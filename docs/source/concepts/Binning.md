@@ -426,20 +426,21 @@ count — the reported score no longer inflates for a bin count
 [the caller did not choose](#the-bin-count-is-a-function-of-the-data-not-a-setting),
 though the mutual information underneath still reflects what those bins retained.
 
-### The Linfoot branch has a ceiling of its own
+### The Linfoot branch has a ceiling of its own, and it is divided out
 
-Dropping the entropy ceiling does not leave the Linfoot branch scale-free. Mutual
-information between two factors cannot exceed the smaller of their entropies, so
-the largest Linfoot value a pair can reach is bounded by their alphabets too —
-just in the opposite direction. A factor scored against an identical copy of
-itself does not read 1.0 unless it has enough levels:
+Dropping the entropy denominator does not by itself leave the Linfoot branch
+scale-free. Mutual information between two factors cannot exceed the smaller of
+their entropies whatever produced the codes, so the largest value the
+transformation can return is bounded by their alphabets too — just in the
+opposite direction from the entropy ceiling. Left alone, a factor scored against
+an identical copy of itself would not read 1.0 unless it had enough levels:
 
 :::{list-table}
 :widths: 30 20 50
 :header-rows: 1
 
 - - Factor
-  - Duplicate reads
+  - Transformation alone would give
   - Ceiling, `1 - exp(-2·min(H₁, H₂))`
 - - 2 bins, equal occupancy
   - 0.750
@@ -462,18 +463,18 @@ itself does not read 1.0 unless it has enough levels:
 :::
 
 The ceiling is exact, not approximate, and it depends on how full the bins are
-rather than only on how many there are — a lopsided binary split is capped near
-0.47. Because
-[the automatic path lands between 3 and 10 bins](#the-bin-count-is-a-function-of-the-data-not-a-setting),
-an auto-binned pair is typically capped somewhere between 0.89 and 0.99, and a
-factor that
-[collapsed to a binary split](#a-factor-can-collapse-to-two-bins) is capped at
-0.75 — so two identical factors can never report as identical.
+rather than only on how many there are — a lopsided binary split would be capped
+near 0.47.
 
-This is the mirror image of the artifact the Linfoot branch exists to remove. The
-entropy denominator deflates a score as bins are *added*; the Linfoot ceiling
-deflates it as bins are *removed*. Both are properties of the cut rather than of
-the data.
+That ceiling is the mirror image of the artifact the Linfoot branch exists to
+remove. The entropy denominator deflates a score as bins are *added*; this one
+would deflate it as bins are *removed*. Both are properties of the cut rather
+than of the data, so **`factors` divides by the reachable maximum**, exactly as
+the entropy branch divides by the entropy. A duplicated factor reads 1.0 on
+either branch, at any cut, however unevenly its bins are filled.
+
+What this does *not* do is give back the resolution the cut destroyed — see
+below.
 
 ### What a coarse cut costs a correlation
 
@@ -490,16 +491,16 @@ Linfoot scale is exactly ρ², at n = 5,000:
   - `mi_value` reaches 0.5 at a true dependence of
   - Reported at true dependence 0.64
 - - 2 bins
-  - 0.88
-  - 0.32
+  - 0.73
+  - 0.42
 - - 3 bins
-  - 0.71
-  - 0.44
+  - 0.64
+  - 0.50
 - - 5 bins
-  - 0.59
-  - 0.54
+  - 0.57
+  - 0.57
 - - 16 bins
-  - 0.52
+  - 0.51
   - 0.62
 - - unbinned values, for reference
   - 0.49
@@ -507,14 +508,16 @@ Linfoot scale is exactly ρ², at n = 5,000:
 :::
 
 A pair with a true dependence of 0.64 — a strong relationship by any standard —
-is flagged at 16 bins and is not flagged at 2 or 3. **The coarser the cut, the
-more dependence a pair must carry before `is_correlated` fires.**
+is flagged at 16 bins and is not flagged at 2. **The coarser the cut, the more
+dependence a pair must carry before `is_correlated` fires.**
 
-Most of that is the cut doing its job: two binary variables cut from a strongly
-correlated pair genuinely are less dependent than the values they came from, and
-reporting less is correct. Part of it is the ceiling above, which is an artifact.
-Either way, the number to compare a `factors` score against is not 1.0 but the
-ceiling for that pair, and the level counts are worth reading beside the scores:
+What remains after the ceiling is divided out is the cut doing its job: two
+binary variables cut from a strongly correlated pair genuinely are less dependent
+than the values they came from, and reporting less is correct. It does mean a
+declared cutoff — which is usually coarse, two or three bins — buys its meaning
+at the price of sensitivity, and that a pair sitting just under the threshold is
+worth re-reading at a finer cut before concluding anything. The level counts are
+worth reading beside the scores:
 
 ```python
 [len(np.unique(md.factor_data[:, i])) for i in range(md.factor_data.shape[1])]
@@ -532,11 +535,11 @@ association means nothing:
   - Binned pair (Linfoot)
   - Own-alphabet pair (entropy)
 - - 200
-  - 0.135
+  - 0.137
   - 0.034
 - - 1,000
   - 0.044
-  - 0.009
+  - 0.008
 - - 5,000
   - 0.009
   - 0.002

@@ -49,8 +49,10 @@ class BalanceOutput(DictOutput):
           own, so a duplicated categorical factor reads 1.0. A pair of binned factors
           has no such alphabet — the number of bins is derived from the data — and is
           scored by the Linfoot transformation instead, which drops the entropy-ceiling
-          artifact that grows with bin count. The mutual information underneath still
-          reflects what the binning kept. See :func:`~dataeval.core.mutual_info`.
+          artifact that grows with bin count. Either way the pair is divided by the most
+          it could have shared, so a duplicated factor reads 1.0 at any cut; what the
+          binning cost is in the numerator, and a coarsely cut pair reports less than a
+          finely cut one on the same values. See :func:`~dataeval.core.mutual_info`.
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
     classwise : pl.DataFrame
         DataFrame with per-class-to-factor normalized mutual information. Unlike
