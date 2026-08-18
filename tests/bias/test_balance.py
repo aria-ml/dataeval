@@ -68,7 +68,7 @@ class TestBalanceUnit:
             class_labels=np.array([], dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={},
         )
         balance_obj = Balance()
@@ -107,7 +107,7 @@ class TestBalanceUnit:
             class_labels=np.array([2, 2, 2, 3, 3, 3] * 10, dtype=np.intp),
             factor_data=np.array([[0, 0, 0, 1, 1, 1] * 10], dtype=np.int64).T,
             factor_names=["factor1"],
-            is_discrete=[True],
+            is_binned=[False],
             index2label={0: "cat", 1: "dog", 2: "bird", 3: "fish"},
         )
         result = Balance().evaluate(mock_metadata)

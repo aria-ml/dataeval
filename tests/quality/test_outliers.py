@@ -30,7 +30,7 @@ def make_mock_metadata(lstat: LabelStatsResult) -> MockMetadata:
         class_labels=np.array([0, 1, 2, 0, 1, 2, 1, 0, 2, 1], dtype=np.intp),
         factor_data=np.array([], dtype=np.int64),  # Not used by aggregate_by_class
         factor_names=[],  # Not used by aggregate_by_class
-        is_discrete=[],  # Not used by aggregate_by_class
+        is_binned=[],  # Not used by aggregate_by_class
         index2label=lstat["index2label"],
     )
 
@@ -983,7 +983,7 @@ class TestBuildClassIds:
             class_labels=np.array([0, 1, 0], dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "cat", 1: "dog"},
         )
         class_ids = _build_class_ids(source_index, metadata)
@@ -1003,7 +1003,7 @@ class TestBuildClassIds:
             class_labels=np.array([0, 1, 0], dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "cat", 1: "dog"},
             item_indices=np.array([0, 0, 1], dtype=np.int64),
         )
@@ -1026,7 +1026,7 @@ class TestBuildClassIds:
             class_labels=np.array([1, 1], dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={1: "dog"},
             item_indices=np.array([0, 0], dtype=np.int64),
         )
@@ -1039,7 +1039,7 @@ class TestBuildClassIds:
             class_labels=np.array([], dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={},
         )
         class_ids = _build_class_ids([], metadata)
@@ -1069,7 +1069,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "bright", 1: "dark"},
         )
 
@@ -1101,7 +1101,7 @@ class TestOutliersPerClass:
             class_labels=np.array(labels, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "a", 1: "b", 2: "c"},
         )
         outliers = Outliers(flags=ImageStats.PIXEL)
@@ -1116,7 +1116,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "a", 1: "b"},
         )
         outliers = Outliers(flags=ImageStats.PIXEL)
@@ -1138,7 +1138,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "bright", 1: "dark"},
         )
 
@@ -1160,7 +1160,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "bright", 1: "dark"},
         )
 
@@ -1177,7 +1177,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "a", 1: "b"},
         )
 
@@ -1205,7 +1205,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0], dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "a"},
         )
         with pytest.raises(ValueError, match="requires statistics"):
@@ -1237,7 +1237,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "bright", 1: "dark"},
         )
 
@@ -1266,7 +1266,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "bright", 1: "dark"},
         )
 
@@ -1328,7 +1328,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "bright", 1: "dark"},
         )
 
@@ -1458,7 +1458,7 @@ class TestOutliersPerClass:
             class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={0: "bright", 1: "dark"},
         )
 

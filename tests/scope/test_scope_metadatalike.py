@@ -22,7 +22,7 @@ def mock_metadata():
         class_labels=labels,
         factor_data=rng.integers(0, 4, size=(n, 2)).astype(np.int64),
         factor_names=["a", "b"],
-        is_discrete=[True, True],
+        is_binned=[False, False],
         index2label={0: "cat", 1: "dog", 2: "bird"},
     )
     assert isinstance(md, MetadataLike)

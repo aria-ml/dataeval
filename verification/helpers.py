@@ -22,7 +22,7 @@ class SimpleMetadata:
     class_labels: NDArray[np.intp]
     factor_data: NDArray[np.int64]
     factor_names: list[str]
-    is_discrete: list[bool]
+    is_binned: list[bool]
     index2label: dict[int, str] = field(default_factory=dict)
 
 
@@ -37,14 +37,14 @@ def make_metadata(
     class_labels = np.tile(np.arange(n_classes, dtype=np.intp), n_samples // n_classes + 1)[:n_samples]
     factor_data = rng.integers(0, 4, size=(n_samples, n_factors), dtype=np.int64)
     factor_names = [f"factor_{i}" for i in range(n_factors)]
-    is_discrete = [True] * n_factors
+    is_binned = [False] * n_factors
     index2label = {i: f"class_{i}" for i in range(n_classes)}
 
     return SimpleMetadata(
         class_labels=class_labels,
         factor_data=factor_data,
         factor_names=factor_names,
-        is_discrete=is_discrete,
+        is_binned=is_binned,
         index2label=index2label,
     )
 

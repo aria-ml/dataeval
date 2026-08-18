@@ -212,7 +212,7 @@ class MockMetadata:
     class_labels: NDArray[np.intp]
     factor_data: NDArray[np.int64]
     factor_names: Sequence[str]
-    is_discrete: Sequence[bool]
+    is_binned: Sequence[bool]
     index2label: Mapping[int, str]
     item_indices: NDArray[np.int64] | None = None
 
@@ -564,7 +564,7 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
         class_labels=np.array(flat_class_labels, dtype=np.intp),
         factor_data=factor_data,
         factor_names=sorted_factor_names,
-        is_discrete=[True] * len(sorted_factor_names),
+        is_binned=[False] * len(sorted_factor_names),
         index2label=INDEX2LABEL,
         item_indices=np.array(flat_item_indices, dtype=np.int64),
     )
