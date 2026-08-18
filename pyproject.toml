@@ -394,7 +394,7 @@ extend-exclude = [
 
 [tool.codespell]
 skip = 'pyproject.toml,./*env*,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.*.txt,*.html,*.lock,*.ipynb,./graphify-out'
-ignore-words-list = ["Hart","FPR", "MOT", "mot"]
+ignore-words-list = ["Hart","FPR", "MOT", "mot", "reencode"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

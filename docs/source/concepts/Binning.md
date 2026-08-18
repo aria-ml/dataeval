@@ -409,9 +409,8 @@ equally. The difference is what each one divides by:
   2, 8, 32 and 256 bins gives 0.27, 0.39, 0.40 and 0.41 — settled by about 16 bins.
 - **`factors`** compares two metadata factors, and *both* may be binned. There is
   no fixed reference, so a factor whose alphabet came out of the cuts contributes
-  no ceiling: such a pair is scored by the Linfoot transformation, which maps
-  mutual information onto [0, 1] without reference to an alphabet size. Scoring it
-  against a binned factor's entropy instead would make the reported association
+  no entropy ceiling: such a pair is scored by the Linfoot transformation instead.
+  Scoring it against a binned factor's entropy would make the reported association
   shrink as the same data is cut more finely — 0.40 at four bins down to 0.14 at
   128, on identical data.
 
@@ -421,11 +420,131 @@ reads 1.0. The two conventions are each correct in one regime, which is why the
 choice is made per factor rather than globally.
 
 None of this recovers what binning destroyed. A factor cut into four bins is
-scored on four bins' worth of information whichever denominator is used. What it
-buys is dropping the entropy-ceiling artifact — the reported score no longer
-inflates or deflates for a bin count
+scored on four bins' worth of information whichever denominator is used. What the
+Linfoot branch buys is dropping the entropy-ceiling artifact that *grows* with bin
+count — the reported score no longer inflates for a bin count
 [the caller did not choose](#the-bin-count-is-a-function-of-the-data-not-a-setting),
 though the mutual information underneath still reflects what those bins retained.
+
+### The Linfoot branch has a ceiling of its own
+
+Dropping the entropy ceiling does not leave the Linfoot branch scale-free. Mutual
+information between two factors cannot exceed the smaller of their entropies, so
+the largest Linfoot value a pair can reach is bounded by their alphabets too —
+just in the opposite direction. A factor scored against an identical copy of
+itself does not read 1.0 unless it has enough levels:
+
+:::{list-table}
+:widths: 30 20 50
+:header-rows: 1
+
+- - Factor
+  - Duplicate reads
+  - Ceiling, `1 - exp(-2·min(H₁, H₂))`
+- - 2 bins, equal occupancy
+  - 0.750
+  - 0.750
+- - 3 bins, equal occupancy
+  - 0.889
+  - 0.889
+- - 4 bins, equal occupancy
+  - 0.937
+  - 0.938
+- - 8 bins, equal occupancy
+  - 0.984
+  - 0.984
+- - 16 bins, equal occupancy
+  - 0.996
+  - 0.996
+- - 2 bins, 90/10 split
+  - 0.473
+  - 0.473
+:::
+
+The ceiling is exact, not approximate, and it depends on how full the bins are
+rather than only on how many there are — a lopsided binary split is capped near
+0.47. Because
+[the automatic path lands between 3 and 10 bins](#the-bin-count-is-a-function-of-the-data-not-a-setting),
+an auto-binned pair is typically capped somewhere between 0.89 and 0.99, and a
+factor that
+[collapsed to a binary split](#a-factor-can-collapse-to-two-bins) is capped at
+0.75 — so two identical factors can never report as identical.
+
+This is the mirror image of the artifact the Linfoot branch exists to remove. The
+entropy denominator deflates a score as bins are *added*; the Linfoot ceiling
+deflates it as bins are *removed*. Both are properties of the cut rather than of
+the data.
+
+### What a coarse cut costs a correlation
+
+The practical consequence is that `factor_correlation_threshold` — 0.5 by default
+— is crossed at very different true dependences depending on how finely each side
+was cut. Measured on bivariate normal pairs where the true dependence on the
+Linfoot scale is exactly ρ², at n = 5,000:
+
+:::{list-table}
+:widths: 30 35 35
+:header-rows: 1
+
+- - Both factors cut into
+  - `mi_value` reaches 0.5 at a true dependence of
+  - Reported at true dependence 0.64
+- - 2 bins
+  - 0.88
+  - 0.32
+- - 3 bins
+  - 0.71
+  - 0.44
+- - 5 bins
+  - 0.59
+  - 0.54
+- - 16 bins
+  - 0.52
+  - 0.62
+- - unbinned values, for reference
+  - 0.49
+  - 0.65
+:::
+
+A pair with a true dependence of 0.64 — a strong relationship by any standard —
+is flagged at 16 bins and is not flagged at 2 or 3. **The coarser the cut, the
+more dependence a pair must carry before `is_correlated` fires.**
+
+Most of that is the cut doing its job: two binary variables cut from a strongly
+correlated pair genuinely are less dependent than the values they came from, and
+reporting less is correct. Part of it is the ceiling above, which is an artifact.
+Either way, the number to compare a `factors` score against is not 1.0 but the
+ceiling for that pair, and the level counts are worth reading beside the scores:
+
+```python
+[len(np.unique(md.factor_data[:, i])) for i in range(md.factor_data.shape[1])]
+```
+
+For calibration at the other end, the largest score two **independent** factors
+produced over 40 seeds, both carrying 16 levels — the level at which a reported
+association means nothing:
+
+:::{list-table}
+:widths: 25 37 38
+:header-rows: 1
+
+- - Samples
+  - Binned pair (Linfoot)
+  - Own-alphabet pair (entropy)
+- - 200
+  - 0.135
+  - 0.034
+- - 1,000
+  - 0.044
+  - 0.009
+- - 5,000
+  - 0.009
+  - 0.002
+:::
+
+Both floors sit far below the 0.5 default, so the threshold is not at risk of
+firing on noise — but at n = 200 a spurious 0.135 is within reach, and that is a
+sample-size limit rather than a binning one.
 
 ## How DataEval decides
 
