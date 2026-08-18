@@ -336,6 +336,11 @@ class MetadataLike(Protocol):
     and quality evaluators (Outliers). Users can implement lightweight custom
     metadata containers that satisfy this protocol.
 
+    .. versionchanged:: 1.1
+        ``is_binned`` replaces ``is_discrete`` as the fourth member. A container
+        providing only ``is_discrete`` is still accepted and warns once; support for it
+        is removed in 1.2. See :ref:`metadatalike-is-binned` for what to change and why.
+
     Attributes
     ----------
     index2label : NotRequired[Mapping[int, str]]
@@ -352,11 +357,11 @@ class MetadataLike(Protocol):
     >>> from dataeval.protocols import MetadataLike
     >>>
     >>> class SimpleMetadata(MetadataLike):
-    ...     def __init__(self, factors, labels, names, discrete):
+    ...     def __init__(self, factors, labels, names, binned):
     ...         self._factors = factors
     ...         self._labels = labels
     ...         self._names = names
-    ...         self._discrete = discrete
+    ...         self._binned = binned
     ...
     ...     @property
     ...     def factor_names(self):
@@ -371,14 +376,14 @@ class MetadataLike(Protocol):
     ...         return self._labels
     ...
     ...     @property
-    ...     def is_discrete(self):
-    ...         return self._discrete
+    ...     def is_binned(self):
+    ...         return self._binned
     >>>
     >>> meta = SimpleMetadata(
     ...     factors=np.array([[0, 1], [1, 0], [0, 1]]),
     ...     labels=np.array([0, 1, 0]),
     ...     names=["age_bin", "gender"],
-    ...     discrete=[True, True],
+    ...     binned=[True, False],  # age was cut into bins; gender is a category
     ... )
     >>> isinstance(meta, MetadataLike)
     True
@@ -410,11 +415,26 @@ class MetadataLike(Protocol):
         ...
 
     @property
-    def is_discrete(self) -> Sequence[bool]:
+    def is_binned(self) -> Sequence[bool]:
         """
-        Whether each factor is discrete (True) or continuous (False).
+        Whether each factor's codes came from cutting a range, rather than from its own values.
 
         Must have the same length as factor_names.
+
+        True for a factor whose integers are **bin indices** — a continuous quantity, or a
+        numeric one with too many distinct values to keep, cut into intervals. False for one
+        whose integers stand for the values themselves: a category, a count, a rating.
+
+        The distinction is not recoverable from ``factor_data``, since both arrive as small
+        integers, and it decides how a pair of factors is scored against each other. A
+        binned factor's number of distinct codes is a property of where the cuts fell rather
+        than of the variable, so it is not used as a ceiling; one whose codes are its own
+        values is. Reporting it wrongly does not raise — it moves the numbers in
+        :attr:`.BalanceOutput.factors`.
+
+        .. versionadded:: 1.1
+            Replaces ``is_discrete``, which asked about the variable rather than about the
+            codes and gave the wrong answer for a discrete factor that was binned anyway.
         """
         ...
 

@@ -23,13 +23,13 @@ class MockMetadata:
 
     This provides a lightweight alternative to the full Metadata class
     when tests only need the protocol interface (class_labels, binned_data,
-    factor_names, is_discrete, index2label).
+    factor_names, is_binned, index2label).
     """
 
     class_labels: NDArray[np.intp]
     factor_data: NDArray[np.int64]
     factor_names: Sequence[str]
-    is_discrete: Sequence[bool]
+    is_binned: Sequence[bool]
     index2label: Mapping[int, str]
     item_indices: NDArray[np.int64] | None = None
 

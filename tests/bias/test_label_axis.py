@@ -33,7 +33,7 @@ class _BareMetadata:
     factor_names = ["a", "b"]
     factor_data = np.array([[0, 1], [1, 0], [0, 1], [1, 1], [0, 0], [1, 0]])
     class_labels = np.array([0, 1, 0, 1, 0, 1])
-    is_discrete = [True, True]
+    is_binned = [False, False]
 
 
 class _SingleFactorMetadata(_BareMetadata):
@@ -41,7 +41,7 @@ class _SingleFactorMetadata(_BareMetadata):
 
     factor_names = ["a"]
     factor_data = np.array([[0], [1], [0], [1], [0], [1]])
-    is_discrete = [True]
+    is_binned = [False]
 
 
 @pytest.mark.required

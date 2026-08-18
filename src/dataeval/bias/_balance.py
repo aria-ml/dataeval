@@ -9,7 +9,7 @@ import numpy as np
 import polars as pl
 
 from dataeval import Metadata
-from dataeval._helpers import factors_excluding, is_metadata_like, resolve_label_axis
+from dataeval._helpers import factors_excluding, has_own_alphabet, is_metadata_like, resolve_label_axis
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
 from dataeval.exceptions import DeprecatedWarning
 from dataeval.protocols import AnnotatedDataset, MetadataLike
@@ -44,7 +44,13 @@ class BalanceOutput(DictOutput):
 
         - factor1: str - Name of the first factor
         - factor2: str - Name of the second factor
-        - mi_value: float - Normalized mutual information value
+        - mi_value: float - Dependence between the pair, corrected for chance. Scored
+          against the smaller entropy of whichever factors have an alphabet of their
+          own, so a duplicated categorical factor reads 1.0. A pair of binned factors
+          has no such alphabet — the number of bins is derived from the data — and is
+          scored by the Linfoot transformation instead, which drops the entropy-ceiling
+          artifact that grows with bin count. The mutual information underneath still
+          reflects what the binning kept. See :func:`~dataeval.core.mutual_info`.
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
     classwise : pl.DataFrame
         DataFrame with per-class-to-factor normalized mutual information. Unlike
@@ -76,9 +82,10 @@ class Balance(Evaluator):
     Parameters
     ----------
     num_neighbors : int, default 5
-        Deprecated, removed in 1.2. Every factor reaching this evaluator holds bin
-        indices, which takes the discrete estimator path where a neighborhood size is
-        never consulted, so this value has no effect on the result. Setting it warns.
+        Deprecated, removed in 1.2. Every factor reaching this evaluator holds integer
+        codes, which are read off a contingency table rather than by the neighbor-based
+        estimator a neighborhood size belongs to, so this value has no effect on the
+        result. Setting it warns.
     class_imbalance_threshold : float, default 0.3
         Threshold for identifying imbalanced classes. Classes with NMI above this
         threshold with any metadata factor are considered imbalanced.
@@ -125,6 +132,17 @@ class Balance(Evaluator):
     side is privileged, and divides by the smaller of the two entropies. Values are
     therefore comparable within each DataFrame but not across them; see
     :func:`~dataeval.core.mutual_info`.
+
+    Binning reaches those three DataFrames differently, which is worth knowing before
+    comparing a result against an earlier run. ``balance`` and ``classwise`` divide by an
+    entropy belonging to the class label, which is never binned, so refining a factor's
+    cuts moves such a score toward the dependence the unbinned values carry and then
+    leaves it there. ``factors`` has no such fixed reference: both sides of the pair may
+    be binned, and :class:`~dataeval.Metadata` derives a factor's bin count from the data
+    rather than taking it as a setting. So a pair of binned factors is scored on a
+    quantity that does not reference an alphabet size at all. What binning cost in
+    resolution is not recoverable in either DataFrame — see :doc:`/concepts/Binning` — but
+    neither score moves with a cut the caller did not choose.
 
     References
     ----------
@@ -198,8 +216,8 @@ class Balance(Evaluator):
         if self.num_neighbors != DEFAULT_BALANCE_NUM_NEIGHBORS:
             warnings.warn(
                 "Balance.num_neighbors is deprecated and will be removed in 1.2. It has no "
-                "effect: every factor reaching the estimator arrives already binned, which "
-                "takes the discrete path where a neighborhood size is never consulted.",
+                "effect: every factor reaching the estimator arrives as integer codes, which "
+                "are tabulated rather than read by the neighbor-based estimator.",
                 DeprecatedWarning,
                 stacklevel=2,
             )
@@ -308,21 +326,25 @@ class Balance(Evaluator):
         # analysed against it, since it would otherwise report perfect correlation with
         # itself.
         axis = resolve_label_axis(self.metadata, self.label)
-        factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
+        factor_data, factor_names, kept = factors_excluding(self.metadata, axis.excluded)
 
-        # Every column of factor_data holds discrete integer bins: MetadataLike requires a
+        # Every column of factor_data holds integer codes: MetadataLike requires a
         # continuous factor to be binned before it reaches here, so what arrives is bin
-        # indices either way. The factor's *original* continuous/discrete nature is
-        # provenance, not a description of these values, and passing it as though it were
-        # would give a binned factor an infinite entropy. Its class-to-factor score would
-        # then be normalized by the class entropy rather than its own, holding it below
-        # H(factor)/H(class) no matter how strongly the class determines it.
-        binned = [True] * len(factor_names)
+        # indices either way, and `mutual_info` reads that off the values themselves. What
+        # it cannot read off them is whether a factor's set of values is a property of the
+        # factor or an artifact of where the cuts fell -- both arrive as small integers --
+        # and that is what decides whether the factor's entropy is a ceiling worth dividing
+        # by. A binned factor's entropy grows with its bin count, which
+        # :class:`~dataeval.Metadata` derives from the data rather than taking as a
+        # setting, so scoring a pair against it makes `factors` move with the draw.
+        own_alphabet = has_own_alphabet(self.metadata, kept)
 
-        mi = mutual_info(axis.values, factor_data, binned, self.num_neighbors)
+        mi = mutual_info(axis.values, factor_data, own_alphabet, self.num_neighbors)
 
-        # Calculate classwise balance
-        classwise = mutual_info_classwise(axis.values, factor_data, binned, self.num_neighbors)
+        # Calculate classwise balance. `own_alphabet` is deliberately not passed on: each row
+        # here is divided by the entropy of one class against the rest, so there is no factor
+        # entropy for the declaration to select and the argument is deprecated.
+        classwise = mutual_info_classwise(axis.values, factor_data, num_neighbors=self.num_neighbors)
 
         index2label = axis.names
 

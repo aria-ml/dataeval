@@ -1,5 +1,7 @@
 """Tests for dataeval._helpers config utilities."""
 
+import warnings
+
 import pytest
 from pydantic import BaseModel
 
@@ -68,16 +70,53 @@ class TestIsMetadataLike:
 
         assert is_metadata_like(Metadata(get_od_dataset(6, targets_per_image=2)).at("unit"))
 
-    def test_third_party_container_still_resolves(self):
+    def test_third_party_container_still_resolves(self, recwarn):
         from dataeval._helpers import is_metadata_like
 
         class Simple:
             factor_names = ["a"]
             factor_data = [[0]]
             class_labels = [0]
-            is_discrete = [True]
+            is_binned = [False]
 
         assert is_metadata_like(Simple())
+        assert not [w for w in recwarn.list if "is_binned" in str(w.message)]
+
+    def test_legacy_container_resolves_and_warns_once_per_class(self):
+        """A container written against the 1.0 protocol keeps working, and says so once.
+
+        Rejecting it would report the object as "not metadata" rather than as out of date,
+        so it is accepted and its author told what to add. The budget is per class because
+        that is what the message is about — an evaluator called in a loop would otherwise
+        repeat it once per call without saying anything new.
+        """
+        import dataeval._helpers as helpers
+        from dataeval.exceptions import DeprecatedWarning
+
+        class LegacySimple:
+            factor_names = ["a"]
+            factor_data = [[0]]
+            class_labels = [0]
+            is_discrete = [True]
+
+        helpers._WARNED_LEGACY_METADATA.discard(LegacySimple)
+        with pytest.warns(DeprecatedWarning, match="is_discrete.*no.*is_binned"):
+            assert helpers.is_metadata_like(LegacySimple())
+
+        with warnings.catch_warnings(record=True) as second:
+            warnings.simplefilter("always")
+            assert helpers.is_metadata_like(LegacySimple())
+        assert not [w for w in second if issubclass(w.category, DeprecatedWarning)]
+
+    def test_container_with_neither_member_is_rejected(self):
+        from dataeval._helpers import is_metadata_like
+
+        class Neither:
+            factor_names = ["a"]
+            factor_data = [[0]]
+            class_labels = [0]
+
+        assert not is_metadata_like(Neither())
 
     def test_non_metadata_objects_are_rejected(self, get_od_dataset):
         from dataeval._helpers import is_metadata_like

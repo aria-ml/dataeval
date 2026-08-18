@@ -1,5 +1,6 @@
 __all__ = []
 
+import warnings
 from collections.abc import Iterable
 from typing import Any, TypedDict
 
@@ -13,6 +14,7 @@ from sklearn.metrics.cluster import contingency_matrix, expected_mutual_informat
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes, get_seed
 from dataeval.core._bin import is_continuous
+from dataeval.exceptions import DeprecatedWarning
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._internal import as_numpy, opt_as_numpy
 
@@ -43,6 +45,53 @@ class MutualInfoResult(TypedDict):
 
     class_to_factor: NDArray[np.float64]
     interfactor: NDArray[np.float64]
+
+
+def _warn_auto_discrete_features() -> None:
+    """Announce that leaving ``discrete_features`` unset is going away.
+
+    The auto-detection reads the column's values, and that is the one thing they cannot
+    answer: a factor cut into six bins and a factor with six categories both arrive as the
+    integers 0-5. :func:`~dataeval.core.is_continuous` calls both discrete, so a binned
+    factor is credited with an alphabet of its own and scored against a ceiling that is
+    really its bin count — the drift :func:`mutual_info` exists to avoid.
+
+    Warned rather than changed, because guessing differently would be no better: nothing in
+    the array distinguishes the two cases. Only the caller knows.
+    """
+    warnings.warn(
+        "Leaving `discrete_features` unset is deprecated and it becomes required in 1.2. "
+        "The values are auto-detected today, which cannot work: a factor cut into six bins "
+        "and a factor with six categories are both the integers 0-5, so a binned factor is "
+        "scored against a ceiling that is really its bin count, and its association with "
+        "another factor shrinks as it is cut more finely.\n"
+        "Pass one bool per factor -- True where the factor's integers stand for values of "
+        "its own, False where you produced them by cutting a range. From a Metadata that is "
+        "`[not b for b in metadata.is_binned]`.",
+        DeprecatedWarning,
+        stacklevel=3,
+    )
+
+
+def _warn_unused_discrete_features() -> None:
+    """Announce that ``discrete_features`` is going away from :func:`mutual_info_classwise`.
+
+    The declaration selects a *denominator*, and this function does not have the choice to
+    make: every row is divided by the entropy of one class against the rest, which belongs
+    to the class label rather than to any factor. There is no factor entropy for the
+    declaration to accept or reject, so it is discarded — the argument is accepted only
+    because the two functions have matched signatures since before that was true.
+    """
+    warnings.warn(
+        "`discrete_features` has no effect on mutual_info_classwise and is removed in 1.2. "
+        "Every row here is divided by the entropy of one class against the rest, which "
+        "belongs to the class label rather than to any factor, so there is no factor "
+        "entropy for the declaration to select and it is discarded. Drop the argument.\n"
+        "`mutual_info` does use it -- for the factor-to-factor block, which this function "
+        "does not return -- and there it becomes required in 1.2 rather than being removed.",
+        DeprecatedWarning,
+        stacklevel=3,
+    )
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:
@@ -105,9 +154,14 @@ def _adjusted_share(target: NDArray[Any], factor: NDArray[Any], target_entropy: 
     return float(np.clip((observed - expected) / denominator, 0.0, 1.0))
 
 
-def _adjusted_association(first: NDArray[Any], second: NDArray[Any]) -> float:
+def _adjusted_association(
+    first: NDArray[Any],
+    second: NDArray[Any],
+    first_bound: float,
+    second_bound: float,
+) -> float:
     """
-    Association between two discretized factors, corrected for chance.
+    Association between two tabulable factors, corrected for chance.
 
     The chance correction is the one ``_adjusted_share`` applies, over a different
     denominator. Neither factor here is the thing being explained, so there is no reason
@@ -116,23 +170,41 @@ def _adjusted_association(first: NDArray[Any], second: NDArray[Any]) -> float:
     class-to-factor direction is not symmetric in that way and uses the class entropy
     alone, so a value from that row and a value from this block answer different
     questions and are not comparable to each other.
+
+    ``first_bound`` and ``second_bound`` are each factor's entropy where its alphabet is
+    a property of the variable, and infinite where the alphabet came from binning. An
+    infinite bound contributes no ceiling, because a binned factor's entropy measures the
+    cut rather than the variable: it grows with the bin count, so dividing by it makes the
+    reported association shrink as the same data is cut more finely. When neither factor
+    offers a real bound the pair is scored by the Linfoot transformation instead, which
+    maps mutual information onto [0, 1] without reference to an alphabet size, so the
+    denominator no longer moves with the bin count. The numerator still does: cutting the
+    same values more finely changes what the contingency table captures. See
+    :func:`mutual_info` for the measurements.
     """
-    ceiling = min(_entropy_of(first), _entropy_of(second))
     contingency = contingency_matrix(first, second, sparse=True)
     observed = float(mutual_info_score(None, None, contingency=contingency))
     expected = float(expected_mutual_information(contingency, first.shape[0]))
+    # Clamped before either branch: the correction can drive an independent pair slightly
+    # below zero, which the entropy branch clips away but the Linfoot branch would turn
+    # into a small positive value by way of a negative exponent.
+    adjusted = max(observed - expected, 0.0)
+
+    ceiling = min(first_bound, second_bound)
+    if np.isinf(ceiling):
+        return float(np.clip(1.0 - np.exp(-2.0 * adjusted), 0.0, 1.0))
     denominator = ceiling - expected
     # A constant factor has no entropy to share, and a pair of near-identifier columns
     # collapses both sides of the ratio to rounding error; see ``_adjusted_share``.
     if denominator <= ceiling * 1e-6:
         return 0.0
-    return float(np.clip((observed - expected) / denominator, 0.0, 1.0))
+    return float(np.clip(adjusted / denominator, 0.0, 1.0))
 
 
 def _target_to_factor(
     target: NDArray[Any],
     data: NDArray[np.intp],
-    declared_list: list[bool],
+    coded_list: list[bool],
     raw_mi: NDArray[Any],
 ) -> NDArray[np.float64]:
     """
@@ -151,42 +223,79 @@ def _target_to_factor(
     the row ranks factors of comparable width reliably and scores a very wide one
     conservatively rather than generously.
 
-    Discretized factors are additionally corrected for chance; see ``_adjusted_share``.
-    A factor arriving unbinned has no contingency table to take that expectation over, so
-    it is scored on the estimated mutual information alone.
+    Because the denominator is the *target's* entropy rather than the factor's, this row
+    is unaffected by how finely a factor was cut: refining a binned factor's cuts moves
+    the numerator toward the mutual information the unbinned values carry and leaves the
+    denominator alone, so the score converges instead of drifting. That is what separates
+    this row from the factor-to-factor block, where both sides of the ratio move with the
+    bin count unless the ceiling is dropped; see ``_adjusted_association``.
 
-    ``declared_list`` is the discreteness the caller declared, not the one
-    ``_merge_labels_and_factors`` hands sklearn: a column of distinct values is
-    presented to the estimator as continuous, but it is exactly the identifier case the
-    chance correction exists for, so the branch here is chosen before that substitution.
+    ``coded_list`` says which columns hold codes a contingency table can be built over,
+    which is read from the column's own values rather than declared by the caller. Coded
+    columns are corrected for chance; see ``_adjusted_share``. A column of measured values
+    has no contingency table to take that expectation over, so it is scored on the
+    estimated mutual information alone. This is deliberately not the caller's
+    ``discrete_features``: a column of distinct integer identifiers is coded whatever the
+    caller calls it, and it is exactly the case the chance correction exists for.
     """
-    row = np.zeros(len(declared_list), dtype=np.float64)
+    row = np.zeros(len(coded_list), dtype=np.float64)
     row[0] = 1.0  # the target against itself
     target_entropy = _entropy_of(target)
     if target_entropy <= 0:
         # A target taking one value carries no uncertainty for a factor to explain.
         return row
-    for j in range(1, len(declared_list)):
+    for j in range(1, len(coded_list)):
         share = (
             _adjusted_share(target, data[:, j], target_entropy)
-            if declared_list[j]
+            if coded_list[j]
             else float(np.clip(float(raw_mi[j]) / target_entropy, 0.0, 1.0))
         )
         row[j] = share
     return row
 
 
+def _is_coded(column: NDArray[Any]) -> bool:
+    """Whether a column holds category codes rather than measured values.
+
+    Integral values are codes — bin indices, ordinals, counts, identifiers — and a
+    contingency table over them is exact, which is what makes the chance correction
+    available. A column carrying a fractional part was measured rather than coded, and
+    tabulating it would give most rows a cell of their own.
+
+    Read from the values rather than taken from the caller, because it is a fact about
+    the array in hand and not a judgement about the variable behind it. Non-finite entries
+    are ignored: a NaN is neither integral nor measured, and would otherwise make every
+    column carrying one look measured.
+    """
+    finite = column[np.isfinite(column)] if np.issubdtype(column.dtype, np.inexact) else column
+    return bool(finite.size == 0 or np.all(finite == np.floor(finite)))
+
+
 def _merge_labels_and_factors(
     class_labels: NDArray[np.intp],
     factor_data: NDArray[np.intp],
     discrete_features: Iterable[bool] | None,
-) -> tuple[NDArray[np.intp], list[bool], list[bool]]:
-    """Stack the label axis onto the factors and say which columns are discrete.
+) -> tuple[NDArray[np.intp], list[bool], list[bool], list[bool]]:
+    """Stack the label axis onto the factors and answer three questions about each column.
 
-    Returns the stacked data, the list handed to sklearn, and the list as declared. The
-    two differ only for a column of all-distinct values: sklearn is told it is continuous
-    so the estimator does not treat every value as its own category, while the declared
-    list keeps the caller's word so the chance correction still applies to it.
+    Two independent things have to be known about a column, and they come from different
+    places:
+
+    - **Can it be tabulated?** ``coded_list``, read from the values themselves by
+      :func:`_is_coded`. This decides which estimator reads the column and whether the
+      chance correction is available, and is never the caller's to state — a column either
+      holds codes or it does not.
+    - **Is its alphabet a property of the variable?** ``declared_list``, the caller's
+      ``discrete_features``. This decides only whether the column's entropy is a legitimate
+      ceiling to divide by. A binned continuous factor is coded but its alphabet is an
+      artifact of where the cuts fell, so it answers True to the first question and False
+      to the second — the combination the previous single flag could not express.
+
+    Returns the stacked data, the list handed to sklearn, ``coded_list`` and
+    ``declared_list``. The sklearn list is ``coded_list`` with one substitution: a column
+    of all-distinct values is presented to the estimator as continuous so it does not
+    treat every value as its own category. ``coded_list`` itself keeps that column coded,
+    since a per-row identifier is exactly the case the chance correction exists for.
     """
     declared_list = [True] + (
         [not is_continuous(d) for d in factor_data.T] if discrete_features is None else list(discrete_features)
@@ -194,13 +303,15 @@ def _merge_labels_and_factors(
 
     # Use numeric data for MI
     data = np.hstack((class_labels[:, np.newaxis], factor_data))
-    # Present discrete features composed of distinct values as continuous for `mutual_info_classif`
-    discrete_list = list(declared_list)
-    for i in range(len(discrete_list)):
-        if len(data) == len(np.unique(data[:, i])):
-            discrete_list[i] = False
+    coded_list = [_is_coded(data[:, i]) for i in range(data.shape[1])]
 
-    return data, discrete_list, declared_list
+    # Present coded features composed of distinct values as continuous for `mutual_info_classif`
+    sklearn_list = list(coded_list)
+    for i in range(len(sklearn_list)):
+        if len(data) == len(np.unique(data[:, i])):
+            sklearn_list[i] = False
+
+    return data, sklearn_list, coded_list, declared_list
 
 
 def mutual_info(  # noqa: C901
@@ -221,10 +332,23 @@ def mutual_info(  # noqa: C901
     factor_data : Array2D[int | float], shape - (N, F)
         Factor values after binning or digitization. Can be a 2D list, or array-like object.
     discrete_features : Array1D[bool] | None, shape - (F,), default None
-        Boolean array defining whether or not the feature set is discretized.
-        Can be a 1D list, or array-like object.
+        Whether each factor's set of values is a property of the *variable* rather than of
+        how it was processed — True for a category, a count or any factor with a finite
+        alphabet of its own, False for one whose values were produced by cutting a
+        continuous quantity into bins. This does not select an estimator: which estimator
+        reads a column is read from the column's own values. It selects only whether the
+        column's entropy is used as a ceiling; see Notes. From a
+        :class:`~dataeval.Metadata` this is ``[not b for b in metadata.is_binned]``. Can be
+        a 1D list, or array-like object.
+
+        .. deprecated:: 1.1
+            Leaving this unset warns and becomes an error in 1.2. The auto-detection reads
+            the column's values, and that is the one thing they cannot answer: a factor cut
+            into six bins and a factor with six categories are both the integers 0-5, so a
+            binned factor is credited with an alphabet of its own.
     num_neighbors : int, default 5
-        Number of points to consider as neighbors.
+        Number of points to consider as neighbors. Consulted only for columns holding
+        measured values, which are the only ones the neighbor-based estimator reads.
 
     Returns
     -------
@@ -246,19 +370,35 @@ def mutual_info(  # noqa: C901
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
     seed. MI is computed differently for categorical and continuous variables.
 
-    The two halves of the result answer different questions and are normalized
-    accordingly. Between two factors neither side is privileged, so that block is divided
-    by the smaller of the two entropies, and pairs involving a variable left continuous
-    use the Linfoot transformation instead, there being no upper limit to the entropy of a
-    continuous distribution to divide by. The class-to-factor row is directed -- it asks
-    how much of the class label a factor accounts for -- so every entry is divided by the
-    class entropy alone. Dividing each factor by its own entropy there would rank a factor
-    by how few categories it has as much as by how much it explains.
+    Two decisions are made per column, from two different sources. **Which estimator reads
+    it** is read from the column's own values: integral values are codes and are tabulated
+    exactly, anything with a fractional part was measured and goes to the neighbor-based
+    estimator. **Whether its entropy is a legitimate ceiling** is what ``discrete_features``
+    declares, and nothing else depends on it.
 
-    That row is also corrected for chance. Mutual information read off a contingency table
-    rises with the number of categories even when the factor and the class are
-    independent, enough that an identifier column can outrank a genuine effect; see
-    ``_adjusted_share``.
+    The two halves of the result answer different questions and are normalized
+    accordingly. The class-to-factor row is directed -- it asks how much of the class label
+    a factor accounts for -- so every entry is divided by the class entropy alone.
+    Dividing each factor by its own entropy there would rank a factor by how few categories
+    it has as much as by how much it explains. Because the denominator belongs to the class
+    rather than to the factor, that row is unaffected by how finely a factor was cut.
+
+    Between two factors neither side is privileged, so that block is divided by the
+    smaller of the entropies **of the factors whose alphabet is their own**. A factor
+    declared to have no alphabet of its own contributes no ceiling, because its entropy
+    describes the cut rather than the variable: it grows with the bin count, so a ratio
+    against it shrinks as the same data is cut more finely. On a bivariate normal pair with
+    a true dependence of 0.81, dividing by a binned factor's entropy reports 0.40 at four
+    bins falling to 0.14 at 128 -- on identical data, with only the cut changed. Where
+    neither factor offers a real ceiling the pair is scored by the Linfoot transformation,
+    which stays between 0.67 and 0.80 over that same range: still short of the truth at four bins,
+    because binning genuinely destroyed the information, but no longer moving with a
+    choice the caller did not make.
+
+    Both halves are corrected for chance wherever a contingency table exists. Mutual
+    information read off one rises with the number of categories even when the factor and
+    the class are independent, enough that an identifier column can outrank a genuine
+    effect; see ``_adjusted_share``.
 
     References
     ----------
@@ -281,7 +421,15 @@ def mutual_info(  # noqa: C901
     ...     ),
     ...     rng.choice([0, 1], size=2000),  # gender, unrelated to the class
     ... ])
-    >>> result = mutual_info(class_labels=class_labels, factor_data=factor_data)
+
+    Each factor's integers stand for values of its own here — ages, site ids, a gender code
+    — so every entry is True. A factor you had binned would be False:
+
+    >>> result = mutual_info(
+    ...     class_labels=class_labels,
+    ...     factor_data=factor_data,
+    ...     discrete_features=[True, True, True],
+    ... )
 
     Only the site accounts for any of the class label; the two unrelated factors sit at
     zero rather than at the small positive value their cardinality alone would produce:
@@ -298,59 +446,65 @@ def mutual_info(  # noqa: C901
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
     factor_data_np = as_numpy(factor_data, required_ndim=2)
     discrete_feat_np = opt_as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
+    if discrete_feat_np is None:
+        _warn_auto_discrete_features()
 
     _logger.debug("Input shapes: class_labels=%s, factor_data=%s", class_labels_np.shape, factor_data_np.shape)
 
     num_neighbors = _validate_num_neighbors(num_neighbors)
-    data, discrete_list, declared_list = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_feat_np)
-    num_factors = len(discrete_list)
+    data, sklearn_list, coded_list, declared_list = _merge_labels_and_factors(
+        class_labels_np, factor_data_np, discrete_feat_np
+    )
+    num_factors = len(coded_list)
 
-    _logger.debug("Computing NMI for %d factors (%d discrete)", num_factors, sum(discrete_list))
+    _logger.debug(
+        "Computing NMI for %d factors (%d coded, %d with an alphabet of their own)",
+        num_factors,
+        sum(coded_list),
+        sum(declared_list),
+    )
 
     # initialize output matrix
     mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
 
-    # pre-compute normalization factor and use it for discrete-discrete continuous-discrete cases.
-    norm_factor = np.zeros(len(discrete_list))
-    for i in range(len(discrete_list)):
-        if not discrete_list[i]:
-            # Ensure that bogus entropies from a continuous variable will not be chosen ever.
-            norm_factor[i] = np.inf
-        else:
-            norm_factor[i] = _entropy_of(data[:, i])
+    # A factor whose alphabet is its own bounds what any pair containing it can share, so
+    # its entropy is a legitimate ceiling. One whose values came out of a binning does not:
+    # that entropy measures the cut and grows with the bin count, so it is left infinite
+    # and contributes no ceiling at all.
+    norm_factor = np.zeros(num_factors)
+    for i in range(num_factors):
+        norm_factor[i] = _entropy_of(data[:, i]) if declared_list[i] else np.inf
 
-    # Only the factor-to-factor block of `mi` is returned, so row 0 is needed solely to
-    # score a factor the caller declared continuous, which is the one case the class row
-    # cannot read off a contingency table. With every factor declared discrete it is a
-    # whole estimator pass over the data whose result nothing reads.
-    row_zero_is_read = not all(declared_list[1:])
-    for idx, is_discrete in enumerate(discrete_list):
-        if idx == 0 and not row_zero_is_read:
-            mi[idx, :] = 0.0
-            continue
-        mi[idx, :] = (mutual_info_classif if is_discrete else mutual_info_regression)(
-            data,
-            data[:, idx],
-            discrete_features=discrete_list,  # type: ignore - sklearn function not typed
-            n_neighbors=num_neighbors,
-            random_state=get_seed(),
-            n_jobs=get_max_processes(),  # type: ignore - added in 1.5
-        )
+    # The estimator is consulted only where a column cannot be tabulated. With every column
+    # holding codes -- which is every call arriving from :class:`~dataeval.bias.Balance`,
+    # since `factor_data` is bin and category indices throughout -- nothing below reads
+    # `mi`, and the pass is a full sklearn run per factor whose result is then overwritten.
+    if all(coded_list):
+        mi[:, :] = 0.0
+    else:
+        for idx in range(num_factors):
+            mi[idx, :] = (mutual_info_classif if sklearn_list[idx] else mutual_info_regression)(
+                data,
+                data[:, idx],
+                discrete_features=sklearn_list,  # type: ignore - sklearn function not typed
+                n_neighbors=num_neighbors,
+                random_state=get_seed(),
+                n_jobs=get_max_processes(),  # type: ignore - added in 1.5
+            )
 
     # Estimated mutual information in nats, kept before normalization because the
     # class-to-factor row is normalized differently from the factor-to-factor block.
     raw_mi = mi[0].copy()
 
-    for idx, is_discrete in enumerate(discrete_list):
+    for idx in range(num_factors):
         # Normalization via entropy, pre-computed above
         for j in range(data.shape[1]):
-            if discrete_list[j] or is_discrete:
-                if norm_factor[j] == 0 or norm_factor[idx] == 0:
-                    mi[idx, j] = 0.0
-                else:
-                    mi[idx, j] /= min(norm_factor[j], norm_factor[idx])
-            else:
+            if np.isinf(norm_factor[j]) and np.isinf(norm_factor[idx]):
                 mi[idx, j] = 1.0 - np.exp(-2.0 * float(mi[idx, j]))  # Linfoot transformation, mi in nats
+            elif norm_factor[j] == 0 or norm_factor[idx] == 0:
+                mi[idx, j] = 0.0
+            else:
+                mi[idx, j] /= min(norm_factor[j], norm_factor[idx])
 
     full_matrix = 0.5 * (mi + mi.T).astype(np.float64)
     interfactor = full_matrix[1:, 1:]
@@ -358,22 +512,32 @@ def mutual_info(  # noqa: C901
     # Every pair with a contingency table behind it is corrected for chance, on the same
     # grounds as the class row: plug-in mutual information rises with cardinality even
     # under independence, and this block carries a correlation threshold, so an uncorrected
-    # value turns a finely binned factor into a reported correlation with everything. Pairs
-    # involving a factor the caller declared continuous have no such table and keep the
-    # estimator's own normalization above.
+    # value turns a finely binned factor into a reported correlation with everything. The
+    # ceiling each pair is scored against comes from `norm_factor`, so a pair of binned
+    # factors falls through to Linfoot rather than being divided by an artifact. Pairs
+    # involving a column of measured values have no table and keep the estimator's own
+    # normalization above.
     for i in range(1, num_factors):
-        if not declared_list[i]:
+        if not coded_list[i]:
             continue
         for j in range(i + 1, num_factors):
-            if not declared_list[j]:
+            if not coded_list[j]:
                 continue
-            adjusted = _adjusted_association(data[:, i], data[:, j])
+            adjusted = _adjusted_association(data[:, i], data[:, j], norm_factor[i], norm_factor[j])
             interfactor[i - 1, j - 1] = interfactor[j - 1, i - 1] = adjusted
+
+    # A factor shares all of itself with itself, whatever it is made of. Stated rather than
+    # left to whichever branch above happened to run, which reported 1.0 for a tabulated
+    # factor and a Linfoot-transformed self-estimate for a measured one -- two different
+    # answers to a question with only one. A factor holding a single value has nothing to
+    # share and stays at zero.
+    for i in range(1, num_factors):
+        interfactor[i - 1, i - 1] = 1.0 if _entropy_of(data[:, i]) > 0 else 0.0
 
     # Between two factors neither side is privileged, so that block is scored against the
     # smaller of the two entropies. The class-to-factor row asks a directed question --
     # how much of the class label does this factor account for -- and is scored accordingly.
-    class_to_factor = _target_to_factor(data[:, 0], data, declared_list, raw_mi)
+    class_to_factor = _target_to_factor(data[:, 0], data, coded_list, raw_mi)
 
     _logger.info(
         "Mutual info calculation complete: %d factors, mean class_to_factor NMI=%.4f",
@@ -405,10 +569,19 @@ def mutual_info_classwise(
     factor_data : Array2D[int | float], shape - (N, F)
         Factor values after binning or digitization. Can be a 2D list, or array-like object.
     discrete_features : Array1D[bool] | None, shape - (F,), default None
-        Boolean array defining whether or not the feature set is discretized.
-        Can be a 1D list, or array-like object.
+        Ignored.
+
+        .. deprecated:: 1.1
+            Has no effect and is **removed in 1.2**; setting it warns. The declaration
+            selects a denominator, and this function does not have that choice to make:
+            every row is divided by the entropy of one class against the rest, which belongs
+            to the class label rather than to any factor. It is accepted only because the
+            two functions have had matching signatures since before that was true.
+            :func:`mutual_info` does use it, for the factor-to-factor block this function
+            does not return, and there it becomes *required* in 1.2 rather than removed.
     num_neighbors : int, default 5
-        Number of points to consider as neighbors.
+        Number of points to consider as neighbors. Consulted only for columns holding
+        measured values, which are the only ones the neighbor-based estimator reads.
 
     Returns
     -------
@@ -460,11 +633,18 @@ def mutual_info_classwise(
 
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
     factor_data_np = as_numpy(factor_data, required_ndim=2)
-    discrete_feat_np = opt_as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
+    if discrete_features is not None:
+        _warn_unused_discrete_features()
 
     num_neighbors = _validate_num_neighbors(num_neighbors)
-    data, discrete_list, declared_list = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_feat_np)
-    num_factors = len(discrete_list)
+    # Not forwarded, and a constant rather than None: the declaration it produces is
+    # discarded below, and None would sweep `is_continuous` over every column to build a
+    # list nothing reads. Stating that here is what makes "has no effect" true of the code
+    # and not only of the docstring.
+    data, sklearn_list, coded_list, _ = _merge_labels_and_factors(
+        class_labels_np, factor_data_np, np.ones(factor_data_np.shape[1], dtype=np.bool_)
+    )
+    num_factors = len(coded_list)
     u_classes = np.unique(class_labels_np)
     num_classes = len(u_classes)
 
@@ -478,16 +658,16 @@ def mutual_info_classwise(
     # classwise targets (binary indicators)
     tgt_bin = data[:, 0][:, None] == u_classes
 
-    # Compute MI. The estimate is read only where a factor was declared continuous, since
-    # every other column is scored off its contingency table instead; with none of them
-    # declared continuous the whole loop is an estimator pass nothing reads.
+    # Compute MI. The estimate is read only where a column holds measured values, since
+    # every other column is scored off its contingency table instead; with every column
+    # coded the whole loop is an estimator pass nothing reads.
     classwise_mi = np.zeros((num_classes, num_factors), dtype=np.float32)
-    if not all(declared_list[1:]):
+    if not all(coded_list[1:]):
         for idx in range(num_classes):
             classwise_mi[idx, :] = mutual_info_classif(
                 data,
                 tgt_bin[:, idx],
-                discrete_features=discrete_list,  # type: ignore - sklearn function not typed
+                discrete_features=sklearn_list,  # type: ignore - sklearn function not typed
                 n_neighbors=num_neighbors,
                 random_state=get_seed(),
                 n_jobs=get_max_processes(),  # type: ignore - added in 1.5
@@ -495,9 +675,11 @@ def mutual_info_classwise(
 
     # Each row asks the same directed question the class-to-factor row asks, with one
     # class against the rest standing in for the class label, so it is scored the same way:
-    # a shared denominator per row, and chance correction wherever a factor is discretized.
+    # a shared denominator per row, and chance correction wherever a factor is tabulable.
+    # Like that row it divides by the target's entropy rather than the factor's, so it does
+    # not move with a factor's bin count and `discrete_features` does not reach it.
     normalized = np.stack([
-        _target_to_factor(tgt_bin[:, idx], data, declared_list, classwise_mi[idx]) for idx in range(num_classes)
+        _target_to_factor(tgt_bin[:, idx], data, coded_list, classwise_mi[idx]) for idx in range(num_classes)
     ])
 
     _logger.info("Mutual info classwise calculation complete: %d classes x %d factors", num_classes, num_factors)

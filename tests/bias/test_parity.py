@@ -71,7 +71,7 @@ class TestParityUnit:
             class_labels=np.array([], dtype=np.intp),
             factor_data=np.array([], dtype=np.int64),
             factor_names=[],
-            is_discrete=[],
+            is_binned=[],
             index2label={},
         )
         parity_obj = Parity()

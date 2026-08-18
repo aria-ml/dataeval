@@ -7,7 +7,9 @@ from dataeval.core._mutual_info import (
     _merge_labels_and_factors,
     _validate_num_neighbors,
     mutual_info,
+    mutual_info_classwise,
 )
+from dataeval.exceptions import DeprecatedWarning
 
 CLASS_LABELS = np.array([0, 0, 1, 1, 0, 1, 0, 1, 0, 1])
 FACTOR_DATA = np.array(
@@ -57,44 +59,53 @@ class TestBalanceValidateNumNeighbors:
 
 @pytest.mark.required
 class TestBalanceMergeLabelsAndFactors:
+    """Two questions per column, answered from two different places.
+
+    ``coded`` is read from the values -- can this column be tabulated -- and ``declared``
+    is the caller's word on whether the column's alphabet belongs to the variable. Every
+    column of ``FACTOR_DATA`` holds integers, so ``coded`` is True throughout however the
+    caller declares them.
+    """
+
     def test_without_discrete_features(self):
-        data, discrete_features, declared = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, None)
+        data, sklearn_list, coded, declared = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, None)
         assert data.shape == (FACTOR_DATA.shape[0], FACTOR_DATA.shape[1] + 1)
-        assert discrete_features == [True, True, True, False]
+        assert coded == [True, True, True, True]
         # `is_continuous` calls all three factors discrete; only the sklearn-facing list
         # demotes the all-distinct third one.
         assert declared == [True, True, True, True]
+        assert sklearn_list == [True, True, True, False]
 
     def test_provided_discrete_features(self):
-        provided_discrete_features = [False, True, False]
-        expected_discrete_features = [True] + provided_discrete_features
-
-        data, discrete_features, declared = _merge_labels_and_factors(
-            CLASS_LABELS, FACTOR_DATA, provided_discrete_features
-        )
+        data, sklearn_list, coded, declared = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, [False, True, False])
         assert data.shape == (FACTOR_DATA.shape[0], FACTOR_DATA.shape[1] + 1)
-        assert discrete_features == expected_discrete_features
-        assert declared == expected_discrete_features
+        # The declaration is the caller's, verbatim, with the label axis prepended.
+        assert declared == [True, False, True, False]
+        # It does not reach `coded`, which describes the columns rather than the variables.
+        assert coded == [True, True, True, True]
+        assert sklearn_list == [True, True, True, False]
 
-    def test_provided_discrete_features_override_unique(self):
-        provided_discrete_features = [False, True, True]
-        expected_discrete_features = [True, False, True, False]
+    def test_declaration_does_not_move_the_sklearn_list(self):
+        """Declaring a column's alphabet an artifact does not change which estimator reads it.
 
-        data, discrete_features, declared = _merge_labels_and_factors(
-            CLASS_LABELS, FACTOR_DATA, provided_discrete_features
-        )
-        assert data.shape == (FACTOR_DATA.shape[0], FACTOR_DATA.shape[1] + 1)
-        # A column of distinct values is presented to sklearn as continuous, but the
-        # caller's word is kept so the chance correction still applies to it.
-        assert discrete_features == expected_discrete_features
-        assert declared == [True, *provided_discrete_features]
+        The two lists were one flag before, so a caller declaring a binned factor
+        continuous also pushed it onto the neighbor-based estimator -- which then read bin
+        indices as measurements. Now the estimator follows the values.
+        """
+        _, sklearn_list, coded, declared = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, [False, True, True])
+        assert declared == [True, False, True, True]
+        assert coded == [True, True, True, True]
+        # A column of distinct values is still presented to sklearn as continuous, so the
+        # estimator does not treat every value as its own category. `coded` keeps it
+        # tabulable, since a per-row identifier is what the chance correction is for.
+        assert sklearn_list == [True, True, True, False]
 
 
 @pytest.mark.required
 class TestBalanceFunctional:
     def test_balance(self):
         """Test the balance function with TypedDict return."""
-        result = mutual_info(CLASS_LABELS, FACTOR_DATA)
+        result = mutual_info(CLASS_LABELS, FACTOR_DATA, discrete_features=[True, True, True])
 
         # Test that result is a dict with the expected keys
         assert "class_to_factor" in result
@@ -118,12 +129,12 @@ class TestBalanceFunctional:
         assert result["interfactor"].shape == (FACTOR_DATA.shape[1], FACTOR_DATA.shape[1])
         np.testing.assert_allclose(result["interfactor"], result["interfactor"].T, atol=1e-6)
         # The factor-to-factor block is chance-corrected too, so factor 2 -- a distinct
-        # value per row -- no longer reports an association with the other two. Its
-        # diagonal entry is left at the estimator's own value, since a factor is not
-        # scored against itself here.
+        # value per row -- no longer reports an association with the other two. The
+        # diagonal is 1.0 throughout: a factor shares all of itself with itself, whatever
+        # it is made of.
         np.testing.assert_allclose(
             result["interfactor"],
-            np.array([[1.0, 0.64, 0.0], [0.64, 1.0, 0.0], [0.0, 0.0, 0.621398]]),
+            np.array([[1.0, 0.64, 0.0], [0.64, 1.0, 0.0], [0.0, 0.0, 1.0]]),
             atol=1e-6,
         )
 
@@ -176,6 +187,140 @@ class TestBalanceFunctional:
         unrelated = rng.integers(0, cardinality, size=n)  # independent of labels
         row = mutual_info(labels, unrelated.reshape(-1, 1), discrete_features=[True])["class_to_factor"]
         assert row[1] < 0.01
+
+    @staticmethod
+    def _quantile_bins(values, count):
+        """Cut `values` into `count` equal-occupancy bins."""
+        return np.digitize(values, np.quantile(values, np.linspace(0, 1, count + 1)[1:-1]))
+
+    def _correlated_pair(self, rho=0.9, n=20000, seed=4):
+        rng = np.random.default_rng(seed)
+        first = rng.normal(size=n)
+        second = rho * first + np.sqrt(1 - rho**2) * rng.normal(size=n)
+        return rng.integers(0, 2, size=n), first, second
+
+    @pytest.mark.parametrize("bin_count", [8, 16, 32, 64])
+    def test_binned_pair_holds_still_as_the_cut_changes(self, bin_count):
+        """A pair of binned factors scores the same however finely the same data is cut.
+
+        :class:`~dataeval.Metadata` derives a factor's bin count from the data rather than
+        taking it as a setting, so the same factor measured twice can arrive cut into
+        different numbers of bins. Dividing by a binned factor's entropy made the reported
+        association a function of that count -- 0.40 at four bins down to 0.14 at 128 on
+        this data -- which put the correlation threshold at the mercy of the draw.
+
+        For a bivariate normal pair the Linfoot transformation has an exact target: it
+        equals rho^2, here 0.81. Binning still costs resolution at the coarse end, so the
+        floor is generous; what this pins is that the value converges rather than decays.
+        """
+        labels, first, second = self._correlated_pair()
+        factors = np.column_stack([
+            self._quantile_bins(first, bin_count),
+            self._quantile_bins(second, bin_count),
+        ])
+        # Declared False: these hold bin indices, so their alphabet is the cut's, not theirs.
+        score = mutual_info(labels, factors, discrete_features=[False, False])["interfactor"][0, 1]
+        assert 0.72 < score < 0.85
+
+    @pytest.mark.parametrize("bin_count", [8, 64, 256, 1024])
+    def test_independent_binned_pair_scores_zero_at_any_cut(self, bin_count):
+        """Dropping the entropy ceiling must not drop the chance correction with it.
+
+        The correction removes the mutual information a pair's cardinality produces on
+        average under independence, not the sampling noise around it, so the residual is
+        small rather than exactly zero -- and unlike the floor it does not grow with the
+        bin count. The same bound the class row is held to; without the correction this
+        pair reads as a genuine association at the finer cuts.
+        """
+        rng = np.random.default_rng(11)
+        n = 20000
+        labels = rng.integers(0, 2, size=n)
+        factors = np.column_stack([
+            self._quantile_bins(rng.normal(size=n), bin_count),
+            self._quantile_bins(rng.normal(size=n), bin_count),
+        ])
+        score = mutual_info(labels, factors, discrete_features=[False, False])["interfactor"][0, 1]
+        assert score < 0.01
+
+    @pytest.mark.parametrize("cardinality", [2, 8, 40])
+    def test_identical_factors_with_their_own_alphabet_score_one(self, cardinality):
+        """A factor whose alphabet is its own keeps the entropy ceiling, so a duplicate is 1.0.
+
+        The Linfoot transformation would report 0.75 for a duplicated binary factor, since
+        a two-letter alphabet cannot carry enough mutual information to reach its ceiling.
+        That is why the ceiling is dropped per factor rather than globally.
+        """
+        rng = np.random.default_rng(4)
+        n = 20000
+        values = rng.integers(0, cardinality, size=n)
+        factors = np.column_stack([values, values])
+        score = mutual_info(rng.integers(0, 2, size=n), factors, discrete_features=[True, True])["interfactor"][0, 1]
+        assert score == pytest.approx(1.0, abs=1e-6)
+
+    def test_class_row_is_unmoved_by_the_declaration(self):
+        """`discrete_features` reaches the factor block only; the class row divides by H(class).
+
+        The class row's denominator belongs to the class, which is never binned, so the
+        declaration has nothing to change there. Keeping the two independent is what lets
+        `balance` and `classwise` stay comparable while `factors` is rescaled.
+        """
+        labels, first, second = self._correlated_pair()
+        factors = np.column_stack([self._quantile_bins(first, 16), self._quantile_bins(second, 16)])
+        as_own = mutual_info(labels, factors, discrete_features=[True, True])["class_to_factor"]
+        as_artifact = mutual_info(labels, factors, discrete_features=[False, False])["class_to_factor"]
+        np.testing.assert_array_equal(as_own, as_artifact)
+
+    @pytest.mark.parametrize("declaration", [False, True])
+    def test_measured_values_still_reach_the_neighbor_estimator(self, declaration):
+        """A column with a fractional part is not tabulable, whatever the caller declares.
+
+        This is the path `Balance` cannot reach, and the one `num_neighbors` exists for.
+        """
+        rng = np.random.default_rng(2)
+        n = 3000
+        labels = rng.choice([0, 1, 2], size=n)
+        measured = (labels * 2.0 + rng.normal(size=n)).reshape(-1, 1)
+        score = mutual_info(labels, measured, discrete_features=[declaration])["class_to_factor"][1]
+        # Tabulating a column of 3000 distinct floats would give every row its own cell and
+        # score it at zero; the estimator recovers the relationship instead.
+        assert score > 0.4
+
+    def test_omitting_discrete_features_warns(self):
+        """Auto-detection cannot see binning, so leaving the declaration off is on its way out.
+
+        A factor cut into bins and a factor with that many categories are the same integers,
+        so nothing in the array separates them; only the caller knows. The guess is kept for
+        one release and announced rather than silently changed.
+        """
+        with pytest.warns(DeprecatedWarning, match="becomes required in 1.2"):
+            mutual_info(CLASS_LABELS, FACTOR_DATA)
+
+    def test_declaring_discrete_features_does_not_warn(self, recwarn):
+        mutual_info(CLASS_LABELS, FACTOR_DATA, discrete_features=[True, True, True])
+        assert not [w for w in recwarn.list if issubclass(w.category, DeprecatedWarning)]
+
+    def test_classwise_warns_the_other_way_round(self):
+        """The declaration is inert here, so it is *setting* it that warns.
+
+        Every row of this output is divided by the entropy of one class against the rest,
+        which belongs to the class label rather than to any factor -- so there is no factor
+        entropy for the declaration to select. It is removed in 1.2 rather than made
+        required, which is the opposite of `mutual_info`.
+        """
+        with pytest.warns(DeprecatedWarning, match="no effect on mutual_info_classwise"):
+            mutual_info_classwise(CLASS_LABELS, FACTOR_DATA, discrete_features=[True, True, True])
+
+    def test_classwise_without_the_argument_does_not_warn(self, recwarn):
+        mutual_info_classwise(CLASS_LABELS, FACTOR_DATA)
+        assert not [w for w in recwarn.list if issubclass(w.category, DeprecatedWarning)]
+
+    @pytest.mark.parametrize("declaration", [[True, True, True], [False, False, False], [True, False, True]])
+    def test_classwise_result_ignores_the_declaration(self, declaration):
+        """What the deprecation asserts, asserted: the argument cannot move the result."""
+        baseline = mutual_info_classwise(CLASS_LABELS, FACTOR_DATA)
+        with pytest.warns(DeprecatedWarning):
+            declared = mutual_info_classwise(CLASS_LABELS, FACTOR_DATA, discrete_features=declaration)
+        np.testing.assert_array_equal(baseline, declared)
 
     def test_constant_factor_zero_norm(self):
         """A constant factor has zero entropy, so its normalization factor is 0 and MI is 0.0."""

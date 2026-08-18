@@ -52,4 +52,4 @@ class TestMetadataEmbeddings:
         assert hasattr(meta, "factor_names")
         assert hasattr(meta, "factor_data")
         assert hasattr(meta, "class_labels")
-        assert hasattr(meta, "is_discrete")
+        assert hasattr(meta, "is_binned")

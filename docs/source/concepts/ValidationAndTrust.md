@@ -278,15 +278,16 @@ bear on trusting a result:
     coarser bins avoid the sparse cells reported in `insufficient_data`, at the
     cost of resolution.
 - - {class}`.Balance`
-  - **A convention**
-  - {func}`.mutual_info` handles continuous factors natively — given
-    `discrete_features=None` it calls `is_continuous` per column and routes
-    continuous ones to `mutual_info_regression`. But `Balance` never takes that
-    path: it passes `Metadata.factor_data`, which is already binned, and declares
-    every column discrete rather than forwarding `Metadata.is_discrete`, since
-    what arrives is bin indices whatever the factor once was. The information
-    lost at the binning step cannot be recovered downstream, and nothing in the
-    output says it happened.
+  - **Required in practice**
+  - It passes `Metadata.factor_data`, which is bin and category indices
+    throughout, so the information lost at the binning step cannot be recovered
+    downstream and nothing in the output says it happened. Binning reaches the
+    three DataFrames unequally: `balance` and `classwise` divide by the class
+    label's entropy, which is never binned, so their scores converge as a factor
+    is cut more finely; `factors` compares two possibly-binned factors and is
+    scored so its denominator no longer grows with a bin count you did not
+    choose — though the mutual information above the line still shifts with the
+    binning. See [Binning](Binning.md#binning-reaches-the-three-outputs-differently).
 - - {func}`.split_dataset` with `split_on`
   - **Required**
   - Groups are formed from binned factor values, so grouping granularity is the

@@ -212,6 +212,7 @@ Three of {class}`.Metadata`'s accessors name a level, and they answer different
 questions. Confusing them is the most common source of surprise.
 
 **{attr}`.Metadata.item_level` — where one row is one dataset item.**
+
 `md.rows_at(md.item_level)` is the task-generic spelling of "one row per thing the
 dataset yields". For image tasks that is `unit` (image); for tracking it is `sequence` (video).
 This is a structural fact about the task, so it is read-only.
@@ -231,11 +232,13 @@ level the caller asked for, which is `unit` by default. So a single-level
 Like {attr}`.Metadata.item_level`, {attr}`.Metadata.label_level` is read-only.
 
 **{attr}`.Metadata.view` — which rows the array-shaped accessors project.**
-This changes based on the level of data currently being accessed. The view defaults to `label_level`,
-which keeps the projection aligned with {attr}`.Metadata.class_labels` row for row. {attr}`.Metadata.factor_data`,
-{attr}`.Metadata.factor_names`, {attr}`.Metadata.is_discrete`, and
-{attr}`.Metadata.shape` — and `len()`, iteration, and indexing — all describe the
-rows at the view. The dataframe is unaffected; it always holds every level.
+
+This changes based on the level of data currently being accessed. The view defaults to
+`label_level`, which keeps the projection aligned with {attr}`.Metadata.class_labels`
+row for row. {attr}`.Metadata.factor_data`, {attr}`.Metadata.factor_names`,
+{attr}`.Metadata.is_binned`, {attr}`.Metadata.is_discrete`, and {attr}`.Metadata.shape`
+— and `len()`, iteration, and indexing — all describe the rows at the view. The dataframe
+is unaffected; it always holds every level.
 
 Changing the view of the data allows DataEval's tools to answer different questions
 about the dataset. The first view below directs inquiries towards variations across detections (e.g.

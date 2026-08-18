@@ -1905,6 +1905,32 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         return info
 
     @property
+    def is_binned(self) -> Sequence[bool]:
+        """Whether each factor's codes came from cutting a range, rather than from its own values.
+
+        Returns
+        -------
+        Sequence[bool]
+            Boolean sequence with length equal to :attr:`factor_names`, True where the
+            factor's entries in :attr:`factor_data` are bin indices and False where each
+            code stands for one value.
+
+        Notes
+        -----
+        This property is part of the :class:`~dataeval.protocols.MetadataLike` protocol,
+        and is the same answer :attr:`factor_info` gives through
+        :attr:`~dataeval.types.FactorInfo.is_binned` — offered here as a flat sequence
+        aligned with :attr:`factor_names`, which is the form the evaluators read.
+
+        Not the same question as :attr:`is_discrete`. The two agree except for a discrete
+        numeric factor carrying more levels than the sample supports, which is binned like a
+        continuous one while remaining discrete; see :ref:`binning-levels`.
+
+        .. versionadded:: 1.1
+        """
+        return [info.is_binned for info in self._factor_info.values()]
+
+    @property
     def is_discrete(self) -> Sequence[bool]:
         """Whether each factor is discrete (True) or continuous (False).
 
@@ -1917,9 +1943,15 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
 
         Notes
         -----
-        This property is part of the :class:`~dataeval.protocols.MetadataLike`
-        and aligns with scientific computing conventions where discrete factors
-        are treated differently from continuous ones in statistical analyses.
+        Describes the *variable*, not what was done to it — a continuous factor stays
+        continuous here after being binned. For the latter question, which is what the bias
+        evaluators read, use :attr:`is_binned`.
+
+        .. versionchanged:: 1.1
+            No longer part of :class:`~dataeval.protocols.MetadataLike`, which now asks for
+            :attr:`is_binned` instead. This property is unaffected and stays: it is a true
+            description of the factors, and :class:`Metadata` has always offered more than
+            the protocol requires.
         """
         return [info.factor_type != "continuous" for info in self._factor_info.values()]
 

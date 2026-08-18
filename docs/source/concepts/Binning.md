@@ -291,7 +291,7 @@ see.
 Because dtype decides the label, a **categorical factor stored as integers** —
 sensor IDs, encoded weather codes — is reported as `discrete`. The evaluators
 are unaffected: both digitize identically and both reach them as
-`is_discrete=True`. Your own code is not, so anything selecting factors by
+`is_binned=False`. Your own code is not, so anything selecting factors by
 `factor_type` will miss it. Dtype is the only input to that label, so the same
 factor stored as strings reports as `categorical`.
 
@@ -338,9 +338,9 @@ spaced.
 
 Downstream code reads the number, because the number is nearly all it gets.
 Evaluators reach factors through {class}`.MetadataLike`, whose four required
-members are `factor_names`, `factor_data`, `class_labels` and `is_discrete` —
-`factor_info` is not one of them. Everything a factor's kind contributes is that
-one bool, which is `False` for a binned continuous factor:
+members are `factor_names`, `factor_data`, `class_labels` and `is_binned` —
+`factor_info` is not one of them. Everything a factor's treatment contributes is
+that one bool, which is `True` for a binned continuous factor:
 
 - {func}`.split_dataset` groups on bin index, so two adjacent bins are as
   different as two distant ones.
@@ -377,16 +377,13 @@ mathematical reason at all.
   - Grouping needs discrete group identities. Note that `split_on` is ignored
     outright on object detection datasets, with a log message and no error.
 - - {class}`.Balance`
-  - **A convention**
-  - {func}`.mutual_info` handles continuous factors natively: given
-    `discrete_features=None` it calls `is_continuous` per column and routes
-    continuous ones to `mutual_info_regression`. But `Balance` never takes that
-    path. It passes `factor_data`, which is already binned, and declares every
-    column discrete rather than forwarding `Metadata.is_discrete` — what arrives
-    is bin indices whatever the factor once was, and calling a binned column
-    continuous would hand it an infinite entropy to be normalized by. So the
-    contingency-table estimator runs on every factor, and the binning upstream is
-    the whole of the loss. Nothing in the output says so.
+  - **Required in practice**
+  - It reads `factor_data`, which is bin and category indices throughout, so the
+    contingency-table estimator runs on every factor and the binning upstream is
+    the whole of the loss. What `Balance` forwards is not *which estimator* to use
+    — that is read from the column's values — but whether each factor's set of
+    values is its own or an artifact of the cuts, which decides how the `factors`
+    DataFrame is normalized. See [below](#binning-reaches-the-three-outputs-differently).
 - - {func}`.factor_deviation`, {func}`.factor_predictors`
   - **Not applied**
   - Both take a plain mapping of factor name to raw array and never touch
@@ -394,12 +391,41 @@ mathematical reason at all.
 :::
 
 The `Balance` row is a property of what it passes, not of the estimator it calls.
-{func}`.mutual_info` given raw values still routes the continuous ones to the
-continuous estimator; the loss happened upstream in `factor_data`, and declaring
-the columns discrete is `Balance` describing what it holds rather than adding a
-second approximation on top. One visible consequence: `Balance.num_neighbors`
-tunes a neighborhood the discrete path never consults, which is why it is
-deprecated and warns when set.
+{func}`.mutual_info` given raw values still routes the measured columns to the
+neighbor-based estimator; the loss happened upstream in `factor_data`. One visible
+consequence: `Balance.num_neighbors` tunes a neighborhood that only the measured
+path consults, which `Balance` cannot produce — which is why it is deprecated and
+warns when set.
+
+### Binning reaches the three outputs differently
+
+{class}`.Balance` returns three DataFrames, and binning does not reach them
+equally. The difference is what each one divides by:
+
+- **`balance` and `classwise`** divide by the entropy of the **class label**,
+  which is never binned. Cutting a factor more finely moves the numerator toward
+  the dependence the unbinned values carry and leaves the denominator alone, so
+  the score converges. On a factor with a true dependence of 0.41, cutting it into
+  2, 8, 32 and 256 bins gives 0.27, 0.39, 0.40 and 0.41 — settled by about 16 bins.
+- **`factors`** compares two metadata factors, and *both* may be binned. There is
+  no fixed reference, so a factor whose alphabet came out of the cuts contributes
+  no ceiling: such a pair is scored by the Linfoot transformation, which maps
+  mutual information onto [0, 1] without reference to an alphabet size. Scoring it
+  against a binned factor's entropy instead would make the reported association
+  shrink as the same data is cut more finely — 0.40 at four bins down to 0.14 at
+  128, on identical data.
+
+A factor whose values *are* its own alphabet — a category, a count, a rating —
+keeps the entropy ceiling in `factors`, so a duplicated categorical factor still
+reads 1.0. The two conventions are each correct in one regime, which is why the
+choice is made per factor rather than globally.
+
+None of this recovers what binning destroyed. A factor cut into four bins is
+scored on four bins' worth of information whichever denominator is used. What it
+buys is dropping the entropy-ceiling artifact — the reported score no longer
+inflates or deflates for a bin count
+[the caller did not choose](#the-bin-count-is-a-function-of-the-data-not-a-setting),
+though the mutual information underneath still reflects what those bins retained.
 
 ## How DataEval decides
 

@@ -28,8 +28,17 @@
 # - `factor_data` - a `(n_samples, n_factors)` integer array of *discretized*
 #   factor values (continuous factors must be pre-binned to integers)
 # - `class_labels` - one label per sample
-# - `is_discrete` - a flag per factor (discrete vs continuous), same length as
-#   `factor_names`
+# - `is_binned` - a flag per factor, same length as `factor_names`: `True` where
+#   you produced that factor's integers by cutting a range into bins, `False`
+#   where each integer stands for a value of its own (a category, a count)
+#
+# ```{note}
+# `is_binned` replaced `is_discrete` in v1.1. A container providing only
+# `is_discrete` still works and warns once; support ends in v1.2. The flag is
+# read to decide whether a factor's number of distinct codes is a real ceiling
+# on what it can share with another factor — for a binned factor that count
+# describes your bin choice rather than the variable, so it is not used as one.
+# ```
 #
 # and two optional properties: `index2label` (class-name mapping) and
 # `item_indices` (which source image each label came from).
@@ -120,20 +129,20 @@ class DataFrameMetadata:
 
         columns: list[np.ndarray] = []
         self._factor_names: list[str] = []
-        self._is_discrete: list[bool] = []
+        self._is_binned: list[bool] = []
 
         # Discrete factors: map each distinct value to an integer code
         for name in discrete_factors:
             columns.append(pd.factorize(dataframe[name])[0].astype(np.int64))
             self._factor_names.append(name)
-            self._is_discrete.append(True)
+            self._is_binned.append(False)  # codes stand for the values themselves
 
         # Continuous factors: bin into the requested number of integer bins
         for name, n_bins in continuous_factors.items():
             binned = pd.cut(dataframe[name], bins=n_bins, labels=False)
             columns.append(np.asarray(binned, dtype=np.int64))
             self._factor_names.append(name)
-            self._is_discrete.append(False)
+            self._is_binned.append(True)  # pd.cut produced bin indices
 
         self._factor_data = np.stack(columns, axis=1) if columns else np.empty((len(dataframe), 0), dtype=np.int64)
         self._class_labels = dataframe[label_col].to_numpy(dtype=np.intp)
@@ -155,8 +164,8 @@ class DataFrameMetadata:
         return self._factor_data
 
     @property
-    def is_discrete(self) -> list[bool]:
-        return self._is_discrete
+    def is_binned(self) -> list[bool]:
+        return self._is_binned
 
     @property
     def class_labels(self) -> np.ndarray:
@@ -204,7 +213,7 @@ ic_meta = DataFrameMetadata(
 
 print(f"Is a MetadataLike:  {isinstance(ic_meta, MetadataLike)}")
 print(f"factor_names:       {ic_meta.factor_names}")
-print(f"is_discrete:        {ic_meta.is_discrete}")
+print(f"is_binned:          {ic_meta.is_binned}")
 print(f"factor_data shape:  {ic_meta.factor_data.shape}")
 print(f"class_labels shape: {ic_meta.class_labels.shape}")
 

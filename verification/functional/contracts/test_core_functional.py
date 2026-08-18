@@ -49,7 +49,7 @@ class TestCoreFunctional:
         label = factor.flatten().astype(np.intp)
 
         # Fix: ensure label is 1D
-        result = mutual_info(label, factor)
+        result = mutual_info(label, factor, discrete_features=[True])
         assert isinstance(result, dict)
         assert result["class_to_factor"][1] > 0.9
 
