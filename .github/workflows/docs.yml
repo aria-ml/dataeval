@@ -124,6 +124,5 @@ jobs:
         uses: DavidAnson/markdownlint-cli2-action@v18
         with:
           globs: |
-            README.md
-            CONTRIBUTING.md
+            *.md
             docs/**/*.md

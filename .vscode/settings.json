@@ -18,8 +18,9 @@
       "source.organizeImports": "explicit",
     },
   },
-  // Markdownlint config lives in .markdownlint.yaml (MD013/MD049/MD050) so the
-  // editor and CI read the same rules. Do not duplicate it here.
+  // Markdownlint config lives in .markdownlint-cli2.yaml, which the extension
+  // discovers on its own, so the editor and CI read the same rules. Do not
+  // duplicate it here.
 
   // Prettier rewrites *emphasis* to _emphasis_ and escapes *args/**kwargs, which
   // conflicts with MD049/MD050 (style: asterisk). It has no option to change that,

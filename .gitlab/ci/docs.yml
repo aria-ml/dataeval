@@ -77,7 +77,4 @@ markdownlint:
     name: davidanson/markdownlint-cli2
     entrypoint: ['']
   script: |
-    markdownlint-cli2 README.md || FAIL=1
-    markdownlint-cli2 CONTRIBUTING.md || FAIL=1
-    markdownlint-cli2 'docs/**/*.md' '#node_modules' || FAIL=1
-    exit $FAIL
+    markdownlint-cli2 '*.md' 'docs/**/*.md' '#node_modules'
