@@ -3,22 +3,19 @@
 **Last updated:** August 2026
 **Horizon:** through February 2027
 
-This roadmap covers the next six months, which at the cadence the project has actually
-held is about one minor release. Work beyond that horizon is listed as direction only and
-carries no dates, because dates that far out have not survived contact with the schedule.
-Detailed planning lives in PI planning; this document is intentionally coarser so it stays
-true longer.
+This roadmap captures the long-term vision and rough quarter-level timing for DataEval
+through early 2027 (roughly one minor release). Detailed schedules live in PI planning;
+this document is intentionally coarser so it stays meaningful longer.
 
 ---
 
 ## Vision
 
 DataEval is the evaluation library for image and video datasets used in operational ML
-systems. Three shifts drive the work through this horizon:
+systems. Three focuses drive the work through this horizon:
 
-1. **Full-motion video (FMV) parity.** Every evaluator that exists for still images
-   becomes available for video, with FMV-native metrics added where they have no
-   still-image analogue.
+1. **Full-motion video (FMV) expansion.** FMV-native metrics with no still-image analogue
+   are added, with a focus on multiobject tracking data analysis and validation.
 2. **Ontology and label validation as first-class capabilities.** Label taxonomies are a
    core input to the library, with validation, alignment, and taxonomy-aware analyses
    available to every downstream evaluator.
@@ -35,8 +32,8 @@ systems. Three shifts drive the work through this horizon:
 | v1.1    | Aug 2026 ✓ | Scope module; ontology stack; object-tracking foundation   |
 | v1.2    | Q1 2027    | FMV foundation and first video evaluators; ontology depth  |
 
-Minor releases have run about five months apart — v1.0 in March 2026, v1.1 in August
-2026. v1.2 is planned against that observed cadence rather than against a shorter target.
+Minor releases have run about five months apart - v1.0 in March 2026, v1.1 in August
+2026. v1.2 is planned against that observed cadence.
 
 ---
 
@@ -54,7 +51,7 @@ set of core label functions: `label_alignment`, `label_coverage`, `label_errors`
 
 **Object-tracking foundation.** Track types, track-aware dataset views, per-track
 statistics, and tracking-aware metadata structurers. This is the substrate the video work
-below builds on — tracks are the first data model in the library whose identity spans
+below builds on - tracks are the first data model in the library whose identity spans
 frames.
 
 **Metadata and bias corrections.** Metadata levels rework, and chance correction
@@ -62,36 +59,34 @@ throughout `Balance` and `mutual_info` so that a finely binned factor no longer 
 correlation with everything.
 
 **Deferred out of v1.1.** Every video-native capability originally planned alongside the
-tracking work — dataset classes, key-frame and key-clip selection, framerate
-normalization, video-aware splitting, and FMV statistics. All of it moves to v1.2.
+tracking work moves to v1.2.
 
 ---
 
-## v1.2 — target Q1 2027
+## v1.2 - target Q1 2027
 
-Two tracks. The FMV track is sequential: the foundation has to land before any evaluator
-can run on video. The ontology and operational track is independent and runs alongside it.
+This work lies along two tracks; The FMV track and the ontology and operational track.
 
-### Track 1 — FMV foundation and first evaluators
+### Track 1 - FMV foundation and first evaluators
 
-Foundation, in dependency order:
+Foundation:
 
 - Video dataset classes, extending the track-aware data model shipped in v1.1.
-- Key-frame and key-clip selection.
-- Clipping and framerate normalization, so datasets collected at different rates become
-  comparable.
+- Key-frame selection, enabling the use of statistical tools on video frames.
+- Ego-motion removal, facilitating unsupervised analysis and label error detection.
 - Video-aware splitting, ensuring no two clips from the same source video land on
   opposite sides of a split.
-- Initial FMV statistics: time, motion, quality, and aggregated frame statistics.
+- FMV statistics: motion, quality, and aggregated frame statistics.
+- Formalized Aggregators, to ensure stats/metadata at different levels can be passed
+  to bias detectors (and other tools) smoothly.
 
-First evaluators on video, once the foundation is stable:
+Video-specific evaluators that build on this foundation:
 
-- **Quality on video** — duplicate and near-duplicate detection, outlier detection, and
-  core-set selection over video embeddings and motion signatures.
-- **One bias evaluator with video-aware groupings**, to prove the grouping path end to
-  end before committing every module to it.
+- **Quality on video** - duplicate and near-duplicate detection.
+- **MOT labeling error detection** - spatially and temporally misaligned boxes, common
+  track ID errors.
 
-### Track 2 — Ontology depth and operational hardening
+### Track 2 - Ontology depth and operational hardening
 
 - Hierarchical-taxonomy support in the bias and balance evaluators, so a taxonomy's
   structure informs the grouping rather than only its leaf labels.
@@ -102,32 +97,23 @@ First evaluators on video, once the foundation is stable:
   scikit-learn through `dataeval.core`; making the core module surface lazy is the first
   step and was deliberately deferred out of v1.1 as too broad for a release eve.
 
-**Scope note.** Both tracks in one release is more than v1.1 carried. If the FMV
-foundation slips, Track 2 ships as v1.2 on its own and the video evaluators move to the
-release after it.
+**Scope note.** Both tracks in one release is more than v1.1 carried. The advanced video
+evaluators will likely move to the following release.
 
 ---
 
-## Beyond v1.2 — direction, no dates
+## Direction beyond v1.2
 
-- **Full video parity.** The remaining evaluator modules — shifts, scope, and performance
-  research — validated on video across classification, object detection, and object
-  tracking.
-- **FMV-native metrics.** Measures with no direct still-image analogue: temporal drift
-  within a clip and across collection time, scene complexity from entity counts and scene
-  transitions, action diversity across action classes and transitions, camera motion
-  characterization, temporal consistency of labels and embeddings, and occlusion and
-  visibility profiles.
-- **Video-specific evaluators.** Near-duplicate detection across videos, clips, and
-  frames; a leakage detector for video datasets integrated into the bias module.
-- **Scale.** Long-video support with streaming embeddings, multi-camera and multi-view
-  datasets, real-time evaluation hooks.
-- **Synthetic and augmented video.** Detection and characterization of synthetic content
-  in operational datasets.
+- **Full video validation and documentation.** Evaluator modules - shifts, scope, and
+  performance - validated on video across classification, object detection, and object
+  tracking, and proper usage documented.
+- **More FMV-native metrics.** Measures with no direct still-image analogue, such as
+  temporal drift within a video sequence, and additional stats for use in evaluators that
+  analyze metadata.
+- **Support for exotic video formats.** - Streaming (long video) datasets, multi-camera
+  and multi-view datasets, real-time evaluation.
 
 A v2.0 marking full video support across every evaluator module remains the destination.
-It is not given a date here: at the observed cadence it is more than one release away, and
-the last two roadmaps placed it a year earlier than the schedule supported.
 
 ---
 
@@ -138,5 +124,4 @@ the last two roadmaps placed it a year earlier than the schedule supported.
 - At least one evaluator module runs end to end on video and is validated on a benchmark
   dataset.
 - Taxonomy structure, not just leaf labels, reaches the bias and balance evaluators.
-- The library is exercised against operational data, with the resulting ergonomic gaps
-  captured as tracked work rather than as folklore.
+- The library is exercised against operational data in relevant demos.
