@@ -4,17 +4,24 @@ __all__ = []
 
 from collections.abc import Sized
 from functools import partial
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from sklearn.cluster import MiniBatchKMeans
 
 from dataeval.config import get_max_processes, get_seed
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array
 from dataeval.utils._internal import PoolWrapper, as_numpy, unwrap_image
 from dataeval.utils.preprocessing import ValueRange, rescale, to_canonical_grayscale
+
+# scikit-learn is a third of `import dataeval`'s cost and only this extractor needs it,
+# so it is imported where it is used rather than at module scope. Matches the cv2 import
+# below, which is deferred for the same reason.
+if TYPE_CHECKING:
+    from sklearn.cluster import MiniBatchKMeans
+else:
+    MiniBatchKMeans = Any
 
 
 def _extract_single(args: tuple[int, Any]) -> tuple[int, NDArray[np.float32]]:
@@ -30,7 +37,10 @@ def _extract_single(args: tuple[int, Any]) -> tuple[int, NDArray[np.float32]]:
         img = rescale(img, depth=8, value_range=ValueRange.observed(img))
     gray = to_canonical_grayscale(img)
     sift = cv2.SIFT.create()
-    _, des = sift.detectAndCompute(gray, None)
+    # No mask: the whole image is searched. The cv2 stubs type `mask` as MatLike with no
+    # None overload, but the C++ signature defaults it to an empty Mat and OpenCV accepts
+    # None for exactly that.
+    _, des = sift.detectAndCompute(gray, None)  # type: ignore[arg-type] - cv2 stubs omit the None mask
     des = np.zeros((0, 128), dtype=np.float32) if des is None else des.astype(np.float32)
     return idx, des
 
@@ -212,6 +222,8 @@ class BoVWExtractor:
         n_clusters = min(self.vocab_size, len(train_data))
 
         # Use MiniBatchKMeans for speed on large datasets
+        from sklearn.cluster import MiniBatchKMeans
+
         seed = get_seed()
         self._kmeans = MiniBatchKMeans(n_clusters=n_clusters, n_init="auto", random_state=seed)
         self._kmeans.fit(train_data)

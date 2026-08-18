@@ -832,7 +832,7 @@ def compute_stats(  # noqa: C901
             that reach :class:`~dataeval.Metadata`. Per-channel rows cannot: a source
             index addresses an item and a target, and a channel is a third axis with no
             level to land on, so balance, diversity and parity cannot see a per-channel
-            statistic at all. Will be removed in v1.2.
+            statistic at all. Will be removed in v1.2.0.
     channels : Mapping[str, ChannelGroupLike] or True or None, default None
         Named groups of bands to measure separately, alongside the whole image.
 
@@ -860,7 +860,7 @@ def compute_stats(  # noqa: C901
         missing bands is a defect that should read as absent.
 
         ``channels=True`` is a deprecated spelling of ``per_channel=True`` and returns
-        rows rather than columns; it is removed in v1.2 along with the row path. A
+        rows rather than columns; it is removed in v1.2.0 along with the row path. A
         mapping cannot be combined with ``per_channel=True``
         and raises: a per-channel row layout is indexed by the datum's own channel count,
         which a narrower group has no row to land on.
@@ -887,7 +887,7 @@ def compute_stats(  # noqa: C901
 
         .. deprecated:: 1.0
             The default changed to False in v1.1. Pass explicitly to silence
-            the deprecation warning. This warning will be removed in v1.2.
+            the deprecation warning. This warning will be removed in v1.2.0.
     value_range : tuple[float, float] or None, default None
         The interval every image's values should be measured against, as ``(low, high)``.
 
@@ -1041,7 +1041,7 @@ def compute_stats(  # noqa: C901
         warnings.warn(
             "The default value of normalize_pixel_values changed to False in v1.1. "
             "Pass normalize_pixel_values explicitly to silence this warning. "
-            "This warning will be removed in v1.2.",
+            "This warning will be removed in v1.2.0.",
             FutureWarning,
             stacklevel=2,
         )
@@ -1062,7 +1062,7 @@ def compute_stats(  # noqa: C901
         per_channel = True
     if per_channel:
         warnings.warn(
-            "Per-channel rows are deprecated since v1.1 and will be removed in v1.2: they cannot reach "
+            "Per-channel rows are deprecated since v1.1 and will be removed in v1.2.0: they cannot reach "
             "Metadata, so balance, diversity and parity cannot see them. Name the bands instead — for "
             "RGB, channels={'r': 0, 'g': 1, 'b': 2} — which returns columns that work everywhere the "
             "rows did not.",

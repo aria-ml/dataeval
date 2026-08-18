@@ -304,7 +304,7 @@ class TestBalanceFunctional:
 
         Every row of this output is divided by the entropy of one class against the rest,
         which belongs to the class label rather than to any factor -- so there is no factor
-        entropy for the declaration to select. It is removed in 1.2 rather than made
+        entropy for the declaration to select. It is removed in v1.2.0 rather than made
         required, which is the opposite of `mutual_info`.
         """
         with pytest.warns(DeprecatedWarning, match="no effect on mutual_info_classwise"):

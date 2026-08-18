@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from dataeval.extractors._resize import resize_chw
+from dataeval.utils._internal import resize_chw
 
 
 def test_resize_chw_changes_spatial_dims_only():

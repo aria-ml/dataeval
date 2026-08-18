@@ -60,7 +60,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
       This column is omitted when all stats are aggregated across channels.
 
       .. deprecated:: 1.1
-         Removed in v1.2 with the per-channel row path that populates it. Name band
+         Removed in v1.2.0 with the per-channel row path that populates it. Name band
          groups with ``compute_stats(channels=...)`` instead: the band is then part of
          ``metric_name`` (``nir_mean`` rather than ``mean`` on channel 3), and each band
          is thresholded against its own distribution rather than one pooled across every

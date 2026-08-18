@@ -429,6 +429,18 @@ def channels_first_to_last(array: TArray) -> TArray:
     raise TypeError(f"Unsupported array type {type(array)}.")
 
 
+def resize_chw(image: NDArray[Any], size: tuple[int, int]) -> NDArray[np.floating[Any]]:
+    """Bilinearly resize a CHW image to ``(height, width)`` (IR-3.1-S-4)."""
+    height, width = size
+    tensor = torch.as_tensor(np.asarray(image)).float()
+    if tensor.ndim != 3:
+        raise ValueError(f"resize_chw expects CHW images; got shape {tuple(tensor.shape)}")
+    resized = torch.nn.functional.interpolate(
+        tensor.unsqueeze(0), size=(height, width), mode="bilinear", align_corners=False
+    )
+    return resized.squeeze(0).numpy()
+
+
 TYPE_MAP = {int: 0, float: 1, str: 2}
 
 

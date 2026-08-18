@@ -13,6 +13,7 @@ __all__ = [
     "use_max_processes",
     "get_seed",
     "set_seed",
+    "use_seed",
     "GlobalConfig",
 ]
 
@@ -369,3 +370,42 @@ def get_seed() -> int | None:
         The seed to use.
     """
     return _config.seed
+
+
+def use_seed(seed: int | None) -> _ConfigContextManager:
+    """
+    Context manager to temporarily override the DataEval seed.
+
+    Parameters
+    ----------
+    seed : int or None
+        The seed to use within the context. None runs the block unseeded.
+
+    Returns
+    -------
+    _ConfigContextManager
+        Context manager that restores the previous seed on exit.
+
+    See Also
+    --------
+    set_seed, get_seed
+
+    Notes
+    -----
+    Only the value :func:`get_seed` returns is swapped, which is the seed DataEval
+    passes to the estimators it calls. Unlike :func:`set_seed`, the global NumPy and
+    PyTorch generators are left alone: their state cannot be restored on exit, so
+    seeding them from a scope that promises to undo itself would be a promise this
+    cannot keep. Seed them with :func:`set_seed` when a block needs that.
+
+    Examples
+    --------
+    >>> set_seed(1234)
+    >>> with use_seed(42):
+    ...     get_seed()
+    42
+    >>> # Previous seed is restored
+    >>> get_seed()
+    1234
+    """
+    return _ConfigContextManager("seed", seed)

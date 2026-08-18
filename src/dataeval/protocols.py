@@ -339,7 +339,7 @@ class MetadataLike(Protocol):
     .. versionchanged:: 1.1
         ``is_binned`` replaces ``is_discrete`` as the fourth member. A container
         providing only ``is_discrete`` is still accepted and warns once; support for it
-        is removed in 1.2. See :ref:`metadatalike-is-binned` for what to change and why.
+        is removed in v1.2.0. See :ref:`metadatalike-is-binned` for what to change and why.
 
     Attributes
     ----------

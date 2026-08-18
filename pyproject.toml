@@ -345,7 +345,7 @@ extend-include = ["*.ipynb"]
 select = ["F", "E", "W", "C90", "I", "N", "D", "UP", "YTT", "ANN", "S", "BLE", "B", "A",
           "COM", "C4", "T10", "ISC", "ICN", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SIM",
           "TID252", "ARG", "FIX", "PD", "FLY", "NPY", "RUF027", "RUF100", "PERF"]
-ignore = ["ANN101", "ANN102", "ANN401", "C408", "C416", "COM812", "NPY002", "SLF001"]
+ignore = ["ANN401", "C408", "C416", "COM812", "NPY002", "SLF001"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"

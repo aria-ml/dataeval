@@ -18,5 +18,5 @@ v1.1
 
 - - [](v1.1.md)
   - **v1.0 to v1.1** — metadata levels, `View` and operations, image statistic scales, and
-    chance-corrected `Balance`. Everything deprecated here is removed in v1.2.
+    chance-corrected `Balance`. Everything deprecated here is removed in v1.2.0.
 :::

@@ -50,7 +50,7 @@ def _validate_vocabularies(datasets: tuple[AnnotatedDataset[Any], ...]) -> None:
             "merge_datasets: none of the datasets expose an 'index2label' mapping, so their "
             "label spaces cannot be verified to match. Merging assumes the integer labels already "
             "denote the same classes. Conform them to a common vocabulary first "
-            "(see dataeval.data.Conform / Relabel) to silence this warning.",
+            "(see dataeval.data.View with dataeval.data.Relabel) to silence this warning.",
             UserWarning,
             stacklevel=3,
         )
@@ -59,7 +59,7 @@ def _validate_vocabularies(datasets: tuple[AnnotatedDataset[Any], ...]) -> None:
     if len(present) != len(datasets) or any(vocabulary != present[0] for vocabulary in present[1:]):
         raise ValueError(
             "merge_datasets requires all datasets to share the same 'index2label'. "
-            "Conform them to a common vocabulary first (see dataeval.data.Conform / Relabel)."
+            "Conform them to a common vocabulary first (see dataeval.data.View with dataeval.data.Relabel)."
         )
 
 

@@ -134,7 +134,7 @@ def _warn_missing_is_binned(candidate_type: type) -> None:
     _WARNED_LEGACY_METADATA.add(candidate_type)
     warnings.warn(
         f"{candidate_type.__name__} implements MetadataLike with `is_discrete` but no "
-        "`is_binned`. Support for `is_discrete` is removed in 1.2. Add an `is_binned` "
+        "`is_binned`. Support for `is_discrete` is removed in v1.2.0. Add an `is_binned` "
         "property returning, per factor and aligned with `factor_names`, whether that "
         "factor's entries in `factor_data` are bin indices (True) rather than codes "
         "standing for the values themselves (False).\n"

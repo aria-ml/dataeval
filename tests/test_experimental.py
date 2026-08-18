@@ -129,7 +129,7 @@ class TestDeprecatedDecorator:
         def old_func():
             return 1
 
-        with pytest.warns(DeprecatedWarning, match="since version 1.0"):
+        with pytest.warns(DeprecatedWarning, match="since v1.0"):
             old_func()
 
     def test_function_with_removal(self):
@@ -137,7 +137,7 @@ class TestDeprecatedDecorator:
         def old_func():
             return 1
 
-        with pytest.warns(DeprecatedWarning, match="removed in version 2.0"):
+        with pytest.warns(DeprecatedWarning, match="removed in v2.0"):
             old_func()
 
     def test_function_with_alternative(self):
@@ -259,7 +259,7 @@ class TestLazyImportWithWarning:
             _warn_on_access("my_module.MyThing", "experimental")
 
     def test_warn_on_access_deprecated_with_metadata(self):
-        with pytest.warns(DeprecatedWarning, match="removed in version 3.0"):
+        with pytest.warns(DeprecatedWarning, match="removed in v3.0"):
             _warn_on_access("my_module.OldThing", "deprecated", since="2.0", removal="3.0")
 
     def test_getattr_for_missing_name_raises(self):

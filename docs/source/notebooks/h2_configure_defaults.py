@@ -253,6 +253,22 @@ with dataeval.config.use_max_processes(2):
 print(f"After context: {dataeval.config.get_max_processes()}")
 
 # %% [markdown]
+# `use_seed` swaps only the seed DataEval hands to the estimators it calls, which is what
+# `get_seed` returns. It deliberately leaves the NumPy and PyTorch generators alone: their
+# state cannot be put back on exit, so a scope that promised to restore it could not keep
+# that promise. Use `set_seed(..., all_generators=True)` when a block needs those seeded.
+
+# %%
+dataeval.config.set_seed(42)
+print(f"Before context: {dataeval.config.get_seed()}")
+
+with dataeval.config.use_seed(7):
+    print(f"Inside context: {dataeval.config.get_seed()}")
+    # Perform operations with seed=7
+
+print(f"After context: {dataeval.config.get_seed()}")
+
+# %% [markdown]
 # ## See also
 #
 # ### How-to guides

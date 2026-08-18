@@ -82,7 +82,7 @@ class Balance(Evaluator):
     Parameters
     ----------
     num_neighbors : int, default 5
-        Deprecated, removed in 1.2. Every factor reaching this evaluator holds integer
+        Deprecated, removed in v1.2.0. Every factor reaching this evaluator holds integer
         codes, which are read off a contingency table rather than by the neighbor-based
         estimator a neighborhood size belongs to, so this value has no effect on the
         result. Setting it warns.
@@ -104,7 +104,7 @@ class Balance(Evaluator):
     metadata : MetadataLike
         Preprocessed metadata from the last evaluate() call.
     num_neighbors : int
-        Deprecated, removed in 1.2. Has no effect; see Parameters.
+        Deprecated, removed in v1.2.0. Has no effect; see Parameters.
     class_imbalance_threshold : float
         Threshold for identifying imbalanced classes
     factor_correlation_threshold : float
@@ -180,7 +180,7 @@ class Balance(Evaluator):
         Attributes
         ----------
         num_neighbors : int, default 5
-            Deprecated, removed in 1.2. Has no effect; see :class:`.Balance`.
+            Deprecated, removed in v1.2.0. Has no effect; see :class:`.Balance`.
         class_imbalance_threshold : float, default 0.3
             Threshold for identifying imbalanced classes.
         factor_correlation_threshold : float, default 0.5
@@ -215,7 +215,7 @@ class Balance(Evaluator):
         super().__init__(locals())
         if self.num_neighbors != DEFAULT_BALANCE_NUM_NEIGHBORS:
             warnings.warn(
-                "Balance.num_neighbors is deprecated and will be removed in 1.2. It has no "
+                "Balance.num_neighbors is deprecated and will be removed in v1.2.0. It has no "
                 "effect: every factor reaching the estimator arrives as integer codes, which "
                 "are tabulated rather than read by the neighbor-based estimator.",
                 DeprecatedWarning,

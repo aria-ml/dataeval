@@ -28,10 +28,12 @@ def _make_warning_message(  # noqa: C901
     else:
         msg = f"'{name}' is deprecated"
         if since:
-            msg += f" since version {since}"
+            msg += f" since v{since}"
         msg += "."
         if removal:
-            msg += f" It will be removed in version {removal}."
+            # "removed in vX.Y.Z", the one spelling used across every deprecation notice in
+            # the library, so a caller can grep their warnings for a single string.
+            msg += f" It will be removed in v{removal}."
     if alternative:
         msg += f" Use '{alternative}' instead."
     if details:

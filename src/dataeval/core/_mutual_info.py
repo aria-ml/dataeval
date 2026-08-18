@@ -28,7 +28,7 @@ class MutualInfoResult(TypedDict):
     Attributes
     ----------
     class_to_factor : NDArray[np.float64]
-        1D array of length (num_factors+1) holding the share of the class label's entropy
+        1D array of shape (F+1,) holding the share of the class label's entropy
         that each factor accounts for, corrected for chance, with the class label itself at
         index 0. 1.0 means the factor determines the class outright and 0.0 means it says
         nothing beyond what its cardinality would produce by chance. The entries are
@@ -36,7 +36,7 @@ class MutualInfoResult(TypedDict):
         taking several hundred values is scored conservatively and can fall below a
         coarser factor that accounts for less. See Notes.
     interfactor : NDArray[np.float64]
-        (num_factors) x (num_factors) symmetric matrix of normalized mutual information
+        (F, F) symmetric matrix of normalized mutual information
         between metadata factors only (excluding class labels), corrected for chance on the
         same grounds. Neither factor in a pair is privileged, so these are normalized by the
         smaller of the two entropies rather than against the class entropy, which puts them
@@ -83,7 +83,7 @@ def _warn_unused_discrete_features() -> None:
     because the two functions have matched signatures since before that was true.
     """
     warnings.warn(
-        "`discrete_features` has no effect on mutual_info_classwise and is removed in 1.2. "
+        "`discrete_features` has no effect on mutual_info_classwise and is removed in v1.2.0. "
         "Every row here is divided by the entropy of one class against the rest, which "
         "belongs to the class label rather than to any factor, so there is no factor "
         "entropy for the declaration to select and it is discarded. Drop the argument.\n"
@@ -355,8 +355,16 @@ def mutual_info(  # noqa: C901
     MutualInfoResult
         TypedDict containing:
 
-        - class_to_factor: NDArray[np.float64] - 1D array of normalized MI between class labels and each factor
-        - interfactor: NDArray[np.float64] - (num_factors) x (num_factors) matrix of normalized MI between factors only
+        - class_to_factor: NDArray[np.float64], shape - (F+1,) - normalized MI between the
+          class label and each factor, with the class label's own self-MI at index 0 and
+          factor ``i`` of ``factor_data`` at index ``i+1``.
+        - interfactor: NDArray[np.float64], shape - (F, F) - normalized MI between factors
+          only; the class label is excluded, so row/column ``i`` is factor ``i`` of
+          ``factor_data``.
+
+        The two are indexed differently on purpose: the class label is one of the entries
+        the first answers for and is not an entry of the second at all. See Notes for why
+        they are also normalized differently.
 
     See Also
     --------
@@ -455,24 +463,27 @@ def mutual_info(  # noqa: C901
     data, sklearn_list, coded_list, declared_list = _merge_labels_and_factors(
         class_labels_np, factor_data_np, discrete_feat_np
     )
-    num_factors = len(coded_list)
+    # Counts columns of `data`, which is the class label followed by the F factors, so this
+    # is F+1. `class_to_factor` is returned at this length; `interfactor` drops the class.
+    num_columns = len(coded_list)
 
     _logger.debug(
-        "Computing NMI for %d factors (%d coded, %d with an alphabet of their own)",
-        num_factors,
+        "Computing NMI over %d columns (%d factors, %d coded, %d with an alphabet of their own)",
+        num_columns,
+        num_columns - 1,
         sum(coded_list),
         sum(declared_list),
     )
 
     # initialize output matrix
-    mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
+    mi = np.full((num_columns, num_columns), np.nan, dtype=np.float32)
 
     # A factor whose alphabet is its own bounds what any pair containing it can share, so
     # its entropy is a legitimate ceiling. One whose values came out of a binning does not:
     # that entropy measures the cut and grows with the bin count, so it is left infinite
     # and contributes no ceiling at all.
-    norm_factor = np.zeros(num_factors)
-    for i in range(num_factors):
+    norm_factor = np.zeros(num_columns)
+    for i in range(num_columns):
         norm_factor[i] = _entropy_of(data[:, i]) if declared_list[i] else np.inf
 
     # The estimator is consulted only where a column cannot be tabulated. With every column
@@ -482,7 +493,7 @@ def mutual_info(  # noqa: C901
     if all(coded_list):
         mi[:, :] = 0.0
     else:
-        for idx in range(num_factors):
+        for idx in range(num_columns):
             mi[idx, :] = (mutual_info_classif if sklearn_list[idx] else mutual_info_regression)(
                 data,
                 data[:, idx],
@@ -496,7 +507,7 @@ def mutual_info(  # noqa: C901
     # class-to-factor row is normalized differently from the factor-to-factor block.
     raw_mi = mi[0].copy()
 
-    for idx in range(num_factors):
+    for idx in range(num_columns):
         # Normalization via entropy, pre-computed above
         for j in range(data.shape[1]):
             if np.isinf(norm_factor[j]) and np.isinf(norm_factor[idx]):
@@ -517,10 +528,10 @@ def mutual_info(  # noqa: C901
     # factors falls through to Linfoot rather than being divided by an artifact. Pairs
     # involving a column of measured values have no table and keep the estimator's own
     # normalization above.
-    for i in range(1, num_factors):
+    for i in range(1, num_columns):
         if not coded_list[i]:
             continue
-        for j in range(i + 1, num_factors):
+        for j in range(i + 1, num_columns):
             if not coded_list[j]:
                 continue
             adjusted = _adjusted_association(data[:, i], data[:, j], norm_factor[i], norm_factor[j])
@@ -531,7 +542,7 @@ def mutual_info(  # noqa: C901
     # factor and a Linfoot-transformed self-estimate for a measured one -- two different
     # answers to a question with only one. A factor holding a single value has nothing to
     # share and stays at zero.
-    for i in range(1, num_factors):
+    for i in range(1, num_columns):
         interfactor[i - 1, i - 1] = 1.0 if _entropy_of(data[:, i]) > 0 else 0.0
 
     # Between two factors neither side is privileged, so that block is scored against the
@@ -541,7 +552,7 @@ def mutual_info(  # noqa: C901
 
     _logger.info(
         "Mutual info calculation complete: %d factors, mean class_to_factor NMI=%.4f",
-        num_factors - 1,
+        num_columns - 1,
         np.mean(class_to_factor[1:]),
     )
 
@@ -572,7 +583,7 @@ def mutual_info_classwise(
         Ignored.
 
         .. deprecated:: 1.1
-            Has no effect and is **removed in 1.2**; setting it warns. The declaration
+            Has no effect and is **removed in v1.2.0**; setting it warns. The declaration
             selects a denominator, and this function does not have that choice to make:
             every row is divided by the entropy of one class against the rest, which belongs
             to the class label rather than to any factor. It is accepted only because the
@@ -586,7 +597,7 @@ def mutual_info_classwise(
     Returns
     -------
     NDArray[np.float64]
-        (num_classes) x (num_factors+1) array holding, for each class taken against the
+        (num_classes, F+1) array holding, for each class taken against the
         rest, the share of that one-against-the-rest split's entropy which each factor
         accounts for, corrected for chance. Each row shares a single denominator, so it
         ranks the factors for that class the way ``class_to_factor`` ranks them for the
@@ -644,16 +655,18 @@ def mutual_info_classwise(
     data, sklearn_list, coded_list, _ = _merge_labels_and_factors(
         class_labels_np, factor_data_np, np.ones(factor_data_np.shape[1], dtype=np.bool_)
     )
-    num_factors = len(coded_list)
+    # Columns of `data`: the class label followed by the F factors, so F+1. Each returned
+    # row is this wide, with the class label's self-MI at index 0.
+    num_columns = len(coded_list)
     u_classes = np.unique(class_labels_np)
     num_classes = len(u_classes)
 
-    _logger.debug("Computing classwise NMI for %d classes and %d factors", num_classes, num_factors)
+    _logger.debug("Computing classwise NMI for %d classes and %d factors", num_classes, num_columns - 1)
 
     if num_classes == 0:
         # No class to take against the rest, so there is no row to score. Returned rather
         # than stacked: np.stack has no shape to infer from an empty list.
-        return np.zeros((0, num_factors), dtype=np.float64)
+        return np.zeros((0, num_columns), dtype=np.float64)
 
     # classwise targets (binary indicators)
     tgt_bin = data[:, 0][:, None] == u_classes
@@ -661,7 +674,7 @@ def mutual_info_classwise(
     # Compute MI. The estimate is read only where a column holds measured values, since
     # every other column is scored off its contingency table instead; with every column
     # coded the whole loop is an estimator pass nothing reads.
-    classwise_mi = np.zeros((num_classes, num_factors), dtype=np.float32)
+    classwise_mi = np.zeros((num_classes, num_columns), dtype=np.float32)
     if not all(coded_list[1:]):
         for idx in range(num_classes):
             classwise_mi[idx, :] = mutual_info_classif(
@@ -682,6 +695,6 @@ def mutual_info_classwise(
         _target_to_factor(tgt_bin[:, idx], data, coded_list, classwise_mi[idx]) for idx in range(num_classes)
     ])
 
-    _logger.info("Mutual info classwise calculation complete: %d classes x %d factors", num_classes, num_factors)
+    _logger.info("Mutual info classwise calculation complete: %d classes x %d factors", num_classes, num_columns - 1)
 
     return normalized.astype(np.float64)

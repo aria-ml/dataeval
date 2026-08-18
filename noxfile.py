@@ -270,7 +270,7 @@ def verify(session: nox.Session) -> None:
     session.run("python", "verification/generate_metarepo.py")
 
 
-@session(uv_groups=["type"], uv_extras=with_onnx(["cpu"]))
+@session(uv_groups=["type"], uv_extras=with_onnx(["cpu", "opencv", "ontology"]))
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
     session.run("pyright", "--stats")

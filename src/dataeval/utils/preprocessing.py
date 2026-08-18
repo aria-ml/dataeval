@@ -480,7 +480,7 @@ class BitDepth:
 
     .. deprecated:: 1.1
         Use :class:`ValueRange`, which separates the interval statistics are computed
-        against from the encoding depth it was decoded from. Will be removed in v1.2.
+        against from the encoding depth it was decoded from. Will be removed in v1.2.0.
 
     Attributes
     ----------
@@ -581,7 +581,7 @@ class ValueRange:
 _UNKNOWN_RANGE = ValueRange(np.nan, np.nan, np.nan)
 
 
-@deprecated(since="1.1", removal="1.2", alternative="get_value_range")
+@deprecated(since="1.1", removal="1.2.0", alternative="get_value_range")
 def get_bitdepth(image: NDArray[Any]) -> BitDepth:
     """
     Approximates the bit depth of the image using the min and max pixel values.
@@ -589,7 +589,7 @@ def get_bitdepth(image: NDArray[Any]) -> BitDepth:
     .. deprecated:: 1.1
         Use :func:`get_value_range`, which does not fabricate a depth for float data and
         does not discard the observed range of data holding negative values. Will be
-        removed in v1.2.
+        removed in v1.2.0.
 
     Parameters
     ----------
@@ -1093,7 +1093,7 @@ def crop_with_fill(
     return output, (x0, y0)
 
 
-@deprecated(since="1.1", removal="1.2")
+@deprecated(since="1.1", removal="1.2.0")
 def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
     """
     Extract a region from an image based on a bounding box.
@@ -1103,7 +1103,7 @@ def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
     .. deprecated:: 1.1
         Use :func:`crop_with_fill` and pass ``fill=np.nan`` and take the
         first tuple value for the equivalent functionality.  Will be
-        removed in v1.2.
+        removed in v1.2.0.
 
     Parameters
     ----------

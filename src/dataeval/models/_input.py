@@ -8,9 +8,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.extractors._resize import resize_chw
 from dataeval.models._metadata import ModelIOSpec
-from dataeval.utils._internal import ImageOrItem, as_numpy, unwrap_image
+from dataeval.utils._internal import ImageOrItem, as_numpy, resize_chw, unwrap_image
 
 
 def _to_channels(img: NDArray[Any], channels: str) -> NDArray[Any]:

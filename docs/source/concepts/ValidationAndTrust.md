@@ -442,7 +442,7 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for what these measure.
   - Delegated (MI estimation); Internal only (normalization)
   - `class_imbalance_threshold=0.3` and `factor_correlation_threshold=0.5`
     decide what is reported as imbalanced or entangled. `num_neighbors=5` is
-    deprecated and will be removed in 1.2: it sets the MI estimator's
+    deprecated and will be removed in v1.2.0: it sets the MI estimator's
     neighborhood, and every column arriving from a {class}`.Metadata` is already
     binned and so never reaches the neighbor-based estimator. Setting it warns.
   - Declares every factor discrete, so the result depends on a binning you may

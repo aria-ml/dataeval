@@ -18,6 +18,48 @@ class TestSeed:
         finally:
             config.set_seed(original_seed, all_generators=True)
 
+    def test_seed_context(self):
+        original_seed = config.get_seed()
+        try:
+            config.set_seed(7)
+            with config.use_seed(99):
+                assert config.get_seed() == 99
+            assert config.get_seed() == 7
+        finally:
+            config.set_seed(original_seed, all_generators=True)
+
+    def test_seed_context_restores_on_exception(self):
+        original_seed = config.get_seed()
+        try:
+            config.set_seed(7)
+            with pytest.raises(RuntimeError), config.use_seed(99):
+                raise RuntimeError("boom")
+            assert config.get_seed() == 7
+        finally:
+            config.set_seed(original_seed, all_generators=True)
+
+    def test_seed_context_accepts_none(self):
+        original_seed = config.get_seed()
+        try:
+            config.set_seed(7)
+            with config.use_seed(None):
+                assert config.get_seed() is None
+            assert config.get_seed() == 7
+        finally:
+            config.set_seed(original_seed, all_generators=True)
+
+    def test_seed_context_leaves_global_generators_alone(self):
+        """use_seed swaps only the DataEval seed; it cannot restore torch/numpy state."""
+        original_seed = config.get_seed()
+        try:
+            config.set_seed(7, all_generators=True)
+            before = torch.initial_seed()
+            with config.use_seed(99):
+                assert torch.initial_seed() == before
+            assert torch.initial_seed() == before
+        finally:
+            config.set_seed(original_seed, all_generators=True)
+
 
 class TestDevice:
     def test_device(self):

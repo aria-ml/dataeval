@@ -312,7 +312,7 @@ class ClasswiseUncertaintyExtractor(_UncertaintyBase):
 
 @deprecated(
     since="1.1",
-    removal="1.2",
+    removal="1.2.0",
     alternative="UncertaintyExtractor or ClasswiseUncertaintyExtractor",
     details=(
         "Wrap a TorchExtractor (or any FeatureExtractor) in UncertaintyExtractor for per-instance "
@@ -327,7 +327,7 @@ class ClassifierUncertaintyExtractor:
         Wrap a ``TorchExtractor`` (or any ``FeatureExtractor``) in
         :class:`UncertaintyExtractor` for per-instance uncertainty, or
         :class:`ClasswiseUncertaintyExtractor` for per-class uncertainty.
-        ``ClassifierUncertaintyExtractor`` will be removed in version 1.2.
+        ``ClassifierUncertaintyExtractor`` will be removed in v1.2.0.
 
     This class implements the :class:`~dataeval.protocols.FeatureExtractor` protocol
     for use with drift detectors (e.g., :class:`~dataeval.shift.DriftUnivariate`).
