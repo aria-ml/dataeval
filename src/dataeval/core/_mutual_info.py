@@ -216,13 +216,14 @@ def mutual_info(  # noqa: C901
 
     Parameters
     ----------
-    class_labels : Array1D[int]
+    class_labels : Array1D[int], shape - (N,)
         Target class labels as integer indices. Can be a 1D list, or array-like object.
-    factor_data : Array2D[int | float]
+    factor_data : Array2D[int | float], shape - (N, F)
         Factor values after binning or digitization. Can be a 2D list, or array-like object.
-    discrete_features : Array1D[bool] | None = None
-        Boolean array defining whether or not the feature set is discretized. Can be a 1D list, or array-like object.
-    num_neighbors : int = 5
+    discrete_features : Array1D[bool] | None, shape - (F,), default None
+        Boolean array defining whether or not the feature set is discretized.
+        Can be a 1D list, or array-like object.
+    num_neighbors : int, default 5
         Number of points to consider as neighbors.
 
     Returns
@@ -399,14 +400,14 @@ def mutual_info_classwise(
 
     Parameters
     ----------
-    class_labels : Array1D[int]
+    class_labels : Array1D[int], shape - (N,)
         Target class labels as integer indices. Can be a 1D list, or array-like object.
-    factor_data : Array2D[int | float]
-        Factor values after binning or digitization. Can be a 1D list, or array-like object.
-    discrete_features : Array1D[bool] | None = None
-        Boolean array or iterable defining whether or not the feature set is discretized.
+    factor_data : Array2D[int | float], shape - (N, F)
+        Factor values after binning or digitization. Can be a 2D list, or array-like object.
+    discrete_features : Array1D[bool] | None, shape - (F,), default None
+        Boolean array defining whether or not the feature set is discretized.
         Can be a 1D list, or array-like object.
-    num_neighbors : int = 5
+    num_neighbors : int, default 5
         Number of points to consider as neighbors.
 
     Returns

@@ -1,0 +1,5 @@
+# Markdown is formatted by markdownlint (see .markdownlint.yaml), not Prettier.
+# Prettier rewrites *emphasis* to _emphasis_ and escapes *args / **kwargs, which
+# conflicts with MD049/MD050 (style: asterisk). Prettier has no option to change
+# its emphasis character, so Markdown is excluded here rather than fought on save.
+*.md

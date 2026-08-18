@@ -82,7 +82,7 @@ name has one job:
   is a sequence of frames.
 - **`unit`** — one element of media. An image, a video frame, an audio clip, a
   text document, a row of a table. This is the level whose name used to be
-  `image`; [Units, not images](#units-not-images) explains why it is not.
+  `image`; [Level names](#level-names) explains why it is not.
 - **`track`** — one identity a tracker assigns, of which each observation is one
   detection.
 - **`instance`** — one labelled thing. A detection for object detection and
@@ -228,7 +228,7 @@ impose a shape: it places both the item level and the label level at whichever
 level the caller asked for, which is `unit` by default. So a single-level
 `from_factors` metadata has `item_level == label_level == "unit"`.
 
-Like {attr}`.Metadata.item_level`, {attr}`.Metadata.lavel_level` is read-only.
+Like {attr}`.Metadata.item_level`, {attr}`.Metadata.label_level` is read-only.
 
 **{attr}`.Metadata.view` — which rows the array-shaped accessors project.**
 This changes based on the level of data currently being accessed. The view defaults to `label_level`,
@@ -240,7 +240,7 @@ rows at the view. The dataframe is unaffected; it always holds every level.
 Changing the view of the data allows DataEval's tools to answer different questions
 about the dataset. The first view below directs inquiries towards variations across detections (e.g.
 "across all detections, how do these factors co-vary?"). The second invites analysis
-"accross all images" instead.
+"across all images" instead.
 
 ```python
 md.factor_data.shape[0]  # 93 — one row per detection

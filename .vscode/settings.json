@@ -18,20 +18,19 @@
       "source.organizeImports": "explicit",
     },
   },
-  "markdownlint.config": {
-        "MD013": {
-            "line_length": 120
-        }
-    },
+  // Markdownlint config lives in .markdownlint.yaml (MD013/MD049/MD050) so the
+  // editor and CI read the same rules. Do not duplicate it here.
 
+  // Prettier rewrites *emphasis* to _emphasis_ and escapes *args/**kwargs, which
+  // conflicts with MD049/MD050 (style: asterisk). It has no option to change that,
+  // and formatOnSave runs after codeActionsOnSave, so it would undo the markdownlint
+  // fix on every save. Markdown is formatted by markdownlint's fixer only.
   "[markdown]": {
-    "editor.formatOnSave": true,
-    "editor.formatOnPaste": true,
-    "editor.formatOnSaveMode": "file",
+    "editor.formatOnSave": false,
+    "editor.formatOnPaste": false,
     "editor.codeActionsOnSave": {
       "source.fixAll.markdownlint": "explicit"
     }
-    
   },
 
   "notebook.formatOnSave.enabled": true,

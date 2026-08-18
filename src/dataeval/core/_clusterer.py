@@ -313,7 +313,7 @@ _SORTER_MAP: dict[str, type[_Sorter]] = {
 
 class _HDBSCAN:
     """
-    Use hierarchical clustering on the flattened data and return clustering information.
+    Use density-based (HDBSCAN) clustering on the flattened data and return clustering information.
 
     Parameters
     ----------
@@ -323,8 +323,8 @@ class _HDBSCAN:
         the number of observations in a P-dimensional space.
     n_clusters : int, optional
         Hint for the expected number of clusters (e.g., number of classes in dataset).
-        This adaptively adjusts min_cluster_size to encourage finding
-        approximately this many clusters. Useful when you have
+        This adaptively sets ``min_cluster_size`` to ``max(5, n_samples // (n_clusters * 3))``
+        to encourage finding approximately this many clusters. Useful when you have
         domain knowledge about the data structure.
     max_cluster_size : int, optional
         Option to limit the size of the identified clusters. Useful when you have
@@ -651,7 +651,7 @@ def cluster(  # noqa: C901
     n_init: int | Literal["auto"] = "auto",
 ) -> ClusterResult:
     """
-    Use hierarchical clustering on the flattened data and return clustering information.
+    Cluster the flattened data using KMeans or HDBSCAN and return clustering information.
 
     Parameters
     ----------
@@ -664,8 +664,8 @@ def cluster(  # noqa: C901
     n_clusters : int, optional
         The expected number of clusters (e.g., number of classes in dataset).
         For KMeans, this is the exact number of clusters to find.
-        For HDBSCAN, adaptively adjusts min_cluster_size to encourage finding
-        approximately this many clusters.
+        For HDBSCAN, adaptively sets ``min_cluster_size`` to ``max(5, n_samples // (n_clusters * 3))``
+        to encourage finding approximately this many clusters.
     max_cluster_size : int, optional
         Option to limit the size of the identified clusters. Useful when you have
         domain knowledge about the data structure. (HDBSCAN only)
