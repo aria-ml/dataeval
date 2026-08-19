@@ -213,6 +213,21 @@ def _declared_bins(spec: BinSpec) -> int:
     return max(len(spec.edges) - 1, 0)
 
 
+def _declared_codes(spec: "BinSpec | LevelSpec | None") -> list[int]:
+    """Codes a record describes, before any data is consulted.
+
+    The point of asking the record rather than the column: a bin nothing reached still has
+    a name, because the cut still declares it. Excludes the out-of-range catchalls and the
+    missing-value code, which the record does not declare -- they are named only where the
+    data actually put something in them.
+    """
+    if isinstance(spec, BinSpec):
+        return list(range(1, _declared_bins(spec) + 1))
+    if isinstance(spec, LevelSpec):
+        return list(range(len(spec.levels)))
+    return []
+
+
 def _unused_bins(spec: BinSpec, codes: NDArray[np.int64]) -> tuple[NDArray[np.int64], str | None]:
     """Codes a cut actually placed, and a note naming how many of its intervals hold rows.
 
@@ -2121,6 +2136,76 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         if factor not in info:
             raise KeyError(f"{factor!r} is not among this metadata's factors {sorted(info)}.")
         return info[factor].encoding
+
+    def code_names(self, factor: str | None = None) -> Any:
+        """How each of a factor's codes reads, as the record spells it.
+
+        A code is opaque on its own -- ``illum_lux = 3`` says nothing -- and the encoding
+        record is what turns it back into ``[0, 12.4)`` or ``rain``. This is that lookup,
+        asked directly. It is what :attr:`~dataeval.bias.ParityOutput.insufficient_data`
+        reports its levels through and what names the groups of a ``label=`` axis, so a
+        caller rendering the same factor themselves gets the same strings those outputs
+        use rather than approximating them.
+
+        Names come from the **record**, not from the rows. A bin is named for the interval
+        its edges describe, so the same policy reads the same way over a different draw and
+        a declared cutoff survives into its own label -- naming a bin after its contents
+        rendered ``{"temp_c": [-inf, 0.0, inf]}`` as ``[-40, -0.3]``, with nothing saying
+        that zero was where the meaning was.
+
+        Every code the record declares is named, whether or not this sample reached it. An
+        empty bin is a finding rather than an absence -- it is how a locked encoding says
+        it no longer fits -- and something reporting one still has to name it. Codes the
+        record does not declare but the data holds are named too: the out-of-range
+        catchalls, and the reserved code for a missing value.
+
+        Parameters
+        ----------
+        factor : str or None, default None
+            The factor to name codes for, or None for every factor.
+
+        Returns
+        -------
+        dict[int, str], or a Mapping of them
+            Code to display name for ``factor``, or a mapping from every factor name to
+            its own lookup when ``factor`` is None. Empty for a factor that reached
+            neither encoding path, which has codes for nothing to name.
+
+        Raises
+        ------
+        KeyError
+            When ``factor`` is not one of this metadata's factors.
+
+        See Also
+        --------
+        encoding : The record the names are read from.
+
+        Examples
+        --------
+        >>> md = Metadata(dataset)
+        >>> md.code_names("weather")
+        {0: 'clear', 1: 'cloudy', 2: 'rainy'}
+        """
+        info = self._factor_info
+        if factor is not None and factor not in info:
+            raise KeyError(f"{factor!r} is not among this metadata's factors {sorted(info)}.")
+        wanted = info if factor is None else {factor: info[factor]}
+        named = {name: self._names_for(name, entry) for name, entry in wanted.items()}
+        return named if factor is None else named[factor]
+
+    def _names_for(self, name: str, info: FactorInfo) -> dict[int, str]:
+        """Name every code one factor can produce, declared or merely present."""
+        # Imported here rather than at module scope: `_helpers` reaches back into this
+        # module, so a module-level import closes the cycle. Same reason `_helpers` defers
+        # its own import of `Metadata`.
+        from dataeval._helpers import _code_names
+
+        if not (info.is_binned or info.is_digitized):
+            # No companion column, so nothing holds codes and there is nothing to name.
+            return {}
+        present = self._store.frame(info.level)[to_col(name, info)].to_numpy()
+        declared = _declared_codes(info.encoding)
+        return _code_names(np.concatenate([np.asarray(declared, dtype=present.dtype), present]), info.encoding)
 
     @property
     def encoding_digest(self) -> str:

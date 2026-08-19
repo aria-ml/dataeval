@@ -175,14 +175,13 @@ companion says `is_binned`, a `LevelSpec` holding the value per code where it
 says `is_digitized`. That is what lets a code be read back as `[0, 12.4)` or
 `rain` rather than as `3`.
 
-```python
-for name, info in md.factor_info.items():
-    print(f"{name:12s} {info.factor_type:11s} binned={info.is_binned}")
+Four factors as `factor_info` reports them:
 
-# altitude_m   continuous  binned=True     ← cut into intervals, lossy
-# epoch_s      discrete    binned=True     ← too many levels to afford, cut anyway
-# n_people     discrete    binned=False    ← relabeled, lossless
-# weather      categorical binned=False    ← relabeled, lossless
+```text
+altitude_m   continuous   binned=True    ← cut into intervals, lossy
+epoch_s      discrete     binned=True    ← too many levels to afford, cut anyway
+n_people     discrete     binned=False   ← relabeled, lossless
+weather      categorical  binned=False   ← relabeled, lossless
 ```
 
 `factor_type` and `is_binned` are therefore independent: the type records what the
@@ -358,15 +357,25 @@ the two Wasserstein thresholds, a `0.005` duplicate tolerance, a `0.85` lattice
 cutoff, and a `0.05` near-integer tolerance inside the GCD test — so on data
 whose support you already know, the verdict is quick to confirm.
 {func}`.is_continuous` is public, and its verdict on an array is the same one
-{class}`.Metadata` acts on:
+{class}`.Metadata` acts on. Three samples of 200 values:
 
-```python
-from dataeval.core import is_continuous
+:::{list-table}
+:widths: 36 16 48
+:header-rows: 1
 
-is_continuous(rng.normal(size=200))  # True
-is_continuous(rng.integers(0, 100, size=200))  # False — lumpy NNN, duplicates, lattice
-is_continuous(np.round(rng.normal(size=200), 1))  # False — rounding creates all three
-```
+- - Sample
+  - Verdict
+  - Which signals fired
+- - Draws from a standard normal
+  - continuous
+  - None — near-uniform neighbor positions, no collisions, no lattice
+- - Integers drawn from 0-99
+  - discrete
+  - All three: lumpy neighbor positions, duplicates, and a lattice
+- - The same normal draws rounded to one decimal
+  - discrete
+  - All three, created by the rounding alone
+:::
 
 That last case is the common one. **Rounding a continuous quantity for storage
 makes it discrete**, so a brightness value written to one decimal place will be
@@ -396,11 +405,8 @@ a value at a time is what makes it report a correlation with anything it is
 measured against, because a contingency table with more cells than observations
 records which cells were hit rather than anything about the factor.
 
-So no numeric factor carries more levels than the sample's level budget:
-
-```python
-max(20, sqrt(n))  # n at the factor's own level
-```
+So no numeric factor carries more levels than the sample's level budget,
+`max(20, sqrt(n))`, with `n` counted at the factor's own level.
 
 `sqrt(n)` is the square-root rule for histogram bin counts; the floor of 20 keeps
 an ordinary categorical factor intact on a small sample. Both are standard rules
@@ -436,6 +442,16 @@ meant to be categorical.
 A merely *wide* vocabulary is not dropped. A factor whose levels are thin for the
 sample is what {attr}`.ParityOutput.insufficient_data` exists to report, and
 removing the factor would foreclose the mechanism that says so.
+
+That report names its levels rather than numbering them, and
+{meth}`.Metadata.code_names` is the same lookup asked directly — what code 3 of
+`illum_lux` means, without going through an evaluator to find out. Names come from
+the record, so a declared cutoff reads as `< 0` rather than as whatever the coldest
+row happened to be. A factor cut at `[-np.inf, 0.0, 10.0, np.inf]` reads back as
+`< 0`, `[0, 10)` and `>= 10`, and every bin the cut declares is named whether or
+not this sample reached it. Anything rendering a factor's codes itself — a report,
+an export, a plot axis — gets the strings the evaluators use rather than
+approximating them.
 
 Both the automatic binning and the drop raise a `UserWarning`, naming every factor
 affected, in addition to the per-factor detail on the `dataeval.metadata` logger.
@@ -550,13 +566,14 @@ between modes. None of them has any way to know that one particular value on
 that axis is a phase change. The information needed to cut this factor for
 *this* question is not in the factor.
 
-It has to arrive from outside the factor, through `continuous_factor_bins`:
+It has to arrive from outside the factor, through `continuous_factor_bins` —
+declaring the edges `[-np.inf, 0.0, np.inf]` for `temp_c` puts the one cut where
+the meaning is instead of where the values happen to fall:
 
-```python
-md = Metadata(dataset, continuous_factor_bins={"temp_c": [-np.inf, 0.0, np.inf]})
-
-# bin 1   n=103   [-18.6,   0.0)   100% freezing
-# bin 2   n=297   [  0.0,  22.4]     0% freezing
+```text
+declared edges — 2 bins
+  bin 1   n=103   [-18.6,   0.0)   100% freezing
+  bin 2   n=297   [  0.0,  22.4]     0% freezing
 ```
 
 Two bins, cut in the one place that carries meaning, and the `Parity` test now
@@ -631,9 +648,11 @@ any non-empty bin holds fewer than 10 samples. The 10-sample floor keeps every
 bin populated enough to count into, and the tails trip it readily, so the count
 that comes out is a property of the particular draw:
 
-```python
-# 500 draws from a standard normal, 200 different seeds
-Counter({4: 63, 5: 59, 6: 39, 7: 20, 3: 12, 8: 6, 10: 1})
+```text
+500 draws from a standard normal, 200 different seeds
+
+bins     3    4    5    6    7    8   10
+seeds   12   63   59   39   20    6    1
 ```
 
 Between **3 and 10 bins** for the same distribution at the same sample size. The
@@ -652,12 +671,8 @@ draw.
 The reduction stops at two bins, so a factor never comes back constant. Two is
 the floor, and a small sample with a far-off tail reaches it every time: the
 outlier stretches the range, the interior bins come out sparse, and the
-reduction runs all the way down.
-
-```python
-# 20-80 draws from a standard normal plus 3 outliers near 50, 2000 seeds
-Counter({2: 2000})
-```
+reduction runs all the way down — 20 to 80 draws from a standard normal plus
+three outliers near 50 came back as two bins on every one of 2,000 seeds.
 
 A continuous factor reduced to a **binary split** still answers every question
 put to it — a {class}`.Diversity` index over two categories, a {class}`.Parity`
@@ -668,24 +683,31 @@ a question about a spread of values is usually not the one you wanted.
 
 The level count is what tells you. `factor_data` columns follow `factor_info`
 order, so the level count of a binned factor is worth checking before reading
-anything computed from it:
-
-```python
-len(np.unique(md.factor_data[:, i]))  # 2 — the i-th factor is a binary split
-```
+anything computed from it. A column carrying two distinct codes is a factor that
+arrived as a binary split, whatever resolution the values behind it had.
 
 ### Explicit edge lists produce more bins than edges
 
 `continuous_factor_bins` accepts either an integer count or a sequence of edges,
 and they behave differently at the boundaries. An **integer** gets the ±∞
 treatment described above. An explicit **sequence** is used verbatim, so values
-outside its range fall into open-ended bins on either side:
+outside its range fall into open-ended bins on either side. For a factor holding
+`-5.0`, `5.0`, `15.0` and `25.0`:
 
-```python
-# a factor holding [-5.0, 5.0, 15.0, 25.0]
-Metadata(ds, continuous_factor_bins={"f": [0, 10, 20]})  # → bins [0, 1, 2, 3]
-Metadata(ds, continuous_factor_bins={"f": 3})  # → bins [1, 2, 3, 3]
-```
+:::{list-table}
+:widths: 34 22 44
+:header-rows: 1
+
+- - `continuous_factor_bins` value
+  - Codes produced
+  - What the outermost edges are
+- - The edge sequence `[0, 10, 20]`
+  - `0, 1, 2, 3`
+  - `0` and `20`, so anything beyond them gets a bin of its own
+- - The count `3`
+  - `1, 2, 3, 3`
+  - ±∞, so the end bins absorb everything past the observed range
+:::
 
 Three edges describe two intervals, but four bins come back: one below `0` and
 one above `20`. ±∞ present in the sequence is what makes the given edges the
@@ -727,11 +749,7 @@ default unit — is affected, and only below a resolution no bin edge on a captu
 time is placed at. What it does change is the *distinct count* of such a column,
 which feeds the continuous/discrete verdict and the near-uniqueness test that
 drops identifiers. If a sub-microsecond difference is one you need kept, cast the
-column before adding it:
-
-```python
-md.add_factors({"captured_at": stamps.astype("datetime64[us]")}, level="unit")
-```
+column to `datetime64[us]` before handing it to {meth}`.Metadata.add_factors`.
 
 ### The automatic path announces itself
 
@@ -875,11 +893,8 @@ than the values they came from, and reporting less is correct. It does mean a
 declared cutoff — which is usually coarse, two or three bins — buys its meaning
 at the price of sensitivity, and that a pair sitting just under the threshold is
 worth re-reading at a finer cut before concluding anything. The level counts are
-worth reading beside the scores:
-
-```python
-[len(np.unique(md.factor_data[:, i])) for i in range(md.factor_data.shape[1])]
-```
+worth reading beside the scores, and a factor's level count is the number of
+distinct codes its `factor_data` column carries.
 
 ### A fine cut costs the same correlation, from the other side
 
