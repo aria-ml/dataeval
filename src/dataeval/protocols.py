@@ -2,6 +2,7 @@
 
 __all__ = [
     "AnnotatedDataset",
+    "AnyMetadataLike",
     "Model",
     "Array",
     "ArrayLike",
@@ -16,10 +17,13 @@ __all__ = [
     "FeatureExtractor",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
+    "CodedMetadataLike",
+    "LabelsLike",
     "LossFn",
     "is_multiobject_tracking_target",
     "Matcher",
     "MetadataLike",
+    "ValuedMetadataLike",
     "ModelMetadata",
     "ModelResetStrategy",
     "MultiobjectTrackingDatum",
@@ -327,7 +331,109 @@ class SegmentationTarget(Protocol):
 
 
 @runtime_checkable
-class MetadataLike(Protocol):
+class LabelsLike(Protocol):
+    """
+    Class labels and nothing else.
+
+    What :class:`~dataeval.scope.Coverage` and :class:`~dataeval.scope.Representation`
+    actually read. They never look at a factor, so requiring them to be handed a container
+    that carries factors -- in one representation or the other -- asks for work nobody uses
+    and makes a labels-only container look like it is missing something.
+    :class:`~dataeval.quality.Outliers` reads no more than this either, but still declares
+    :class:`CodedMetadataLike`; it moves in a later release.
+
+    The floor both metadata protocols are built on, so anything satisfying either of them
+    satisfies this too. Written once here rather than restated in each: they differ in how
+    the *factors* arrive, and not at all in the labels.
+
+    .. versionadded:: 1.1
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> from dataeval.protocols import LabelsLike
+    >>>
+    >>> class Labels:
+    ...     def __init__(self, labels):
+    ...         self.class_labels = labels
+    >>>
+    >>> isinstance(Labels(np.array([0, 1, 0])), LabelsLike)
+    True
+    """
+
+    @property
+    def class_labels(self) -> NDArray[np.intp]:
+        """
+        Flat array of class labels with one entry per target/detection.
+
+        For image classification, length equals number of images.
+        For object detection, length equals total detections across all images.
+        """
+        ...
+
+
+@runtime_checkable
+class ValuedMetadataLike(LabelsLike, Protocol):
+    """
+    Factors as the values they were measured in, with nothing cut.
+
+    The alternative to :class:`CodedMetadataLike`, not an extension of it. A container
+    provides one representation or the other -- or, like :class:`~dataeval.Metadata`,
+    both -- and ``factor_values`` is what tells them apart, since a
+    :func:`~typing.runtime_checkable` protocol tests for the *presence* of a member and
+    never its type. Two protocols naming the same member could not be distinguished by
+    ``isinstance`` at all.
+
+    Deliberately no ``is_binned``. That member exists to resolve one ambiguity -- integers
+    that might be bin indices -- and this contract resolves it by construction: these are
+    the values themselves, so an integral column is genuinely integral. A container that
+    cuts a factor and then hands the codes over as floats does not meet this contract.
+
+    Extends :class:`LabelsLike`, which is where ``class_labels`` comes from. Both metadata
+    protocols do, and neither extends the other: labels are what every consumer reads, and
+    the factors are the part that comes in two forms.
+
+    .. versionadded:: 1.1
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> from dataeval.protocols import ValuedMetadataLike
+    >>>
+    >>> class Measured:
+    ...     def __init__(self, values, labels, names):
+    ...         self.factor_values = values
+    ...         self.class_labels = labels
+    ...         self.factor_names = names
+    >>>
+    >>> meta = Measured(
+    ...     values=np.array([[21.4, 1.0], [-3.2, 0.0], [17.9, 1.0]]),
+    ...     labels=np.array([0, 1, 0]),
+    ...     names=["temp_c", "daylight"],
+    ... )
+    >>> isinstance(meta, ValuedMetadataLike)
+    True
+    """
+
+    @property
+    def factor_names(self) -> SequenceLike[str]:
+        """Names of the metadata factors."""
+        ...
+
+    @property
+    def factor_values(self) -> NDArray[np.floating[Any]]:
+        """
+        Metadata factors in array of shape (n_samples, n_factors), as measured.
+
+        Native values, not codes: a temperature in degrees, not the index of the interval
+        it fell in. A factor that has no numeric reading -- a category -- has no place
+        here and belongs in :attr:`CodedMetadataLike.factor_data`.
+        """
+        ...
+
+
+@runtime_checkable
+class CodedMetadataLike(LabelsLike, Protocol):
     """
     Minimal protocol for metadata objects used in bias and quality analysis.
 
@@ -335,6 +441,18 @@ class MetadataLike(Protocol):
     to be used with DataEval's bias evaluators (Balance, Diversity, Parity)
     and quality evaluators (Outliers). Users can implement lightweight custom
     metadata containers that satisfy this protocol.
+
+    Factors arrive as integer codes: a bin index for a quantity that was cut, a category
+    index for one that was not. :class:`ValuedMetadataLike` is the same information in the
+    other representation, and the two are alternatives rather than layers -- see
+    :attr:`~dataeval.bias.Balance.factor_source` for which one an evaluator reads. Both
+    extend :class:`LabelsLike`, which is where ``class_labels`` comes from.
+
+    .. versionchanged:: 1.1
+        Named ``CodedMetadataLike``; ``MetadataLike`` remains as an alias for it and is
+        kept indefinitely. The rename names the axis the two protocols differ on -- codes
+        against values -- now that "binned" is recorded per factor rather than being a
+        property of the whole container.
 
     .. versionchanged:: 1.1
         ``is_binned`` replaces ``is_discrete`` as the fourth member. A container
@@ -405,16 +523,6 @@ class MetadataLike(Protocol):
         ...
 
     @property
-    def class_labels(self) -> NDArray[np.intp]:
-        """
-        Flat array of class labels with one entry per target/detection.
-
-        For image classification, length equals number of images.
-        For object detection, length equals total detections across all images.
-        """
-        ...
-
-    @property
     def is_binned(self) -> Sequence[bool]:
         """
         Whether each factor's codes came from cutting a range, rather than from its own values.
@@ -437,6 +545,17 @@ class MetadataLike(Protocol):
             codes and gave the wrong answer for a discrete factor that was binned anyway.
         """
         ...
+
+
+#: The coded channel under its original name. A **plain alias**, not a union: it is used
+#: as a base class as well as an annotation -- ``class Mine(MetadataLike)`` appears in this
+#: module's own doctest -- and only aliasing the class object keeps both usages working.
+MetadataLike: TypeAlias = CodedMetadataLike
+
+#: Either representation, for the consumers that genuinely take both. Spelled as a union
+#: rather than as a third protocol so that a container satisfying either one is accepted
+#: without having to declare anything new, and so that ``isinstance`` against it works.
+AnyMetadataLike: TypeAlias = CodedMetadataLike | ValuedMetadataLike
 
 
 # ========== DATASETS ==========

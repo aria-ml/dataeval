@@ -142,6 +142,29 @@ class TestNamespaceCoverage:
         assert stale == [], f"{stale} match no module under src/dataeval; drop them from _log._NAMESPACES"
 
 
+class _TracedResult(Output): ...
+
+
+def evaluate(self) -> _TracedResult:
+    return _TracedResult()
+
+
+# Declared before decorating: ``set_metadata`` closes over the function it is given, so
+# setting ``__module__`` on the wrapper afterwards would not reach it. Named ``evaluate``
+# because the trace reports the *defining* function, and this stands in for a real one.
+evaluate.__module__ = "dataeval.bias._balance"
+
+
+class _Evaluator:
+    evaluate = set_metadata(evaluate)
+
+
+class _Subclass(_Evaluator):
+    """An evaluator a caller inherited into their own package."""
+
+    __module__ = "acme.evaluators"
+
+
 class TestSetMetadataNamespace:
     """``set_metadata`` resolves its logger at call time from the decorated function.
 
@@ -172,3 +195,18 @@ class TestSetMetadataNamespace:
         caplog.set_level(logging.INFO, logger="dataeval")
         self._decorated("dataeval.bias._balance")()
         assert "dataeval.bias._balance.evaluate" in caplog.records[0].message
+
+    @pytest.mark.required
+    def test_a_subclass_traces_to_the_namespace_of_the_code_it_inherited(self, caplog):
+        """A caller's subclass lives in a module DataEval has no namespace for.
+
+        The namespace names the subsystem whose code ran, so inheriting an evaluator
+        must not move its trace off ``dataeval.bias`` and onto the root -- a handler
+        scoped to the subsystem would stop seeing it.
+        """
+        caplog.set_level(logging.INFO, logger="dataeval")
+        _Subclass().evaluate()
+
+        assert {record.name for record in caplog.records} == {"dataeval.bias"}
+        # And the message still names what actually ran, which is the subclass.
+        assert "acme.evaluators._Subclass.evaluate" in caplog.records[0].message

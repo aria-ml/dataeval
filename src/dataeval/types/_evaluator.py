@@ -53,6 +53,20 @@ class ReprMixin:
 class Evaluator:
     """Base class for all evaluators."""
 
+    @property
+    def encoding_digest(self) -> str | None:
+        """Fingerprint of the encoding this evaluator's metadata was read under, if it has one.
+
+        Named in ``set_metadata(state=...)`` by the evaluators that read factors, so a
+        result carries the encoding that produced it. Comparing two passes is only sound if
+        each can say which cuts it was computed against — otherwise a score that moved is
+        unattributable between *the override worked* and *the data changed*.
+
+        None for an evaluator that has not run, and for a bare container that keeps no
+        record.
+        """
+        return getattr(getattr(self, "metadata", None), "encoding_digest", None)
+
     def __init__(self, kwargs: dict[str, Any] | None = None, *, exclude: set[str] | None = None) -> None:
         if kwargs is None:
             return

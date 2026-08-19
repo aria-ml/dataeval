@@ -20,12 +20,12 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval import Metadata
-from dataeval._helpers import is_metadata_like
+from dataeval._helpers import is_labels_like
 from dataeval._log import get_logger
 from dataeval._ontology import Ontology
 from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
 from dataeval.core._label_stats import label_stats
-from dataeval.protocols import AnnotatedDataset, MetadataLike
+from dataeval.protocols import AnnotatedDataset, LabelsLike
 from dataeval.types import DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _logger = get_logger(__name__)
@@ -258,7 +258,7 @@ class Representation(Evaluator):
 
     def _label_counts(
         self,
-        data: "AnnotatedDataset[Any] | MetadataLike | Mapping[str, int] | Mapping[int, int] | Sequence[int] | NDArray[np.integer]",  # noqa: E501
+        data: "AnnotatedDataset[Any] | LabelsLike | Mapping[str, int] | Mapping[int, int] | Sequence[int] | NDArray[np.integer]",  # noqa: E501
         index2label: Mapping[int, str] | None,
     ) -> dict[str, int]:
         """Reduce any accepted input form to the ``{label_name: count}`` mapping the core consumes.
@@ -272,11 +272,14 @@ class Representation(Evaluator):
                 return {str(key): int(count) for key, count in data.items()}
             i2l = {int(k): str(v) for k, v in (index2label or {}).items()}
             return {i2l.get(int(key), str(int(key))): int(count) for key, count in data.items()}
-        # Dataset / Metadata / generic MetadataLike: all reduce to a label array plus a naming.
-        # A Metadata is a MetadataLike, so only AnnotatedDataset needs converting first.
+        # Dataset / Metadata / any labelled container: all reduce to a label array plus a
+        # naming. A Metadata already carries labels, so only AnnotatedDataset needs
+        # converting first. Labels are the whole of what is read here, so that is the whole
+        # of what is asked for -- a container built for this evaluator should not have to
+        # declare factors it has none of.
         if isinstance(data, AnnotatedDataset):
             data = Metadata(data)
-        if is_metadata_like(data):
+        if is_labels_like(data):
             return self._counts_from_labels(data.class_labels, getattr(data, "index2label", None) or index2label)
         # A raw label sequence: count it, then name the observed indices.
         return self._counts_from_labels(data, index2label)
@@ -294,7 +297,7 @@ class Representation(Evaluator):
     @set_metadata
     def evaluate(
         self,
-        data: "AnnotatedDataset[Any] | MetadataLike | Mapping[str, int] | Mapping[int, int] | Sequence[int] | NDArray[np.integer]",  # noqa: E501
+        data: "AnnotatedDataset[Any] | LabelsLike | Mapping[str, int] | Mapping[int, int] | Sequence[int] | NDArray[np.integer]",  # noqa: E501
         *,
         index2label: Mapping[int, str] | None = None,
     ) -> RepresentationOutput:
@@ -303,14 +306,14 @@ class Representation(Evaluator):
 
         Parameters
         ----------
-        data : AnnotatedDataset, MetadataLike, Mapping, or Sequence of int
+        data : AnnotatedDataset, LabelsLike, Mapping, or Sequence of int
             The source of class labels, accepted in several forms:
 
             * a full :class:`~dataeval.protocols.AnnotatedDataset` — class labels and their
               ``index2label`` names are read from it and counted via
               :func:`~dataeval.core.label_stats`;
             * a :class:`~dataeval.Metadata` — same, but read straight from it;
-            * any :class:`~dataeval.protocols.MetadataLike` object — its ``class_labels`` are
+            * any :class:`~dataeval.protocols.LabelsLike` object — its ``class_labels`` are
               counted, named via its own ``index2label`` if present, else the ``index2label``
               argument;
             * a ``{label_name: count}`` mapping (string keys) — the minimal form the core

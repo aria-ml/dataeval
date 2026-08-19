@@ -251,16 +251,18 @@ def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | N
         arguments.update(kwargs)
         arguments = {k: fmt(v) for k, v in arguments.items()}
         is_method = "self" in arguments
-        state_attrs = {k: fmt(getattr(args[0], k)) for k in state or []} if is_method else {}
         module = args[0].__class__.__module__ if is_method else fn.__module__.removeprefix("src.")
         class_prefix = f".{args[0].__class__.__name__}." if is_method else "."
         name = f"{module}{class_prefix}{fn.__name__}"
         arguments = {k: v for k, v in arguments.items() if k != "self"}
 
-        # Resolved from the decorated callable, so the trace lands on the subsystem
-        # that ran rather than on ``dataeval.types``. ``name`` keeps the full module
-        # path, so curating the logger costs no provenance.
-        _logger = get_logger(module)
+        # Resolved from where the decorated code is defined, not from the instance's
+        # class, so the trace lands on the subsystem that ran rather than on
+        # ``dataeval.types`` where the decorator lives -- and stays there when a caller
+        # subclasses an evaluator, whose module DataEval has no namespace for. ``name``
+        # above keeps the instance's class and the full module path, so curating the
+        # logger costs no provenance.
+        _logger = get_logger(fn.__module__)
         time = datetime.now(timezone.utc)
         _logger.log(logging.INFO, f">>> Executing '{name}': args={arguments} state={state} <<<")
 
@@ -270,6 +272,17 @@ def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | N
 
         duration = (datetime.now(timezone.utc) - time).total_seconds()
         _logger.log(logging.INFO, f">>> Completed '{name}': args={arguments} state={state} duration={duration} <<<")
+
+        # Read after the call, not before. Every name in ``state`` is configuration that the
+        # call does not change, so the values are the same either way -- except where the
+        # attribute *describes what was run against*, which only exists once it has run.
+        # ``encoding_digest`` is the case that forced this: it reads through the metadata an
+        # evaluator is handed, and evaluators take that as an argument to ``evaluate``.
+        #
+        # Still an unguarded lookup. A name in ``state`` that the class does not carry is a
+        # typo in the decorator, and recording it as ``None`` writes a plausible-looking
+        # null into every result rather than saying so.
+        state_attrs = {k: fmt(getattr(args[0], k)) for k in state or []} if is_method else {}
 
         # Update output with recorded metadata
         metadata = ExecutionMetadata(name, time, duration, arguments, state_attrs, __version__)

@@ -308,13 +308,19 @@ bear on trusting a result:
 
 ### What no output records
 
-- **Neither the binning nor the extractor appears in a result.** Two runs with
-  different binning are no more comparable than two runs with different
-  extractors, and no result object carries either, so comparability rests
-  entirely on what was recorded outside DataEval.
-- **The automatic path announces itself only in logs.** Each auto-binned factor
-  emits a WARNING on the `dataeval.metadata` logger, and DataEval attaches a
-  `NullHandler` to that logger, so the default is silence.
+- **The extractor does not appear in a result, and the binning appears only as a
+  fingerprint.** Every bias result carries
+  {attr}`~dataeval.Metadata.encoding_digest` in its execution metadata, so two
+  runs can be told apart — but the digest says *whether* the cuts matched, not
+  what they were, and nothing records the extractor at all. Keep
+  {meth}`.Metadata.export_encoding`'s descriptor alongside the result for the
+  binning; comparability of an embedding-based result still rests entirely on
+  what was recorded outside DataEval.
+- **The automatic path announces itself.** Structuring raises a `UserWarning`
+  naming every factor it binned unasked, because the per-factor WARNING it also
+  writes to the `dataeval.metadata` logger is silenced by the `NullHandler`
+  DataEval attaches there. {attr}`.FactorInfo.encoding` keeps the same fact
+  afterwards, in `provenance`.
 
 [Binning](Binning.md#what-the-choice-determines) covers the rest: what
 {attr}`.Metadata.factor_info` reports and what it does not, the thresholds no
@@ -1166,15 +1172,13 @@ DataEval's evidentiary record, not a research frontier.
      scripting the comparison themselves.
    - **Bin counts are not stable across datasets.** Because `"uniform_width"`
      derives the count from the data, the same factor can be binned differently
-     in a reference and an operational set. DataEval neither detects this nor
-     provides a way to pin a binning learned on one dataset and reapply it to
-     another, short of passing explicit edges.
-   - **The auto-binning notice is easy to miss.** It is a log record on a
-     logger with a `NullHandler` attached, not a `Warning`, so the default
-     experience is silent discretization. A `Warning` would be caught by the
-     same filters users already apply to
-     {class}`~dataeval.exceptions.ExperimentalWarning` and
-     {class}`~dataeval.exceptions.DeprecatedWarning`.
+     in a reference and an operational set. {attr}`.FactorInfo.encoding` now
+     records the edges that were applied, so the discrepancy is detectable by
+     comparing two runs' specs, and {meth}`.Metadata.export_encoding` writes them
+     out for `Metadata(dataset, encoding=...)` to reapply unchanged. What is still
+     missing is a way to tell whether a pinned cut *should* have moved: a locked
+     encoding reports the bins the new data no longer fills, but nothing measures
+     how much of a score the cut is responsible for.
 
 ## Related concept pages
 

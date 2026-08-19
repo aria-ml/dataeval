@@ -8,7 +8,7 @@ import polars as pl
 
 from dataeval import Metadata
 from dataeval._experimental import experimental
-from dataeval._helpers import factors_excluding, is_metadata_like, resolve_label_axis
+from dataeval._helpers import factor_code_names, factors_excluding, is_metadata_like, resolve_label_axis
 from dataeval._log import get_logger
 from dataeval.core._parity import parity
 from dataeval.protocols import AnnotatedDataset, MetadataLike
@@ -40,13 +40,18 @@ class ParityOutput(DictOutput):
         - p_value: float - P-value from G-test (Log-Likelihood Ratio)
         - is_significant: bool - True if score >= score_threshold AND p_value <= p_value_threshold
         - has_insufficient_data: bool - True if any cells have < 5 samples
-    insufficient_data : dict[str, dict[int, dict[str, int]]]
+    insufficient_data : dict[str, dict[str, dict[str, int]]]
         Dictionary flagging specific data subsets with low sample counts (< 5).
-        Structure: {factor_name: {factor_category_value: {class_label: count}}}.
+        Structure: {factor_name: {factor_level_name: {class_label: count}}}.
+
+        The factor's level is named from its recorded encoding — ``"[0, 12.4)"`` for a
+        binned factor, ``"rain"`` for a categorical one — so the entry says which subset
+        to collect more of. A container carrying no encoding record falls back to the
+        code as a string.
     """
 
     factors: pl.DataFrame
-    insufficient_data: dict[str, dict[int, dict[str, int]]]
+    insufficient_data: dict[str, dict[str, dict[str, int]]]
 
 
 @experimental
@@ -165,7 +170,7 @@ class Parity(Evaluator):
     ) -> None:
         super().__init__(locals())
 
-    @set_metadata(state=["score_threshold", "p_value_threshold", "label"])
+    @set_metadata(state=["score_threshold", "p_value_threshold", "label", "encoding_digest"])
     def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> ParityOutput:
         """
         Compute chi-square statistics for the dataset.
@@ -221,9 +226,15 @@ class Parity(Evaluator):
 
         output = parity(factor_data, class_labels)
 
+        # The factor's level is resolved the way the class label already was. This is the
+        # only output that hands a user a bare code, and a bare code cannot be acted on:
+        # knowing that `illum_lux = 3` is under-sampled says nothing about which lighting
+        # to go and collect.
+        level_names = factor_code_names(self.metadata, factor_data, factor_names)
         insufficient_data = {
             factor_names[k]: {
-                vk: {index2label.get(vvk, str(vvk)): vvv for vvk, vvv in vv.items()} for vk, vv in v.items()
+                level_names[k].get(int(vk), str(vk)): {index2label.get(vvk, str(vvk)): vvv for vvk, vvv in vv.items()}
+                for vk, vv in v.items()
             }
             for k, v in output["insufficient_data"].items()
         }

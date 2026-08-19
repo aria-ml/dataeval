@@ -1,7 +1,7 @@
 __all__ = []
 
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -9,6 +9,7 @@ from scipy.stats import wasserstein_distance
 
 from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
+from dataeval.types import BinSpec
 
 _logger = get_logger(__name__)
 
@@ -47,27 +48,43 @@ def get_counts(data: NDArray[np.intp], min_num_bins: int | None = None) -> NDArr
     return cnt_array
 
 
-def _digitize_with_missing(data: NDArray[Any], bin_edges: Any) -> NDArray[np.intp]:
+def _digitize_with_missing(data: NDArray[Any], spec: BinSpec) -> NDArray[np.intp]:
     """
     Digitize values, giving NaN a bin of its own above every other bin.
 
     A missing value is not a small value, a large value, or a value between two edges, so
     it cannot share a bin with observed data without distorting whatever reads the result.
-    It gets the next index above the highest one the observed values reached, which keeps
-    the codes contiguous — a gap would show up downstream as an empty category.
+
+    Its code is **reserved from the edges rather than taken from what the sample filled**:
+    ``np.digitize`` cannot return more than ``len(bin_edges)``, so one above that is free
+    whatever the data does. Reading it off the highest occupied bin instead — the obvious
+    contiguous choice — makes the code a property of the draw. A sample that left the top
+    bin empty would hand missing a code that a later row could legitimately occupy, and
+    adding rows that reach the top bin would move it. Neither works for an encoding that
+    has to mean the same thing twice.
+
+    The cost is a gap, where the reserved codes below it went unused. Everything
+    downstream counts the levels it actually sees — ``Diversity`` over the non-zero bins,
+    ``Parity`` after dropping all-zero rows, ``mutual_info`` off the observed uniques — so
+    an empty code is skipped rather than scored.
+
+    Takes the whole :class:`~dataeval.types.BinSpec` rather than the edges, so that the
+    reserved code is read off :attr:`~dataeval.types.BinSpec.missing_code` instead of being
+    recomputed here. Two spellings of the same arithmetic, in the module that assigns the
+    code and the type that reports it, is the pair that has to agree for a caller to be
+    able to find its missing rows at all.
     """
     missing = np.isnan(data)
     if not missing.any():
-        return np.digitize(data, bin_edges)
+        return np.digitize(data, spec.edges)
 
     # Digitize the missing entries against a placeholder, then overwrite their bin.
-    binned = np.digitize(np.where(missing, 0.0, data), bin_edges)
-    observed = binned[~missing]
-    binned[missing] = observed.max() + 1 if observed.size else 0
+    binned = np.digitize(np.where(missing, 0.0, data), spec.edges)
+    binned[missing] = spec.missing_code
     return binned
 
 
-def digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -> NDArray[np.intp]:
+def digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -> tuple[NDArray[np.intp], BinSpec]:
     """
     Digitizes a list of values into a given number of bins.
 
@@ -82,8 +99,12 @@ def digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -
 
     Returns
     -------
-    NDArray[np.intp]
-        The digitized values
+    tuple[NDArray[np.intp], BinSpec]
+        The digitized values, and the map that produced them. The two forms of ``bins``
+        are recorded differently: a count says how many were wanted and leaves the
+        placement to the histogram, so it is ``provenance="count"``; an edge list says
+        where the boundaries are, so it is ``provenance="edges"`` and is kept verbatim.
+        Only the second carries meaning, and nothing distinguished them before.
     """
     if not np.all([np.issubdtype(type(n), np.number) for n in data]):
         raise TypeError(
@@ -91,14 +112,44 @@ def digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -
             "Ensure all occurrences of continuous factors are numeric types.",
         )
     data = np.asarray(data)
+    provenance: Literal["count", "edges"]
+    method: Literal["uniform_width"] | None
     if isinstance(bins, int):
         # Edges describe where observed values fall, so they are derived from those alone.
         _, bin_edges = np.histogram(_observed(data), bins=bins)
         bin_edges[-1] = np.inf
         bin_edges[0] = -np.inf
+        provenance, method = "count", "uniform_width"
     else:
         bin_edges = list(bins)
-    return _digitize_with_missing(data, bin_edges)
+        provenance, method = "edges", None
+    spec = BinSpec(edges=tuple(float(e) for e in bin_edges), provenance=provenance, method=method)
+    return _digitize_with_missing(data, spec), spec
+
+
+def apply_bin_spec(data: list[Any] | NDArray[Any], spec: BinSpec) -> NDArray[np.intp]:
+    """Cut values against a cut that was already chosen.
+
+    The reapply half of :func:`bin_data` and :func:`digitize_data`, and the reason a
+    :class:`~dataeval.types.BinSpec` is worth recording: the edges are used as given rather
+    than re-derived, so the same value lands in the same code in a dataset the edges were
+    never fitted to. A value outside the recorded range falls into an end bin, which is
+    what the infinite outer edges are for -- no new code can appear, so nothing that was
+    encoded before means something else now.
+
+    Parameters
+    ----------
+    data : list | NDArray
+        The values to encode.
+    spec : BinSpec
+        The cut to apply.
+
+    Returns
+    -------
+    NDArray[np.intp]
+        Bin index per entry, on the code space ``spec`` describes.
+    """
+    return _digitize_with_missing(np.asarray(data, dtype=np.float64), spec)
 
 
 def _observed(data: NDArray[Any]) -> NDArray[Any]:
@@ -186,7 +237,7 @@ def level_budget(n_samples: int) -> int:
     return int(max(MIN_LEVEL_BUDGET, np.sqrt(n_samples)))
 
 
-def bin_data(data: NDArray[Any], bin_method: str, max_bins: int | None = None) -> NDArray[np.intp]:
+def bin_data(data: NDArray[Any], bin_method: str, max_bins: int | None = None) -> tuple[NDArray[np.intp], BinSpec]:
     """
     Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters.
 
@@ -211,14 +262,24 @@ def bin_data(data: NDArray[Any], bin_method: str, max_bins: int | None = None) -
 
     Returns
     -------
-    NDArray[np.intp]
-        Bin index per entry, with missing values in a bin of their own above the rest.
+    tuple[NDArray[np.intp], BinSpec]
+        Bin index per entry, with missing values in a bin of their own above the rest, and
+        the map that produced them. The spec is ``provenance="derived"``: both the count
+        and the placement were chosen here, and nobody has reviewed either.
     """
     data = np.asarray(data)
     observed = _observed(data)
     if observed.size == 0:
-        # Nothing observed to place edges between, so every entry is the missing bin.
-        return np.zeros(data.shape, dtype=np.intp)
+        # Nothing observed to place edges between, so every entry is the missing bin. One
+        # bin spanning everything is the honest record: it says no cut was possible.
+        #
+        # The code is the spec's own ``missing_code`` rather than zero. Zero is where these
+        # rows used to land, and it made the record contradict the codes it describes: the
+        # spec said missing was 3, the column said 0, and naming the factor read the rows
+        # back as "< -inf" -- an observed magnitude -- instead of "missing". A record that
+        # does not describe its own output cannot be reapplied to anything.
+        spec = BinSpec(edges=(-np.inf, np.inf), provenance="derived", method=bin_method)  # type: ignore[arg-type]
+        return np.full(data.shape, spec.missing_code, dtype=np.intp), spec
 
     if bin_method == "clusters":
         bin_edges = _bin_by_clusters(observed)
@@ -228,7 +289,8 @@ def bin_data(data: NDArray[Any], bin_method: str, max_bins: int | None = None) -
         bin_edges = _uniform_edges(observed, bin_method, max_bins)
     bin_edges[0] = -np.inf
     bin_edges[-1] = np.inf
-    return _digitize_with_missing(data, bin_edges)
+    spec = BinSpec(edges=tuple(float(e) for e in bin_edges), provenance="derived", method=bin_method)  # type: ignore[arg-type]
+    return _digitize_with_missing(data, spec), spec
 
 
 def _gcd_ratio(data: NDArray[np.number[Any]], tol: float = 1e-9) -> float:

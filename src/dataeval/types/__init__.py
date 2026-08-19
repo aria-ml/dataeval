@@ -9,6 +9,7 @@ __all__ = [
     "ArrayND",
     "AlignmentRelation",
     "BaseCollectionMixin",
+    "BinSpec",
     "ClusterConfigMixin",
     "Correspondence",
     "DataFrameOutput",
@@ -21,6 +22,7 @@ __all__ = [
     "FactorInfo",
     "FactorLevel",
     "FactorLevelSchema",
+    "LevelSpec",
     "MappingOutput",
     "MetadataJson",
     "ModelInfo",
@@ -41,7 +43,7 @@ from dataeval.types._array import Array1D, Array2D, Array3D, Array4D, Array5D, A
 from dataeval.types._config import ClusterConfigMixin, EvaluatorConfig
 from dataeval.types._evaluator import Evaluator, ReprMixin
 from dataeval.types._execution import ExecutionMetadata
-from dataeval.types._factors import FactorInfo, FactorLevel, FactorLevelSchema
+from dataeval.types._factors import BinSpec, FactorInfo, FactorLevel, FactorLevelSchema, LevelSpec
 from dataeval.types._index import SourceIndex
 from dataeval.types._ontology import AlignmentRelation, Correspondence, OntologyConcept
 from dataeval.types._output import (

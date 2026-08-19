@@ -241,3 +241,65 @@ class TestParityFunctional:
         # Check that has_insufficient_data flag is set
         has_insuff = result.factors["has_insufficient_data"][0]
         assert has_insuff is True
+
+
+@pytest.mark.required
+class TestInsufficientDataNamesItsLevels:
+    """The only output that used to hand a user a bare factor code."""
+
+    def _metadata(self, n=120, **kwargs):
+        rng = np.random.default_rng(3)
+        return Metadata.from_factors(
+            {
+                "illum_lux": rng.normal(50, 30, n),
+                "weather": np.array(["sun", "rain", "fog"])[rng.integers(0, 3, n)],
+            },
+            class_labels=rng.integers(0, 3, n),
+            **kwargs,
+        )
+
+    def test_a_binned_factors_level_is_named_by_its_interval(self):
+        """`{"illum_lux": {3: ...}}` said nothing about which lighting to go and collect."""
+        result = Parity().evaluate(self._metadata())
+        for levels in result.insufficient_data.values():
+            for name in levels:
+                assert not name.lstrip("-").isdigit(), f"{name!r} is still a bare code"
+
+    def test_a_declared_cutoff_names_the_level_it_declared(self):
+        """The level a user asked about, spelled the way they asked for it."""
+        result = Parity().evaluate(
+            self._metadata(continuous_factor_bins={"illum_lux": [-np.inf, 10.0, np.inf]}),
+        )
+        for levels in result.insufficient_data.get("illum_lux", {}):
+            assert levels in ("< 10", ">= 10")
+
+    def test_a_categorical_factors_level_is_named_by_its_value(self):
+        rng = np.random.default_rng(11)
+        # One rare category, so it is guaranteed to land in insufficient_data.
+        weather = np.array(["sun"] * 100 + ["eclipse"] * 3)
+        md = Metadata.from_factors(
+            {"weather": weather},
+            class_labels=rng.integers(0, 3, len(weather)),
+        )
+        levels = Parity().evaluate(md).insufficient_data.get("weather", {})
+        assert "eclipse" in levels
+
+    def test_a_container_with_no_record_still_reports_something(self):
+        """A bare MetadataLike keeps the code, stringified -- what it always got.
+
+        The record lives on Metadata; the protocol stays four members, so a third-party
+        container degrades to naming a code after itself rather than failing.
+        """
+        rng = np.random.default_rng(5)
+        n = 60
+        codes = np.column_stack([rng.integers(0, 8, n), rng.integers(0, 3, n)])
+        bare = MockMetadata(
+            class_labels=rng.integers(0, 3, n),
+            factor_data=codes,
+            factor_names=["a", "b"],
+            is_binned=[True, False],
+            index2label={0: "x", 1: "y", 2: "z"},
+        )
+        result = Parity().evaluate(bare)
+        for levels in result.insufficient_data.values():
+            assert all(isinstance(name, str) for name in levels)

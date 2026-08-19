@@ -391,13 +391,33 @@ def _get_groups(metadata: MetadataLike, split_on: Sequence[str] | None) -> NDArr
     -------
     np.ndarray
         group identifiers from metadata
+
+    Raises
+    ------
+    ValueError
+        When a named factor is not among the metadata's factors. Refused rather than
+        skipped: ``split_on`` exists to keep rows that belong together on one side of a
+        split, so silently grouping by a *subset* of what was asked for hands back folds
+        that do not honour the request, and nothing downstream can tell. A factor
+        :class:`~dataeval.Metadata` dropped as an identifier is the common way to arrive
+        here — and a per-entity id is exactly what a caller reaches for first.
     """
     # get only the factors that are present in the metadata
     if split_on is None:
         return None
 
+    names = list(metadata.factor_names)
     split_set = set(split_on)
-    indices = [i for i, name in enumerate(metadata.factor_names) if name in split_set]
+    if missing := sorted(split_set - set(names)):
+        dropped = getattr(metadata, "dropped_factors", {})
+        why = {name: list(dropped[name]) for name in missing if name in dropped}
+        detail = f" {why} were dropped from the factor set;" if why else ""
+        raise ValueError(
+            f"`split_on` names {missing}, which {'is' if len(missing) == 1 else 'are'} not among this "
+            f"metadata's factors {names}.{detail} Grouping by the rest would return folds that do not "
+            "honour the request, so it is refused. Name only factors the metadata carries.",
+        )
+    indices = [i for i, name in enumerate(names) if name in split_set]
     binned_features = metadata.factor_data[:, indices]
     return np.unique(binned_features, axis=0, return_inverse=True)[1]
 

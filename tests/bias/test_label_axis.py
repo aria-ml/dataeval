@@ -126,13 +126,59 @@ class TestLabelAxisResolution:
         with pytest.raises(ValueError, match="empty sequence names none"):
             resolve_label_axis(_metadata(get_od_dataset), [])
 
-    def test_a_continuous_factors_groups_are_named_by_their_span(self):
-        """A bin covers a range, so naming it after one member would read as an exact value."""
+    def test_a_continuous_factors_groups_are_named_by_their_edges(self):
+        """A bin is named by where it was cut, not by which rows landed in it.
+
+        Naming a bin after its contents made the label move with the sample: the same
+        policy over a different draw printed a different name. The edges are the policy.
+        """
         rng = np.random.default_rng(0)
         metadata = Metadata.from_factors({"alt": rng.normal(50, 10, 200)}, class_labels=rng.integers(0, 3, 200))
         assert metadata.is_discrete[metadata.factor_names.index("alt")] is False
-        axis = resolve_label_axis(metadata, "alt")
-        assert all(name.startswith("[") and ", " in name for name in axis.names.values())
+        names = list(resolve_label_axis(metadata, "alt").names.values())
+
+        # Interior bins carry both boundaries; the infinitely-bounded ends carry one.
+        assert names[0].startswith("< ")
+        assert names[-1].startswith(">= ")
+        assert all(name.startswith("[") and ", " in name for name in names[1:-1])
+
+    def test_a_declared_cutoff_survives_into_its_own_label(self):
+        """The failure that motivated reading names off the record.
+
+        Declaring freezing at zero and having the group render as ``[-40, -0.3]`` puts the
+        one number that carries the meaning nowhere in the output.
+        """
+        rng = np.random.default_rng(0)
+        metadata = Metadata.from_factors(
+            {"temp_c": rng.normal(0, 15, 200)},
+            class_labels=rng.integers(0, 3, 200),
+            continuous_factor_bins={"temp_c": [-np.inf, 0.0, np.inf]},
+        )
+        assert sorted(resolve_label_axis(metadata, "temp_c").names.values()) == ["< 0", ">= 0"]
+
+    def test_bin_names_do_not_move_with_the_sample(self):
+        """Same policy, different draw, same names -- which was not true of observed spans."""
+        edges = {"alt": [-np.inf, 40.0, 60.0, np.inf]}
+        names = []
+        for seed in (0, 1, 2):
+            rng = np.random.default_rng(seed)
+            metadata = Metadata.from_factors(
+                {"alt": rng.normal(50, 10, 200)},
+                class_labels=rng.integers(0, 3, 200),
+                continuous_factor_bins=edges,
+            )
+            names.append(sorted(resolve_label_axis(metadata, "alt").names.values()))
+        assert names[0] == names[1] == names[2]
+        assert names[0] == ["< 40", ">= 60", "[40, 60)"]
+
+    def test_a_categorical_factor_is_named_from_its_recorded_levels(self):
+        """No raw column is read, which is what lets the record name codes on its own."""
+        rng = np.random.default_rng(0)
+        metadata = Metadata.from_factors(
+            {"weather": np.array(["sun", "rain", "fog"] * 40)},
+            class_labels=rng.integers(0, 3, 120),
+        )
+        assert sorted(resolve_label_axis(metadata, "weather").names.values()) == ["fog", "rain", "sun"]
 
     def test_an_axis_naming_every_factor_is_rejected(self):
         # Every evaluator checks that the metadata has factors before the axis is
