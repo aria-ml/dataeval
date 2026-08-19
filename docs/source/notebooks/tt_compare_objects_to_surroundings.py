@@ -29,7 +29,7 @@
 #
 # - Compute image statistics for the whole frame, individual bounding boxes, and the masked background.
 # - Calculate a per-detection separation score to find camouflaged objects.
-# - Compare scene-relative ratios across different lighting conditions.
+# - Compare scene-relative ratios that stay meaningful across different lighting conditions.
 # - Evaluate dataset balance and mutual information to detect background shortcut risks.
 
 # %% [markdown]
@@ -85,8 +85,6 @@ except Exception:
     pass
 
 # %%
-import warnings
-
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
@@ -104,10 +102,6 @@ set_max_processes(4)
 # Show every row of the comparison tables below rather than polars' default window - the
 # rows this guide reasons about would otherwise be the ones elided.
 pl.Config.set_tbl_rows(20)
-
-# Balance's mutual-information estimator warns when a factor has many distinct values,
-# which the continuous image statistics here do by construction. Not a finding.
-warnings.filterwarnings("ignore", message="The number of unique classes is greater", category=UserWarning)
 
 # %% [markdown]
 # ## Load the dataset
@@ -233,17 +227,26 @@ by_class = (
 print(by_class)
 
 # %% [markdown]
-# Two things fall out of this table.
+# Three things fall out of this table.
 #
-# **Only one class is brighter than the water it sits on.** Boats read positive; swimmers,
-# buoys, jetskis, and life-saving appliances all read negative - they are darker than their
-# background. A detector tuned on bright-object contrast has the sign wrong for four of
-# the five classes.
+# **Buoys are the one class darker than the water they sit on.** Boats, swimmers,
+# life-saving appliances, and jetskis all read positive against a dark sea. Buoys read
+# `-6.8`, and with the tightest spread of any class (`sd` of `7.4`) they are darker
+# *systematically* rather than occasionally. A detector tuned on bright-object contrast
+# has the sign wrong for exactly one class - and only 1 of the 11 buoys is close enough
+# to zero for that to be a near miss.
 #
-# **The hardest classes are hard twice over.** Life-saving appliances separate most
-# strongly but are among the smallest objects on screen, and jetskis - despite being
-# large - sit closest to zero with the widest spread, meaning they are sometimes bright
-# and sometimes dark against the water with no consistent polarity.
+# **Separation does not track size.** Boats separate most strongly *and* are by far the
+# largest objects on screen, so they are easy twice over. Life-saving appliances hold a
+# respectable `+8.8`, but spend it across a median of 195 pixels - the smallest objects
+# here - so there is very little of that contrast to actually see. And jetskis, the
+# second-largest class by median size, sit closest to zero at `+1.6`: large, and still
+# without dependable polarity against the water.
+#
+# **Read the spread beside every mean.** Jetskis and life-saving appliances both carry an
+# `sd` well above their own mean, which is the table's way of saying those means straddle
+# zero. Their `n` is the other guard: 7 and 8 detections in this 120-image sample, against
+# 213 boats. Treat the rare-class rows as a question to check on more data, not a finding.
 
 # %%
 # Diverging bars around a meaningful zero: color encodes the sign, length the magnitude.
@@ -306,7 +309,8 @@ plt.show()
 
 # %% [markdown]
 # The dots show why the class means are not the whole story: every class has detections
-# sitting on the zero line, whatever its average. Those are the individually hard cases.
+# sitting on the zero line, whatever its average. Those are the individually hard cases -
+# and note below that the two *best*-separated classes contribute most of them.
 
 # %%
 camouflaged = detections.filter(pl.col("separation").abs() < 5)
@@ -364,9 +368,16 @@ comparison = (
 print(comparison)
 
 # %% [markdown]
-# Read as ratios, `1.0` means "indistinguishable from the frame average". Boats sit above
-# it, everything else below - the same ordering the separation score gave, now on a scale
-# that is comparable across scenes shot in different light.
+# Read as ratios, `1.0` means "indistinguishable from the frame average". Buoys sit below
+# it and every other class above - the same picture the separation score gave, in nearly
+# the same order (jetskis and life-saving appliances trade places), now on a scale that is
+# comparable across scenes shot in different light.
+#
+# The other two columns are worth a glance while the table is open. Every class sits
+# *below* `1.0` on contrast: a box holds one object, while the frame around it holds water,
+# sky, and glare, so the frame is always the more varied of the two. And `size_vs_image`
+# states the scale of the problem in a single number - even the largest class covers about
+# 0.2% of the frame it was found in.
 
 # %% [markdown]
 # ## Does the background predict the class?
@@ -378,6 +389,13 @@ print(comparison)
 # {class}`.Balance` measures exactly that, as mutual information between each factor and
 # the class label. Restrict the metadata to the statistics of interest so the dataset's own
 # capture metadata does not crowd the output.
+#
+# Mutual information is measured over *binned* values, so the bins are part of the
+# measurement. Left undeclared they are derived from whichever sample you loaded, which
+# makes the same factor measured twice not necessarily comparable - and which factor comes
+# out flagged can move with them. Declare them once, on the scale each statistic actually
+# lives on: brightness on the 0-255 display range, contrast and background fraction on
+# their natural bounds, and size in half-decades because it spans three of them.
 
 # %%
 capture_metadata = [
@@ -402,7 +420,27 @@ capture_metadata = [
     "yspeed",
     "zspeed",
 ]
-focused = Metadata(dataset, exclude=capture_metadata)
+# One edge list per quantity, shared across the image, background, and box readings of it,
+# so the three land on a single scale.
+BRIGHTNESS_BINS = [0, 32, 64, 96, 128, 160, 192, 224, 255]
+CONTRAST_BINS = [0.0, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+FRACTION_BINS = [0.0, 0.9, 0.95, 0.99, 0.999, 1.0]
+SIZE_BINS = [0, 316, 1000, 3162, 10000, 31623, 100000]
+
+focused = Metadata(
+    dataset,
+    exclude=capture_metadata,
+    continuous_factor_bins={
+        "unit_brightness": BRIGHTNESS_BINS,
+        "unit_background_brightness": BRIGHTNESS_BINS,
+        "instance_brightness": BRIGHTNESS_BINS,
+        "unit_contrast": CONTRAST_BINS,
+        "unit_background_contrast": CONTRAST_BINS,
+        "instance_contrast": CONTRAST_BINS,
+        "unit_background_fraction": FRACTION_BINS,
+        "instance_size": SIZE_BINS,
+    },
+)
 focused.add_factors(stats)
 
 classwise = (
@@ -415,16 +453,27 @@ classwise = (
 print(classwise)
 
 # %% [markdown]
-# Evaluating dataset balance helps you identify dependencies between class labels and background-only factors.
-# Here, `unit_background_contrast` exhibits a clear relationship with the class label, revealing that the sea
-# state or wave pattern itself is partly predictive of which object is on screen.
+# The result is classwise, so every row answers one narrow question: how much does knowing
+# this background number tell you that *this particular class* is present?
 #
-# This represents a dataset shortcut: a model could achieve high accuracy on this data by learning to
-# classify the water instead of the object, which is a major deployment risk.
+# One cell is flagged. `unit_background_brightness` carries `0.329` about `buoy` - roughly
+# twice the next class on that factor and an order of magnitude above boats and swimmers.
+# Buoys are photographed against water of a particular brightness often enough that the
+# water alone is partly predictive of them. That is the shape of a dataset shortcut: a model
+# can score on this data by reading the sea rather than the object, and it loses that
+# accuracy the moment the deployment scenery changes.
 #
-# Crucially, `unit_background_fraction` remains completely independent of the class label.
-# This serves as a vital sanity check, confirming that the findings reflect the actual scenery rather
-# than a mathematical artifact of bounding box size.
+# Note what is *not* flagged. Background contrast runs high for buoys and jetskis (`0.225`
+# and `0.257`) without crossing the threshold - something to watch on more data rather than
+# to act on from 11 and 7 detections. The narrow conclusion is the defensible one: buoys
+# appear in a small, distinctive set of frames, and the scenery of those frames identifies
+# them.
+#
+# `unit_background_fraction` is the sanity check, and it passes cleanly - every class sits
+# at or near zero. That is what makes the rest readable. Background fraction stands in for
+# how much of the frame the boxes cover, so had it scored highly, the brightness finding
+# would more likely be about box geometry than about scenery, and the section would need
+# re-reading.
 
 # %% [markdown]
 # ## What to do with this
@@ -432,9 +481,10 @@ print(classwise)
 # - **Triage missed detections with the separation score.** A missed detection with near-zero
 #   separation is a hard-scene problem, not a model-capacity problem, and no amount of
 #   retraining on the same imagery will fix it.
-# - **Treat a background factor flagged by {class}`.Balance` as a deployment risk.** Test on
-#   held-out scenery, not just held-out images, and check whether per-class performance
-#   tracks the background factor.
+# - **Treat a flagged class-factor pair from {class}`.Balance` as a deployment risk.** The
+#   flag here is specific - buoys against background brightness - so the check is specific
+#   too: hold out *scenery*, not just images, and see whether buoy performance tracks the
+#   brightness of the water rather than the buoy.
 # - **Always read `background_fraction` first.** It decides whether the rest of the
 #   background numbers mean anything, and on datasets with large objects it will vary far
 #   more than it does here.
