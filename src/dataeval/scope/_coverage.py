@@ -38,12 +38,12 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval import Metadata
-from dataeval._helpers import is_metadata_like, reject_filtered_metadata
+from dataeval._helpers import is_labels_like, reject_filtered_metadata
 from dataeval._log import get_logger
 from dataeval.core._completeness import completeness as _completeness
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.exceptions import ShapeMismatchError
-from dataeval.protocols import AnnotatedDataset, Array, ArrayLike, FeatureExtractor, MetadataLike
+from dataeval.protocols import AnnotatedDataset, Array, ArrayLike, FeatureExtractor, LabelsLike
 from dataeval.types import DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _logger = get_logger(__name__)
@@ -272,7 +272,7 @@ class Coverage(Evaluator):
         super().__init__(locals())
 
     def _embeddings(
-        self, dataset: AnnotatedDataset[Any] | MetadataLike | ArrayLike, embeddings: Array | None
+        self, dataset: AnnotatedDataset[Any] | LabelsLike | ArrayLike, embeddings: Array | None
     ) -> NDArray[np.float64]:
         """Use pre-computed embeddings if given, else extract them from the dataset."""
         if embeddings is not None:
@@ -282,7 +282,7 @@ class Coverage(Evaluator):
         from dataeval._embeddings import Embeddings as _Embeddings
 
         # Reached only when no embeddings were supplied, i.e. ``dataset`` is a real image
-        # dataset (raw labels / MetadataLike are rejected upstream unless embeddings are given).
+        # dataset (raw labels / LabelsLike are rejected upstream unless embeddings are given).
         image_source = cast("AnnotatedDataset[Any]", dataset)
         return np.asarray(
             _Embeddings(image_source, extractor=self.extractor, batch_size=self.batch_size), dtype=np.float64
@@ -290,23 +290,24 @@ class Coverage(Evaluator):
 
     def _resolve_labels(
         self,
-        dataset: AnnotatedDataset[Any] | MetadataLike | ArrayLike,
+        dataset: AnnotatedDataset[Any] | LabelsLike | ArrayLike,
         embeddings: Array | None,
     ) -> tuple[NDArray[np.intp], Mapping[int, str]]:
         """Read class labels and their names from a dataset/metadata, or accept raw labels.
 
         A full :class:`~dataeval.protocols.AnnotatedDataset`, a :class:`~dataeval.Metadata`,
-        or any object implementing the :class:`~dataeval.protocols.MetadataLike` protocol
+        or any object implementing the :class:`~dataeval.protocols.LabelsLike` protocol
         yields the class labels (and, when available, an ``index2label`` naming). When
         pre-computed ``embeddings`` are supplied, ``dataset`` may instead be a raw sequence
         of integer class labels (one per embedding) so no MAITE dataset or metadata object
         is required; the labels then name themselves by their integer index.
         """
-        # A Metadata is itself a MetadataLike (and is not an AnnotatedDataset), so the
-        # MetadataLike branch below covers it — no separate concrete-Metadata case needed.
+        # A Metadata already carries labels (and is not an AnnotatedDataset), so the branch
+        # below covers it — no separate concrete-Metadata case needed. Labels are the whole
+        # of what is read here, so a container that carries only those is enough.
         if isinstance(dataset, AnnotatedDataset):
             dataset = Metadata(dataset)
-        if is_metadata_like(dataset):
+        if is_labels_like(dataset):
             index2label = getattr(dataset, "index2label", None) or {}
             return np.asarray(dataset.class_labels, dtype=np.intp), index2label
         if embeddings is None:
@@ -402,7 +403,7 @@ class Coverage(Evaluator):
     @set_metadata
     def evaluate(
         self,
-        dataset: AnnotatedDataset[Any] | MetadataLike | ArrayLike,
+        dataset: AnnotatedDataset[Any] | LabelsLike | ArrayLike,
         embeddings: Array | None = None,
     ) -> CoverageOutput:
         """
@@ -410,14 +411,14 @@ class Coverage(Evaluator):
 
         Parameters
         ----------
-        dataset : AnnotatedDataset, MetadataLike, or ArrayLike of int
+        dataset : AnnotatedDataset, LabelsLike, or ArrayLike of int
             The source of class labels, accepted in four forms:
 
             * a full :class:`~dataeval.protocols.AnnotatedDataset` — class labels and their
               ``index2label`` names are read from it, and embeddings are computed from it via
               the configured extractor unless ``embeddings`` is passed;
             * a :class:`~dataeval.Metadata` — same, but labels/names come straight from it;
-            * any :class:`~dataeval.protocols.MetadataLike` object (e.g. a custom lightweight
+            * any :class:`~dataeval.protocols.LabelsLike` object (e.g. a custom lightweight
               metadata container) — its ``class_labels`` are used, and ``index2label`` if it
               exposes one;
             * a raw sequence/array of integer class labels (one per embedding) — the minimal

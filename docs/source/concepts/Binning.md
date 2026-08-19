@@ -264,7 +264,17 @@ reports, so it doubles as a legend for that output:
   - `"categorical"`
   - `is_digitized=True`
   - Ordinal encoding of the distinct values
+- - Non-numeric, near-unique
+  - — dropped —
+  - — none —
+  - `"cardinality_over_budget"` in {attr}`.Metadata.dropped_factors`
 :::
+
+Each surviving factor also carries the map itself in
+{attr}`.FactorInfo.encoding`: a `BinSpec` holding the cut points where the
+companion says `is_binned`, a `LevelSpec` holding the value per code where it
+says `is_digitized`. That is what lets a code be read back as `[0, 12.4)` or
+`rain` rather than as `3`.
 
 ```python
 for name, info in md.factor_info.items():
@@ -523,38 +533,132 @@ worth reading beside the scores:
 [len(np.unique(md.factor_data[:, i])) for i in range(md.factor_data.shape[1])]
 ```
 
-For calibration at the other end, the largest score two **independent** factors
-produced over 40 seeds, both carrying 16 levels — the level at which a reported
-association means nothing:
+### A fine cut costs the same correlation, from the other side
+
+Cutting finer does not recover it either, because both tails lose the signal. A
+cut so fine that the contingency table has more cells than the sample has rows
+records which cells were hit rather than anything about the factor, and the
+chance correction then subtracts nearly everything the counts found. Recovered
+dependence for the same ρ = 0.9 pair — a true value of 0.810 — cut into quantiles
+at each count, 8 seeds:
 
 :::{list-table}
-:widths: 25 37 38
+:widths: 12 11 11 11 11 11 11 11 11
+:header-rows: 1
+
+- - Samples
+  - k = 2
+  - k = 4
+  - k = 8
+  - k = 16
+  - k = 32
+  - k = 64
+  - k = 128
+  - Level budget
+- - 200
+  - 0.582
+  - 0.710
+  - **0.729**
+  - 0.606
+  - 0.302
+  - 0.072
+  - 0.011
+  - 20
+- - 1,000
+  - 0.576
+  - 0.705
+  - 0.761
+  - **0.770**
+  - 0.667
+  - 0.376
+  - 0.135
+  - 31
+- - 5,000
+  - 0.582
+  - 0.705
+  - 0.766
+  - 0.788
+  - **0.789**
+  - 0.713
+  - 0.458
+  - 70
+:::
+
+**The count that reads best moves with the sample size**, from about 8 at n = 200
+to about 32 at n = 5,000, so one setting is unlikely to suit two datasets of
+different sizes. This is the same finding as
+[the bin count being a function of the data](#the-bin-count-is-a-function-of-the-data-not-a-setting),
+arriving from the other direction: there it is the automatic path that cannot be
+pinned, here it is the declared one that cannot be pinned *once*.
+
+**The level budget is a ceiling, not a target.** It is the last column above, and
+in every row it sits past the peak — cutting at exactly the budget reports 0.507
+where 8 bins report 0.729 at n = 200, and 0.691 against 0.789 at n = 5,000.
+Staying under the budget is what keeps a factor's table readable; it is not what
+makes the cut a good one. DataEval warns when a **declared** encoding overruns
+the budget and deliberately names no count in its place, because the number it
+would name is this one.
+
+A cut cannot avoid this trade: the sensitivity a fine cut buys is given back
+through the sparsity it creates. The one read with no `k` to choose is the
+unbinned one, which is what {attr}`~dataeval.bias.Balance.factor_source` selects
+and why it prefers native values wherever nobody declared a cut.
+
+For calibration at the other end, the largest score two **independent** factors
+produced over 40 seeds, both carrying 16 levels — the level at which a reported
+association means nothing. One seed set, all three regimes, so the columns are
+comparable to each other:
+
+:::{list-table}
+:widths: 20 27 27 26
 :header-rows: 1
 
 - - Samples
   - Binned pair (Linfoot)
   - Own-alphabet pair (entropy)
+  - Native values (estimator)
 - - 200
   - 0.137
   - 0.034
+  - 0.082
 - - 1,000
-  - 0.044
-  - 0.008
+  - 0.058
+  - 0.011
+  - 0.020
 - - 5,000
-  - 0.009
-  - 0.002
+  - 0.008
+  - 0.001
+  - 0.003
 :::
 
-Both floors sit far below the 0.5 default, so the threshold is not at risk of
-firing on noise — but at n = 200 a spurious 0.135 is within reach, and that is a
+Every floor sits far below the 0.5 default, so the threshold is unlikely to fire
+on noise — but at n = 200 a spurious 0.137 is within reach, and that is a
 sample-size limit rather than a binning one.
+
+Reading the two tables together answers the question
+{attr}`~dataeval.bias.Balance.factor_source` turns on. A pair read as **native
+values** reports 0.5 at a true dependence of 0.49 and carries the *lowest* null
+floor of the three — the closest to calibrated, and the one that discards nothing.
+Every cut under-reports, and the coarser the cut the further it under-reports:
+0.73 at two bins against 0.51 at sixteen. So the span the single threshold has to
+cover is set by **how coarsely factors were cut**, not by which channel read
+them; reading unbinned values moves the near edge of that span from 0.51 to 0.49,
+on a range already 0.24 wide.
+
+That is why `factor_source="auto"` reads native values only where nobody declared
+anything. A declared cutoff is a claim, and the under-reporting is that claim
+being honored — you asked about *freezing*, not about temperature. Where no one
+claimed anything, there is nothing to honour, and the calibrated read is the
+better one.
 
 ## How DataEval decides
 
 With `continuous_factor_bins=None` — the default — {class}`.Metadata` classifies
 each factor without being asked. Non-numeric columns are ordinal-encoded
-immediately. Numeric columns go to {func}`.is_continuous`, and its verdict picks
-the treatment.
+immediately, unless they carry more distinct values than [the level
+budget](#a-discrete-factor-can-still-be-binned) allows, in which case they are
+dropped. Numeric columns go to {func}`.is_continuous`, and its verdict picks the
+treatment.
 
 ### The continuous/discrete heuristic
 
@@ -629,12 +733,38 @@ max(20, sqrt(n))  # n at the factor's own level
 an ordinary categorical factor intact on a small sample. Both are rules of thumb,
 not derived quantities. A discrete factor over that budget is binned rather than
 ordinal-encoded — reported as `factor_type="discrete"` with `is_binned=True` — and
-the same budget caps the bin count on the continuous path. The cap applies to
-numeric columns only: a non-numeric column keeps one category per distinct value
-however many there are, since there is no axis along which to merge them.
+the same budget caps the bin count on the continuous path.
 
-Like automatic binning generally, this announces itself only as a `WARNING` on the
-`dataeval.metadata` logger.
+The budget is the point past which a contingency table stops describing the data,
+and nothing more than that. It is **not** the count that reads best, which sits
+well under it and moves with the sample size —
+[measured here](#a-fine-cut-costs-the-same-correlation-from-the-other-side). A
+factor sitting just inside the budget is safe from the failure the budget exists
+to prevent and is still cut more finely than the sample rewards.
+
+A different line binds non-numeric columns, and it is not the budget. The budget
+answers *how many cells can this sample fill*, which is the right question for
+choosing a bin count and the wrong one for deciding whether a column is a factor
+at all — twenty-five cities over a hundred images overruns it and is a perfectly
+good factor. What is asked instead is whether the column **names its rows rather
+than grouping them**: a value per row is not a category, every contingency table
+over it is a table of ones, and there is no order along a set of strings to cut it
+into fewer. Such a column is **dropped**, leaving {attr}`.Metadata.factor_names`
+and gaining a `"cardinality_over_budget"` entry in
+{attr}`.Metadata.dropped_factors`.
+
+A numeric column at the same cardinality is binned and kept — that asymmetry is
+the point, and it extends to timestamps, which are ordered and so cut into
+intervals like any other measured quantity. Map the values onto a smaller
+vocabulary — a coarser taxonomy, a prefix, a lookup — to keep a column that is
+meant to be categorical.
+
+A merely *wide* vocabulary is not dropped. A factor whose levels are thin for the
+sample is what {attr}`.ParityOutput.insufficient_data` exists to report, and
+removing the factor would foreclose the mechanism that says so.
+
+Both the automatic binning and the drop raise a `UserWarning`, naming every factor
+affected, in addition to the per-factor detail on the `dataeval.metadata` logger.
 
 ### Where the decision is made matters
 
@@ -786,13 +916,41 @@ explicit, on binned and digitized factors alike.
 So where the missing rate is material, part of any finding about that factor is
 a finding about its absence, and the output does not separate the two.
 
-### The automatic path announces itself only in logs
+### A nanosecond timestamp is read to 256 ns
 
-Each auto-binned factor emits a `WARNING` on the `dataeval.metadata` logger —
-the only record that its edges were derived rather than given. DataEval attaches
-a `NullHandler` to that logger, so the default is silence, and a run that binned
-every factor automatically is indistinguishable from one handed explicit edges
-for all of them.
+A capture time is totally ordered, so it cuts into intervals exactly like a
+number — DataEval reads one as a float so that `NaT` can travel as `NaN` and be
+given the missing bin like any other gap. A float64 carries 53 bits of mantissa,
+and near the current epoch (~1.8e18 nanoseconds) consecutive representable values
+are **256 ns** apart, so two capture times closer together than that become one
+number.
+
+`datetime64[us]` and `datetime64[ms]` are exact. Only `[ns]` — polars' and pandas'
+default unit — is affected, and only below a resolution no bin edge on a capture
+time is placed at. What it does change is the *distinct count* of such a column,
+which feeds the continuous/discrete verdict and the near-uniqueness test that
+drops identifiers. If a sub-microsecond difference is one you need kept, cast the
+column before adding it:
+
+```python
+md.add_factors({"captured_at": stamps.astype("datetime64[us]")}, level="unit")
+```
+
+### The automatic path announces itself
+
+Structuring raises a `UserWarning` naming every factor it binned on the caller's
+behalf, because the per-factor `WARNING` it also writes to the `dataeval.metadata`
+logger reaches nobody by default — DataEval attaches a `NullHandler` there, which
+suppresses Python's last-resort stderr handler. One aggregated warning rather than
+one per factor: a dozen near-identical warnings during one construction is how a
+warning teaches people to filter it.
+
+The record survives the warning. Each factor's {attr}`.FactorInfo.encoding` says
+where its cuts fell and who chose them — `provenance="derived"` where DataEval
+chose both the count and the placement, against `"count"`, `"edges"` or
+`"declared"` where the caller did — so a run that binned automatically is
+distinguishable from one handed explicit edges long after the warning scrolled
+past. `repr(md)` reports the count as `auto_encoded=N`.
 
 ## What the choice determines
 
@@ -811,15 +969,17 @@ dtype, and whether it is named in `continuous_factor_bins`.
 **The thresholds that matter are not in the data.** Where a factor has a value
 at which the world changes — freezing, sunset, a detection-size floor — no
 method that places edges by reading values can find it, and the factor is binned
-successfully anyway. `continuous_factor_bins` is the only input that carries
-such a threshold in, and the only one that fixes a factor's vocabulary across
-datasets rather than letting each draw derive its own count and edges.
+successfully anyway. `continuous_factor_bins`, `factor_levels` and `encoding` are
+what carry such a threshold in, and the only inputs that fix a factor's
+vocabulary across datasets rather than letting each draw derive its own count and
+edges.
 
-**Nothing marks a result as binning-sensitive.** A score computed at one setting
-and a score computed at another are both returned without reference to the cut
-behind them. The difference between the two is the only available evidence that
-a conclusion is about the binning rather than about the data, and DataEval
-neither computes it nor warns that it might matter.
+**Nothing measures how binning-sensitive a result is.** A result now says which
+cut produced it — {attr}`~dataeval.Metadata.encoding_digest` on every bias
+result, and `scored_as` on {attr}`.BalanceOutput.factors` — so two scores can be told
+apart. What no output gives is the difference between them: re-running across
+binnings is the only evidence that a conclusion is about the cut rather than
+about the data, and DataEval does not do it for you.
 
 For the provenance side — what to record so that two runs stay comparable, and
 which caveats attach to each evaluator — see
@@ -841,6 +1001,9 @@ which caveats attach to each evaluator — see
 
 ### How-to guides
 
+- [How to control and reuse a factor's binning](../notebooks/h2_control_factor_binning.py)
+  — declaring the cuts you mean, ratifying the ones you do not, and carrying the
+  whole map to the next collection so two results are comparable.
 - [How to bin factors by level](../notebooks/h2_bin_factors_by_level.py) — a worked
   example of binning at a factor's own level, with the numbers that show why the
   alternative distorts.

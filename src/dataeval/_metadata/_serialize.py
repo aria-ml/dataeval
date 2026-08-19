@@ -52,6 +52,12 @@ from numpy.typing import NDArray
 
 from dataeval._log import get_logger
 from dataeval._metadata._columns import binned, digitized
+from dataeval._metadata._encoding import (
+    bins_from_mapping,
+    bins_to_mapping,
+    encoding_from_mapping,
+    encoding_to_mapping,
+)
 from dataeval._metadata._links import LinkIndex
 from dataeval._metadata._store import LevelStore
 from dataeval._metadata._structurers import TASK_STRUCTURERS, FactorsStructurer, Structurer
@@ -109,6 +115,21 @@ def _edge_frame(store: LevelStore, level: FactorLevel) -> pl.DataFrame | None:
     return pl.DataFrame([pl.Series(parent, store.link(level, parent).positions()) for parent in parents])
 
 
+def _applied_encodings(md: "Metadata") -> dict[str, Any]:
+    """Merge what the caller declared with what binning resolved it to.
+
+    So that the same object writes the same record whether or not anything has read
+    ``factor_data`` from it yet: ``_factor_cache`` is empty until the binning pass runs, and
+    reading it alone dropped a declared encoding entirely from an archive saved before the
+    first read. The applied entry wins where both exist — it is the declared one plus any
+    growth.
+    """
+    return {
+        **md._encoding,
+        **{name: info.encoding for name, info in md._factor_cache.items() if info.encoding is not None},
+    }
+
+
 def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
     """Everything about the instance that is not a frame or an edge.
 
@@ -127,6 +148,7 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
     with the wrong shape, whereas comparing the two makes that a refusal.
     """
     structurer = md._structurer
+    applied = _applied_encodings(md)
     return {
         "format_version": FORMAT_VERSION,
         "dataeval_version": __version__,
@@ -145,6 +167,36 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
         "count": int(md._count),
         "dropped_factors": {name: list(reasons) for name, reasons in md._dropped_factors.items()},
         "aggregated_from": dict(md._aggregated_from),
+        # The applied encodings. Companion columns are stripped on the way in and rebuilt on
+        # load, so without this a restored instance re-derives its cuts — which loses
+        # `accept()` outright, and reproduces the old codes only for as long as the binning
+        # heuristics do not change. Written as an optional key: a file from before this
+        # existed simply has none, and restores the way it always did.
+        #
+        # What the caller declared underneath what binning applied, so that the same object
+        # writes the same record whether or not anything has read `factor_data` from it
+        # yet. `_factor_cache` is empty until the binning pass runs, and reading it alone
+        # dropped a declared encoding entirely from an archive saved before the first read.
+        # The applied entry wins where both exist: it is the declared one plus any growth.
+        "encoding": encoding_to_mapping(applied),
+        # The third spelling of a declaration, and the one every existing caller uses. It
+        # does not resolve into an encoding until the binning pass runs, so an instance
+        # saved before its first read carries the cut only here -- and without this member
+        # a declared `continuous_factor_bins` was the one declaration a save could lose.
+        #
+        # Only where the record does not already cover the factor. Writing both put one
+        # factor into two members, `_adopt_manifest` restored both, and the constructor
+        # refuses that pair -- so `save(); load().new(...)` raised on every declared cut
+        # that had been through a read. A resolved BinSpec carries `provenance="count"`,
+        # so nothing is lost by omitting the count it came from.
+        "continuous_factor_bins": bins_to_mapping({
+            name: spec for name, spec in md._continuous_factor_bins.items() if name not in applied
+        }),
+        # Part of the declaration, not of the data: a closed vocabulary that silently
+        # reopens across a round trip is the one failure `strict` exists to prevent, and it
+        # fails open -- the next dataset's unseen value is appended rather than refused, and
+        # nothing says the taxonomy widened.
+        "strict": bool(md._strict),
         "is_filtered": bool(md._is_filtered),
         "cut_below_items": bool(md._cut_below_items),
     }
@@ -176,6 +228,14 @@ def save(md: "Metadata", path: Path | str) -> None:
     Structures first if it has to, so that saving a freshly constructed instance writes
     the rows a caller expects rather than an empty file — the same way
     :meth:`~dataeval.Embeddings.save` computes before it writes.
+
+    Structures but does not **bin**: binning writes companion columns onto the instance,
+    and saving must not change what the object it was handed reports. Every *declaration*
+    is written regardless -- ``encoding`` and ``factor_levels`` through the manifest's
+    encoding member, ``continuous_factor_bins`` through its own -- so no choice anybody
+    made depends on whether something has read from the instance first. What an unbinned
+    instance has not got is a *derived* cut, and losing one costs nothing: it is a function
+    of the values, and the archive holds the same values to re-derive it from.
 
     Written to a temporary file in the destination directory and renamed over the target,
     so a reader either sees the previous file or the new one. A crash mid-write cannot
@@ -398,6 +458,34 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     md._count = int(manifest["count"])
     md._dropped_factors = {name: list(reasons) for name, reasons in manifest["dropped_factors"].items()}
     md._aggregated_from = dict(manifest["aggregated_from"])
+    # Underneath whatever the caller passed, never over it. Binning is configuration rather
+    # than data here — ``load(..., continuous_factor_bins=...)`` is meant to re-cut the
+    # restored rows — so the archive's record fills in only the factors the reader said
+    # nothing about. Both spellings of "the reader spoke" count, since ``_encoding`` is
+    # consulted before ``continuous_factor_bins`` and would otherwise shadow it.
+    spoken_for = set(md._encoding) | set(md._continuous_factor_bins)
+    restored = {
+        name: spec
+        for name, spec in encoding_from_mapping(manifest.get("encoding", {})).items()
+        if name not in spoken_for
+    }
+    md._encoding = {**restored, **md._encoding}
+    # The same rule for the same reason, on the other member. Filtered against the reader's
+    # `encoding` as well, so the archive cannot reintroduce a cut for a factor the reader
+    # gave a vocabulary -- the pair is mutually exclusive per factor, and the constructor's
+    # check has already run by the time this does.
+    md._continuous_factor_bins = {
+        **{
+            name: spec
+            for name, spec in bins_from_mapping(manifest.get("continuous_factor_bins", {})).items()
+            if name not in spoken_for
+        },
+        **md._continuous_factor_bins,
+    }
+    # Underneath the reader's own, like every other declaration: `load(..., strict=True)`
+    # closes a vocabulary the archive left open, and passing nothing keeps what was written.
+    # Optional, so a file from before this existed restores as the permissive default.
+    md._strict = md._strict or bool(manifest.get("strict", False))
     md._is_filtered = bool(manifest["is_filtered"])
     md._cut_below_items = bool(manifest["cut_below_items"])
     # Not written, and said so rather than answered as an empty dataset would be.

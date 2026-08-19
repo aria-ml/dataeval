@@ -210,10 +210,15 @@ class TestGroupData:
             _validate_groupable(np.ones(shape=(100, 1), dtype=np.intp), 1000)
 
     def test_no_valid_groups(self, labels, groups):
+        """Names that resolve to no factor are refused, and the message says which.
+
+        Previously this fell through to "Unique groups (1) must be greater than 1", which
+        names neither the factor nor the reason — the grouping had already been silently
+        reduced to nothing by then.
+        """
         metadata = get_metadata(labels, groups)
         keys = ["Foo", "Bar"]
-        error_msg = "Unique groups (1) must be greater than 1."
-        with pytest.raises(ValueError, match=re.escape(error_msg)):
+        with pytest.raises(ValueError, match=re.escape("['Bar', 'Foo']")):
             split_dataset(
                 metadata,
                 num_folds=1,
@@ -555,3 +560,47 @@ class TestODSplitDataset:
         splits = split_dataset(metadata, num_folds=1, stratify=True, val_frac=0.2, test_frac=0.2)
         check_sample_leakage(splits)
         check_stratification(labels, splits, tolerance=0.02)
+
+
+@pytest.mark.required
+class TestSplitOnNamesAFactorTheMetadataDoesNotCarry:
+    """``split_on`` exists to keep rows that belong together on one side of a split.
+
+    Grouping by a *subset* of what was asked for hands back folds that do not honour the
+    request, and nothing downstream can tell — so an unresolvable name is refused rather
+    than skipped.
+    """
+
+    @staticmethod
+    def _md(n=120):
+        from dataeval import Metadata
+
+        rng = np.random.default_rng(0)
+        return Metadata.from_factors(
+            {
+                # Near-unique, so Metadata drops it as an identifier — and a per-entity id
+                # is exactly what a caller reaches for first when grouping a split.
+                "patient_id": np.array([f"p{i % 80:03d}" for i in range(n)]),
+                "site": np.array([f"s{i % 6}" for i in range(n)]),
+            },
+            class_labels=rng.integers(0, 2, n),
+        )
+
+    def test_a_dropped_factor_is_refused_not_silently_skipped(self):
+        md = self._md()
+        assert "patient_id" not in md.factor_names
+
+        with pytest.raises(ValueError, match="patient_id"):
+            split_dataset(md, num_folds=2, split_on=["patient_id", "site"])
+
+    def test_the_message_says_why_the_factor_is_missing(self):
+        """A dropped factor and a typo are different mistakes and read differently."""
+        with pytest.raises(ValueError, match="cardinality_over_budget"):
+            split_dataset(self._md(), num_folds=2, split_on=["patient_id"])
+
+    def test_a_misspelled_factor_is_refused(self):
+        with pytest.raises(ValueError, match=r"\['sight'\]"):
+            split_dataset(self._md(), num_folds=2, split_on=["sight"])
+
+    def test_a_factor_the_metadata_carries_still_groups(self):
+        assert split_dataset(self._md(), num_folds=2, split_on=["site"]) is not None

@@ -1,8 +1,12 @@
 __all__ = []
 
 import copy
+import hashlib
+import inspect
+import json
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Literal, NamedTuple, cast
 
@@ -22,6 +26,14 @@ from dataeval._metadata._columns import (
     to_col,
 )
 from dataeval._metadata._deprecated import DeprecatedMetadataAPI
+from dataeval._metadata._encoding import (
+    FactorEncoding,
+    apply_level_spec,
+    declared_levels,
+    encoding_to_json,
+    encoding_to_mapping,
+    read_encoding,
+)
 from dataeval._metadata._entry_legacy import infer_factor_level, resolve_combined, resolve_destinations
 from dataeval._metadata._filters import evaluate, report_orphaned_rows
 from dataeval._metadata._input import (
@@ -45,7 +57,14 @@ from dataeval._metadata._structurers import (
     safe_column_name,
     select_structurer,
 )
-from dataeval.core._bin import bin_data, digitize_data, is_continuous, level_budget
+from dataeval.core._bin import (
+    MIN_LEVEL_BUDGET,
+    apply_bin_spec,
+    bin_data,
+    digitize_data,
+    is_continuous,
+    level_budget,
+)
 from dataeval.core._compute_stats import StatsResult
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import (
@@ -55,7 +74,7 @@ from dataeval.protocols import (
     FeatureExtractor,
     ProgressCallback,
 )
-from dataeval.types import Array1D, FactorInfo, FactorLevel, FactorLevelSchema, SourceIndex
+from dataeval.types import Array1D, BinSpec, FactorInfo, FactorLevel, FactorLevelSchema, LevelSpec, SourceIndex
 from dataeval.utils._validate import requires_maite_dataset
 
 _logger = get_logger(__name__)
@@ -91,6 +110,178 @@ def _reject_unusable_key(
             f"key={key!r} matches against a column of one level's rows, so that level has to be "
             "named: pass level= as well.",
         )
+
+
+def _as_orderable(data: NDArray) -> NDArray:
+    """Read a temporal column as the number it already is.
+
+    A timestamp is totally ordered, so it cuts into intervals exactly like a number and
+    should not be treated as an unorderable set of labels — a capture time is one of the
+    most common per-row fields there is, and one distinct value per row would otherwise
+    make it look like an identifier. The edges come out in the column's own unit, which is
+    what a caller declaring ``continuous_factor_bins`` against it would supply.
+
+    Floats rather than integers, so that ``NaT`` can be carried across as ``NaN`` — which
+    is how every other column spells a missing value, and what the binning path reads to
+    reserve the missing code. ``astype(np.int64)`` alone renders ``NaT`` as ``INT64_MIN``,
+    an extreme *observed* magnitude nine quintillion below the data: the derived edges are
+    placed to span it, every real timestamp collapses into one bin, and the missing code
+    the record reserves is never used.
+
+    **Nanosecond timestamps lose resolution here, deliberately.** A float64 carries 53 bits
+    of mantissa, so near the current epoch — about 1.8e18 nanoseconds — consecutive
+    representable values are 256 ns apart, and two capture times closer together than that
+    become one number. ``datetime64[us]`` and ``[ms]`` are exact; only ``[ns]``, which is
+    polars' and pandas' default unit, is affected.
+
+    Accepted rather than worked around, because 256 ns is far below any bin edge a capture
+    time is cut on — the alternative is a second integral path carrying its own missing
+    sentinel, to preserve a distinction no binning can express. It does mean the distinct
+    *count* of an ``[ns]`` column can read lower than the data holds, which reaches
+    :func:`~dataeval.core.is_continuous` and the near-uniqueness test; cast to ``[us]``
+    before adding the factor if a sub-microsecond difference is one you need kept.
+    """
+    if data.dtype.kind not in "Mm":
+        return data
+    return np.where(np.isnat(data), np.nan, data.astype(np.int64).astype(np.float64))
+
+
+def _name_list(names: Sequence[str]) -> str:
+    """Render factor names as a reader would say them: ``a``, ``a and b``, ``a, b and c``."""
+    quoted = [f"`{name}`" for name in names]
+    if len(quoted) == 1:
+        return quoted[0]
+    return f"{', '.join(quoted[:-1])} and {quoted[-1]}"
+
+
+def _was_were(names: Sequence[str]) -> str:
+    """Agree the verb with the list :func:`_name_list` just produced."""
+    return "was" if len(names) == 1 else "were"
+
+
+def _reconcile_encoding(
+    continuous_factor_bins: Mapping[str, int | Sequence[float]],
+    encoding: str | Path | Mapping[str, FactorEncoding] | None,
+    factor_levels: Mapping[str, Sequence[Any]] | None,
+) -> dict[str, FactorEncoding]:
+    """Merge the three ways a caller declares an encoding, refusing any factor named twice.
+
+    Per factor, not per argument. What has no good resolution is *one factor* described
+    twice; arguments covering disjoint factors are only a longhand for one record, and
+    refusing the pair outright refused a combination the library itself produces —
+    ``load(path, continuous_factor_bins=...)`` restores the archive's record for every
+    factor the caller said nothing about, leaving both populated, after which ``new()``
+    could not reconfigure the instance it had just built.
+
+    ``continuous_factor_bins`` stays where it is and is applied on its own path; the two
+    vocabulary-shaped arguments come back as one mapping.
+    """
+    records: dict[str, FactorEncoding] = read_encoding(encoding) if encoding is not None else {}
+    if overlapping := sorted(set(continuous_factor_bins) & set(records)):
+        raise ValueError(
+            f"Factors {overlapping} are cut by both `continuous_factor_bins` and `encoding`, and two "
+            "sources disagreeing about one factor has no good resolution. `encoding` is the general "
+            "form and carries everything the other does; pass one.",
+        )
+    if not factor_levels:
+        return records
+    if overlapping := sorted(set(factor_levels) & set(records)):
+        raise ValueError(
+            f"Factors {overlapping} have a vocabulary in both `factor_levels` and `encoding`; "
+            "declare each factor once.",
+        )
+    if overlapping := sorted(set(factor_levels) & set(continuous_factor_bins)):
+        raise ValueError(
+            f"Factors {overlapping} have a vocabulary in `factor_levels` and a cut in "
+            "`continuous_factor_bins`. A factor is encoded one way or the other, and the vocabulary "
+            "would silently win; declare each factor once.",
+        )
+    records.update(declared_levels(factor_levels))
+    return records
+
+
+def _declared_bins(spec: BinSpec) -> int:
+    """Intervals the caller's edges describe — the bins the cut is a claim *about*.
+
+    Not every code a value can land in. ``np.digitize`` has to put an out-of-range value
+    somewhere, so a finitely bounded list like ``[0, 10, 20]`` also yields a below-first and
+    an above-last catchall. Nobody declared those, and their being **empty is the good
+    case**: it says every value fell inside the range the caller described. Counting them
+    made a cut that fits its data perfectly report "2 of 4 bins hold rows" on every read,
+    which teaches a reader to filter the one warning here worth reading.
+    """
+    return max(len(spec.edges) - 1, 0)
+
+
+def _unused_bins(spec: BinSpec, codes: NDArray[np.int64]) -> tuple[NDArray[np.int64], str | None]:
+    """Codes a cut actually placed, and a note naming how many of its intervals hold rows.
+
+    Split out from :meth:`Metadata._measure_fit` because emptiness is a question about a
+    cut and fineness is a question about a contingency table: only the first is asked here,
+    and the codes it returns are what the second counts.
+    """
+    # Missing rows are not a bin the cut placed. Counting their reserved code as occupancy
+    # inflated every tally by one and, where exactly one bin short of the count was empty,
+    # cancelled the shortfall out and said nothing at all.
+    present = codes[codes != spec.missing_code]
+    declared = _declared_bins(spec)
+    # Asked of the declared intervals alone — codes 1 through `declared` — since an empty
+    # out-of-range catchall is the cut working, not failing.
+    occupied = len(np.unique(present[(present >= 1) & (present <= declared)]))
+    note = f"{occupied} of {declared} bins hold rows" if declared and occupied < declared else None
+    return present, note
+
+
+def _is_derived_encoding(info: FactorInfo) -> bool:
+    """Say whether a factor's encoding was chosen for it rather than by anyone.
+
+    True of a derived cut and of a vocabulary read off whatever values turned up — both are
+    decisions DataEval made on the caller's behalf, and both are what :meth:`Metadata.accept`
+    exists to let a person ratify.
+    """
+    return info.encoding is not None and info.encoding.provenance == "derived"
+
+
+def _is_auto_binned(info: FactorInfo) -> bool:
+    """Say whether a factor's *cuts* were chosen for it rather than declared.
+
+    Narrower than :func:`_is_derived_encoding`: a digitized factor's levels are its own
+    values, so it was not binned at all and the auto-binning warning has nothing to say
+    about it.
+    """
+    return isinstance(info.encoding, BinSpec) and _is_derived_encoding(info)
+
+
+def _caller_stacklevel() -> int:
+    """Depth of the first frame outside :mod:`dataeval`, counted from this function's caller.
+
+    A constant will not do here. Binning is reached from :attr:`Metadata.factor_names`, from
+    :attr:`~Metadata.factor_data` by way of ``_factor_info``, from :attr:`~Metadata.shape`
+    and from :attr:`~Metadata.dropped_factors`, each a different number of frames above the
+    warning, so any fixed ``stacklevel`` points at library internals from most of them.
+
+    That is not cosmetic. :func:`warnings.warn` stores its once-per-location bookkeeping in
+    the globals of the frame ``stacklevel`` selects, keyed by line number: attributing every
+    caller to one line inside this module puts them all in one registry entry, so the second
+    place in a program that builds a :class:`Metadata` with the same factor names is told
+    nothing. Pointing at the caller gives each site its own entry, which is what "warn once"
+    is supposed to mean.
+
+    Falls back to 2 -- the caller's caller -- when the stack cannot be walked, which is the
+    behaviour this replaces.
+    """
+    frame = inspect.currentframe()
+    frame = frame.f_back if frame is not None else None
+    level = 1
+    while frame is not None:
+        # The dot matters: a downstream package named ``dataeval_studio`` is a caller, not
+        # an internal frame, and a bare prefix test would walk straight past its code.
+        module = frame.f_globals.get("__name__", "")
+        if module != "dataeval" and not module.startswith("dataeval."):
+            return level
+        frame = frame.f_back
+        level += 1
+    return 2
 
 
 class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
@@ -158,6 +349,24 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         When None, uses automatic discretization. A bin count is applied to the factor's
         values at its own level, so ``{"brightness": 10}`` on a unit-level factor means
         ten bins over the units.
+    encoding : str, Path, Mapping[str, BinSpec | LevelSpec] or None, default None
+        A recorded encoding to apply rather than derive: a path to a descriptor written by
+        :meth:`export_encoding`, or the records :meth:`encoding` returns. Named factors are
+        reapplied — the same value gets the same code in a dataset the cut was never fitted
+        to — and the rest are encoded from their own values. The general form of
+        ``continuous_factor_bins``, and mutually exclusive with it *per factor*: naming one
+        factor in both is an error.
+    factor_levels : Mapping[str, Sequence] or None, default None
+        Vocabularies declared ahead of the data, one per factor: code ``i`` means
+        ``levels[i]``, so two datasets declared against the same list share an alphabet
+        without either having been structured first. The categorical counterpart to
+        ``continuous_factor_bins``, and likewise an error for a factor already named in
+        ``encoding`` or ``continuous_factor_bins``.
+    strict : bool, default False
+        Whether a value no declared vocabulary holds is an error. The default appends it,
+        which is what extension wants; pass True for a closed taxonomy that should report
+        the data leaving it rather than be widened to fit. Bin edges are unaffected — an
+        unseen magnitude lands in an end bin either way.
     auto_bin_method : Literal["uniform_width", "uniform_count", "clusters"], default "uniform_width"
         Binning strategy for continuous factors without explicit bins. Default "uniform_width"
         provides intuitive equal-width intervals for most distributions. Every strategy reads
@@ -228,13 +437,15 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         *,
         task: TaskOverride | None = None,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
+        encoding: str | Path | Mapping[str, FactorEncoding] | None = None,
+        factor_levels: Mapping[str, Sequence[Any]] | None = None,
+        strict: bool = False,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
         exclude: str | Sequence[str] | None = None,
         include: str | Sequence[str] | None = None,
         view: FactorLevel | Literal["image"] | None = None,
         inherited: bool = True,
     ) -> None:
-        self._dropped_factors: dict[str, list[str]]
         self._raw: Sequence[Mapping[str, Any]]
 
         self._warned_level_rename = False
@@ -244,6 +455,12 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         self._task: TaskOverride | None = task
         self._count = len(dataset) if dataset is not None and isinstance(dataset, Sized) else 0
         self._continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else {}
+        self._encoding: dict[str, FactorEncoding] = _reconcile_encoding(
+            self._continuous_factor_bins,
+            encoding,
+            factor_levels,
+        )
+        self._strict = strict
         self._auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = auto_bin_method
 
         if exclude is not None and include is not None:
@@ -277,6 +494,17 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         # stayed — and _bin() skips a factor that has one, so it would never be recomputed.
         self._factors: set[str] = set()
         self._factor_cache: dict[str, FactorInfo] = {}
+        # Emptied here rather than only being rebuilt by ``_structure``: binning records
+        # drops of its own, so it has to be readable on an instance that has not structured
+        # yet. Was previously a bare annotation, which left it genuinely absent until
+        # structuring ran.
+        self._dropped_factors: dict[str, list[str]] = {}
+        # Whether each column names its rows rather than grouping them. Cached because the
+        # answer is a property of the column and `_build_factors` re-runs on every view
+        # change, filter and include/exclude set; carried onto derived instances so that a
+        # filter cannot re-answer it against the rows it happened to keep. Cleared wherever
+        # a column's contents change, which is `add_factors` and a fresh structuring.
+        self._identifier_cache: dict[str, bool] = {}
         self._is_structured = False
         self._is_binned = False
         # Set by where()/having() and never cleared: a filtered instance still holds its
@@ -335,6 +563,9 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         level: FactorLevel | Literal["image"] | None = None,
         source_index: Sequence[SourceIndex] | None = None,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
+        encoding: str | Path | Mapping[str, FactorEncoding] | None = None,
+        factor_levels: Mapping[str, Sequence[Any]] | None = None,
+        strict: bool = False,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
         exclude: str | Sequence[str] | None = None,
         include: str | Sequence[str] | None = None,
@@ -398,6 +629,15 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         continuous_factor_bins : Mapping[str, int | Sequence[float]] or None, default None
             Bin counts or explicit edges for continuous factors. When None, uses
             automatic discretization via ``auto_bin_method``.
+        encoding : str, Path, Mapping[str, BinSpec | LevelSpec] or None, default None
+            A recorded encoding to apply rather than derive — a descriptor path or the
+            records :meth:`encoding` returns. See the class docstring.
+        factor_levels : Mapping[str, Sequence] or None, default None
+            Vocabularies declared ahead of the data, one per factor. See the class
+            docstring.
+        strict : bool, default False
+            Whether a value no declared vocabulary holds is an error rather than an
+            append. See the class docstring.
         auto_bin_method : {"uniform_width", "uniform_count", "clusters"}, default "uniform_width"
             Binning strategy for continuous factors without explicit bins.
         exclude : str or Sequence[str] or None, default None
@@ -460,6 +700,9 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         inst = cls(
             None,
             continuous_factor_bins=continuous_factor_bins,
+            encoding=encoding,
+            factor_levels=factor_levels,
+            strict=strict,
             auto_bin_method=auto_bin_method,
             exclude=exclude,
             include=include,
@@ -483,6 +726,8 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]] | None = None,
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
+        encoding: str | Path | Mapping[str, FactorEncoding] | None = None,
+        strict: bool = False,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
         exclude: str | Sequence[str] | None = None,
         include: str | Sequence[str] | None = None,
@@ -502,9 +747,14 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         counts be checked against each other, and is what anything reading images
         alongside the metadata needs; omitting it gives a working but unbound instance.
 
-        Binning is **not** restored. The file holds each factor's values, and the binning
-        configuration given here is applied lazily on first read, so one file serves every
-        set of bins a caller might want from it.
+        Binned **columns** are not restored — the file holds each factor's values, and the
+        cut is reapplied lazily on first read — but the **record** of that cut is. The file
+        carries the encoding each factor was written under, so a restored instance
+        reproduces its codes rather than re-deriving them, and neither a ratified placement
+        nor a grown vocabulary is lost to a save. The record is applied *underneath*
+        whatever is passed here: ``continuous_factor_bins`` and ``encoding`` re-cut the
+        factors they name, and the archive fills in only the rest. One file still serves
+        every set of bins a caller might want from it.
 
         Parameters
         ----------
@@ -515,6 +765,14 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             Its item count is checked against the file's.
         continuous_factor_bins : Mapping[str, int or Sequence[float]] or None, default None
             Bin counts or explicit edges per factor, applied when factors are first read.
+            Overrides the archive's record for the factors it names.
+        encoding : str, Path, Mapping[str, BinSpec | LevelSpec] or None, default None
+            A recorded encoding to apply instead of the archive's, for the factors it
+            names. Mutually exclusive with ``continuous_factor_bins`` per factor.
+        strict : bool, default False
+            Whether a value no declared vocabulary holds is an error. Restored from the
+            archive when not set here, so a closed taxonomy stays closed across a round
+            trip; passing True closes one the archive left open.
         auto_bin_method : {"uniform_width", "uniform_count", "clusters"}, default "uniform_width"
             Binning strategy for continuous factors with no explicit bins.
         exclude : str, Sequence[str] or None, default None
@@ -584,6 +842,8 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         inst = cls(
             dataset,
             continuous_factor_bins=continuous_factor_bins,
+            encoding=encoding,
+            strict=strict,
             auto_bin_method=auto_bin_method,
             exclude=exclude,
             include=include,
@@ -651,6 +911,13 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         if self._continuous_factor_bins:
             parts.append(f"continuous_factor_bins={self._continuous_factor_bins!r}")
         parts.append(f"auto_bin_method={self._auto_bin_method!r}")
+        # Only once binning has happened — a repr must not trigger the expensive pass, and
+        # before it there is nothing to count. Reported so the silent default is visible on
+        # inspection as well as through the warning, which a caller may have filtered.
+        if self._is_binned:
+            derived = sum(1 for info in self._factor_cache.values() if _is_auto_binned(info))
+            if derived:
+                parts.append(f"auto_encoded={derived}")
         if self._exclude:
             parts.append(f"exclude={self._exclude!r}")
         if self._include:
@@ -821,13 +1088,13 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
 
         Notes
         -----
-        This property triggers dataset structure analysis on first access.
+        This property triggers dataset structure analysis and binning on first access.
         """
         if not self._is_fitted:
             raise NotFittedError("No dataset bound. Call bind() first.")
         self._structure()
         # Counted rather than read off factor_names, which would sort the names only to
-        # discard the sorted list; len() and ndim both route through here.
+        # discard the sorted list.
         return (self._store.height(self._view_level), sum(1 for name in self._factors if self._filter(name)))
 
     def __iter__(self) -> Iterator[NDArray[np.int64]]:
@@ -904,10 +1171,23 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             stays at the default, so the new instance follows its own dataset's
             :attr:`label_level` rather than inheriting this one's.
         """
+        # Both, where both are set, but never the same factor twice. Carried because
+        # encoding *this* dataset against a record and the next one against its own draw is
+        # the drift the record exists to prevent, and this method exists to configure the
+        # next one identically.
+        #
+        # A factor named in both is dropped from the count: `_classify_factor` consults the
+        # record first, so the count says nothing the record does not already say, and the
+        # constructor refuses the pair. That pair is not hypothetical — an archive stores
+        # the declared count *and* the BinSpec it resolved to, and `load` restores both, so
+        # `md.save(); Metadata.load(...).new(...)` raised on every declared cut.
+        bins = {name: spec for name, spec in self._continuous_factor_bins.items() if name not in self._encoding}
         return self.__class__(
             dataset,
             task=self._task,
-            continuous_factor_bins=self._continuous_factor_bins,
+            continuous_factor_bins=bins or None,
+            encoding=self._encoding or None,
+            strict=self._strict,
             auto_bin_method=self._auto_bin_method,
             exclude=list(self._exclude) if self._exclude else None,
             include=list(self._include) if self._include else None,
@@ -1218,6 +1498,8 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         view._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
         view._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
         view._aggregated_from = dict(self._aggregated_from)
+        view._identifier_cache = dict(self._identifier_cache)
+        view._encoding = dict(self._encoding)
         view._view = resolved
         # The move can expose factors the source never binned — anything below its view —
         # so its "nothing left to process" claim does not carry. _bin() skips a factor
@@ -1243,6 +1525,8 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         filtered._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
         filtered._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
         filtered._aggregated_from = dict(self._aggregated_from)
+        filtered._identifier_cache = dict(self._identifier_cache)
+        filtered._encoding = dict(self._encoding)
         filtered._cut_below_items = self._cut_below_items or self._cuts_below_items(keep)
         filtered._store = self._store.restrict(keep)
         filtered._is_filtered = True
@@ -1471,6 +1755,8 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         rolled._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
         rolled._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
         rolled._aggregated_from = dict(self._aggregated_from)
+        rolled._identifier_cache = dict(self._identifier_cache)
+        rolled._encoding = dict(self._encoding)
 
         store = self._store
         taken = set(store.columns)
@@ -1664,6 +1950,11 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         Triggers re-binning when configuration changes to ensure data
         consistency with new bin specifications.
 
+        A cut set here supersedes any record the named factor carried — a restored archive
+        brings one for every factor it holds, and :meth:`_classify_factor` consults the
+        record *before* this mapping, so leaving it in place made the assignment silently
+        do nothing on exactly the instances a caller is most likely to re-cut.
+
         Parameters
         ----------
         bins : Mapping[str, int | Sequence[float]]
@@ -1671,6 +1962,8 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         """
         if self._continuous_factor_bins != bins:
             self._continuous_factor_bins = dict(bins)
+            for name in bins:
+                self._encoding.pop(name, None)
             self._reset_bins(bins)
 
     @property
@@ -1782,6 +2075,203 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             self._flat = self._store.flat()
         return self._flat
 
+    def encoding(self, factor: str | None = None) -> Any:
+        """How a factor's values became its codes.
+
+        Answers "where did you cut, and who chose it" — a question a reader needs answered
+        before a finding about a binned factor can be interpreted, and one that had no
+        answer before: bin edges were computed, used once and dropped.
+
+        Parameters
+        ----------
+        factor : str or None, default None
+            The factor to describe, or None for every factor.
+
+        Returns
+        -------
+        BinSpec or LevelSpec or None, or a Mapping of them
+            The record for ``factor``, or a mapping from every factor name to its record
+            when ``factor`` is None. None for a factor that reached neither encoding path.
+
+        Raises
+        ------
+        KeyError
+            When ``factor`` is not one of this metadata's factors.
+
+        See Also
+        --------
+        export_encoding : Write the record out as a reviewable descriptor.
+
+        Examples
+        --------
+        >>> md = Metadata(dataset)
+        >>> spec = md.encoding("weather")
+        >>> spec.levels
+        ('clear', 'cloudy', 'rainy')
+
+        ``provenance`` is what separates a cut somebody chose from one DataEval derived on
+        their behalf, and is the field a reviewer audits:
+
+        >>> spec.provenance
+        'derived'
+        """
+        info = self._factor_info
+        if factor is None:
+            return {name: entry.encoding for name, entry in info.items()}
+        if factor not in info:
+            raise KeyError(f"{factor!r} is not among this metadata's factors {sorted(info)}.")
+        return info[factor].encoding
+
+    @property
+    def encoding_digest(self) -> str:
+        """A fingerprint of every factor's encoding, for attributing a result to it.
+
+        Comparing two passes is only sound if each can say which encoding produced it.
+        Without that, a ``Balance`` score that moved between runs is unattributable between
+        *my override worked* and *the data changed* — the two readings a caller is trying
+        to tell apart. This is cheap enough to carry on every result and stable enough to
+        compare across processes.
+
+        Covers what was applied, so it moves when a cutoff is declared, when a vocabulary
+        grows, and when a derived encoding is ratified — and not when the rows change under
+        an encoding that stayed put.
+
+        Returns
+        -------
+        str
+            Sixteen hex characters over the descriptor, or the digest of an empty encoding
+            when no factor carries one.
+        """
+        payload = json.dumps(encoding_to_mapping(self.encoding()), sort_keys=True, separators=(",", ":"))
+        return hashlib.blake2b(payload.encode("utf-8"), digest_size=8).hexdigest()
+
+    def accept(self, *factors: str) -> None:
+        """Ratify a derived encoding, so the record says a person looked at it.
+
+        A reviewer who reads the bins DataEval chose and judges them adequate has done
+        exactly the semantic work that requiring declared cutoffs is meant to force — and
+        has changed no edges. Without somewhere to record that, a descriptor cannot tell
+        **nobody looked** from **someone looked and approved**, which is the distinction
+        treating binning as policy depends on. Entries still carrying
+        ``provenance="derived"`` mark the factors nobody has reviewed yet.
+
+        Accepting also *fixes* the placement. The edges stop being re-derived from each new
+        draw and are reapplied instead, which is the point: a cut somebody has approved
+        should not move because the next sample was shaped differently. No code changes —
+        the same edges over the same values give the same answers — so nothing computed
+        before needs recomputing.
+
+        Parameters
+        ----------
+        *factors : str
+            Factors to ratify. With none given, every factor whose encoding DataEval
+            derived is accepted, which is the usual move once the whole set has been read.
+
+        Raises
+        ------
+        KeyError
+            When a named factor is not one of this metadata's factors.
+
+        See Also
+        --------
+        encoding : Read what is about to be accepted.
+        export_encoding : Write the ratified record out for review.
+        """
+        info = self._factor_info
+        names = factors or tuple(name for name, entry in info.items() if _is_derived_encoding(entry))
+        if unknown := sorted(name for name in names if name not in info):
+            raise KeyError(f"{unknown} are not among this metadata's factors {sorted(info)}.")
+        for name in names:
+            spec = info[name].encoding
+            if spec is None or spec.provenance != "derived":
+                continue
+            accepted = replace(spec, provenance="accepted")
+            # Both, deliberately. ``_encoding`` is what survives a re-bin and what gets
+            # exported; the cached info is what a reader sees now, without having to
+            # trigger a pass that would produce identical codes.
+            #
+            # Rebound in the cache rather than written into the FactorInfo. That object is
+            # shared with every copy `at`, `where`, `agg` and `reencode` make -- they copy
+            # the dict, and a dict copy shares its values -- so mutating it ratified the
+            # source's encoding as well, from a view the caller was holding precisely to
+            # leave the source alone.
+            self._encoding[name] = accepted
+            self._factor_cache[name] = replace(info[name], encoding=accepted)
+
+    def reencode(self, *, keep_declared: bool = True) -> Self:
+        """Re-derive the encodings from the data currently held, on a new instance.
+
+        The escape hatch, and deliberately explicit: re-deriving **moves codes**. A factor
+        digitized at five levels over three hundred rows can cross the level budget as rows
+        arrive and become binned instead, which changes what every existing code means —
+        so classification and placement are reapplied rather than recomputed on every
+        ordinary pass, and changing them is something a caller has to ask for.
+
+        Parameters
+        ----------
+        keep_declared : bool, default True
+            Whether cuts a person chose or ratified survive. Re-deriving over a declaration
+            discards the semantic work the declaration *is*, so it is opt-out rather than
+            the default; pass False to start from the data alone.
+
+        Returns
+        -------
+        Metadata
+            A new instance. This one is untouched, so a result already computed under the
+            old codes stays attributable to the encoding that produced it.
+
+        See Also
+        --------
+        accept : Fix a derived placement instead of re-deriving it.
+        """
+        fresh = copy.copy(self)
+        # The same copy discipline as :meth:`at`: everything mutable this instance reads
+        # the store through is owned, or the "this one is untouched" promise above holds
+        # only for the two containers that happened to be rebuilt.
+        fresh._factors = set(self._factors)
+        fresh._factor_cache = dict(self._factor_cache)
+        fresh._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
+        fresh._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
+        fresh._aggregated_from = dict(self._aggregated_from)
+        fresh._identifier_cache = dict(self._identifier_cache)
+        fresh._warned_level_rename = False
+        # Both spellings of a declaration, or neither. ``continuous_factor_bins`` is as much
+        # a cut somebody chose as a ``BinSpec`` is, and it is consulted on the re-derived
+        # pass, so leaving it in place made ``keep_declared=False`` keep half the
+        # declarations it says it drops.
+        fresh._encoding = (
+            {name: spec for name, spec in self._encoding.items() if spec.provenance != "derived"}
+            if keep_declared
+            else {}
+        )
+        fresh._continuous_factor_bins = dict(self._continuous_factor_bins) if keep_declared else {}
+        fresh._reset_bins()
+        return fresh
+
+    def export_encoding(self, path: str | Path) -> None:
+        """Write every factor's encoding out as a descriptor a person can review.
+
+        The artifact this produces is *policy*: it belongs in a repository next to the code
+        that reads the dataset, gets read in a pull request, and is handed back through
+        ``Metadata(dataset, encoding=...)`` so a later dataset is encoded against the same
+        cuts rather than against its own draw. That is why it is JSON with sorted keys and
+        not a member inside the metadata archive — the archive is state, this is the
+        decision, and a decision written in a form nobody can read is hard to review.
+
+        Entries still carrying ``provenance="derived"`` mark the factors nobody has
+        reviewed yet.
+
+        Parameters
+        ----------
+        path : str or Path
+            Where to write the descriptor.
+
+        See Also
+        --------
+        encoding : Read the records without writing them.
+        """
+        Path(path).write_text(encoding_to_json(self.encoding()), encoding="utf-8")
+
     @property
     def dropped_factors(self) -> Mapping[str, Sequence[str]]:
         """Factors removed during preprocessing with removal reasons.
@@ -1805,6 +2295,20 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
           them, so that half was not written. The name recorded is the generated
           ``<level>_<name>``, and the factor's other level(s) were kept. A factor whose
           every level came back empty is kept whole rather than recorded here.
+
+        One more is recorded while the factor set is built:
+
+        - ``"cardinality_over_budget"`` — nearly every row of a non-numeric column held a
+          different value, so the column identifies rows rather than grouping them, and it
+          has no order along which to be cut into groups. A numeric or temporal column in
+          the same position is binned instead and kept. Map the values onto a smaller
+          vocabulary — a coarser taxonomy, a prefix, a lookup — if the factor is meant to
+          be categorical. A merely *wide* vocabulary is kept: a factor whose levels are
+          thin for the sample is reported by
+          :attr:`~dataeval.bias.ParityOutput.insufficient_data`, not removed.
+
+        Every reason is decided during structuring, so this answers the same whatever has
+        been accessed before it.
         """
         self._structure()
         return self._dropped_factors
@@ -1850,6 +2354,47 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         return self._project([to_col(name, info) for name, info in info_by_name.items()], np.int64)
 
     @property
+    def factor_values(self) -> NDArray[np.float64]:
+        """Factor data as measured, with nothing cut.
+
+        The other representation of the same factors: where :attr:`factor_data` reports
+        which interval a temperature fell in, this reports the temperature. Same columns
+        in the same order, same rows, read at the same level — so a caller can hold both
+        and know that column *j* is the same factor in each.
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Array with shape (n_samples, n_factors). Empty when there are no factors.
+
+        Notes
+        -----
+        A factor with no numeric reading — a category, whose values are strings — has no
+        native form to report, so it contributes its **codes** here, exactly as in
+        :attr:`factor_data`. There is nothing lost by that: a category's codes are its own
+        alphabet already, and cutting is what this representation exists to avoid.
+
+        Which of the two an evaluator reads is
+        :attr:`~dataeval.bias.Balance.factor_source`, and under its default the choice is
+        made per factor from :meth:`encoding` — declared cuts keep their codes, because a
+        declared cut is a claim about the world and reading past it would discard the
+        claim. See :doc:`/concepts/Binning` for what each read costs.
+
+        Examples
+        --------
+        >>> metadata = Metadata(dataset)
+        >>> metadata.factor_values.shape == metadata.factor_data.shape
+        True
+        """
+        info_by_name = self._factor_info
+        if not info_by_name:
+            return self._empty_projection(np.float64)
+        # Read off the store rather than through ``dataframe.schema``, which would build
+        # the whole flat frame to answer "is this numeric" about a handful of names.
+        schema = {name: self._store.dtype_of(name) for name in info_by_name}
+        return self._project([float_col(name, info, schema) for name, info in info_by_name.items()], np.float64)
+
+    @property
     def factor_names(self) -> Sequence[str]:
         """Names of all processed metadata factors.
 
@@ -1862,6 +2407,23 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         Notes
         -----
         Factor names respect include/exclude filtering settings.
+
+        Structuring is enough: every factor that will not survive to ``factor_data`` is
+        removed while the factor set is built, so this and the binned array agree without
+        the expensive pass having to run first.
+        """
+        return self._visible_factors()
+
+    def _visible_factors(self) -> list[str]:
+        """Return the filtered factor set, structured but not binned.
+
+        :attr:`factor_names` forces a bin as well and is what callers should use. This
+        spelling exists for :meth:`_bin` itself and for the paths it runs through, which
+        would otherwise re-enter it.
+
+        Structuring is still forced here: ``_factors`` is empty until it runs, so a
+        :meth:`_bin` reached before any other access would otherwise find nothing to do
+        and mark itself complete.
         """
         self._structure()
         return sorted(filter(self._filter, self._factors))
@@ -1873,13 +2435,18 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         The warning belongs on the paths that put a :class:`FactorInfo` in *user* hands,
         not on ``factor_data``, which every bias evaluator calls.
         """
-        if not self.factor_names:
+        self._structure()
+        if not (visible := self._visible_factors()):
             return {}
         self._bin()
+        # Read once: `_visible_factors` sorts the whole factor set, `_bin` cannot change
+        # which names are visible, and this property is the funnel every array-shaped
+        # accessor and `encoding()` route through.
+        #
         # Visible *and* processed: a factor is in ``_factors`` from registration but in
         # the cache only once it has a companion column, so the intersection is exactly
         # what factor_data can project.
-        return {name: self._factor_cache[name] for name in self.factor_names if name in self._factor_cache}
+        return {name: self._factor_cache[name] for name in visible if name in self._factor_cache}
 
     @property
     def factor_info(self) -> Mapping[str, FactorInfo]:
@@ -2331,7 +2898,71 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
 
         # Purely derived: nothing carries over from the outgoing set, since a factor's
         # binning lives in ``_factor_cache`` and survives the rebuild there.
-        self._factors = {k for k in visible if not isinstance(self._store.dtype_of(k), pl.List | pl.Struct | pl.Array)}
+        usable = {k for k in visible if not isinstance(self._store.dtype_of(k), pl.List | pl.Struct | pl.Array)}
+        identifiers, unannounced = self._identifiers(usable)
+        # Assigned before anything is announced. A warning filter turned into an error
+        # otherwise raises out of `_structure`, which has already set `_is_structured`, and
+        # leaves the instance permanently claiming it has no factors at all.
+        self._factors = usable - identifiers
+        self._announce_identifier_drops(unannounced)
+
+    def _identifiers(self, names: set[str]) -> tuple[set[str], list[str]]:
+        """Record the columns that name their rows instead of grouping them.
+
+        Returns the identifiers among ``names``, and the ones this instance has not yet
+        announced. Announced only where the reason is new: `_build_factors` re-runs whenever
+        the view or the filters change, and a derived instance inherits the reasons its
+        parent recorded, so announcing the whole set would repeat a drop the reader has
+        already been told about -- once per `at()`, `where()` or filter set.
+        """
+        identifiers = {name for name in names if self._is_identifier(name)}
+        unannounced = sorted(
+            name for name in identifiers if "cardinality_over_budget" not in self._dropped_factors.get(name, ())
+        )
+        for name in identifiers:
+            self._record_over_budget(name)
+        return identifiers, unannounced
+
+    def _is_identifier(self, name: str) -> bool:
+        """Whether a non-numeric column names its rows rather than grouping them.
+
+        A factor with one distinct value per row is not a category: every contingency table
+        over it is a table of ones, every diversity index reads maximal, and its vocabulary
+        would be written verbatim into an exported encoding, where a person has to read it.
+        A numeric column in the same position is cut into bins instead and kept, which is
+        why this asks only about the ones that cannot be.
+
+        The line is **near-uniqueness**, not the level budget. The budget answers "how many
+        cells can this sample fill", which is the right question for choosing a *bin count*
+        and the wrong one for deciding whether a column is a factor at all — twenty-five
+        cities over a hundred images overruns it and is a perfectly good factor.
+        :attr:`~dataeval.bias.ParityOutput.insufficient_data` is what reports a thin level;
+        deleting the factor forecloses the mechanism that exists to say so.
+
+        Answered once per column and remembered, because it is a question about the column
+        and not about which rows are in view. Re-asking it on a derived instance made
+        ``where()`` delete a factor its source had kept: the ratio is measured against the
+        surviving row count, so twenty-five cities over sixty rows is an ordinary factor and
+        the same twenty-two cities over the thirty rows a filter left are an "identifier".
+        A filter is a question about rows and must not silently change the factor set.
+        """
+        if (remembered := self._identifier_cache.get(name)) is not None:
+            return remembered
+        verdict = self._measure_identifier(name)
+        self._identifier_cache[name] = verdict
+        return verdict
+
+    def _measure_identifier(self, name: str) -> bool:
+        """Read the near-uniqueness of one column off the rows currently held."""
+        dtype = self._store.dtype_of(name)
+        if dtype is None or dtype.is_numeric() or dtype.is_temporal():
+            return False
+        level = self._factor_level(name)
+        column = self._store.frame(level)[name]
+        height = column.len()
+        # Floored so a small sample cannot make an ordinary vocabulary look like an
+        # identifier: five values over eight rows is near-unique by ratio alone.
+        return height > 0 and column.n_unique() > max(MIN_LEVEL_BUDGET, height // 2)
 
     def _structure(
         self,
@@ -2386,12 +3017,49 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             self._view = self._resolve_level(self._view, stacklevel=3)
 
         self._raw = data.raw
+        # A fresh set of columns, so no verdict carried from a previous structuring holds.
+        self._identifier_cache = {}
         # ``class_labels`` and ``item_indices`` are deliberately not stored: both are
         # columns the store already holds, and the properties read them from there.
         self._dropped_factors = {name: list(reasons) for name, reasons in data.dropped_factors.items()}
         self._is_structured = True
 
         self._build_factors()
+
+    def _apply_recorded(self, col: str, data: NDArray, spec: FactorEncoding) -> tuple[NDArray[np.int64], FactorInfo]:
+        """Encode one factor against the record the caller supplied.
+
+        Nothing is measured here except the values themselves: the cut and the vocabulary
+        both come from the record. A :class:`~dataeval.types.LevelSpec` can still grow, and
+        the grown spec is what is stored, so the factor's own record always describes the
+        codes actually in the column.
+        """
+        # `factor_type` is a fact about the variable, not about the map: an integer count is
+        # discrete however its codes were produced. Read from the values, which is cheap and
+        # deterministic, while the placement -- the expensive and unstable half -- comes from
+        # the record. Assuming a kind here instead relabelled every restored discrete factor
+        # as categorical.
+        numeric = bool(np.issubdtype(data.dtype, np.number))
+        if isinstance(spec, BinSpec):
+            if not numeric:
+                # Said here rather than left to the cast. Digitizing a column of strings
+                # against float edges raises `could not convert string to float: 'fog'`
+                # from inside NumPy, which names a value and neither the factor nor the
+                # record that sent it there.
+                raise TypeError(
+                    f"The encoding recorded for factor {col!r} is a BinSpec, which cuts an ordered "
+                    f"quantity, but the factor holds {data.dtype} values. Record a LevelSpec for a "
+                    "non-numeric factor, or drop the entry to encode it from its own values.",
+                )
+            kind = "continuous" if is_continuous(data) else "discrete"
+            return apply_bin_spec(data, spec).astype(np.int64), FactorInfo(kind, is_binned=True, encoding=spec)
+        codes, grown = apply_level_spec(data, spec, strict=self._strict)
+        # Written back, not only cached. `_encoding` is what a re-bin reapplies and what
+        # `new()` hands the next dataset, so leaving the pre-growth vocabulary there sends
+        # the next dataset an alphabet this one has already outgrown.
+        if grown is not spec:
+            self._encoding[col] = grown
+        return codes, FactorInfo("discrete" if numeric else "categorical", is_digitized=True, encoding=grown)
 
     def _classify_factor(
         self,
@@ -2404,16 +3072,40 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         ``data`` holds one value per entity at the factor's own level, so every decision
         here is read off the factor's true distribution.
         """
+        data = _as_orderable(data)
+        # A recorded encoding is reapplied rather than re-derived. That is the whole of
+        # what a descriptor buys: the same value gets the same code in a dataset the cut
+        # was never fitted to, so two Metadata built from one record share an alphabet.
+        if (recorded := self._encoding.get(col)) is not None:
+            return self._apply_recorded(col, data, recorded)
+
         if col in factor_bins:
-            return digitize_data(data, factor_bins[col]).astype(np.int64), FactorInfo("continuous", is_binned=True)
+            binned, spec = digitize_data(data, factor_bins[col])
+            return binned.astype(np.int64), FactorInfo("continuous", is_binned=True, encoding=spec)
 
         distinct, ordinal = np.unique(data, return_inverse=True)
-        if not np.issubdtype(data.dtype, np.number):
-            return ordinal.astype(np.int64), FactorInfo("categorical", is_digitized=True)
         # No de-duplication argument: one value per entity means no propagated repeats
         # for is_continuous to mistake for discrete support.
         # No factor carries more levels than the sample can fill, whichever path bins it.
         budget = level_budget(data.shape[0])
+        # `np.unique` sorts, so the codes and the recorded order agree and both match what
+        # a reader sorting the values would expect. The record is what makes that order
+        # survive: extending a factor appends to `levels` rather than re-sorting, which is
+        # the one thing that keeps a code meaning what it meant.
+        if not np.issubdtype(data.dtype, np.number):
+            spec = LevelSpec(levels=tuple(distinct.tolist()), provenance="derived")
+            return ordinal.astype(np.int64), FactorInfo("categorical", is_digitized=True, encoding=spec)
+        return self._classify_numeric(col, data, distinct, ordinal, budget)
+
+    def _classify_numeric(
+        self,
+        col: str,
+        data: NDArray,
+        distinct: NDArray,
+        ordinal: NDArray,
+        budget: int,
+    ) -> tuple[NDArray[np.int64], FactorInfo]:
+        """Choose the encoding for an ordered factor nobody declared one for."""
         if is_continuous(data):
             _logger.warning(
                 f"A user defined binning was not provided for {col}. "
@@ -2421,8 +3113,8 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
                 "It is recommended that the user rerun and supply the desired "
                 "bins using the continuous_factor_bins parameter.",
             )
-            binned = bin_data(data, self.auto_bin_method, max_bins=budget)
-            return binned.astype(np.int64), FactorInfo("continuous", is_binned=True)
+            binned, spec = bin_data(data, self.auto_bin_method, max_bins=budget)
+            return binned.astype(np.int64), FactorInfo("continuous", is_binned=True, encoding=spec)
         # Discrete, but not necessarily coarse: an integer factor can take a value per
         # entity and still read as discrete, and scoring one value at a time is what makes
         # such a factor report a correlation with anything it is measured against. Bin it
@@ -2435,11 +3127,12 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
                 f"Binning it with the {self.auto_bin_method} method. Supply explicit bins "
                 "using the continuous_factor_bins parameter to control this.",
             )
-            binned = bin_data(data, self.auto_bin_method, max_bins=budget)
-            return binned.astype(np.int64), FactorInfo("discrete", is_binned=True)
+            binned, spec = bin_data(data, self.auto_bin_method, max_bins=budget)
+            return binned.astype(np.int64), FactorInfo("discrete", is_binned=True, encoding=spec)
         # Digitized so factor_data holds non-negative integers, which np.bincount in the
         # downstream bias evaluators requires.
-        return ordinal.astype(np.int64), FactorInfo("discrete", is_digitized=True)
+        spec = LevelSpec(levels=tuple(distinct.tolist()), provenance="derived")
+        return ordinal.astype(np.int64), FactorInfo("discrete", is_digitized=True, encoding=spec)
 
     def _process_factor(
         self,
@@ -2459,6 +3152,184 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         info.aggregated_from = self._aggregated_from.get(col)
         return pl.Series(name=to_col(col, info), values=values, dtype=pl.Int64), info
 
+    def _warn_unknown_factor_keys(self, factor_bins: Mapping[str, int | Sequence[float]]) -> None:
+        """Name any declared encoding that matches no column, whichever way it was declared.
+
+        Ignored rather than rejected, because a caller reusing one configuration across
+        several datasets will legitimately name factors a given one does not carry — which
+        is the same reason it has to be *said*. A descriptor that names nothing is not a
+        no-op with a small cost: every factor it was meant to pin falls back to a cut
+        derived from this draw, which is precisely the drift the descriptor exists to
+        prevent, and the failure looks identical to never having passed one.
+
+        All three declaration channels, in one check. ``continuous_factor_bins`` had it and
+        the two the encoding record arrives through — ``encoding`` and ``factor_levels`` —
+        did not, so a renamed or misspelled factor was caught on the older spelling and
+        silently dropped on the newer ones.
+        """
+        columns = set(self._store.columns)
+        unknown = sorted((set(factor_bins) | set(self._encoding)) - columns)
+        if not unknown:
+            return
+        _logger.warning(
+            f"The keys - {set(unknown)} - were given an encoding but are not columns in the metadata "
+            "DataFrame. Unknown keys will be ignored.",
+        )
+        warnings.warn(
+            f"{_name_list(unknown)} {_was_were(unknown)} given an encoding but "
+            f"{'is' if len(unknown) == 1 else 'are'} not a factor of this metadata "
+            f"{sorted(columns & set(self._factors)) or sorted(columns)[:8]}. The encoding is ignored, so "
+            "those factors are cut from this draw instead of from what was declared — check the names "
+            "against `factor_names`.",
+            UserWarning,
+            stacklevel=_caller_stacklevel(),
+        )
+
+    def _announce_identifier_drops(self, dropped: Sequence[str]) -> None:
+        """Say out loud that a factor was removed for being an identifier rather than a category.
+
+        Emitted from structuring, where the decision is made, so it fires once per instance
+        rather than once per re-bin. Same reasoning as :meth:`_announce_derived_encodings`
+        for why it is a warning at all.
+        """
+        if not dropped:
+            return
+        names = sorted(dropped)
+        warnings.warn(
+            f"{_name_list(names)} {_was_were(names)} dropped: nearly every row holds a different "
+            "value, so the column identifies rows rather than grouping them, and it is not numeric "
+            "so there is no order along which to cut it into groups. Map the values onto a smaller "
+            "vocabulary to keep the factor. See Metadata.dropped_factors.",
+            UserWarning,
+            stacklevel=_caller_stacklevel(),
+        )
+
+    def _measure_fit(self, factor_info: Mapping[str, FactorInfo]) -> tuple[list[str], list[str]]:
+        """Count, per declared encoding, the bins nothing reached and the levels the sample cannot fill.
+
+        Both counts are read at the factor's **own** level, which is where its codes were
+        assigned and the only place it holds one value per entity. Measuring the occupancy
+        there and the budget at the view compared two different samples: a unit-level factor
+        over five hundred images was judged against the budget for ten thousand detections,
+        which is the number :meth:`_classify_factor` deliberately does not use either.
+
+        The two counts do not cover the same factors. Emptiness is a question about a *cut*
+        and is asked of :class:`~dataeval.types.BinSpec` alone; fineness is a question about
+        a contingency table, which a declared vocabulary fills exactly as a declared cut
+        does, so it is asked of both.
+        """
+        empty: list[str] = []
+        overcut: list[str] = []
+        for name, info in sorted(factor_info.items()):
+            spec = info.encoding
+            # A derived encoding is skipped because nobody claimed anything for this report
+            # to hold up against the data. Both automatic *binning* paths cut against
+            # `level_budget` and cannot overrun it anyway; a derived *vocabulary* can — a
+            # non-numeric column is kept on near-uniqueness rather than on the budget, so
+            # sixty cities over two hundred rows is retained by design — and whether that
+            # deserves the same notice is a scope question this report does not settle.
+            # What it does cover is what somebody *declared*, which is the one path that
+            # takes a caller at their word: taking them at their word is the point, so the
+            # answer is to say what it cost rather than to quietly cut it back.
+            if spec is None or spec.provenance == "derived":
+                continue
+            codes = self._store.frame(info.level)[to_col(name, info)].to_numpy()
+            # A declared vocabulary is not asked the emptiness question at all, so it keeps
+            # every code. An unused bin says the cut no longer describes the data; an unused
+            # *level* is the ordinary case for a closed taxonomy declared once and applied to
+            # every subset of it, so asking would fire the warning on its intended use.
+            present, unused = _unused_bins(spec, codes) if isinstance(spec, BinSpec) else (codes, None)
+            if unused:
+                empty.append(f"{name} ({unused})")
+            # Whether the encoding is too fine for the sample is asked of both kinds, over
+            # every code that reaches a contingency table — catchalls included, because each
+            # one is a cell. A vocabulary reaches a table the same way a cut does, so a
+            # `factor_levels` finer than the sample fails in exactly the same way, and went
+            # unreported while the identical shape on `continuous_factor_bins` did not.
+            levels = len(np.unique(present))
+            rows = self._store.height(info.level)
+            budget = level_budget(rows) if rows else 0
+            if budget and levels > budget:
+                overcut.append(f"{name} ({levels} levels over {rows} rows)")
+        return empty, overcut
+
+    def _announce_fit(self, factor_info: Mapping[str, FactorInfo]) -> None:
+        """Report where an encoding does not suit the data it was just applied to.
+
+        Two failures with one shape, which is why they are one report. A locked descriptor
+        **degrades**: bins that were well-occupied when it was written can empty out as the
+        data moves under it, and saying so is more useful than re-deriving quietly —
+        re-deriving is :meth:`reencode`, and it is the caller's decision because it moves
+        codes. And an encoding can **never have fitted**: a declared count finer than the
+        sample supports leaves a contingency table with more cells than rows, and a
+        chance-corrected association over one of those tends to zero whatever the data says.
+
+        Reported rather than fixed, in both cases. The cut is the caller's policy, so what
+        a record gives them is notice that it no longer matches the data, not a new fit.
+
+        **No replacement count is offered, deliberately.** The obvious thing to name is the
+        budget this fires against, and it would be read as a recommendation. It is not one:
+        measured on a pair whose true dependence is 0.810, the count recovering the most
+        association is about 8 at n=200 while the budget is 20, and cutting at the budget
+        instead reports 0.507. The budget is a ceiling past which a table stops describing
+        the data at all; the count that reads best sits well under it and moves with the
+        sample size, and DataEval has no defensible estimate of it. A number that reads as a
+        recommendation without being one would mislead more than saying only that the score
+        moves with the cut, so that is what is said, with the measurements a page away.
+        """
+        empty, overcut = self._measure_fit(factor_info)
+
+        if empty:
+            warnings.warn(
+                f"Declared cuts left bins unused: {', '.join(empty)}. The encoding still applies "
+                "and the codes are unchanged; this is the data no longer matching the policy, not "
+                "an error. Call reencode() to refit — which moves codes — or leave it and read the "
+                "empty groups as the finding they are.",
+                UserWarning,
+                stacklevel=_caller_stacklevel(),
+            )
+        if overcut:
+            warnings.warn(
+                f"Declared encodings are finer than the sample supports: {', '.join(overcut)}. "
+                "A contingency table with more cells than rows records which cells were hit rather "
+                "than anything about the factor, so a chance-corrected association over one reads "
+                "near zero whatever the data holds, and a factor encoded this finely will look "
+                "uncorrelated with everything. There is no count to recommend in its place: the "
+                "resolution that recovers the most association moves with the sample size and sits "
+                "well below the ceiling this warning fires against. See the binning concept page "
+                "for the measurements, and choose a coarser encoding deliberately.",
+                UserWarning,
+                stacklevel=_caller_stacklevel(),
+            )
+
+    def _announce_derived_encodings(self, factor_info: Mapping[str, FactorInfo]) -> None:
+        """Say out loud what structuring decided on the caller's behalf.
+
+        The advice already existed on both auto-binning paths and reached nobody: both are
+        ``_logger.warning``, and :mod:`dataeval` attaches a ``NullHandler`` to its root
+        logger, which suppresses Python's last-resort stderr handler. Advice that reaches
+        only the callers who configured logging reaches very few of them.
+
+        Aggregated rather than per factor: twelve continuous factors would otherwise emit
+        twelve near-identical warnings during one construction, which is how a warning
+        teaches people to filter it. The per-factor detail stays in the log, where a reader
+        who wants it is already looking.
+
+        ``UserWarning``, not ``DeprecatedWarning`` — nothing here is going away. Auto-binning
+        stays supported; it is being reported, not retired.
+        """
+        auto_binned = sorted(name for name, info in factor_info.items() if _is_auto_binned(info))
+        if auto_binned:
+            warnings.warn(
+                f"{_name_list(auto_binned)} {_was_were(auto_binned)} binned automatically "
+                f"({self._auto_bin_method!r}) because no bins were declared. The bin "
+                "count is derived from the data, so it is not stable across samples and the "
+                "same factor measured twice may not be comparable. Declare cutoffs with "
+                'continuous_factor_bins={"' + auto_binned[0] + '": [...]} to control this.',
+                UserWarning,
+                stacklevel=_caller_stacklevel(),
+            )
+
     def _bin(
         self,
         *,
@@ -2477,15 +3348,10 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         factor_info: dict[str, FactorInfo] = {}
         factor_bins = self.continuous_factor_bins
 
-        invalid_keys = set(factor_bins.keys()) - set(self._store.columns)
-        if invalid_keys:
-            _logger.warning(
-                f"The keys - {invalid_keys} - are present in the `continuous_factor_bins` dictionary "
-                "but are not columns in the metadata DataFrame. Unknown keys will be ignored.",
-            )
+        self._warn_unknown_factor_keys(factor_bins)
 
         column_set = set(self._store.columns)
-        factors_to_process = [col for col in self.factor_names if not {binned(col), digitized(col)} & column_set]
+        factors_to_process = [col for col in self._visible_factors() if not {binned(col), digitized(col)} & column_set]
         total_factors = len(factors_to_process)
 
         # One frame lookup per level, not per factor: a dataset has a handful of levels
@@ -2506,6 +3372,10 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         self._store = store
         self._factor_cache.update(factor_info)
         self._is_binned = True
+        # After the flag, so a warning filter turned into an error cannot leave the object
+        # half-binned and force the whole pass to run again on the next access.
+        self._announce_derived_encodings(factor_info)
+        self._announce_fit(factor_info)
 
     def _resolve_factor_name(self, name: str, taken: set[str], overwrite: bool, append_string: str) -> str:
         """Pick the dataframe column a new factor should be written to.
@@ -2566,6 +3436,19 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             reasons = self._dropped_factors.setdefault(name, [])
             if "multi_dimensional" not in reasons:
                 reasons.append("multi_dimensional")
+
+    def _record_over_budget(self, name: str) -> None:
+        """Record a non-numeric factor dropped for carrying more levels than the sample supports.
+
+        Reason-only, like its two siblings: :meth:`_build_factors` decides which names are
+        in the analysed set and simply does not admit this one. Writing back into
+        ``_factors_by_level`` from a later pass would edit the registry structuring owns,
+        which made the same object serialize differently depending on what had been read
+        from it first.
+        """
+        reasons = self._dropped_factors.setdefault(name, [])
+        if "cardinality_over_budget" not in reasons:
+            reasons.append("cardinality_over_budget")
 
     def _record_vacuous(self, names: Sequence[str]) -> None:
         """Record level splits that were discarded for holding no values at their level.
@@ -2917,6 +3800,9 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
 
         self._store_native_factors(resolved)
         self._register_factor_levels([(factor.name, factor.level) for factor in resolved])
+        # A replaced column holds different values, so its remembered verdict is stale.
+        for factor in resolved:
+            self._identifier_cache.pop(factor.name, None)
 
         self._is_binned = False
         self._build_factors()

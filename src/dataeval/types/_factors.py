@@ -1,12 +1,12 @@
 """Factor info and level schema shared by the metadata structuring layer."""
 
-__all__ = ["FactorLevel", "FactorLevelSchema", "FactorInfo"]
+__all__ = ["FactorLevel", "FactorLevelSchema", "FactorInfo", "BinSpec", "LevelSpec"]
 
 from collections import deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 # Every level name the schema recognizes.
 #
@@ -511,6 +511,85 @@ class FactorLevelSchema:
         raise ValueError(f"Unknown level {level!r} for this dataset. Available levels are {list(self._levels)}.")
 
 
+@dataclass(frozen=True)
+class BinSpec:
+    """How one factor's values were cut into codes.
+
+    A bin edge is a claim about the world -- *below 0 °C is freezing*, *over 500 px is a
+    large object* -- so where the cuts fell, and who chose them, is part of what a result
+    computed from the factor means. Recording it is what lets a caller inspect the policy,
+    apply the same one to data arriving later, and tell a cut they chose from one
+    :class:`~dataeval.Metadata` derived on their behalf.
+
+    Attributes
+    ----------
+    edges : tuple of float
+        Cut points actually applied, ascending. The outer edges are ``-inf`` and ``+inf``
+        wherever DataEval placed them itself, which is what makes a value outside the
+        observed range land in an end bin rather than in a code of its own. An explicit
+        edge list is recorded as given, infinite or not.
+    provenance : {"derived", "accepted", "count", "edges"}
+        Who chose what. ``"derived"``: DataEval chose both the count and the placement,
+        and nobody has reviewed it. ``"accepted"``: derived placement that a person
+        inspected and ratified. ``"count"``: the caller asked for a number of bins and
+        DataEval chose where they fell. ``"edges"``: the caller said where to cut.
+    method : {"uniform_width", "uniform_count", "clusters"} or None
+        How the placement was chosen, or None when the caller supplied the edges outright.
+
+    Notes
+    -----
+    Codes run from 0 to ``len(edges)`` inclusive, with :attr:`missing_code` above them.
+    Code 0 means *below the first edge* and ``len(edges)`` means *at or above the last*;
+    both are unreachable when the corresponding outer edge is infinite, so an
+    infinitely-bounded spec leaves them empty rather than absent. The span is fixed by the
+    edges rather than by which codes a particular sample happened to fill, so the same spec
+    assigns the same code to the same value in any dataset -- which is what makes a
+    recorded encoding reusable.
+    """
+
+    edges: tuple[float, ...]
+    provenance: Literal["derived", "accepted", "count", "edges"]
+    method: Literal["uniform_width", "uniform_count", "clusters"] | None = None
+
+    @property
+    def missing_code(self) -> int:
+        """Code standing for a missing value, above every code the edges can produce.
+
+        A missing value is not a small value, a large value, or a value between two edges,
+        so it cannot share a bin with observed data without distorting whatever reads the
+        result. Its position is an artifact of needing one -- it sits at the top because
+        the codes have to go somewhere, not because missing is large.
+        """
+        return len(self.edges) + 1
+
+
+@dataclass(frozen=True)
+class LevelSpec:
+    """Which value each code stands for, in code order.
+
+    Recorded for the same reason as :class:`BinSpec`, and answering a second question
+    besides: a code is only stable if something remembers what it meant. Reading the map
+    back off the current data -- which is what ``np.unique`` does -- renumbers the factor
+    whenever the set of observed values changes.
+
+    Attributes
+    ----------
+    levels : tuple
+        Value per code: code ``i`` stands for ``levels[i]``. Sorted when the factor is
+        first structured, so the codes match what sorting the observed values would give.
+        **Append-only afterwards**: a value not already present takes the next code and
+        goes at the end, out of sort order, so that codes already assigned keep their
+        meaning. Anything displaying levels sorts by the value rather than by the code.
+    provenance : {"derived", "accepted", "declared"}
+        Who chose the vocabulary. ``"derived"``: read off the values during structuring,
+        unreviewed. ``"accepted"``: derived and then ratified by a person. ``"declared"``:
+        supplied by the caller, so the codes were fixed before any data was seen.
+    """
+
+    levels: tuple[Any, ...]
+    provenance: Literal["derived", "accepted", "declared"]
+
+
 @dataclass
 class FactorInfo:
     """Type information and provenance for a single metadata factor.
@@ -534,6 +613,15 @@ class FactorInfo:
         only, not the operation: what distinguishes an aggregate from a measurement is
         that its values describe a *set* of finer rows, which is what a reader has to
         know before comparing it against a factor measured at ``level`` itself.
+    encoding : BinSpec or LevelSpec or None, default None
+        The map from values to codes: a :class:`BinSpec` where the factor was binned, a
+        :class:`LevelSpec` where it was digitized. One field rather than two, because a
+        factor has exactly one map and ``is_binned``/``is_digitized`` already say which
+        kind it is. None only for a factor that reached neither path.
+
+        Where the other fields record *that* a factor was encoded, this records *how* --
+        which is what a reader needs to say what a code means, and what a later dataset
+        needs to be given the same codes for the same values.
     """
 
     factor_type: Literal["categorical", "continuous", "discrete"]
@@ -541,3 +629,4 @@ class FactorInfo:
     is_digitized: bool = False
     level: FactorLevel = "unit"
     aggregated_from: FactorLevel | None = None
+    encoding: BinSpec | LevelSpec | None = None

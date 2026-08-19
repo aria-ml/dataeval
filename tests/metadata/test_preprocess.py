@@ -12,8 +12,8 @@ class TestMDPreprocessingUnit:
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["a"] * 5 + ["b"] * 5}
         continuous_bincounts = {"something_else": 2}
-        err_msg = "The keys - {'something_else'} - are present in the `continuous_factor_bins` dictionary"
-        with caplog.at_level(logging.WARNING):
+        err_msg = "The keys - {'something_else'} - were given an encoding but are not columns"
+        with caplog.at_level(logging.WARNING), pytest.warns(UserWarning, match="something_else"):
             to_metadata(factors, labels, continuous_bincounts)._bin()
         assert err_msg in caplog.text
 

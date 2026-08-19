@@ -63,6 +63,7 @@ datasets for machine learning.
 ../notebooks/h2_measure_channel_groups.py
 ../notebooks/h2_add_intrinsic_factors.py
 ../notebooks/h2_bin_factors_by_level.py
+../notebooks/h2_control_factor_binning.py
 ../notebooks/h2_detect_undersampling.py
 ../notebooks/h2_wrap_dataframe_ic_dataset.py
 ../notebooks/h2_wrap_dataframe_od_dataset.py
@@ -108,6 +109,10 @@ datasets for machine learning.
   - Understand how factors are binned at their own level and
     what that means for bias results
   - [![Open In Colab][colab-badge]][bin-colab]
+- - [](../notebooks/h2_control_factor_binning.py)
+  - Declare, review and reuse a factor's bin edges so results
+    are comparable across collections
+  - [![Open In Colab][colab-badge]][ctrl-colab]
 - - [](../notebooks/h2_detect_undersampling.py)
   - Detect undersampled subsets of datasets
   - [![Open In Colab][colab-badge]][cov-colab]
@@ -158,6 +163,7 @@ datasets for machine learning.
 [band-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc4/notebooks/h2_measure_channel_groups.ipynb
 [imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc4/notebooks/h2_add_intrinsic_factors.ipynb
 [bin-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc4/notebooks/h2_bin_factors_by_level.ipynb
+[ctrl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc4/notebooks/h2_control_factor_binning.ipynb
 [cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc4/notebooks/h2_detect_undersampling.ipynb
 [wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc4/notebooks/h2_wrap_dataframe_ic_dataset.ipynb
 [wdfod-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0-rc4/notebooks/h2_wrap_dataframe_od_dataset.ipynb

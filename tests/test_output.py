@@ -104,6 +104,46 @@ class TestOutputMetadata:
 
 
 @pytest.mark.required
+class TestStateIsReadFromTheInstance:
+    """``state`` names attributes to record alongside a result.
+
+    Read after the call rather than before, because an attribute that describes what the
+    call ran *against* does not exist until it has run.
+    """
+
+    def test_a_state_name_the_class_does_not_carry_is_an_error(self):
+        """A misspelled name is a typo in the decorator, not a null worth recording.
+
+        Recording it as ``None`` writes a plausible-looking null into every result the
+        method returns, and the typo is then invisible in the output it was meant to
+        attribute.
+        """
+
+        class _Typo:
+            state1: int = 1
+
+            @set_metadata(state=["state1", "state1_typo"])
+            def evaluate(self) -> MockOutput:
+                return MockOutput(1, True, "value")
+
+        with pytest.raises(AttributeError, match="state1_typo"):
+            _Typo().evaluate()
+
+    def test_state_is_read_after_the_call(self):
+        """An attribute the call itself sets is recorded with the value it ended on."""
+
+        class _Late:
+            computed: str = "before"
+
+            @set_metadata(state=["computed"])
+            def evaluate(self) -> MockOutput:
+                self.computed = "after"
+                return MockOutput(1, True, "value")
+
+        assert _Late().evaluate().meta().state == {"computed": "after"}
+
+
+@pytest.mark.required
 class TestCollectionOutput:
     dict_data = {"mock_key": 1.0}
     list_data = [1.0]

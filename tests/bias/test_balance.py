@@ -172,6 +172,7 @@ class TestBalanceUnit:
             "factor2",
             "mi_value",
             "is_correlated",
+            "scored_as",
         }
         assert result.factors.schema["factor1"].base_type() == pl.Categorical
         assert result.factors.schema["factor2"].base_type() == pl.Categorical

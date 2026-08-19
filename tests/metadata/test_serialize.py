@@ -138,6 +138,12 @@ EXPECTED_DIFFERENCES = {
     "_structurer",
     # Memoized derivations, rebuilt on demand from the fields above.
     "_flat",
+    # Restored *fuller* than it was written, deliberately. The writer's ``_encoding`` holds
+    # only what a caller declared; the archive carries the encodings that were actually
+    # applied, so that a restored instance reproduces its codes rather than re-deriving
+    # them and loses neither an accepted placement nor a grown vocabulary. Reproduction is
+    # asserted by comparing factor_data, which TestRoundTripIsFaithful already does.
+    "_encoding",
 }
 
 

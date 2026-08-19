@@ -1,6 +1,5 @@
 __all__ = []
 
-import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -9,15 +8,21 @@ import numpy as np
 import polars as pl
 
 from dataeval import Metadata
-from dataeval._helpers import factors_excluding, has_own_alphabet, is_metadata_like, resolve_label_axis
+from dataeval._helpers import (
+    is_any_metadata_like,
+    kept_factors,
+    resolve_factor_channel,
+    resolve_label_axis,
+    scored_as,
+)
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
-from dataeval.exceptions import DeprecatedWarning
-from dataeval.protocols import AnnotatedDataset, MetadataLike
+from dataeval.protocols import AnnotatedDataset, AnyMetadataLike
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 DEFAULT_BALANCE_NUM_NEIGHBORS = 5
 DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD = 0.3
 DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD = 0.5
+DEFAULT_BALANCE_FACTOR_SOURCE = "auto"
 
 
 @dataclass(frozen=True, repr=False)
@@ -54,6 +59,18 @@ class BalanceOutput(DictOutput):
           binning cost is in the numerator, and a coarsely cut pair reports less than a
           finely cut one on the same values. See :func:`~dataeval.core.mutual_info`.
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
+        - scored_as: str - Which of the three regimes produced ``mi_value``, since the
+          number alone does not say. ``"table"`` where both factors were read as codes
+          and at least one alphabet is the factor's own, so the pair is tabulated and
+          divided by an entropy it genuinely cannot exceed. ``"linfoot"`` where both were
+          read as codes but neither alphabet is its own, so there is no honest ceiling and
+          the Linfoot transformation is used instead. ``"estimator"`` where at least one
+          factor was read as measured values, which have no contingency table and are not
+          corrected for chance. The three reach 0.5 at different true dependences — see
+          :doc:`/concepts/Binning` — so a pair sitting near the threshold is worth reading
+          beside this column.
+
+          .. versionadded:: 1.1
     classwise : pl.DataFrame
         DataFrame with per-class-to-factor normalized mutual information. Unlike
         ``balance``, this excludes "class_label", whose mutual information with a
@@ -84,10 +101,15 @@ class Balance(Evaluator):
     Parameters
     ----------
     num_neighbors : int, default 5
-        Deprecated, removed in v1.2.0. Every factor reaching this evaluator holds integer
-        codes, which are read off a contingency table rather than by the neighbor-based
-        estimator a neighborhood size belongs to, so this value has no effect on the
-        result. Setting it warns.
+        Neighborhood size for the estimator that reads **measured** columns. It applies to
+        exactly the pairs ``factors`` reports as ``scored_as="estimator"``, and to no
+        others: a pair of coded factors is read off a contingency table, where a
+        neighborhood has no meaning. Under ``factor_source="coded"`` nothing reaches the
+        estimator and this has no effect at all.
+
+        .. versionchanged:: 1.1
+            No longer deprecated. It was deprecated in a release candidate on the grounds
+            that every factor arrived as codes, which ``factor_source`` makes untrue.
     class_imbalance_threshold : float, default 0.3
         Threshold for identifying imbalanced classes. Classes with NMI above this
         threshold with any metadata factor are considered imbalanced.
@@ -100,19 +122,48 @@ class Balance(Evaluator):
         at its label level; naming a factor is how the same question is asked at a
         coarser view, where there is no single class label per row. Several names are
         combined into one composite axis.
+    factor_source : {"coded", "values", "auto"}, default "auto"
+        Which representation of each factor to score.
+
+        Named for the two representations rather than for binning: ``factor_data`` holds
+        **codes**, of which bin indices are only one kind — a category's codes are its own
+        values and were never cut from anything. Whether a factor was *binned* is a
+        separate question, recorded per factor and reported by
+        :attr:`~dataeval.types.FactorInfo.is_binned`; it is what ``"auto"`` consults, and
+        it is not what this argument selects.
+
+        - ``"auto"`` decides **per factor**, from what
+          :meth:`~dataeval.Metadata.encoding` records. A cut somebody declared, asked for
+          by count, or ratified with :meth:`~dataeval.Metadata.accept` is read as codes:
+          the cut is a claim about the world, and reading past it would answer a question
+          the caller did not ask. A cut nobody chose carries no claim, so the measured
+          values are read instead. A category is always read as codes — there is no
+          measurement behind it to prefer.
+        - ``"coded"`` reads ``factor_data`` throughout. The behaviour of every release
+          before 1.1, and what to pass to reproduce a number from one.
+        - ``"values"`` reads ``factor_values`` throughout, ignoring every declared cut.
+          An error on a container that provides only codes.
+
+        Reading measured values has a cost. It is the closest of the three to calibrated,
+        but it is also the one regime that is not corrected for chance, and it takes
+        roughly an order of magnitude more time. See :doc:`/concepts/Binning`.
+
+        .. versionadded:: 1.1
 
     Attributes
     ----------
-    metadata : MetadataLike
+    metadata : AnyMetadataLike
         Preprocessed metadata from the last evaluate() call.
     num_neighbors : int
-        Deprecated, removed in v1.2.0. Has no effect; see Parameters.
+        Neighborhood size for the estimator; see Parameters.
     class_imbalance_threshold : float
         Threshold for identifying imbalanced classes
     factor_correlation_threshold : float
         Threshold for identifying highly correlated metadata factors
     label : str or Sequence[str] or None
         Factor(s) conditioned on instead of the class labels
+    factor_source : {"coded", "values", "auto"}
+        Which representation of each factor is scored; see Parameters
 
     See Also
     --------
@@ -182,7 +233,7 @@ class Balance(Evaluator):
         Attributes
         ----------
         num_neighbors : int, default 5
-            Deprecated, removed in v1.2.0. Has no effect; see :class:`.Balance`.
+            Neighborhood size for the estimator; see :class:`.Balance`.
         class_imbalance_threshold : float, default 0.3
             Threshold for identifying imbalanced classes.
         factor_correlation_threshold : float, default 0.5
@@ -192,18 +243,22 @@ class Balance(Evaluator):
             :attr:`~dataeval.Metadata.class_labels`, which requires the metadata be
             viewed at its label level; naming a factor is how the same question is
             asked at a coarser view, where there is no single class label per row.
+        factor_source : {"coded", "values", "auto"}, default "auto"
+            Which representation of each factor to score; see :class:`.Balance`.
         """
 
         num_neighbors: int = DEFAULT_BALANCE_NUM_NEIGHBORS
         class_imbalance_threshold: float = DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD
         factor_correlation_threshold: float = DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD
         label: str | Sequence[str] | None = None
+        factor_source: Literal["coded", "values", "auto"] = DEFAULT_BALANCE_FACTOR_SOURCE
 
-    metadata: MetadataLike
+    metadata: AnyMetadataLike
     num_neighbors: int
     class_imbalance_threshold: float
     factor_correlation_threshold: float
     label: str | Sequence[str] | None
+    factor_source: Literal["coded", "values", "auto"]
     config: Config
 
     def __init__(
@@ -212,28 +267,32 @@ class Balance(Evaluator):
         class_imbalance_threshold: float | None = None,
         factor_correlation_threshold: float | None = None,
         label: str | Sequence[str] | None = None,
+        factor_source: Literal["coded", "values", "auto"] | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
-        if self.num_neighbors != DEFAULT_BALANCE_NUM_NEIGHBORS:
-            warnings.warn(
-                "Balance.num_neighbors is deprecated and will be removed in v1.2.0. It has no "
-                "effect: every factor reaching the estimator arrives as integer codes, which "
-                "are tabulated rather than read by the neighbor-based estimator.",
-                DeprecatedWarning,
-                stacklevel=2,
-            )
 
-    @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold", "label"])
-    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> BalanceOutput:  # noqa: C901
+    @set_metadata(
+        state=[
+            "num_neighbors",
+            "class_imbalance_threshold",
+            "factor_correlation_threshold",
+            "label",
+            "factor_source",
+            "encoding_digest",
+        ]
+    )
+    def evaluate(self, data: AnnotatedDataset[Any] | AnyMetadataLike) -> BalanceOutput:  # noqa: C901
         """
         Compute normalized mutual information between factors and identify imbalanced classes.
 
         Parameters
         ----------
-        data : AnnotatedDataset[Any] or MetadataLike
+        data : AnnotatedDataset[Any] or AnyMetadataLike
             Either an annotated dataset (which will be converted to Metadata)
-            or any object implementing the MetadataLike protocol.
+            or any object implementing either metadata protocol -- codes
+            (:class:`~dataeval.protocols.CodedMetadataLike`) or measured values
+            (:class:`~dataeval.protocols.ValuedMetadataLike`).
 
         Returns
         -------
@@ -275,24 +334,24 @@ class Balance(Evaluator):
         └─────────────┴──────────┘
 
         >>> result.factors
-        shape: (20, 4)
-        ┌─────────────┬─────────────┬──────────┬───────────────┐
-        │ factor1     ┆ factor2     ┆ mi_value ┆ is_correlated │
-        │ ---         ┆ ---         ┆ ---      ┆ ---           │
-        │ cat         ┆ cat         ┆ f64      ┆ bool          │
-        ╞═════════════╪═════════════╪══════════╪═══════════════╡
-        │ angle       ┆ id          ┆ 0.017837 ┆ false         │
-        │ angle       ┆ location    ┆ 0.071866 ┆ false         │
-        │ angle       ┆ time_of_day ┆ 0.014648 ┆ false         │
-        │ angle       ┆ weather     ┆ 0.001868 ┆ false         │
-        │ id          ┆ angle       ┆ 0.017837 ┆ false         │
-        │ …           ┆ …           ┆ …        ┆ …             │
-        │ time_of_day ┆ weather     ┆ 0.007897 ┆ false         │
-        │ weather     ┆ angle       ┆ 0.001868 ┆ false         │
-        │ weather     ┆ id          ┆ 0.0      ┆ false         │
-        │ weather     ┆ location    ┆ 0.084927 ┆ false         │
-        │ weather     ┆ time_of_day ┆ 0.007897 ┆ false         │
-        └─────────────┴─────────────┴──────────┴───────────────┘
+        shape: (20, 5)
+        ┌─────────────┬─────────────┬──────────┬───────────────┬───────────┐
+        │ factor1     ┆ factor2     ┆ mi_value ┆ is_correlated ┆ scored_as │
+        │ ---         ┆ ---         ┆ ---      ┆ ---           ┆ ---       │
+        │ cat         ┆ cat         ┆ f64      ┆ bool          ┆ cat       │
+        ╞═════════════╪═════════════╪══════════╪═══════════════╪═══════════╡
+        │ angle       ┆ id          ┆ 0.017837 ┆ false         ┆ table     │
+        │ angle       ┆ location    ┆ 0.071866 ┆ false         ┆ table     │
+        │ angle       ┆ time_of_day ┆ 0.014648 ┆ false         ┆ table     │
+        │ angle       ┆ weather     ┆ 0.001868 ┆ false         ┆ table     │
+        │ id          ┆ angle       ┆ 0.017837 ┆ false         ┆ table     │
+        │ …           ┆ …           ┆ …        ┆ …             ┆ …         │
+        │ time_of_day ┆ weather     ┆ 0.007897 ┆ false         ┆ table     │
+        │ weather     ┆ angle       ┆ 0.001868 ┆ false         ┆ table     │
+        │ weather     ┆ id          ┆ 0.0      ┆ false         ┆ table     │
+        │ weather     ┆ location    ┆ 0.084927 ┆ false         ┆ table     │
+        │ weather     ┆ time_of_day ┆ 0.007897 ┆ false         ┆ table     │
+        └─────────────┴─────────────┴──────────┴───────────────┴───────────┘
 
         >>> result.classwise
         shape: (20, 4)
@@ -314,8 +373,10 @@ class Balance(Evaluator):
         │ plane      ┆ weather     ┆ 0.0      ┆ false         │
         └────────────┴─────────────┴──────────┴───────────────┘
         """
-        # Convert AnnotatedDataset to Metadata if needed
-        if is_metadata_like(data):
+        # Convert AnnotatedDataset to Metadata if needed. Either representation counts as
+        # metadata here: `factor_source` decides which one is read, so a container carrying
+        # only measured values must not be mistaken for a dataset and re-derived.
+        if is_any_metadata_like(data):
             self.metadata = data
         else:
             self.metadata = Metadata(data)
@@ -328,25 +389,27 @@ class Balance(Evaluator):
         # analysed against it, since it would otherwise report perfect correlation with
         # itself.
         axis = resolve_label_axis(self.metadata, self.label)
-        factor_data, factor_names, kept = factors_excluding(self.metadata, axis.excluded)
+        factor_names, kept = kept_factors(self.metadata, axis.excluded)
 
-        # Every column of factor_data holds integer codes: MetadataLike requires a
-        # continuous factor to be binned before it reaches here, so what arrives is bin
-        # indices either way, and `mutual_info` reads that off the values themselves. What
-        # it cannot read off them is whether a factor's set of values is a property of the
-        # factor or an artifact of where the cuts fell -- both arrive as small integers --
-        # and that is what decides whether the factor's entropy is a ceiling worth dividing
-        # by. A binned factor's entropy grows with its bin count, which
-        # :class:`~dataeval.Metadata` derives from the data rather than taking as a
-        # setting, so scoring a pair against it makes `factors` move with the draw.
-        own_alphabet = has_own_alphabet(self.metadata, kept)
+        # Which representation each factor is read in, and what that made it. `mutual_info`
+        # reads off the values themselves whether a column can be tabulated; what it cannot
+        # read off them is whether a factor's set of values is a property of the factor or
+        # an artifact of where the cuts fell -- both arrive as small integers -- and that is
+        # what decides whether the factor's entropy is a ceiling worth dividing by. A binned
+        # factor's entropy grows with its bin count, which :class:`~dataeval.Metadata`
+        # derives from the data rather than taking as a setting, so scoring a pair against
+        # it makes `factors` move with the draw.
+        channel = resolve_factor_channel(self.metadata, self.factor_source, factor_names, kept)
 
-        mi = mutual_info(axis.values, factor_data, own_alphabet, self.num_neighbors)
+        mi = mutual_info(axis.values, channel.data, channel.own_alphabet, self.num_neighbors)
 
-        # Calculate classwise balance. `own_alphabet` is deliberately not passed on: each row
-        # here is divided by the entropy of one class against the rest, so there is no factor
-        # entropy for the declaration to select and the argument is deprecated.
-        classwise = mutual_info_classwise(axis.values, factor_data, num_neighbors=self.num_neighbors)
+        # The same columns the pairwise block read. `factor_source` is one setting and it
+        # governs the whole output: reporting `classwise` off the codes while `factors`
+        # scored the values would put two reads of the same data in one result with nothing
+        # saying which was which. `own_alphabet` is deliberately not passed on -- each row
+        # here is divided by the entropy of one class against the rest, so there is no
+        # factor entropy for the declaration to select.
+        classwise = mutual_info_classwise(axis.values, channel.data, num_neighbors=self.num_neighbors)
 
         index2label = axis.names
 
@@ -394,6 +457,7 @@ class Balance(Evaluator):
         factor2_col: list[str] = []
         mi_value_col_factors: list[float] = []
         is_correlated_col: list[bool] = []
+        scored_as_col: list[str] = []
 
         for i in range(num_metadata_factors):
             for j in range(num_metadata_factors):
@@ -405,6 +469,7 @@ class Balance(Evaluator):
                 factor2_col.append(factor_names[j])
                 mi_value_col_factors.append(float(mi_value))
                 is_correlated_col.append(bool(mi_value > self.factor_correlation_threshold))
+                scored_as_col.append(scored_as(channel.coded, channel.own_alphabet, i, j))
 
         factors_df = pl.DataFrame(
             {
@@ -412,12 +477,14 @@ class Balance(Evaluator):
                 "factor2": factor2_col,
                 "mi_value": mi_value_col_factors,
                 "is_correlated": is_correlated_col,
+                "scored_as": scored_as_col,
             },
             schema={
                 "factor1": pl.Categorical("lexical"),
                 "factor2": pl.Categorical("lexical"),
                 "mi_value": pl.Float64,
                 "is_correlated": pl.Boolean,
+                "scored_as": pl.Categorical("lexical"),
             },
         ).sort(["factor1", "factor2"])
 

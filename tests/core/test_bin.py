@@ -17,38 +17,55 @@ from dataeval.core._bin import (
 from dataeval.exceptions import ShapeMismatchError
 
 
+def _codes_of_bin_data(*args, **kwargs):
+    """Codes only, for the tests that predate the encoding record.
+
+    :func:`bin_data` returns its :class:`~dataeval.types.BinSpec` alongside the codes now.
+    The spec has its own tests; these assert on the codes, so they say so rather than
+    indexing a tuple at every call.
+    """
+    codes, _ = bin_data(*args, **kwargs)
+    return codes
+
+
+def _codes_of_digitize_data(*args, **kwargs):
+    """Codes only. See :func:`_codes_of_bin_data`."""
+    codes, _ = digitize_data(*args, **kwargs)
+    return codes
+
+
 @pytest.mark.required
 class TestDigitizeDataUnit:
     def test_nbins_returns_array(self):
         factors = [0.1, 1.1, 1.2]
         bincounts = 2
-        hist = digitize_data(factors, bincounts)
+        hist = _codes_of_digitize_data(factors, bincounts)
         assert type(hist) is np.ndarray
 
     def test_bin_edges_returns_array(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [-np.inf, 1, np.inf]
-        hist = digitize_data(factors, bin_edges)
+        hist = _codes_of_digitize_data(factors, bin_edges)
         assert type(hist) is np.ndarray
 
     def test_crashes_with_negative_nbins(self):
         factors = [0.1, 1.1, 1.2]
         bincounts = -10
         with pytest.raises(ValueError, match="bins"):
-            digitize_data(factors, bincounts)
+            _codes_of_digitize_data(factors, bincounts)
 
     def test_crashes_with_wrong_order(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [np.inf, 1, 2]
         with pytest.raises(ValueError, match="monotonically"):
-            digitize_data(factors, bin_edges)
+            _codes_of_digitize_data(factors, bin_edges)
 
     def test_mixed_type(self):
         factors = [1, "a", 4.0]
         bins = 3
         err_msg = "Encountered a data value with non-numeric type when digitizing a factor."
         with pytest.raises(TypeError) as e:
-            digitize_data(factors, bins)
+            _codes_of_digitize_data(factors, bins)
         assert err_msg in str(e.value)
 
 
@@ -62,7 +79,7 @@ class TestMissingValueBinning:
         data = rng.normal(size=200)
         data[5] = data[7] = np.nan
 
-        binned = bin_data(data, method)
+        binned = _codes_of_bin_data(data, method)
         missing = np.isnan(data)
         assert np.unique(binned[missing]).size == 1
         assert not set(binned[missing]) & set(binned[~missing])
@@ -76,7 +93,8 @@ class TestMissingValueBinning:
 
         observed = ~np.isnan(with_missing)
         assert np.array_equal(
-            bin_data(with_missing, "uniform_width")[observed], bin_data(clean, "uniform_width")[observed]
+            _codes_of_bin_data(with_missing, "uniform_width")[observed],
+            _codes_of_bin_data(clean, "uniform_width")[observed],
         )
 
     def test_bin_data_separates_nan_from_infinity(self):
@@ -84,19 +102,25 @@ class TestMissingValueBinning:
         rng = np.random.default_rng(0)
         data = np.concatenate([rng.normal(size=100), [np.inf, -np.inf, np.nan]])
 
-        binned = bin_data(data, "uniform_width")
+        binned = _codes_of_bin_data(data, "uniform_width")
         pos_inf, neg_inf, nan = binned[-3], binned[-2], binned[-1]
         assert neg_inf == binned[:100].min()  # absorbed by the -inf outer edge
         assert nan not in (pos_inf, neg_inf)
 
     def test_bin_data_all_missing(self):
-        """With nothing observed there are no edges to place, so every entry is missing."""
-        assert np.array_equal(bin_data(np.full(30, np.nan), "uniform_width"), np.zeros(30))
+        """With nothing observed there are no edges to place, so every entry is missing.
+
+        The code is the one the spec reserves for missing, not zero. Zero read back through
+        the record as ``< -inf`` -- an observed magnitude -- because the spec said missing
+        lived elsewhere.
+        """
+        codes, spec = bin_data(np.full(30, np.nan), "uniform_width")
+        assert np.array_equal(codes, np.full(30, spec.missing_code))
 
     def test_digitize_data_gives_nan_its_own_bin(self):
         data = np.array([0.1, 1.1, np.nan, 1.2, 0.5])
         for bins in (2, [-np.inf, 1.0, np.inf]):
-            binned = digitize_data(data, bins)
+            binned = _codes_of_digitize_data(data, bins)
             assert binned[2] not in np.delete(binned, 2)
 
     def test_is_continuous_ignores_missing(self):
@@ -144,30 +168,102 @@ class TestMissingValueBinning:
                 assert is_continuous(np.append(data, sentinel)) is expected
 
 
+@pytest.mark.required
+class TestEncodingRecord:
+    """What the binning functions record about the map they applied."""
+
+    def test_declared_edges_are_recorded_verbatim(self):
+        """An edge list is a claim about the world, so it survives exactly as given."""
+        edges = [-np.inf, 0.0, 10.0, np.inf]
+        _, spec = digitize_data(np.array([-5.0, 5.0, 15.0]), edges)
+        assert spec.edges == (-np.inf, 0.0, 10.0, np.inf)
+        assert spec.provenance == "edges"
+        assert spec.method is None
+
+    def test_declared_count_records_where_the_cuts_landed(self):
+        """A count says how many, not where. The record keeps the interior cuts it derived.
+
+        ``continuous_factor_bins={"f": 10}`` used to retain the request and lose all nine
+        boundaries, so nothing could say what the codes meant.
+        """
+        _, spec = digitize_data(np.linspace(0.0, 100.0, 500), 5)
+        assert spec.provenance == "count"
+        assert spec.method == "uniform_width"
+        assert len(spec.edges) == 6
+        # Outer edges are pushed to infinity; the four interior cuts are real values.
+        assert spec.edges[0] == -np.inf
+        assert spec.edges[-1] == np.inf
+        assert all(np.isfinite(e) for e in spec.edges[1:-1])
+
+    @pytest.mark.parametrize("method", ["uniform_width", "uniform_count", "clusters"])
+    def test_auto_binning_records_that_nobody_chose_it(self, method):
+        """The distinction the policy argument rests on: derived is not declared."""
+        rng = np.random.default_rng(3)
+        _, spec = bin_data(rng.normal(size=400), method)
+        assert spec.provenance == "derived"
+        assert spec.method == method
+        assert spec.edges[0] == -np.inf
+        assert spec.edges[-1] == np.inf
+
+    def test_missing_code_is_reserved_from_the_edges_not_from_occupancy(self):
+        """A sample that leaves the top bin empty must not hand missing that bin's code.
+
+        Four bins are declared and only the lowest two are filled. Reading the missing code
+        off the highest *occupied* bin would put it at 3 -- which is the code for
+        ``[4.0, 10.0)``, a bin the next batch of data could legitimately fill. Reserving it
+        from the edges instead makes it a property of the encoding rather than of the draw.
+        """
+        data = np.array([1.0, 2.0, 3.0, np.nan, 1.5, 2.5])
+        edges = [-np.inf, 2.0, 4.0, 10.0, np.inf]
+        codes, spec = digitize_data(data, edges)
+        assert spec.missing_code == len(edges) + 1
+        assert codes[3] == spec.missing_code
+        # The empty bins sit below it, unused rather than reassigned.
+        assert codes[~np.isnan(data)].max() < spec.missing_code
+
+    def test_the_missing_code_does_not_move_when_rows_are_added(self):
+        """Same encoding, more data, same code for missing -- the point of reserving it."""
+        edges = [-np.inf, 2.0, 4.0, 10.0, np.inf]
+        sparse = np.array([1.0, np.nan])
+        full = np.array([1.0, np.nan, 5.0, 20.0, 3.0])
+        first, first_spec = digitize_data(sparse, edges)
+        second, second_spec = digitize_data(full, edges)
+        assert first_spec.missing_code == second_spec.missing_code
+        assert first[1] == second[1]
+
+    def test_all_missing_records_a_single_span(self):
+        """Nothing observed places no cuts, and the record says so rather than inventing any."""
+        codes, spec = bin_data(np.full(30, np.nan), "uniform_width")
+        assert spec.edges == (-np.inf, np.inf)
+        assert spec.provenance == "derived"
+        # The record has to describe the codes it ships with, or it cannot be reapplied.
+        assert set(np.unique(codes).tolist()) == {spec.missing_code}
+
+
 @pytest.mark.optional
 class TestDigitizeDataFunctional:
     def test_udb_regression_nbins(self):
         factors = [0.1, 1.1, 1.2]
         bincounts = 2
-        hist = digitize_data(factors, bincounts)
+        hist = _codes_of_digitize_data(factors, bincounts)
         assert np.all(hist == [1, 2, 2])
 
     def test_udb_regression_bin_edges(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [-np.inf, 1, np.inf]
-        hist = digitize_data(factors, bin_edges)
+        hist = _codes_of_digitize_data(factors, bin_edges)
         assert np.all(hist == [1, 2, 2])
 
     def test_udb_regression_flipped_bin_edges(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [np.inf, 1, -np.inf]
-        hist = digitize_data(factors, bin_edges)
+        hist = _codes_of_digitize_data(factors, bin_edges)
         assert np.all(hist == [2, 1, 1])
 
     def test_narrow_bin_edges(self):
         factors = [0.1, 1.1, 1.5]
         bin_edges = [-10, 1, 1.2]
-        hist = digitize_data(factors, bin_edges)
+        hist = _codes_of_digitize_data(factors, bin_edges)
         assert np.all(hist == [1, 2, 3])
 
 
@@ -184,7 +280,7 @@ class TestBinDataFunctional:
         ],
     )
     def test_binning_method(self, method, data, expected_result):
-        output = bin_data(data, method)
+        output = _codes_of_bin_data(data, method)
         unq, vals = np.unique(output, return_inverse=True)
         print(unq)
         print(data[:20])
@@ -667,7 +763,7 @@ class TestLevelBudget:
     @pytest.mark.parametrize("method", ["uniform_width", "uniform_count", "clusters"])
     def test_bin_data_respects_max_bins(self, method: str) -> None:
         data = self._peaked_factor()
-        binned = bin_data(data, method, max_bins=level_budget(data.size))
+        binned = _codes_of_bin_data(data, method, max_bins=level_budget(data.size))
         assert len(np.unique(binned)) <= level_budget(data.size)
 
     def test_max_bins_binds_a_method_that_would_overrun(self) -> None:
@@ -679,8 +775,8 @@ class TestLevelBudget:
         # budget -- and the ceiling has to be shown binding on every one of them.
         data = self._peaked_factor()
         cap = 3
-        assert len(np.unique(bin_data(data, "uniform_width"))) > cap
-        assert len(np.unique(bin_data(data, "uniform_width", max_bins=cap))) <= cap
+        assert len(np.unique(_codes_of_bin_data(data, "uniform_width"))) > cap
+        assert len(np.unique(_codes_of_bin_data(data, "uniform_width", max_bins=cap))) <= cap
 
     @pytest.mark.parametrize("method", ["uniform_width", "uniform_count"])
     def test_binning_never_collapses_a_factor_to_one_bin(self, method: str) -> None:
@@ -689,7 +785,7 @@ class TestLevelBudget:
         # entropy, so the factor would vanish from every bias statistic rather than be
         # reported coarsely.
         data = np.array([0.0] * 4 + list(range(1, 21)) + [1_000_000.0])
-        assert len(np.unique(bin_data(data, method, max_bins=level_budget(data.size)))) >= 2
+        assert len(np.unique(_codes_of_bin_data(data, method, max_bins=level_budget(data.size)))) >= 2
 
 
 class TestIsContinuousOnIntegerValues:
