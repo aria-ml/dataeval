@@ -8,129 +8,28 @@ a **finite alphabet** — a fixed set of categories a value can take — and a
 continuous factor does not have one. So before either can run, the factor has to
 be cut into pieces.
 
-That cutting is **binning**, and DataEval applies it without being asked.
+That cutting is **binning**, and DataEval does it for you by default.
 {class}`.Metadata` {term}`discretizes <Discretization>` every factor before any
 evaluator sees it: by the time one reads a factor, it is looking at integer
 codes, not at altitudes. The bias and diversity results you get back describe
 your factors *as binned*.
 
-This page explains what that means — what kinds of factor exist, which of them
-survive discretization intact and which do not, how DataEval decides, and where
-the choice leaks into results. It is the metadata-side counterpart to
-[Embeddings](Embeddings.md): where the choice of feature extractor is the
-largest uncontrolled variable in the geometric half of the library, binning is
-the largest one in the metadata half.
+This page follows that in four movements: **what** binning is and how it differs
+from the relabeling that discrete and categorical factors get, **why** it
+matters and which evaluators depend on it, **how** DataEval places the edges,
+and how the cut shows up in results. It is the metadata-side counterpart to
+[Embeddings](Embeddings.md): the choice of feature extractor shapes every
+geometric result, and the choice of bins shapes every metadata one.
 
-## A worked example: temperature
+## What binning is
 
-Take 400 road-scene images with the air temperature recorded for each, ranging
-from -18.6 °C to 22.4 °C. A quarter of them were shot below freezing. That
-boundary is the one that matters: below 0 °C the road may be iced, above it the
-same road is merely wet, and a model that has never seen ice will fail on it. So
-the question you want to ask the dataset is *"are pedestrians under-represented
-in freezing conditions?"* — a {class}`.Parity` ⚠️ test between the class labels
-and a temperature factor.
+{term}`Binning` cuts a continuous factor into intervals and hands each interval
+an integer. That is the whole operation. What makes it worth a page is that it
+sits beside a second operation that also produces integers but keeps every
+distinction, and that DataEval picks between the two per factor, based on what
+each factor is.
 
-That test needs categories, so the temperature has to be cut. Here is what the
-default does with it:
-
-```text
-uniform_width — 3 bins
-  bin 1   n= 17   [-18.6,  -5.1]   100% freezing
-  bin 2   n=299   [ -4.9,   8.7]    29% freezing   ←
-  bin 3   n= 84   [  8.7,  22.4]     0% freezing
-```
-
-Three quarters of the dataset landed in one bin that is 29% icy and 71% wet.
-Every evaluator downstream now sees "temperature = 2" for both an iced road and
-a mild wet one, so no result computed from this factor can distinguish them. The
-`Parity` test still runs and still returns a number. What it compares is a
-category that mixes iced and wet roads, so the number is not an answer to the
-question you asked, and nothing in its output says so.
-
-Switching method does not rescue it:
-
-```text
-uniform_count — 3 bins
-  bin 1   n=134   [-18.6,   1.1]    77% freezing   ←
-  bin 2   n=133   [  1.1,   6.2]     0% freezing
-  bin 3   n=133   [  6.2,  22.4]     0% freezing
-```
-
-The edge moved, but it still straddles zero. It always will, because **0 °C is
-not a feature of the distribution — it is a feature of water.** Every automatic
-method places edges by reading the values: equal spans, equal counts, or gaps
-between modes. None of them has any way to know that one particular value on
-that axis is a phase change. The information needed to bin this factor correctly
-is not in the factor.
-
-It has to arrive from outside the factor, through `continuous_factor_bins`:
-
-```python
-md = Metadata(dataset, continuous_factor_bins={"temp_c": [-np.inf, 0.0, np.inf]})
-
-# bin 1   n=103   [-18.6,   0.0)   100% freezing
-# bin 2   n=297   [  0.0,  22.4]     0% freezing
-```
-
-Two bins, cut in the one place that carries meaning, and the `Parity` test now
-answers the question that was asked. A longer edge list adds resolution —
-`[-np.inf, -5, 0, 5, np.inf]` separates hard freeze from marginal freeze — but
-the edge at zero is the one doing the work.
-
-### A second collection
-
-Now shoot the same road again in early spring. Same camera, same `temp_c`
-factor, same call to {class}`.Metadata` — and only 2% of the images below
-freezing this time:
-
-```text
-uniform_width — 4 bins
-  bin 1   n= 37   [ -4.6,   2.7]    24% freezing
-  bin 2   n=211   [  2.7,  10.0]     0% freezing
-  bin 3   n=139   [ 10.0,  17.1]     0% freezing
-  bin 4   n= 13   [ 17.8,  24.5]     0% freezing
-```
-
-Nothing was configured differently. The winter collection came out in three
-bins and this one in four, because the count is derived from the values rather
-than set by you. Two separate things broke:
-
-- **Contextually**, the freezing signal has all but vanished — nine images out
-  of 400 — and it is *still* not isolated. Bin 1 mixes freezing with mild, the
-  same failure winter's bin 2 had, at a different place on the axis.
-- **Comparatively**, the two collections no longer share a vocabulary.
-  `temp_c = 1` means "hard freeze, -18.6 to -5.1" in the winter data and "-4.6
-  to 2.7, mostly above freezing" in the spring data. The integer is the same
-  and the meaning is not.
-
-That second failure is the one that spreads. A {class}`.Diversity` index over a
-three-letter alphabet is not on the same scale as one over a four-letter
-alphabet, and a {class}`.Balance` score that moved between the two collections
-may be reporting a change in the road or only a change in where the cuts fell —
-with nothing in either output to tell you which. Anything that reads
-`factor_data` inherits this; {func}`.factor_deviation` and
-{func}`.factor_predictors` escape it precisely because they read the raw values
-instead.
-
-Explicit edges fix both failures at once. `[-np.inf, 0.0, np.inf]` gives the
-spring data bin 1 = 9 images below freezing, bin 2 = 391 above — the same two
-categories, meaning the same two things, as the winter data. The factor becomes
-comparable across collections because you fixed its vocabulary instead of
-letting each dataset invent its own. [The bin count is a function of the data,
-not a setting](#the-bin-count-is-a-function-of-the-data-not-a-setting) has the
-measurements behind this.
-
-### The same problem elsewhere
-
-The same shape of problem recurs whenever a factor has a threshold that comes
-from the world rather than from the data: dawn and dusk in a time-of-day factor,
-a sensor's rated range in a distance factor, the resolution below which an object
-is unrecognizable in a box-area factor. **In each case, the default will bin the
-factor successfully and silently answer a different question than the one you
-asked.** The rest of this page is about recognizing when that has happened.
-
-## Three questions about every factor
+### Three questions about every factor
 
 Three separate questions get asked of every factor, and they are usually
 collapsed into one. Separating them is what makes `factor_info` readable.
@@ -203,8 +102,8 @@ has a finite alphabet. It is why the two words are not interchangeable.
 
 ### Binned is not digitized
 
-Digitizing and binning both hand the evaluators integers. Only one of them loses
-anything:
+Digitizing and binning both hand the evaluators integers. They differ in what
+they keep:
 
 :::{list-table}
 :widths: 16 42 42
@@ -218,11 +117,11 @@ anything:
   - Assigns one integer per interval of values
 - - Information
   - **Lossless.** The map is one-to-one and invertible
-  - **Lossy.** Many values collapse to one code, irreversibly
+  - **Lossy by design.** Many values share one code, which is what gives the
+    factor a finite alphabet
 - - Choice involved
   - None. The distinct values are whatever they are
-  - **The bin edges**, and there is no correct answer independent of the
-    question being asked
+  - **The bin edges.** Which ones are right depends on the question being asked
 - - Applies to
   - Categorical factors, and discrete factors the sample can afford
   - Continuous factors, and discrete numeric factors carrying more levels than the
@@ -230,10 +129,10 @@ anything:
 :::
 
 Digitizing is bookkeeping — a relabeling that any downstream count would have
-produced anyway. Binning destroys information that cannot be recovered
-downstream, and how much it destroys depends on a decision made for you.
-**Everything difficult in what follows is a consequence of binning, not
-digitizing.**
+produced anyway. Binning is a summary: it trades resolution for the finite
+alphabet the evaluators need, and how much resolution it trades depends on where
+the edges fall. **Everything on this page that involves a decision involves
+binning, not digitizing.**
 
 ### Reading `factor_info`
 
@@ -288,15 +187,15 @@ for name, info in md.factor_info.items():
 
 `factor_type` and `is_binned` are therefore independent: the type records what the
 factor is, the companion flag records what was done to it, and `discrete` appears
-against both. Selecting the factors that lost information means reading
-`is_binned`, not `factor_type`.
+against both. Selecting the factors that were summarized rather than relabeled
+means reading `is_binned`, not `factor_type`.
 
 The discretized values live in a **companion column** rather than replacing the
 factor: `altitude_m↕` holds the bin indices, `weather#` the ordinal codes.
 {attr}`.Metadata.factor_data` is the view built from those companions and is
 what the bias evaluators read; {meth}`.Metadata.rows_at` carries the native
-values, so nothing is destroyed in the dataframe — only in what the evaluators
-see.
+values, so the dataframe keeps the measurements at full resolution. The summary
+sits alongside them, and is what the evaluators read.
 
 Because dtype decides the label, a **categorical factor stored as integers** —
 sensor IDs, encoded weather codes — is reported as `discrete`. The evaluators
@@ -308,9 +207,10 @@ factor stored as strings reports as `categorical`.
 There is a fourth path. Naming a factor in `continuous_factor_bins` sends it
 down the first row **regardless of what its numeric values mean**, marking it
 continuous and binned even if they are categorical codes. A non-numeric column
-named there raises `TypeError` rather than being coerced. That is the intended escape
-hatch, and also a way to mislabel a factor for the life of that
-{class}`.Metadata`.
+named there raises `TypeError` rather than being coerced. That is the intended
+escape hatch for a numeric factor you want cut on edges of your own, so it is
+worth naming only factors you mean to treat as continuous — the label holds for
+the life of that {class}`.Metadata`.
 
 ### Binning moves a factor one way
 
@@ -358,14 +258,31 @@ that one bool, which is `True` for a binned continuous factor:
   sits *above* the highest observed bin, so anything reading position as
   magnitude reads "missing" as "large".
 
-The arrow only runs left to right. You cannot recover altitude from bin index,
-which is why a binning you did not choose is not a detail — it is a
-lossy transform applied to your data before you saw the results.
+The arrow only runs left to right: a bin index does not carry altitude back.
+That is why the edges are worth knowing — they set the vocabulary every metadata
+result is expressed in.
 
-## When binning is required, and when it is only a convention
+## Why it matters
 
-Not every consumer needs it. One of the most-used evaluators bins for no
-mathematical reason at all.
+**Binning is what makes the measurement possible.** Entropy, a contingency
+table, a group identity — each needs a finite set of categories to count into,
+and a continuous factor supplies none. Cutting one into intervals is what puts
+altitude, brightness and box area on the same footing as weather and city, so a
+single set of evaluators can read all of them.
+
+**The edges decide what the measurement can see.** Two values in the same bin
+are one value to everything downstream, and two in different bins are simply
+different — no closer for being adjacent. That is the summary doing its job, and
+it is also why edges placed at the boundaries your question cares about give
+sharper answers than edges placed anywhere else.
+
+How much each point matters depends on the consumer.
+
+### Which consumers require it
+
+Not every consumer needs binning, and the ones that do need it for different
+reasons — most of them mathematically, one as a consequence of what it is
+handed.
 
 :::{list-table}
 :widths: 26 18 56
@@ -389,11 +306,11 @@ mathematical reason at all.
 - - {class}`.Balance`
   - **Required in practice**
   - It reads `factor_data`, which is bin and category indices throughout, so the
-    contingency-table estimator runs on every factor and the binning upstream is
-    the whole of the loss. What `Balance` forwards is not *which estimator* to use
-    — that is read from the column's values — but whether each factor's set of
-    values is its own or an artifact of the cuts, which decides how the `factors`
-    DataFrame is normalized. See [below](#binning-reaches-the-three-outputs-differently).
+    contingency-table estimator runs on every factor, at whatever resolution the
+    binning upstream produced. What `Balance` forwards is not *which estimator*
+    to use — that is read from the column's values — but whether each factor's
+    set of values is its own or an artifact of the cuts, which decides how the
+    `factors` DataFrame is normalized. See [below](#binning-reaches-the-three-outputs-differently).
 - - {func}`.factor_deviation`, {func}`.factor_predictors`
   - **Not applied**
   - Both take a plain mapping of factor name to raw array and never touch
@@ -402,10 +319,441 @@ mathematical reason at all.
 
 The `Balance` row is a property of what it passes, not of the estimator it calls.
 {func}`.mutual_info` given raw values still routes the measured columns to the
-neighbor-based estimator; the loss happened upstream in `factor_data`. One visible
-consequence: `Balance.num_neighbors` tunes a neighborhood that only the measured
-path consults, which `Balance` cannot produce — which is why it is deprecated and
-warns when set.
+neighbor-based estimator; the resolution was set upstream in `factor_data`. One
+visible consequence: `Balance.num_neighbors` tunes a neighborhood only the
+measured path consults, which `Balance` does not produce — it is deprecated for
+that reason and warns when set.
+
+## How DataEval bins
+
+With `continuous_factor_bins=None` — the default — {class}`.Metadata` classifies
+each factor on its own. Non-numeric columns are ordinal-encoded
+immediately, unless they carry more distinct values than [the level
+budget](#a-discrete-factor-can-still-be-binned) allows, in which case they are
+dropped. Numeric columns go to {func}`.is_continuous`, and its verdict picks the
+treatment.
+
+### The continuous/discrete heuristic
+
+{func}`.is_continuous` is a heuristic, not a hypothesis test: it reports no
+p-value and has no stated error rate. It combines three signals:
+
+1. **Near-neighbor uniformity.** Under a continuous distribution, a point is
+   equally likely to lie anywhere between its two neighbors. Normalizing those
+   positions to [0, 1] gives a distribution that is near-uniform for continuous
+   data and lumpy for discrete data; the Wasserstein distance from uniform
+   measures the gap, against a threshold of `0.5 / sqrt(n)`.
+2. **Duplicate fraction.** Genuinely continuous values drawn into floating point
+   collide with probability zero, so exact duplicates are evidence of discrete
+   support.
+3. **Lattice (GCD) test.** Discrete values on a regular grid have gaps that are
+   near-integer multiples of a base unit. This catches integer-valued
+   distributions before enough collisions accumulate for signal 2 to fire.
+
+A sample is called continuous when signal 1 clears its threshold and neither
+secondary signal fires. If exactly one secondary fires, the stricter
+`0.3 / sqrt(n)` threshold decides. If both fire, the sample is discrete
+regardless. **All five constants are tuned empirically rather than derived** —
+the two Wasserstein thresholds, a `0.005` duplicate tolerance, a `0.85` lattice
+cutoff, and a `0.05` near-integer tolerance inside the GCD test — so on data
+whose support you already know, the verdict is quick to confirm.
+{func}`.is_continuous` is public, and its verdict on an array is the same one
+{class}`.Metadata` acts on:
+
+```python
+from dataeval.core import is_continuous
+
+is_continuous(rng.normal(size=200))  # True
+is_continuous(rng.integers(0, 100, size=200))  # False — lumpy NNN, duplicates, lattice
+is_continuous(np.round(rng.normal(size=200), 1))  # False — rounding creates all three
+```
+
+That last case is the common one. **Rounding a continuous quantity for storage
+makes it discrete**, so a brightness value written to one decimal place will be
+digitized into one category per distinct value rather than binned.
+
+### Floors that override everything
+
+- **Fewer than 20 observations → discrete, unconditionally.** On a small
+  dataset every distinct float becomes its own category, and the factor ends up
+  nearly one-to-one with the sample index.
+- **Fewer than 3 distinct values → discrete.** The near-neighbor construction
+  needs interior points.
+
+Both counts are taken *after* dropping non-finite values, so a factor that is
+mostly missing falls under the floor and is called discrete. Infinities are
+dropped alongside `NaN`: a missing value has no position on the line and an
+infinity no finite distance to its neighbors, so neither carries the spacing
+information the test reads. These are the same values the bin edges are placed
+on, so the verdict and the edges are read off one set of numbers.
+
+### A discrete factor can still be binned
+
+A discrete verdict says the factor's support is countable. It does not promise
+the support is *small*, and an integer factor can be discrete while taking a
+value per entity — pixel areas, epoch seconds, identifiers. Scoring one of those
+a value at a time is what makes it report a correlation with anything it is
+measured against, because a contingency table with more cells than observations
+records which cells were hit rather than anything about the factor.
+
+So no numeric factor carries more levels than the sample's level budget:
+
+```python
+max(20, sqrt(n))  # n at the factor's own level
+```
+
+`sqrt(n)` is the square-root rule for histogram bin counts; the floor of 20 keeps
+an ordinary categorical factor intact on a small sample. Both are standard rules
+of thumb rather than derived quantities. A discrete factor over that budget is
+binned rather than ordinal-encoded — reported as `factor_type="discrete"` with
+`is_binned=True` — and the same budget caps the bin count on the continuous
+path.
+
+The budget is the point past which a contingency table stops describing the data,
+and nothing more than that. It is **not** the count that reads best, which sits
+well under it and moves with the sample size —
+[measured here](#a-fine-cut-costs-the-same-correlation-from-the-other-side). A
+factor sitting just inside the budget clears what the budget guards against and
+is still cut more finely than the sample rewards.
+
+A different line binds non-numeric columns, and it is not the budget. The budget
+answers *how many cells can this sample fill*, which is the right question for
+choosing a bin count and the wrong one for deciding whether a column is a factor
+at all — twenty-five cities over a hundred images overruns it and is a perfectly
+good factor. What is asked instead is whether the column **names its rows rather
+than grouping them**: a value per row is not a category, every contingency table
+over it is a table of ones, and there is no order along a set of strings to cut it
+into fewer. Such a column is **dropped**, leaving {attr}`.Metadata.factor_names`
+and gaining a `"cardinality_over_budget"` entry in
+{attr}`.Metadata.dropped_factors`.
+
+A numeric column at the same cardinality is binned and kept — that asymmetry is
+the point, and it extends to timestamps, which are ordered and so cut into
+intervals like any other measured quantity. Map the values onto a smaller
+vocabulary — a coarser taxonomy, a prefix, a lookup — to keep a column that is
+meant to be categorical.
+
+A merely *wide* vocabulary is not dropped. A factor whose levels are thin for the
+sample is what {attr}`.ParityOutput.insufficient_data` exists to report, and
+removing the factor would foreclose the mechanism that says so.
+
+Both the automatic binning and the drop raise a `UserWarning`, naming every factor
+affected, in addition to the per-factor detail on the `dataeval.metadata` logger.
+
+### Where the decision is made matters
+
+On {term}`object detection <Object Detection>` metadata, factors live at
+different [levels](MetadataLevels.md). A factor recorded at the **unit** level
+is classified and binned on its per-image values, not on the copy replicated
+onto each detection — otherwise the replication would look like duplicates and
+signals 2 and 3 would call a continuous factor discrete. A factor recorded at
+the **instance** level is scored on every detection, because there the repeats
+are genuine observations.
+
+The 20-sample floor applies to whichever set the factor is judged on, so a
+unit-level factor on fewer than 20 images is always called discrete no matter
+how many detections those images carry. {ref}`binning-levels` works through the
+consequences.
+
+### Choosing a method
+
+`auto_bin_method` selects how edges are placed for factors judged continuous —
+and for [discrete factors that overrun the level budget](#a-discrete-factor-can-still-be-binned).
+All three place edges from the finite values only, then set the outermost edges
+to ±∞ so that finite values beyond the observed range would still land in an end
+bin rather than forming their own. That absorbs `-inf`; `+inf` escapes it, for
+the reason given [below](#missing-values-get-a-bin-with-a-position-but-no-meaning).
+
+:::{list-table}
+:widths: 20 40 40
+:header-rows: 1
+
+- - Method
+  - Preserves
+  - Costs
+- - `"uniform_width"` *(default)*
+  - The **shape** of the distribution. Equal-width bins mean bar height is
+    proportional to density, so a histogram of the result looks like the data.
+  - Statistical power is unequal across bins — tail bins may hold a handful of
+    samples while the mode holds hundreds.
+- - `"uniform_count"`
+  - **Power per bin.** Quantile edges give every bin roughly equal occupancy,
+    which is what contingency tests want.
+  - Shape. Bin width now varies inversely with density, so equal bins do not
+    mean equal ranges and the result cannot be read as a histogram.
+- - `"clusters"`
+  - **Natural gaps.** Edges are derived from DataEval's HDBSCAN port, so
+    genuinely multimodal factors get cuts between the modes rather than through
+    them.
+  - Stability. It inherits the clusterer's sensitivity, and there is no
+    guarantee the number of modes is stable across datasets.
+:::
+
+Those trade-offs line up with particular consumers. `"uniform_count"` is the one
+that matches what {func}`.parity` wants, since equal occupancy is what keeps
+cells out of `insufficient_data`. `"clusters"` is the only one that will not cut
+through a mode on a visibly multimodal factor. The default trades both for a
+result that reads back as a histogram of the data.
+
+All three place edges by reading the values, so where a factor has a threshold
+that comes from the world rather than the data, the choice of method is not the
+lever that reaches it. `continuous_factor_bins` is.
+
+## Matching the cut to the question
+
+Automatic binning reads the values and nothing else, which is the right default:
+most factors have no privileged cut point, and edges derived from the
+distribution describe them well. Some factors do have one — a value at which the
+meaning of the factor changes — and that value is not something the distribution
+can reveal. Declaring it is what this section works through.
+
+### A worked example: temperature
+
+Take 400 road-scene images with the air temperature recorded for each, ranging
+from -18.6 °C to 22.4 °C. A quarter of them were shot below freezing. That
+boundary is the one that matters: below 0 °C the road may be iced, above it the
+same road is merely wet, and a model that has never seen ice will fail on it. So
+the question you want to ask the dataset is *"are pedestrians under-represented
+in freezing conditions?"* — a {class}`.Parity` ⚠️ test between the class labels
+and a temperature factor.
+
+That test needs categories, so the temperature has to be cut. Here is what the
+default does with it:
+
+```text
+uniform_width — 3 bins
+  bin 1   n= 17   [-18.6,  -5.1]   100% freezing
+  bin 2   n=299   [ -4.9,   8.7]    29% freezing   ←
+  bin 3   n= 84   [  8.7,  22.4]     0% freezing
+```
+
+Three quarters of the dataset landed in one bin that is 29% icy and 71% wet.
+Every evaluator downstream now sees "temperature = 2" for both an iced road and
+a mild wet one, so no result computed from this factor can distinguish them. The
+`Parity` test runs and returns a number, computed over a category that mixes
+iced and wet roads. It is a sound answer about that category, and not an answer
+about freezing.
+
+Switching method moves the edge but not the mixing:
+
+```text
+uniform_count — 3 bins
+  bin 1   n=134   [-18.6,   1.1]    77% freezing   ←
+  bin 2   n=133   [  1.1,   6.2]     0% freezing
+  bin 3   n=133   [  6.2,  22.4]     0% freezing
+```
+
+The edge moved, but it still straddles zero. It always will, because **0 °C is
+not a feature of the distribution — it is a feature of water.** Every automatic
+method places edges by reading the values: equal spans, equal counts, or gaps
+between modes. None of them has any way to know that one particular value on
+that axis is a phase change. The information needed to cut this factor for
+*this* question is not in the factor.
+
+It has to arrive from outside the factor, through `continuous_factor_bins`:
+
+```python
+md = Metadata(dataset, continuous_factor_bins={"temp_c": [-np.inf, 0.0, np.inf]})
+
+# bin 1   n=103   [-18.6,   0.0)   100% freezing
+# bin 2   n=297   [  0.0,  22.4]     0% freezing
+```
+
+Two bins, cut in the one place that carries meaning, and the `Parity` test now
+answers the question that was asked. A longer edge list adds resolution —
+`[-np.inf, -5, 0, 5, np.inf]` separates hard freeze from marginal freeze — but
+the edge at zero is the one doing the work.
+
+### A second collection
+
+Now shoot the same road again in early spring. Same camera, same `temp_c`
+factor, same call to {class}`.Metadata` — and only 2% of the images below
+freezing this time:
+
+```text
+uniform_width — 4 bins
+  bin 1   n= 37   [ -4.6,   2.7]    24% freezing
+  bin 2   n=211   [  2.7,  10.0]     0% freezing
+  bin 3   n=139   [ 10.0,  17.1]     0% freezing
+  bin 4   n= 13   [ 17.8,  24.5]     0% freezing
+```
+
+Nothing was configured differently. The winter collection came out in three
+bins and this one in four, because the count is derived from the values rather
+than set by you. Two things follow:
+
+- **Contextually**, the freezing signal has all but vanished — nine images out
+  of 400 — and it is *still* not isolated. Bin 1 mixes freezing with mild, the
+  same mixing winter's bin 2 had, at a different place on the axis.
+- **Comparatively**, the two collections no longer share a vocabulary.
+  `temp_c = 1` means "hard freeze, -18.6 to -5.1" in the winter data and "-4.6
+  to 2.7, mostly above freezing" in the spring data. The integer is the same
+  and the meaning is not.
+
+The second is the one that spreads. A {class}`.Diversity` index over a
+three-letter alphabet is not on the same scale as one over a four-letter
+alphabet, and a {class}`.Balance` score that moved between the two collections
+may be reporting a change in the road or only a change in where the cuts fell —
+with nothing in either output to tell you which. Anything that reads
+`factor_data` inherits this; {func}`.factor_deviation` and
+{func}`.factor_predictors` escape it precisely because they read the raw values
+instead.
+
+Explicit edges settle both at once. `[-np.inf, 0.0, np.inf]` gives the spring
+data bin 1 = 9 images below freezing, bin 2 = 391 above — the same two
+categories, meaning the same two things, as the winter data. The factor becomes
+comparable across collections because its vocabulary is now fixed by you rather
+than derived per dataset. [The bin count is a function of the data,
+not a setting](#the-bin-count-is-a-function-of-the-data-not-a-setting) has the
+measurements behind this.
+
+### Other thresholds that come from the world
+
+The same shape recurs whenever a factor has a threshold set outside the data:
+dawn and dusk in a time-of-day factor, a sensor's rated range in a distance
+factor, the resolution below which an object is unrecognizable in a box-area
+factor. **In each case, a cut derived from the values is a good summary of the
+distribution and not a summary of the boundary you care about** — so that
+boundary is worth declaring. These are the factors `continuous_factor_bins`
+exists for; the rest are well served by the default.
+
+## Pitfalls to check for
+
+The automatic path derives its cut from the values, which has consequences worth
+knowing so you can recognize the factors that would be better off declared. Each
+of these is visible before you read anything computed from the factor.
+
+### The bin count is a function of the data, not a setting
+
+`"uniform_width"` does not take a bin count. It starts from NumPy's
+`histogram(bins="auto")`, then *reduces* the count — at most 20 times — while
+any non-empty bin holds fewer than 10 samples. The 10-sample floor keeps every
+bin populated enough to count into, and the tails trip it readily, so the count
+that comes out is a property of the particular draw:
+
+```python
+# 500 draws from a standard normal, 200 different seeds
+Counter({4: 63, 5: 59, 6: 39, 7: 20, 3: 12, 8: 6, 10: 1})
+```
+
+Between **3 and 10 bins** for the same distribution at the same sample size. The
+consequence is not that any one of those is wrong — it is that **the same factor
+measured on two datasets can be cut into different numbers of bins**, so binned
+factor values, and every score computed from them, are not comparable across
+runs. `"uniform_count"` inherits this count and moves only the edges.
+
+The [level budget](#a-discrete-factor-can-still-be-binned) caps the count from
+above and the reduction floors it at two, so the result is bounded — but a bound
+is not a setting, and anything between those two ends is still chosen by the
+draw.
+
+### A factor can reduce to two bins
+
+The reduction stops at two bins, so a factor never comes back constant. Two is
+the floor, and a small sample with a far-off tail reaches it every time: the
+outlier stretches the range, the interior bins come out sparse, and the
+reduction runs all the way down.
+
+```python
+# 20-80 draws from a standard normal plus 3 outliers near 50, 2000 seeds
+Counter({2: 2000})
+```
+
+A continuous factor reduced to a **binary split** still answers every question
+put to it — a {class}`.Diversity` index over two categories, a {class}`.Parity`
+table with two columns, two groups under {func}`.split_dataset` — at the
+resolution two categories allow. On this shape the cut lands between the mode
+and the outliers, which is where the sample supports one, and a binary answer to
+a question about a spread of values is usually not the one you wanted.
+
+The level count is what tells you. `factor_data` columns follow `factor_info`
+order, so the level count of a binned factor is worth checking before reading
+anything computed from it:
+
+```python
+len(np.unique(md.factor_data[:, i]))  # 2 — the i-th factor is a binary split
+```
+
+### Explicit edge lists produce more bins than edges
+
+`continuous_factor_bins` accepts either an integer count or a sequence of edges,
+and they behave differently at the boundaries. An **integer** gets the ±∞
+treatment described above. An explicit **sequence** is used verbatim, so values
+outside its range fall into open-ended bins on either side:
+
+```python
+# a factor holding [-5.0, 5.0, 15.0, 25.0]
+Metadata(ds, continuous_factor_bins={"f": [0, 10, 20]})  # → bins [0, 1, 2, 3]
+Metadata(ds, continuous_factor_bins={"f": 3})  # → bins [1, 2, 3, 3]
+```
+
+Three edges describe two intervals, but four bins come back: one below `0` and
+one above `20`. ±∞ present in the sequence is what makes the given edges the
+outer limits — the treatment an integer count receives automatically and a
+sequence does not.
+
+### Missing values get a bin with a position but no meaning
+
+A `NaN` is not a small value, a large value, or a value between two edges, so it
+is given a bin of its own above the bins holding observed values — automatic or
+explicit, on binned and digitized factors alike.
+
+- **Edges are placed on the finite values alone**, so a missing value does not
+  shift where the cuts fall.
+- **`+inf` is not absorbed.** `-inf` lands in the first bin, but because the top
+  edge is `+inf` and digitizing is right-open, `+inf` falls past it into a bin of
+  its own, one above the highest finite bin. The missing bin then sits one above
+  *that*, so a factor carrying both ends up with two categories that are not
+  values.
+- **The position is an artifact.** The missing bin sits at the top because the
+  codes have to be contiguous — a gap would show up downstream as an empty
+  category — not because missing is large. Anything treating the factor as
+  ordinal reads that position as a value.
+
+So where the missing rate is material, part of any finding about that factor is
+a finding about its absence, and the output does not separate the two.
+
+### A nanosecond timestamp is read to 256 ns
+
+A capture time is totally ordered, so it cuts into intervals exactly like a
+number — DataEval reads one as a float so that `NaT` can travel as `NaN` and be
+given the missing bin like any other gap. A float64 carries 53 bits of mantissa,
+and near the current epoch (~1.8e18 nanoseconds) consecutive representable values
+are **256 ns** apart, so two capture times closer together than that become one
+number.
+
+`datetime64[us]` and `datetime64[ms]` are exact. Only `[ns]` — polars' and pandas'
+default unit — is affected, and only below a resolution no bin edge on a capture
+time is placed at. What it does change is the *distinct count* of such a column,
+which feeds the continuous/discrete verdict and the near-uniqueness test that
+drops identifiers. If a sub-microsecond difference is one you need kept, cast the
+column before adding it:
+
+```python
+md.add_factors({"captured_at": stamps.astype("datetime64[us]")}, level="unit")
+```
+
+### The automatic path announces itself
+
+Structuring raises a `UserWarning` naming every factor it binned on the caller's
+behalf, because the per-factor `WARNING` it also writes to the `dataeval.metadata`
+logger reaches nobody by default — DataEval attaches a `NullHandler` there, which
+suppresses Python's last-resort stderr handler. One aggregated warning rather than
+one per factor, so it stays readable on a dataset carrying many of them.
+
+The record survives the warning. Each factor's {attr}`.FactorInfo.encoding` says
+where its cuts fell and who chose them — `provenance="derived"` where DataEval
+chose both the count and the placement, against `"count"`, `"edges"` or
+`"declared"` where the caller did — so a run that binned automatically is
+distinguishable from one handed explicit edges long after the warning scrolled
+past. `repr(md)` reports the count as `auto_encoded=N`.
+
+## How the cut shows up in a score
+
+The sections above are about where the edges land. This one is about the
+arithmetic that follows from having edges at all: how much association a cut
+carries through, and how the number is normalized so that two different cuts can
+be read on one scale.
 
 ### Binning reaches the three outputs differently
 
@@ -429,12 +777,13 @@ keeps the entropy ceiling in `factors`, so a duplicated categorical factor still
 reads 1.0. The two conventions are each correct in one regime, which is why the
 choice is made per factor rather than globally.
 
-None of this recovers what binning destroyed. A factor cut into four bins is
+Normalization does not add back resolution. A factor cut into four bins is
 scored on four bins' worth of information whichever denominator is used. What the
 Linfoot branch buys is dropping the entropy-ceiling artifact that *grows* with bin
 count — the reported score no longer inflates for a bin count
-[the caller did not choose](#the-bin-count-is-a-function-of-the-data-not-a-setting),
-though the mutual information underneath still reflects what those bins retained.
+[the data derived rather than the caller](#the-bin-count-is-a-function-of-the-data-not-a-setting)
+settled on, though the mutual information underneath still reflects what those
+bins retained.
 
 ### The Linfoot branch has a ceiling of its own, and it is divided out
 
@@ -483,8 +832,7 @@ than of the data, so **`factors` divides by the reachable maximum**, exactly as
 the entropy branch divides by the entropy. A duplicated factor reads 1.0 on
 either branch, at any cut, however unevenly its bins are filled.
 
-What this does *not* do is give back the resolution the cut destroyed — see
-below.
+What this does *not* do is add resolution the cut did not keep — see below.
 
 ### What a coarse cut costs a correlation
 
@@ -651,307 +999,6 @@ being honored — you asked about *freezing*, not about temperature. Where no on
 claimed anything, there is nothing to honour, and the calibrated read is the
 better one.
 
-## How DataEval decides
-
-With `continuous_factor_bins=None` — the default — {class}`.Metadata` classifies
-each factor without being asked. Non-numeric columns are ordinal-encoded
-immediately, unless they carry more distinct values than [the level
-budget](#a-discrete-factor-can-still-be-binned) allows, in which case they are
-dropped. Numeric columns go to {func}`.is_continuous`, and its verdict picks the
-treatment.
-
-### The continuous/discrete heuristic
-
-{func}`.is_continuous` is a heuristic, not a hypothesis test: it reports no
-p-value and has no stated error rate. It combines three signals:
-
-1. **Near-neighbor uniformity.** Under a continuous distribution, a point is
-   equally likely to lie anywhere between its two neighbors. Normalizing those
-   positions to [0, 1] gives a distribution that is near-uniform for continuous
-   data and lumpy for discrete data; the Wasserstein distance from uniform
-   measures the gap, against a threshold of `0.5 / sqrt(n)`.
-2. **Duplicate fraction.** Genuinely continuous values drawn into floating point
-   collide with probability zero, so exact duplicates are evidence of discrete
-   support.
-3. **Lattice (GCD) test.** Discrete values on a regular grid have gaps that are
-   near-integer multiples of a base unit. This catches integer-valued
-   distributions before enough collisions accumulate for signal 2 to fire.
-
-A sample is called continuous when signal 1 clears its threshold and neither
-secondary signal fires. If exactly one secondary fires, the stricter
-`0.3 / sqrt(n)` threshold decides. If both fire, the sample is discrete
-regardless. **All five constants are tuned values carrying no derivation** — the
-two Wasserstein thresholds, a `0.005` duplicate tolerance, a `0.85` lattice
-cutoff, and a `0.05` near-integer tolerance inside the GCD test — so the verdict
-is worth checking on data whose support you already know.
-{func}`.is_continuous` is public, and its verdict on an array is the same one
-{class}`.Metadata` acts on:
-
-```python
-from dataeval.core import is_continuous
-
-is_continuous(rng.normal(size=200))  # True
-is_continuous(rng.integers(0, 100, size=200))  # False — lumpy NNN, duplicates, lattice
-is_continuous(np.round(rng.normal(size=200), 1))  # False — rounding creates all three
-```
-
-That last case is the common one. **Rounding a continuous quantity for storage
-makes it discrete**, so a brightness value written to one decimal place will be
-digitized into one category per distinct value rather than binned.
-
-### Floors that override everything
-
-- **Fewer than 20 observations → discrete, unconditionally.** On a small
-  dataset every distinct float becomes its own category, and the factor ends up
-  nearly one-to-one with the sample index.
-- **Fewer than 3 distinct values → discrete.** The near-neighbor construction
-  needs interior points.
-
-Both counts are taken *after* dropping non-finite values, so a factor that is
-mostly missing falls under the floor and is called discrete. Infinities are
-dropped alongside `NaN`: a missing value has no position on the line and an
-infinity no finite distance to its neighbors, so neither carries the spacing
-information the test reads. These are the same values the bin edges are placed
-on, so the verdict and the edges are read off one set of numbers.
-
-### A discrete factor can still be binned
-
-A discrete verdict says the factor's support is countable. It does not promise
-the support is *small*, and an integer factor can be discrete while taking a
-value per entity — pixel areas, epoch seconds, identifiers. Scoring one of those
-a value at a time is what makes it report a correlation with anything it is
-measured against, because a contingency table with more cells than observations
-records which cells were hit rather than anything about the factor.
-
-So no numeric factor carries more levels than the sample's level budget:
-
-```python
-max(20, sqrt(n))  # n at the factor's own level
-```
-
-`sqrt(n)` is the square-root rule for histogram bin counts; the floor of 20 keeps
-an ordinary categorical factor intact on a small sample. Both are rules of thumb,
-not derived quantities. A discrete factor over that budget is binned rather than
-ordinal-encoded — reported as `factor_type="discrete"` with `is_binned=True` — and
-the same budget caps the bin count on the continuous path.
-
-The budget is the point past which a contingency table stops describing the data,
-and nothing more than that. It is **not** the count that reads best, which sits
-well under it and moves with the sample size —
-[measured here](#a-fine-cut-costs-the-same-correlation-from-the-other-side). A
-factor sitting just inside the budget is safe from the failure the budget exists
-to prevent and is still cut more finely than the sample rewards.
-
-A different line binds non-numeric columns, and it is not the budget. The budget
-answers *how many cells can this sample fill*, which is the right question for
-choosing a bin count and the wrong one for deciding whether a column is a factor
-at all — twenty-five cities over a hundred images overruns it and is a perfectly
-good factor. What is asked instead is whether the column **names its rows rather
-than grouping them**: a value per row is not a category, every contingency table
-over it is a table of ones, and there is no order along a set of strings to cut it
-into fewer. Such a column is **dropped**, leaving {attr}`.Metadata.factor_names`
-and gaining a `"cardinality_over_budget"` entry in
-{attr}`.Metadata.dropped_factors`.
-
-A numeric column at the same cardinality is binned and kept — that asymmetry is
-the point, and it extends to timestamps, which are ordered and so cut into
-intervals like any other measured quantity. Map the values onto a smaller
-vocabulary — a coarser taxonomy, a prefix, a lookup — to keep a column that is
-meant to be categorical.
-
-A merely *wide* vocabulary is not dropped. A factor whose levels are thin for the
-sample is what {attr}`.ParityOutput.insufficient_data` exists to report, and
-removing the factor would foreclose the mechanism that says so.
-
-Both the automatic binning and the drop raise a `UserWarning`, naming every factor
-affected, in addition to the per-factor detail on the `dataeval.metadata` logger.
-
-### Where the decision is made matters
-
-On {term}`object detection <Object Detection>` metadata, factors live at
-different [levels](MetadataLevels.md). A factor recorded at the **unit** level
-is classified and binned on its per-image values, not on the copy replicated
-onto each detection — otherwise the replication would look like duplicates and
-signals 2 and 3 would call a continuous factor discrete. A factor recorded at
-the **instance** level is scored on every detection, because there the repeats
-are genuine observations.
-
-The 20-sample floor applies to whichever set the factor is judged on, so a
-unit-level factor on fewer than 20 images is always called discrete no matter
-how many detections those images carry. {ref}`binning-levels` works through the
-consequences.
-
-## Choosing a method
-
-`auto_bin_method` selects how edges are placed for factors judged continuous —
-and for [discrete factors that overrun the level budget](#a-discrete-factor-can-still-be-binned).
-All three place edges from the finite values only, then set the outermost edges
-to ±∞ so that finite values beyond the observed range would still land in an end
-bin rather than forming their own. That absorbs `-inf`; `+inf` escapes it, for
-the reason given [below](#missing-values-get-a-bin-with-a-position-but-no-meaning).
-
-:::{list-table}
-:widths: 20 40 40
-:header-rows: 1
-
-- - Method
-  - Preserves
-  - Costs
-- - `"uniform_width"` *(default)*
-  - The **shape** of the distribution. Equal-width bins mean bar height is
-    proportional to density, so a histogram of the result looks like the data.
-  - Statistical power is unequal across bins — tail bins may hold a handful of
-    samples while the mode holds hundreds.
-- - `"uniform_count"`
-  - **Power per bin.** Quantile edges give every bin roughly equal occupancy,
-    which is what contingency tests want.
-  - Shape. Bin width now varies inversely with density, so equal bins do not
-    mean equal ranges and the result cannot be read as a histogram.
-- - `"clusters"`
-  - **Natural gaps.** Edges are derived from DataEval's HDBSCAN port, so
-    genuinely multimodal factors get cuts between the modes rather than through
-    them.
-  - Stability. It inherits the clusterer's sensitivity, and there is no
-    guarantee the number of modes is stable across datasets.
-:::
-
-Those trade-offs line up with particular consumers. `"uniform_count"` is the one
-that matches what {func}`.parity` wants, since equal occupancy is what keeps
-cells out of `insufficient_data`. `"clusters"` is the only one that will not cut
-through a mode on a visibly multimodal factor. The default gives up both to keep
-the result readable as a histogram.
-
-All three place edges by reading the values, so where a factor has a threshold
-that comes from the world rather than the data, the choice of method is not the
-decision that matters. Setting `continuous_factor_bins` is.
-
-## Pitfalls of automatic binning
-
-### The bin count is a function of the data, not a setting
-
-`"uniform_width"` does not take a bin count. It starts from NumPy's
-`histogram(bins="auto")`, then *reduces* the count — at most 20 times — while
-any non-empty bin holds fewer than 10 samples. The 10-sample floor is aggressive
-and the tails keep tripping it, so the count that comes out is a property of the
-particular draw:
-
-```python
-# 500 draws from a standard normal, 200 different seeds
-Counter({4: 63, 5: 59, 6: 39, 7: 20, 3: 12, 8: 6, 10: 1})
-```
-
-Between **3 and 10 bins** for the same distribution at the same sample size. The
-consequence is not that any one of those is wrong — it is that **the same factor
-measured on two datasets can be cut into different numbers of bins**, so binned
-factor values, and every score computed from them, are not comparable across
-runs. `"uniform_count"` inherits this count and moves only the edges.
-
-The [level budget](#a-discrete-factor-can-still-be-binned) caps the count from
-above and the reduction floors it at two, so the result is bounded — but a bound
-is not a setting, and anything between those two ends is still chosen by the
-draw.
-
-### A factor can collapse to two bins
-
-The reduction stops at two bins, so a factor cannot come back constant and
-information-free. Two is the floor, not a reassuring one: a small sample with a
-far-off tail hits it every time, and the reduction has nowhere left to go.
-
-```python
-# 20-80 draws from a standard normal plus 3 outliers near 50, 2000 seeds
-Counter({2: 2000})
-```
-
-A continuous factor reduced to a **binary split** still answers every question
-put to it — a {class}`.Diversity` index over two categories, a {class}`.Parity`
-table with two columns, two groups under {func}`.split_dataset` — and the
-resolution it had is gone. The cut sits wherever the reduction left it, which on
-this shape is between the mode and the outliers rather than anywhere meaningful.
-Nothing in the output says the factor arrived this coarse.
-
-It is visible as a shape. `factor_data` columns follow `factor_info` order, so
-the level count of a binned factor is worth checking before reading anything
-computed from it:
-
-```python
-len(np.unique(md.factor_data[:, i]))  # 2 — the i-th factor is a binary split
-```
-
-### Explicit edge lists get bins you did not ask for
-
-`continuous_factor_bins` accepts either an integer count or a sequence of edges,
-and they behave differently at the boundaries. An **integer** gets the ±∞
-treatment described above. An explicit **sequence** is used verbatim, so values
-outside its range fall into open-ended bins on either side:
-
-```python
-# a factor holding [-5.0, 5.0, 15.0, 25.0]
-Metadata(ds, continuous_factor_bins={"f": [0, 10, 20]})  # → bins [0, 1, 2, 3]
-Metadata(ds, continuous_factor_bins={"f": 3})  # → bins [1, 2, 3, 3]
-```
-
-Three edges describe two intervals, but four bins come back: one below `0` and
-one above `20`. ±∞ present in the sequence is what makes the given edges the
-outer limits — the treatment an integer count receives automatically and a
-sequence does not.
-
-### Missing values get a bin with a position but no meaning
-
-A `NaN` is not a small value, a large value, or a value between two edges, so it
-is given a bin of its own above the bins holding observed values — automatic or
-explicit, on binned and digitized factors alike.
-
-- **Edges are placed on the finite values alone**, so a missing value does not
-  shift where the cuts fall.
-- **`+inf` is not absorbed.** `-inf` lands in the first bin, but because the top
-  edge is `+inf` and digitizing is right-open, `+inf` falls past it into a bin of
-  its own, one above the highest finite bin. The missing bin then sits one above
-  *that*, so a factor carrying both ends up with two categories that are not
-  values.
-- **The position is an artifact.** The missing bin sits at the top because the
-  codes have to be contiguous — a gap would show up downstream as an empty
-  category — not because missing is large. Anything treating the factor as
-  ordinal reads that position as a value.
-
-So where the missing rate is material, part of any finding about that factor is
-a finding about its absence, and the output does not separate the two.
-
-### A nanosecond timestamp is read to 256 ns
-
-A capture time is totally ordered, so it cuts into intervals exactly like a
-number — DataEval reads one as a float so that `NaT` can travel as `NaN` and be
-given the missing bin like any other gap. A float64 carries 53 bits of mantissa,
-and near the current epoch (~1.8e18 nanoseconds) consecutive representable values
-are **256 ns** apart, so two capture times closer together than that become one
-number.
-
-`datetime64[us]` and `datetime64[ms]` are exact. Only `[ns]` — polars' and pandas'
-default unit — is affected, and only below a resolution no bin edge on a capture
-time is placed at. What it does change is the *distinct count* of such a column,
-which feeds the continuous/discrete verdict and the near-uniqueness test that
-drops identifiers. If a sub-microsecond difference is one you need kept, cast the
-column before adding it:
-
-```python
-md.add_factors({"captured_at": stamps.astype("datetime64[us]")}, level="unit")
-```
-
-### The automatic path announces itself
-
-Structuring raises a `UserWarning` naming every factor it binned on the caller's
-behalf, because the per-factor `WARNING` it also writes to the `dataeval.metadata`
-logger reaches nobody by default — DataEval attaches a `NullHandler` there, which
-suppresses Python's last-resort stderr handler. One aggregated warning rather than
-one per factor: a dozen near-identical warnings during one construction is how a
-warning teaches people to filter it.
-
-The record survives the warning. Each factor's {attr}`.FactorInfo.encoding` says
-where its cuts fell and who chose them — `provenance="derived"` where DataEval
-chose both the count and the placement, against `"count"`, `"edges"` or
-`"declared"` where the caller did — so a run that binned automatically is
-distinguishable from one handed explicit edges long after the warning scrolled
-past. `repr(md)` reports the count as `auto_encoded=N`.
-
 ## What the choice determines
 
 Binning is the one band of the taxonomy that records a decision rather than an
@@ -961,25 +1008,24 @@ page has been describing.
 **The classification is visible in exactly one place.**
 {attr}`.Metadata.factor_info` is where a factor's kind and treatment are
 reported, and nothing downstream carries either, because {class}`.MetadataLike`
-does not expose it. Both ways of landing in the wrong row — an integer-coded
-category read as `discrete`, a rounded continuous quantity read the same way —
-are silent everywhere else. Two inputs decide which row a factor lands in: its
-dtype, and whether it is named in `continuous_factor_bins`.
+does not expose it. Both ways a factor can land in a row you did not expect — an
+integer-coded category read as `discrete`, a rounded continuous quantity read
+the same way — are visible nowhere else. Two inputs decide which row a factor
+lands in: its dtype, and whether it is named in `continuous_factor_bins`.
 
-**The thresholds that matter are not in the data.** Where a factor has a value
-at which the world changes — freezing, sunset, a detection-size floor — no
-method that places edges by reading values can find it, and the factor is binned
-successfully anyway. `continuous_factor_bins`, `factor_levels` and `encoding` are
-what carry such a threshold in, and the only inputs that fix a factor's
-vocabulary across datasets rather than letting each draw derive its own count and
-edges.
+**A threshold that comes from the world has to be declared.** Where a factor has
+a value at which the world changes — freezing, sunset, a detection-size floor —
+no method that places edges by reading values can find it, so the factor gets a
+cut describing its distribution instead. `continuous_factor_bins`,
+`factor_levels` and `encoding` are what carry such a threshold in, and the only
+inputs that fix a factor's vocabulary across datasets rather than letting each
+draw derive its own count and edges.
 
-**Nothing measures how binning-sensitive a result is.** A result now says which
-cut produced it — {attr}`~dataeval.Metadata.encoding_digest` on every bias
-result, and `scored_as` on {attr}`.BalanceOutput.factors` — so two scores can be told
-apart. What no output gives is the difference between them: re-running across
-binnings is the only evidence that a conclusion is about the cut rather than
-about the data, and DataEval does not do it for you.
+**Sensitivity to the cut is something you measure.** A result says which cut
+produced it — {attr}`~dataeval.Metadata.encoding_digest` on every bias result,
+and `scored_as` on {attr}`.BalanceOutput.factors` — so two scores can be told
+apart. Comparing them is the step that shows whether a conclusion is about the
+data or about the cut, and it is one you run yourself.
 
 For the provenance side — what to record so that two runs stay comparable, and
 which caveats attach to each evaluator — see
@@ -993,9 +1039,9 @@ which caveats attach to each evaluator — see
   factors, and what each of them does with the integers.
 - [Validation and Trust](ValidationAndTrust.md#metadata-binning-a-policy-applied-to-every-factor)
   — binning as one entry in the per-evaluator caveat inventory, alongside the
-  extractor problem it mirrors.
+  extractor choice it mirrors.
 - [Embeddings](Embeddings.md) — the same question on the geometric side: a
-  transformation applied before measurement that no result object records.
+  transformation applied before measurement, chosen for the same kind of reason.
 
 ## See this in practice
 

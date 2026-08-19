@@ -5,7 +5,7 @@ dimension, and hash), and two of them—pixel and visual—answer fundamentally 
 kinds of questions. Knowing which is which is the difference between a number you can
 compare across a dataset and one you cannot.
 
-## Pixel is the data, visual is the picture
+## Raw values and visual interpretation
 
 A **pixel statistic** reduces the values as they were stored. `PIXEL_MEAN` on a
 16-bit image is a mean of numbers that run to 65535, because that is what the file
