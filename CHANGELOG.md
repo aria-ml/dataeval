@@ -1,6 +1,32 @@
-[//]: # (3b042c1db92ce0f3159f42f6313e295c20d891b0)
+[//]: # (b0470902e2950d8b43a4064f0461dd9e1f1d6b0d)
 
 # DataEval Change Log
+
+## v1.1.0-rc5
+
+🛠️ **Improvements and Enhancements**
+
+- `b0470902` - [impr] Metadata binning as Policy
+- `aa7c0a4b` - [impr] Change balance and mutual_info binned behavior
+
+👾 **Fixes**
+
+- `bb541b8d` - [fix] Normalize Linfoot branch by its reachable maximum and clip mixed pairs
+
+📝 **Miscellaneous**
+
+- `a4a61dbe` - [docs] Adjust findings for background object comparison
+- `ab70513b` - [docs] Update binning linfoot ceiling
+- `1b6c4175` - [docs] Update ROADMAP.md with longer-term vision
+- `f1996b53` - [docs] Update roadmap
+- `2c06676a` - [misc] Implement polish and consistency fixes
+- `516e4b40` - [devsecops] Update markdownlint rules
+- `7964e3d2` - [docs] Address docstring inconsistencies and broken links
+- `6006940e` - [docs] Small edits to phrasing for clarity
+- `5075f184` - [devsecops] Remove init script and clear up torchvision dependency
+- `050463ea` - [docs] Remove mention of Conform - not shipped in 1.0
+- `67fee229` - Pre-release v1.1.0-rc4
+- `e95d37f9` - [docs] Add an input requirements page
 
 ## v1.1.0-rc4
 
