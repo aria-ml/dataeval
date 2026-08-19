@@ -8,6 +8,7 @@ request, hand it to the next dataset, and get the same codes for the same values
 import json
 import re
 import warnings
+from dataclasses import replace
 
 import numpy as np
 import polars as pl
@@ -56,6 +57,78 @@ class TestEncodingAccessor:
         assert isinstance(spec, BinSpec)
         assert spec.edges == (-np.inf, 0.0, np.inf)
         assert spec.provenance == "edges"
+
+
+@pytest.mark.required
+class TestCodeNames:
+    """Asking the record what a code means, without going through an evaluator.
+
+    The lookup existed and had no public door: :attr:`ParityOutput.insufficient_data` and
+    the ``label=`` axis groups are named through it, so anything rendering the same factor
+    itself either got the same strings or approximated them.
+    """
+
+    def test_one_factor_and_every_factor(self):
+        md = _md(_winter())
+        every = md.code_names()
+
+        assert set(every) == set(md.factor_names)
+        assert md.code_names("weather") == every["weather"]
+
+    def test_an_unknown_factor_is_an_error(self):
+        with pytest.raises(KeyError, match="not among this metadata's factors"):
+            _md(_winter()).code_names("nonexistent")
+
+    def test_a_vocabulary_names_its_codes_by_value(self):
+        md = _md(_winter())
+        assert set(md.code_names("weather").values()) == {"sun", "rain", "fog"}
+
+    def test_a_declared_cut_survives_into_its_own_labels(self):
+        """Naming a bin after its contents hid the cutoff that gave it meaning."""
+        md = _md(_winter(), continuous_factor_bins={"temp_c": [-np.inf, 0.0, np.inf]})
+        assert md.code_names("temp_c") == {1: "< 0", 2: ">= 0"}
+
+    def test_a_bin_nothing_reached_is_still_named(self):
+        """An empty bin is a finding, and reporting one means naming it."""
+        rng = np.random.default_rng(2)
+        md = _md(
+            {"temp_c": rng.normal(20.0, 3.0, 200)},
+            continuous_factor_bins={"temp_c": [-np.inf, 0.0, 10.0, np.inf]},
+        )
+        names = md.code_names("temp_c")
+
+        assert set(names) == {1, 2, 3}
+        assert names[1] == "< 0"  # named although no row is below freezing
+        assert names[2] == "[0, 10)"
+
+    def test_names_agree_with_what_the_evaluators_report(self):
+        """The whole reason this is public: one answer, not two that nearly match."""
+        md = _md(_winter(), continuous_factor_bins={"temp_c": [-np.inf, 0.0, np.inf]})
+        names = list(md.factor_names)
+        through_evaluators = factor_code_names(md, md.factor_data, names)
+
+        for position, name in enumerate(names):
+            for code, label in through_evaluators[position].items():
+                assert md.code_names(name)[code] == label
+
+    def test_large_magnitudes_stay_distinguishable(self):
+        """Six significant figures collapses epoch milliseconds onto one label."""
+        rng = np.random.default_rng(3)
+        base = 1787011240000000
+        md = _md(
+            {"capture_ms": (base + rng.integers(0, 1_200_000, 200)).astype(float)},
+            continuous_factor_bins={"capture_ms": 6},
+        )
+        names = md.code_names("capture_ms")
+
+        assert len(set(names.values())) == len(names)
+
+    def test_a_factor_that_reached_neither_path_names_nothing(self):
+        md = _md(_winter())
+        md._factor_cache["temp_c"] = replace(
+            md.factor_info["temp_c"], is_binned=False, is_digitized=False, encoding=None
+        )
+        assert md.code_names("temp_c") == {}
 
 
 @pytest.mark.required
