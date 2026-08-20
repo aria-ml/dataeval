@@ -95,7 +95,7 @@ def download_onnx_model(url, save_path):
         return
 
     print(f"Downloading model from {url}...")
-    response = requests.get(url, stream=True)
+    response = requests.get(url, stream=True, timeout=30)
     if response.status_code == 200:
         with open(save_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):

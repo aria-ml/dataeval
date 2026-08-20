@@ -76,7 +76,10 @@ def compute_notebook_hash(nb_path: Path) -> str:
 
     # Hash using NO_CONVERT mode (same as jupyter-cache)
     nb_str = nbformat.writes(hash_nb, nbformat.NO_CONVERT)
-    return hashlib.md5(nb_str.encode()).hexdigest()
+    # md5 is required for parity, not chosen for strength: jupyter-cache keys its entries
+    # with hashlib.md5 (jupyter_cache/cache/main.py), so any other algorithm would never
+    # match a cached notebook. This is a cache key, not a security boundary.
+    return hashlib.md5(nb_str.encode(), usedforsecurity=False).hexdigest()  # nosemgrep: bandit.B303-1
 
 
 def check_cache_status(docs_source_dir: Path = Path("docs/source")):
