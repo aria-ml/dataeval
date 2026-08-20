@@ -274,7 +274,7 @@ numpy = { skip = true, packages = "numpy>=1.24.2" }
 scikit-learn = { skip = true, packages = "scikit-learn>=1.5.0" }
 scipy = { skip = true, packages = "scipy>=1.10.0" }
 torch = { pip = true }  # PyTorch is no longer maintained on conda-forge
-xxhash = { skip = true, packages = "python-xxhash>=3.3" }
+xxhash = { skip = true, packages = "python-xxhash>=3.4" }
 
 [tool.pyright]
 include = ["src", "tests", "verification", "docs/source/notebooks"]

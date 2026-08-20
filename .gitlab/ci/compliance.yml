@@ -19,6 +19,7 @@ include:
       tools_used: [pyproject, poetry, ruff]
       generate_environment_yml: false
       conda_env_name: "dataeval"
+      conda_package_aliases: "xxhash=python-xxhash"
       pyproject_format: "pep621"
       full_execution_on_commit: true
       allow_failure: true
