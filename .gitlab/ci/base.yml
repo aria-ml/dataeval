@@ -11,6 +11,11 @@ variables:
   NUMBA_CACHE_DIR: .numba-cache
   FORCE_COLOR: '1'
   RELEASE_BRANCH_PATTERN: '/^release\/v.*/'
+  # Commits to main normally force a full notebook re-execution (DOCS_CLEAN
+  # below). Putting +skipdocsclean in the commit message drops that, so the docs
+  # build reuses the cached notebook outputs from docs-artifacts/main and only
+  # re-executes notebooks whose code actually changed.
+  DOCS_SKIP_CLEAN_PATTERN: '/\+skipdocsclean/'
 
 .python_versions: &python_versions
   - PYTHON_VERSION: ['3.10', '3.11', '3.12', '3.13', '3.14']
@@ -145,6 +150,10 @@ stages:
   rules:
     - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $PUBLISH_VERIFICATION
       when: never
+    # Build off the cache instead of re-executing every notebook. Scheduled
+    # pipelines (the nightly cache refresh) ignore the marker so the cache still
+    # gets rebuilt from scratch on its usual cadence.
+    - if: $CI_PIPELINE_SOURCE != 'schedule' && $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_MESSAGE =~ $DOCS_SKIP_CLEAN_PATTERN
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_CLEAN: '-- clean'

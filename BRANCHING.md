@@ -289,6 +289,22 @@ All automation scripts are located in [`.gitlab/scripts/`](.gitlab/scripts/):
 | [`releasegen.py`](.gitlab/scripts/releasegen.py)                         | Core release logic & changelog | Called by release scripts         |
 | [`versiontag.py`](.gitlab/scripts/versiontag.py)                         | Version parsing & increment    | Called by release scripts         |
 
+### Commit Message Triggers
+
+| Marker           | Effect                                                                   |
+| ---------------- | ------------------------------------------------------------------------ |
+| `+skipdocsclean` | Build docs from the cached notebook outputs instead of re-executing them |
+
+Commits to `main` normally run the docs build with `nox -e docs -- clean`, which wipes the Jupyter cache and
+re-executes every notebook. Adding `+skipdocsclean` to the commit message drops the `clean`, so the build pulls
+`.jupyter_cache` from the `docs-artifacts/main` branch and only re-executes notebooks whose code cells
+changed. The docs still build and publish -- only the notebook execution is avoided.
+
+Use it for commits that cannot change notebook output (CI config, packaging, prose-only doc edits). The
+marker has to appear in the *merge commit* message, which GitLab composes from the MR title and description,
+so putting `+skipdocsclean` in either one works. Scheduled pipelines ignore the marker, so the nightly cache
+refresh still rebuilds from scratch.
+
 ### CI/CD Pipeline
 
 The release pipeline consists of these key jobs:

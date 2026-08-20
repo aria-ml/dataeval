@@ -15,7 +15,10 @@ docs:
     - curl -LsSf https://astral.sh/uv/install.sh | sh
     - uv tool install nox --with nox-uv
   script:
-    - if [ "$CI_COMMIT_BRANCH" != "main" ]; then bash docs/fetch-docs-cache.sh || true; fi
+    # Pull the cached notebook outputs unless this build is going to clear the
+    # cache anyway. Equivalent to the old "not main" guard, except a main build
+    # marked +skipdocsclean now gets the cache too.
+    - if [ -z "$DOCS_CLEAN" ]; then bash docs/fetch-docs-cache.sh || true; fi
     - uvx nox -P 3.13 -e docs $DOCS_CLEAN
     - bash docs/push-docs-cache.sh
   cache:
