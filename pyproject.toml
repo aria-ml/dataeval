@@ -53,14 +53,18 @@ litert = ["ai-edge-litert>=2.0; python_version <= '3.14'"]
 opencv = ["opencv-python-headless>=4.8.0"]
 onnx = [
   "onnx>=1.14.0",
-  "onnxruntime>=1.15.0,<1.24; python_version == '3.10'",
-  "onnxruntime>=1.15.0; python_version >= '3.11'",
+  "onnxruntime>=1.17",
 ]
-onnx-gpu = [
+onnx-cu126 = [
   "onnx>=1.14.0",
-  "onnxruntime-gpu>=1.15.0,<1.24; python_version == '3.10'",
-  "onnxruntime-gpu>=1.15.0,<1.27; python_version >= '3.11'",  # 1.27+ requires CUDA 13.0
-  "onnxruntime-gpu>=1.24,<1.27; python_version >= '3.14'",  # 1.24+ for cp314 wheels
+  "onnxruntime-gpu>=1.17,<1.24; python_version == '3.10' and extra != 'onnx-cu130'",
+  "onnxruntime-gpu>=1.17,<1.27; python_version >= '3.11' and extra != 'onnx-cu130'",  # 1.27+ requires CUDA 13.0
+  "onnxruntime-gpu>=1.24,<1.27; python_version >= '3.14' and extra != 'onnx-cu130'",  # 1.24+ for cp314 wheels
+]
+onnx-cu130 = [
+  "onnx>=1.14.0",
+  "onnxruntime>=1.17; python_version == '3.10' and extra != 'onnx-cu126'",  # CUDA 13.0 is not supported on Python 3.10
+  "onnxruntime-gpu>=1.27; python_version >= '3.11' and extra != 'onnx-cu126'",
 ]
 ontology = ["rdflib>=7.0"]
 
@@ -184,6 +188,11 @@ conflicts = [
     { extra = "cpu" },
     { extra = "cu126" },
     { extra = "cu130" },
+  ],
+  [
+    { extra = "onnx" },
+    { extra = "onnx-cu126" },
+    { extra = "onnx-cu130" },
   ],
 ]
 constraint-dependencies = [

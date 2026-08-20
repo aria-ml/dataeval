@@ -298,7 +298,7 @@ description = "Base class for creating enumerated constants that are also subcla
 optional = true
 python-versions = ">=3.8.6,<4.0.0"
 groups = ["main"]
-markers = "python_version <= \"3.14\" and extra == \"litert\" and python_version >= \"3.11\""
+markers = "python_version >= \"3.11\" and python_version <= \"3.14\" and extra == \"litert\""
 files = [
     {file = "backports_strenum-1.2.8-py3-none-any.whl", hash = "sha256:fc297cb26971f7d5e15a478a06a78575197f81daea47975771b1aae996dcccf4"},
     {file = "backports_strenum-1.2.8.tar.gz", hash = "sha256:4dd47365fd427ac8028aeb1ad3628ea38e67c4d0336ceebd5c0f113e0c487ce9"},
@@ -747,7 +747,7 @@ description = "Colored terminal output for Python's logging module"
 optional = true
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 groups = ["main"]
-markers = "python_version == \"3.10\" and (extra == \"onnx\" or extra == \"onnx-gpu\")"
+markers = "(extra != \"onnx-cu126\" and extra == \"onnx-cu130\" or extra == \"onnx\" or extra != \"onnx-cu130\" and extra == \"onnx-cu126\") and python_version == \"3.10\""
 files = [
     {file = "coloredlogs-15.0.1-py2.py3-none-any.whl", hash = "sha256:612ee75c546f53e92e70049c9dbfcc18c935a2b9a53b66085ce9ef6a6e5c0934"},
     {file = "coloredlogs-15.0.1.tar.gz", hash = "sha256:7c991aa71a4577af2f82600d8f8f3a89f936baeaf9b50a9c197da014e5bf16b0"},
@@ -1485,7 +1485,7 @@ description = "The FlatBuffers serialization format for Python"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "(python_version <= \"3.14\" or extra == \"onnx\" or extra == \"onnx-gpu\") and (extra == \"litert\" or extra == \"onnx\" or extra == \"onnx-gpu\")"
+markers = "(extra == \"litert\" or extra == \"onnx\") and python_version <= \"3.14\" or extra != \"onnx-cu130\" and extra == \"onnx-cu126\" or extra != \"onnx-cu126\" and extra == \"onnx-cu130\" or extra == \"onnx\""
 files = [
     {file = "flatbuffers-25.12.19-py2.py3-none-any.whl", hash = "sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4"},
 ]
@@ -1766,7 +1766,7 @@ description = "Human friendly output for text interfaces using Python"
 optional = true
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 groups = ["main"]
-markers = "python_version == \"3.10\" and (extra == \"onnx\" or extra == \"onnx-gpu\")"
+markers = "(extra != \"onnx-cu126\" and extra == \"onnx-cu130\" or extra == \"onnx\" or extra != \"onnx-cu130\" and extra == \"onnx-cu126\") and python_version == \"3.10\""
 files = [
     {file = "humanfriendly-10.0-py2.py3-none-any.whl", hash = "sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477"},
     {file = "humanfriendly-10.0.tar.gz", hash = "sha256:6b0b831ce8f15f7300721aa49829fc4e83921a9a301cc7f606be6686a2288ddc"},
@@ -3304,7 +3304,7 @@ files = [
     {file = "ml_dtypes-0.5.4-cp39-cp39-win_amd64.whl", hash = "sha256:3d277bf3637f2a62176f4575512e9ff9ef51d00e39626d9fe4a161992f355af2"},
     {file = "ml_dtypes-0.5.4.tar.gz", hash = "sha256:8ab06a50fb9bf9666dd0fe5dfb4676fa2b0ac0f31ecff72a6c3af8e22c063453"},
 ]
-markers = {main = "extra == \"onnx\" or extra == \"onnx-gpu\""}
+markers = {main = "extra == \"onnx\" or extra == \"onnx-cu126\" or extra == \"onnx-cu130\""}
 
 [package.dependencies]
 numpy = [
@@ -3951,7 +3951,7 @@ files = [
     {file = "onnx-1.21.0-cp314-cp314t-win_arm64.whl", hash = "sha256:efba467efb316baf2a9452d892c2f982b9b758c778d23e38c7f44fa211b30bb9"},
     {file = "onnx-1.21.0.tar.gz", hash = "sha256:4d8b67d0aaec5864c87633188b91cc520877477ec0254eda122bef8be43cd764"},
 ]
-markers = {main = "extra == \"onnx\" or extra == \"onnx-gpu\""}
+markers = {main = "extra == \"onnx\" or extra == \"onnx-cu126\" or extra == \"onnx-cu130\""}
 
 [package.dependencies]
 ml_dtypes = [
@@ -3991,7 +3991,7 @@ description = "ONNX Runtime is a runtime accelerator for Machine Learning models
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "python_version == \"3.10\" and extra == \"onnx\""
+markers = "(extra != \"onnx-cu126\" and extra == \"onnx-cu130\" or extra == \"onnx\") and python_version == \"3.10\""
 files = [
     {file = "onnxruntime-1.23.2-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:a7730122afe186a784660f6ec5807138bf9d792fa1df76556b27307ea9ebcbe3"},
     {file = "onnxruntime-1.23.2-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:b28740f4ecef1738ea8f807461dd541b8287d5650b5be33bca7b474e3cbd1f36"},
@@ -4032,7 +4032,7 @@ description = "ONNX Runtime is a runtime accelerator for Machine Learning models
 optional = true
 python-versions = ">=3.11"
 groups = ["main"]
-markers = "python_version >= \"3.11\" and extra == \"onnx\""
+markers = "extra == \"onnx\" and python_version >= \"3.11\""
 files = [
     {file = "onnxruntime-1.24.4-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:0bdfce8e9a6497cec584aab407b71bf697dac5e1b7b7974adc50bf7533bdb3a2"},
     {file = "onnxruntime-1.24.4-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:046ff290045a387676941a02a8ae5c3ebec6b4f551ae228711968c4a69d8f6b7"},
@@ -4074,7 +4074,7 @@ description = "ONNX Runtime is a runtime accelerator for Machine Learning models
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "python_version == \"3.10\" and extra == \"onnx-gpu\""
+markers = "python_version == \"3.10\" and extra != \"onnx-cu130\" and extra == \"onnx-cu126\""
 files = [
     {file = "onnxruntime_gpu-1.23.2-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:18de50c6c8eea50acc405ea13d299aec593e46478d7a22cd32cdbbdf7c42899d"},
     {file = "onnxruntime_gpu-1.23.2-cp310-cp310-win_amd64.whl", hash = "sha256:deba091e15357355aa836fd64c6c4ac97dd0c4609c38b08a69675073ea46b321"},
@@ -4106,7 +4106,7 @@ description = "ONNX Runtime is a runtime accelerator for Machine Learning models
 optional = true
 python-versions = ">=3.11"
 groups = ["main"]
-markers = "python_version >= \"3.11\" and extra == \"onnx-gpu\""
+markers = "python_version >= \"3.11\" and extra != \"onnx-cu130\" and extra == \"onnx-cu126\""
 files = [
     {file = "onnxruntime_gpu-1.24.4-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c2a698659271c28220b3f56fe9b63f70eae3b3c36afa544201bf750b929a36dc"},
     {file = "onnxruntime_gpu-1.24.4-cp311-cp311-win_amd64.whl", hash = "sha256:1a799a16e5f1ff4d6a9e5f72d750849ab0fe534da8d323ae4a5d8d8bb7daeca8"},
@@ -4130,6 +4130,45 @@ sympy = "*"
 [package.extras]
 cuda = ["nvidia-cuda-nvrtc-cu12 (>=12.0,<13.0)", "nvidia-cuda-runtime-cu12 (>=12.0,<13.0)", "nvidia-cufft-cu12 (>=11.0,<12.0)", "nvidia-curand-cu12 (>=10.0,<11.0)"]
 cudnn = ["nvidia-cudnn-cu12 (>=9.0,<10.0)"]
+
+[[package]]
+name = "onnxruntime-gpu"
+version = "1.29.0"
+description = "ONNX Runtime is a runtime accelerator for Machine Learning models"
+optional = true
+python-versions = ">=3.11"
+groups = ["main"]
+markers = "python_version >= \"3.11\" and extra != \"onnx-cu126\" and extra == \"onnx-cu130\""
+files = [
+    {file = "onnxruntime_gpu-1.29.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:de3caf93887ba4ad51c7d3cab04c7b464f9dd93c51047be5bfb413fd4a191e6a"},
+    {file = "onnxruntime_gpu-1.29.0-cp311-cp311-manylinux_2_34_aarch64.whl", hash = "sha256:6f5344dce3d6d41248d5135e159f5addb49114198ea4630c258855cb532a6688"},
+    {file = "onnxruntime_gpu-1.29.0-cp311-cp311-win_amd64.whl", hash = "sha256:fb6045d8623a5b9f949449bb4b93bab92e7f77578a2dc34420babacd16e2908c"},
+    {file = "onnxruntime_gpu-1.29.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:8ccd052ca4de21b2a335f3503a283126163b6fab9dba29d1d9cbf3fa55c51d28"},
+    {file = "onnxruntime_gpu-1.29.0-cp312-cp312-manylinux_2_34_aarch64.whl", hash = "sha256:545d2966dd11208bbc98e67be4d92e54ecd793acc45c0532cc7bfd36f50692fa"},
+    {file = "onnxruntime_gpu-1.29.0-cp312-cp312-win_amd64.whl", hash = "sha256:a64aa7c3dd7fa6b29fa7bcb0439ebd204607a590d3ce02bb276672257da4a454"},
+    {file = "onnxruntime_gpu-1.29.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:264f14cac514238bd548b5960b487383768c05967dc1291ccf46e7a9e7699af5"},
+    {file = "onnxruntime_gpu-1.29.0-cp313-cp313-manylinux_2_34_aarch64.whl", hash = "sha256:38f5ed87714af536f38d6ee81329d4a3899bf40d2fce9cf39dd6be74855b4832"},
+    {file = "onnxruntime_gpu-1.29.0-cp313-cp313-win_amd64.whl", hash = "sha256:c37187aaa39802283f47094ccdfa5a0667b7f9723feed67facf2cef6e0e6a6dc"},
+    {file = "onnxruntime_gpu-1.29.0-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:dca01986a5feb7c494d02333d43aa4deb2b482a9d341c6888b7837b72c9a9a07"},
+    {file = "onnxruntime_gpu-1.29.0-cp313-cp313t-manylinux_2_34_aarch64.whl", hash = "sha256:3eace12b5065ca64bfe17ebd88427e833a8b4ed288f40e5e045db050c08d76b8"},
+    {file = "onnxruntime_gpu-1.29.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:5c50d24541bf61e668dfe0a7a3a62de98def81959c832cc2d376814b661cb006"},
+    {file = "onnxruntime_gpu-1.29.0-cp314-cp314-manylinux_2_34_aarch64.whl", hash = "sha256:17d6ec021b06e9b3f622c69083ad48d725f95c319d2625280eacf092490e21f6"},
+    {file = "onnxruntime_gpu-1.29.0-cp314-cp314-win_amd64.whl", hash = "sha256:4247025e674a666f839c02b90c829277cb2e1be11576d3646cad5c86b7fc26c5"},
+    {file = "onnxruntime_gpu-1.29.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:f1330dcda8cb6f7ad46d87cbf2330fc52f007206a1d22f3830d680d36c8de80f"},
+    {file = "onnxruntime_gpu-1.29.0-cp314-cp314t-manylinux_2_34_aarch64.whl", hash = "sha256:70a3cab61b800bff1c1cce1d56ecd31f894075b2eb92577bc6189eb660e3e8b2"},
+]
+
+[package.dependencies]
+flatbuffers = "*"
+numpy = ">=1.21.6"
+packaging = "*"
+protobuf = ">=4.25.8"
+
+[package.extras]
+cuda = ["nvidia-cuda-nvrtc (>=13.0,<14.0)", "nvidia-cuda-runtime (>=13.0,<14.0)", "nvidia-cufft (>=12.0,<13.0)", "nvidia-curand (>=10.0,<11.0)"]
+cudnn = ["nvidia-cudnn-cu13 (>=9.0,<10.0)"]
+quantization = ["ml_dtypes"]
+symbolic = ["sympy"]
 
 [[package]]
 name = "onnxscript"
@@ -4235,7 +4274,7 @@ files = [
     {file = "packaging-26.0-py3-none-any.whl", hash = "sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529"},
     {file = "packaging-26.0.tar.gz", hash = "sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4"},
 ]
-markers = {main = "extra == \"onnx\" or extra == \"onnx-gpu\""}
+markers = {main = "extra != \"onnx-cu126\" and extra == \"onnx-cu130\" or extra == \"onnx\" or extra != \"onnx-cu130\" and extra == \"onnx-cu126\""}
 
 [[package]]
 name = "pandas"
@@ -5173,7 +5212,7 @@ description = "A python implementation of GNU readline."
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "sys_platform == \"win32\" and (extra == \"onnx\" or extra == \"onnx-gpu\") and python_version == \"3.10\""
+markers = "sys_platform == \"win32\" and (extra != \"onnx-cu126\" and extra == \"onnx-cu130\" or extra == \"onnx\" or extra != \"onnx-cu130\" and extra == \"onnx-cu126\") and python_version == \"3.10\""
 files = [
     {file = "pyreadline3-3.5.4-py3-none-any.whl", hash = "sha256:eaf8e6cc3c49bcccf145fc6067ba8643d1df34d604a1ec0eccbf7a18e6d3fae6"},
     {file = "pyreadline3-3.5.4.tar.gz", hash = "sha256:8d57d53039a1c75adba8e50dd3d992b28143480816187ea5efbd5c78e6c885b7"},
@@ -8030,12 +8069,13 @@ cpu = ["torch", "torchvision"]
 cu126 = ["torch", "torchvision"]
 cu130 = ["torch", "torchvision"]
 litert = ["ai-edge-litert"]
-onnx = ["onnx", "onnxruntime", "onnxruntime"]
-onnx-gpu = ["onnx", "onnxruntime-gpu", "onnxruntime-gpu", "onnxruntime-gpu"]
+onnx = ["onnx", "onnxruntime"]
+onnx-cu126 = ["onnx", "onnxruntime-gpu", "onnxruntime-gpu", "onnxruntime-gpu"]
+onnx-cu130 = ["onnx", "onnxruntime", "onnxruntime-gpu"]
 ontology = ["rdflib"]
 opencv = ["opencv-python-headless"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "aebfa48948e04f087bd5f14d7de529807abfdcc7e7e397ca63429040372c6283"
+content-hash = "01af3c95b7a846e3c1cdaa7c39cc0d9cee97b01d0711627cafb35dc6c7ea8fcb"

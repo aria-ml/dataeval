@@ -73,7 +73,7 @@ PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 PYTHON_DEFAULT = "3.11"
 PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
 DEVICE_VARIANTS = ["cpu", "cu126", "cu130"]
-DEVICE_DEFAULT = "cu130"
+DEVICE_DEFAULT = "cpu"
 VENV_DEFAULT = ".venv"
 CUDA_VERSION_FILE = ".cuda-version"
 IS_CI = bool(os.environ.get("CI"))
@@ -115,11 +115,9 @@ def get_python_version(session: nox.Session) -> str:
 
 
 def with_onnx(extras: list[str]) -> list[str]:
-    if "cpu" in extras:
-        return extras + ["onnx"]
-    if any(extra.startswith("cu") for extra in extras):
-        return extras + ["onnx-gpu"]
-    return extras
+    if cuda_extra := next((extra for extra in extras if extra.startswith("cu")), None):
+        return extras + [f"onnx-{cuda_extra}"]
+    return extras + ["onnx"]
 
 
 def resolve_option(session: nox.Session, label: str, provided: "str | None", allowed: list[str], default: str) -> str:
@@ -394,7 +392,7 @@ def lock(session: nox.Session) -> None:
             "--extra",
             variant,
             "--extra",
-            "onnx" if variant == "cpu" else "onnx-gpu",
+            "onnx" if variant == "cpu" else f"onnx-{variant}",
             "--extra",
             "opencv",
             "-o",
