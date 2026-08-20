@@ -174,22 +174,22 @@ class TestViewCore:
         assert "Selected Size: 3" in text
 
 
-class TestRootDatasetAndOperationGroups:
-    """``root_dataset`` and ``operation_groups`` walk a nested View chain for metadata."""
+class TestRootAndOperationGroups:
+    """``root`` and ``operation_groups`` walk a nested View chain for metadata."""
 
     @staticmethod
     def _noop() -> Operation:
         return type("_Noop", (Operation,), {"apply": lambda self_, view: None})()
 
-    def test_root_dataset_on_unwrapped_view(self):
+    def test_root_on_unwrapped_view(self):
         base = MockDataset()
         v = View(base)  # type: ignore
-        assert v.root_dataset is base
+        assert v.root is base
 
-    def test_root_dataset_walks_through_nesting(self):
+    def test_root_walks_through_nesting(self):
         base = MockDataset()
         chain = View(View(View(base)))  # type: ignore
-        assert chain.root_dataset is base
+        assert chain.root is base
 
     def test_operation_groups_empty_when_no_operations_anywhere(self):
         base = MockDataset()
@@ -219,3 +219,77 @@ class TestRootDatasetAndOperationGroups:
         base.metadata = {"id": "RealBase"}
         outer = View(View(base))  # type: ignore
         assert outer.metadata["id"] == "RealBase"
+
+
+class LabeledDataset:
+    """A dataset that mirrors its label vocabulary as an instance attribute.
+
+    The convention a real source dataset follows -- ``index2label`` reachable both as
+    ``ds.index2label`` and through ``ds.metadata`` -- and the shape of the conflict the
+    ``source`` property exists to prevent.
+    """
+
+    def __init__(self) -> None:
+        self.index2label = {0: "cat", 1: "dog"}
+        self.metadata = {"id": "labeled", "index2label": dict(self.index2label)}
+        self._cache = ["private", "state"]
+
+    def __len__(self) -> int:
+        return 2
+
+    def __getitem__(self, index: int) -> int:
+        return index
+
+
+class CollapseVocabulary(Operation):
+    """Metadata op: rewrite the class vocabulary to a single merged class."""
+
+    def apply_metadata(self, metadata: DatasetMetadata) -> DatasetMetadata:
+        return {**metadata, "index2label": {0: "animal"}}  # type: ignore[return-value]
+
+    def apply(self, view: View) -> None:
+        return None
+
+
+class TestSource:
+    """``source`` names the immediate wrapped dataset; nothing else crosses the boundary."""
+
+    def test_source_is_the_immediate_wrapped_dataset(self):
+        base = MockDataset()
+        assert View(base).source is base  # type: ignore
+
+    def test_source_of_a_nested_view_is_the_inner_view(self):
+        base = MockDataset()
+        inner = View(base)  # type: ignore
+        outer = View(inner)
+        assert outer.source is inner
+        assert inner.source is base
+
+    def test_source_and_root_differ_on_a_nested_chain(self):
+        base = MockDataset()
+        inner = View(base)  # type: ignore
+        outer = View(inner)
+        assert outer.source is inner
+        assert outer.root is base
+
+    def test_source_reaches_the_original_vocabulary_explicitly(self):
+        view = View(LabeledDataset(), [CollapseVocabulary()])  # type: ignore
+        source = view.source
+        assert isinstance(source, LabeledDataset)
+        assert source.index2label == {0: "cat", 1: "dog"}
+
+    def test_source_public_attributes_do_not_leak_onto_the_view(self):
+        view = View(LabeledDataset())  # type: ignore
+        assert not hasattr(view, "index2label")
+
+    def test_source_private_state_does_not_leak_onto_the_view(self):
+        view = View(LabeledDataset())  # type: ignore
+        assert "_cache" not in view.__dict__
+
+    def test_stale_source_vocabulary_is_unreachable_when_an_operation_rewrites_it(self):
+        # The conflict: the view's metadata is relabeled, so a leaked ``index2label``
+        # attribute would contradict it. Only the rewritten vocabulary is reachable.
+        view = View(LabeledDataset(), [CollapseVocabulary()])  # type: ignore
+        assert "index2label" in view.metadata
+        assert view.metadata["index2label"] == {0: "animal"}
+        assert not hasattr(view, "index2label")

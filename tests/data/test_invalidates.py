@@ -129,10 +129,23 @@ class TestInvalidatedStatsCrossesNonViewBarrier:
     def test_crops_does_not_invalidate_channels(self):
         assert not invalidated_stats(DetectionCrops(_ODDataset())) & ImageStats.DIMENSION_CHANNELS
 
-    def test_invalidates_is_a_class_attribute_not_instance_state(self):
-        # View.__init__ copies the source's __dict__ onto itself; an instance-level
-        # `invalidates` would leak upward and be attributed to the wrapping View.
-        assert "invalidates" not in DetectionCrops(_ODDataset()).__dict__
+    def test_walk_descends_a_wrapper_exposing_only_the_public_source(self):
+        # The wrapper contract is `source`, not a private `_dataset` probe: a third-party
+        # wrapper that names its parent the documented way is walked through.
+        class ThirdPartyWrapper:
+            metadata = {"id": "third-party"}
+
+            def __init__(self, dataset) -> None:
+                self.source = dataset
+
+            def __len__(self) -> int:
+                return len(self.source)
+
+            def __getitem__(self, index: int):
+                return self.source[index]
+
+        wrapped = ThirdPartyWrapper(View(Images(), [Resizer((2, 2))]))
+        assert invalidated_stats(wrapped) == ImageStats.DIMENSION | ImageStats.VISUAL_SHARPNESS
 
     def test_wrapping_view_is_not_credited_with_the_crop_invalidation(self):
         view = View(DetectionCrops(_ODDataset()))

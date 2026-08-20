@@ -254,13 +254,13 @@ assert np.array_equal(np.asarray(custom[0][0]), 255 - np.asarray(mnist[0][0]))
 nested = View(View(mnist, [ClassFilter([0, 1])]), [Limit(25)])
 
 print("operations, innermost first:", nested.operation_groups)
-print("original dataset:", type(nested.root_dataset).__name__)
+print("original dataset:", type(nested.root).__name__)
 print("source indices behind the first 5 items:", nested.resolve_indices()[:5])
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
 assert len(nested.operation_groups) == 2
-assert nested.root_dataset is mnist
+assert nested.root is mnist
 
 # %% [markdown]
 # ## Summary

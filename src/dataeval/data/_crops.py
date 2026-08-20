@@ -132,8 +132,6 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
     ----------
     n_dropped : int
         Number of detections dropped by ``min_size`` (or for being degenerate).
-    index2label : dict[int, str]
-        Mapping from class index to name, inherited from the source dataset.
 
     Notes
     -----
@@ -166,10 +164,9 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
 
     # Every datum is a re-framed sub-image — a crop, plus a resize to square unless
     # square="off" — so every dimension statistic describes the crop policy rather than
-    # the source image. Channel count is the one dimension stat that survives. Declared
-    # as a class attribute, never set in __init__: View.__init__ copies a source's
-    # instance __dict__ onto itself, so instance state here would be misattributed to a
-    # wrapping View.
+    # the source image. Channel count is the one dimension stat that survives. A class
+    # attribute rather than a property because it does not vary with the constructor
+    # arguments: every crop policy invalidates the same set.
     invalidates: ImageStats = ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS
 
     @requires_maite_dataset("dataset", expected="object_detection")
@@ -218,10 +215,10 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         self._index_map = index_map
         self._source_ids = source_ids
         self.n_dropped: int = n_dropped
-        self.index2label: Mapping[int, str] = self._resolve_index2label(observed)
-        self._n_classes = (max(self.index2label) + 1) if self.index2label else 0
+        self._index2label: Mapping[int, str] = self._resolve_index2label(observed)
+        self._n_classes = (max(self._index2label) + 1) if self._index2label else 0
         source_id = str(dataset.metadata.get("id", "dataset"))
-        self._metadata = DatasetMetadata({"id": f"{source_id}-crops", "index2label": dict(self.index2label)})
+        self._metadata = DatasetMetadata({"id": f"{source_id}-crops", "index2label": dict(self._index2label)})
 
         # Single-slot cache: index_map is in image order, so consecutive detections from the
         # same image reuse one read instead of re-reading the image per detection.
@@ -245,6 +242,15 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
                 index2label.setdefault(label, f"UNDEFINED_CLASS_{label}")
             return index2label
         return {label: str(label) for label in sorted(observed)}
+
+    @property
+    def source(self) -> ObjectDetectionDataset:
+        """The object-detection dataset this wrapper directly wraps -- one link up the chain.
+
+        Named to match :attr:`~dataeval.data.View.source`, so a mixed wrapping chain such as
+        ``View(DetectionCrops(base))`` is walkable through one public attribute.
+        """
+        return self._dataset
 
     @property
     def metadata(self) -> DatasetMetadata:
@@ -282,7 +288,7 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         sep = "-" * len(title)
         return (
             f"{title}\n{sep}\n    region: {self._region}\n    square: {self._square}\n"
-            f"    crops: {len(self)} ({self.n_dropped} dropped)\n    classes: {len(self.index2label)}\n\n"
+            f"    crops: {len(self)} ({self.n_dropped} dropped)\n    classes: {len(self._index2label)}\n\n"
             f"{self._dataset}"
         )
 

@@ -67,11 +67,9 @@ class Operation(ReprMixin, ABC):
         Unlike :attr:`requires`, which is a static class attribute, this is a read-only
         property, and concrete operations override it as one — what a transform invalidates
         depends on its constructor arguments (``Resize(size, mode="stretch")`` leaves the
-        pixel statistics alone; ``mode="pad"`` does not). Declaring it on a wrapper *dataset*
-        rather than an operation (see :class:`~dataeval.data.DetectionCrops`) must use a
-        class attribute and never set it in ``__init__``: :meth:`View.__init__` copies a
-        source's instance ``__dict__`` onto the view, so instance-level state would leak up
-        to the wrapper.
+        pixel statistics alone; ``mode="pad"`` does not). A wrapper *dataset* may declare it
+        directly instead (see :class:`~dataeval.data.DetectionCrops`), as either a class
+        attribute or a property.
         """
         return ImageStats.NONE
 
@@ -117,6 +115,13 @@ class View(AnnotatedDataset[_TDatum]):
     filters on the *relabeled* classes, while the reverse filters on the source ones,
     and ``[Limit(1000), Shuffle(), Limit(100)]`` keeps a random 100 of the first 1000.
 
+    A view does not inherit the source dataset's attributes. It exposes only its own
+    surface — :attr:`metadata`, :attr:`selection`, :attr:`source`, :attr:`root`,
+    :attr:`operation_groups` — so a value an operation rewrote has exactly one reachable
+    form. ``Relabel`` folds a new ``index2label`` into :attr:`metadata`; an inherited
+    ``view.index2label`` would still hold the source's, and the two would disagree.
+    Reach anything source-specific through :attr:`source`.
+
     Examples
     --------
     >>> from dataeval.data import View, ClassFilter, Limit
@@ -138,7 +143,6 @@ class View(AnnotatedDataset[_TDatum]):
         dataset: Dataset[_TDatum],
         operations: Operation | Sequence[Operation] | None = None,
     ) -> None:
-        self.__dict__.update(getattr(dataset, "__dict__", {}))
         self._dataset = dataset
         self._operations = self._normalize(operations)
         self.selection = list(range(len(dataset)))
@@ -183,11 +187,32 @@ class View(AnnotatedDataset[_TDatum]):
 
     # -- dataset interface ----------------------------------------------------
     @property
-    def root_dataset(self) -> Dataset[_TDatum]:
-        """The original dataset at the bottom of any :class:`View` wrapping chain."""
+    def source(self) -> Dataset[_TDatum]:
+        """The dataset this view directly wraps -- one link up the chain.
+
+        A view exposes only its own surface: :attr:`metadata` (folded through the
+        operations, so a rewritten ``index2label`` is the one you get), :attr:`selection`,
+        :attr:`operation_groups`, and this. Nothing else crosses the boundary -- reach
+        anything source-specific explicitly through ``view.source``, which cannot go
+        stale the way a copied attribute would.
+
+        See Also
+        --------
+        root : the dataset at the *bottom* of the chain, however deep.
+        """
+        return self._dataset
+
+    @property
+    def root(self) -> Dataset[_TDatum]:
+        """The original dataset at the bottom of any :class:`View` wrapping chain.
+
+        See Also
+        --------
+        source : the dataset one link up, whether or not it is itself a view.
+        """
         current: Dataset[_TDatum] = self
         while isinstance(current, View):
-            current = current._dataset
+            current = current.source
         return current
 
     @property
@@ -203,7 +228,7 @@ class View(AnnotatedDataset[_TDatum]):
         while isinstance(current, View):
             if current._operations:
                 groups.append(list(current._operations))
-            current = current._dataset
+            current = current.source
         groups.reverse()
         return groups
 

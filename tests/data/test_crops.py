@@ -56,6 +56,16 @@ def _simple_dataset() -> _ODDataset:
 
 @pytest.mark.required
 class TestStructure:
+    def test_source_is_the_wrapped_dataset(self):
+        ds = _simple_dataset()
+        assert DetectionCrops(ds).source is ds
+
+    def test_source_makes_the_wrapper_chain_walkable_from_a_view(self):
+        ds = _simple_dataset()
+        crops = DetectionCrops(ds)
+        assert View(crops).source is crops
+        assert crops.source is ds
+
     def test_length_is_total_detections(self):
         crops = DetectionCrops(_simple_dataset())
         assert len(crops) == 5  # 2 + 1 + 2
@@ -93,7 +103,6 @@ class TestStructure:
 
     def test_index2label_inherited_and_metadata_id_suffixed(self):
         crops = DetectionCrops(_simple_dataset())
-        assert crops.index2label == {0: "a", 1: "b", 2: "c"}
         assert crops.metadata["id"] == "toy-crops"
         assert "index2label" in crops.metadata
         assert crops.metadata["index2label"] == {0: "a", 1: "b", 2: "c"}
@@ -103,7 +112,7 @@ class TestStructure:
         ds = _ODDataset(images, [_ODTarget([[0, 0, 10, 10]], [5])], index2label={0: "a"})
         crops = DetectionCrops(ds)
         assert "index2label" in crops.metadata
-        assert crops.index2label[5] == "UNDEFINED_CLASS_5"
+        assert crops.metadata["index2label"][5] == "UNDEFINED_CLASS_5"
         assert crops[0][1].shape == (6,)  # one-hot sized to the highest class index
 
     def test_empty_dataset(self):
@@ -253,7 +262,6 @@ class TestIndex2LabelFallback:
         ds = _NoLabelMapODDataset(images, [_ODTarget([[0, 0, 10, 10], [20, 20, 30, 30]], [2, 0])])
         crops = DetectionCrops(ds)
         assert ds.metadata.get("index2label") is None  # precondition for the fallback branch
-        assert crops.index2label == {0: "0", 2: "2"}
         assert "index2label" in crops.metadata
         assert crops.metadata["index2label"] == {0: "0", 2: "2"}
 
@@ -285,7 +293,8 @@ class TestDunders:
         assert "DetectionCrops Dataset" in text
         assert "region: object" in text
         assert f"crops: {len(crops)} ({crops.n_dropped} dropped)" in text
-        assert f"classes: {len(crops.index2label)}" in text
+        assert "index2label" in crops.metadata
+        assert f"classes: {len(crops.metadata['index2label'])}" in text
 
 
 @pytest.mark.required

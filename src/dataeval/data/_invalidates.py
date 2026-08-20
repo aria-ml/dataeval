@@ -25,9 +25,9 @@ def _node_sources(node: Any) -> list[tuple[str, ImageStats]]:
     """Return the invalidation declared by a single link in a wrapping chain.
 
     A :class:`~dataeval.data.View`'s own ``invalidates`` attribute is deliberately not
-    read: :meth:`View.__init__` copies the source's instance ``__dict__`` onto the view,
-    so an instance-level declaration on a wrapped dataset would be misattributed to the
-    wrapping view. A view speaks only through its operations.
+    read: a view rewrites content only through its operations, so its declaration is the
+    union of theirs and reading both would double-count. A wrapper *dataset*, which has
+    no operations, declares directly.
     """
     from dataeval.data._view import View
 
@@ -55,19 +55,24 @@ def invalidating_sources(dataset: Any) -> list[tuple[str, ImageStats]]:
 
     Notes
     -----
-    The walk descends ``_dataset`` rather than reading
+    The walk descends :attr:`~dataeval.data.View.source` rather than reading
     :attr:`~dataeval.data.View.operation_groups` alone. ``operation_groups`` stops at the
     first non-:class:`~dataeval.data.View` in the chain, so an ``operation_groups``-only
     implementation silently misses the inner operations of
     ``View(DetectionCrops(View(base, [Resize()])))``. Descending also revisits operations
     that ``operation_groups`` already spans, which double-counts — harmless, because the
     caller only unions with ``|``.
+
+    ``source`` is the public name every wrapper in this package gives its parent, so the
+    walk crosses a third-party wrapper that follows the same convention. A wrapper with
+    several parents (see ``merge_datasets``) names none of them ``source`` and terminates
+    the walk.
     """
     sources: list[tuple[str, ImageStats]] = []
     current: Any = dataset
     while current is not None:
         sources.extend(_node_sources(current))
-        current = getattr(current, "_dataset", None)
+        current = getattr(current, "source", None)
     return sources
 
 
