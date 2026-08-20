@@ -1,6 +1,17 @@
-[//]: # (b0470902e2950d8b43a4064f0461dd9e1f1d6b0d)
+[//]: # (80617a40fa719cf50a2fd1e834a212f25798a93f)
 
 # DataEval Change Log
+
+## v1.1.0-rc6
+
+🛠️ **Improvements and Enhancements**
+
+- `80617a40` - [impr] Expose code_names from Metadata
+
+📝 **Miscellaneous**
+
+- `e29313e9` - [docs] Address feedback on concept page prose
+- `000b2d21` - Pre-release v1.1.0-rc5
 
 ## v1.1.0-rc5
 
