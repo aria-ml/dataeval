@@ -4,6 +4,7 @@ import pytest
 
 from dataeval import Metadata
 from dataeval.bias import Diversity
+from dataeval.bias._diversity import DiversityOutput
 from dataeval.types import ExecutionMetadata
 from tests.conftest import MockMetadata, to_metadata
 
@@ -205,3 +206,11 @@ class TestDiversityFunctional:
         classwise_values = result.classwise["diversity_value"].to_numpy()
         for val in classwise_values:
             np.testing.assert_almost_equal(val, expected_classwise)
+
+
+@pytest.mark.required
+def test_plot_type_identifies_the_output_for_plotting():
+    """`plot_type` is the discriminator dataeval-plots dispatches on."""
+    empty = pl.DataFrame()
+    output = DiversityOutput(factors=empty, classwise=empty)
+    assert output.plot_type == "diversity"

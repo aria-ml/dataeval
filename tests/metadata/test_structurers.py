@@ -17,6 +17,7 @@ from dataeval._metadata._structurers import (
     ODImageStructurer,
     RowBlock,
     StructuredData,
+    Structurer,
     reserved_block_columns,
     select_structurer,
 )
@@ -723,3 +724,78 @@ class TestUnitIndexColumn:
         assert "image_index" not in RESERVED_COLUMNS
         assert safe_column_name("unit_index") == "metadata_unit_index"
         assert safe_column_name("image_index") == "image_index"
+
+
+@pytest.mark.required
+class TestStructurerDeclarationChecks:
+    """The three level declarations are interdependent, so a mismatch is a class-creation error."""
+
+    def test_item_level_outside_the_schema_is_rejected(self):
+        with pytest.raises(TypeError, match=r"item_level is 'frame'.*not one of its declared levels"):
+
+            class _BadItemLevel(Structurer):
+                levels = FactorLevelSchema.of("unit")
+                item_level = "frame"  # type: ignore[assignment]
+
+    def test_label_level_outside_the_schema_is_rejected(self):
+        with pytest.raises(TypeError, match=r"label_level is 'box'.*not one of its declared levels"):
+
+            class _BadLabelLevel(Structurer):
+                levels = FactorLevelSchema.of("unit")
+                label_level = "box"  # type: ignore[assignment]
+
+
+@pytest.mark.required
+class TestRowBlockAncestry:
+    def test_a_level_absent_from_the_mapping_reads_as_no_ancestor(self):
+        """A missing level is the block-wide statement that no row has such an ancestor."""
+        block = RowBlock("unit", 3, reserved_block_columns("unit", 3, item_index=[0, 1, 2]), {"unit": np.arange(3)})
+        np.testing.assert_array_equal(block.positions_at("sequence"), np.full(3, -1, dtype=np.intp))
+
+
+@pytest.mark.required
+class TestStructuredDataEmptyFrame:
+    def test_to_frame_with_no_blocks_keeps_the_column_order(self):
+        data = StructuredData((), {})
+        frame = data.to_frame()
+        assert frame.height == 0
+        assert tuple(frame.columns) == tuple(data.column_order)
+
+
+@pytest.mark.required
+class TestFactorsStructurerEntryPoints:
+    def test_build_from_source_index_needs_one(self):
+        """The two builders are not interchangeable: this one has no rows to place onto."""
+        from dataeval._metadata._structurers._factors import FactorsStructurer
+
+        with pytest.raises(ValueError, match="requires a structurer built with a source index"):
+            FactorsStructurer().build_from_source_index({"a": np.array([1, 2])}, None)
+
+
+@pytest.mark.required
+class TestRowLayoutPartialAncestry:
+    """Whether every row at one level records an ancestor at another."""
+
+    @staticmethod
+    def _layout(positions):
+        from dataeval._metadata._structurers._layout import RowLayout
+
+        # A unit block first, so the scan has a block to step past before the match.
+        return RowLayout((
+            ("unit", 2, {"unit": np.arange(2, dtype=np.intp)}),
+            ("instance", 3, {"unit": np.asarray(positions, dtype=np.intp)}),
+        ))
+
+    def test_a_level_with_no_rows_reports_no_gap(self):
+        from dataeval._metadata._structurers._layout import RowLayout
+
+        assert RowLayout(()).partial_ancestry("unit", "instance") is False
+
+    def test_every_row_recording_an_ancestor_is_not_partial(self):
+        assert self._layout([0, 0, 1]).partial_ancestry("unit", "instance") is False
+
+    def test_a_negative_position_marks_a_missing_ancestor(self):
+        assert self._layout([0, -1, 1]).partial_ancestry("unit", "instance") is True
+
+    def test_a_level_no_block_records_is_not_a_gap(self):
+        assert self._layout([0, 0, 1]).partial_ancestry("sequence", "instance") is False

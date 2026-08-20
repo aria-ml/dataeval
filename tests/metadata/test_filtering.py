@@ -550,3 +550,14 @@ class TestEmbeddingEvaluatorsRefuseFilteredMetadata:
         reject_filtered_metadata(metadata, "Coverage")
         reject_filtered_metadata(None, "Coverage")
         reject_filtered_metadata(np.zeros(3), "Coverage")
+
+
+@pytest.mark.required
+def test_a_multi_column_predicate_is_rejected(get_od_dataset):
+    """`pl.col('a', 'b')` asks two questions at once; a filter answers exactly one."""
+    from dataeval._metadata._filters import evaluate
+
+    metadata = Metadata(get_od_dataset(4, metadata=[{"a": 1.0, "b": 2.0}] * 4))
+    metadata._structure()
+    with pytest.raises(ValueError, match="must answer one column"):
+        evaluate(metadata._store, metadata._item_level, pl.col("a", "b"))

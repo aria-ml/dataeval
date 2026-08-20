@@ -192,3 +192,20 @@ class TestAggRejections:
         _, metadata = tracking
         with pytest.raises(ValueError, match="at least one expression"):
             metadata.agg("instance", "unit")
+
+
+@pytest.mark.required
+def test_a_level_the_schema_declares_but_that_has_no_rows_is_rejected(tracking):
+    """Aggregating into a level with nowhere to land would be a silent no-op."""
+    import dataclasses
+
+    from dataeval._metadata._aggregate import validate
+
+    _, metadata = tracking
+    metadata._structure()
+    store = metadata._store
+    gone = list(store.frames)[-1]
+    thinned = dataclasses.replace(store, frames={k: v for k, v in store.frames.items() if k != gone})
+
+    with pytest.raises(ValueError, match="agg needs rows at both levels"):
+        validate(thinned, gone, list(store.frames)[0], [pl.len()], None)

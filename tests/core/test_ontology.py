@@ -902,3 +902,16 @@ class TestEquivalence:
         ])
         assert onto.concept("ex:Sedan").parents == ("ex:Auto",)
         assert onto.concept("ex:Sedan").synonyms == ("Sedan", "Saloon")  # untouched
+
+
+@pytest.mark.required
+def test_equivalence_merging_is_idempotent_for_already_joined_concepts():
+    """Two owl:equivalentClass edges over the same pair must not double-merge."""
+    pytest.importorskip("rdflib")
+    turtle = TURTLE + (
+        "\nex:Dog owl:equivalentClass ex:Hound .\n"
+        "ex:Hound owl:equivalentClass ex:Dog .\n"
+        "ex:Dog owl:equivalentClass ex:Hound .\n"
+    )
+    onto = Ontology.from_rdf(turtle, format="turtle")
+    assert onto is not None

@@ -3151,3 +3151,24 @@ class TestHistogramRangeCoverage:
             compute_stats([image], stats=ImageStats.PIXEL_HISTOGRAM, normalize_pixel_values=False)
 
         assert "fall outside the histogram range" not in caplog.text
+
+
+@pytest.mark.required
+class TestCacheWithoutAKnownRange:
+    """A float image carrying no encoding to decode has no interval to measure against."""
+
+    @staticmethod
+    def _cache(*, normalize: bool = False) -> CalculatorCache:
+        # Float data outside [0, 1] with no declared value_range -- an elevation or
+        # temperature band, whose dtype describes no encoding to decode.
+        image = np.linspace(100.0, 500.0, 3 * 8 * 8, dtype=np.float64).reshape(3, 8, 8)
+        cache = CalculatorCache(image, box=None, normalize_pixel_values=normalize)
+        assert not cache.value_range.is_known
+        return cache
+
+    def test_scaled_reports_absence_rather_than_raising(self):
+        """`scaled` only reaches the range at all when normalization is asked for."""
+        assert np.isnan(self._cache(normalize=True).scaled).all()
+
+    def test_perceptual_reports_absence_rather_than_raising(self):
+        assert np.isnan(self._cache().perceptual).all()

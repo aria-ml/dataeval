@@ -186,7 +186,7 @@ def _multilabel_make_splits(
 def _multilabel_find_best_split(
     multilabel: NDArray[np.int8],
     split_defs: list[TrainValSplit],
-    split_frac: float,
+    _split_frac: float,
 ) -> TrainValSplit:
     """Find the split whose per-label frequencies best match the overall distribution."""
 
@@ -196,16 +196,8 @@ def _multilabel_find_best_split(
         val_freq = multilabel[split.val].mean(axis=0) if len(split.val) else np.zeros_like(overall)
         return float(np.sum(np.abs(train_freq - overall)) + np.sum(np.abs(val_freq - overall)))
 
-    def split_ratio(split: TrainValSplit) -> float:
-        return len(split.val) / (len(split.val) + len(split.train))
-
-    def split_diff(split: TrainValSplit) -> float:
-        return abs(split_frac - split_ratio(split))
-
-    def split_inv_diff(split: TrainValSplit) -> float:
-        return abs(1 - split_frac - split_ratio(split))
-
-    # Prefer label balance for multi-label; fall back to ratio for non-stratified
+    # Label balance is the whole criterion here: the candidates were generated at the
+    # requested ratio already, so re-scoring them by ratio would only re-rank ties.
     return min(split_defs, key=label_freq_diff)
 
 

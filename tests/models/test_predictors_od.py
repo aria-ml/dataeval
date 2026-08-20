@@ -28,16 +28,6 @@ def _meta(tmp_path: Path, interface: str = "IMAGE_OBJECT_DETECTION") -> Path:
     return p
 
 
-class _FakeBackend:
-    """A runtime backend returning fixed outputs, bypassing real inference."""
-
-    def __init__(self, outputs: dict) -> None:
-        self._outputs = outputs
-
-    def run(self, tensor) -> dict:
-        return self._outputs
-
-
 def test_detector_returns_targets_per_image(onnx_detector: Path, tmp_path: Path):
     model = OnnxObjectDetector(onnx_detector, _meta(tmp_path))
     preds = model([np.zeros((3, 8, 8), dtype=np.uint8), np.full((3, 8, 8), 255, dtype=np.uint8)])
@@ -73,30 +63,31 @@ def test_wrong_task_metadata_raises(tmp_path: Path):
         OnnxObjectDetector("unused.onnx", meta)
 
 
-def test_missing_output_raises(onnx_detector: Path, tmp_path: Path):
-    model = OnnxObjectDetector(onnx_detector, _meta(tmp_path))
-    model._backend = _FakeBackend({"boxes": np.zeros((1, 5, 4), dtype=np.float32)})  # type: ignore # no "scores"
+def test_missing_output_raises(stub_model_file, fake_onnxruntime, tmp_path: Path):
+    # boxes but no scores -- the pair is checked before either is decoded
+    fake_onnxruntime({"boxes": np.zeros((1, 5, 4), dtype=np.float32)})
+    model = OnnxObjectDetector(stub_model_file("detector.onnx"), _meta(tmp_path))
     with pytest.raises(ValueError, match="not found"):
         model([np.zeros((3, 8, 8), dtype=np.uint8)])
 
 
-def test_bad_boxes_shape_raises(onnx_detector: Path, tmp_path: Path):
-    model = OnnxObjectDetector(onnx_detector, _meta(tmp_path))
+def test_bad_boxes_shape_raises(stub_model_file, fake_onnxruntime, tmp_path: Path):
     # boxes last dim is 3, not 4
-    model._backend = _FakeBackend({
+    fake_onnxruntime({
         "boxes": np.zeros((1, 5, 3), dtype=np.float32),
         "scores": np.zeros((1, 5, 4), dtype=np.float32),
-    })  # type: ignore
+    })
+    model = OnnxObjectDetector(stub_model_file("detector.onnx"), _meta(tmp_path))
     with pytest.raises(ValueError, match=r"boxes must be \(B, nBoxes, 4\)"):
         model([np.zeros((3, 8, 8), dtype=np.uint8)])
 
 
-def test_non_3d_scores_raises(onnx_detector: Path, tmp_path: Path):
-    model = OnnxObjectDetector(onnx_detector, _meta(tmp_path))
-    model._backend = _FakeBackend({
+def test_non_3d_scores_raises(stub_model_file, fake_onnxruntime, tmp_path: Path):
+    fake_onnxruntime({
         "boxes": np.zeros((1, 5, 4), dtype=np.float32),
         "scores": np.zeros((1, 5), dtype=np.float32),  # 2-D
-    })  # type: ignore
+    })
+    model = OnnxObjectDetector(stub_model_file("detector.onnx"), _meta(tmp_path))
     with pytest.raises(ValueError, match=r"scores must be \(B, nBoxes, nClasses\)"):
         model([np.zeros((3, 8, 8), dtype=np.uint8)])
 
@@ -105,3 +96,38 @@ def test_litert_detector_make_backend_loads_tflite(tmp_path: Path):
     # the LiteRT subclass reaches its backend, which rejects the missing model file
     with pytest.raises(FileNotFoundError):
         LiteRtObjectDetector(tmp_path / "missing.tflite", _meta(tmp_path))
+
+
+def test_detector_runs_with_stubbed_runtime(stub_model_file, fake_onnxruntime, tmp_path: Path):
+    """The full construct-preprocess-decode path, without needing a real ONNX runtime."""
+    scores = np.tile(np.array([0.1, 0.2, 0.6, 0.1], dtype=np.float32), (5, 1))
+    fake_onnxruntime({
+        "boxes": lambda t: np.zeros((t.shape[0], 5, 4), dtype=np.float32),
+        "scores": lambda t: np.tile(scores, (t.shape[0], 1, 1)),
+    })
+
+    model = OnnxObjectDetector(stub_model_file("detector.onnx"), _meta(tmp_path))
+    assert model.metadata["id"] == "dataeval-onnx-detector:detector.onnx"
+
+    preds = model([np.zeros((3, 8, 8), dtype=np.uint8), np.full((3, 8, 8), 255, dtype=np.uint8)])
+    assert len(preds) == 2
+    t = preds[0]
+    assert isinstance(t, ObjectDetectionTarget)
+    assert np.asarray(t.boxes).shape == (5, 4)
+    assert np.asarray(t.scores).shape == (5, 4)
+    # labels are the argmax over each detection's class scores
+    np.testing.assert_array_equal(np.asarray(t.labels), np.full(5, 2))
+
+
+def test_detector_honors_image_size_override(stub_model_file, fake_onnxruntime, tmp_path: Path):
+    """An explicit image_size resizes the batch instead of the size declared in metadata."""
+    session = fake_onnxruntime({
+        "boxes": lambda t: np.zeros((t.shape[0], 5, 4), dtype=np.float32),
+        "scores": lambda t: np.zeros((t.shape[0], 5, 4), dtype=np.float32),
+    })
+
+    model = OnnxObjectDetector(stub_model_file("detector.onnx"), _meta(tmp_path), image_size=(4, 4))
+    model([np.zeros((3, 8, 8), dtype=np.uint8)])
+
+    assert session.last_feed is not None
+    assert session.last_feed["image"].shape == (1, 3, 4, 4)

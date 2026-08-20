@@ -954,3 +954,17 @@ class TestSourceIndexLevelLimits:
             source_index=[SourceIndex(i, None, None) for i in range(3)],
         )
         assert "bright" in md.factor_names
+
+
+@pytest.mark.required
+def test_combined_on_a_single_level_instance_has_no_split_to_make():
+    """`from_factors` puts items and labels at one level, where 'combined' is ambiguous."""
+    md = Metadata.from_factors({"a": np.array([1.0, 2.0, 3.0])}, [0, 1, 0])
+    md._structure()
+    assert md._item_level == md._label_level
+
+    with (
+        pytest.warns(DeprecationWarning, match="level='combined' is deprecated"),
+        pytest.raises(ValueError, match="there is no split to make"),
+    ):
+        md.add_factors({"bright": np.arange(3.0)}, level="combined")

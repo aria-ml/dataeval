@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.core._hash import dhash, dhash_d4, phash, phash_d4, resize, xxhash
+from dataeval.core._hash import dhash, dhash_d4, hamming_distance, phash, phash_d4, resize, xxhash
 
 
 @pytest.mark.required
@@ -187,3 +187,17 @@ class TestDHashD4:
         result1 = dhash_d4(np.random.randint(64, 255, (28, 28)))
         result2 = dhash_d4(np.random.randint(0, 191, (28, 28)))
         assert result1 != result2
+
+
+@pytest.mark.required
+class TestHammingDistance:
+    def test_identical_hashes_are_zero_apart(self):
+        assert hamming_distance("ff00ff00", "ff00ff00") == 0
+
+    def test_counts_differing_bits(self):
+        assert hamming_distance("ff00ff00", "ff00ff01") == 1
+
+    @pytest.mark.parametrize(("a", "b"), [("", "ff"), ("ff", ""), ("ff00", "ff")])
+    def test_unusable_pairs_return_minus_one(self, a: str, b: str):
+        """Empty or length-mismatched hashes have no meaningful distance."""
+        assert hamming_distance(a, b) == -1

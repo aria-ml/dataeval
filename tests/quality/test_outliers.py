@@ -18,7 +18,7 @@ from dataeval.utils.thresholds import (
     ModifiedZScoreThreshold,
     ZScoreThreshold,
 )
-from tests.conftest import MockMetadata
+from tests.conftest import MockMetadata, _get_dataset
 
 
 def make_mock_metadata(lstat: LabelStatsResult) -> MockMetadata:
@@ -1685,3 +1685,30 @@ class TestOutliersPropertyMultiDataset:
         for ds_idx, items in outliers_map.items():
             assert isinstance(ds_idx, int)
             assert isinstance(items, dict)
+
+
+@pytest.mark.required
+class TestOutliersPerTargetKeying:
+    """Per-target results are keyed by SourceIndex; across datasets, by dataset first."""
+
+    @staticmethod
+    def _stats():
+        images = np.random.random((20, 3, 64, 64)) / 2.0
+        images[10] = 1.0
+        dataset = _get_dataset(list(images), 2, True, {10: [(-5, -5, -1, -1), (1, 1, 5, 5)]})
+        image_iter, box_iter = unzip_dataset(dataset, True)
+        return compute_stats(image_iter, boxes=box_iter, stats=ImageStats.PIXEL | ImageStats.VISUAL, per_target=True)
+
+    def test_a_single_dataset_is_keyed_by_source_index(self):
+        outliers = Outliers().from_stats(self._stats(), per_target=True).outliers
+        assert outliers
+        assert all(isinstance(key, SourceIndex) for key in outliers)
+        assert all(isinstance(metric, str) for metrics in outliers.values() for metric in metrics)
+
+    def test_across_datasets_the_outer_key_is_the_dataset(self):
+        with use_max_processes(1):
+            results = Outliers().from_stats((self._stats(), self._stats()), per_target=True)
+        outliers = results.outliers
+        assert set(outliers) == {0, 1}
+        for per_row in outliers.values():
+            assert all(isinstance(key, SourceIndex) for key in per_row)

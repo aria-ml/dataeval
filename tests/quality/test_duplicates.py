@@ -936,3 +936,59 @@ class TestUnmeasuredRegionsAreNotDuplicates:
         )
 
         assert result.data()["item_indices"].to_list() == [[0, 1]]
+
+
+@pytest.mark.required
+class TestDuplicatesLevelViews:
+    """`items` and `targets` narrow the result to one level, keeping the same surface."""
+
+    @staticmethod
+    def _results() -> DuplicatesOutput:
+        data = np.random.random((6, 3, 16, 16))
+        data = np.concatenate((data, data))
+        stats = compute_stats(data, stats=ImageStats.HASH, per_image=True, per_target=False)
+        return Duplicates(ImageStats.HASH_XXHASH).from_stats(stats)
+
+    def test_items_keeps_only_item_level_rows(self):
+        filtered = self._results().items
+        assert isinstance(filtered, DuplicatesOutput)
+        assert filtered.data()["level"].unique().to_list() in ([], ["item"])
+
+    def test_targets_keeps_only_target_level_rows(self):
+        filtered = self._results().targets
+        assert isinstance(filtered, DuplicatesOutput)
+        assert filtered.data()["level"].unique().to_list() in ([], ["target"])
+
+
+@pytest.mark.required
+def test_aggregate_by_group_carries_orientation_for_d4_hashes():
+    """D4 hashing records which rotation/flip matched, and the summary keeps that column."""
+    df = _build_duplicates_dataframe(
+        item_exact=[[0, 1], [2, 3]],
+        item_near_method_groups=[((4, 5), "phash_d4")],
+        target_exact=None,
+        target_near_method_groups=[],
+        available_stats={"phash", "dhash", "phash_d4", "dhash_d4"},
+        merge=True,
+    )
+    assert "orientation" in df.columns
+
+    results = DuplicatesOutput(df, flags=ImageStats.HASH_DUPLICATES_D4)
+    summary = results.aggregate_by_group()
+    assert "orientation" in summary.columns
+    assert summary.height == df.height
+
+
+@pytest.mark.required
+def test_aggregate_by_group_of_an_empty_d4_result_keeps_the_orientation_column():
+    """The empty frame is built from the same schema, so readers see the same columns."""
+    df = _build_duplicates_dataframe(
+        item_exact=[[0, 1]],
+        item_near_method_groups=[((2, 3), "phash_d4")],
+        target_exact=None,
+        target_near_method_groups=[],
+        available_stats={"phash", "dhash", "phash_d4", "dhash_d4"},
+        merge=True,
+    )
+    empty = DuplicatesOutput(df.clear(), flags=ImageStats.HASH_DUPLICATES_D4)
+    assert "orientation" in empty.aggregate_by_group().columns

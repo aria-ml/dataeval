@@ -27,16 +27,6 @@ def _meta(tmp_path: Path, n_classes: int = 4, interface: str = "IMAGE_CLASSIFICA
     return p
 
 
-class _FakeBackend:
-    """A runtime backend returning fixed outputs, bypassing real inference."""
-
-    def __init__(self, outputs: dict) -> None:
-        self._outputs = outputs
-
-    def run(self, tensor) -> dict:
-        return self._outputs
-
-
 def test_classifier_returns_per_image_scores(onnx_classifier: Path, tmp_path: Path):
     model = OnnxImageClassifier(onnx_classifier, _meta(tmp_path))
     batch = [np.zeros((3, 16, 16), dtype=np.uint8), np.full((3, 16, 16), 255, dtype=np.uint8)]
@@ -69,16 +59,17 @@ def test_wrong_task_metadata_raises(tmp_path: Path):
         OnnxImageClassifier("unused.onnx", meta)
 
 
-def test_missing_scores_output_raises(onnx_classifier: Path, tmp_path: Path):
-    model = OnnxImageClassifier(onnx_classifier, _meta(tmp_path))
-    model._backend = _FakeBackend({})  # type: ignore # no "scores" key
+def test_missing_scores_output_raises(stub_model_file, fake_onnxruntime, tmp_path: Path):
+    # a model whose only output is named something else -- nothing to decode as scores
+    fake_onnxruntime({"logits": lambda t: np.zeros((t.shape[0], 4), dtype=np.float32)})
+    model = OnnxImageClassifier(stub_model_file("classifier.onnx"), _meta(tmp_path))
     with pytest.raises(ValueError, match="not found"):
         model([np.zeros((3, 8, 8), dtype=np.uint8)])
 
 
-def test_non_2d_scores_raises(onnx_classifier: Path, tmp_path: Path):
-    model = OnnxImageClassifier(onnx_classifier, _meta(tmp_path))
-    model._backend = _FakeBackend({"scores": np.zeros((2, 3, 4), dtype=np.float32)})  # type: ignore # 3-D
+def test_non_2d_scores_raises(stub_model_file, fake_onnxruntime, tmp_path: Path):
+    fake_onnxruntime({"scores": lambda t: np.zeros((t.shape[0], 3, 4), dtype=np.float32)})  # 3-D
+    model = OnnxImageClassifier(stub_model_file("classifier.onnx"), _meta(tmp_path))
     with pytest.raises(ValueError, match="must be 2-D"):
         model([np.zeros((3, 8, 8), dtype=np.uint8)])
 
@@ -87,3 +78,27 @@ def test_litert_classifier_make_backend_loads_tflite(tmp_path: Path):
     # the LiteRT subclass reaches its backend, which rejects the missing model file
     with pytest.raises(FileNotFoundError):
         LiteRtImageClassifier(tmp_path / "missing.tflite", _meta(tmp_path))
+
+
+def test_classifier_runs_with_stubbed_runtime(stub_model_file, fake_onnxruntime, tmp_path: Path):
+    """The full construct-preprocess-decode path, without needing a real ONNX runtime."""
+    fake_onnxruntime({"scores": lambda t: np.full((t.shape[0], 4), 0.25, dtype=np.float32)})
+
+    model = OnnxImageClassifier(stub_model_file("classifier.onnx"), _meta(tmp_path))
+    assert model.metadata["id"] == "dataeval-onnx-classifier:classifier.onnx"
+
+    preds = model([np.zeros((3, 8, 8), dtype=np.uint8), np.full((3, 8, 8), 255, dtype=np.uint8)])
+    assert len(preds) == 2
+    assert preds[0].shape == (4,)
+    np.testing.assert_allclose(preds[0], 0.25)
+
+
+def test_classifier_honors_image_size_override(stub_model_file, fake_onnxruntime, tmp_path: Path):
+    """An explicit image_size resizes the batch instead of the size declared in metadata."""
+    session = fake_onnxruntime({"scores": lambda t: np.zeros((t.shape[0], 4), dtype=np.float32)})
+
+    model = OnnxImageClassifier(stub_model_file("classifier.onnx"), _meta(tmp_path), image_size=(4, 4))
+    model([np.zeros((3, 8, 8), dtype=np.uint8)])
+
+    assert session.last_feed is not None
+    assert session.last_feed["image"].shape == (1, 3, 4, 4)

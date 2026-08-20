@@ -385,3 +385,23 @@ class TestProgressCallback:
 
         assert len(callback_calls) > 0
         assert isinstance(embs._embeddings, np.memmap)
+
+
+@pytest.mark.required
+class TestSaveOnMemmapBackedEmbeddings:
+    """A memmap is already on disk, so `save` flushes rather than rewriting the array."""
+
+    def test_save_flushes_instead_of_rewriting(self, tmp_path, memmap_embeddings, monkeypatch):
+        emb, data = memmap_embeddings
+        flushed: list[bool] = []
+        monkeypatch.setattr(type(emb._embeddings), "flush", lambda _self: flushed.append(True), raising=False)
+        monkeypatch.setattr(np, "save", lambda *a, **k: pytest.fail("memmap must not be re-saved"))
+
+        emb.save(tmp_path / "out" / "embeddings.npy")
+
+        assert flushed == [True]
+
+    def test_save_without_a_path_anywhere_is_an_error(self, memmap_embeddings):
+        emb, _ = memmap_embeddings
+        with pytest.raises(ValueError, match="No path specified"):
+            emb.save()

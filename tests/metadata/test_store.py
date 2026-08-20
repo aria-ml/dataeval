@@ -14,6 +14,7 @@ import pytest
 
 from dataeval import Metadata
 from dataeval._metadata._columns import to_col
+from dataeval.types import FactorInfo
 from tests.metadata.test_structurers import _mot_dataset
 
 
@@ -266,3 +267,62 @@ class TestTheLabelsAreHeldOnce:
     def test_class_labels_is_empty_rather_than_absent_without_a_dataset(self):
         metadata = Metadata.from_factors({"a": np.arange(6.0)})
         assert metadata.class_labels.tolist() == [0] * 6
+
+
+@pytest.mark.required
+class TestStoreDegenerateLevels:
+    """A level the schema knows but that holds no rows must answer, not raise."""
+
+    @staticmethod
+    def _missing_a_level(metadata) -> tuple:
+        """The MOT store with its finest level's rows dropped, plus that level's name."""
+        store = metadata._store
+        gone = list(store.frames)[-1]
+        return dataclasses.replace(store, frames={k: v for k, v in store.frames.items() if k != gone}), gone
+
+    def test_source_of_an_unpopulated_level_is_none(self, tasks):
+        store, gone = self._missing_a_level(tasks["MOT"])
+        assert store.source_of(gone, "anything") is None
+
+    def test_with_column_on_an_unpopulated_level_is_a_no_op(self, tasks):
+        store, gone = self._missing_a_level(tasks["MOT"])
+        assert store.with_column(gone, pl.Series("added", [1])) is store
+
+    def test_surviving_having_skips_unpopulated_ancestors(self, tasks):
+        """An ancestor with no rows contributes nothing rather than failing the walk."""
+        store = tasks["MOT"]._store
+        level = list(store.frames)[-1]
+        thinned = dataclasses.replace(
+            store, frames={k: v for k, v in store.frames.items() if k in (level, list(store.frames)[0])}
+        )
+        mask = np.ones(thinned.frames[level].height, dtype=np.bool_)
+        assert level in thinned.surviving_having(level, mask)
+
+    def test_flat_of_an_empty_store_keeps_the_column_order(self, tasks):
+        store = dataclasses.replace(tasks["MOT"]._store, frames={})
+        flat = store.flat()
+        assert flat.height == 0
+        assert tuple(flat.columns) == tuple(store.column_order)
+
+
+@pytest.mark.required
+class TestToCol:
+    """Which column a reader of a factor should select, given what binning produced."""
+
+    def test_an_unbinned_undigitized_factor_reads_its_own_name(self):
+        assert to_col("brightness", FactorInfo("continuous")) == "brightness"
+
+    def test_binning_is_ignored_when_the_caller_asks_for_the_raw_column(self):
+        assert to_col("brightness", FactorInfo("continuous", is_binned=True), is_binned=False) == "brightness"
+
+
+@pytest.mark.required
+def test_surviving_where_skips_unpopulated_ancestors(tasks):
+    """An ancestor with no frame is simply absent from the answer, not an error."""
+    store = tasks["MOT"]._store
+    level = list(store.frames)[-1]
+    thinned = dataclasses.replace(store, frames={level: store.frames[level]})
+    mask = np.zeros(thinned.frames[level].height, dtype=np.bool_)
+    mask[0] = True
+    survivors = thinned.surviving_where(level, mask)
+    assert set(survivors) == {level}

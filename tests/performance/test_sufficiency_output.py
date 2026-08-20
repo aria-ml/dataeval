@@ -466,3 +466,20 @@ class TestParamsLRUCache:
         params = data.get_params(n_iter=1000)
         assert params is data._params[1000]
         assert 1000 in data._params_cache_keys
+
+
+@pytest.mark.required
+class TestSufficiencyOutputAccessors:
+    def test_params_delegates_to_get_params(self, so_single_averaged_inputs: SufficiencyOutput):
+        """`params` is the zero-argument spelling of `get_params()`."""
+        assert so_single_averaged_inputs.params.keys() == so_single_averaged_inputs.get_params().keys()
+        for name, values in so_single_averaged_inputs.params.items():
+            npt.assert_array_equal(values, so_single_averaged_inputs.get_params()[name])
+
+    def test_to_dataframe_is_wide_over_steps(self, so_single_averaged_inputs: SufficiencyOutput):
+        df = so_single_averaged_inputs.to_dataframe()
+        assert df.columns == ["step", "test1"]
+        assert df["step"].to_list() == [10, 100, 1000]
+
+    def test_plot_type_identifies_the_output_for_plotting(self, so_single_averaged_inputs: SufficiencyOutput):
+        assert so_single_averaged_inputs.plot_type == "sufficiency"

@@ -362,3 +362,49 @@ class TestPrioritizeEdgeCases:
 
         with pytest.raises(ValueError, match="scores are not available"):
             output.stratified()
+
+
+@pytest.mark.required
+class TestPrioritizeOutputMapping:
+    """PrioritizeOutput's read-only mapping surface over its declared fields."""
+
+    @staticmethod
+    def _output() -> PrioritizeOutput:
+        rank_result = RankResult(indices=np.array([2, 0, 1], dtype=np.intp), scores=None)
+        return PrioritizeOutput(rank_result, method="knn")
+
+    def test_data_returns_the_ranked_indices(self):
+        output = self._output()
+        np.testing.assert_array_equal(output.data(), output.indices)
+
+    def test_iter_yields_the_field_names(self):
+        assert list(self._output()) == list(PrioritizeOutput._fields)
+
+    def test_values_pairs_with_the_field_names(self):
+        output = self._output()
+        assert [type(v) for v in output.values()] == [type(getattr(output, k)) for k in PrioritizeOutput._fields]
+
+    def test_items_pairs_names_with_values(self):
+        output = self._output()
+        assert [k for k, _ in output.items()] == list(PrioritizeOutput._fields)
+
+
+@pytest.mark.required
+class TestPrioritizeEvaluateRejections:
+    """Combinations that cannot produce an answer are refused before any work happens."""
+
+    def test_stratified_needs_a_scoring_method(self):
+        prioritize = Prioritize(method="kmeans_complexity", policy="stratified")
+        with pytest.raises(ValueError, match="stratified policy is not available with kmeans_complexity"):
+            prioritize.evaluate(np.zeros((8, 4), dtype=np.float32))
+
+    def test_a_reference_dataset_without_an_extractor_is_rejected(self):
+        """A raw reference dataset cannot be embedded with nothing to embed it."""
+        prioritize = Prioritize(method="knn", reference=MagicMock(spec=AnnotatedDataset))
+        with pytest.raises(ValueError, match="or configure an extractor to compute them"):
+            prioritize.evaluate(np.zeros((8, 4), dtype=np.float32))
+
+    def test_class_balanced_needs_labels(self):
+        prioritize = Prioritize(method="knn", policy="class_balanced")
+        with pytest.raises(ValueError, match="requires an AnnotatedDataset with metadata"):
+            prioritize.evaluate(np.zeros((8, 4), dtype=np.float32))

@@ -689,3 +689,28 @@ class TestLevelPaths:
         for level in self.schema.levels:
             for ancestor in self.schema.ancestors(level):
                 assert self.schema.paths(level, ancestor), f"{level} -> {ancestor}"
+
+
+@pytest.mark.required
+class TestFactorLevelSchemaIdentity:
+    """Equality and hashing are by (levels, parents), so schemas work as dict keys."""
+
+    @staticmethod
+    def _schema() -> FactorLevelSchema:
+        return FactorLevelSchema(("unit", "instance"), {"instance": ("unit",)})
+
+    def test_equal_schemas_hash_alike(self):
+        assert self._schema() == self._schema()
+        assert hash(self._schema()) == hash(self._schema())
+
+    def test_usable_as_a_mapping_key(self):
+        assert {self._schema(): "value"}[self._schema()] == "value"
+
+    def test_comparison_with_a_foreign_type_defers(self):
+        """Returning NotImplemented lets Python fall back rather than claiming inequality."""
+        assert self._schema().__eq__(object()) is NotImplemented
+        assert self._schema() != object()
+
+    def test_highest_of_nothing_is_an_error(self):
+        with pytest.raises(ValueError, match="empty collection"):
+            self._schema().highest([])

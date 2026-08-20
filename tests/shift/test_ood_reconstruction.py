@@ -1326,3 +1326,67 @@ def test_gmm_score_mode_config_parameter():
     ood_pct.fit(x_ref)
     score_pct = ood_pct.score(x_test)
     assert score_pct.instance_score.shape == (10,)
+
+
+@pytest.mark.required
+def test_model_exposes_the_wrapped_module():
+    """`model` reaches through the scorer to the module the caller handed in."""
+    module = AE(input_shape=(1, 8, 8))
+    detector = OODReconstruction(module, config=OODReconstruction.Config(epochs=1))
+    assert detector.model is module
+
+
+@pytest.mark.required
+def test_an_unknown_gmm_score_mode_is_rejected_at_score_time():
+    """The two supported modes are checked where they are used, not only at config time."""
+    input_shape = (1, 8, 8)
+
+    class _GMMModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.encoder = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(64, 10))
+            self.decoder = torch.nn.Sequential(torch.nn.Linear(10, 64), torch.nn.Unflatten(1, input_shape))
+            self.gmm_net = torch.nn.Linear(10, 3)
+
+        def forward(self, x):
+            z = self.encoder(x)
+            return self.decoder(z), z, torch.softmax(self.gmm_net(z), dim=-1)
+
+    ood = OODReconstruction(
+        _GMMModel(),
+        model_type="ae",
+        use_gmm=True,
+        config=OODReconstruction.Config(gmm_score_mode="percentile", epochs=1),
+    )
+    ood.fit(np.random.rand(20, *input_shape).astype(np.float32))
+
+    ood._scorer.gmm_score_mode = "nonsense"  # bypasses the config's own validation
+    with pytest.raises(ValueError, match="Unknown gmm_score_mode: nonsense"):
+        ood.score(np.random.rand(4, *input_shape).astype(np.float32))
+
+
+@pytest.mark.required
+def test_gmm_scoring_requires_a_latent_in_the_model_output():
+    """use_gmm=True reads the second element, so a bare tensor cannot be scored."""
+    input_shape = (1, 8, 8)
+
+    class _GMMModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.encoder = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(64, 10))
+            self.decoder = torch.nn.Sequential(torch.nn.Linear(10, 64), torch.nn.Unflatten(1, input_shape))
+            self.gmm_net = torch.nn.Linear(10, 3)
+            self.plain = False
+
+        def forward(self, x):
+            z = self.encoder(x)
+            recon = self.decoder(z)
+            return recon if self.plain else (recon, z, torch.softmax(self.gmm_net(z), dim=-1))
+
+    model = _GMMModel()
+    ood = OODReconstruction(model, model_type="ae", use_gmm=True, config=OODReconstruction.Config(epochs=1))
+    ood.fit(np.random.rand(20, *input_shape).astype(np.float32))
+
+    model.plain = True  # the same model now answers without a latent
+    with pytest.raises(ValueError, match="must return tuple with latent representation"):
+        ood.score(np.random.rand(4, *input_shape).astype(np.float32))

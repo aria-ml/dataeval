@@ -11,8 +11,10 @@ from dataeval.utils.preprocessing import (
     BitDepth,
     BoundingBox,
     BoundingBoxFormat,
+    ChannelGroup,
     ValueRange,
     boxes_to_mask,
+    clip_and_pad,
     clip_box,
     compute_iou,
     crop_with_fill,
@@ -617,3 +619,41 @@ class TestRescaleZeroSpan:
         result = rescale(image, depth=8, value_range=ValueRange.observed(image))
 
         assert np.array_equal(result, np.zeros((2, 2)))
+
+
+@pytest.mark.required
+class TestChannelGroupIdentity:
+    """A group is a set of bands plus a declared range, and compares as such."""
+
+    def test_index_order_is_not_part_of_identity(self):
+        assert ChannelGroup([2, 0, 1]) == ChannelGroup([0, 1, 2])
+        assert hash(ChannelGroup([2, 0, 1])) == hash(ChannelGroup([0, 1, 2]))
+
+    def test_value_range_participates_in_identity(self):
+        assert ChannelGroup([0, 1], value_range=(0.0, 1.0)) != ChannelGroup([0, 1])
+
+    def test_usable_as_a_mapping_key(self):
+        assert {ChannelGroup([0, 1]): "visible"}[ChannelGroup([1, 0])] == "visible"
+
+    def test_comparison_with_a_foreign_type_defers(self):
+        assert ChannelGroup([0]).__eq__(object()) is NotImplemented
+        assert ChannelGroup([0]) != object()
+
+
+@pytest.mark.required
+class TestBitDepthAndClipEdges:
+    def test_all_nan_image_has_no_measurable_depth(self):
+        depth = get_bitdepth(np.full((1, 4, 4), np.nan, dtype=np.float64))
+        assert depth.depth == 0
+        assert math.isnan(depth.pmin)
+        assert math.isnan(depth.pmax)
+
+    def test_clip_and_pad_matches_crop_with_fill(self):
+        """The deprecated spelling is the first element of `crop_with_fill(..., fill=nan)`."""
+        from dataeval.exceptions import DeprecatedWarning
+
+        image = np.arange(3 * 4 * 4, dtype=np.uint8).reshape(3, 4, 4)
+        box = (-1, -1, 3, 3)
+        with pytest.warns(DeprecatedWarning, match="clip_and_pad"):
+            padded = clip_and_pad(image, box)
+        np.testing.assert_array_equal(padded, crop_with_fill(image, box, fill=np.nan, dtype=float)[0])

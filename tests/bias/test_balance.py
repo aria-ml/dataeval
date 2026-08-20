@@ -5,7 +5,7 @@ import polars as pl
 import pytest
 
 from dataeval import Metadata
-from dataeval.bias._balance import Balance
+from dataeval.bias._balance import Balance, BalanceOutput
 from tests.conftest import MockMetadata, to_metadata
 
 
@@ -178,3 +178,11 @@ class TestBalanceUnit:
         assert result.factors.schema["factor2"].base_type() == pl.Categorical
         assert result.factors.schema["mi_value"] == pl.Float64
         assert result.factors.schema["is_correlated"] == pl.Boolean
+
+
+@pytest.mark.required
+def test_plot_type_identifies_the_output_for_plotting():
+    """`plot_type` is the discriminator dataeval-plots dispatches on."""
+    empty = pl.DataFrame()
+    output = BalanceOutput(balance=empty, factors=empty, classwise=empty)
+    assert output.plot_type == "balance"

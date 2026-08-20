@@ -230,3 +230,69 @@ class TestClustersWithDifferentEmbeddings:
 
         assert len(sorted_indices) == len(query_data)
         assert set(sorted_indices) == set(range(len(query_data)))
+
+
+@pytest.mark.required
+class TestClustererInputValidation:
+    """The shape checks that run before any clustering work is attempted."""
+
+    def test_expected_clusters_at_or_above_the_sample_count_is_rejected(self):
+        from dataeval.core._clusterer import _HDBSCANSorter
+
+        with pytest.raises(ValueError, match=r"n_expected_clusters=10 should be less than dataset size \(10\)"):
+            _HDBSCANSorter(samples=10, n_expected_clusters=10)
+
+    def test_a_non_2d_array_is_rejected(self):
+        from dataeval.core._clusterer import _HDBSCAN
+        from dataeval.exceptions import ShapeMismatchError
+
+        with pytest.raises(ShapeMismatchError, match="2 dimensional array, got 3"):
+            _HDBSCAN().fit(np.zeros((2, 2, 2)))
+
+    def test_a_single_sample_cannot_be_clustered(self):
+        from dataeval.core._clusterer import _HDBSCAN
+
+        with pytest.raises(ValueError, match="at least 2 samples; got 1"):
+            _HDBSCAN().fit(np.zeros((1, 3)))
+
+    def test_samples_without_features_are_rejected(self):
+        from dataeval.core._clusterer import _HDBSCAN
+
+        with pytest.raises(ValueError, match="at least 1 feature; got 0"):
+            _HDBSCAN().fit(np.zeros((4, 0)))
+
+
+@pytest.mark.required
+class TestComputeClusterStatsEdges:
+    """Labels that name no cluster produce empty statistics rather than failing."""
+
+    def test_all_noise_labels_yield_empty_statistics(self):
+        from dataeval.core._clusterer import compute_cluster_stats
+
+        embeddings = np.random.default_rng(0).random((10, 4))
+        stats = compute_cluster_stats(embeddings, np.full(10, -1, dtype=np.intp))
+        assert stats["cluster_ids"].size == 0
+        assert stats["centers"].size == 0
+
+
+@pytest.mark.required
+class TestComputeClusterStatsInputs:
+    """Both accepted label spellings, and the no-cluster case for each."""
+
+    def test_a_clusters_object_is_used_directly(self):
+        from dataeval.core._clusterer import _Clusters, compute_cluster_stats
+
+        embeddings = np.random.default_rng(0).random((8, 3))
+        labels = np.array([0, 0, 1, 1, 0, 1, 0, 1], dtype=np.intp)
+        clusters = _Clusters(labels, np.zeros((2, 3), dtype=np.float64))
+        stats = compute_cluster_stats(embeddings, clusters)
+        assert stats["cluster_ids"].size == 2
+
+    def test_a_clusters_object_naming_no_cluster_yields_empty_statistics(self):
+        """A `_Clusters` carrying no labels at all reports absence rather than indexing."""
+        from dataeval.core._clusterer import _Clusters, compute_cluster_stats
+
+        clusters = _Clusters(np.array([], dtype=np.intp), np.zeros((0, 3), dtype=np.float64))
+        stats = compute_cluster_stats(np.zeros((0, 3)), clusters)
+        assert stats["cluster_ids"].size == 0
+        assert stats["centers"].size == 0

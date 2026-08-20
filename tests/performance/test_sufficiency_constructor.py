@@ -6,6 +6,8 @@ during the compatibility period. The old signature will be removed in
 a future step.
 """
 
+import pytest
+
 from dataeval.performance import Sufficiency
 
 
@@ -51,3 +53,18 @@ class TestSufficiencyConfigConstructor:
         assert suff.runs == multi_run_config.runs
         assert suff.substeps == multi_run_config.substeps
         assert suff.unit_interval == multi_run_config.unit_interval
+
+
+@pytest.mark.required
+class TestSufficiencyConstructorValidation:
+    """runs and substeps count things, so a non-positive value has no meaning."""
+
+    @pytest.mark.parametrize("runs", [0, -1])
+    def test_non_positive_runs_is_rejected(self, mock_model, mock_train, mock_eval, runs: int):
+        with pytest.raises(Exception, match="[Mm]ust be positive"):
+            Sufficiency(mock_model, training_strategy=mock_train, evaluation_strategy=mock_eval, runs=runs)
+
+    @pytest.mark.parametrize("substeps", [0, -1])
+    def test_non_positive_substeps_is_rejected(self, mock_model, mock_train, mock_eval, substeps: int):
+        with pytest.raises(Exception, match="[Mm]ust be positive"):
+            Sufficiency(mock_model, training_strategy=mock_train, evaluation_strategy=mock_eval, substeps=substeps)

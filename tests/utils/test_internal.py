@@ -7,11 +7,13 @@ import torch
 
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.utils._internal import (
+    PoolWrapper,
     channels_first_to_last,
     ensure_embeddings,
     flatten_metadata,
     flatten_samples,
     iter_images,
+    materialize_target_attrs,
     merge_metadata,
     rescale_array,
     simplify_type,
@@ -747,3 +749,56 @@ class TestCastSimplify:
     )
     def test_convert_type(self, value, output):
         assert output == simplify_type(value)
+
+
+@pytest.mark.required
+class TestEnsureEmbeddingsShapeChecks:
+    """Embeddings are a matrix of samples by features; anything else is a caller error."""
+
+    @pytest.mark.parametrize("shape", [(4,), (2, 3, 4)])
+    def test_a_non_2d_array_is_rejected(self, shape: tuple[int, ...]):
+        with pytest.raises(ShapeMismatchError, match=rf"got a {len(shape)}D array"):
+            ensure_embeddings(np.zeros(shape))
+
+    @pytest.mark.parametrize("shape", [(0, 3), (3, 0)])
+    def test_a_zero_dimension_is_rejected(self, shape: tuple[int, int]):
+        with pytest.raises(ShapeMismatchError, match="at least one zero dimension"):
+            ensure_embeddings(np.zeros(shape))
+
+
+@pytest.mark.required
+class TestFlattenSamplesRejections:
+    def test_an_unreshapeable_object_names_its_type(self):
+        """The as_numpy/reshape path raises, and the type is what the caller needs to see."""
+        # Ragged rows: numpy cannot build a rectangular array, so the conversion raises.
+        with pytest.raises(TypeError, match="Unsupported array type"):
+            flatten_samples([[1, 2], [3]])
+
+
+@pytest.mark.required
+class TestMaterializeTargetAttrs:
+    def test_a_target_with_neither_dict_nor_fields_yields_nothing(self):
+        """__slots__ without _fields is neither a namedtuple nor a __dict__ carrier."""
+
+        class _Opaque:
+            __slots__ = ()
+
+        assert materialize_target_attrs(_Opaque()) == {}
+
+
+@pytest.mark.required
+class TestPoolWrapperLifecycle:
+    """A real pool must be closed and joined on exit; the single-threaded path has none."""
+
+    def test_a_multiprocess_pool_is_closed_on_exit(self):
+        with PoolWrapper(processes=2) as pool:
+            assert pool._pool is not None
+            assert list(pool.imap_unordered(abs, [-1, -2, -3])) != []
+        # close() then join() have run; a closed pool refuses new work.
+        with pytest.raises(ValueError, match="Pool not running"):
+            pool._pool.apply(abs, (-1,))
+
+    def test_the_single_threaded_path_has_nothing_to_close(self):
+        with PoolWrapper(processes=1) as pool:
+            assert pool._pool is None
+            assert sorted(pool.imap_unordered(abs, [-1, -2])) == [1, 2]

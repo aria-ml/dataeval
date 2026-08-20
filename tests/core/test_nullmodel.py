@@ -335,3 +335,14 @@ class TestNullModelMetrics:
         train_labels = []
         output = nullmodel_metrics(test_labels, train_labels)
         assert output is not None
+
+
+@pytest.mark.required
+def test_trapezoid_integration_reports_an_unsupported_numpy(monkeypatch):
+    """Neither spelling present means the installed NumPy cannot integrate."""
+    from dataeval.core import _nullmodel
+
+    monkeypatch.delattr(_nullmodel.np, "trapezoid", raising=False)
+    monkeypatch.delattr(_nullmodel.np, "trapz", raising=False)
+    with pytest.raises(ImportError, match="does not support trapezoid integration"):
+        _nullmodel.np_trapezoid(np.array([0.0, 1.0]), np.array([0.0, 1.0]))

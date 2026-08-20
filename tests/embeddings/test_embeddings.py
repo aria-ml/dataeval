@@ -439,6 +439,16 @@ class TestEmbeddings:
         # Shape should be (0,) for empty dataset
         assert embs.shape == (0,)
 
+    def test_partially_cached_shape(self, numpy_extractor):
+        """Shape reads an already-cached index rather than computing index 0 afresh."""
+        embs = Embeddings(MockDataset(np.ones((4, 3, 3)), np.ones((4,))), extractor=numpy_extractor)
+
+        _ = embs[2]  # cache a single index, deliberately not the first
+        assert embs._cached_idx == {2}
+
+        assert embs.shape == (4, 9)
+        assert embs._cached_idx == {2}  # reused the cached embedding; index 0 stayed uncomputed
+
     def test_hash_with_dataset_model_transforms(self, torch_ic_ds, identity_extractor):
         """Test __hash__ for regular embeddings with dataset, model, and transforms (lines 228-231)."""
         embs = Embeddings(torch_ic_ds, extractor=identity_extractor)
@@ -648,3 +658,30 @@ class TestProgressCallback:
         assert len(callback_calls) > 0
         for call in callback_calls:
             assert call["total"] == 5  # New dataset size
+
+
+@pytest.mark.required
+def test_ndim_counts_the_axes_of_shape(numpy_extractor):
+    """`ndim` is derived from `shape`, so it materializes the same lazy computation."""
+    em = Embeddings(MockDataset(np.ones((4, 3, 3)), np.ones((4, 3)), [{} for _ in range(4)]), extractor=numpy_extractor)
+    assert em.ndim == len(em.shape)
+
+
+@pytest.mark.required
+class TestEmbeddingsPathSetter:
+    """Clearing the path keeps the values; setting one only writes what exists."""
+
+    def test_clearing_the_path_on_an_in_memory_array_keeps_it(self, numpy_extractor):
+        em = Embeddings(MockDataset(np.ones((3, 2, 2)), np.ones((3, 3)), [{}] * 3), extractor=numpy_extractor)
+        em.compute()
+        assert not isinstance(em._embeddings, np.memmap)
+        em.path = None
+        assert em.path is None
+        assert em._embeddings.size > 0
+
+    def test_setting_a_path_with_nothing_computed_writes_nothing(self, tmp_path, numpy_extractor):
+        em = Embeddings(extractor=numpy_extractor)
+        assert em._embeddings.size == 0
+        em.path = tmp_path / "empty.npy"
+        assert em.path == tmp_path / "empty.npy"
+        assert not (tmp_path / "empty.npy").exists()

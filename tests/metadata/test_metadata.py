@@ -559,3 +559,111 @@ class TestMetadata:
         result = md.filter_by_factor(lambda name, info: info.factor_type == "continuous")
         assert result.shape[0] >= 5  # At least 5 samples (could be more with targets)
         assert result.shape[1] >= 1  # At least 1 continuous factor
+
+
+@pytest.mark.required
+class TestMetadataIndexing:
+    """``metadata[...]`` reads the factor matrix by row, by name, or by slice."""
+
+    @staticmethod
+    def _metadata():
+        from tests.conftest import to_metadata
+
+        return to_metadata({"a": [1.0, 2.0, 3.0, 4.0], "b": [0, 1, 0, 1]}, [0, 1, 0, 1])
+
+    def test_a_name_selects_that_factor_column(self):
+        metadata = self._metadata()
+        column = metadata["a"]
+        assert column.shape == (metadata.factor_data.shape[0],)
+        np.testing.assert_array_equal(column, metadata.factor_data[:, metadata.factor_names.index("a")])
+
+    def test_a_slice_selects_rows(self):
+        metadata = self._metadata()
+        np.testing.assert_array_equal(metadata[1:3], metadata.factor_data[1:3])
+
+    def test_an_unknown_name_is_a_key_error(self):
+        with pytest.raises(KeyError, match="not found in metadata"):
+            self._metadata()["nope"]
+
+    def test_an_unusable_index_type_is_rejected(self):
+        with pytest.raises(TypeError, match="int, str, or slice"):
+            self._metadata()[object()]  # type: ignore[index]
+
+
+@pytest.mark.required
+class TestMetadataWithNoFactors:
+    """A dataset carrying no factors still answers with correctly-shaped emptiness."""
+
+    @staticmethod
+    def _metadata(get_od_dataset):
+        # `id` is auto-generated, so excluding it is what leaves no factors at all.
+        return Metadata(get_od_dataset(4, metadata=[{}] * 4), exclude=["id"])
+
+    def test_factor_values_is_an_empty_projection(self, get_od_dataset):
+        values = self._metadata(get_od_dataset).factor_values
+        assert values.shape[1] == 0
+        assert values.dtype == np.float64
+
+    def test_item_count_structures_on_demand(self, get_od_dataset):
+        """An unfiltered instance has not been structured yet, so the count triggers it."""
+        assert self._metadata(get_od_dataset).item_count == 4
+
+
+@pytest.mark.required
+def test_item_count_on_an_empty_dataset_structures_to_find_zero():
+    """A zero-length dataset leaves `_count` at 0, which is what triggers the extraction."""
+
+    class _Empty:
+        metadata = {"id": "empty"}
+
+        def __len__(self) -> int:
+            return 0
+
+        def __getitem__(self, index: int):
+            raise IndexError(index)
+
+    with pytest.warns(UserWarning, match="empty dataset"):
+        metadata = Metadata(_Empty())  # type: ignore[arg-type]  # type: ignore[arg-type]
+    assert metadata.item_count == 0
+
+
+@pytest.mark.required
+class TestIdempotentSetters:
+    """Assigning the value already in place changes nothing and rebuilds nothing."""
+
+    def test_setting_view_to_the_current_level_is_a_no_op(self, get_od_dataset):
+        metadata = Metadata(get_od_dataset(4, targets_per_image=2))
+        metadata.view = metadata.view
+        before = metadata.dataframe
+        metadata.view = metadata.view
+        assert metadata.dataframe.equals(before)
+
+    def test_setting_inherited_to_its_current_value_is_a_no_op(self, get_od_dataset):
+        metadata = Metadata(get_od_dataset(4, targets_per_image=2))
+        before = metadata.inherited
+        metadata.inherited = before
+        assert metadata.inherited == before
+
+    def test_setting_target_factors_only_to_its_current_value_is_a_no_op(self, get_od_dataset):
+        metadata = Metadata(get_od_dataset(4, targets_per_image=2))
+        with pytest.warns(DeprecationWarning, match="target_factors_only"):
+            current = metadata.target_factors_only
+        with pytest.warns(DeprecationWarning, match="target_factors_only"):
+            metadata.target_factors_only = current
+        with pytest.warns(DeprecationWarning, match="target_factors_only"):
+            assert metadata.target_factors_only == current
+
+
+@pytest.mark.required
+def test_accept_passes_over_factors_already_ratified(get_od_dataset):
+    """Accepting twice is idempotent: the second pass has nothing left to ratify."""
+    metadata = Metadata(get_od_dataset(6, metadata=[{"w": "a", "n": float(i)} for i in range(6)]))
+    metadata.factor_data  # noqa: B018  # bin, so the factors gain a derived encoding
+
+    names = tuple(metadata.factor_names)
+    metadata.accept(*names)
+    accepted = {name: metadata._factor_info[name].encoding for name in names}
+
+    # Naming them again reaches the skip: their provenance is no longer "derived".
+    metadata.accept(*names)
+    assert {name: metadata._factor_info[name].encoding for name in names} == accepted

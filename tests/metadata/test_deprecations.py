@@ -568,3 +568,16 @@ class TestLevelInferenceIsDeprecated:
         assert "coincidence" not in message
         assert "placement is forced" in message
         assert "v1.2.0" in message
+
+
+@pytest.mark.required
+def test_image_data_is_undefined_when_items_are_not_images():
+    """A tracking dataset's items are sequences, so there is no image row to return."""
+    from tests.metadata.test_structurers import _mot_dataset
+
+    metadata = Metadata(_mot_dataset([[2, 0, [1, -1]], [[0, 2], [1]]], [{"w": "a"}] * 2))
+    with (
+        pytest.warns(DeprecationWarning, match="image_data"),
+        pytest.raises(ValueError, match="only defined for image-based tasks"),
+    ):
+        metadata.image_data  # noqa: B018

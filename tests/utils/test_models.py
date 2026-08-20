@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.utils.models import AE, VAE, GMMDensityNet
 
 
@@ -146,3 +147,35 @@ class TestGMMDensityNet:
         gamma2 = gmm_net(z)
 
         assert torch.allclose(gamma1, gamma2)
+
+
+@pytest.mark.required
+class TestAutoencoderShapeChecks:
+    """input_shape is CHW, and a GMM head must match the encoder it is attached to."""
+
+    @pytest.mark.parametrize("model_cls", [AE, VAE])
+    @pytest.mark.parametrize("shape", [(28, 28), (1, 1, 28, 28)])
+    def test_a_non_chw_input_shape_is_rejected(self, model_cls, shape: tuple[int, ...]):
+        with pytest.raises(ShapeMismatchError, match="CHW format"):
+            model_cls(input_shape=shape)
+
+    @pytest.mark.parametrize("model_cls", [AE, VAE])
+    def test_a_mismatched_gmm_latent_dim_is_rejected(self, model_cls):
+        with pytest.raises(ShapeMismatchError, match="must match"):
+            model_cls(input_shape=(1, 16, 16), gmm_density_net=GMMDensityNet(latent_dim=3, n_gmm=2))
+
+
+@pytest.mark.required
+class TestAutoencoderGMMForward:
+    """With a GMM head attached, forward answers the triple the GMM scorer needs."""
+
+    @pytest.mark.parametrize("model_cls", [AE, VAE])
+    def test_forward_returns_reconstruction_latent_and_gamma(self, model_cls):
+        probe = model_cls(input_shape=(1, 16, 16))
+        encoded = probe.encoder(torch.zeros(1, 1, 16, 16))
+        latent_dim = (encoded[0] if isinstance(encoded, tuple) else encoded).shape[-1]  # VAE returns (mu, logvar)
+        model = model_cls(input_shape=(1, 16, 16), gmm_density_net=GMMDensityNet(latent_dim=latent_dim, n_gmm=2))
+        reconstruction, latent, gamma = model(torch.zeros(2, 1, 16, 16))
+        assert reconstruction.shape == (2, 1, 16, 16)
+        assert latent.shape[0] == 2
+        assert gamma.shape == (2, 2)

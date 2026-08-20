@@ -57,3 +57,14 @@ class TestResultsEdgeCases:
         assert [s.item for s in source_index] == [0, 1]
         assert dataset_steps == []
         np.testing.assert_array_equal(stats["x"], [1.0, 2.0])
+
+
+@pytest.mark.required
+def test_add_dataset_index_without_steps_is_a_no_op():
+    """No dataset boundaries means a single dataset, which needs no index prepended."""
+    import polars as pl
+
+    from dataeval.quality._shared import add_dataset_index
+
+    df = pl.DataFrame({"item_index": [0, 1, 2]})
+    assert add_dataset_index(df, []) is df

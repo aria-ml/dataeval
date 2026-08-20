@@ -331,3 +331,13 @@ class TestSurroundMaskEdges:
         ring = crop[..., ring_mask]
         for channel in range(crop.shape[0]):
             assert masked[channel, 0, 0] == pytest.approx(ring[channel].mean(), abs=1)
+
+
+@pytest.mark.required
+def test_unzipped_images_support_next_as_well_as_iteration(get_od_dataset):
+    """`unzip_dataset` hands back sized iterators: `len` is declared up front, `next` steps."""
+    from dataeval.data import unzip_dataset
+
+    images, _boxes = unzip_dataset(get_od_dataset(3), per_target=False)
+    assert len(images) == 3  # type: ignore[arg-type]
+    assert np.asarray(next(images)).ndim == 3  # type: ignore[call-overload]

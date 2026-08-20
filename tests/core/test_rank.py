@@ -111,3 +111,13 @@ class TestSorters:
         sorter = _DistanceSorter(samples=len(self.embeddings), algorithm="hdbscan", c=2)
         with pytest.raises(ValueError, match="Clustering failed to produce"):
             sorter._sort(self.embeddings)
+
+
+@pytest.mark.required
+def test_stratified_ranking_needs_scores():
+    """Stratification bins by score, so a score-free ranking has nothing to bin."""
+    from dataeval.core._rank import RankResult, rank_result_stratified
+
+    result = RankResult(indices=np.arange(5, dtype=np.intp), scores=None)
+    with pytest.raises(ValueError, match="Ranking scores are necessary for stratified policy"):
+        rank_result_stratified(result, num_bins=4)

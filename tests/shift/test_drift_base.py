@@ -16,6 +16,7 @@ import torch
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Dataset
 from dataeval.shift._drift._base import (
+    ChunkedDrift,
     ChunkResult,
     DriftOutput,
     _chunk_results_to_dataframe,
@@ -31,6 +32,7 @@ from dataeval.shift._drift._kneighbors import DriftKNeighbors
 from dataeval.shift._drift._mmd import DriftMMD
 from dataeval.shift._drift._reconstruction import DriftReconstruction
 from dataeval.shift._drift._univariate import DriftUnivariate
+from dataeval.utils.models import AE
 
 
 @pytest.mark.required
@@ -269,3 +271,54 @@ class TestDriftConfigRepr:
         det = DriftReconstruction(model=torch.nn.Identity(), p_val=0.01)
         assert det.config.p_val == 0.01
         assert "p_val=0.01" in repr(det)
+
+
+@pytest.mark.required
+class TestDriftFitPreconditions:
+    """Every accessor that reads fitted state says so rather than answering with None."""
+
+    def test_reference_data_before_fit_is_an_error(self):
+        # DriftReconstruction inherits the base accessor; the adaptive detectors override it.
+        detector = DriftReconstruction(AE(input_shape=(1, 8, 8)))
+        with pytest.raises(NotFittedError, match="Must call fit\\(\\) before accessing reference_data"):
+            detector.reference_data  # noqa: B018
+
+    def test_chunked_predict_before_fit_is_an_error(self):
+        chunked = ChunkedDrift(DriftUnivariate(), chunk_size=4)
+        with pytest.raises(NotFittedError, match="Must call fit\\(\\) before predict\\(\\)"):
+            chunked.predict(np.zeros((8, 3), dtype=np.float32))
+
+
+@pytest.mark.required
+class TestChunkedDriftConstruction:
+    def test_a_detector_that_cannot_chunk_is_rejected(self):
+        """Chunked mode needs the per-chunk metric hook, which ChunkableMixin supplies."""
+
+        class _NotChunkable:
+            pass
+
+        with pytest.raises(TypeError, match="does not support chunked mode"):
+            ChunkedDrift(_NotChunkable())  # type: ignore[arg-type]
+
+    def test_some_chunking_specification_is_required(self):
+        with pytest.raises(ValueError, match="Must provide chunker, chunk_size, or chunk_count"):
+            ChunkedDrift(DriftUnivariate())
+
+
+@pytest.mark.required
+class TestChunkedDriftPredictEdges:
+    """Predict needs a chunking rule at call time, and answers an empty run without one."""
+
+    def test_a_detector_whose_chunker_was_cleared_is_rejected(self):
+        chunked = ChunkedDrift(DriftUnivariate(), chunk_size=4)
+        chunked.fit(np.random.default_rng(0).random((16, 3)).astype(np.float32))
+        chunked._chunker = None  # the resolved chunker is what predict falls back to
+        with pytest.raises(ValueError, match="No chunking specification provided"):
+            chunked.predict(np.random.default_rng(1).random((16, 3)).astype(np.float32))
+
+    def test_no_chunks_yields_an_undrifted_result(self):
+        """An empty chunk list produces an empty frame, which reads as "no drift"."""
+        chunked = ChunkedDrift(DriftUnivariate(), chunk_size=4)
+        chunked.fit(np.random.default_rng(0).random((16, 3)).astype(np.float32))
+        output = chunked.predict(np.random.default_rng(1).random((16, 3)).astype(np.float32), chunk_indices=[])
+        assert output.drifted is False

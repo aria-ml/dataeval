@@ -162,3 +162,13 @@ class TestFromFactorsBuildsTheStore:
         metadata.add_factors({"late": np.arange(metadata.level_counts["unit"], dtype=np.float64)}, level="unit")
         assert "late" not in flat.columns
         assert "late" in metadata.dataframe.columns
+
+
+@pytest.mark.required
+def test_a_factor_that_does_not_match_the_source_index_is_rejected():
+    """The source index is the placement, so a short factor names rows nobody described."""
+    from dataeval._metadata._input import reject_length_mismatch
+
+    source_index = [SourceIndex(0, None), SourceIndex(1, None), SourceIndex(2, None)]
+    with pytest.raises(ShapeMismatchError, match=r"one value per source_index entry \(3\); got \{'a': 2\}"):
+        reject_length_mismatch({"a": np.array([1.0, 2.0])}, source_index)

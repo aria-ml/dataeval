@@ -57,10 +57,11 @@ def test_onnx_backend_detector_outputs(onnx_detector: Path):
     assert out["scores"].shape == (1, 5, 4)
 
 
-def test_onnx_backend_missing_file_raises():
-    # Unlike its neighbours this one takes no onnx fixture, so nothing else guards it --
-    # without onnxruntime `OnnxBackend` raises ImportError before it ever looks at the path.
-    pytest.importorskip("onnxruntime")
+def test_onnx_backend_missing_file_raises(fake_onnxruntime):
+    # The missing-file guard sits after the runtime import, so without onnxruntime
+    # `OnnxBackend` raises ImportError before it ever looks at the path -- stub the
+    # runtime rather than skip, so the guard is exercised everywhere.
+    fake_onnxruntime({"scores": np.ones((1, 4), dtype=np.float32)})
     with pytest.raises(FileNotFoundError):
         OnnxBackend("/nonexistent/model.onnx")
 
@@ -124,3 +125,33 @@ def test_litert_interpreter_uses_tflite_runtime(monkeypatch):
     interp = backends._litert_interpreter("model.tflite")
     assert isinstance(interp, _FakeInterpreter)
     assert interp.model_path == "model.tflite"
+
+
+def test_onnx_backend_init_and_run_with_stubbed_runtime(stub_model_file, fake_onnxruntime):
+    """With a stubbed runtime, init reads tensor names and run casts and keys the outputs."""
+    session = fake_onnxruntime({"scores": np.ones((2, 4), dtype=np.float32)})
+
+    backend = OnnxBackend(stub_model_file("model.onnx"))
+    assert backend.input_name == "image"
+    assert backend.output_names == ["scores"]
+
+    out = backend.run(np.zeros((2, 3, 8, 8), dtype=np.uint8))
+    assert out["scores"].shape == (2, 4)
+    # the batch reaches the session under the model's own input name, cast to float32
+    assert session.last_feed is not None
+    assert session.last_feed["image"].dtype == np.float32
+
+
+def test_onnx_backend_prefers_gpu_providers(stub_model_file, fake_onnxruntime):
+    """Available accelerators are ordered ahead of CPU; unavailable ones are dropped."""
+    session = fake_onnxruntime(
+        {"scores": np.ones((1, 4), dtype=np.float32)},
+        available_providers=["CPUExecutionProvider", "CUDAExecutionProvider"],
+    )
+    OnnxBackend(stub_model_file("model.onnx"))
+    assert session.providers == ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+
+def test_make_backend_dispatches_onnx_with_stubbed_runtime(stub_model_file, fake_onnxruntime):
+    fake_onnxruntime({"scores": np.ones((1, 4), dtype=np.float32)})
+    assert isinstance(make_backend(stub_model_file("model.onnx")), OnnxBackend)

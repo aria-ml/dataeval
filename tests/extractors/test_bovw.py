@@ -301,3 +301,15 @@ class TestBoVWEdgeCases:
         emb2 = extractor.transform(test_images)
 
         np.testing.assert_array_equal(emb1, emb2)
+
+
+@pytest.mark.required
+def test_construction_without_opencv_names_the_extra(monkeypatch):
+    """The lazy cv2 import is caught at construction so the message names the fix."""
+    import sys
+
+    from dataeval.extractors._bovw import BoVWExtractor as _BoVWExtractor
+
+    monkeypatch.setitem(sys.modules, "cv2", None)
+    with pytest.raises(ImportError, match=r"dataeval\[opencv\]"):
+        _BoVWExtractor()
