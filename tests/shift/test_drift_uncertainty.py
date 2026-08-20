@@ -194,8 +194,8 @@ class TestClassifierUncertainty:
 
     def test_prediction_uncertainty_notimplementederror(self):
         with pytest.raises(NotImplementedError):
-            _prediction_uncertainty(torch.empty([]), "invalid")  # type: ignore
+            _prediction_uncertainty(torch.tensor([[0.5, 0.5]]), "invalid")  # type: ignore
 
     def test_prediction_uncertainty_valueerror(self):
         with pytest.raises(ValueError, match="Probabilities across labels should sum to 1"):
-            _prediction_uncertainty(torch.empty([]), "probs")
+            _prediction_uncertainty(torch.tensor([[0.5, 0.2, 0.1]]), "probs")
