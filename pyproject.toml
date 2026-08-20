@@ -242,6 +242,7 @@ priority = "supplemental"
 
 [tool.poetry.dependencies]
 torch = { version = ">=2.2.0", source = "pytorch-cpu" }
+torchvision = { version = ">=0.17.0", source = "pytorch-cpu" }
 
 [tool.hatch.build.targets.sdist]
 include = ["src/dataeval"]
