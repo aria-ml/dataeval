@@ -82,12 +82,17 @@ except Exception:
     pass
 
 # %%
+from typing import cast
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from maite_datasets.object_detection import SeaDrone, VOCDetection
 from torchvision.transforms.functional import resize
-from ultralytics import YOLO
+
+# ultralytics builds its __all__ by unpacking a tuple, which a type checker cannot read, so
+# the canonical import looks private to it. Keep the import users actually write.
+from ultralytics import YOLO  # pyright: ignore[reportPrivateImportUsage]
 
 from dataeval.config import set_batch_size
 from dataeval.data import Indices, Limit, Shuffle, View
@@ -205,7 +210,7 @@ def postprocess_fn(output: tuple) -> torch.Tensor:
 
 # %%
 # Load the underlying torch module from the Ultralytics wrapper
-model = YOLO("data/yolov8s.pt").model
+model = cast(torch.nn.Module, YOLO("data/yolov8s.pt").model)
 
 # Decode the detector into per-detection class scores
 scores = TorchExtractor(

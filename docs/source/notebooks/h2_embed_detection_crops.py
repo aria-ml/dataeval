@@ -86,7 +86,7 @@ print(ds)
 # dataset.
 
 # %%
-index2label = ds.metadata["index2label"]  # {0: "aeroplane", 1: "bicycle", ...}
+index2label = ds.metadata.get("index2label", {})  # {0: "aeroplane", 1: "bicycle", ...}
 name_to_index = {name: index for index, name in index2label.items()}
 
 focus_classes = ["aeroplane", "bicycle", "bird", "car", "cat", "dog"]
