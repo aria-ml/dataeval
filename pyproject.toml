@@ -106,12 +106,13 @@ docsync = [
 test = [
   "coverage[toml]>=7.6",
   "filelock>=3.20.3",
-  "onnx>=1.14.0",
-  "onnxscript>=0.6.0",
   "pytest>=8.3",
   "pytest-cov>=6.1",
   "pytest-xdist>=3.6.1",
-  "rdflib>=7.0",
+]
+test-onnx = [
+  { include-group = "test" },
+  "onnxscript>=0.6.0",
 ]
 verify = [
   "pytest>=8.3",
@@ -168,7 +169,7 @@ security = [  # keep in sync with [tool.uv.constraint-dependencies]
 dev = [
   { include-group = "base" },
   { include-group = "lint" },
-  { include-group = "test" },
+  { include-group = "test-onnx" },
   { include-group = "type" },
   { include-group = "docs" },
   "nox>=2025.5.1",
@@ -317,7 +318,12 @@ omit = ["src/dataeval/_version.py"]
 exclude_also = [
   "raise NotImplementedError",
   ": \\.\\.\\.",
-  "if TYPE_CHECKING:"
+  "if TYPE_CHECKING:",
+  # Debug reprs carry no logic worth asserting on, and pinning their exact text in a
+  # test makes the string harder to improve than it is worth. coverage.py documents
+  # `def __repr__` as a canonical exclusion.
+  "def __repr__",
+  "def __str__",
 ]
 include = ["*/src/dataeval/*"]
 omit = [

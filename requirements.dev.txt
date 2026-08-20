@@ -1836,9 +1836,9 @@ onnx==1.22.0 \
     #   dataeval
     #   onnx-ir
     #   onnxscript
-onnx-ir==0.2.1 \
-    --hash=sha256:8b8b10a93f43e65962104de6070c43c5dacb0e3cdfefc7c8059dd83c9db64f35 \
-    --hash=sha256:c7285da889312f91882de2092e298a9eeeefbfc1d1951c49d983992967eb09a7
+onnx-ir==1.0.0 \
+    --hash=sha256:9e261f25fde8da9612ae5cb43b3b374d5ff469c04af0363cad588b2bb000b812 \
+    --hash=sha256:e578f0d608d3062866b48223616eb2d10a6d6d01f8b8faac596129034f483cc7
     # via onnxscript
 onnxruntime==1.23.2 ; python_full_version < '3.11' \
     --hash=sha256:0be6a37a45e6719db5120e9986fcd30ea205ac8103fd1fb74b6c33348327a0cc \

@@ -7,8 +7,19 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-pytest.importorskip("onnx")
-pytest.importorskip("onnxruntime")
+
+def _require_onnx_runtime() -> None:
+    """Skip the calling test when the ONNX toolchain is missing.
+
+    Deliberately not at module scope: a module-level ``importorskip`` in a conftest skips
+    every test in that conftest's directory, and tests/extractors/conftest.py imports this
+    module for its two fixtures -- which spread the skip across a second tree whose tests
+    have nothing to do with ONNX. Guarding inside the fixtures keeps it to the tests that
+    actually build an ONNX model.
+    """
+    pytest.importorskip("onnx")
+    pytest.importorskip("onnxruntime")
+
 
 try:
     from torch import Tensor
@@ -43,6 +54,7 @@ class _TinyDetector(torch.nn.Module):
 
 @pytest.fixture
 def onnx_classifier(tmp_path: Path) -> Path:
+    _require_onnx_runtime()
     path = tmp_path / "classifier.onnx"
     model = _TinyClassifier(n_classes=4).eval()
     dummy = torch.zeros(1, 3, 8, 8)
@@ -62,6 +74,7 @@ def onnx_classifier(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def onnx_detector(tmp_path: Path) -> Path:
+    _require_onnx_runtime()
     path = tmp_path / "detector.onnx"
     model = _TinyDetector(n_boxes=5, n_classes=4).eval()
     dummy = torch.zeros(1, 3, 8, 8)

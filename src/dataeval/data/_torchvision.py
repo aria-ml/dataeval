@@ -70,7 +70,7 @@ def _datum_seed(metadata: Any, image: NDArray[Any]) -> tuple[int, bool]:
     """
     datum_id = metadata.get("id") if isinstance(metadata, dict) else None
     if datum_id is not None:
-        return xxh.xxh64_intdigest(str(datum_id)), False
+        return xxh.xxh64_intdigest(str(datum_id).encode()), False
     subsample = image[..., ::_CONTENT_HASH_STRIDE, ::_CONTENT_HASH_STRIDE]
     return xxh.xxh64_intdigest(np.ascontiguousarray(subsample).tobytes()), True
 
@@ -159,7 +159,7 @@ class TorchvisionTransform(Operation):
         self._invalidates = invalidates
         # Salt per operation: two operations deriving the same seed from the same id would
         # produce correlated draws — two RandomHorizontalFlips that always agree.
-        self._salt = seed ^ xxh.xxh64_intdigest(repr(transform))
+        self._salt = seed ^ xxh.xxh64_intdigest(repr(transform).encode())
         self._warned_missing_id = False
         self._checked_preprocessing = False
 

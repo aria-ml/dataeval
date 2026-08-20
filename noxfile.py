@@ -213,7 +213,7 @@ def dev(session: nox.Session) -> None:
         )
 
 
-@session(uv_groups=["test"], uv_extras=["cpu", "onnx", "opencv"])
+@session(uv_groups=["test-onnx"], uv_extras=with_onnx(["cpu", "opencv", "ontology"]))
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`.
 
@@ -294,7 +294,7 @@ def lint(session: nox.Session) -> None:
     session.run("typos")
 
 
-@session(uv_groups=["test"], uv_extras=with_onnx(["cpu", "opencv"]))
+@session(uv_groups=["test-onnx"], uv_extras=with_onnx(["cpu", "opencv"]))
 def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
     target = session.posargs if session.posargs else ["src/dataeval"]

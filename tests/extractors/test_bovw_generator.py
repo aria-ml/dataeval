@@ -7,7 +7,7 @@ len(data), which crashes on a generator/iterator.
 import numpy as np
 import pytest
 
-from dataeval.extractors import BoVWExtractor
+pytest.importorskip("cv2", reason="opencv-python not installed")
 
 
 @pytest.fixture
@@ -18,6 +18,8 @@ def rgb_images():
 
 @pytest.mark.optional
 def test_transform_accepts_generator(rgb_images):
+    from dataeval.extractors import BoVWExtractor
+
     extractor = BoVWExtractor(vocab_size=16)
     extractor.fit(rgb_images)
 
@@ -31,6 +33,8 @@ def test_transform_accepts_generator(rgb_images):
 
 @pytest.mark.optional
 def test_call_accepts_generator(rgb_images):
+    from dataeval.extractors import BoVWExtractor
+
     extractor = BoVWExtractor(vocab_size=16)
     extractor.fit(rgb_images)
     out = np.asarray(extractor(img for img in rgb_images))

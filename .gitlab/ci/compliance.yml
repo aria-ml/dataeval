@@ -38,7 +38,7 @@ include:
       package_name: "${PACKAGE_NAME}"
       marker: required
       dependency: required
-      poetry_install_options: --only main,dev
+      poetry_install_options: --only main,test
       allow_failure: true
 
   - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
@@ -48,7 +48,7 @@ include:
       package_name: "${PACKAGE_NAME}"
       marker: optional
       dependency: optional
-      poetry_install_options: --extras=onnx
+      poetry_install_options: --only main,test-onnx --extras=cpu --extras=onnx --extras=opencv --extras=ontology
       allow_failure: true
 
   - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
@@ -58,7 +58,7 @@ include:
       package_name: "${PACKAGE_NAME}"
       marker: optional
       dependency: required
-      poetry_install_options: --only main,dev
+      poetry_install_options: --only main,test
       allow_failure: true
 
   - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
@@ -68,7 +68,7 @@ include:
       package_name: "${PACKAGE_NAME}"
       marker: all
       dependency: required
-      poetry_install_options: --extras=onnx
+      poetry_install_options: --only main,test
       allow_failure: true
 
   - component: gitlab.jatic.net/jatic/devsecops/components/tr-compliance@1.2.0

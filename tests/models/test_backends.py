@@ -58,6 +58,9 @@ def test_onnx_backend_detector_outputs(onnx_detector: Path):
 
 
 def test_onnx_backend_missing_file_raises():
+    # Unlike its neighbours this one takes no onnx fixture, so nothing else guards it --
+    # without onnxruntime `OnnxBackend` raises ImportError before it ever looks at the path.
+    pytest.importorskip("onnxruntime")
     with pytest.raises(FileNotFoundError):
         OnnxBackend("/nonexistent/model.onnx")
 

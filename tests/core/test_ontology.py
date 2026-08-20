@@ -449,6 +449,11 @@ class TestOptionalDependency:
 
 @pytest.mark.optional
 class TestRdfAdapters:
+    @pytest.fixture(autouse=True)
+    def _require_rdflib(self):
+        """Every case here goes through an RDF constructor, which needs the optional dep."""
+        pytest.importorskip("rdflib")
+
     def test_from_turtle(self):
         onto = Ontology.from_rdf(TURTLE, format="turtle")
         dog = onto.concept("http://example.org/Dog")
@@ -546,6 +551,11 @@ VEHICLE_ONTOLOGY = Path(__file__).parent / "vehicle_ontology.jsonld"
 class TestVehicleOntologyFixture:
     """End-to-end against the committed public sample ontology (a CUI-free stand-in
     for a real-world OWL/JSON-LD ontology, including an intentional dangling parent)."""
+
+    @pytest.fixture(autouse=True)
+    def _require_rdflib(self):
+        """Every case here goes through an RDF constructor, which needs the optional dep."""
+        pytest.importorskip("rdflib")
 
     @pytest.fixture
     def onto(self):

@@ -13,7 +13,26 @@ from dataeval.flags import ImageStats
 from dataeval.protocols import DatasetMetadata
 
 torch = pytest.importorskip("torch")
-v2 = pytest.importorskip("torchvision.transforms.v2")
+
+
+class _LazyV2:
+    """Resolve ``torchvision.transforms.v2`` on first attribute access, not at import.
+
+    A module-level ``importorskip`` would skip the whole file -- including TestLazyImport
+    and TestInvalidates, which are precisely the tests about behaviour when torchvision is
+    *absent*, and which need nothing from it. Deferring means each test that reaches for a
+    real transform skips on its own, and the rest run in a torchvision-free environment.
+    """
+
+    def __getattr__(self, name: str):
+        # Collection probes module-level objects for dunders such as `__test__`; answering
+        # those by importing would skip the file before a single test ran.
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+        return getattr(pytest.importorskip("torchvision.transforms.v2"), name)
+
+
+v2 = _LazyV2()
 
 pytestmark = pytest.mark.optional
 
@@ -177,6 +196,8 @@ class TestDeterminism:
         assert [datum[2]["id"] for datum in shuffled] != [10, 11, 12, 13]
 
     def test_output_is_identical_under_different_python_hash_seeds(self):
+        # The subprocess imports torchvision directly, out of reach of the lazy `v2` proxy.
+        pytest.importorskip("torchvision")
         code = (
             "import numpy as np;"
             "from torchvision.transforms import v2;"
