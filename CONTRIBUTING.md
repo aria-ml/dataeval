@@ -22,13 +22,13 @@ arguments it prompts for the Python version and the PyTorch build; pass them as
 arguments to skip the prompts:
 
 ```bash
-uvx --with nox-uv nox -s dev -- --python 3.12 --device cu128
+uvx --with nox-uv nox -s dev -- --python 3.12 --device cu130
 ```
 
 | Flag | Values | Default |
 | ---- | ------ | ------- |
 | `-p`, `--python` | `3.10` – `3.14` | `3.11` |
-| `-d`, `--device` | `cpu`, `cu118`, `cu128` | `cu128` |
+| `-d`, `--device` | `cpu`, `cu126`, `cu130` | `cu130` |
 | `-n`, `--name` | any directory | `.venv` |
 
 The chosen device is recorded in `.cuda-version`, which later sessions read so they

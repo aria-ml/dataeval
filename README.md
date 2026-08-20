@@ -83,8 +83,8 @@ variant, install `torch` from that variant's wheel index **first**, then install
 DataEval — it accepts the build already present in the environment:
 
 ```bash
-# 1. Pick your PyTorch build (cpu / cu118 / cu128)
-pip install torch --index-url https://download.pytorch.org/whl/cu128
+# 1. Pick your PyTorch build (cpu / cu126 / cu130)
+pip install torch --index-url https://download.pytorch.org/whl/cu130
 
 # 2. Install DataEval
 pip install dataeval
@@ -99,7 +99,7 @@ pip install dataeval
 > `pip install dataeval --extra-index-url https://download.pytorch.org/whl/cpu`
 > does work, because the CPU index tracks the latest release.)
 >
-> **The `cpu` / `cu118` / `cu128` extras do not select a PyTorch variant under
+> **The `cpu` / `cu126` / `cu130` extras do not select a PyTorch variant under
 > pip.** All three declare the same requirements (`torch`, `torchvision`); what
 > distinguishes them is `[tool.uv.sources]`, which routes those packages to the
 > right wheel index. That is project metadata applied by uv when resolving **from
@@ -115,7 +115,7 @@ transform across a dataset view. If you want that class, install torchvision
 yourself, from the **same index as your torch build**:
 
 ```bash
-pip install torchvision --index-url https://download.pytorch.org/whl/cu128
+pip install torchvision --index-url https://download.pytorch.org/whl/cu130
 ```
 
 > **Do not mix indexes.** A `torchvision` from PyPI alongside a torch installed
@@ -129,7 +129,7 @@ pip install torchvision --index-url https://download.pytorch.org/whl/cu128
 ### **Installing with uv**
 
 ```bash
-uv pip install dataeval --torch-backend cpu   # or cu118 / cu128 / auto
+uv pip install dataeval --torch-backend cpu   # or cu126 / cu130 / auto
 ```
 
 ### **Installing with conda**

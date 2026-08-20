@@ -44,7 +44,7 @@ docs:
     UV_INSTALL_DIR: /usr/local/bin
     UV_COMPILE_BYTECODE: 1
     UV_NO_PROGRESS: true
-    DATAEVAL_NOX_UV_EXTRAS_OVERRIDE: cu128
+    DATAEVAL_NOX_UV_EXTRAS_OVERRIDE: cu130
     GIT_STRATEGY: clone  # Full clone needed for artifact branch operations
 
 doctest:

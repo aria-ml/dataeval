@@ -29,9 +29,9 @@ def _install_hint() -> str:
     except ImportError:
         return (
             "Install both from one wheel index, e.g. `pip install torch torchvision "
-            "--index-url https://download.pytorch.org/whl/cpu` (or cu118/cu128)."
+            "--index-url https://download.pytorch.org/whl/cpu` (or cu126/cu130)."
         )
-    # A wheel-index build tags its local version with the index name ("2.13.0+cu128"); a
+    # A wheel-index build tags its local version with the index name ("2.13.0+cu130"); a
     # PyPI build has no tag, and anything else is too unusual to turn into a URL.
     _, _, build = torch.__version__.partition("+")
     if not build:

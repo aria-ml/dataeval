@@ -89,11 +89,11 @@ class TestLazyImport:
         [
             # A wheel-index build names the index it came from in its local version.
             ("2.13.0+cpu", "https://download.pytorch.org/whl/cpu"),
-            ("2.11.0+cu128", "https://download.pytorch.org/whl/cu128"),
+            ("2.11.0+cu130", "https://download.pytorch.org/whl/cu130"),
             # A PyPI build has no local version, so PyPI's torchvision is the match.
             ("2.13.0", "`pip install torchvision`"),
             # An exotic tag cannot be turned into an index URL, so do not invent one.
-            ("2.11.0+cu128.with.pypi.cudnn", "published alongside it"),
+            ("2.11.0+cu130.with.pypi.cudnn", "published alongside it"),
         ],
     )
     def test_install_hint_points_at_the_matching_index(self, monkeypatch, version, expected):

@@ -21,8 +21,8 @@ index **first**, then install DataEval — it accepts the build already present 
 the environment:
 
 ```bash
-# 1. Pick your PyTorch build (cpu / cu118 / cu128)
-pip install torch --index-url https://download.pytorch.org/whl/cu128
+# 1. Pick your PyTorch build (cpu / cu126 / cu130)
+pip install torch --index-url https://download.pytorch.org/whl/cu130
 
 # 2. Install DataEval
 pip install dataeval
@@ -49,13 +49,13 @@ pip install dataeval --extra-index-url https://download.pytorch.org/whl/cpu
 ```
 
 :::{important}
-The `cpu`, `cu118`, and `cu128` extras are **not** a way to select a PyTorch
+The `cpu`, `cu126`, and `cu130` extras are **not** a way to select a PyTorch
 variant with pip. All three declare exactly the same requirements (`torch` and
 `torchvision`); what distinguishes them is `[tool.uv.sources]` in the project's
 `pyproject.toml`, which routes those two packages to the right wheel index. That
 routing is project metadata — uv applies it when resolving **from a source
 checkout**, and it is not part of the published wheel. Installing
-`dataeval[cu128]` from PyPI therefore only adds `torchvision` — and adds it from
+`dataeval[cu130]` from PyPI therefore only adds `torchvision` — and adds it from
 PyPI, which will *not* match a torch you installed from a wheel index — while
 PyTorch still resolves from whichever index pip is pointed at.
 
@@ -71,7 +71,7 @@ a torchvision v2 transform across a dataset view. If you want that class, instal
 torchvision yourself, from the **same index as your torch build**:
 
 ```bash
-pip install torchvision --index-url https://download.pytorch.org/whl/cu128
+pip install torchvision --index-url https://download.pytorch.org/whl/cu130
 ```
 
 :::{warning}
@@ -110,7 +110,7 @@ To control which PyTorch build you get, see
 Installing from PyPI with `uv`, letting uv select the PyTorch index for you:
 
 ```bash
-uv pip install dataeval --torch-backend cpu   # or cu118 / cu128 / auto
+uv pip install dataeval --torch-backend cpu   # or cu126 / cu130 / auto
 ```
 
 `--torch-backend` is the `uv pip` equivalent of `--index-url`; `auto` detects
@@ -183,7 +183,7 @@ Install DataEval with development dependencies.
 ```
 
 Optionally, you can specify the version of Python and PyTorch CPU/CUDA
-support (cpu, cu118, cu128) using -p and --extra respectively. This is the one
+support (cpu, cu126, cu130) using -p and --extra respectively. This is the one
 place the PyTorch variant extras take effect — uv applies the `[tool.uv.sources]`
 index routing when resolving from a source checkout.
 

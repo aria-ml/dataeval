@@ -37,7 +37,7 @@ include:
       package_name: "${PACKAGE_NAME}"
       marker: required
       dependency: required
-      poetry_install_options: --only dev
+      poetry_install_options: --only main,dev
       allow_failure: true
 
   - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
@@ -57,7 +57,7 @@ include:
       package_name: "${PACKAGE_NAME}"
       marker: optional
       dependency: required
-      poetry_install_options: --only dev
+      poetry_install_options: --only main,dev
       allow_failure: true
 
   - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0

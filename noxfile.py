@@ -72,8 +72,8 @@ PYTHON_VERSION = f"{sys.version_info[0]}.{sys.version_info[1]}"
 PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 PYTHON_DEFAULT = "3.11"
 PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
-DEVICE_VARIANTS = ["cpu", "cu118", "cu128"]
-DEVICE_DEFAULT = "cu128"
+DEVICE_VARIANTS = ["cpu", "cu126", "cu130"]
+DEVICE_DEFAULT = "cu130"
 VENV_DEFAULT = ".venv"
 CUDA_VERSION_FILE = ".cuda-version"
 IS_CI = bool(os.environ.get("CI"))
@@ -126,7 +126,7 @@ def resolve_option(session: nox.Session, label: str, provided: "str | None", all
     """Validate an option value, prompting for it when it was not supplied on the command line.
 
     A value typed at the prompt falls back to `default` when unrecognized, but a value passed
-    as a flag is an error, so that a typo such as `-d cu126` cannot silently install cu128.
+    as a flag is an error, so that a typo such as `-d cu124` cannot silently install cu130.
     """
     value = provided
     interactive = value is None

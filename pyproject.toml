@@ -47,8 +47,8 @@ dependencies = [
 
 [project.optional-dependencies]
 cpu = ["torch>=2.2.0", "torchvision>=0.17.0"]
-cu118 = ["torch>=2.2.0", "torchvision>=0.17.0"]
-cu128 = ["torch>=2.2.0", "torchvision>=0.17.0"]
+cu126 = ["torch>=2.2.0", "torchvision>=0.17.0"]
+cu130 = ["torch>=2.2.0", "torchvision>=0.17.0"]
 litert = ["ai-edge-litert>=2.0; python_version <= '3.14'"]
 opencv = ["opencv-python-headless>=4.8.0"]
 onnx = [
@@ -181,8 +181,8 @@ dev = [
 conflicts = [
   [
     { extra = "cpu" },
-    { extra = "cu118" },
-    { extra = "cu128" },
+    { extra = "cu126" },
+    { extra = "cu130" },
   ],
 ]
 constraint-dependencies = [
@@ -208,25 +208,25 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cu118"
-url = "https://download.pytorch.org/whl/cu118"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.uv.sources]
 torch = [
   { index = "pytorch-cpu", extra = "cpu" },
-  { index = "pytorch-cu118", extra = "cu118" },
-  { index = "pytorch-cu128", extra = "cu128" },
+  { index = "pytorch-cu126", extra = "cu126" },
+  { index = "pytorch-cu130", extra = "cu130" },
 ]
 torchvision = [
   { index = "pytorch-cpu", extra = "cpu" },
-  { index = "pytorch-cu118", extra = "cu118" },
-  { index = "pytorch-cu128", extra = "cu128" },
+  { index = "pytorch-cu126", extra = "cu126" },
+  { index = "pytorch-cu130", extra = "cu130" },
 ]
 
 [tool.uv.extra-build-dependencies]
@@ -349,7 +349,12 @@ extend-include = ["*.ipynb"]
 select = ["F", "E", "W", "C90", "I", "N", "D", "UP", "YTT", "ANN", "S", "BLE", "B", "A",
           "COM", "C4", "T10", "ISC", "ICN", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SIM",
           "TID252", "ARG", "FIX", "PD", "FLY", "NPY", "RUF027", "RUF100", "PERF"]
-ignore = ["ANN401", "C408", "C416", "COM812", "NPY002", "SLF001"]
+# ANN101/ANN102 were removed in Ruff 0.8, so ignoring them is inert and Ruff warns as much.
+# They stay because the JATIC program-standards Ruff config requires them verbatim in
+# lint.ignore, and verify_ruff_config.py matches against the parsed TOML -- a comment
+# cannot satisfy it, and the only other accepted spelling is bare "ANN", which would
+# disable every annotation rule.
+ignore = ["ANN101", "ANN102", "ANN401", "C408", "C416", "COM812", "NPY002", "SLF001"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
