@@ -264,6 +264,10 @@ vcs = "git"
 style = "pep440"
 pattern = "^v?(?P<base>\\d+\\.\\d+\\.\\d+)"
 
+[tool.pyproject2conda]
+# maite is only published on conda-forge; the defaults channel cannot resolve it.
+channels = ["conda-forge"]
+
 [tool.pyproject2conda.dependencies]
 numpy = { skip = true, packages = "numpy>=1.24.2" }
 scikit-learn = { skip = true, packages = "scikit-learn>=1.5.0" }

@@ -8,6 +8,8 @@
 # Instead edit the corresponding pyproject.toml file.
 #
 name: dataeval
+channels:
+  - conda-forge
 dependencies:
   - python>=3.10
   - lightgbm>=4
