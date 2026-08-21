@@ -2,19 +2,77 @@
 
 __all__ = ["VideoTorchExtractor"]
 
-import logging
-import traceback
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from contextlib import nullcontext
 from typing import Any
 
 import numpy as np
 import torch
 from torch.amp.autocast_mode import autocast
 
+from dataeval._log import get_logger
 from dataeval.config import get_device
+from dataeval.extractors._torch import get_valid_layer, normalize_transforms
 from dataeval.protocols import Array, DeviceLike, Transform
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
+
+# One source of truth for the strategy names: the constructor validates against these keys
+# rather than against a second literal set that could drift from what is implemented.
+_POOLING: dict[str, Callable[[torch.Tensor], torch.Tensor]] = {
+    "mean": lambda embeddings: embeddings.mean(dim=1),
+    "first": lambda embeddings: embeddings[:, 0],
+    "last": lambda embeddings: embeddings[:, -1],
+    # Keep every position, as one row per batch entry.
+    "none": lambda embeddings: embeddings.reshape(embeddings.shape[0], -1),
+}
+
+# ``add_`` accumulates into the running aggregate and ``maximum`` returns a fresh tensor;
+# both answer to ``combine(running, clip) -> running``, so the loop needs no branch.
+_CLIP_AGGREGATION: dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = {
+    "mean": torch.Tensor.add_,
+    "max": torch.maximum,
+}
+
+# Beyond this many clips a video is long enough that releasing cached CUDA blocks now and
+# then is worth the synchronization, and that progress is worth reporting.
+_LONG_VIDEO_CLIPS = 100
+_CACHE_RELEASE_CLIPS = 500
+_CACHE_RELEASE_EVERY = 100
+
+
+def _tensor_of(model_output: Any) -> Any:  # noqa: C901
+    """Pull the embedding tensor out of whatever shape a model or a layer returned.
+
+    A bare tensor, a HuggingFace ``BaseModelOutput``, a plain dict and a tuple are all in
+    circulation, so the tensor is found by asking rather than by assuming. ``None`` comes
+    back when none of those shapes fit, leaving what to do about it to the caller: the
+    forward path refuses such an output, while the layer hook keeps it as it came.
+    """
+    if isinstance(model_output, torch.Tensor):
+        return model_output
+    if getattr(model_output, "last_hidden_state", None) is not None:
+        return model_output.last_hidden_state
+    if getattr(model_output, "pooler_output", None) is not None:
+        return model_output.pooler_output
+    if isinstance(model_output, dict) and "last_hidden_state" in model_output:
+        return model_output["last_hidden_state"]
+    if isinstance(model_output, tuple) and model_output:
+        return model_output[0]
+    return None
+
+
+def _resolve_num_frames(model: torch.nn.Module, num_frames: int | None) -> int:
+    """Settle on the clip length, from the argument or from the model's own config."""
+    if num_frames is None:
+        config = getattr(model, "config", None)
+        num_frames = getattr(config, "num_frames", None) if config is not None else None
+        if num_frames is None:
+            raise ValueError("num_frames must be provided or available in model.config.num_frames")
+        _logger.debug(f"Using num_frames={num_frames} from model.config")
+    if num_frames < 1:
+        raise ValueError(f"num_frames must be at least 1; got {num_frames}.")
+    return int(num_frames)
 
 
 class VideoTorchExtractor:
@@ -59,7 +117,7 @@ class VideoTorchExtractor:
         - "mean": Average pool across temporal dimension
         - "first": Use first token (CLS token for BERT-style models)
         - "last": Use last token
-        - "none": Return full sequence
+        - "none": Keep the whole sequence, flattened into one vector per clip
     num_frames : int or None, default None
         Number of frames per clip. When None, automatically extracted from
         model.config.num_frames. Must be set if model doesn't have this config.
@@ -67,6 +125,16 @@ class VideoTorchExtractor:
         Strategy for aggregating clip embeddings into video embedding. Options:
         - "mean": Average all clip embeddings
         - "max": Max pool across clip embeddings (strongest activation for each feature preserved)
+    use_amp : bool, default False
+        Run the forward pass under ``torch.autocast`` mixed precision. Only takes
+        effect on a CUDA device; ignored everywhere else.
+
+    Raises
+    ------
+    ValueError
+        When `pooling` or `clip_aggregation` names an unknown strategy, when `num_frames`
+        is neither given nor available from ``model.config``, or when `layer_name` names
+        no submodule of `model`.
 
 
     Example
@@ -115,7 +183,7 @@ class VideoTorchExtractor:
     ) -> None:
         self.device = get_device(device)
         self._processor = processor
-        self._transforms = self._normalize_transforms(transforms)
+        self._transforms = normalize_transforms(transforms)
         self._layer_name = layer_name
         self._use_output = use_output
         self._pooling = pooling
@@ -123,105 +191,58 @@ class VideoTorchExtractor:
         self._use_amp = use_amp
 
         # Validate pooling strategy
-        valid_pooling = {"mean", "first", "last", "none"}
-        if pooling not in valid_pooling:
-            raise ValueError(f"Invalid pooling '{pooling}'. Must be one of {valid_pooling}")
+        if pooling not in _POOLING:
+            raise ValueError(f"Invalid pooling '{pooling}'. Must be one of {set(_POOLING)}")
 
         # Validate clip aggregation
-        valid_aggregation = {"mean", "max"}
-        if clip_aggregation not in valid_aggregation:
-            raise ValueError(f"Invalid clip_aggregation '{clip_aggregation}'. Must be one of {valid_aggregation}")
+        if clip_aggregation not in _CLIP_AGGREGATION:
+            raise ValueError(f"Invalid clip_aggregation '{clip_aggregation}'. Must be one of {set(_CLIP_AGGREGATION)}")
 
         # Setup model
         self._model = model.to(self.device).eval()
-
-        # Ensure cuDNN is properly initialized
-        if self.device.type == "cuda":
-            torch.backends.cudnn.benchmark = False
-            torch.backends.cudnn.deterministic = True
-
-        # Get num_frames from model config if not provided
-        if num_frames is None:
-            config = getattr(model, "config", None)
-            self._num_frames = getattr(config, "num_frames", None) if config is not None else None
-            _logger.debug(f"Using num_frames={self._num_frames} from model.config")
-
-            if self._num_frames is None:
-                raise ValueError("num_frames must be provided")
-
-        elif num_frames is not None:
-            self._num_frames = num_frames
-        else:
-            raise ValueError("num_frames must be provided or available in model.config.num_frames")
+        self._num_frames = _resolve_num_frames(model, num_frames)
 
         # Setup hook for intermediate layer extraction
         self._captured_output: Any = None
         if layer_name is not None:
-            target_layer = self._get_valid_layer(layer_name, model)
+            target_layer = get_valid_layer(layer_name, model)
             target_layer.register_forward_hook(self._hook_fn)
             _logger.debug(f"Capturing {'output' if use_output else 'input'} data from layer {layer_name}.")
 
     @property
     def layer_name(self) -> str | None:
-        """Return the layer name for intermediate extraction, if set."""
+        """Layer name for intermediate extraction, if set."""
         return self._layer_name
 
     @property
     def use_output(self) -> bool:
-        """Return whether output (True) or input (False) is captured from the layer."""
+        """Whether output (True) or input (False) is captured from the layer."""
         return self._use_output
 
     @property
     def pooling(self) -> str:
-        """Return the pooling strategy."""
+        """Pooling strategy applied within each clip."""
         return self._pooling
 
     @property
     def clip_aggregation(self) -> str:
-        """Return the clip aggregation strategy."""
+        """Strategy used to aggregate clip embeddings into a video embedding."""
         return self._clip_aggregation
 
     @property
-    def num_frames(self) -> int | None:
-        """Return the number of frames per clip."""
+    def num_frames(self) -> int:
+        """Number of frames per clip."""
         return self._num_frames
-
-    def _normalize_transforms(
-        self, transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None
-    ) -> list[Transform[torch.Tensor]]:
-        """Normalize transforms to a list."""
-        if transforms is None:
-            return []
-        if isinstance(transforms, Transform):
-            return [transforms]
-        return list(transforms)
 
     def _hook_fn(self, _module: torch.nn.Module, inputs: tuple[torch.Tensor, ...], output: Any) -> None:
         """Forward hook to capture layer input or output."""
-        if self._use_output:
-            # Handle different output types (tensor, tuple, dict, BaseModelOutput)
-            if isinstance(output, torch.Tensor):
-                self._captured_output = output.detach().clone()
-            elif isinstance(output, tuple):
-                self._captured_output = output[0].detach().clone()
-            elif hasattr(output, "last_hidden_state"):
-                self._captured_output = output.last_hidden_state.detach().clone()
-            elif isinstance(output, dict) and "last_hidden_state" in output:
-                self._captured_output = output["last_hidden_state"].detach().clone()
-            else:
-                self._captured_output = output
+        captured = _tensor_of(output) if self._use_output else inputs[0]
+        if captured is None:
+            # Unrecognised output kept as it came, rather than discarded: the layer was
+            # named by the caller, who knows what it produces better than this does.
+            self._captured_output = output
         else:
-            self._captured_output = inputs[0].detach().clone()
-
-    def _get_valid_layer(self, layer_name: str, model: torch.nn.Module) -> torch.nn.Module:
-        """Validate and return the target layer for hook registration."""
-        modules_dict = dict(model.named_modules())
-
-        if layer_name not in modules_dict:
-            formatted_layers = "\n".join(f"  {layer}" for layer in modules_dict)
-            raise ValueError(f"Invalid layer '{layer_name}'. Available layers are:\n{formatted_layers}")
-
-        return modules_dict[layer_name]
+            self._captured_output = captured.detach().clone()
 
     def _apply_pooling(self, embeddings: torch.Tensor) -> torch.Tensor:
         """
@@ -236,23 +257,20 @@ class VideoTorchExtractor:
         Returns
         -------
         torch.Tensor
-            Pooled embeddings.
+            Pooled embeddings, batch dimension intact.
+
+        Notes
+        -----
+        The dimension being pooled over is dimension 1 whatever follows it, so a layer
+        capture with spatial dimensions -- ``(batch, channels, height, width)`` -- pools
+        over channels and keeps the rest, which the caller then flattens. Unpacking the
+        shape into exactly three names instead would refuse such a capture outright.
         """
         # If already 2D, no pooling needed
         if embeddings.ndim == 2:
             return embeddings
 
-        if self._pooling == "mean":
-            return embeddings.mean(dim=1)
-        if self._pooling == "first":
-            return embeddings[:, 0]
-        if self._pooling == "last":
-            return embeddings[:, -1]
-        if self._pooling == "none":
-            # Flatten batch and sequence dimensions
-            batch_size, seq_len, hidden_dim = embeddings.shape
-            return embeddings.reshape(batch_size * seq_len, hidden_dim)
-        raise ValueError(f"Unknown pooling strategy: {self._pooling}")
+        return _POOLING[self._pooling](embeddings)
 
     def _preprocess_clip(self, clip_frames: list) -> torch.Tensor:
         """
@@ -280,8 +298,9 @@ class VideoTorchExtractor:
             else:
                 tensor = processed
         else:
-            # Convert to tensor if no processor
-            tensor = torch.as_tensor(clip_frames)
+            # np.asarray first: torch.as_tensor on a list of arrays copies frame by frame
+            # and warns about it, while one stacked array converts without a copy.
+            tensor = torch.as_tensor(np.asarray(clip_frames))
 
         # Apply additional transforms
         for transform in self._transforms:
@@ -304,9 +323,6 @@ class VideoTorchExtractor:
         list[list]
             List of clips, where each clip is a list of frames.
         """
-        if self._num_frames is None:
-            raise RuntimeError("num_frames was not properly initialized")
-
         # Convert to list of frames if numpy array
         video_frames = list(video) if isinstance(video, np.ndarray) and video.ndim == 4 else video
 
@@ -340,36 +356,20 @@ class VideoTorchExtractor:
         torch.Tensor
             Aggregated video embedding.
         """
-        if len(clips) == 0:
+        if not clips:
             raise ValueError("No clips to process")
 
-        running_aggregate = None
         n_clips = len(clips)
+        combine = _CLIP_AGGREGATION[self._clip_aggregation]
+        # Cloned so the accumulator owns its memory: the pooled embedding can be a view of
+        # the model's output, which the in-place ``mean`` combine would otherwise write to.
+        running_aggregate = self._embed_clip(clips[0]).clone()
 
-        for clip_idx, clip_frames in enumerate(clips):
-            # Preprocess and extract embedding for this clip
-            clip_tensor = self._preprocess_clip(clip_frames)
-            clip_embedding = self._extract_clip_embedding(clip_tensor)
-
-            # Update running aggregate
-            if running_aggregate is None:
-                running_aggregate = clip_embedding.clone()  # Keep on GPU
-            else:
-                if self._clip_aggregation == "mean":
-                    running_aggregate.add_(clip_embedding)  # In-place addition
-                elif self._clip_aggregation == "max":
-                    running_aggregate = torch.maximum(running_aggregate, clip_embedding)
-
-            # delete no-longer-needed references
-            del clip_tensor, clip_embedding
-
-            # clear cache periodically for very long videos
-            if n_clips > 500 and (clip_idx + 1) % 100 == 0:
-                if self.device.type == "cuda":
-                    torch.cuda.empty_cache()
-                _logger.debug(f"Processed {clip_idx + 1}/{n_clips} clips")
-        if running_aggregate is None:
-            raise RuntimeError("Unexpected error: running_aggregate is None after processing clips")
+        for clip_idx, clip_frames in enumerate(clips[1:], start=2):
+            clip_embedding = self._embed_clip(clip_frames)
+            running_aggregate = combine(running_aggregate, clip_embedding)
+            del clip_embedding  # no longer needed
+            self._relieve_memory(clip_idx, n_clips)
 
         # Finalize aggregation
         if self._clip_aggregation == "mean":
@@ -377,7 +377,43 @@ class VideoTorchExtractor:
 
         return running_aggregate
 
-    def _extract_clip_embedding(self, clip_tensor: torch.Tensor) -> torch.Tensor:  # noqa: C901
+    def _embed_clip(self, clip_frames: list) -> torch.Tensor:
+        """Preprocess one clip and run it through the model."""
+        return self._extract_clip_embedding(self._preprocess_clip(clip_frames))
+
+    def _relieve_memory(self, processed: int, n_clips: int) -> None:
+        """Release cached CUDA blocks now and then while working through a very long video."""
+        if n_clips <= _CACHE_RELEASE_CLIPS or processed % _CACHE_RELEASE_EVERY:
+            return
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        _logger.debug(f"Processed {processed}/{n_clips} clips")
+
+    def _forward(self, clip_tensor: torch.Tensor) -> torch.Tensor:
+        """Run one clip through the model and return the tensor to pool.
+
+        With a hooked layer the value comes from the hook rather than from the return
+        value, so the capture is cleared first: a forward pass that never reaches the
+        layer would otherwise hand back the *previous* clip's activations as if they were
+        this one's, and every clip after it would read as a copy of the last one that ran.
+        """
+        if self._layer_name:
+            self._captured_output = None
+            self._model(clip_tensor)
+            if self._captured_output is None:
+                raise RuntimeError(
+                    f"Layer {self._layer_name!r} did not run during the forward pass, so there is "
+                    "nothing to extract from it.",
+                )
+            return self._captured_output
+
+        model_output = self._model(clip_tensor)
+        output = _tensor_of(model_output)
+        if output is None:
+            raise ValueError(f"Unsupported model output type: {type(model_output)}")
+        return output
+
+    def _extract_clip_embedding(self, clip_tensor: torch.Tensor) -> torch.Tensor:
         """
         Extract embedding from a single preprocessed clip.
 
@@ -393,49 +429,15 @@ class VideoTorchExtractor:
         """
         clip_tensor = clip_tensor.unsqueeze(0).to(self.device)  # Add batch dim
 
-        with torch.no_grad():
-            if self._use_amp and self.device.type == "cuda":
-                with autocast("cuda"):
-                    if self._layer_name:
-                        _ = self._model(clip_tensor)
-                        output = self._captured_output
-                    else:
-                        model_output = self._model(clip_tensor)
+        # autocast is CUDA-only here, so the enabled case is the only one that needs it and
+        # the disabled case costs nothing rather than entering a no-op autocast.
+        amp = autocast("cuda") if self._use_amp and self.device.type == "cuda" else nullcontext()
+        with torch.no_grad(), amp:
+            output = self._forward(clip_tensor)
 
-                        if isinstance(model_output, torch.Tensor):
-                            output = model_output
-                        elif hasattr(model_output, "last_hidden_state"):
-                            output = model_output.last_hidden_state
-                        elif hasattr(model_output, "pooler_output") and model_output.pooler_output is not None:
-                            output = model_output.pooler_output
-                        elif isinstance(model_output, dict) and "last_hidden_state" in model_output:
-                            output = model_output["last_hidden_state"]
-                        elif isinstance(model_output, tuple):
-                            output = model_output[0]
-                        else:
-                            raise ValueError(f"Unsupported model output type: {type(model_output)}")
-            else:
-                if self._layer_name:
-                    _ = self._model(clip_tensor)
-                    output = self._captured_output
-                else:
-                    model_output = self._model(clip_tensor)
-
-                    if isinstance(model_output, torch.Tensor):
-                        output = model_output
-                    elif hasattr(model_output, "last_hidden_state"):
-                        output = model_output.last_hidden_state
-                    elif hasattr(model_output, "pooler_output") and model_output.pooler_output is not None:
-                        output = model_output.pooler_output
-                    elif isinstance(model_output, dict) and "last_hidden_state" in model_output:
-                        output = model_output["last_hidden_state"]
-                    elif isinstance(model_output, tuple):
-                        output = model_output[0]
-                    else:
-                        raise ValueError(f"Unsupported model output type: {type(model_output)}")
-
-        # Apply pooling to get single embedding per clip
-        return self._apply_pooling(output).squeeze(0)  # Remove batch dim
+        # One row per clip whatever the pooled rank: the batch dimension is always 1 here,
+        # and a caller indexes the result by video, so anything left over is flattened in.
+        return self._apply_pooling(output).reshape(-1)
 
     def __call__(self, data: Any) -> Array:
         """
@@ -454,39 +456,47 @@ class VideoTorchExtractor:
         Returns
         -------
         Array
-            Embeddings array of shape (n_videos, embedding_dim).
+            Embeddings array of shape (n_videos, embedding_dim), one row per video in
+            `data`, in the order they were given.
+
+        Raises
+        ------
+        ValueError
+            When a video is too short to fill even one clip, so it has no embedding.
+
+        Notes
+        -----
+        The result is addressed **positionally** -- :class:`~dataeval.Embeddings` assigns
+        row *i* to the *i*-th index of the batch it asked for -- so a video that produced
+        no embedding cannot simply be left out: every later video's embedding would land
+        on the wrong item, silently. A video with no complete clip is therefore an error
+        rather than a skip, and so is a failure anywhere in the forward pass.
         """
         all_video_embeddings = []
 
         for video_idx, video in enumerate(data):
-            try:
-                # Split video into clips
-                clips = self._split_video_into_clips(video)
+            # Split video into clips
+            clips = self._split_video_into_clips(video)
 
-                if not clips:
-                    _logger.warning("No valid clips extracted from video")
-                    continue
+            if not clips:
+                raise ValueError(
+                    f"Video at index {video_idx} is shorter than one clip of {self._num_frames} "
+                    "frames, so it yields no embedding, and the result is read by position. "
+                    "Drop the video from the dataset, or lower num_frames.",
+                )
 
-                # Log for very long videos
-                if len(clips) > 100:
-                    _logger.info(f"Processing long video {video_idx + 1} with {len(clips)} clips")
+            # Log for very long videos
+            if len(clips) > _LONG_VIDEO_CLIPS:
+                _logger.info(f"Processing long video {video_idx + 1} with {len(clips)} clips")
 
-                # Process clips incrementally
-                video_embedding = self._aggregate_clips_incremental(clips)
-                all_video_embeddings.append(video_embedding.cpu())
-
-                # Log progress periodically
-                if (video_idx + 1) % 10 == 0:
-                    _logger.info(f"Processed {video_idx + 1} videos")
-
-            except Exception as e:  # noqa: BLE001
-                _logger.warning(f"Failed to process video {video_idx + 1}: {e}")
-                _logger.debug(traceback.format_exc())
-                continue
+            # Process clips incrementally
+            video_embedding = self._aggregate_clips_incremental(clips)
+            all_video_embeddings.append(video_embedding.cpu())
 
         if not all_video_embeddings:
             return np.empty((0,), dtype=np.float32)
 
+        _logger.info(f"Processed {len(all_video_embeddings)} videos")
         # Stack all video embeddings
         return torch.stack(all_video_embeddings).numpy()
 
