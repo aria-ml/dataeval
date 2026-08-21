@@ -30,6 +30,8 @@ class MOTAccumulator:
     frame_index: list[int] = field(default_factory=list)
     frame_time_s: list[float | None] = field(default_factory=list)
     frame_pts: list[int | None] = field(default_factory=list)
+    frame_width: list[int | None] = field(default_factory=list)
+    frame_height: list[int | None] = field(default_factory=list)
 
     track_sequence: list[int] = field(default_factory=list)
     track_id: list[int] = field(default_factory=list)
@@ -56,6 +58,8 @@ class MOTAccumulator:
             self.frame_index.append(rows.frame_index)
             self.frame_time_s.append(rows.time_s)
             self.frame_pts.append(rows.pts)
+            self.frame_width.append(rows.width)
+            self.frame_height.append(rows.height)
 
             if len(rows.labels):
                 self.instance_labels.append(rows.labels)

@@ -26,6 +26,7 @@ from dataeval.protocols import (
     SingleFrameObjectTrackingTarget,
 )
 from dataeval.types import FactorLevelSchema
+from dataeval.types._track import frame_size
 
 _logger = get_logger(__name__)
 
@@ -116,10 +117,14 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             # duck-types the target rather than requiring the full protocol, so each is
             # optional. frame_index falls back to decode order, which is what it means for
             # a conforming stream anyway; a timing has no such stand-in and stays None.
+            # Taken here because the frame is released as soon as this yields.
+            width, height = frame_size(frame)
             yield FrameRows(
                 getattr(frame, "frame_index", position),
                 getattr(frame, "time_s", None),
                 getattr(frame, "pts", None),
+                width,
+                height,
                 labels,
                 boxes,
                 scores,
@@ -135,19 +140,28 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
 
     @staticmethod
     def _frame_factors(rows: MOTAccumulator) -> dict[str, NDArray[Any]]:
-        """Per-frame timings, as ``unit``-level factors, when every frame supplies them.
+        """Per-frame timings and dimensions, as ``unit``-level factors, when every frame has them.
 
-        All-or-nothing rather than null-padded. A partially null numeric factor cannot be
-        binned — sorting it compares None against a float — so a factor present for only
-        some frames would break factor analysis for the whole dataset rather than degrade
-        gracefully. A conforming :obj:`~dataeval.protocols.VideoStream` declares both, so
-        the all-or-nothing case is the normal one; a duck-typed stream that omits them gets
-        no timing factors and a log line saying so.
+        All-or-nothing rather than null-padded, one factor at a time. A partially null
+        numeric factor cannot be binned — sorting it compares None against a float — so a
+        factor present for only some frames would break factor analysis for the whole
+        dataset rather than degrade gracefully. A conforming
+        :obj:`~dataeval.protocols.VideoStream` declares all four, so the all-or-nothing
+        case is the normal one; a duck-typed stream that omits one gets no factor for it
+        and a log line saying so.
+
+        ``width`` and ``height`` are recorded here because this walk is the only thing that
+        ever holds a decoded frame. They are what
+        :func:`~dataeval.core.track_stats` needs to decide whether a track enters or leaves
+        at the frame border, and they carry the same names
+        :func:`~dataeval.core.compute_stats` gives the same two quantities.
         """
         factors: dict[str, NDArray[Any]] = {}
         for name, values, dtype in (
             ("time_s", rows.frame_time_s, np.float64),
             ("pts", rows.frame_pts, np.intp),
+            ("width", rows.frame_width, np.intp),
+            ("height", rows.frame_height, np.intp),
         ):
             missing = sum(value is None for value in values)
             if missing:

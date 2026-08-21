@@ -613,6 +613,18 @@ class TestTrackLevel:
         # The rest of the level survives.
         assert md.at("track").rows_at("track")["track_length"].to_list() == [2, 2, 1]
 
+    def test_frame_dimensions_become_unit_level_factors(self):
+        """The walk is the only thing that ever holds a decoded frame, so it reads the size."""
+        md = Metadata(_mot_dataset(_TRACKED))
+        assert md.rows_at("unit")["width"].to_list() == [4, 4, 4, 4]
+        assert md.rows_at("unit")["height"].to_list() == [4, 4, 4, 4]
+
+    def test_frame_dimensions_survive_a_stream_declaring_nothing_else(self):
+        """Pixels are the one thing a frame must carry, unlike the optional timings."""
+        md = Metadata(_mot_dataset(_TRACKED, bare_frames=True))
+        assert "time_s" not in md.dataframe.columns
+        assert md.rows_at("unit")["width"].to_list() == [4, 4, 4, 4]
+
     def test_a_derived_name_displaces_a_metadata_key_of_the_same_name(self):
         """The structurer reads it off the dataset itself, which outranks a dict key."""
         metadata = [{"id": 0, "track_length": 99}, {"id": 1, "track_length": 98}]

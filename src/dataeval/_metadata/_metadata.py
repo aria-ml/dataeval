@@ -3476,9 +3476,9 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         A keyed write names *rows*. Reaching rows that no earlier write reached is not a
         name collision even though the column exists — it is the rest of the same column
         arriving. Attaching per-sequence results one item at a time has exactly that
-        shape, and :func:`~dataeval.core.track_stats` describes one sequence at a time, so
-        it is the shape a caller naturally writes. Treating it as a collision instead
-        leaves two half-null columns under two names and says nothing about it.
+        shape, and measuring one sequence is a form :func:`~dataeval.core.track_stats`
+        offers, so it is a shape callers write. Treating it as a collision instead leaves
+        two half-null columns under two names and says nothing about it.
 
         Returns
         -------
@@ -3790,9 +3790,15 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             indexed by sorted track id within one sequence while a metadata track row is
             keyed ``(item_index, track_index)`` in order of first appearance. The two
             orders coincide only by accident. Matching is on ``(item_index, key)``,
-            because a track id restarts in each sequence; supply an ``item_index`` entry
-            alongside the values when the dataset holds more than one item, which
-            ``track_stats`` requires since it describes one sequence at a time.
+            because a track id restarts in each sequence, so the values have to say which
+            item each belongs to. ``track_stats`` given the dataset says so itself — it
+            returns an ``item_index`` alongside the track ids — which makes the whole
+            result attachable as it stands::
+
+                metadata.add_factors(track_stats(dataset), level="track", key="track_id")
+
+            Measuring one sequence at a time instead means adding that ``item_index``
+            entry by hand, one value per track, before each call.
 
             The key column itself is consumed rather than stored — it says which row a
             value belongs to, not anything about the row. ``track_stats`` returns it as
@@ -3803,10 +3809,10 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             **folds into that column** rather than colliding with it: rows the new keys
             name take the new values, and rows they do not are left as they were. Attaching
             one sequence per call therefore builds a single column across the whole dataset,
-            which is what ``track_stats`` invites, describing one sequence at a time. A name
-            collision is reported only when a row that already holds a value is named again,
-            and `overwrite` then decides it as it does anywhere else — replacing just the
-            named rows rather than the whole column.
+            just as the one-call form does. A name collision is reported only when a row
+            that already holds a value is named again, and `overwrite` then decides it as
+            it does anywhere else — replacing just the named rows rather than the whole
+            column.
 
         Raises
         ------

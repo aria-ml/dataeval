@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -66,6 +68,10 @@ ALL_FIELDS = (
     "entry_at_edge",
     "exit_at_edge",
 )
+
+# ``item_index`` says which sequence a row came from, so it is present only when a whole
+# dataset was measured. The type declares it; a single sequence's result does not carry it.
+DATASET_FIELDS = (*ALL_FIELDS, "item_index")
 
 
 class TestCenters:
@@ -219,9 +225,10 @@ class TestComputeStraightness:
 class TestComputeEdgeFlags:
     """Tests for ``_compute_edge_flags``."""
 
-    def test_no_frame_dims_returns_false_false(self):
+    def test_no_frame_dims_returns_none_none(self):
+        """Null, not False: there is no measurement to report when the border is unknown."""
         boxes = np.array([[0, 0, 10, 10], [90, 90, 100, 100]], dtype=np.float64)
-        assert _compute_edge_flags(boxes, False, 0, 0, 5) == (False, False)
+        assert _compute_edge_flags(boxes, False, 0, 0, 5) == (None, None)
 
     def test_first_and_last_box_at_edge(self):
         boxes = np.array([[0, 0, 10, 10], [90, 90, 100, 100]], dtype=np.float64)
@@ -323,8 +330,9 @@ class TestTrackStats:
         assert stats["straightness_index"][0] == pytest.approx(1.0)
         # Short track (< jitter_min_frames) -> jitter_rate is NaN, no _jitter_sparc call.
         assert np.isnan(stats["jitter_rate"][0])
-        assert stats["entry_at_edge"] == [False]
-        assert stats["exit_at_edge"] == [False]
+        # No frame dimensions were given, so where the border sits is unknown.
+        assert stats["entry_at_edge"] == [None]
+        assert stats["exit_at_edge"] == [None]
 
     def test_track_with_gaps(self):
         # frames [0, 2, 5]: two gap runs, total 3 missing frames.
@@ -451,13 +459,13 @@ class TestTrackStats:
         assert stats["entry_at_edge"] == [False]
         assert stats["exit_at_edge"] == [False]
 
-    def test_missing_frame_dims_warns_and_flags_false(self, caplog):
+    def test_missing_frame_dims_warns_and_flags_null(self, caplog):
         track = make_track([[0, 0, 10, 10], [90, 90, 100, 100]], [0, 1])
         with caplog.at_level(logging.WARNING):
             stats = track_stats({1: track})  # no frame_width/frame_height
-        assert any("entry_at_edge and exit_at_edge will always be False" in r.message for r in caplog.records)
-        assert stats["entry_at_edge"] == [False]
-        assert stats["exit_at_edge"] == [False]
+        assert any("entry_at_edge and exit_at_edge will be null" in r.message for r in caplog.records)
+        assert stats["entry_at_edge"] == [None]
+        assert stats["exit_at_edge"] == [None]
 
     def test_large_edge_threshold_warns(self, caplog):
         track = make_track([[40, 40, 50, 50], [45, 45, 55, 55]], [0, 1])
@@ -507,9 +515,117 @@ class TestTrackStatsResult:
     """Tests for the ``TrackStatsResult`` typed dict."""
 
     def test_declares_all_fields(self):
-        assert set(TrackStatsResult.__annotations__) == set(ALL_FIELDS)
+        assert set(TrackStatsResult.__annotations__) == set(DATASET_FIELDS)
 
     def test_track_stats_returns_mapping_with_those_keys(self):
         track = make_track([[0, 0, 10, 10], [10, 0, 20, 10]], [0, 1])
         stats = track_stats({1: track})
         assert set(stats.keys()) == set(ALL_FIELDS)
+
+
+@pytest.mark.required
+class TestTrackStatsOverDataset:
+    """The dataset form: every sequence measured, each result labelled with its item."""
+
+    @staticmethod
+    def _dataset(shapes):
+        from tests.metadata.test_structurers import _mot_dataset
+
+        return _mot_dataset(shapes)
+
+    def test_every_sequence_is_measured_and_labelled(self):
+        """``item_index`` and ``track_ids`` together name one track; ids restart per item."""
+        stats = track_stats(self._dataset([[[5, 9], [5]], [[7], [3, 7]]]))
+        items = stats.get("item_index", [])
+        assert list(zip(items, stats["track_ids"], strict=True)) == [(0, 5), (0, 9), (1, 3), (1, 7)]
+        assert stats["n_appearances"] == [2, 1, 1, 2]
+
+    def test_the_result_declares_every_field(self):
+        stats = track_stats(self._dataset([[[5, 9], [5]]]))
+        assert set(stats.keys()) == set(DATASET_FIELDS)
+
+    def test_frame_dimensions_are_read_from_the_stream(self):
+        """Nothing was passed, yet the flags are measurements — null is what unknown looks like.
+
+        The threshold is below the box's 1px offset from the origin so that only the far
+        border can fire, which is the half of the answer that needs the frame's width.
+        """
+        stats = track_stats(self._dataset([[[5]]]), edge_threshold=0.5)
+        assert stats["entry_at_edge"] == [False]
+        assert stats["exit_at_edge"] == [False]
+
+    def test_stated_dimensions_win_over_the_stream(self):
+        """The mock streams 4x4 frames; stating 2x2 moves the far border past the box."""
+        dataset = self._dataset([[[5]]])
+        assert track_stats(dataset, edge_threshold=0.5)["exit_at_edge"] == [False]
+        assert track_stats(dataset, frame_width=2, frame_height=2, edge_threshold=0.5)["exit_at_edge"] == [True]
+
+    def test_untracked_detections_take_no_part(self):
+        """A negative id belongs to no track, so it contributes to none of these."""
+        stats = track_stats(self._dataset([[[5, -1], [-1]]]))
+        assert stats["track_ids"] == [5]
+        assert stats["n_appearances"] == [1]
+
+    def test_an_empty_dataset_still_answers_with_every_field(self):
+        stats = track_stats(self._dataset([]))
+        assert set(stats.keys()) == set(DATASET_FIELDS)
+        # Read as a plain mapping: the assertion is about every field, whichever it is.
+        assert all(len(values) == 0 for values in cast("Mapping[str, Sequence[Any]]", stats).values())
+
+    def test_a_sequence_without_tracks_contributes_nothing(self):
+        stats = track_stats(self._dataset([[[-1]], [[7]]]))
+        items = stats.get("item_index", [])
+        assert list(zip(items, stats["track_ids"], strict=True)) == [(1, 7)]
+
+    def test_a_non_dataset_non_mapping_source_is_refused(self):
+        with pytest.raises(TypeError, match="'source' must be"):
+            track_stats(42)  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("dim", ["frame_width", "frame_height"])
+    def test_non_positive_dimensions_are_refused(self, dim):
+        with pytest.raises(ValueError, match=f"{dim} must be positive"):
+            track_stats(self._dataset([[[5]]]), **{dim: 0})
+
+
+@pytest.mark.required
+class TestAttachingToMetadata:
+    """The whole point of the dataset form: one call places every value on its own row."""
+
+    @staticmethod
+    def _metadata(shapes):
+        from dataeval import Metadata
+        from tests.metadata.test_structurers import _mot_dataset
+
+        dataset = _mot_dataset(shapes)
+        metadata = Metadata(dataset)
+        metadata._structure()
+        return metadata, dataset
+
+    def test_a_whole_result_attaches_in_one_call(self):
+        """First-appearance order is (5, 9), (7, 3); track_stats reports sorted ids."""
+        md, dataset = self._metadata([[[5, 9], [5], [9, 5]], [[7], [3, 7], [7]]])
+        assert md._store.frame("track").select("item_index", "track_id").rows() == [(0, 5), (0, 9), (1, 7), (1, 3)]
+
+        md.add_factors(track_stats(dataset), level="track", key="track_id")
+
+        frame = md._store.frame("track")
+        assert frame["n_appearances"].to_list() == [3, 2, 3, 1]
+        assert not [name for name in md.factor_names if name.endswith("_added")]
+
+    def test_the_tracks_measured_are_the_rows_metadata_holds(self):
+        """Both drop untracked detections, so neither names a track the other lacks."""
+        md, dataset = self._metadata([[[5, -1], [5]]])
+        stats = track_stats(dataset)
+        assert set(stats["track_ids"]) == set(md._store.frame("track")["track_id"].to_list())
+
+    def test_unknown_edge_flags_land_as_null_not_false(self):
+        """A null column reads as 'not determined'; an all-False one reads as a measurement."""
+        from dataeval.data import build_tracks
+
+        md, dataset = self._metadata([[[5, 9], [5]]])
+        stats = track_stats(build_tracks(dataset)["0"])  # a bare mapping has no stream to read
+        md.add_factors(stats, level="track", key="track_id")
+
+        column = md._store.frame("track")["entry_at_edge"]
+        assert column.to_list() == [None, None]
+        assert column.null_count() == len(column), "an Object column would break binning"
