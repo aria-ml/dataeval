@@ -66,6 +66,7 @@ from dataeval.core._bin import (
     level_budget,
 )
 from dataeval.core._compute_stats import StatsResult
+from dataeval.core._track_stats import TrackStatsResult
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import (
     AnnotatedDataset,
@@ -3473,6 +3474,49 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         self._announce_derived_encodings(factor_info)
         self._announce_fit(factor_info)
 
+    def _merge_keyed(
+        self,
+        name: str,
+        level: FactorLevel,
+        values: Any,
+        named: NDArray[np.bool_],
+        overwrite: bool,
+    ) -> tuple[str, pl.Series] | None:
+        """Fold a keyed write into a column of the same name already held at that level.
+
+        A keyed write names *rows*. Reaching rows that no earlier write reached is not a
+        name collision even though the column exists — it is the rest of the same column
+        arriving. Attaching per-sequence results one item at a time has exactly that
+        shape, and :func:`~dataeval.core.track_stats` describes one sequence at a time, so
+        it is the shape a caller naturally writes. Treating it as a collision instead
+        leaves two half-null columns under two names and says nothing about it.
+
+        Returns
+        -------
+        tuple[str, pl.Series] or None
+            The column to write and its merged values, or None when there is nothing to
+            fold into or the write collides for real.
+
+        Notes
+        -----
+        None comes back in two cases. The level holds no such factor, so this is a first
+        write and there is nothing to merge; or a row this write names already holds a
+        value while `overwrite` is False, which is two values for one row and so a real
+        collision — left to :meth:`_resolve_factor_name` to rename, like any other.
+
+        Under ``overwrite=True`` the named rows are replaced and the rest are kept, rather
+        than the whole column being replaced. Rows this write does not name are not rows
+        it says anything about.
+        """
+        safe = safe_column_name(name)
+        if safe not in self._factors_by_level.get(level, ()):
+            return None
+        existing = self._store.frame(level)[safe]
+        written = pl.Series(named)
+        if not overwrite and existing.filter(written).is_not_null().any():
+            return None
+        return safe, to_series(safe, values).zip_with(written, existing)
+
     def _resolve_factor_name(self, name: str, taken: set[str], overwrite: bool, append_string: str) -> str:
         """Pick the dataframe column a new factor should be written to.
 
@@ -3672,7 +3716,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
 
     def add_factors(
         self,
-        factors: Mapping[str, Array1D[Any]] | StatsResult,
+        factors: Mapping[str, Array1D[Any]] | StatsResult | TrackStatsResult,
         level: FactorLevel | Literal["auto", "target", "combined", "image"] = "auto",
         overwrite: bool = False,
         append_string: str = "_added",
@@ -3738,6 +3782,9 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         overwrite : bool, default False
             Whether to overwrite factors of the same name already present in the metadata.
             When False, a colliding factor is stored under a new name instead (see `append_string`).
+
+            Under `key` a collision is decided per row rather than per name, since a keyed
+            write names rows: see the `key` description below.
         append_string : str, default "_added"
             Suffix appended to a factor name that collides with an existing column when
             `overwrite` is False. If the suffixed name is also taken, an incrementing
@@ -3765,6 +3812,15 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             value belongs to, not anything about the row. ``track_stats`` returns it as
             ``track_ids``, and both that and the singular column name are accepted. A row
             no incoming key names is null, so the column still has one value per row.
+
+            Because a keyed write names rows, a second one adding a factor already present
+            **folds into that column** rather than colliding with it: rows the new keys
+            name take the new values, and rows they do not are left as they were. Attaching
+            one sequence per call therefore builds a single column across the whole dataset,
+            which is what ``track_stats`` invites, describing one sequence at a time. A name
+            collision is reported only when a row that already holds a value is named again,
+            and `overwrite` then decides it as it does anywhere else — replacing just the
+            named rows rather than the whole column.
 
         Raises
         ------
@@ -3866,14 +3922,19 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
 
         taken = set(self._store.columns)
         resolved: list[_ResolvedFactor] = []
+        named: NDArray[np.bool_] | None = None
         if key is not None:
             # _reject_unusable_key has already refused "auto" and "combined", the only
             # spellings resolving to something other than a level, so this is one.
-            placed, vacuous = resolve_keyed(self, kept, cast("FactorLevel", resolved_level), key), []
+            (placed, named), vacuous = resolve_keyed(self, kept, cast("FactorLevel", resolved_level), key), []
         else:
             placed, vacuous = self._resolve_factor_levels(kept, resolved_level, source_index)
         for name, factor_level, values in placed:
-            col_name = self._resolve_factor_name(name, taken, overwrite, append_string)
+            merged = None if named is None else self._merge_keyed(name, factor_level, values, named, overwrite)
+            if merged is not None:
+                col_name, values = merged
+            else:
+                col_name = self._resolve_factor_name(name, taken, overwrite, append_string)
             taken.add(col_name)
             # One value per entity at the factor's own level: descendant rows read them by
             # the store's gather, so there is no expanded copy to build and no dtype to
