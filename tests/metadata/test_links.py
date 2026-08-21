@@ -432,6 +432,28 @@ class TestToSeries:
         assert to_series("x", ["a", "b"]).to_list() == ["a", "b"]
         assert to_series("x", np.empty(0, dtype=np.float32)).dtype == pl.Float32
 
+    @pytest.mark.parametrize(
+        ("values", "dtype"),
+        [
+            ([None, None], pl.Null),
+            ([True, None], pl.Boolean),
+            ([1, None], pl.Int64),
+            (["a", "b"], pl.String),
+        ],
+    )
+    def test_an_object_array_is_typed_by_its_values(self, values, dtype):
+        """An object array states no element type, and ``Object`` cannot be binned or counted.
+
+        Any factor carrying a null arrives as one — ``np.asarray`` has nowhere else to put
+        a None — so this is the difference between a nullable column that works and one
+        that raises on ``n_unique``.
+        """
+        assert to_series("x", np.array(values, dtype=object)).dtype == dtype
+
+    def test_an_object_column_of_nulls_can_be_counted(self):
+        """The operation that failed: polars refuses ``n_unique`` on an ``Object`` column."""
+        assert to_series("x", np.array([None, None], dtype=object)).n_unique() == 1
+
     def test_a_dataset_with_no_detections_structures(self):
         """The end-to-end shape that made the floor fail: an empty (0, 4) box column.
 

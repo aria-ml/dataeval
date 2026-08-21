@@ -2,7 +2,7 @@
 
 Every other way into :meth:`~dataeval.Metadata.add_factors` hands over values already in a
 level's row order. Per-track statistics do not: :func:`~dataeval.core.track_stats` indexes
-its results by **sorted track id within one sequence**, while a metadata track row is keyed
+its results by **sorted track id within each sequence**, while a metadata track row is keyed
 ``(item_index, track_index)`` with ``track_index`` dense in order of first appearance. The
 two orders coincide only by accident, so attaching one to the other positionally is a
 silent scramble, and building the mapping by hand is the ergonomic complaint the normalized
@@ -58,14 +58,15 @@ def _key_values(factors: Mapping[str, Any], key: str) -> tuple[NDArray[Any], set
 def _item_values(md: "Metadata", factors: Mapping[str, Any], rows: int, key: str) -> NDArray[np.intp]:
     """One source item per incoming row, supplied or inferred.
 
-    ``track_stats`` describes a single sequence and says nothing about which, so a dataset
+    ``track_stats`` measuring a single sequence says nothing about which, so a dataset
     holding exactly one item can supply the answer itself. A dataset holding several cannot:
     track ids restart per sequence, so a bare id names a row in every one of them.
 
-    Which item a value belongs to has to be *said*, whether the caller attaches every
-    sequence at once or one per call. Repeated calls fold into one column rather than
-    colliding — see ``Metadata._merge_keyed`` — but each still has to name the item its
-    keys are scoped to.
+    Which item a value belongs to has to be *said*, and given the whole dataset
+    ``track_stats`` says it — the ``item_index`` it returns is read straight from here.
+    A caller measuring one sequence at a time supplies it instead; those repeated calls fold
+    into one column rather than colliding — see ``Metadata._merge_keyed`` — but each still
+    has to name the item its keys are scoped to.
     """
     if _ITEM in factors:
         return np.asarray(factors[_ITEM], dtype=np.intp).reshape(-1)
@@ -76,9 +77,9 @@ def _item_values(md: "Metadata", factors: Mapping[str, Any], rows: int, key: str
         f"key={key!r} matches on (item_index, {key}), and {key} restarts per item, so values "
         f"for a dataset with {len(items)} items have to say which item each belongs to. Add an "
         f"'item_index' entry to the factors — one entry per value, naming the item that value's "
-        f"{key} is scoped to. track_stats describes one sequence at a time, so attaching a "
-        "dataset's worth of them means saying which sequence each result came from, whether "
-        "they go in one call or one call per sequence.",
+        f"{key} is scoped to. track_stats given the dataset returns one, so passing its result "
+        "straight through needs nothing added; measuring one sequence at a time means saying "
+        "which sequence each result came from.",
     )
 
 

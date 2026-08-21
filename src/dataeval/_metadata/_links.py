@@ -52,13 +52,24 @@ def to_series(name: str, values: Any) -> pl.Series:
     name : str
         Name for the resulting series.
     values : Any
-        Column values, as an array or any sequence polars accepts.
+        Column values, as an array or any sequence polars accepts. A 1-D object array is
+        read through its Python values, which is where a nullable column gets a real dtype
+        rather than ``Object``.
 
     Returns
     -------
     pl.Series
         The column, with a fixed-width ``Array`` dtype where the values are 2-D.
     """
+    if isinstance(values, np.ndarray) and values.ndim == 1 and values.dtype == object:
+        # An object array states no element type, so polars keeps it as an opaque
+        # ``Object`` column — one that cannot be counted, binned or compared, and that
+        # raises rather than answering ``n_unique``. The Python values do carry a type, so
+        # they are what it infers from instead: an all-null column reaches ``Null`` and a
+        # nullable bool reaches ``Boolean``, where the array form of either reaches
+        # ``Object``. Homogeneous strings — much the commonest object array here — reach
+        # ``String`` by both routes, so nothing that already worked changes.
+        return pl.Series(name, values.tolist())
     if isinstance(values, np.ndarray) and values.ndim == 2 and values.shape[0] == 0:
         # A 1-D empty of the same dtype is inferred without trouble, so it is the
         # cheapest way to name the inner type without a numpy-to-polars mapping here.
