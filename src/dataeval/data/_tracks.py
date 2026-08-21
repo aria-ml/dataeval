@@ -6,29 +6,54 @@ from typing import cast, overload
 
 import numpy as np
 
+from dataeval._log import get_logger
 from dataeval.protocols import Dataset, MultiobjectTrackingDataset, MultiobjectTrackingTarget
 from dataeval.types import Track
 
+_logger = get_logger(__name__)
+
+
+def _log_untracked(untracked: int) -> None:
+    """Report detections that belong to no track, when there were any."""
+    if untracked:
+        _logger.info("%d detection(s) carry no track id and are not part of any track.", untracked)
+
 
 def _build_tracks(tracking_target: MultiobjectTrackingTarget) -> Mapping[int, Track]:
-    """Reorganize a `MultiobjectTrackingTarget` from frame-indexed to track-indexed."""
+    """Reorganize a `MultiobjectTrackingTarget` from frame-indexed to track-indexed.
+
+    A detection carrying a negative id belongs to no track and is left out. Collecting
+    them under a shared id would invent one track that jumps between unrelated objects,
+    and every per-track statistic computed from it — speed, straightness, duration —
+    would describe that fiction rather than anything in the data. The structuring walk
+    behind :class:`~dataeval.Metadata` applies the same rule when it builds track rows,
+    so the two agree on which detections belong to a track.
+    """
     _boxes: defaultdict[int, list[list[float]]] = defaultdict(list)
     _frames: defaultdict[int, list[int]] = defaultdict(list)
     _scores: defaultdict[int, list[float]] = defaultdict(list)
     _labels: defaultdict[int, list[int]] = defaultdict(list)
 
+    untracked = 0
     for frame_idx, frame_target in enumerate(tracking_target.frame_tracks):
         track_ids = np.asarray(frame_target.track_ids)
-        if track_ids.size == 0:
+        # Selected up front rather than skipped inside the loop, so the walk below sees
+        # only detections that belong to a track.
+        tracked = np.flatnonzero(track_ids >= 0)
+        untracked += track_ids.size - tracked.size
+        if tracked.size == 0:
             continue
         boxes = np.asarray(frame_target.boxes)
         scores = np.asarray(frame_target.scores)
         labels = np.asarray(frame_target.labels)
-        for det_idx, tid in enumerate(track_ids.tolist()):
+        for det_idx in tracked.tolist():
+            tid = int(track_ids[det_idx])
             _boxes[tid].append(boxes[det_idx].tolist())
             _frames[tid].append(frame_idx)
             _scores[tid].append(float(scores[det_idx]))
             _labels[tid].append(int(labels[det_idx]))
+
+    _log_untracked(untracked)
 
     return {
         tid: Track(
@@ -69,6 +94,14 @@ def build_tracks(
     MultiobjectTrackingTarget stores detections grouped by frame.  This
     function inverts that structure so that each unique track ID maps to all
     of its observations across the sequence, in frame order.
+
+    A detection whose track ID is negative belongs to no track and appears in no
+    entry of the result.  Gathering them under the sentinel would produce a track
+    that is really a bag of unrelated objects, and per-track statistics computed
+    over it would describe nothing.  This matches how
+    :class:`~dataeval.Metadata` builds its ``track`` rows, so a result attached
+    with ``add_factors(..., key="track_id")`` names exactly the tracks metadata
+    holds.
     """
     # MultiobjectTrackingTarget is not runtime_checkable
     if isinstance(getattr(source, "frame_tracks", None), Sequence):
