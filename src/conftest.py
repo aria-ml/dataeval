@@ -640,15 +640,22 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
     # Video-related fixtures (transformers mocks)
     # -------------------------------------------------------------------------
 
+    # A real video transformer takes 224x224 frames, but nothing in the examples looks at a
+    # frame or an embedding value, and the extractor is agnostic to frame resolution. Tiny
+    # frames keep the mock's linear layer to a few hundred thousand weights: at 224x224 it
+    # would be 1.8 billion (7.4 GB), allocated eagerly for every doctest session.
+    video_frame_shape = (16, 16, 3)  # (H, W, C)
+    video_frame_size = 16 * 16 * 3
+
     class MockVideoModel(torch.nn.Module):
         """Mock video transformer model that mimics HuggingFace structure."""
 
-        def __init__(self, hidden_size: int = 768, num_frames: int = 16) -> None:
+        def __init__(self, hidden_size: int = 64, num_frames: int = 8) -> None:
             super().__init__()
             self.config = type("Config", (), {"num_frames": num_frames, "hidden_size": hidden_size})()
             self.encoder = torch.nn.Sequential(
                 torch.nn.Flatten(),
-                torch.nn.Linear(num_frames * 224 * 224 * 3, hidden_size),
+                torch.nn.Linear(num_frames * video_frame_size, hidden_size),
             )
 
         def forward(self, pixel_values):  # noqa: ANN001, ANN202
@@ -680,11 +687,7 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
 
     doctest_namespace["video_processor"] = MockProcessor()
     doctest_namespace["video_model"] = MockVideoModel()
-    doctest_namespace["video_dataset"] = [
-        np.random.rand(16, 224, 224, 3).astype(np.float32),
-        np.random.rand(32, 224, 224, 3).astype(np.float32),
-        np.random.rand(16, 224, 224, 3).astype(np.float32),
-    ]
+    doctest_namespace["video_dataset"] = [np.random.rand(n, *video_frame_shape).astype(np.float32) for n in (8, 16, 8)]
 
     # -------------------------------------------------------------------------
     # Prioritize fixtures

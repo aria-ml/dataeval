@@ -109,7 +109,6 @@ docsync = [
 ]
 test = [
   "coverage[toml]>=7.6",
-  "filelock>=3.20.3",
   "pytest>=8.3",
   "pytest-cov>=6.1",
   "pytest-xdist>=3.6.1",
@@ -418,7 +417,7 @@ extend-exclude = [
 ]
 
 [tool.codespell]
-skip = 'pyproject.toml,./*env*,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.*.txt,*.html,*.lock,*.ipynb,./graphify-out'
+skip = 'pyproject.toml,./*env*,./specs,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.*.txt,*.html,*.lock,*.ipynb,./graphify-out'
 ignore-words-list = ["Hart","FPR", "MOT", "mot", "reencode"]
 
 [build-system]
