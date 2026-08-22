@@ -490,6 +490,31 @@ class TestImageUtils:
 
 
 @pytest.mark.required
+class TestCropFillPromotion:
+    """The inferred output dtype must not depend on which NumPy is installed.
+
+    ``np.result_type`` demotes a 0-d array by the value it holds below NumPy 2.0 and by its
+    type from 2.0 on, so inferring against ``np.asarray(np.nan)`` answered float32 on one
+    and float64 on the other — the same statistic computed to two precisions depending on
+    the environment. `crop_with_fill` promotes against the fill's dtype for that reason.
+    """
+
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.int32, np.float16, np.float32, np.float64])
+    def test_a_nan_fill_lands_on_float64_whatever_the_image_holds(self, dtype):
+        image = np.ones((3, 8, 8), dtype=dtype)
+        assert crop_with_fill(image, (1, 1, 5, 5))[0].dtype == np.float64
+
+    def test_a_fill_the_image_dtype_already_holds_does_not_promote_it(self):
+        """A boolean mask filled with False stays a mask — this is how `window_mask` crops."""
+        mask = np.zeros((1, 8, 8), dtype=np.bool_)
+        assert crop_with_fill(mask, (1, 1, 5, 5), fill=False)[0].dtype == np.bool_
+
+    def test_an_explicit_dtype_still_wins(self):
+        image = np.ones((3, 8, 8), dtype=np.uint8)
+        assert crop_with_fill(image, (-1, -1, 5, 5), fill=0, dtype=np.uint8)[0].dtype == np.uint8
+
+
+@pytest.mark.required
 @pytest.mark.parametrize("image", [np.arange(25).reshape(1, 5, 5), np.arange(75).reshape(3, 5, 5)])
 class TestClipAndPad:
     def test_inside(self, image):

@@ -1073,8 +1073,10 @@ def crop_with_fill(
         directly; a callable is passed the in-bounds region (C, H, W; possibly
         empty) and must return a scalar or per-channel array.
     dtype : DTypeLike or None, default None
-        Output dtype. Defaults to a dtype that can hold both the image pixels and the
-        fill, so ``np.nan`` fill promotes an integer image to float automatically.
+        Output dtype. Defaults to the promotion of the image's dtype and the fill's, so
+        ``np.nan`` fill promotes an integer image to float automatically, and a narrow
+        float image to ``float64``. Promoting against the fill's type rather than its
+        value keeps that answer the same on every supported NumPy.
 
     Returns
     -------
@@ -1092,8 +1094,12 @@ def crop_with_fill(
     fill_value = fill(region) if callable(fill) else fill
 
     if dtype is None:
-        # Hold both the real pixels and the fill, so NaN fill promotes an integer image to float.
-        dtype = np.result_type(image.dtype, np.asarray(fill_value))
+        # Hold both the real pixels and the fill, so NaN fill promotes an integer image to
+        # float. Promoted against the fill's *dtype*, never its value: NumPy below 2.0
+        # demotes a 0-d array by what it holds, which left a float32 image float32 there and
+        # float64 on 2.x — one statistic computed to two precisions depending on which NumPy
+        # was installed. Passing the dtype is a plain type promotion on every version.
+        dtype = np.result_type(image.dtype, np.asarray(fill_value).dtype)
     output = np.empty((channels, out_h, out_w), dtype=dtype)
 
     pasted = is_valid_box(sbox)
