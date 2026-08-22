@@ -18,6 +18,15 @@ TAB = "    "
 # Pattern to match versions with optional pre-release suffix (e.g., v1.0.0 or v1.0.0-rc0)
 version_pattern = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-rc([0-9]+))?")
 
+# Commit titles the release pipeline writes for its own bookkeeping. These are not
+# user-facing changes, so they never belong in the published changelog.
+RELEASE_COMMIT_PREFIXES = ("Release ", "Pre-release ")
+
+# Matches an already-recorded bookkeeping entry inside a pre-release section, e.g.
+# "- `000b2d21` - Pre-release v1.1.0-rc5". Entries written by _Commit.to_markdown
+# are always single-line, so dropping the matched line cannot orphan a detail block.
+prerelease_entry_pattern = re.compile(r"^- `[0-9a-f]+` - Pre-release v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$")
+
 """
 Multiline pattern that matches for the following content in MR description:
 
@@ -327,7 +336,7 @@ class ReleaseGen:
             commit = _Commit(response)
 
             # skip the boundary commit itself and release commits made by this pipeline
-            if commit.hash == last_hash or commit.description.startswith("Release "):
+            if commit.hash == last_hash or commit.description.startswith(RELEASE_COMMIT_PREFIXES):
                 continue
 
             # skip commits already recorded in the changelog or captured as a merge
@@ -392,6 +401,12 @@ class ReleaseGen:
 
             # Skip blank lines before first category
             if current_category is None:
+                continue
+
+            # Drop bookkeeping entries recorded by earlier pre-release runs so they
+            # do not resurface in the consolidated release section
+            if prerelease_entry_pattern.match(stripped):
+                verbose(f"Dropping pre-release bookkeeping entry: {stripped}")
                 continue
 
             # Collect entry lines (items, continuation lines, and blank lines between entries)

@@ -71,11 +71,13 @@ graph LR
     C --> D[Generate changelog]
     D --> E[Update docs links]
     E --> F[Create git tag vX.Y.0]
-    F --> G[Create release/vX.Y branch]
-    G --> H[Publish release]
+    F --> G[Publish release]
 ```
 
 **Script**: [`.gitlab/scripts/create_release.py`](.gitlab/scripts/create_release.py)
+
+> **Note**: this does **not** cut a `release/vX.Y` branch. Branching is a deliberate second step, run only when a
+> release line needs to receive backported fixes. See [Cutting a Release Branch](#cutting-a-release-branch).
 
 **Version Increment**:
 
@@ -145,6 +147,18 @@ git push -u origin cherry-pick/fix-to-v0-74
 
 **Manual Step**: Maintainers create the cherry-pick branch, open the MR, and merge it. The resulting commit on
 `release/vX.X` triggers the automatic patch release.
+
+### Cutting a Release Branch
+
+**Purpose**: open a `release/vX.Y` line so that release can receive backported fixes independently of `main`
+
+**Trigger**: Manual pipeline execution on `main` with `CREATE_RELEASE_BRANCH=vX.Y` (major.minor only, no patch
+number). Run it **after** the `vX.Y.0` tag exists -- the script branches from the newest `vX.Y.*` tag.
+
+**Script**: [`.gitlab/scripts/create_release_branch.py`](.gitlab/scripts/create_release_branch.py)
+
+The job is a no-op if `release/vX.Y` already exists, so it is safe to re-run. Not every release needs a branch;
+cut one only when a shipped version has to be patched while `main` moves on.
 
 ## Release Labels
 
@@ -262,8 +276,7 @@ flowchart TD
     H --> I[Calculates version from labels]
     I --> J[Generates changelog]
     J --> K[Creates git tag vX.Y.0]
-    K --> L[Creates release/vX.Y branch]
-    L --> M[Publishes release]
+    K --> M[Publishes release]
     M --> N[Done]
     D --> O[CI detects commit on release branch]
     O --> P[Validates only release::fix MRs]
@@ -281,13 +294,15 @@ Our release process is highly automated through GitLab CI/CD pipelines.
 
 All automation scripts are located in [`.gitlab/scripts/`](.gitlab/scripts/):
 
-| Script                                                                   | Purpose                        | Trigger                           |
-| ------------------------------------------------------------------------ | ------------------------------ | --------------------------------- |
-| [`create_release.py`](.gitlab/scripts/create_release.py)                 | Create major/minor releases    | Manual: `CREATE_NEW_RELEASE=true` |
-| [`create_patch_release.py`](.gitlab/scripts/create_patch_release.py)     | Create patch releases          | Auto: Commit to `release/v*`      |
-| [`validate_release_label.py`](.gitlab/scripts/validate_release_label.py) | Ensure MRs have release labels | Auto: All MRs to main             |
-| [`releasegen.py`](.gitlab/scripts/releasegen.py)                         | Core release logic & changelog | Called by release scripts         |
-| [`versiontag.py`](.gitlab/scripts/versiontag.py)                         | Version parsing & increment    | Called by release scripts         |
+| Script                                                                   | Purpose                        | Trigger                              |
+| ------------------------------------------------------------------------ | ------------------------------ | ------------------------------------ |
+| [`create_release.py`](.gitlab/scripts/create_release.py)                 | Create major/minor releases    | Manual: `CREATE_NEW_RELEASE=true`    |
+| [`create_prerelease.py`](.gitlab/scripts/create_prerelease.py)           | Create pre-release (rc) tags   | Manual: `CREATE_PRE_RELEASE=true`    |
+| [`create_release_branch.py`](.gitlab/scripts/create_release_branch.py)   | Cut a `release/vX.Y` branch    | Manual: `CREATE_RELEASE_BRANCH=vX.Y` |
+| [`create_patch_release.py`](.gitlab/scripts/create_patch_release.py)     | Create patch releases          | Auto: Commit to `release/v*`         |
+| [`validate_release_label.py`](.gitlab/scripts/validate_release_label.py) | Ensure MRs have release labels | Auto: All MRs to main                |
+| [`releasegen.py`](.gitlab/scripts/releasegen.py)                         | Core release logic & changelog | Called by release scripts            |
+| [`versiontag.py`](.gitlab/scripts/versiontag.py)                         | Version parsing & increment    | Called by release scripts            |
 
 ### Commit Message Triggers
 
@@ -331,12 +346,12 @@ graph TD
 - Version number calculation
 - Changelog generation from MR labels
 - Git tag creation
-- Release branch creation
 - Patch release creation when fixes are merged to `release/v*`
 
 **Requires Manual Action**:
 
 - Triggering major/minor releases (set `CREATE_NEW_RELEASE=true`)
+- Cutting a release branch (set `CREATE_RELEASE_BRANCH=vX.Y`)
 - Creating cherry-pick branches and MRs to backport fixes into release branches
 - Reviewing and merging cherry-pick MRs
 - Approving MRs to main
@@ -381,7 +396,8 @@ The version bump is determined by the **highest priority** label among all MRs s
 
 ### Release Branch Lifecycle
 
-**Creation**: Release branches are created automatically when a major/minor release is published from `main`
+**Creation**: Release branches are cut on demand by a maintainer, not automatically -- see
+[Cutting a Release Branch](#cutting-a-release-branch)
 
 **Naming**: `release/vX.Y` (major.minor only, no patch number)
 

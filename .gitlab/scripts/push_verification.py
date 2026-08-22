@@ -55,6 +55,28 @@ class MetaRepo(RestWrapper):
         )
 
 
+def resolve_version() -> str:
+    """Resolve the version label used in the meta repo commit message.
+
+    Tag pipelines expose ``CI_COMMIT_TAG`` directly. The release pipeline is a
+    branch pipeline on main, so fall back to the newest version tag in the
+    project - the ``create release`` dependency guarantees the tag for the
+    release being published is already in place by the time this runs.
+    """
+    tag = os.environ.get("CI_COMMIT_TAG") or os.environ.get("DATAEVAL_VERSION")
+    if tag:
+        return tag
+    try:
+        from gitlab import Gitlab
+        from versiontag import VersionTag
+
+        return VersionTag(Gitlab()).current
+    except Exception as e:
+        # The label is cosmetic; never fail the artifact push over it
+        print(f"Could not resolve version from tags ({e}); using 'dev'")
+        return "dev"
+
+
 def main() -> None:
     dry_run = "--dry-run" in sys.argv
 
@@ -93,7 +115,7 @@ def main() -> None:
         return
 
     # Build commit message
-    version = os.environ.get("CI_COMMIT_TAG", os.environ.get("DATAEVAL_VERSION", "dev"))
+    version = resolve_version()
     message = f"Update verification artifacts for DataEval {version}"
 
     print(f"Commit message: {message}")

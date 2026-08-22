@@ -26,12 +26,19 @@ workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
-    # Publish Verification Workflow (standalone, via web or schedule)
+    # Variable-triggered automation workflows, runnable from a pipeline schedule,
+    # the web 'Run pipeline' form or the API. These have to be matched ahead of the
+    # CHANGELOG.md filters below: GitLab evaluates `changes` as true whenever a
+    # pipeline has no git push event behind it, so those filters would otherwise
+    # reject every one of these triggers before its job rules are ever consulted.
+    # Publish Verification Workflow
     - if: $PUBLISH_VERIFICATION
     # Release Workflow
-    - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
+    - if: $CREATE_NEW_RELEASE
     # Pre-release Workflow
-    - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_PRE_RELEASE
+    - if: $CREATE_PRE_RELEASE
+    # Release Branch Creation Workflow
+    - if: $CREATE_RELEASE_BRANCH
     # Nightly Docs Cache Update Workflow
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
     # Merge Request Workflow

@@ -125,6 +125,10 @@ create release:
   # Serialize with 'create pre-release' - both commit and tag main, so concurrent
   # runs compute the same version and the loser fails on tag creation
   resource_group: release
+  # The commit and the tag are two separate API calls; an auto-cancel landing
+  # between them leaves an untagged release commit on main, so opt out of the
+  # workflow-level auto_cancel that the default 'interruptible: true' enables.
+  interruptible: false
   before_script:
     - uv pip install requests --system
   script:
@@ -137,6 +141,7 @@ create pre-release:
   extends: .rules_prerelease_only
   needs: []
   resource_group: release
+  interruptible: false
   before_script:
     - uv pip install requests --system
   script:
@@ -149,7 +154,12 @@ publish verification:
   extends:
     - .nox
     - .rules_verification_only
-  needs: []
+  # Wait for the release tag when one is being cut so the artifacts are labelled
+  # with it; on a standalone PUBLISH_VERIFICATION run that job is absent and the
+  # optional need is ignored.
+  needs:
+    - job: create release
+      optional: true
   variables:
     GIT_DEPTH: 0
   before_script:
@@ -197,6 +207,7 @@ create patch release:
   stage: release
   extends: .rules_release_branch_only
   needs: []
+  interruptible: false
   before_script:
     - uv pip install requests --system
   script:
