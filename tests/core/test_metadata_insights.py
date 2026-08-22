@@ -327,15 +327,23 @@ class TestFindFactorPredictors:
             assert isinstance(value, float)
             assert value >= 0.0
 
-    def test_perfect_correlation(self):
+    def test_perfect_correlation(self, RNG: Generator):
         """Tests that perfectly correlated factor has high mutual information."""
+        # Enough samples that an uncorrelated draw is very unlikely to separate the
+        # flagged group by chance; with only a handful of samples a random factor can
+        # perfectly predict the flag, saturating NMI at 1.0 and tying with "perfect".
+        n_samples, n_flagged = 20, 8
+        flagged = list(range(n_samples - n_flagged, n_samples))
+
         # Create factor that perfectly separates flagged vs non-flagged
+        perfect = np.zeros(n_samples)
+        perfect[-n_flagged:] = 1.0
         factors = {
-            "perfect": np.array([0.0, 0.0, 1.0, 1.0, 1.0]),
-            "random": np.random.randn(5),
+            "perfect": perfect,
+            "random": RNG.standard_normal(n_samples),
         }
 
-        result = factor_predictors(factors, [2, 3, 4])
+        result = factor_predictors(factors, flagged)
 
         # Perfect correlation should have higher NMI than random
         assert result["perfect"] > result["random"]
