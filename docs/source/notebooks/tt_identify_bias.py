@@ -495,7 +495,7 @@ dep.plot(bal, figsize=(10, 10))
 # Let's investigate this further to see if this bias holds across all classes or is concentrated in a few classes.
 
 # %%
-dep.plot(bal, plot_classwise=True, figsize=(12, 4.5))
+dep.plot(bal, plot_classwise=True, figsize=(12, 5))
 
 # %% [markdown]
 # The classwise heatmap shows that the main culprits of our bounding box bias are the classes - boat, buoy, and swimmer.
@@ -527,7 +527,7 @@ div = Diversity().evaluate(corrected_metadata)
 # to show the factor-class analysis.
 
 # %%
-dep.plot(div, figsize=(10, 5.5))
+dep.plot(div, figsize=(10, 6))
 
 # %% [markdown]
 # In the results above, there are many factors that have values over 0.5 indicating a small potential for bias,
@@ -557,7 +557,7 @@ dep.plot(div, figsize=(10, 5.5))
 # You can visualize the classwise results by setting the `plot_classwise` parameter to True.
 
 # %%
-dep.plot(div, plot_classwise=True, figsize=(12, 4.5))
+dep.plot(div, plot_classwise=True, figsize=(12, 5))
 
 # %% [markdown]
 # These results expand the above results on a classwise basis.
