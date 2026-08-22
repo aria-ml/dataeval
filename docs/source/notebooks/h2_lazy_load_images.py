@@ -335,18 +335,18 @@ print(f"Computed stats over {stats_result['image_count']} images")
 # not one of those built-ins.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-# - [Acting on Results](../concepts/ActingOnResults.md)
+# ### Concepts
 #
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to wrap a DataFrame-backed image classification dataset](./h2_wrap_dataframe_ic_dataset.py)
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py)
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias and coverage concepts in DataEval.
+# - [Acting on Results](../concepts/ActingOnResults.md) — Understand how to act on data evaluation findings and metrics.
 #
 # ### Tutorials
 #
-# - [Identify bias and correlations](./tt_identify_bias.py)
+# - [Identify bias and correlations](./tt_identify_bias.py) — Walk through identifying dataset bias and attribute correlations in an image dataset.
+#
+# ### How-to guides
+#
+# - [How to wrap a DataFrame-backed image classification dataset](./h2_wrap_dataframe_ic_dataset.py) — Wrap a pandas DataFrame into a custom DataEval-compatible dataset.
+# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Add domain-specific intrinsic factors to Metadata for deeper analysis.

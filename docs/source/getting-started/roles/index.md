@@ -14,6 +14,7 @@ related to these roles, see the [JATIC roles and personas webpage](https://cdao.
 - [Testing & Evaluation Engineer](te_engineer.md)
 - [Machine Learning Engineer](ml_engineer.md)
 - [Data Scientist](data_scientist.md)
+- [Data Engineer](data_engineer.md)
 
 :::{toctree}
 :hidden:
@@ -22,6 +23,7 @@ Operational Machine Learning Lifecycle <ML_Lifecycle.md>
 Testing & Evaluation Engineer <te_engineer.md>
 Machine Learning Engineer <ml_engineer.md>
 Data Scientist <data_scientist.md>
+Data Engineer <data_engineer.md>
 :::
 
 Below is an example of how DataEval supports a project from conception to deployment,

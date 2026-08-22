@@ -178,27 +178,19 @@ assert embeddings.shape[0] == 100
 assert embeddings.shape[1] == 2048
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Embeddings](../concepts/Embeddings.md)
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-# - [Distribution Shift](../concepts/DistributionShift.md)
-# - [Clustering](../concepts/Clustering.md)
-# - [Data Integrity](../concepts/DataIntegrity.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py)
-# - [How to measure train and test dataset divergence](./h2_measure_divergence.py)
-# - [How to run clustering analysis](./h2_cluster_analysis.py)
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py)
-#
-# ### Tutorials
-#
-# - [Assess an unlabeled data space](./tt_assess_data_space.py)
-# - [Introduction to data cleaning](./tt_clean_dataset.py)
-# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py)
-# - [Identify out-of-distribution samples](./tt_identify_ood_samples.py)
-# - [Monitor shifts in operational data](./tt_monitor_shift.py)
+# - [Embeddings](../concepts/Embeddings.md) — Learn about vector representations of image features.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand dataset bias and coverage analysis in embedding spaces.
+# - [Distribution Shift](../concepts/DistributionShift.md) — Explore distribution shift detection using feature representations.
+# - [Clustering](../concepts/Clustering.md) — Discover techniques for grouping image embeddings.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Learn about data quality checks and duplicate detection.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Assess structure, clusters, and coverage in an unlabeled dataset.
+# - [Introduction to data cleaning](./tt_clean_dataset.py) — Detect duplicates, outliers, and corrupted samples in datasets.
+# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find augmented image pairs using duplicate detection.
+# - [Identify out-of-distribution samples](./tt_identify_ood_samples.py) — Flag out-of-distribution images using feature embeddings.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational data over time.
+# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find classes or regions thin on coverage in embedding space.
+# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.
+# - [How to run clustering analysis](./h2_cluster_analysis.py) — Apply clustering algorithms to identify groupings in embedded data.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Calculate custom metrics for bounding boxes and object annotations.

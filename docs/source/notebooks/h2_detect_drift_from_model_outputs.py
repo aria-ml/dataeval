@@ -41,6 +41,15 @@
 # Import the libraries needed for this example. We will use NumPy to simulate our historical (baseline)
 # predictions and our incoming (operational) predictions.
 
+# %% tags=["remove_cell"]
+try:
+    import google.colab  # noqa: F401
+
+    # specify the version of DataEval (==X.XX.X) for versions other than the latest
+    # %pip install -q dataeval dataeval-plots[plotly] maite-datasets
+except Exception:
+    pass
+
 # %%
 import numpy as np
 
@@ -53,7 +62,7 @@ set_seed(0, all_generators=True)
 rng = np.random.default_rng(0)
 
 # %% [markdown]
-# ## 1. Confidence/Uncertainty Drift (Using Entropy)
+# ## Confidence/Uncertainty Drift (Using Entropy)
 #
 # If a deployed model encounters data outside its training distribution, its predictions typically become
 # less confident (more uniform). We can calculate the {term}`Shannon entropy<Shannon Entropy>` of the predicted
@@ -95,7 +104,7 @@ print(f"Confidence Shift Detected: {result.drifted}")
 assert result.drifted
 
 # %% [markdown]
-# ## 2. Marginal Class Probability Shift
+# ## Marginal Class Probability Shift
 #
 # Sometimes the model remains confident, but the frequency with which it predicts certain classes changes.
 # You can pass the raw probability arrays `(N, C)` directly into the univariate detector. It will
@@ -122,7 +131,7 @@ assert result_marginal.drifted
 assert result_marginal.details["feature_drift"].any()
 
 # %% [markdown]
-# ## 3. Joint Probability Shift (Multivariate)
+# ## Joint Probability Shift (Multivariate)
 #
 # If the relationships or correlations between the predicted classes shift, univariate tests might miss it.
 # The {class}`.DriftDomainClassifier` treats the model outputs as features and trains a LightGBM classifier
@@ -140,7 +149,7 @@ print(f"Multivariate Shift Detected: {result_multivariate.drifted} (AUROC: {resu
 assert result_multivariate.drifted
 
 # %% [markdown]
-# ## 4. Label Shift (Prior Shift) from Hard Predictions
+# ## Label Shift (Prior Shift) from Hard Predictions
 #
 # If you don't even have probabilities — only discrete integer labels output by the model — you can still
 # detect label shift. Simply one-hot encode the predictions to create an `(N, C)` array where each row
@@ -163,3 +172,13 @@ print(f"Label Shift Detected: {result_label.drifted}")
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
 assert result_label.drifted
+
+# %% [markdown]
+# ## Next steps
+#
+# - [Distribution Shift](../concepts/DistributionShift.md) — Explore types of distribution shift and strategies for detecting drift.
+# - [Divergence](../concepts/Divergence.md) — Learn about distance and divergence metrics used to compare distributions.
+# - [Detect drift with prediction uncertainty](./tt_detect_drift_with_uncertainty.py) — Monitor deployed models for drift using prediction uncertainty.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational streams over time.
+# - [How to detect drift using prediction uncertainty](./h2_detect_uncertainty_drift.py) — Calculate uncertainty metrics to monitor distribution changes.
+# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.

@@ -24,7 +24,7 @@
 #
 # Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 #
-# Relevant personas: Data Engineer, Data Scientist, T&E Engineer
+# Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [Data Scientist](../getting-started/roles/data_scientist.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 
 # %% [markdown]
 # ## What you'll do
@@ -74,7 +74,7 @@
 #
 # Begin by importing the pieces you need. You'll load real CIFAR-10 images and extract
 # embeddings from them with a pretrained ResNet18 — see
-# [Assess an unlabeled data space](tt_assess_data_space.py) for a deeper look at the
+# [Assess an unlabeled data space](./tt_assess_data_space.py) for a deeper look at the
 # embedding-only gap workflow with clustering and outliers.
 
 # %% tags=["remove_cell"]
@@ -117,7 +117,7 @@ dep.set_default_backend("plotly")
 pio.renderers.default = "notebook"  # embed the plotly JS in the notebook output
 
 # %% [markdown]
-# ## 1. The ontology
+# ## The ontology
 #
 # Start with the sanctioned classes your model must recognize. For an everyday object
 # recognizer trained on CIFAR-10, the ten categories split into vehicles and animals, each
@@ -143,7 +143,7 @@ print(ontology)
 print("sanctioned leaf classes:", len(ontology.leaves))
 
 # %% [markdown]
-# ## 2. The dataset
+# ## The dataset
 #
 # Picture a collection scraped together for this recognizer. You start from real CIFAR-10
 # imagery and assemble a subset that is *deceptively healthy* — by count almost every class
@@ -253,7 +253,7 @@ metadata = Metadata(dataset)
 print("images:", len(dataset), "| classes present:", len(present))
 
 # %% [markdown]
-# ## 3. Lens 1 — flat counts
+# ## Lens 1 — flat counts
 #
 # Start with {func}`.label_stats`, which gives the per-class counts. The picture looks mostly
 # healthy: seven well-populated classes and one thin one.
@@ -272,7 +272,7 @@ for name in sorted(counts, key=lambda n: counts[n], reverse=True):
 # The next two lenses answer exactly those questions.
 
 # %% [markdown]
-# ## 4. Lens 2 — label-space coverage
+# ## Lens 2 — label-space coverage
 #
 # Now run {class}`.Representation`, which compares the labels to the ontology and returns a
 # collection worklist: which classes to **acquire** (none collected) or **augment**
@@ -297,7 +297,7 @@ print(representation.dark_branches)
 # varied?
 
 # %% [markdown]
-# ## 5. Embedding extraction
+# ## Embedding extraction
 #
 # To measure variety you need a numeric view of each image. Extract a feature vector per image with
 # a
@@ -308,8 +308,8 @@ print(representation.dark_branches)
 # 512-dimensional feature per image.
 #
 # > For other ways to build embeddings, see
-# > [Encode images with an ONNX model](h2_encode_with_onnx.py) (a framework-agnostic ONNX
-# > extractor) and [Embed object detection crops](h2_embed_detection_crops.py) (one embedding per
+# > [Encode images with an ONNX model](./h2_encode_with_onnx.py) (a framework-agnostic ONNX
+# > extractor) and [Embed object detection crops](./h2_embed_detection_crops.py) (one embedding per
 # > object box).
 
 # %%
@@ -343,7 +343,7 @@ print("embedding shape:", embeddings.shape)
 # :::
 
 # %% [markdown]
-# ## 6. Lens 3 — embedding-space coverage
+# ## Lens 3 — embedding-space coverage
 #
 # Finally, run {class}`.Coverage`, which describes each class with three independent variety
 # signals — each a gap that raw counts cannot see:
@@ -400,7 +400,7 @@ dep.project(
 )
 
 # %% [markdown]
-# ## 7. The combined gap report
+# ## The combined gap report
 #
 # Now join the two axes into one per-class view over every sanctioned class. A class is a
 # **label gap** if it is missing or under-collected; an **embedding gap** if one of the three
@@ -492,14 +492,14 @@ assert all(report_by_class[c]["gap"] == "ok" for c in ["airplane", "cat", "dog",
 # ontology, and even the other two signals could miss.
 
 # %% [markdown]
-# ## What's next
+# ## Next steps
 #
-# - [Assess an unlabeled data space](tt_assess_data_space.py) — the embedding-only gap workflow
-#   on real imagery, with clustering and outliers.
-# - [Reconcile labels against an ontology](h2_reconcile_labels_ontology.py) — check that the
-#   labels you *have* resolve to the ontology (the complement to representation).
-# - Concept pages: [Ontology](../concepts/Ontology.md) and
-#   [Dataset Bias and Coverage](../concepts/DatasetBias.md).
+# - [Ontology concepts](../concepts/Ontology.md) — Learn how hierarchies and taxons organize dataset class labels and target scopes.
+# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Read about dispersion, isotropy, and representation metrics for assessing dataset coverage.
+# - [Assess data space tutorial](./tt_assess_data_space.py) — Discover coverage gaps, clusters, and outliers in unlabeled dataset embeddings.
+# - [Reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Map and validate dataset labels against a target domain ontology.
+# - [Encode a dataset with an ONNX model](./h2_encode_with_onnx.py) — Extract image embeddings and predictions using an ONNX runtime session.
+# - [Embed object detection crops](./h2_embed_detection_crops.py) — Extract feature embeddings for individual bounding box targets in detection datasets.
 
 # %% [markdown]
 # ## On your own

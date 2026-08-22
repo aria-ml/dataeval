@@ -155,10 +155,16 @@ class TestTheFlatFrameIsDerived:
             assert metadata._flat is not None, task
             metadata._reset_bins()
             assert metadata._flat is None, f"{task}: stale frame survived _reset_bins"
-            binned = metadata.dataframe
+            # Memoized by hand because ``dataframe`` bins before it memoizes, so the frame
+            # it hands back already describes the re-binned store. The write under test is
+            # the one that lands on a frame taken from the store as ``_reset_bins`` left it.
+            unbinned = metadata._flat = metadata._store.flat()
             metadata.factor_data  # noqa: B018  # re-bins, writing the companions back
             assert metadata._flat is None, f"{task}: stale frame survived re-binning"
-            assert not binned.is_empty()
+            # And the rebuild describes the re-binned store: the companions are back.
+            rebuilt = metadata.dataframe
+            assert not rebuilt.is_empty()
+            assert set(rebuilt.columns) > set(unbinned.columns), f"{task}: companions missing after re-bin"
 
     def test_resolving_a_level_whose_column_is_unordered_raises(self, tasks):
         """The flat frame's contract is ``column_order``; a column outside it would vanish.

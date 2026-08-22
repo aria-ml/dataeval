@@ -25,7 +25,7 @@
 # Relevant ML stages: [Monitoring](../getting-started/roles/ML_Lifecycle.md#monitoring),
 # [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 #
-# Relevant personas: Machine Learning Engineer, T&E Engineer, Data Scientist
+# Relevant personas: [ML Engineer](../getting-started/roles/ml_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md), [Data Scientist](../getting-started/roles/data_scientist.md)
 #
 # ## What you'll do
 #
@@ -1162,24 +1162,13 @@ plt.show()
 # data distributions.
 
 # %% [markdown]
-# ### What's next
+# ## Next steps
 #
-# To learn more about OOD detection and related concepts:
-#
-# - Read the [OOD Detection concept page](../concepts/DistributionShift.md#out-of-distribution-detection)
-# - Learn about [monitoring operational data](./tt_monitor_shift.py)
-# - Try the [data cleaning tutorial](./tt_clean_dataset.py)
-#
-# To learn more about setting a global seed in DataEval, see the
-# [configuration defaults how-to](../notebooks/h2_configure_defaults.py).
-
-# %% [markdown]
-# ## Related how-to guides
-#
-# Apply OOD detection to your own data with these focused, task-oriented guides:
-#
-# - [Encode image embeddings with an ONNX model](../notebooks/h2_encode_with_onnx.py)
-# - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+# - [OOD detection concepts](../concepts/DistributionShift.md#out-of-distribution-detection) — Learn about reconstruction and distance-based out-of-distribution detection methods.
+# - [Monitor shift tutorial](./tt_monitor_shift.py) — Monitor feature distributions over time to detect operational data drift.
+# - [Clean dataset tutorial](./tt_clean_dataset.py) — Identify duplicate, corrupt, and low-quality samples to prepare a dataset for model training.
+# - [Encode with an ONNX model](./h2_encode_with_onnx.py) — Extract image embeddings and predictions using an ONNX runtime inference session.
+# - [Configure global DataEval defaults](./h2_configure_defaults.py) — Set global default configuration parameters like batch size and execution device.
 
 # %% [markdown]
 # ## On your own

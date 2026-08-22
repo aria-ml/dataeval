@@ -16,13 +16,13 @@
 # %% [markdown]
 # # Introduction to data cleaning
 #
-# Part 1 of our introduction to exploratory data analysis guide
+# This tutorial walks through using DataEval to clean a dataset.
 #
 # Estimated time to complete: 15 minutes
 #
 # Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 #
-# Relevant personas: Data Engineer, ML Engineer
+# Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [ML Engineer](../getting-started/roles/ml_engineer.md)
 
 # %% [markdown]
 # ## What you'll do
@@ -57,14 +57,9 @@
 # projects.
 
 # %% [markdown]
-# ### Step-by-step guide
+# ## Getting started
 #
-# This guide will walk through how to use DataEval to perform basic data cleaning.
-
-# %% [markdown]
-# #### Setup
-#
-# You'll begin by importing the necessary libraries to walk through this guide.
+# First import the required libraries needed to set up the example.
 
 # %% tags=["remove_cell"]
 try:
@@ -270,7 +265,7 @@ pl.DataFrame({
 # This highlights an important concept -
 # [class balance](../concepts/DatasetBias.md#correcting-for-imbalance-classbalance). A dataset that is imbalanced can
 # result in a model that chooses the more prominent class more often just because there are more samples in that class. To
-# explore this concept further, see the bias tutorial in the [What's Next](#whats-next) section at the end of this
+# explore this concept further, see the bias tutorial in the [Next Steps](#next-steps) section at the end of this
 # tutorial.
 #
 # Now that the metadata has been examined, it's important to inspect random images to get an idea of the variety of
@@ -583,56 +578,34 @@ display(duplicates)
 
 # %% [markdown]
 # ## Conclusion
-
-# %% [markdown]
+#
 # Through this process, you've learned how to use DataEval's `Outliers` class to identify and analyze images that deviate
 # from the overall distribution of your dataset and DataEval's `Duplicates` class to identify exact and near duplicates.
 # By examining the images flagged by the different metrics, you gained a deeper understanding of potential issues within
-# your dataset. In this tutorial, the following were covered:
+# your dataset.
+
+# %% [markdown]
+# ## What you learned
 #
 # - **Underrepresented classes** that may require additional data collection.
 # - **Inconsistencies in image characteristics**, such as brightness, sharpness, or size, which could affect model
 #   performance.
 # - **Duplicate data** that can affect model performance.
-#
-# This work has provided a clearer picture of your dataset's strengths and limitations. You are now equipped to make
-# informed decisions about which data points to keep, remove, or augment. For example, you may decide to exclude
-# irrelevant outliers, collect more data for underrepresented scenarios, or address biases that could impact your model's
-# generalizability.
-#
-# By using DataEval, you are not just refining your dataset—you are laying the groundwork for creating a more
-# representative, balanced, and reliable dataset. These insights ultimately enable the development of models that perform
-# robustly in real-world operational settings.
-#
-# DataEval’s tools empower you to move from raw data to actionable insights, ensuring your dataset is not only
-# comprehensive but also aligned with your specific goals and requirements.
-#
-# Good luck with your data!
 
 # %% [markdown]
-# ## What's next
+# ## Next steps
 #
-# Learn how to do the following:
-#
-# - [Assess the data space](./tt_assess_data_space.py)
-# - [Identify bias and correlations](./tt_identify_bias.py)
-# - [Monitor shifting operational data](./tt_monitor_shift.py)
-#
-# To learn more about specific functions or classes, see the [API Reference](../reference/autoapi/dataeval/index.rst)
-# section. To learn more about data cleaning, see the [Data Integrity](../concepts/DataIntegrity.md) explanation page.
-
-# %% [markdown]
-# ## Related how-to guides
-#
-# Apply the cleaning workflow to your own data with these focused, task-oriented guides:
-#
-# - [Identify and remove duplicates from a PyTorch Dataset](../notebooks/h2_deduplicate.py)
-# - [Find negatively impactful images](../notebooks/h2_visualize_cleaning_issues.py)
-# - [Identify outliers and anomalies with clustering](../notebooks/h2_cluster_analysis.py)
-# - [Customize image stats for object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py)
-# - [Configure logging](../notebooks/h2_configure_logging.py) while running the pipeline
-# - [Calculate feasibility of performance requirements (BER)](../notebooks/h2_measure_ic_feasibility.py)
-# - [Determine how much data you need (sufficiency)](../notebooks/h2_measure_ic_sufficiency.py)
+# - [Data Integrity](../concepts/DataIntegrity.md) — Understand core principles of dataset integrity, duplicates, and outliers.
+# - [Assess the data space](./tt_assess_data_space.py) — Evaluate coverage, bias, and dimensionality across dataset splits.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Identify dataset bias and correlation issues in object detection datasets.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational data over time.
+# - [Identify and remove duplicates from a PyTorch Dataset](./h2_deduplicate.py) — Remove exact, duplicate, or near-duplicate images from datasets.
+# - [Find negatively impactful images](./h2_visualize_cleaning_issues.py) — Visualize data cleaning issues and identify negatively impactful samples.
+# - [Identify outliers and anomalies with clustering](./h2_cluster_analysis.py) — Group embeddings using cluster analysis to surface dataset anomalies.
+# - [Customize image stats for object detection datasets](./h2_custom_image_stats_object_detection.py) — Specify custom statistics for bounding box detection datasets.
+# - [Configure logging](./h2_configure_logging.py) — Configure pipeline logging defaults and verbosity settings.
+# - [Calculate feasibility of performance requirements (BER)](./h2_measure_ic_feasibility.py) — Estimate Bayes Error Rate to evaluate problem feasibility.
+# - [Determine how much data you need (sufficiency)](./h2_measure_ic_sufficiency.py) — Calculate sample sufficiency metrics for model training.
 
 # %% [markdown]
 # ## On your own

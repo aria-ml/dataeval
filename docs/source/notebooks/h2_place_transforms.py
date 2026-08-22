@@ -271,15 +271,10 @@ print("...but ask whether the data really has three channels")
 # - Expect to use both homes at once. Layering them is the normal case, not a compromise.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md)
-# - [Embeddings](../concepts/Embeddings.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py)
-# - [How to embed object detection box crops](./h2_embed_detection_crops.py)
-# - [How to customize calculation of image stats](./h2_custom_image_stats_object_detection.py)
+# - [Data Integrity](../concepts/DataIntegrity.md) — Learn about data corruption, missing values, and dataset quality issues.
+# - [Embeddings](../concepts/Embeddings.md) — Learn how feature vectors represent data for similarity and quality analysis.
+# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view transformations.
+# - [How to embed object detection box crops](./h2_embed_detection_crops.py) — Extract and embed cropped regions from object detection bounding boxes.
+# - [How to customize calculation of image stats](./h2_custom_image_stats_object_detection.py) — Configure custom image statistics for object detection dataset analysis.

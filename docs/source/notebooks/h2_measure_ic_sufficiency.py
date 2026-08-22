@@ -15,14 +15,6 @@
 
 # %% [markdown]
 # # How to measure dataset sufficiency for image classification
-#
-# This guide walks you through analyzing an image classification model's hypothetical performance.
-#
-# Estimated time to complete: 10 minutes
-#
-# Relevant ML stages: [Model Development](../getting-started/roles/ML_Lifecycle.md#model-development)
-#
-# Relevant personas: ML Engineer
 
 # %% [markdown]
 # ## Problem statement
@@ -50,7 +42,7 @@
 #    - `tabulate`
 
 # %% [markdown]
-# ### Getting started
+# ## Getting started
 #
 # Let's import the required libraries needed to set up a minimal working example
 
@@ -343,20 +335,20 @@ output.inv_project([0.90, 0.93, 0.99])
 # improbable.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Performance Limits](../concepts/PerformanceLimits.md)
-# - [Embeddings](../concepts/Embeddings.md)
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+# ### Concepts
 #
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py)
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py)
-# - [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand sufficiency curves and diminishing returns in dataset scaling.
+# - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional space.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias and coverage concepts in DataEval.
 #
 # ### Tutorials
 #
-# - [Introduction to data cleaning](./tt_clean_dataset.py)
+# - [Introduction to data cleaning](./tt_clean_dataset.py) — Identify and clean corrupted, duplicated, or mislabeled samples.
+#
+# ### How-to guides
+#
+# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Measure Bayes Error Rate to evaluate classification task difficulty.
+# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented regions in dataset feature space.
+# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Configure global execution options including random seeds and execution devices.

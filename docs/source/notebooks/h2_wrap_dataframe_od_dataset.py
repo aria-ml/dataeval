@@ -331,20 +331,12 @@ print(instances.select(["item_index", "target_index", "class_label", "weather", 
 #   `__getitem__` rather than grouping the DataFrame.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-# - [Acting on Results](../concepts/ActingOnResults.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to wrap a DataFrame-backed image classification dataset](./h2_wrap_dataframe_ic_dataset.py)
-# - [How to build a MetadataLike object from a DataFrame](./h2_metadata_from_dataframe.py)
-# - [How to delay image loading until needed](./h2_lazy_load_images.py)
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py)
-#
-# ### Tutorials
-#
-# - [Identify bias and correlations](./tt_identify_bias.py)
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
+# - [Acting on Results](../concepts/ActingOnResults.md) — Learn strategies to address dataset imbalance, coverage gaps, and bias.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
+# - [How to wrap a DataFrame-backed image classification dataset](./h2_wrap_dataframe_ic_dataset.py) — Adapt tabular image classification catalogs into DataEval dataset formats.
+# - [How to build a MetadataLike object from a DataFrame](./h2_metadata_from_dataframe.py) — Create lightweight MetadataLike adapters directly from DataFrame columns.
+# - [How to delay image loading until needed](./h2_lazy_load_images.py) — Optimize memory usage by lazily reading images during dataset evaluation.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Configure custom image statistics for object detection dataset analysis.

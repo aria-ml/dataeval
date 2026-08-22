@@ -22,7 +22,7 @@
 #
 # Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 #
-# Relevant personas: Data Engineer, ML Engineer
+# Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [ML Engineer](../getting-started/roles/ml_engineer.md)
 #
 # ## What you'll do
 #
@@ -628,31 +628,17 @@ print(f"  Detected by combined method: {len(combined_detected)}")
 print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 
 # %% [markdown]
-# ## What's next
+# ## Next steps
 #
-# In addition to exploring the duplicates in a dataset, DataEval offers additional tutorials on exploratory data analysis:
-#
-# - Clean a dataset with the labels in the [Data Cleaning Guide](./tt_clean_dataset.py)
-# - [Identify Bias and Correlations](./tt_identify_bias.py) in your metadata
-# - Determine how the data groups by [assessing the data space](./tt_assess_data_space.py)
-#
-# Explore deeper explanations on topics such as
-# [duplicates](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering),
-# [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings), and
-# [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) in the
-# [Concept pages](../concepts/index.md).
-#
-# To learn more about setting a global seed in DataEval, see the
-# [configuration defaults how-to](../notebooks/h2_configure_defaults.py).
-
-# %% [markdown]
-# ## Related how-to guides
-#
-# Apply duplicate detection to your own data with these focused, task-oriented guides:
-#
-# - [Identify and remove duplicates from a PyTorch Dataset](../notebooks/h2_deduplicate.py)
-# - [Find negatively impactful images](../notebooks/h2_visualize_cleaning_issues.py)
-# - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+# - [Duplicates](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering) — Deep dive into duplicate detection using hashing and clustering algorithms.
+# - [Outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings) — Learn about outlier detection using image statistics and embeddings.
+# - [Coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Explore measuring dataset coverage geometry in embedding space.
+# - [Clean a dataset with labels](./tt_clean_dataset.py) — Identify label noise and corrupt samples in a labeled dataset.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Measure mutual information and factor balance in metadata.
+# - [Assess the data space](./tt_assess_data_space.py) — Analyze unlabeled data space using clustering and embeddings.
+# - [Identify and remove duplicates from a PyTorch Dataset](./h2_deduplicate.py) — Learn how to remove duplicate images from a PyTorch dataset.
+# - [Find negatively impactful images](./h2_visualize_cleaning_issues.py) — Identify and visualize images that degrade model performance.
+# - [Configure global DataEval defaults](./h2_configure_defaults.py) — Learn how to configure default settings for DataEval.
 
 # %% [markdown]
 # ## On your own

@@ -293,10 +293,17 @@ also enables `VISUAL_PERCENTILES`.
 
 For **object detection** datasets, `compute_stats` can compute statistics
 separately for each bounding box (`per_target=True`, the default when boxes are
-present) and for the full image (`per_image=True`). Setting `per_channel=True`
-produces per-channel breakdowns rather than aggregating across channels. The
-`source_index` field in the output identifies whether each row corresponds to
-a full image, a specific bounding box within an image, or a specific channel.
+present) and for the full image (`per_image=True`). The `source_index` field in
+the output identifies whether each row corresponds to a full image or to a
+specific bounding box within an image.
+
+Bands are addressed with `channels=`, which names groups of them and measures
+each group jointly, returning `<group>_<statistic>` columns on the same rows —
+`channels={"r": 0, "g": 1, "b": 2}` for RGB, or
+`channels={"visible": range(0, 30), "nir": range(30, 70)}` for a hyperspectral
+cube. Because they are columns rather than rows, band statistics reach
+{class}`.Metadata` and are visible to {class}`.Balance` and {class}`.Diversity`
+like any other factor.
 
 Object detection datasets can also be measured on the pixels that *are not*
 annotated. `per_background=True` unions every box in an image into a mask,

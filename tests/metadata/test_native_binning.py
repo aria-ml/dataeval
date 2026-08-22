@@ -9,6 +9,7 @@ through however many descendants an entity happens to have.
 import warnings
 
 import numpy as np
+import polars as pl
 import pytest
 
 from dataeval import Metadata
@@ -475,3 +476,93 @@ def test_an_empty_edge_list_names_its_codes_rather_than_raising():
     md = _od([1] * 60, {"temp": list(np.linspace(0, 1, 60)), "w": ["a", "b"] * 30}, continuous_factor_bins={"temp": []})
 
     assert set(resolve_label_axis(md, "temp").names.values()) == {"0"}
+
+
+@pytest.mark.required
+class TestTheCompanionNamespaceIsReserved:
+    """A factor may not be named where binning writes, because nothing could tell them apart.
+
+    Every reader resolves a companion by construction — ``binned(col)`` and ``digitized(col)``
+    over the columns present — so a factor named ``w#`` beside a factor ``w`` *is* ``w``'s
+    companion as far as the store can see. Three readers then disagree with the caller at
+    once: ``_bin`` skips ``w`` as already binned, ``_reset_bins`` and ``save`` drop the
+    caller's values as derived, and ``factor_names`` ends up a name longer than
+    ``factor_data`` is wide. The name is moved out of the namespace on the way in instead.
+    """
+
+    _VALUES = np.arange(100, 160, dtype=np.float64)
+
+    def _collided(self, name: str) -> Metadata:
+        """An IC metadata carrying factor ``w`` and a caller's factor named into ``w``'s namespace."""
+        md = _od([1] * 60, {"w": ["a", "b"] * 30})
+        md.add_factors({name: self._VALUES}, level="unit")
+        return md
+
+    @pytest.mark.parametrize("name", ["w#", "w↕"])
+    def test_the_stem_factor_is_still_binned(self, name):
+        """The failure that reaches a result: ``w`` silently stops being a factor at all."""
+        md = self._collided(name)
+
+        assert "w" in md.factor_info
+        assert md._store.frame("unit")[_companion(md, "w")].null_count() == 0
+
+    @pytest.mark.parametrize("name", ["w#", "w↕"])
+    def test_the_names_and_the_columns_agree(self, name):
+        """``factor_names`` indexes ``factor_data``'s columns, so a mismatch misattributes
+        every finding to the wrong factor rather than merely losing one."""
+        md = self._collided(name)
+
+        assert len(md.factor_names) == md.factor_data.shape[1] == md.shape[1]
+        assert len(md.is_binned) == len(md.is_discrete) == len(md.factor_names)
+
+    @pytest.mark.parametrize("name", ["w#", "w↕"])
+    def test_the_renamed_factor_keeps_its_values(self, name):
+        md = self._collided(name)
+        renamed = f"{name}_metadata"
+
+        assert renamed in md.factor_names
+        assert md._store.frame("unit")[renamed].to_list() == list(self._VALUES)
+
+    def test_dropping_the_bins_does_not_drop_it(self):
+        """``_reset_bins`` resolves companions the same way, so an unreserved name would
+        be deleted by the next include/exclude change rather than by anything binning-shaped."""
+        md = self._collided("w#")
+        md.factor_data  # noqa: B018  # bin, so there is something to reset
+
+        md._reset_bins()
+
+        assert "w#_metadata" in md._store.columns
+        assert md._store.frame("unit")["w#_metadata"].to_list() == list(self._VALUES)
+
+    def test_saving_does_not_drop_it(self, tmp_path):
+        """``save`` writes the values and not the bins, deciding which is which by the
+        same construction — so an unreserved name would not survive a round trip."""
+        md = self._collided("w#")
+        md.save(tmp_path / "collision.dem")
+
+        assert "w#_metadata" in Metadata.load(tmp_path / "collision.dem").factor_names
+
+    def test_a_dataset_key_goes_through_the_same_gate(self):
+        """Reserved at the one point every factor name passes, not at ``add_factors`` — a
+        dataset whose metadata dictionaries carry the name never reaches that call."""
+        md = _od([1] * 60, {"w": ["a", "b"] * 30, "w#": list(self._VALUES)})
+
+        assert "w#_metadata" in md.factor_names
+        assert len(md.factor_names) == md.factor_data.shape[1]
+
+    def test_an_aggregate_may_not_be_aliased_into_it_either(self):
+        """``agg`` resolves its alias against the columns present, which on an unbinned
+        source is every column except the companions it is about to collide with."""
+        md = _od([2] * 30, {"w": ["a", "b"] * 15})
+        md._structure()
+
+        rolled = md.agg("instance", "unit", pl.len().alias("w#"))
+
+        assert "w#_metadata" in rolled.factor_names
+        assert len(rolled.factor_names) == rolled.factor_data.shape[1]
+
+    def test_an_ordinary_name_is_left_alone(self):
+        md = _od([1] * 60, {"w": ["a", "b"] * 30, "sharp#ish": list(self._VALUES)})
+
+        assert "sharp#ish" in md.factor_names
+        assert "sharp#ish_metadata" not in md.factor_names

@@ -45,7 +45,7 @@
 #    - `maite-datasets`
 
 # %% [markdown]
-# ### Getting started
+# ## Getting started
 #
 # Let's import the required libraries needed to set up a minimal working example
 
@@ -273,15 +273,10 @@ assert nested.root is mnist
 # - Write your own by subclassing {class}`.Operation` and implementing `apply(view)`.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Ontology](../concepts/Ontology.md)
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to conform and merge datasets with different label vocabularies](./h2_conform_and_merge_datasets.py)
-# - [How to align label spaces across datasets](./h2_align_label_spaces.py)
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py)
+# - [Ontology](../concepts/Ontology.md) — Learn about taxonomic ontologies and label space mapping.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand coverage and balance in dataset views.
+# - [How to conform and merge datasets with different label vocabularies](./h2_conform_and_merge_datasets.py) — Conform and merge datasets with disparate label vocabularies into a unified view.
+# - [How to align label spaces across datasets](./h2_align_label_spaces.py) — Establish typed correspondences between source and reference label spaces.
+# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify undersampled or low-density regions in dataset views.

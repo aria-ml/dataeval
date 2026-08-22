@@ -908,10 +908,6 @@ class Duplicates(Evaluator):
     flags : ImageStats, default ImageStats.HASH_DUPLICATES_BASIC
         Statistics to compute for hash-based duplicate detection. Set to
         ``ImageStats.NONE`` to disable hash-based detection.
-    extractor : FeatureExtractor, optional
-        Feature extractor for cluster-based duplicate detection. Must be provided
-        together with cluster_sensitivity to enable clustering. When provided alone
-        without cluster_sensitivity, clustering is skipped.
     cluster_sensitivity : float, optional
         Controls how aggressively points within a cluster are considered
         duplicates, by scaling the cluster's standard deviation of MST edge
@@ -922,16 +918,23 @@ class Duplicates(Evaluator):
         Must be provided together with ``extractor`` to enable clustering.
         When None or when extractor is None, cluster-based detection is
         skipped entirely.
-    cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
-        Clustering algorithm for cluster-based detection.
-    n_clusters : int, optional
-        Expected number of clusters. For HDBSCAN, this is a hint that adjusts
-        min_cluster_size. For KMeans, this is the exact number of clusters.
     merge_near_duplicates : bool, default True
         If True, overlapping near duplicate groups from different detection
         methods are merged into unified groups. Each group tracks which methods
         detected it, providing confidence information. If False, groups from
         each method are kept separate.
+    extractor : FeatureExtractor, optional
+        Feature extractor for cluster-based duplicate detection. Must be provided
+        together with cluster_sensitivity to enable clustering. When provided alone
+        without cluster_sensitivity, clustering is skipped.
+    batch_size : int or None, default None
+        Batch size for feature extraction during cluster-based detection. If None, uses DataEval
+        default. Must be set by either parameter or global default if extractor is provided.
+    cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
+        Clustering algorithm for cluster-based detection.
+    n_clusters : int, optional
+        Expected number of clusters. For HDBSCAN, this is a hint that adjusts
+        min_cluster_size. For KMeans, this is the exact number of clusters.
     config : Duplicates.Config or None, default None
         Optional configuration object with default parameters. Parameters
         specified directly in __init__ will override config defaults.

@@ -45,8 +45,9 @@ task. A slightly brighter version of the same image adds little; the same scene
 from a marginally different angle may add enough viewpoint diversity to keep. In
 evaluation datasets, near-duplicates between train and test are the primary
 concern — they degrade the validity of held-out metrics, while a near-duplicate
-group sitting entirely within one split does not. Which of the two a group is
-does not appear in the result; only the grouping does.
+group sitting entirely within one split does not. However, near-duplicates only
+informs that a duplicate group exists; it does not specify which split each data
+point comes from unless each split is passed in as a separate dataset.
 
 **Semantic clusters** (from cluster-based detection) identify images that are
 different in appearance but close in embedding space — similar scene
@@ -98,9 +99,10 @@ evidence of model failure.
 
 ### Image statistics
 
-{func}`.compute_stats` computes per-image and per-channel statistics (mean,
-standard deviation, entropy, sharpness, and others), with {class}`.ImageStats`
-flags controlling which statistics are calculated. These are diagnostic inputs
+{func}`.compute_stats` computes statistics (mean, standard deviation,
+entropy, sharpness, and others) for whole images, for bounding boxes, and — with
+`channels=` — for named groups of bands, with {class}`.ImageStats` flags
+controlling which statistics are calculated. These are diagnostic inputs
 to outlier detection and dataset characterization rather than pass/fail outputs
 on their own.
 

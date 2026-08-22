@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to configuring logging with DataEval
+# # How to configure logging with DataEval
 
 # %% [markdown]
 # ## Problem statement
@@ -283,12 +283,7 @@ for log_file in log_files:
 print("\nCleanup complete!")
 
 # %% [markdown]
-# ## See also
+# ## Next steps
 #
-# ### How-to guides
-#
-# - [How to configure global DataEval defaults](./h2_configure_defaults.py)
-#
-# ### Tutorials
-#
-# - [Introduction to data cleaning](./tt_clean_dataset.py)
+# - [Introduction to data cleaning](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
+# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Set global default device, batch size, worker processes, and seed.

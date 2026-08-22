@@ -285,18 +285,10 @@ print(od_balance.balance)
 # {class}`.Diversity`, and {class}`.Parity` - no images required.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-# - [Acting on Results](../concepts/ActingOnResults.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to wrap a DataFrame-backed image classification dataset](./h2_wrap_dataframe_ic_dataset.py)
-# - [How to wrap a DataFrame-backed object detection dataset](./h2_wrap_dataframe_od_dataset.py)
-#
-# ### Tutorials
-#
-# - [Identify bias and correlations](./tt_identify_bias.py)
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
+# - [Acting on Results](../concepts/ActingOnResults.md) — Learn strategies to address dataset imbalance, coverage gaps, and bias.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
+# - [How to wrap a DataFrame-backed image classification dataset](./h2_wrap_dataframe_ic_dataset.py) — Adapt tabular image classification catalogs into DataEval dataset formats.
+# - [How to wrap a DataFrame-backed object detection dataset](./h2_wrap_dataframe_od_dataset.py) — Adapt tabular object detection catalogs with bounding boxes into DataEval dataset formats.
