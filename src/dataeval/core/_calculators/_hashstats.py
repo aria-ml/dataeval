@@ -5,6 +5,7 @@ __all__ = []
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.core._calculators._base import Calculator, Handler, ViewKind
@@ -43,7 +44,13 @@ class HashStatCalculator(Calculator):
         """
         if self.cache.is_all_nan:
             return [""]
-        hash_value, warning = digest(self.cache.image)
+        # float64 explicitly, not whatever dtype the view happens to carry. `xxhash`
+        # digests the raw bytes, so an 8-bit view and a float64 one of the same pixels
+        # hash differently — and which of the two a row gets would otherwise depend on
+        # whether its window needed padding. Anchoring here keeps a digest comparable
+        # across rows, across runs and across releases; the perceptual hashes are
+        # unaffected either way, since they resample before they read anything.
+        hash_value, warning = digest(np.asarray(self.cache.image, dtype=np.float64))
         if warning:
             self.warnings.append(warning)
         return [hash_value]

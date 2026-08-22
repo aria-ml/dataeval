@@ -36,8 +36,7 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import DTypeLike, NDArray
-from scipy.ndimage import zoom
-from scipy.signal import convolve2d
+from scipy.ndimage import convolve, zoom
 
 from dataeval._experimental import deprecated
 from dataeval._log import get_logger
@@ -1012,7 +1011,7 @@ def normalize_image_shape(image: NDArray[Any]) -> NDArray[Any]:
     raise ShapeMismatchError("Images must have 2 or more dimensions.")
 
 
-def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
+def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.floating[Any]]:
     """
     Return the image filtered using a 3x3 edge detection kernel.
 
@@ -1020,6 +1019,9 @@ def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
         [[ -1, -1, -1 ],
          [ -1,  8, -1 ],
          [ -1, -1, -1 ]]
+
+    Edges are read off a symmetric reflection of the image at its borders, and clipped
+    to the 0-255 display range on the way out.
 
     Parameters
     ----------
@@ -1030,10 +1032,20 @@ def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
 
     Returns
     -------
-    NDArray[np.uint8]
-        Edge-filtered image
+    NDArray[np.floating]
+        Edge-filtered image, on the same floating dtype as `image` where it had one and
+        float64 where it did not.
     """
-    edges = convolve2d(image, _EDGE_KERNEL, mode="same", boundary="symm") + offset
+    # `scipy.ndimage.convolve` rather than `scipy.signal.convolve2d`: the two agree to
+    # floating-point rounding on this kernel -- ndimage's ``reflect`` is signal's ``symm``
+    # -- and ndimage is several times quicker on the megapixel images this runs over.
+    # Accumulating in the image's own dtype would wrap an integer image around 8*255, so
+    # integer input is widened to float first; ndimage takes its output dtype from the
+    # input, where `convolve2d` promoted against the kernel's.
+    values = np.asarray(image)
+    dtype = values.dtype if np.issubdtype(values.dtype, np.inexact) else np.float64
+    edges = convolve(values.astype(dtype, copy=False), _EDGE_KERNEL.astype(dtype), mode="reflect")
+    edges += offset
     np.clip(edges, 0, 255, edges)
     return edges
 
@@ -1083,10 +1095,16 @@ def crop_with_fill(
         # Hold both the real pixels and the fill, so NaN fill promotes an integer image to float.
         dtype = np.result_type(image.dtype, np.asarray(fill_value))
     output = np.empty((channels, out_h, out_w), dtype=dtype)
-    output[:] = np.reshape(fill_value, (channels, 1, 1)) if np.ndim(fill_value) else fill_value
+
+    pasted = is_valid_box(sbox)
+    # The fill only shows where no source pixel lands. A window sitting wholly inside the
+    # image has no such place, and pre-filling it would write the whole array twice --
+    # which over a megapixel image is the larger half of this call.
+    if not pasted or (sbox[2] - sbox[0], sbox[3] - sbox[1]) != (out_w, out_h):
+        output[:] = np.reshape(fill_value, (channels, 1, 1)) if np.ndim(fill_value) else fill_value
 
     # Paste the real pixels at their offset within the (window-sized) output.
-    if is_valid_box(sbox):
+    if pasted:
         dx, dy = sbox[0] - x0, sbox[1] - y0
         output[..., dy : dy + (sbox[3] - sbox[1]), dx : dx + (sbox[2] - sbox[0])] = region
 

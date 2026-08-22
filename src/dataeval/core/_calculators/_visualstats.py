@@ -16,6 +16,29 @@ from dataeval.utils.preprocessing import edge_filter
 QUARTILES = (0, 25, 50, 75, 100)
 
 
+def _percentiles_by_count(counts: NDArray[np.intp], quantiles: tuple[int, ...]) -> NDArray[np.float64]:
+    """Percentiles read off value counts rather than out of the sorted values.
+
+    `np.percentile` partitions the values, which over a megapixel image is a sort's worth
+    of cache misses across the whole array and the single largest cost in this family. An
+    8-bit view holds only 256 distinct values, so `CalculatorCache.display_counts` locates
+    every order statistic at once and the values are never rearranged.
+
+    Exact, not approximate: this reproduces NumPy's default ``linear`` method bit for bit,
+    by resolving the same virtual index against the running totals and interpolating
+    between the same two order statistics it would have partitioned to.
+    """
+    cumulative = np.cumsum(counts)
+    # NumPy places quantile q at index q/100 * (n - 1) of the sorted values, and reads
+    # between its neighbours when that lands off a whole index.
+    virtual = np.asarray(quantiles, dtype=np.float64) / 100.0 * (cumulative[-1] - 1)
+    below = np.floor(virtual)
+    # The k-th smallest value is the first level whose running total has passed k.
+    lower = np.searchsorted(cumulative, below, side="right").astype(np.float64)
+    upper = np.searchsorted(cumulative, np.ceil(virtual), side="right").astype(np.float64)
+    return lower + (virtual - below) * (upper - lower)
+
+
 @CalculatorRegistry.register(ImageStats)
 class VisualStatCalculator(Calculator[ImageStats]):
     """Calculator for visual statistics like brightness, contrast, sharpness.
@@ -44,13 +67,26 @@ class VisualStatCalculator(Calculator[ImageStats]):
     @cached_property
     def percentiles(self) -> NDArray[np.float64]:
         if self._unreadable:
-            if self.per_channel_mode:
-                return self.cache.nan_like((self.cache.channel_count, len(QUARTILES)))
-            return self.cache.nan_like((len(QUARTILES),))
-        # The perceptual view, never `scaled`: a visual statistic reports where values sit
-        # between black and white, which `normalize_pixel_values` has no bearing on.
-        if self.per_channel_mode:
-            return np.nanpercentile(self.cache.per_channel_perceptual, q=QUARTILES, axis=1).T.astype(np.float64)
+            absent = (self.cache.channel_count, len(QUARTILES)) if self.per_channel_mode else (len(QUARTILES),)
+            return self.cache.nan_like(absent)
+        # Both paths read the perceptual view, never `scaled`: a visual statistic reports
+        # where values sit between black and white, which `normalize_pixel_values` has no
+        # bearing on.
+        return self._band_percentiles() if self.per_channel_mode else self._whole_percentiles()
+
+    def _band_percentiles(self) -> NDArray[np.float64]:
+        """One row of quartiles per band."""
+        counts = self.cache.display_counts
+        if counts is not None:
+            return np.stack([_percentiles_by_count(band, QUARTILES) for band in counts])
+        return np.nanpercentile(self.cache.per_channel_perceptual, q=QUARTILES, axis=1).T.astype(np.float64)
+
+    def _whole_percentiles(self) -> NDArray[np.float64]:
+        """Quartiles over every value in the view at once."""
+        counts = self.cache.display_counts
+        if counts is not None:
+            # Summed across bands, which is the same multiset the flat view would sort.
+            return _percentiles_by_count(counts.sum(axis=0), QUARTILES)
         return np.nanpercentile(self.cache.perceptual, q=QUARTILES).astype(np.float64)
 
     def get_applicable_flags(self) -> ImageStats:
@@ -75,10 +111,28 @@ class VisualStatCalculator(Calculator[ImageStats]):
             return self.percentiles[:, -2].tolist()
         return [float(self.percentiles[-2])]
 
+    def _deviation(self, values: NDArray[Any], **kwargs: Any) -> Any:
+        """Spread of `values`, NaN-aware only where the view it came from can hold NaN.
+
+        `np.nanstd` scans for NaN before it reduces, which over a megapixel edge image is
+        a second pass for an answer the view already knows.
+        """
+        return np.std(values, **kwargs) if self.cache.is_fully_measured else np.nanstd(values, **kwargs)
+
     def _sharpness(self) -> list[float]:
         # Sharpness requires 2D spatial data; return NaN for low-dimensional or unreadable data
         if self._unreadable:
             return [np.nan] * self.cache.channel_count if self.per_channel_mode else [np.nan]
+        grayscale = None if self.per_channel_mode else self.cache.display_grayscale
+        if grayscale is None:
+            return self._sharpness_from_view()
+        # Read straight off the window. Reaching this through `perceptual` instead would
+        # promote every band into a float64 copy of the whole datum, only to average it
+        # back down to the one plane the filter runs over.
+        return [float(self._deviation(edge_filter(grayscale)))]
+
+    def _sharpness_from_view(self) -> list[float]:
+        """Sharpness off :attr:`~CalculatorCache.perceptual`, for the views no window slice covers."""
         if self.cache.image.ndim < 2:
             return [np.nan] if not self.per_channel_mode else [np.nan] * self.cache.channel_count
         # Edge magnitudes off the perceptual view, so the same picture at two bit depths
@@ -86,14 +140,14 @@ class VisualStatCalculator(Calculator[ImageStats]):
         perceptual = self.cache.perceptual
         if self.cache.image.ndim == 2:
             # 2D data: treat as single-channel image
-            return [float(np.nanstd(edge_filter(perceptual)))]
+            return [float(self._deviation(edge_filter(perceptual)))]
         # 3D+ data with channels
         if self.per_channel_mode:
-            return np.nanstd(
+            return self._deviation(
                 np.vectorize(edge_filter, signature="(m,n)->(m,n)")(perceptual),
                 axis=(1, 2),
             ).tolist()
-        return [float(np.nanstd(edge_filter(np.mean(perceptual, axis=0))))]
+        return [float(self._deviation(edge_filter(np.mean(perceptual, axis=0))))]
 
     def _percentiles(self) -> list[Any]:
         if self.per_channel_mode:

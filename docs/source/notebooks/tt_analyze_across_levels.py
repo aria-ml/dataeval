@@ -97,10 +97,14 @@ from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
 from dataeval.bias import Balance
+from dataeval.config import set_max_processes
 from dataeval.core import compute_stats
 from dataeval.data import Indices, Limit, Shuffle, View
 from dataeval.exceptions import MetadataFormatError
 from dataeval.flags import ImageStats
+
+# Read and measure four frames at a time rather than one. See Step 5.
+set_max_processes(4)
 
 # %% [markdown]
 # ## Step 1: Load the data and inspect its levels
@@ -297,6 +301,16 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 # ```{note}
 # This cell reads and measures 200 4K frames and takes a couple of minutes. It is by far the most expensive step in
 # the tutorial — and the reason the sample is capped at 200 — so Step 10 shows you how to pay for it once.
+#
+# It is also the reason the first cell called {func}`.set_max_processes` with 4: {func}`.compute_stats` reads each
+# frame independently, so it splits the work across worker processes. Four workers cut this step to roughly a third
+# of its single-process time, for a few hundred megabytes more memory — one frame's pixels are the largest thing any
+# worker holds, and the workers are forked, so most of what they occupy is shared with the parent rather than copied.
+#
+# Note that a positive count is taken literally rather than capped at your core count, so four workers are started
+# whether or not there are four cores to run them on. Pass a negative number to size the pool relative to the machine
+# instead — `-1` for one worker per core, `-2` to leave a core free — or leave it unset, the default, to keep
+# everything in one process.
 # ```
 
 # %%

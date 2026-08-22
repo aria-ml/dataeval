@@ -18,6 +18,21 @@ from dataeval.utils.preprocessing import (
 #: Bit depth of the range a visual statistic is read against — see `CalculatorCache.perceptual`.
 _DISPLAY_DEPTH = 8
 
+#: Distinct values that range holds, which is how many bins count all of them.
+_DISPLAY_LEVELS = 2**_DISPLAY_DEPTH
+
+
+def _reduces_widely(dtype: np.dtype[Any]) -> bool:
+    """Whether reducing over `dtype` is at least as accurate as reducing over a float64 copy of it.
+
+    The gate on `CalculatorCache._windowed`'s slice. That slice replaced a float64 copy, so
+    it may only be taken where the narrower dtype costs no precision. NumPy accumulates a
+    mean or a variance over integers in float64 and over float64 in float64, so both are
+    safe; over float32 it accumulates in float32, and a constant float32 image would come
+    back with a variance of 1e-14 where the copy answered 0.
+    """
+    return dtype == np.float64 or dtype.kind in "biu"
+
 
 class CalculatorCache:
     """
@@ -121,9 +136,14 @@ class CalculatorCache:
         """
         if self.exclude is None:
             return None
+        window = self.box.xyxy_int
+        if self._has_geometry and self._is_interior(window, self.exclude.shape):
+            # Wholly inside, so there is nothing to fill and the mask is already a slice.
+            x0, y0, x1, y1 = window
+            return self.exclude[y0:y1, x0:x1]
         # A leading axis makes the (H, W) mask a one-channel image for the crop, which is
         # the only shape crop_with_fill windows; dropped again on the way out.
-        return crop_with_fill(self.exclude[None, ...], self.box.xyxy_int, fill=False)[0][0]
+        return crop_with_fill(self.exclude[None, ...], window, fill=False)[0][0]
 
     @cached_property
     def channel_count(self) -> int:
@@ -146,23 +166,173 @@ class CalculatorCache:
         return self.excluded_per_channel * self.channel_count
 
     @cached_property
+    def _has_geometry(self) -> bool:
+        """Whether box geometry applies to this datum at all.
+
+        Bounding-box geometry assumes channels-first dimensionality >= 3. An exclusion mask
+        is spatial in the same way, so it brings a datum in here too — that is what gets a
+        2-D single-channel image masked rather than silently returned whole, its background
+        row carrying no box of its own to bring it in.
+        """
+        return self.has_box or self.raw.ndim >= 3 or self.exclude is not None
+
+    @cached_property
+    def _window_slice(self) -> NDArray[Any] | None:
+        """The window as a plain slice of the datum, or None where it is not one.
+
+        None when the window leaves the image and some of it must be filled, when the datum
+        carries no box geometry, or when its dtype is one the reductions need widened —
+        see :func:`_reduces_widely`. Says nothing about `exclude`: this is the datum's own
+        pixels, which is what a *count* of them reads, and the masking happens on the copy
+        :attr:`_windowed` makes.
+        """
+        if not self._has_geometry:
+            return None
+        image = normalize_image_shape(self.raw)
+        window = self.box.xyxy_int
+        if not _reduces_widely(image.dtype) or not self._is_interior(window, image.shape):
+            return None
+        x0, y0, x1, y1 = window
+        # A read-only view rather than a copy, since nothing here writes pixels.
+        return image[:, y0:y1, x0:x1]
+
+    @cached_property
+    def _integer_window(self) -> NDArray[Any] | None:
+        """:attr:`_window_slice` band-selected, where its pixels are integers — otherwise None.
+
+        What both :attr:`display_counts` and :attr:`is_all_nan` read, and they read it for
+        the same reason: an integer window holds no NaN of its own, so every absent pixel
+        in a view built from it is one `exclude` masked out, and every present one is a
+        value that can be counted rather than sorted. None wherever that reasoning does not
+        hold — a float datum, a window that leaves the image, or a band group this datum
+        cannot supply, which :attr:`image` answers with NaN instead.
+        """
+        window = self._window_slice
+        if window is None or not window.size or not np.issubdtype(window.dtype, np.integer):
+            return None
+        if self.bands is None:
+            return window
+        if window.ndim >= 3 and max(self.bands) < window.shape[0]:
+            return window[list(self.bands)]
+        return None
+
+    @cached_property
+    def _display_window(self) -> NDArray[np.uint8] | None:
+        """:attr:`_integer_window` where :attr:`perceptual` is simply those pixels, else None.
+
+        The one place the perceptual view's identity path is restated. `perceptual` takes
+        that path when the datum's range is already the display range, at which point it
+        hands :attr:`image` back untouched — so where the window is the datum's own 8-bit
+        pixels, those pixels *are* the perceptual view, and a statistic can read them
+        without the view ever being built. None for a float datum, a padded window, a band
+        group the datum cannot supply, or a range `perceptual` would have to rescale.
+
+        Pinned to `perceptual` by test rather than by construction: asking `perceptual`
+        directly would mean building the array the readers below exist to avoid.
+        """
+        window = self._integer_window
+        if window is None or window.dtype != np.uint8:
+            return None
+        if not self.value_range.is_known or self.value_range.depth != _DISPLAY_DEPTH:
+            return None
+        return window
+
+    @cached_property
+    def is_fully_measured(self) -> bool:
+        """Whether every pixel of the view holds a measurement, known without scanning for one.
+
+        A licence to take the plain reductions instead of the NaN-aware ones, which each
+        scan the whole view to discover the same thing. False wherever it cannot be
+        answered outright — including views that do happen to hold no NaN, since this
+        makes no claim about the ones it declines.
+        """
+        return self._integer_window is not None and self.window_mask is None
+
+    @cached_property
+    def display_counts(self) -> NDArray[np.intp] | None:
+        """How many measured pixels hold each 8-bit display value, one row per band.
+
+        Shape ``(bands, 256)``, or None wherever :attr:`_display_window` is.
+
+        Read off the datum and the mask rather than off :attr:`perceptual`, which is what
+        makes it worth having: a background view is float64 with a NaN hole wherever a box
+        was, and every percentile of it otherwise costs a compaction and a partition of the
+        whole image. The masked pixels are counted and *subtracted* rather than stepped
+        around, because the boxes are a small part of an image and counting them is far
+        cheaper than counting around them.
+        """
+        window = self._display_window
+        if window is None:
+            return None
+        counts = np.stack([np.bincount(band.ravel(), minlength=_DISPLAY_LEVELS) for band in window])
+        mask = self.window_mask
+        if mask is not None:
+            counts -= np.stack([np.bincount(band[mask], minlength=_DISPLAY_LEVELS) for band in window])
+        return counts
+
+    @cached_property
+    def display_grayscale(self) -> NDArray[np.float64] | None:
+        """:attr:`perceptual` averaged down to one ``(H, W)`` band, or None wherever it cannot be.
+
+        The same values ``np.mean(perceptual, axis=0)`` gives, to the bit: the datum's own
+        8-bit pixels are exact in float64, so summing them across bands reaches the same
+        total whether they were promoted first or not, and a masked pixel is masked in
+        every band so it averages to NaN either way.
+
+        Worth reading separately because of what it lets the caller *not* build. Averaging
+        `perceptual` means promoting every band of the window into one float64 array —
+        eight times the datum, and the largest allocation in a statistics run over
+        megapixel imagery — which sharpness is the only statistic ever to have wanted.
+        """
+        window = self._display_window
+        if window is None or window.ndim != 3:
+            return None
+        bands = window.shape[0]
+        # Totalled in uint16 rather than accumulated in float64 wherever the brightest
+        # possible band stack still fits it. The total is a small whole number either way
+        # and dividing it reaches the same float64 the wider accumulator would have, for
+        # most of a pass over the window less; a stack deep enough to overflow falls back.
+        fits = bands * np.iinfo(np.uint8).max <= np.iinfo(np.uint16).max
+        summed = window.sum(axis=0, dtype=np.uint16 if fits else np.float64)
+        grayscale = summed / bands
+        mask = self.window_mask
+        if mask is not None:
+            grayscale[mask] = np.nan
+        return grayscale
+
+    @cached_property
     def _windowed(self) -> NDArray[Any]:
         """The datum narrowed on its spatial axes: cropped to :attr:`box`, masked by `exclude`."""
-        # Crop/pad to the bounding box (a full-image default when none was given), but only for
-        # image-like data: bounding-box geometry assumes channels-first dimensionality >= 3.
-        # An exclusion mask is spatial in the same way and takes the same path, so that a
-        # 2-D single-channel image gets masked rather than silently returned whole — its
-        # background row carries no box of its own to bring it in here.
-        if self.has_box or self.raw.ndim >= 3 or self.exclude is not None:
-            cropped = crop_with_fill(normalize_image_shape(self.raw), self.box.xyxy_int)[0]
-            window_mask = self.window_mask
-            if window_mask is not None:
-                # In place: crop_with_fill has already allocated a fresh float array (its
-                # NaN fill promotes any integer image), so masking costs no further copy.
-                cropped[:, window_mask] = np.nan
-            return cropped
-        # For data with < 3 dimensions, don't normalize or clip
-        return self.raw
+        if not self._has_geometry:
+            # For data with < 3 dimensions, don't normalize or clip
+            return self.raw
+        window_slice = self._window_slice
+        if window_slice is not None and self.exclude is None:
+            # Nothing to fill and nothing to mask, so the window is already a slice of the
+            # datum. Skipping `crop_with_fill` here skips the copy *and* the float
+            # promotion its NaN fill carries: an 8-bit image stays 8-bit, which is eight
+            # times less to sort, convolve and scan for every statistic below.
+            return window_slice
+        cropped = crop_with_fill(normalize_image_shape(self.raw), self.box.xyxy_int)[0]
+        window_mask = self.window_mask
+        if window_mask is not None:
+            # In place: crop_with_fill has already allocated a fresh float array (its
+            # NaN fill promotes any integer image), so masking costs no further copy.
+            cropped[:, window_mask] = np.nan
+        return cropped
+
+    @staticmethod
+    def _is_interior(window: tuple[int, int, int, int], shape: tuple[int, ...]) -> bool:
+        """Whether `window` lies wholly inside a ``(C, H, W)`` datum and encloses real pixels.
+
+        The condition under which `crop_with_fill` would fill nothing, so slicing gives the
+        same pixels for none of the cost. Degenerate windows are excluded deliberately:
+        `crop_with_fill` widens an empty one to a single all-fill pixel, and a slice would
+        instead produce a zero-sized array that the reductions below answer differently.
+        """
+        x0, y0, x1, y1 = window
+        height, width = shape[-2:]
+        return 0 <= x0 < x1 <= width and 0 <= y0 < y1 <= height
 
     @cached_property
     def image(self) -> NDArray[Any]:
@@ -186,7 +356,18 @@ class CalculatorCache:
     @cached_property
     def is_all_nan(self) -> bool:
         """Check if the image data is entirely NaN (e.g. from an out-of-bounds bounding box)."""
-        return bool(np.isnan(self.image).all())
+        if self._integer_window is not None:
+            # An integer window brings no NaN of its own, so the view is wholly absent
+            # exactly when `exclude` covered all of it. Read off the one-band mask rather
+            # than scanned out of the float64 copy every band was promoted into.
+            mask = self.window_mask
+            return mask is not None and bool(mask.all())
+        image = self.image
+        if image.size and not np.issubdtype(image.dtype, np.inexact):
+            # An integer or boolean view cannot hold NaN, so the answer is known without
+            # the scan — which is over every pixel, and reached once per statistic family.
+            return False
+        return bool(np.isnan(image).all())
 
     @cached_property
     def is_unmeasurable(self) -> bool:

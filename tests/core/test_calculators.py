@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 from scipy.stats import entropy as scipy_entropy
 from scipy.stats import kurtosis as scipy_kurtosis
 from scipy.stats import skew as scipy_skew
@@ -14,10 +15,10 @@ from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._dimensionstats import DimensionStatCalculator
 from dataeval.core._calculators._hashstats import HashStatCalculator
 from dataeval.core._calculators._pixelstats import PixelStatCalculator
-from dataeval.core._calculators._visualstats import QUARTILES, VisualStatCalculator
+from dataeval.core._calculators._visualstats import QUARTILES, VisualStatCalculator, _percentiles_by_count
 from dataeval.flags import ImageStats
 from dataeval.types import SourceIndex
-from dataeval.utils.preprocessing import BoundingBox, get_value_range, rescale
+from dataeval.utils.preprocessing import BoundingBox, edge_filter, get_value_range, rescale
 
 
 class TestPixelStats:
@@ -3172,3 +3173,334 @@ class TestCacheWithoutAKnownRange:
 
     def test_perceptual_reports_absence_rather_than_raising(self):
         assert np.isnan(self._cache().perceptual).all()
+
+
+@pytest.mark.required
+class TestInteriorWindowIsNotCopied:
+    """A window that needs no padding is a slice of the datum, not a float64 rebuild of it."""
+
+    @staticmethod
+    def _image() -> NDArray[np.uint8]:
+        return (np.random.default_rng(0).random((3, 24, 32)) * 255).astype(np.uint8)
+
+    def test_whole_image_keeps_its_own_dtype(self):
+        """The default box spans the datum, so nothing is ever filled."""
+        image = self._image()
+        assert CalculatorCache(image).image.dtype == np.uint8
+
+    def test_interior_box_keeps_its_own_dtype(self):
+        image = self._image()
+        cache = CalculatorCache(image, box=BoundingBox(4, 5, 20, 18, image_shape=image.shape))
+        assert cache.image.dtype == np.uint8
+        assert cache.image.shape == (3, 13, 16)
+
+    def test_interior_box_holds_the_datum_s_pixels(self):
+        image = self._image()
+        cache = CalculatorCache(image, box=BoundingBox(4, 5, 20, 18, image_shape=image.shape))
+        np.testing.assert_array_equal(cache.image, image[:, 5:18, 4:20])
+
+    @pytest.mark.parametrize(
+        "box",
+        [
+            BoundingBox(-2, 0, 10, 10, image_shape=(3, 24, 32)),
+            BoundingBox(0, 0, 40, 10, image_shape=(3, 24, 32)),
+            BoundingBox(0, 20, 10, 30, image_shape=(3, 24, 32)),
+        ],
+        ids=["past_left", "past_right", "past_bottom"],
+    )
+    def test_a_box_leaving_the_image_is_still_padded_with_nan(self, box):
+        """The slice is only reachable where `crop_with_fill` would have filled nothing."""
+        cache = CalculatorCache(self._image(), box=box)
+        assert cache.image.dtype == np.float64
+        assert np.isnan(cache.image).any()
+
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.int32, np.float64])
+    def test_dtypes_numpy_reduces_in_float64_take_the_slice(self, dtype):
+        image = (np.random.default_rng(2).random((3, 12, 16)) * 100).astype(dtype)
+        assert CalculatorCache(image).image.dtype == dtype
+
+    @pytest.mark.parametrize("dtype", [np.float16, np.float32])
+    def test_a_narrow_float_is_still_widened_so_the_reductions_stay_accurate(self, dtype):
+        """NumPy accumulates a float32 mean in float32; the copy this replaced did not."""
+        image = np.full((3, 12, 16), 0.98, dtype=dtype)
+        cache = CalculatorCache(image)
+
+        assert cache.image.dtype == np.float64
+        assert float(np.var(cache.image)) == 0.0
+
+    def test_a_masked_view_is_still_rebuilt_so_it_can_hold_nan(self):
+        image = self._image()
+        exclude = np.zeros(image.shape[-2:], dtype=np.bool_)
+        exclude[6:9, 6:9] = True
+        cache = CalculatorCache(image, exclude=exclude)
+
+        assert cache.image.dtype == np.float64
+        assert np.isnan(cache.image[:, 6:9, 6:9]).all()
+        assert not np.isnan(cache.image[:, 0:6, 0:6]).any()
+
+    def test_the_slice_is_never_written_through(self):
+        """Every statistic reads the view; none may reach back into the caller's array."""
+        image = self._image()
+        original = image.copy()
+        compute_stats(
+            [image],
+            stats=ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.DIMENSION | ImageStats.HASH,
+            boxes=[[(4, 5, 20, 18)]],
+            per_image=True,
+            per_target=True,
+            per_background=True,
+            normalize_pixel_values=False,
+        )
+        np.testing.assert_array_equal(image, original)
+
+    def test_xxhash_does_not_move_with_the_view_s_dtype(self):
+        """A digest of the raw bytes must not depend on whether the window needed padding."""
+        image = self._image()
+        result = compute_stats(
+            [image],
+            stats=ImageStats.HASH_XXHASH,
+            boxes=[[(0, 0, 32, 24)]],
+            per_image=True,
+            per_target=True,
+            normalize_pixel_values=False,
+        )["stats"]["xxhash"]
+
+        # The box spans the whole image: one row took the slice, the other the rebuild.
+        assert result[0] == result[1]
+
+
+@pytest.mark.required
+class TestCountedPercentiles:
+    """Percentiles of an 8-bit view are counted rather than sorted, and must not drift for it."""
+
+    @pytest.mark.parametrize("n", [1, 2, 3, 7, 10, 99, 256, 1000])
+    @pytest.mark.parametrize("spread", ["uniform", "constant", "two_values", "extremes"])
+    def test_matches_numpy_exactly(self, n, spread):
+        rng = np.random.default_rng(n)
+        if spread == "uniform":
+            values = rng.integers(0, 256, n, dtype=np.uint8)
+        elif spread == "constant":
+            values = np.full(n, 137, dtype=np.uint8)
+        elif spread == "two_values":
+            values = rng.choice(np.array([3, 251], dtype=np.uint8), n)
+        else:
+            values = rng.choice(np.array([0, 255], dtype=np.uint8), n)
+
+        np.testing.assert_array_equal(
+            _percentiles_by_count(np.bincount(values, minlength=256), QUARTILES),
+            np.percentile(values, q=QUARTILES).astype(np.float64),
+        )
+
+    def test_interpolates_between_neighbours_like_numpy(self):
+        """The quartiles of four values all land off a whole index, so nothing is read directly."""
+        values = np.array([10, 20, 30, 41], dtype=np.uint8)
+
+        np.testing.assert_array_equal(
+            _percentiles_by_count(np.bincount(values, minlength=256), QUARTILES),
+            np.array([10.0, 17.5, 25.0, 32.75, 41.0]),
+        )
+
+    def test_a_masked_view_is_counted_around_its_holes(self):
+        """A background view is float64 with a hole where each box was; the counts skip them."""
+        image = (np.random.default_rng(1).random((3, 12, 16)) * 255).astype(np.uint8)
+        exclude = np.zeros(image.shape[-2:], dtype=np.bool_)
+        exclude[2:5, 2:5] = True
+        calculator = VisualStatCalculator(image, CalculatorCache(image, exclude=exclude))
+
+        expected = np.nanpercentile(calculator.cache.perceptual, q=QUARTILES).astype(np.float64)
+        np.testing.assert_array_equal(calculator.percentiles, expected)
+
+    def test_a_float_view_still_takes_the_sorted_path(self):
+        """Only 8-bit pixels fall into 256 bins; anything else must still be partitioned."""
+        image = np.linspace(0.0, 255.0, 3 * 12 * 16, dtype=np.float64).reshape(3, 12, 16)
+        cache = CalculatorCache(image)
+
+        assert cache.display_counts is None
+        np.testing.assert_array_equal(
+            VisualStatCalculator(image, cache).percentiles,
+            np.nanpercentile(cache.perceptual, q=QUARTILES).astype(np.float64),
+        )
+
+
+@pytest.mark.required
+class TestDisplayCounts:
+    """The counts stand in for the perceptual view, so they must agree with it exactly."""
+
+    @staticmethod
+    def _exclude(shape: tuple[int, ...]) -> NDArray[np.bool_]:
+        exclude = np.zeros(shape[-2:], dtype=np.bool_)
+        exclude[3:7, 5:11] = True
+        return exclude
+
+    @pytest.mark.parametrize("masked", [False, True], ids=["whole", "background"])
+    def test_they_count_exactly_what_the_perceptual_view_holds(self, masked):
+        image = (np.random.default_rng(3).random((3, 12, 16)) * 255).astype(np.uint8)
+        exclude = self._exclude(image.shape) if masked else None
+        cache = CalculatorCache(image, exclude=exclude)
+
+        counts = cache.display_counts
+        assert counts is not None
+        for band, band_counts in zip(np.asarray(cache.perceptual, dtype=np.float64), counts, strict=True):
+            measured = band[~np.isnan(band)].astype(np.uint8)
+            np.testing.assert_array_equal(band_counts, np.bincount(measured, minlength=256))
+
+    def test_they_follow_the_bands_the_view_was_narrowed_to(self):
+        image = (np.random.default_rng(4).random((4, 12, 16)) * 255).astype(np.uint8)
+        cache = CalculatorCache(image, bands=(1, 3))
+
+        counts = cache.display_counts
+        assert counts is not None
+        assert counts.shape == (2, 256)
+        np.testing.assert_array_equal(counts[0], np.bincount(image[1].ravel(), minlength=256))
+        np.testing.assert_array_equal(counts[1], np.bincount(image[3].ravel(), minlength=256))
+
+    @pytest.mark.parametrize(
+        ("kwargs", "reason"),
+        [
+            ({"box": BoundingBox(-2, 0, 10, 10, image_shape=(3, 12, 16))}, "padded"),
+            ({"bands": (0, 9)}, "unsupplied_band"),
+        ],
+    )
+    def test_no_counts_where_the_view_is_not_the_datum_s_own_pixels(self, kwargs, reason):
+        image = (np.random.default_rng(5).random((3, 12, 16)) * 255).astype(np.uint8)
+        assert CalculatorCache(image, **kwargs).display_counts is None
+
+    def test_no_counts_where_perceptual_would_have_to_rescale(self):
+        """A 16-bit datum is not read on the display range without being moved onto it."""
+        image = (np.random.default_rng(6).random((3, 12, 16)) * 65535).astype(np.uint16)
+        cache = CalculatorCache(image)
+
+        assert cache.perceptual is not cache.image
+        assert cache.display_counts is None
+
+    def test_counts_and_the_identity_path_agree_on_when_they_apply(self):
+        """`display_counts` restates `perceptual`'s identity condition; they must not drift."""
+        for image in (
+            (np.random.default_rng(7).random((3, 12, 16)) * 255).astype(np.uint8),
+            (np.random.default_rng(7).random((3, 12, 16)) * 65535).astype(np.uint16),
+            np.random.default_rng(7).random((3, 12, 16)),
+            np.linspace(0.0, 255.0, 3 * 12 * 16, dtype=np.float64).reshape(3, 12, 16),
+        ):
+            cache = CalculatorCache(image)
+            counted = cache.display_counts is not None
+            identity = cache.perceptual is cache.image and cache.image.dtype == np.uint8
+            assert counted == identity, f"{image.dtype} counted={counted} identity={identity}"
+
+
+@pytest.mark.required
+class TestDisplayGrayscale:
+    """Sharpness reads the bands averaged down; it must not matter that they were never promoted."""
+
+    @staticmethod
+    def _expected(cache: CalculatorCache) -> NDArray[np.float64]:
+        """What ``np.mean(perceptual, axis=0)`` gives, which is what this replaced."""
+        return np.mean(np.asarray(cache.perceptual, dtype=np.float64), axis=0)
+
+    @pytest.mark.parametrize("bands", [1, 3, 4, 300])
+    @pytest.mark.parametrize("masked", [False, True], ids=["whole", "background"])
+    def test_it_matches_averaging_the_perceptual_view(self, bands, masked):
+        image = (np.random.default_rng(bands).random((bands, 9, 11)) * 255).astype(np.uint8)
+        exclude = None
+        if masked:
+            exclude = np.zeros(image.shape[-2:], dtype=np.bool_)
+            exclude[2:5, 3:7] = True
+        cache = CalculatorCache(image, exclude=exclude)
+
+        grayscale = cache.display_grayscale
+        assert grayscale is not None
+        np.testing.assert_array_equal(grayscale, self._expected(cache))
+
+    def test_an_interior_box_matches_too(self):
+        image = (np.random.default_rng(9).random((3, 12, 16)) * 255).astype(np.uint8)
+        cache = CalculatorCache(image, box=BoundingBox(2, 3, 11, 9, image_shape=image.shape))
+
+        grayscale = cache.display_grayscale
+        assert grayscale is not None
+        np.testing.assert_array_equal(grayscale, self._expected(cache))
+
+    def test_a_fully_masked_view_averages_to_nothing(self):
+        image = (np.random.default_rng(10).random((3, 9, 11)) * 255).astype(np.uint8)
+        cache = CalculatorCache(image, exclude=np.ones(image.shape[-2:], dtype=np.bool_))
+
+        grayscale = cache.display_grayscale
+        assert grayscale is not None
+        assert np.isnan(grayscale).all()
+
+    @pytest.mark.parametrize(
+        "image",
+        [
+            np.linspace(0.0, 255.0, 3 * 9 * 11, dtype=np.float64).reshape(3, 9, 11),
+            (np.random.default_rng(11).random((3, 9, 11)) * 65535).astype(np.uint16),
+        ],
+        ids=["float64", "uint16"],
+    )
+    def test_no_grayscale_where_the_view_is_not_the_datum_s_own_display_pixels(self, image):
+        assert CalculatorCache(image).display_grayscale is None
+
+    def test_sharpness_is_the_same_number_either_way(self):
+        """The two paths through `_sharpness` must not disagree about one image."""
+        image = (np.random.default_rng(12).random((3, 20, 24)) * 255).astype(np.uint8)
+        exclude = np.zeros(image.shape[-2:], dtype=np.bool_)
+        exclude[4:9, 6:13] = True
+
+        for cache in (CalculatorCache(image), CalculatorCache(image, exclude=exclude)):
+            calculator = VisualStatCalculator(image, cache)
+            expected = float(np.nanstd(edge_filter(self._expected(cache))))
+            assert calculator._sharpness() == [expected]
+
+
+@pytest.mark.required
+class TestFullyMeasured:
+    """The plain reductions are only licensed where nothing could be absent."""
+
+    @staticmethod
+    def _image() -> NDArray[np.uint8]:
+        return (np.random.default_rng(13).random((3, 12, 16)) * 255).astype(np.uint8)
+
+    def test_an_unmasked_integer_window_is_fully_measured(self):
+        assert CalculatorCache(self._image()).is_fully_measured
+
+    def test_a_masked_window_is_not(self):
+        image = self._image()
+        exclude = np.zeros(image.shape[-2:], dtype=np.bool_)
+        exclude[2:4, 2:4] = True
+        assert not CalculatorCache(image, exclude=exclude).is_fully_measured
+
+    def test_a_padded_window_is_not(self):
+        image = self._image()
+        box = BoundingBox(-4, 0, 8, 8, image_shape=image.shape)
+        assert not CalculatorCache(image, box=box).is_fully_measured
+
+    def test_a_float_datum_is_not_claimed_either_way(self):
+        """It may well hold no NaN; this makes no claim about views it cannot answer for."""
+        assert not CalculatorCache(np.random.default_rng(14).random((3, 12, 16))).is_fully_measured
+
+
+@pytest.mark.required
+class TestAllNanFromTheMask:
+    """An integer window brings no NaN, so `exclude` is the only thing that can empty it."""
+
+    @staticmethod
+    def _image() -> NDArray[np.uint8]:
+        return (np.random.default_rng(8).random((3, 12, 16)) * 255).astype(np.uint8)
+
+    def test_a_partly_masked_view_is_not_all_nan(self):
+        image = self._image()
+        exclude = np.zeros(image.shape[-2:], dtype=np.bool_)
+        exclude[2:5, 2:5] = True
+        assert not CalculatorCache(image, exclude=exclude).is_all_nan
+
+    def test_a_fully_masked_view_is_all_nan(self):
+        image = self._image()
+        cache = CalculatorCache(image, exclude=np.ones(image.shape[-2:], dtype=np.bool_))
+
+        assert cache.is_all_nan
+        assert np.isnan(cache.image).all()
+
+    def test_an_unmasked_view_is_not_all_nan(self):
+        assert not CalculatorCache(self._image()).is_all_nan
+
+    def test_a_box_wholly_outside_the_image_is_still_all_nan(self):
+        image = self._image()
+        box = BoundingBox(40, 40, 50, 50, image_shape=image.shape)
+        assert CalculatorCache(image, box=box).is_all_nan

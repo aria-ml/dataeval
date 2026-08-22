@@ -25,9 +25,13 @@ class PixelStatCalculator(Calculator[ImageStats]):
     @cached_property
     def _has_nan(self) -> bool:
         """Check once whether the scaled data contains any NaN values."""
-        if self.per_channel_mode:
-            return bool(np.isnan(self.cache.per_channel).any())
-        return bool(np.isnan(self.cache.scaled).any())
+        values = self.cache.per_channel if self.per_channel_mode else self.cache.scaled
+        if not np.issubdtype(values.dtype, np.inexact):
+            # Integer pixels carry no NaN, so every reduction below can take its fast path
+            # without the scan. Reachable whenever the view is an in-bounds window of an
+            # integer image and `normalize_pixel_values` left it in its own dtype.
+            return False
+        return bool(np.isnan(values).any())
 
     def _mean_func(self, data: NDArray[Any], **kw: Any) -> Any:
         """Use fast .mean() when no NaN, fall back to nanmean."""
