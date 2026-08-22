@@ -22,12 +22,12 @@
 #
 # Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 #
-# Relevant personas: Data Engineer, Data Scientist
+# Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [Data Scientist](../getting-started/roles/data_scientist.md)
 
 # %% [markdown]
 # ## What you'll do
 #
-# - Construct [embeddings](../concepts/Embeddings.md) by inferencing the PASCAL VOC 2012 through a model
+# - Construct [embeddings](../concepts/Embeddings.md) by inferencing the PASCAL VOC 2012 dataset through a model
 # - Analyze clustered embeddings to find
 #   [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings)
 # - Run additional analysis to find gaps in data
@@ -48,7 +48,7 @@
 # ## Background
 #
 # Before building predictive models, it's essential to identify outliers and ensure that data groups accurately reflect
-# the underlying distribution. When labels are unavailable do to things like unsupervised learning, initial data curation,
+# the underlying distribution. When labels are unavailable due to things like unsupervised learning, initial data curation,
 # or expensive annotations, analysis can still be done on the images alone. We do this by considering images to be
 # geometric points in a high-dimensional abstract space called _feature space_. By understanding how the data examples are
 # distributed in feature space, you will become able to make the assessments you need.
@@ -61,17 +61,18 @@
 # These techniques are critical for evaluating the quality and representativeness of your data, helping to avoid biases
 # and missing information or overfitting issues in your models. By understanding the space your data occupies and how it
 # groups, you can build more robust and reliable models that generalize well in real-world applications.
-#
+
+# %% [markdown]
 # ## Setup
 #
-# You'll begin by importing the necessary libraries for this tutorial.
+# First import the required libraries needed to set up the example.
 
 # %% tags=["remove_cell"]
 try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval maite-datasets
+    # %pip install -q dataeval dataeval-plots[plotly] maite-datasets
 except Exception:
     pass
 
@@ -109,7 +110,6 @@ set_max_processes(4)
 # available, this notebook will use that hardware rather than the CPU. To force running only on the CPU, change `device`
 # to `"cpu"` For more information, see the
 # [PyTorch device page](https://pytorch.org/tutorials/recipes/recipes/changing_default_device.html).
-#
 # :::
 
 # %% [markdown]
@@ -120,15 +120,15 @@ set_max_processes(4)
 #
 # ### Download VOC dataset
 #
-# Download the train split with `VOCDetection` from `maite_datasets` — 5717 images with a varying number of targets each.
+# Download train split with `VOCDetection` from `maite_datasets` — 5717 images with a varying number of targets each.
 # You can also run this tutorial with your own MAITE-compliant dataset.
 
 # %%
 # Load the training dataset
-dataset = VOCDetection(root="./data", year="2012", image_set="train", download=True)
+dataset = VOCDetection(root="./data", image_set="train", year="2012", download=True)
 
-print(dataset)
-print(dataset[0][0].shape)
+print(f"Images: {len(dataset)}")
+print(f"Image shape: {dataset[0][0].shape}")
 
 # %% [markdown]
 # ### Extract embeddings
@@ -139,8 +139,8 @@ print(dataset[0][0].shape)
 # pooled features down to 128 dimensions, wrap it in a {class}`.TorchExtractor`, and run the dataset through
 # {class}`.Embeddings`, which applies the model's standard resize-and-normalize preprocessing for you.
 #
-# > For other ways to build embeddings, see [Encode images with an ONNX model](h2_encode_with_onnx.py) (a
-# > framework-agnostic ONNX extractor) and [Embed object detection crops](h2_embed_detection_crops.py) (one embedding
+# > For other ways to build embeddings, see [Encode images with an ONNX model](./h2_encode_with_onnx.py) (a
+# > framework-agnostic ONNX extractor) and [Embed object detection crops](./h2_embed_detection_crops.py) (one embedding
 # > per object box).
 
 # %%
@@ -152,13 +152,12 @@ embeddings = Embeddings(dataset=dataset, extractor=extractor, batch_size=64)[:]
 print("embedding shape:", embeddings.shape)
 
 # %% [markdown]
-# Each of the 5717 images is now a single 128-dimensional feature vector rather than a full-resolution image, which
+# Each image is now a single 128-dimensional feature vector rather than a full-resolution image, which
 # greatly speeds up the algorithms below without impacting the accuracy of the results.
 
 # %% [markdown]
 # ## Cluster the embeddings
-
-# %% [markdown]
+#
 # In this section, you will use the embeddings you generated to create clusters. A cluster is a group of images that have
 # similar characteristics. Based on this information, images can be found that are either too similar or too dissimilar.
 # Both cases can lead to performance degradation of downstream tasks such as data analysis or model training.
@@ -231,7 +230,7 @@ output = cluster(normalized_embs)
 # Let's see how many images were flagged by using the `Outliers` detector.
 
 # %%
-# Use the new Outliers.from_clusters() method
+# Use the Outliers.from_clusters() method
 detector = Outliers()
 result = detector.from_clusters(normalized_embs, output, cluster_threshold=3.0)
 
@@ -248,7 +247,7 @@ print(f"Number of outliers: {len(outliers)}")
 print(f"Percent of outliers: {(100 * len(outliers) / len(dataset)):.2f}%")
 
 # %% [markdown]
-# #### Questions
+# ### Outlier inspection questions
 #
 # When looking at these images, you want to think about the following questions:
 #
@@ -257,8 +256,8 @@ print(f"Percent of outliers: {(100 * len(outliers) / len(dataset)):.2f}%")
 # - Is there commonality to the backgrounds of the images?
 # - Is there commonality to the class of objects in the images?
 #
-# Asking these questions will help you notice things like all objects being located on the leftside of the image or all
-# the images of a specific class have a specific background. Training a model with data that has commonalities can cause
+# Asking these questions will help you notice things like all objects being located on the left side of the image or all
+# the images of a specific class having a specific background. Training a model with data that has commonalities can cause
 # your model to develop biases or limit your model's ability to generalize to non-training data.
 #
 # You are free to choose which set of images you would like to examine. Take a moment to swap out the different indices
@@ -270,7 +269,7 @@ print(f"Percent of outliers: {(100 * len(outliers) / len(dataset)):.2f}%")
 indices = outliers
 
 # To use unflagged images, uncomment the line below
-# indices = list(set(range(len(dataset))) - set(outliers)
+# indices = list(set(range(len(dataset))) - set(outliers))
 
 # %% [markdown]
 # Now visualize your chosen set of indices.
@@ -297,15 +296,15 @@ dep.plot(
 # cleaning step:
 #
 # 1. Are there unexpected artifacts in the image?
-#    - **Examples**: Data collection, processing, and visualization can cause discoloration, blurriness, etc
+#    - **Examples**: Data collection, processing, and visualization can cause discoloration, blurriness, etc.
 #    - **Solution**: Ensure images are normalized with the right values, channel order is correct, color scheme is
 #      consistent
-#    - See our in-depth [Data Cleaning](./tt_clean_dataset.py) tutorial to explore these types of outliers
-# 1. Do you have enough data?
-#    - **Examples**: Less data points in each cluster can lead to higher deviation and more outliers
+#    - See our in-depth [Data Cleaning Guide](./tt_clean_dataset.py) to explore these types of outliers
+# 2. Do you have enough data?
+#    - **Examples**: Fewer data points in each cluster can lead to higher deviation and more outliers
 #    - **Solution**: Adding more data can help make the clusters more robust to the variations in images
-# 1. Do the images provide useful information?
-#    - **Examples**: Image attributes like number of duplicates, pixel intensity, etc can cause the clusterer to become
+# 3. Do the images provide useful information?
+#    - **Examples**: Image attributes like number of duplicates, pixel intensity, etc. can cause the clusterer to become
 #      biased to the wrong information
 #    - **Solution**: Determine if the data represents the whole operational distribution
 #    - This solution will be explored in the following section
@@ -323,10 +322,11 @@ dep.plot(
 #
 # One way to determine if an image is relevant even when the total distribution considers it an outlier is to measure its
 # coverage.
-#
+
+# %% [markdown]
 # ## Measure image coverage
 #
-# {term}`Coverage` is the measurement of the representation of an image's variations in a feature's space. When an image
+# {term}`Coverage` is the measurement of the representation of an image's variations in a feature space. When an image
 # does not have enough variations, it is _underrepresented_. In this section, you will test for any gaps in the coverage
 # of the dataset to find underrepresented images.
 #
@@ -334,7 +334,7 @@ dep.plot(
 #
 # The {func}`.coverage_adaptive` function will return a list of image indices that it finds to be underrepresented. This means it
 # does not have enough similar images around it. This should sound familiar as outliers have a very similar situation.
-# However, underrepresented images should be handled different than outliers. More on this in the next section.
+# However, underrepresented images should be handled differently than outliers. More on this in the next section.
 
 # %%
 cov = coverage_adaptive(normalized_embs, 50, 0.01)
@@ -372,38 +372,31 @@ print(f"Number of outliers found as uncovered images: {len(uncovered_outliers)}"
 #
 # Outliers can be handled by additional sampling but typically are removed as they either do not contain enough relevant
 # information or would cause a shift in the underlying distribution if similar items were added.
-#
+
+# %% [markdown]
 # ## Conclusion
 #
 # In this tutorial you have learned to create image embeddings for more efficient calculations, to use cluster based
-# algorithms to find outliers, to check for gaps in coverage, and to make decisions on possible solutions.
+# algorithms to find outliers, to check for gaps in coverage on PASCAL VOC imagery, and to make decisions on possible solutions.
 #
-# Good luck with your data!
+# ## What you learned
+#
+# - Applied cluster-based feature space metrics ({func}`.cluster`, {class}`.Outliers`, {func}`.coverage_adaptive`) to evaluate unlabeled imagery.
+# - Differentiated between corrupt/irrelevant outliers (candidates for pruning) and underrepresented operational edge cases (candidates for targeted collection).
+# - Combined density and coverage metrics to prioritize dataset enrichment.
 
 # %% [markdown]
-# ## What's next
+# ## Next steps
 #
-# In addition to exploring a dataset in its feature space, DataEval offers additional tutorials on exploratory data
-# analysis:
-#
-# - Clean a dataset with the labels in the [Data Cleaning Guide](./tt_clean_dataset.py)
-# - [Identify Bias and Correlations](./tt_identify_bias.py) in your metadata
-#
-# Explore deeper explanations on topics such as [clustering](../concepts/Clustering.md),
-# [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space), and
-# [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings) in the
-# [Concept pages](../concepts/index.md).
-
-# %% [markdown]
-# ## Related how-to guides
-#
-# Apply data space assessment to your own data with these focused, task-oriented guides:
-#
-# - [Encode image embeddings with an ONNX model](../notebooks/h2_encode_with_onnx.py)
-# - [Identify outliers and anomalies with clustering](../notebooks/h2_cluster_analysis.py)
-# - [Detect undersampled subsets of datasets](../notebooks/h2_detect_undersampling.py)
-# - [Display data distributions between two datasets](../notebooks/h2_measure_divergence.py)
-# - [Apply statistical outputs as intrinsic metadata factors](../notebooks/h2_add_intrinsic_factors.py)
+# - [Clustering Concept Page](../concepts/Clustering.md) — Mathematical foundations of minimum spanning tree linkage clustering.
+# - [Dataset Bias and Coverage Concept Page](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Deep dive into coverage geometry and feature space density.
+# - [Clean a dataset with labels](./tt_clean_dataset.py) — Tutorial on identifying label noise and corrupt samples.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Tutorial measuring mutual information and factor balance.
+# - [Encode image embeddings with an ONNX model](./h2_encode_with_onnx.py) — How-to guide on framework-agnostic ONNX extractor workflows.
+# - [Identify outliers and anomalies with clustering](./h2_cluster_analysis.py) — How-to guide on clustering workflows.
+# - [Detect undersampled subsets of datasets](./h2_detect_undersampling.py) — How-to guide on locating low-density data clusters.
+# - [Display data distributions between two datasets](./h2_measure_divergence.py) — How-to guide on distribution divergence.
+# - [Apply statistical outputs as intrinsic metadata factors](./h2_add_intrinsic_factors.py) — How-to guide on metadata factor extraction.
 
 # %% [markdown]
 # ## On your own

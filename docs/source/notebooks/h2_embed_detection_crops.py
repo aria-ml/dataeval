@@ -15,6 +15,9 @@
 
 # %% [markdown]
 # # Embed object detection crops and visualize class clusters
+
+# %% [markdown]
+# ## Problem Statement
 #
 # DataEval's embedding-based tools — {class}`.Coverage`, {func}`.ber_mst`,
 # {class}`.Balance` — assume **one embedding per label**, which is the image-classification
@@ -31,12 +34,16 @@
 # [Performance Limits](../concepts/PerformanceLimits.md)) and embedding-space coverage.
 #
 # Estimated time to complete: 10 minutes
-
-# %% [markdown]
-# ## What you'll need
+#
+# ### What you will need
 #
 # - A Python environment with `dataeval`, `dataeval-plots`, `maite-datasets`, and
 #   `torchvision` installed.
+
+# %% [markdown]
+# ## Getting started
+#
+# Let's import the required libraries needed to set up a minimal working example
 
 # %% tags=["remove_cell"]
 try:
@@ -67,7 +74,7 @@ dep.set_default_backend("plotly")
 pio.renderers.default = "notebook"  # embed the plotly JS in the notebook output
 
 # %% [markdown]
-# ## 1. Load an object detection dataset
+# ## Load an object detection dataset
 #
 # Download the PASCAL VOC 2012 training split with `VOCDetection` from `maite_datasets`. Each image
 # carries a variable number of object detections, each with a bounding box and a class.
@@ -77,7 +84,7 @@ ds = VOCDetection(root="./data", year="2012", image_set="train", download=True)
 print(ds)
 
 # %% [markdown]
-# ## 2. Focus on a few classes
+# ## Focus on a few classes
 #
 # VOC has 20 classes; coloring every crop of all of them at once is hard to read. Pick a
 # handful of visually distinct classes and keep only their detections with
@@ -96,7 +103,7 @@ focused = View(ds, [ClassFilter(focus_indices)])
 print(f"{len(focused)} images contain at least one of {focus_classes}")
 
 # %% [markdown]
-# ## 3. Wrap the boxes as a classification dataset
+# ## Wrap the boxes as a classification dataset
 #
 # {class}`.DetectionCrops` turns each kept detection into one classification datum — the
 # cropped box region, labeled with the detection's class. The result satisfies the
@@ -113,7 +120,7 @@ crops = DetectionCrops(focused)
 print(f"crops (one per detection): {len(crops)}  |  dropped (too small): {crops.n_dropped}")
 
 # %% [markdown]
-# ## 4. Extract an embedding per crop
+# ## Extract an embedding per crop
 #
 # Embed every crop with a
 # [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html).
@@ -147,7 +154,7 @@ metadata = Metadata(crops)
 print("labels:", len(metadata.class_labels), "| embeddings:", len(embeddings))
 
 # %% [markdown]
-# ## 5. Visualize the class clusters
+# ## Visualize the class clusters
 #
 # Project the 512-dimensional crop embeddings down to 2D and color each point by its class.
 # t-SNE groups visually similar crops together, so well-separated classes form distinct
@@ -175,33 +182,15 @@ assert set(np.unique(metadata.class_labels)).issubset(set(focus_indices))  # onl
 # different view of the same embeddings.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Embeddings](../concepts/Embeddings.md) — the feature vectors this guide extracts per
-#   crop and what the tools below consume.
-# - [Performance Limits](../concepts/PerformanceLimits.md) — the detection-feasibility view
-#   that the overlap between class clusters foreshadows.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — measuring how the crop
-#   embeddings fill (or leave gaps in) the feature space.
-# - [Clustering](../concepts/Clustering.md) — how DataEval groups embeddings, the formal
-#   counterpart to the clusters you eyeball here.
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) —
-#   put these crop embeddings through BER to bound achievable detection accuracy.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — find classes
-#   or regions thin on coverage in the same embedding space.
-# - [How to run clustering analysis](./h2_cluster_analysis.py) — cluster crop embeddings to
-#   surface outliers and duplicates.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py)
-#   — other tooling that works directly on object detection datasets.
-# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — an alternative to
-#   `TorchExtractor` for producing the embeddings.
-#
-# ### Tutorials
-#
-# - [Assess an unlabeled data space](./tt_assess_data_space.py) — embed, project, and reason
-#   about a dataset end to end.
+# - [Embeddings](../concepts/Embeddings.md) — Feature vectors extracted per crop for evaluation and analysis.
+# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand classification feasibility and bounding detection performance.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Measure feature space coverage and identify gaps across crop embeddings.
+# - [Clustering](../concepts/Clustering.md) — Learn how DataEval groups embeddings to surface data structure.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Embed, project, and reason about a dataset end to end.
+# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Put crop embeddings through BER to bound achievable classification accuracy.
+# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find classes or regions thin on coverage in embedding space.
+# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster crop embeddings to surface outliers and sub-groupings.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Compute custom bounding box and object statistics.
+# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — Use ONNX runtime models as an alternative extractor for embeddings.

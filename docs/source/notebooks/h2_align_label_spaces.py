@@ -45,7 +45,7 @@
 #   done
 #
 # Aligning a *structureless* source — a bare list of class names — against the
-# target is exactly label [reconciliation](h2_reconcile_labels_ontology.py)
+# target is exactly label [reconciliation](./h2_reconcile_labels_ontology.py)
 # ({func}`.label_reconciliation`) plus structural inference; `label_alignment`
 # generalizes it.
 
@@ -57,6 +57,11 @@
 # 1. Nothing else for the exact/structural core — it has no extra dependencies. The
 #    optional fuzzy-matching recipe in section 4 uses `rapidfuzz`
 #    (`pip install rapidfuzz`).
+
+# %% [markdown]
+# ## Getting started
+#
+# First import the required libraries needed to set up the example.
 
 # %% tags=["remove_cell"]
 try:
@@ -72,7 +77,7 @@ from dataeval import Ontology
 from dataeval.core import label_alignment
 
 # %% [markdown]
-# ## 1. A reference vocabulary
+# ## A reference vocabulary
 #
 # Alignment maps a source onto a *target* — the reference vocabulary everything is
 # expressed in. Here is a small two-level reference taxonomy, built dependency-free
@@ -86,7 +91,7 @@ reference = Ontology.from_hierarchy({
 print(reference)
 
 # %% [markdown]
-# ## 2. Align a list of class names
+# ## Align a list of class names
 #
 # The simplest source is another dataset's class names. Pass them to {func}`.label_alignment`
 # with the reference. The result is a {class}`.LabelAlignmentResult` `TypedDict`.
@@ -128,7 +133,7 @@ rec = label_reconciliation(["sedan", "truck", "spaceship"], reference)
 print("reconciliation matched:", dict(rec["matched"]))
 
 # %% [markdown]
-# ## 3. Reasoning across granularity
+# ## Reasoning across granularity
 #
 # The point of carrying a *relation* on each correspondence is that the relation,
 # not just the pairing, says what the data permits. The asymmetry between coarsening
@@ -171,7 +176,7 @@ print("class_remap:", dict(result["class_remap"]), "| mergeability:", result["me
 # expressible. (A source is *lossless* only when its `class_remap` is injective.)
 
 # %% [markdown]
-# ## 4. Bring your own matcher: fuzzy name matching
+# ## Bring your own matcher: fuzzy name matching
 #
 # Exact matching anchors on labels, synonyms, and ids; typos and word-order
 # variants slip past it. The `matchers=` argument is the **extension seam**: any
@@ -251,7 +256,7 @@ print("unaligned_source:", fuzzy["unaligned_source"])
 # change to `label_alignment`.
 
 # %% [markdown]
-# ## 5. Aligning more than two sources
+# ## Aligning more than two sources
 #
 # To relate *several* sources, align each one to a single shared **reference
 # (pivot)** vocabulary rather than every pair. Correspondences between sources are
@@ -283,12 +288,9 @@ for name, labels in sources.items():
 #   common label space.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Ontology](../concepts/Ontology.md) — the taxonomic model alignment operates on
-#   and the reconciliation it generalizes, plus the [alignment
-#   theory](../concepts/Ontology.md#alignment-relating-two-vocabularies):
-#   correspondences, relations, matchers, mergeability, and the common cut.
-# - [Distribution Shift](../concepts/DistributionShift.md) and
-#   [Divergence](../concepts/Divergence.md) — the distributional differences between
-#   sources that remain *after* their label spaces are aligned.
+# - [Ontology](../concepts/Ontology.md) — Learn about the taxonomic model, correspondences, relations, matchers, and mergeability.
+# - [Distribution Shift](../concepts/DistributionShift.md) — Understand distributional differences between sources that remain after label alignment.
+# - [Divergence](../concepts/Divergence.md) — Measure distribution differences across aligned dataset label spaces.
+# - [How to reconcile label spaces with an ontology](./h2_reconcile_labels_ontology.py) — Reconcile structureless label lists against a reference ontology.

@@ -22,7 +22,7 @@
 #
 # Relevant ML stages: [Monitoring](../getting-started/roles/ML_Lifecycle.md#monitoring)
 #
-# Relevant personas: Machine Learning Engineer, T&E Engineer
+# Relevant personas: [ML Engineer](../getting-started/roles/ml_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 #
 # ## What you'll do
 #
@@ -151,7 +151,7 @@ print(f"Image 0 shape: {operational_ds[0][0].shape}")
 # > entire scene rather than only the four classes you kept. Keep this in mind whenever you monitor embeddings: the
 # > vector reflects everything the camera saw, not just what you labeled.
 #
-# > For other ways to reshape a dataset in place, see [Build dataset views](h2_build_dataset_views.py).
+# > For other ways to reshape a dataset in place, see [Build dataset views](./h2_build_dataset_views.py).
 
 # %%
 # The indoor concepts this deployment monitors
@@ -176,8 +176,8 @@ print(f"vocabulary:  {train_view.metadata.get('index2label')}")
 # 1000-class logits) and run each split through {class}`.Embeddings`, which applies the model's standard
 # resize-and-normalize preprocessing for you. Keeping the `transforms` in a variable lets you reuse them further down.
 #
-# > For other ways to build embeddings, see [Encode images with an ONNX model](h2_encode_with_onnx.py) (a
-# > framework-agnostic ONNX extractor) and [Embed object detection crops](h2_embed_detection_crops.py) (one embedding
+# > For other ways to build embeddings, see [Encode images with an ONNX model](./h2_encode_with_onnx.py) (a
+# > framework-agnostic ONNX extractor) and [Embed object detection crops](./h2_embed_detection_crops.py) (one embedding
 # > per object box).
 
 # %%
@@ -567,28 +567,16 @@ assert poor_parity_p_value < 0.01, f"contrived poor-parity set no longer trips t
 # good idea to consider retraining the model and incorporating operational data into the dataset.
 
 # %% [markdown]
-# ## What's next
+# ## Next steps
 #
-# DataEval plays a small, but impactful role in data monitoring as a metrics library.\
-# Visit these additional resources for more information on other aspects:
-#
-# - Increase your understanding of the types of [data shifts](../concepts/DistributionShift.md) that occur during
-#   monitoring
-# - Read about the entire [monitoring in AI/ML](../getting-started/roles/ML_Lifecycle.md#monitoring) stage
-# - Explore DataEval's [API reference](../reference/autoapi/dataeval/index.rst) for drift and other monitoring tools
-# - Learn about [identifying out-of-distribution samples](./tt_identify_ood_samples.py)
-#
-# To learn more about setting a global seed in DataEval, see the
-# [configuration defaults how-to](../notebooks/h2_configure_defaults.py).
-
-# %% [markdown]
-# ## Related how-to guides
-#
-# Apply drift monitoring to your own data with these focused, task-oriented guides:
-#
-# - [Display data distributions between two datasets](../notebooks/h2_measure_divergence.py)
-# - [Compare label distributions between two datasets](../notebooks/h2_measure_label_independence.py)
-# - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+# - [Distribution shift concepts](../concepts/DistributionShift.md) — Read about covariate shift, concept drift, and label parity in deployed ML models.
+# - [Identify out-of-distribution samples tutorial](./tt_identify_ood_samples.py) — Detect anomalous and out-of-distribution samples using autoencoders and k-NN.
+# - [Display data distributions](./h2_measure_divergence.py) — Measure statistical divergence and plot distribution overlays between reference and target datasets.
+# - [Compare label distributions](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
+# - [Configure global DataEval defaults](./h2_configure_defaults.py) — Set global default configuration parameters like batch size and execution device.
+# - [Build dataset views](./h2_build_dataset_views.py) — Filter, reshape, and transform datasets without copying underlying media files.
+# - [Encode with an ONNX model](./h2_encode_with_onnx.py) — Extract image embeddings and predictions using an ONNX runtime inference session.
+# - [Embed object detection crops](./h2_embed_detection_crops.py) — Extract feature embeddings for individual bounding box targets in detection datasets.
 
 # %% [markdown]
 # ## On your own

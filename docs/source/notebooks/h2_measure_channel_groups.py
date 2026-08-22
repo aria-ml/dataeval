@@ -181,7 +181,7 @@ for name, values in sorted(grouped["stats"].items()):
 # %% [markdown]
 # Each group is now measured against its own range, which is what the prefixed columns buy you:
 #
-# - `rgb_depth` is 8 and `nir_depth` is 12. Both are true, of different bands of one image.
+# - `rgb_depth` is 8 and `nir_depth` is 12. Both ranges are correct and apply to different bands of one image.
 # - `rgb_mean` is back in visible-light units, and is directly comparable against any other 8-bit imagery you have.
 # - `rgb_brightness` is a real perceptual reading, because it is anchored on the visible bands' own scale rather than
 #   on the container's.
@@ -247,7 +247,7 @@ print(
 #
 # This is the reason band groups are columns rather than rows. The older `per_channel=True` returns one row per
 # channel, on a third axis of the source index. A source index addresses an item and a target, with no level for a
-# channel to land on, so per-channel statistics reach the factor layer not at all. `per_channel` is
+# channel to land on, so per-channel statistics can not reach the factor layer at all. `per_channel` is
 # deprecated for this reason; `channels` is its replacement, and for plain RGB the migration is
 # `channels={"r": 0, "g": 1, "b": 2}`.
 
@@ -280,7 +280,7 @@ print(pl.DataFrame({name: np.asarray(values, dtype=float) for name, values in so
 # across a dataset, and a scene missing bands it should have is a defect that ought to read as a defect.
 #
 # `nir_missing` is how you find them. Every other statistic reports absence as NaN; this one reports it as 1.0,
-# because measuring the *presence* of data is precisely what it is for.
+# because measuring the lack of *presence* of data is precisely what it is for.
 
 # %% [markdown]
 # ## Combine band groups with the background
@@ -382,21 +382,21 @@ print(sorted(geometry))
 # Reach for it whenever the bands of your imagery are different measurements. Leave it alone when they are not.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Image Statistics](../concepts/ImageStatistics.md)
-# - [Data Integrity](../concepts/DataIntegrity.md)
-# - [Metadata Levels](../concepts/MetadataLevels.md)
+# ### Concepts
 #
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py)
-# - [How to build dataset views](./h2_build_dataset_views.py)
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py)
+# - [Image Statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across channels.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Learn how data integrity checks identify quality issues in dataset channels.
+# - [Metadata Levels](../concepts/MetadataLevels.md) — Explore dataset, datum, and factor levels in DataEval metadata.
 #
 # ### Tutorials
 #
-# - [Compare objects to their surroundings](./tt_compare_objects_to_surroundings.py)
-# - [Analyze a dataset across its levels](./tt_analyze_across_levels.py)
+# - [Compare objects to their surroundings](./tt_compare_objects_to_surroundings.py) — Measure visual context and object contrast against surrounding pixels.
+# - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Evaluate datasets across instance, item, and dataset levels.
+#
+# ### How-to guides
+#
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Compute custom bounding box and image statistics for object detection tasks.
+# - [How to build dataset views](./h2_build_dataset_views.py) — Filter and transform dataset subsets using View and operations.
+# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Add domain-specific intrinsic factors to Metadata for deeper analysis.

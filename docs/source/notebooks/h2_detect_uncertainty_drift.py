@@ -324,30 +324,11 @@ assert result_cifar.drifted
 assert not result_test.drifted
 
 # %% [markdown]
-# ## On your own
+# ## Next steps
 #
-# - **Swap in your own model**: drop the demo scaffolding and pass {class}`.OnnxImageClassifier` the `.onnx` and
-#   `model-metadata.json` you already ship — or {class}`.LiteRtImageClassifier` for a `.tflite` model.
-# - **Swap the operational data**: point the shifted split at your real incoming data stream.
-# - **Monitor a detector**: use {class}`.OnnxObjectDetector` (or {class}`.LiteRtObjectDetector`) with
-#   {class}`.ScoresExtractor` — or {class}`.ClasswiseUncertaintyExtractor` to break uncertainty down per predicted class.
-# - **Tune sensitivity**: adjust {class}`DriftWasserstein(ratio_threshold=...) <.DriftWasserstein>` to trade off false
-#   alarms against missed drift.
-
-# %% [markdown]
-# ## Related concepts
-#
-# - [Distribution Shift](../concepts/DistributionShift.md)
-# - [Uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection)
-#
-# ## See also
-#
-# ### Tutorials
-#
-# - [Detect drift with prediction uncertainty](./tt_detect_drift_with_uncertainty.py)
-# - [Monitor shifts in operational data](./tt_monitor_shift.py)
-#
-# ### How-to guides
-#
-# - [How to encode images with ONNX models](./h2_encode_with_onnx.py)
-# - [How to measure train and test dataset divergence](./h2_measure_divergence.py)
+# - [Distribution Shift](../concepts/DistributionShift.md) — Explore Distribution Shift.
+# - [Uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection) — Explore Uncertainty-based drift detection.
+# - [Detect drift with prediction uncertainty](./tt_detect_drift_with_uncertainty.py) — Monitor deployed object detectors for drift using prediction uncertainty.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational data over time.
+# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — Encode image datasets into vector embeddings using ONNX runtime models.
+# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.

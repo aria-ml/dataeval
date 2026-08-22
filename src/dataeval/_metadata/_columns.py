@@ -101,14 +101,38 @@ def split_by_dimensionality(
     return kept, [name for name in arrays if name not in kept]
 
 
+# The two suffixes binning appends, and the namespace they define between them. Named
+# rather than spelled inline because :func:`is_companion_name` has to answer for the
+# same characters these build with, and a suffix that drifted between the two would
+# reopen exactly the collision that function exists to close.
+BINNED_SUFFIX = "↕"
+DIGITIZED_SUFFIX = "#"
+COMPANION_SUFFIXES: tuple[str, ...] = (BINNED_SUFFIX, DIGITIZED_SUFFIX)
+
+
 def binned(name: str) -> str:
     """Name of the companion column holding ``name``'s bin indices."""
-    return f"{name}↕"
+    return f"{name}{BINNED_SUFFIX}"
 
 
 def digitized(name: str) -> str:
     """Name of the companion column holding ``name``'s category ordinals."""
-    return f"{name}#"
+    return f"{name}{DIGITIZED_SUFFIX}"
+
+
+def is_companion_name(name: str) -> bool:
+    """Whether ``name`` sits in the namespace binning writes its companion columns into.
+
+    Every reader that resolves a companion does it by construction — ``binned(col)`` and
+    ``digitized(col)`` over the columns actually present — so a *factor* holding one of
+    those names is indistinguishable from the companion of its stem. A column named
+    ``w#`` alongside a factor ``w`` makes ``Metadata._bin`` skip ``w`` as already binned,
+    makes ``_reset_bins`` and the serializer's ``_without_companions`` drop the caller's
+    values as derived, and leaves ``factor_names`` a name longer than ``factor_data`` is
+    wide. Reserving the namespace is what keeps all three honest, so this is consulted
+    wherever a factor is named — see ``safe_column_name`` in ``_structurers._reserved``.
+    """
+    return name.endswith(COMPANION_SUFFIXES)
 
 
 def to_col(name: str, info: FactorInfo, is_binned: bool = True) -> str:

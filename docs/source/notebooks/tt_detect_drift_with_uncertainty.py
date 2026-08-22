@@ -23,7 +23,7 @@
 #
 # Relevant ML stages: [Monitoring](../getting-started/roles/ML_Lifecycle.md#monitoring)
 #
-# Relevant personas: Machine Learning Engineer, T&E Engineer
+# Relevant personas: [ML Engineer](../getting-started/roles/ml_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 #
 # ## What you'll do
 #
@@ -111,7 +111,7 @@ set_batch_size(32)
 # > The device is the piece of hardware where the model and data live in memory; if a GPU is available this notebook uses
 # > it, otherwise the CPU. The batch size set above is the default I/O chunk size DataEval uses when streaming images
 # > through an extractor. For more on these global settings, see the
-# > [configuration defaults how-to](../notebooks/h2_configure_defaults.py).
+# > [configuration defaults how-to](./h2_configure_defaults.py).
 
 # %% [markdown]
 # ## Load the datasets
@@ -340,19 +340,13 @@ print(f"SeaDrone     -> drift: {result_drone.drifted}  (ratio: {result_drone.dis
 # - **Per-class breakdowns** reveal _which_ classes drive the uncertainty, not just the aggregate
 
 # %% [markdown]
-# ## What's next
+# ## Next steps
 #
-# - Compare this approach with feature-based drift in the [monitor shift tutorial](./tt_monitor_shift.py)
-# - Read about the [taxonomy of shift](../concepts/DistributionShift.md#taxonomy-of-shift) and when uncertainty-based
-#   detection is and isn't the right tool
-# - Explore DataEval's [API reference](../reference/autoapi/dataeval/index.rst) for the full set of drift detectors
-
-# %% [markdown]
-# ## Related how-to guides
-#
-# - [Detect uncertainty drift with a MAITE model](../notebooks/h2_detect_uncertainty_drift.py)
-# - [Encode a dataset with an ONNX model](../notebooks/h2_encode_with_onnx.py)
-# - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+# - [Taxonomy of shift](../concepts/DistributionShift.md#taxonomy-of-shift) — Read about shift types and when uncertainty-based detection is and isn't the right tool.
+# - [Monitor shift tutorial](./tt_monitor_shift.py) — Compare prediction uncertainty with feature-based drift detection on dataset embeddings.
+# - [Detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Apply uncertainty drift detection using a MAITE-wrapped model.
+# - [Encode a dataset with an ONNX model](./h2_encode_with_onnx.py) — Extract representations and predictions using an ONNX runtime inference session.
+# - [Configure global DataEval defaults](./h2_configure_defaults.py) — Set global default configuration parameters like batch size and execution device.
 
 # %% [markdown]
 # ## On your own

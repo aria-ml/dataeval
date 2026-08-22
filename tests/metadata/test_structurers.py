@@ -725,6 +725,17 @@ class TestUnitIndexColumn:
         assert safe_column_name("unit_index") == "metadata_unit_index"
         assert safe_column_name("image_index") == "image_index"
 
+    def test_the_companion_namespace_is_reserved_at_the_tail(self):
+        """A reserved column is collided with head-on and escaped by prefix; the namespace
+        binning writes into is reached by a name's tail, so it is escaped there instead."""
+        from dataeval._metadata._structurers import safe_column_name
+
+        assert safe_column_name("w#") == "w#_metadata"
+        assert safe_column_name("w↕") == "w↕_metadata"
+        # Only the tail is reserved: the characters are ordinary anywhere else in a name.
+        assert safe_column_name("w#ish") == "w#ish"
+        assert safe_column_name("weather") == "weather"
+
 
 @pytest.mark.required
 class TestStructurerDeclarationChecks:

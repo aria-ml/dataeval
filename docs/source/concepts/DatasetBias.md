@@ -155,34 +155,37 @@ weather, time of day, location, annotator ID, and so on). The fundamental
 question they answer is: *are class labels independent of these factors?*
 
 **Balance** measures the statistical dependence between class labels and
-metadata factors using
+metadata factors or two metadata factors using
 {term}`mutual information (MI) <Mutual Information (MI)>`. Mutual information
 quantifies how much knowing one variable reduces uncertainty about another:
 
 $$I(Y; M) = \sum_{y, m} P(Y=y, M=m) \log \frac{P(Y=y, M=m)}{P(Y=y)\, P(M=m)}$$
 
-where $Y$ is the class label and $M$ is a metadata factor. When $Y$ and $M$ are
-independent, $I(Y; M) = 0$. When knowing $M$ completely determines $Y$,
-$I(Y; M)$ equals the entropy of $Y$.
+where $Y$ is the class label (or the second metadata factor) and $M$ is a metadata
+factor. When $Y$ and $M$ are independent, $I(Y; M) = 0$. When knowing $M$ completely
+determines $Y$, $I(Y; M)$ equals the entropy of $Y$.
 
 Raw MI values are difficult to interpret, so DataEval provides normalized MI
-(NMI), a value guaranteed to be between 0 and 1. Which normalization applies
-depends on which of two questions the value answers.
+(NMI), a value guaranteed to be between 0 and 1. The type of normalization that
+DataEval applies depends on the type of data passed in.
 
-Between two metadata factors neither side is privileged, so DataEval divides
-by the smaller of the two marginal entropies:
+If both factors are unbinned discrete factors, then DataEval divides by the
+smaller of the two marginal entropies:
 
 $$I_\text{norm}(M_1; M_2) = \frac{I(M_1; M_2)}{\min(H(M_1), H(M_2))}$$
 
 The mutual information can never exceed the smaller of the two discrete
 entropies, so dividing by the minimum keeps the result in $[0, 1]$ and reaches 1
-exactly when either factor determines the other. If one factor is discrete and
-the other continuous, DataEval normalizes by the entropy of the discrete
-variable. If neither variable is discrete, i.e. if both are continuous, the
-mutual information is not bounded and cannot be normalized, so DataEval returns
-a transformation of the MI onto the interval [0, 1]. (In the case of two random
-normal variables, this transformed MI is their correlation coefficient. See
-[Linfoot (1957)](#ref14))
+exactly when either factor determines the other.
+
+If one factor is unbinned discrete and the other continuous, DataEval normalizes
+by the entropy of the discrete variable.
+
+If neither variable is unbinned discrete &emdash i.e., if both are continuous or
+binned discrete or one of each &emdash the mutual information is not bounded and
+cannot be normalized, so DataEval returns a transformation of the MI onto the
+interval [0, 1]. (In the case of two random normal variables, this transformed MI
+is their correlation coefficient. See [Linfoot (1957)](#ref14))
 
 Between the class label and a factor the question is directed — how much of the
 class label does this factor account for — and every factor is measured against

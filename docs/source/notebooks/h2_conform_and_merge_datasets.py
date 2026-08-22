@@ -28,7 +28,7 @@
 # This guide **conforms** the incoming dataset to your reference vocabulary (an
 # {class}`.Ontology`) and then **merges** the two into a single dataset you can
 # analyze together. It builds on
-# [ontology alignment](h2_align_label_spaces.py): alignment establishes *how* the
+# [ontology alignment](./h2_align_label_spaces.py): alignment establishes *how* the
 # labels correspond; {class}`.View` with {class}`.Relabel` *applies* that to the
 # data, and {func}`.merge_datasets` combines the conformed results.
 
@@ -109,7 +109,7 @@ def labels_from_counts(counts: dict[str, int], index2label: dict[int, str]) -> l
 
 
 # %% [markdown]
-# ## 1. A reference vocabulary
+# ## A reference vocabulary
 #
 # The reference vocabulary is an {class}`.Ontology` — the label space everything will
 # be expressed in. Here is a taxonomy of vessels grouped by domain (air / land /
@@ -126,7 +126,7 @@ print(reference_ontology)
 print("reference vocabulary:", {i: reference_ontology.concept(c).label for i, c in enumerate(reference_ontology.ids)})
 
 # %% [markdown]
-# ## 2. The reference dataset, conformed to the vocabulary
+# ## The reference dataset, conformed to the vocabulary
 #
 # Our reference data uses its **own** label ordering. We align its class names to the
 # ontology and conform it. Every class is in the vocabulary, so this is lossless — it
@@ -147,7 +147,7 @@ print("reference images:", len(reference))
 print("reference now uses the vocabulary:", reference.metadata.get("index2label"))
 
 # %% [markdown]
-# ## 3. An incoming dataset in its own label scheme
+# ## An incoming dataset in its own label scheme
 #
 # The incoming data uses a **different, reordered** `index2label` (note `submarine`
 # is index `0` here), and an overlapping-but-different class set: `sedan` and
@@ -164,7 +164,7 @@ incoming = ToyDataset(
 print("incoming vocabulary:", incoming.metadata.get("index2label"))
 
 # %% [markdown]
-# ## 4. Align the incoming labels to the reference vocabulary
+# ## Align the incoming labels to the reference vocabulary
 #
 # {func}`.label_alignment` relates the incoming class *names* to the reference
 # ontology. Matching is by name, so the reordered indices are irrelevant — `sedan`,
@@ -178,7 +178,7 @@ for c in incoming_alignment["correspondences"]:
 print("out-of-vocabulary:", incoming_alignment["unaligned_source"])
 
 # %% [markdown]
-# ## 5. Conform the incoming dataset
+# ## Conform the incoming dataset
 #
 # {class}`.Relabel` applies the alignment: it drops the out-of-vocabulary `submarine`
 # images, rewrites the remaining labels into the reference index space, and replaces
@@ -196,7 +196,7 @@ print(
 )
 
 # %% [markdown]
-# ## 6. Merge
+# ## Merge
 #
 # Both datasets now share one `index2label`, so {func}`.merge_datasets` can combine
 # them into a single dataset view. The per-class counts show the union: `sedan` and
@@ -236,9 +236,7 @@ except ValueError as error:
 #   metadata- and value-conforming operations to follow.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [How to align two label spaces](h2_align_label_spaces.py) — the alignment step
-#   this guide applies.
-# - [Ontology](../concepts/Ontology.md) — the taxonomic model the reference is built on,
-#   correspondences, relations, and mergeability.
+# - [Ontology](../concepts/Ontology.md) — Explore the taxonomic model the reference is built on, correspondences, relations, and mergeability.
+# - [How to align two label spaces](./h2_align_label_spaces.py) — Relate class names and categories between different dataset label spaces.

@@ -76,13 +76,47 @@ datasets for machine learning.
 ../notebooks/h2_conform_and_merge_datasets.py
 ```
 
+### Data Preparation
+
 :::{list-table}
 :widths: 30 50 20
 :header-rows: 0
 
+- - [](../notebooks/h2_wrap_dataframe_ic_dataset.py)
+  - Wrap a pandas DataFrame catalog as a DataEval dataset
+  - [![Open In Colab][colab-badge]][wdf-colab]
+- - [](../notebooks/h2_wrap_dataframe_od_dataset.py)
+  - Wrap a long-format DataFrame of bounding boxes as an
+    object detection dataset
+  - [![Open In Colab][colab-badge]][wdfod-colab]
+- - [](../notebooks/h2_metadata_from_dataframe.py)
+  - Build a MetadataLike object from a DataFrame for bias
+    analysis without loading images
+  - [![Open In Colab][colab-badge]][mdf-colab]
+- - [](../notebooks/h2_lazy_load_images.py)
+  - Defer image decoding to speed up metadata-only analysis
+  - [![Open In Colab][colab-badge]][lazy-colab]
+- - [](../notebooks/h2_build_dataset_views.py)
+  - Filter, balance, reorder, and relabel a dataset by composing
+    a {class}`.View` from {class}`.Operation` steps
+  - [![Open In Colab][colab-badge]][view-colab]
 - - [](../notebooks/h2_encode_with_onnx.py)
   - Encode image embeddings with an ONNX model
   - [![Open In Colab][colab-badge]][onx-colab]
+- - [](../notebooks/h2_place_transforms.py)
+  - Decide whether a transform belongs in a {class}`.View` or in an
+    extractor's `transforms=`, and what to do about a
+    {class}`~dataeval.exceptions.StatsInvalidatedWarning`
+  - [![Open In Colab][colab-badge]][xfrm-colab]
+
+:::
+
+### Data Exploration
+
+:::{list-table}
+:widths: 30 50 20
+:header-rows: 0
+
 - - [](../notebooks/h2_embed_detection_crops.py)
   - Embed object detection box crops and visualize class clusters
   - [![Open In Colab][colab-badge]][crop-colab]
@@ -116,29 +150,15 @@ datasets for machine learning.
 - - [](../notebooks/h2_detect_undersampling.py)
   - Detect undersampled subsets of datasets
   - [![Open In Colab][colab-badge]][cov-colab]
-- - [](../notebooks/h2_wrap_dataframe_ic_dataset.py)
-  - Wrap a pandas DataFrame catalog as a DataEval dataset
-  - [![Open In Colab][colab-badge]][wdf-colab]
-- - [](../notebooks/h2_wrap_dataframe_od_dataset.py)
-  - Wrap a long-format DataFrame of bounding boxes as an
-    object detection dataset
-  - [![Open In Colab][colab-badge]][wdfod-colab]
-- - [](../notebooks/h2_metadata_from_dataframe.py)
-  - Build a MetadataLike object from a DataFrame for bias
-    analysis without loading images
-  - [![Open In Colab][colab-badge]][mdf-colab]
-- - [](../notebooks/h2_lazy_load_images.py)
-  - Defer image decoding to speed up metadata-only analysis
-  - [![Open In Colab][colab-badge]][lazy-colab]
-- - [](../notebooks/h2_build_dataset_views.py)
-  - Filter, balance, reorder, and relabel a dataset by composing
-    a {class}`.View` from {class}`.Operation` steps
-  - [![Open In Colab][colab-badge]][view-colab]
-- - [](../notebooks/h2_place_transforms.py)
-  - Decide whether a transform belongs in a {class}`.View` or in an
-    extractor's `transforms=`, and what to do about a
-    {class}`~dataeval.exceptions.StatsInvalidatedWarning`
-  - [![Open In Colab][colab-badge]][xfrm-colab]
+
+:::
+
+### Ontology
+
+:::{list-table}
+:widths: 30 50 20
+:header-rows: 0
+
 - - [](../notebooks/h2_reconcile_labels_ontology.py)
   - Validate dataset class names against an ontology and
     recover their hierarchy

@@ -42,7 +42,7 @@
 #    - `tabulate`
 
 # %% [markdown]
-# ### Getting started
+# ## Getting started
 #
 # Let's import the required libraries needed to set up a minimal working example
 
@@ -246,29 +246,21 @@ print(wonky)
 assert (wonky / 20) > 0.4
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-# - [Embeddings](../concepts/Embeddings.md)
-# - [Clustering](../concepts/Clustering.md)
-# - [Acting on Results](../concepts/ActingOnResults.md)
-# - [Data Integrity](../concepts/DataIntegrity.md)
-# - [Performance Limits](../concepts/PerformanceLimits.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to run clustering analysis](./h2_cluster_analysis.py)
-# - [How to encode images with ONNX models](./h2_encode_with_onnx.py)
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py)
-# - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py)
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py)
-# - [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
-#
-# ### Tutorials
-#
-# - [Assess an unlabeled data space](./tt_assess_data_space.py)
-# - [Introduction to data cleaning](./tt_clean_dataset.py)
-# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py)
-# - [Identify bias and correlations](./tt_identify_bias.py)
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias, representation, and coverage geometry.
+# - [Embeddings](../concepts/Embeddings.md) — Understand vector embeddings and feature representations.
+# - [Clustering](../concepts/Clustering.md) — Explore clustering techniques for grouping similar data points.
+# - [Acting on Results](../concepts/ActingOnResults.md) — Recommendations for addressing coverage gaps and dataset issues.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Overview of data quality and integrity checks.
+# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand theoretical performance boundaries based on data coverage.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover structure, clusters, and coverage in unlabeled datasets.
+# - [Introduction to data cleaning](./tt_clean_dataset.py) — Detect duplicates, outliers, and corrupted samples in datasets.
+# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find augmented image pairs using duplicate detection.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Measure dataset bias, factor correlations, and class imbalances.
+# - [How to run clustering analysis](./h2_cluster_analysis.py) — Apply clustering algorithms to identify groupings in embedded data.
+# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — Encode image datasets into vector embeddings using ONNX runtime models.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Calculate custom metrics for bounding boxes and object annotations.
+# - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py) — Plot and inspect dataset anomalies and cleaning flags.
+# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Extract and attach intrinsic image properties to dataset metadata.
+# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Set default configuration options for DataEval execution.

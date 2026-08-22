@@ -4,7 +4,8 @@ A dataframe row carries two kinds of column. Factors are observations — anythi
 dataset or the caller measured — and are binned, correlated and reported on. The
 reserved columns are the row's own identity: the level it belongs to, the item it came
 from, and where it sits within each of its parents. A factor whose name would collide
-with one of them is renamed rather than allowed to overwrite it.
+with one of them is renamed rather than allowed to overwrite it, and so is one that
+would be taken for a companion column binning writes — see :func:`safe_column_name`.
 
 Sole producer of that layout: every structurer and
 :meth:`~dataeval.Metadata.from_factors` builds its blocks through
@@ -20,6 +21,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._metadata._columns import is_companion_name
 from dataeval.types import FactorLevel
 
 # Columns the metadata dataframe has always carried. Retained verbatim because
@@ -149,7 +151,22 @@ def _as_column(values: Any) -> Sequence[Any] | NDArray[Any]:
 
 
 def safe_column_name(name: str) -> str:
-    """Prefix a factor name that would clobber a reserved dataframe column.
+    """Rename a factor that would be taken for a column DataEval owns.
+
+    Two namespaces are reserved, and a factor is moved out of either rather than allowed
+    to occupy it. :data:`RESERVED_COLUMNS` is the row's own identity, collided with head-on
+    and escaped by prefix. The companion namespace — anything ending in one of
+    ``COMPANION_SUFFIXES`` — is the one binning writes into, so a name lands in it by its
+    *tail* and has to be escaped there; see ``is_companion_name`` in ``_metadata._columns``
+    for what mistaking the two costs.
+
+    Sole entry point for both: every factor name reaches a frame through here, whether it
+    came from a dataset's metadata dictionaries, from
+    :meth:`~dataeval.Metadata.from_factors`, or from
+    :meth:`~dataeval.Metadata.add_factors` and :meth:`~dataeval.Metadata.agg` by way of
+    ``_resolve_factor_name``. Placed here rather than in each caller because the check has
+    to hold before anything is binned: a writer that resolves its name against the columns
+    currently present cannot see a companion binning has not written yet.
 
     Parameters
     ----------
@@ -159,7 +176,9 @@ def safe_column_name(name: str) -> str:
     Returns
     -------
     str
-        ``name`` unchanged, or ``metadata_<name>`` when it is in
-        :data:`RESERVED_COLUMNS`.
+        ``name`` unchanged; ``metadata_<name>`` when it is in :data:`RESERVED_COLUMNS`;
+        or ``<name>_metadata`` when it ends in a companion suffix.
     """
-    return f"metadata_{name}" if name in RESERVED_COLUMNS else name
+    if name in RESERVED_COLUMNS:
+        return f"metadata_{name}"
+    return f"{name}_metadata" if is_companion_name(name) else name

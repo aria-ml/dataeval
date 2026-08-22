@@ -79,7 +79,7 @@ from dataeval.core import label_reconciliation
 from dataeval.types import OntologyConcept
 
 # %% [markdown]
-# ## 1. Build an ontology
+# ## Build an ontology
 #
 # The simplest, dependency-free way to define a taxonomy is from a plain nested
 # dictionary with {meth}`.Ontology.from_hierarchy`. Mapping values may be
@@ -100,7 +100,7 @@ print(ontology)
 # concepts), leaves (most specific), and external references (more on those below).
 
 # %% [markdown]
-# ## 2. Reconcile a dataset's class names
+# ## Reconcile a dataset's class names
 #
 # Pass your class names — typically `index2label.values()` — to
 # {func}`.label_reconciliation`. Here the label set includes a class that isn't in
@@ -157,7 +157,7 @@ print("sedan vs fighter jet: ", result["relations"][("sedan", "fighter jet")])
 label_reconciliation(["vehicle", "land vehicle", "sedan"], ontology)["induced_edges"]
 
 # %% [markdown]
-# ## 3. Richer ontologies from OWL / RDF / JSON-LD
+# ## Richer ontologies from OWL / RDF / JSON-LD
 #
 # Real ontologies usually ship as standards-based OWL/RDF/JSON-LD files with
 # preferred labels, synonyms, and definitions. Parse already-in-memory content
@@ -204,7 +204,7 @@ print("synonyms:  ", concept.synonyms)
 print("definition:", concept.definition)
 
 # %% [markdown]
-# ## 4. Incomplete (subset) ontologies
+# ## Incomplete (subset) ontologies
 #
 # Ontologies are frequently distributed as subsets, where a concept's parent is
 # referenced but not itself included. DataEval keeps these as *external
@@ -229,7 +229,7 @@ print("external_ancestors:", subset_result["external_ancestors"])
 # `"Sedan"` is fully rooted, so it is absent from `external_ancestors`.
 
 # %% [markdown]
-# ## 5. Exploring the hierarchy
+# ## Exploring the hierarchy
 #
 # The {class}`.Ontology` object exposes dependency-free graph queries for ad-hoc
 # exploration:
@@ -269,9 +269,7 @@ print("ids:", sorted(watercraft.ids))
 # normalization step.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Ontology](../concepts/Ontology.md) — what an ontology is, the vocabulary it
-#   uses, and how reconciliation and conformance are defined.
-# - [Data Integrity](../concepts/DataIntegrity.md) — the other label-quality
-#   checks reconciliation sits alongside.
+# - [Ontology](../concepts/Ontology.md) — Learn about ontologies, taxonomies, and label reconciliation concepts.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Understand label-quality checks and data consistency validation.

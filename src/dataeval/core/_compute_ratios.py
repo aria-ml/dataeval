@@ -390,7 +390,8 @@ def compute_ratios(  # noqa: C901
     - Only processes entries where source_index.box is not None
     - For each box, finds its corresponding image stats (box=None, same image and channel index)
     - Applies custom calculations from override_map or defaults to simple division
-    - Handles per-channel stats automatically via channel_index matching
+    - Divides each band group column against the image column of the same name, so a
+      ``channels=`` mapping yields ``<group>_<statistic>`` ratios alongside the unprefixed ones
     - BASE_ATTRS (source_index, object_count, etc.) are preserved for box entries only
 
     Examples
@@ -421,13 +422,20 @@ def compute_ratios(  # noqa: C901
     ... }
     >>> ratios = compute_ratios(stats, override_map=custom_overrides)
 
-    **Per-channel statistics:**
+    **Band group statistics:**
 
     >>> stats = compute_stats(
-    ...     images, boxes=boxes, stats=ImageStats.PIXEL, per_image=True, per_target=True, per_channel=True
+    ...     images,
+    ...     boxes=boxes,
+    ...     stats=ImageStats.PIXEL_MEAN,
+    ...     per_image=True,
+    ...     per_target=True,
+    ...     channels={"r": 0, "g": 1, "b": 2},
+    ...     normalize_pixel_values=False,
     ... )
     >>> ratios = compute_ratios(stats)
-    >>> # Ratios are calculated per-channel automatically
+    >>> sorted(ratios["stats"])
+    ['b_mean', 'g_mean', 'mean', 'r_mean']
     """
     _logger.info(
         "Starting compute_ratios with %s input pattern",

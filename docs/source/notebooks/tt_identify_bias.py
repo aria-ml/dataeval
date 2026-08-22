@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
-#     display_name: dataeval
+#     display_name: dataeval-prototype (3.12.12)
 #     language: python
 #     name: python3
 # ---
@@ -16,19 +16,19 @@
 # %% [markdown]
 # # Identify bias and correlations
 #
-# This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/DatasetBias.md)
-# and [diversity](../concepts/DatasetBias.md).
+# This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/DatasetBias.md#measuring-bias-normalized-mutual-information)
+# and [diversity](../concepts/DatasetBias.md#measuring-bias-normalized-mutual-information).
 #
 # Estimated time to complete: 15 minutes
 #
 # Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 #
-# Relevant personas: Data Engineer, T&E Engineer
+# Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 
 # %% [markdown]
 # ## What you'll do
 #
-# - Use DataEval to identify bias and correlations in the 2012 VOC dataset
+# - Use DataEval to identify bias and correlations in the [SeaDronesSee dataset](https://seadronessee.cs.uni-tuebingen.de/)
 # - Analyze the results using plots and tables
 
 # %% [markdown]
@@ -103,13 +103,19 @@ except Exception:
 
 # %%
 import dataeval_plots as dep
+import numpy as np
 import plotly.io as pio
-from maite_datasets.object_detection import VOCDetection
+import polars as pl
+from IPython.display import display
+from maite_datasets.object_detection import SeaDrone
 
-# Load the functions from DataEval that are helpful for bias
-# as well as the VOCDetection dataset for the tutorial
 from dataeval import Metadata
 from dataeval.bias import Balance, Diversity
+from dataeval.protocols import CodedMetadataLike
+
+# Show every row of the comparison tables below rather than polars' default window - the
+# rows this guide reasons about would otherwise be the ones elided.
+pl.Config.set_tbl_rows(20)
 
 # Use plotly to render plots
 dep.set_default_backend("plotly")
@@ -118,87 +124,349 @@ dep.set_default_backend("plotly")
 pio.renderers.default = "notebook"
 
 # %% [markdown]
-# ## Step 1: Load the data
+# ## Load the data
 #
-# You are going to work with the PASCAL VOC 2012 dataset. This dataset is a small curated dataset that was used for a
-# computer vision competition. The images were used for classification, object detection, and segmentation. This dataset
-# was chosen because it has multiple classes and a variety of images and metadata.
+# You are going to work with the SeaDronesSee object detection dataset. This dataset is a UAV dataset aimed at helping develop
+# systems for Search and Rescue using UAVs in maritime scenarios. It was used for a computer vision competition in 2023.
+# This dataset was chosen because it has multiple classes, imagery collected from multiple UAVs, and the dataset contains metadata.
 #
 # If this data is already on your computer you can change the file location from `"./data"` to wherever the data is
-# stored. Remember to also change the download value from `True` to `False`.
+# stored. If not, make sure you set the `root` path to be wherever you would like the dataset to be downloaded.
 #
-# For the sake of ensuring that this tutorial runs quickly on most computers, you are going to analyze only the training
-# dataset, which is a little under 6000 images.
+# For the sake of ensuring that this tutorial runs quickly on most computers, you are going to analyze only the validation
+# dataset, which is a little over 1500 images.
 
 # %%
-# Download the 2012 train dataset and verify the size of the loaded dataset
-ds = VOCDetection(root="./data", download=True, image_set="train", year="2012")
+# Download the validation dataset and verify the size of the loaded dataset
+ds = SeaDrone(root="./data", download=True, image_set="val", lazy=True)
 len(ds)
 
 # %% [markdown]
-# Before moving on, verify that the above code cell printed out 5717 for the size of the
-# [dataset](http://host.robots.ox.ac.uk/pascal/VOC/voc2011/dbstats.html).
+# Before moving on, verify that the above code cell printed out 1547 for the size of the dataset.
 #
 # This ensures that everything is working as needed for the tutorial.
+#
+# :::{note}
+# If it didn't, make sure that you have an up-to-date version of maite-datasets (_needs to be >=0.0.17_ )
+# and if you are all up-to-date and still having issues see the [contributing guide for bug reports](../getting-started/contributing.md).
+# :::
 
 # %% [markdown]
-# ## Step 2: Structure the metadata
+# ## Structure the metadata
 #
-# This guide focuses on evaluating labels and metadata of the dataset rather than the images themselves. As each dataset
+# This guide focuses on evaluating the labels and metadata of the dataset rather than the images themselves. As each dataset
 # has its own image and metadata formats, you will need to understand how your particular metadata is structured.
 #
-# Start by taking a look at the metadata structure of the VOC 2012 dataset by creating a `Metadata` class from the
-# dataset.
+# Start by taking a look at the metadata structure of the dataset by grabbing the first item from the dataset and selecting
+# just the metadata.
 
 # %%
-# Extract the Metadata from the dataset
-metadata = Metadata(ds)
+ds[0][2]
 
 # %% [markdown]
 # The metadata in the dataset is provided as a dictionary entry for each datum, such that the aggregated data is a
-# collection of _N_ metadata dictionaries each with a nested list of _M_ objects in the image. Start by inspecting the raw
-# metadata of the first image.
+# collection of _N_ metadata dictionaries each with a nested list of _M_ objects in the image.
+#
+# This dataset has 20 metadata categories, and from the *object_id* category highlights that this image has 1 object in it.
+# From the multiple -1 values, it appears that not every image has a value for every metadata category, which may or may not point towards a bias.
+#
+# Now we'll extract out the metadata for the entire dataset.
+#
+# To do this, we need to first determine if we need to subset our metadata
+# categories by either selecting the factors to include or selecting the factors to exclude (whatever is a easier list to compile).
+# To start we will leave in all of the 20 metadata categories for the bias analysis.
+# We could pull out _id_ and *image_id* now, but let's double check them first to make sure there are no duplicates.
+#
+# Next, we need to determine if and how we want to bin any continuous data.
+# Because we have multiple categories with -1 values, we'll let DataEval handle the binning with it's auto_bin_method.
+# We can always go back and adjust if needed.
 
 # %%
-metadata.raw[0]
+# Extract the metadata from the dataset
+metadata = Metadata(ds)
 
 # %% [markdown]
 # :::{note}
-# `Metadata` is unable to process nested lists. For this dataset, _part_ is a factor that describes certain
-# parts of a _person_ object (such as _head_, _foot_, and _hand_), each with separate bounding box coordinates. You will
-# ignore this information for this example.
+# `Metadata` is unable to process nested lists - any category that is a list of lists will be ignored.
 # :::
 
 # %% [markdown]
-# :::{note}
-# The nested objects _horse_ and _person_ from the first metadata entry will be expanded to a complete metadata
-# entry for each object.
-# :::
-
-# %% [markdown]
-# Next you will want to select the factors to include for bias analysis as well as the continuous factor bins for any
-# continuous data.
+# One other thing to note, most of the metadata is image specific not object specific, so we are going to create an image metadata class and then check it's bins.
+# We'll also double check specifically the object_id and object_size metadata. To grab the binned data for the two object metadata categories, the binned version of continuous columns is the category name followed by a `↕`.
 
 # %%
-metadata.include = [
-    "image_width",
-    "image_height",
-    "segmented",
-    "pose",
-    "truncated",
-    "difficult",
-]
+# Create the image-level metadata instance
+image_metadata = metadata.at("unit")
 
+# Check the binning
+factors = image_metadata.factor_names
+data = image_metadata.factor_data
+print("          Name  - Raw Unique - Bin Unique - Bin Unique Counts")
+for i, col in enumerate(data.T):
+    unique, counts = np.unique(col, return_counts=True)
+    raw_values = image_metadata.dataframe.select(factors[i])
+    print(f"{factors[i]:>15} - {raw_values.n_unique():^10} - {len(unique):^10} - {len(np.unique(counts)):>5}")
+
+# Check the target-level metadata - object_id and object_size
+target_metadata = metadata.rows_at("instance")
+raw_obj_id = target_metadata["object_id"]
+bin_obj_id = target_metadata["object_id↕"]
+print(
+    f"      object_id - {raw_obj_id.n_unique():^10} - {bin_obj_id.n_unique():^10} - {bin_obj_id.value_counts()['count'].n_unique():>5}"
+)
+raw_obj_size = target_metadata["object_size"]
+bin_obj_size = target_metadata["object_size↕"]
+print(
+    f"    object_size - {raw_obj_size.n_unique():^10} - {bin_obj_size.n_unique():^10} - {bin_obj_size.value_counts()['count'].n_unique():>5}"
+)
+
+
+# %% [markdown]
+# We were right in that both _id_ and *image_id* are purely unique values; *object_id* is also a purely unique value. We will exclude them since they will not contain any bias.
+#
+# Now to understand the binning. We would like to see close to identical numbers in our print statement above, sets that have very different numbers
+# such as _latitude_ with 478 and 15 inform us that the auto binning didn't do a good job. And we really need to bin the data ourselves.
+# The categories which appear to be fine are _drone_, _height_, and _width_. _Storage_ appears to be categorical based on when we inspected the metadata above, so it's close enough.
+#
+# So let's get into creating good bins for our data. First lets view the dataframe statistics for the data to get an idea of our value ranges.
+
+# %%
+raw_data = image_metadata.rows_at("unit").select(factors)
+r_desc = raw_data.describe()
+os_desc = raw_obj_size.describe()
+combined = r_desc.join(os_desc, on="statistic", how="full", coalesce=True).rename({"value": "object_size"})
+display(combined)
+
+# %% [markdown]
+# Ah! Look closely at _latitude_ and _longitude_ - these columns are likely a mix of numerics and strings forcing everything to be a string.
+# We'll fix that in a minute, but first let's continue analyzing the rest of the columns.
+#
+# _Altitude_, *compass_heading*, *gimbal_heading*, and *gimbal_pitch* appear to have a significant number of -1 with a scattering of a larger range of values,
+# we'll have to investigate how sparse those other values are.
+#
+# _Speed_, _xspeed_, _yspeed_, _zspeed_ are all pretty close to 0, so we should be able to separate out the -1 values and
+# then break it down into slow and fast, positive and negative groups.
+#
+# As mentioned above, _drone_, _width_, _height_ and _storage_ are just fine with the default settings, and we're going to drop _id_ and *image_id*.
+#
+# That leaves *date_time*, _frame_ and *object_size*. *Date_time* has several easy built in ways to bin it - month, day, year, time of day - so we'll just need to choose one.
+# From reading about the dataset, we learn that it was collected over just a couple of days so time of day is probably the most helpful way to bin, so we'll bin according to the hour.
+# For _frame_, we'll choose something simple based on the percentiles from above, let's say every 20% which gives us 5 bins.
+# We'll also do something similar for *object_size* using the percentiles but we'll bin based on every 5% which gives us 20 bins.
+#
+# To address the potential issues with _latitude_ and _longitude_, and to get a better understanding of some of the other categories,
+# let's inspect some of the actual values.
+
+# %%
+# Inspecting the desired columns
+raw_data.select([
+    "latitude",
+    "longitude",
+    "altitude",
+    "compass_heading",
+    "gimbal_heading",
+    "gimbal_pitch",
+    "frame",
+    "speed",
+    "xspeed",
+    "yspeed",
+    "zspeed",
+])
+
+# %% [markdown]
+# Ah, yes! Just what we suspected _latitude_ and _longitude_ are a mix of numerics and strings.
+# From the column statistics above, it appears our strings are "N" and "E", respectively.
+# And from inspecting the data here, it appears that most of the numbers are very close to each other,
+# so let's try binning them by creating a -2 value for the strings and then rounding all of the actual numbers to their integers and see how many bins that gets us.
+#
+# It appears that *compass_heading* and *gimbal_heading* are in degrees and in the range [0,360] so we can bin into 9 bins - every 45 degrees plus the -1s.
+# It appears the *gimbal_pitch* is similar to the headings and in the range [0,90], so we can bin this into 7 bins - every 15 degrees plus the -1s.
+#
+# _Altitude_ appears to have a decent spread and maxes out at ~260, so lets do 11 bins - multiples of 26 plus the -1s.
+#
+# Okay, this brings us to a slight complication, DataEval's Metadata class currently doesn't handle complicated binning strategies
+# like we want to do with our strings so we will have to post-process bin those columns.
+# For everything else, we can go ahead and create our bins.
+#
+# :::{note}
+# We want to process the original metadata variable, not the image_metadata that we were looking at.
+# :::
+
+# %%
+# Add date_time to the excluded columns and we'll create a new hour column in its place
+metadata.exclude = ["id", "image_id", "object_id", "date_time"]
 metadata.continuous_factor_bins = {
-    "image_width": 5,
-    "image_height": 5,
+    "compass_heading": [-1, 0, 45, 90, 135, 180, 225, 270, 315, 360],
+    "gimbal_heading": [-1, 0, 45, 90, 135, 180, 225, 270, 315, 360],
+    "gimbal_pitch": [-1, 0, 15, 30, 45, 60, 75, 90],
+    "altitude": [-1, 0, 26, 52, 78, 104, 130, 156, 182, 208, 234, 260],
+    "frame": np.quantile(raw_data["frame"], np.linspace(0, 1, 6)).tolist(),
+    "speed": [-1, 0, 3, 15],
+    "xspeed": [-15, -5, 0, 5, 15],
+    "yspeed": [-15, -5, 0, 5, 15],
+    "zspeed": [-5, -0.0001, 0.0001, 5],
+    "object_size": np.quantile(raw_obj_size, np.linspace(0, 1, 21)).tolist(),
 }
 
 # %% [markdown]
-# Now that the `Metadata` is ready to go, you can begin analyzing the dataset for bias!
+# Now for the post-processing. The binned version of categorical columns is the category name followed by a `#`. For example, the binned version of _latitude_ is _latitude#_.
+
+# %%
+df = metadata.dataframe
+
+# Post-process latitude
+# Fix the strings
+df = df.with_columns(
+    pl
+    .when(pl.col("latitude") == "N")
+    .then(pl.lit("-2"))
+    .otherwise(pl.col("latitude"))
+    .cast(pl.Float64)
+    .cast(pl.Int64)
+    .alias("latitude")
+)
+# Bin the data
+df = df.with_columns((pl.col("latitude").rank("dense") - 1).cast(pl.Int64).alias("latitude#"))
+
+# Post-process longitude
+# Fix the strings
+df = df.with_columns(
+    pl
+    .when(pl.col("longitude") == "E")
+    .then(pl.lit("-2"))
+    .otherwise(pl.col("longitude"))
+    .cast(pl.Float64)
+    .cast(pl.Int64)
+    .alias("longitude")
+)
+# Bin the data
+df = df.with_columns((pl.col("longitude").rank("dense") - 1).cast(pl.Int64).alias("longitude#"))
+
+# Post-process date_time
+# Fix the strings
+df = df.with_columns(
+    pl
+    .when(pl.col("date_time") == "")
+    .then(pl.lit(-1))
+    .otherwise(pl.col("date_time").str.to_datetime(strict=False).dt.hour())
+    .fill_null(-1)
+    .alias("hour")
+)
+# Bin the data
+df = df.with_columns((pl.col("hour").rank("dense") - 1).cast(pl.Int64).alias("hour#"))
+
+# Post-process xspeed and yspeed to account for -1 values
+new_max_x = pl.col("xspeed↕").max() + 1
+df = df.with_columns(pl.when(pl.col("xspeed") == -1).then(new_max_x).otherwise(pl.col("xspeed↕")).alias("xspeed↕"))
+new_max_y = pl.col("yspeed↕").max() + 1
+df = df.with_columns(pl.when(pl.col("yspeed") == -1).then(new_max_y).otherwise(pl.col("yspeed↕")).alias("yspeed↕"))
+
 
 # %% [markdown]
-# ## Step 3: Assess dataset balance
+# Now that we have fixed the data, we need to get the data back into a state to pass to our bias functions. We'll create a minimal shell using the {class}`.CodedMetadataLike` protocol.
+
+
+# %%
+class AdjustedMetadata(CodedMetadataLike):
+    def __init__(self, factors, labels, index2label, names, binned):
+        self._factors = factors
+        self._labels = labels
+        self._index2label = index2label
+        self._names = names
+        self._binned = binned
+
+    @property
+    def factor_names(self):
+        return self._names
+
+    @property
+    def factor_data(self):
+        return self._factors
+
+    @property
+    def class_labels(self):
+        return self._labels
+
+    @property
+    def index2label(self):
+        return self._index2label
+
+    @property
+    def is_binned(self):
+        return self._binned
+
+
+corrected_metadata = AdjustedMetadata(
+    factors=df
+    .filter(df["level"] == "instance")
+    .select([  # Only the binned data is needed
+        "altitude↕",
+        "compass_heading↕",
+        "drone#",
+        "frame↕",
+        "gimbal_heading↕",
+        "gimbal_pitch↕",
+        "height#",
+        "hour#",
+        "latitude#",
+        "longitude#",
+        "object_size↕",
+        "speed↕",
+        "storage#",
+        "width#",
+        "xspeed↕",
+        "yspeed↕",
+        "zspeed↕",
+    ])
+    .to_numpy(),
+    labels=df.filter(df["level"] == "instance").select("class_label").to_numpy().squeeze(),
+    index2label=ds.index2label,
+    names=[
+        "altitude",
+        "compass_heading",
+        "drone",
+        "frame",
+        "gimbal_heading",
+        "gimbal_pitch",
+        "height",
+        "hour",
+        "latitude",
+        "longitude",
+        "object_size",
+        "speed",
+        "storage",
+        "width",
+        "xspeed",
+        "yspeed",
+        "zspeed",
+    ],
+    binned=[
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        False,
+        True,
+        True,
+        True,
+    ],
+)
+
+# %% [markdown]
+# Now that the metadata is ready to go, you can begin analyzing the dataset for bias!
+
+# %% [markdown]
+# ## Assess dataset balance
 
 # %% [markdown]
 # The {class}`.Balance` class measures correlational relationships between metadata factors and classes in a dataset. It
@@ -207,44 +475,42 @@ metadata.continuous_factor_bins = {
 # The results can be retrieved using the _balance_ and _factors_ attributes of the output.
 
 # %%
-bal = Balance().evaluate(metadata)
+bal = Balance().evaluate(corrected_metadata)
 
 # %% [markdown]
 # The information provided by `Balance` may be visually understood with a heat map.
 
 # %%
-dep.plot(bal)
+dep.plot(bal, figsize=(10, 10))
 
 # %% [markdown]
-# The heatmap shows that the greatest correlations are in the bounding box locations (_xmin_ with _xmax_ and _ymin_ with
-# _ymax_) and the image dimensions (_height_ and _width_).
+# The heatmap shows that *storage* is highly correlated with many of the other factors, while *object_size* is only correlated with few other categories.
+# The greatest correlations are between things that one might expect to be correlated _latitude_ and _longitude_,
+# _drone_ and _storage_, the headings - *compass_heading* and *gimbal_heading*, and the size of the image - _height_ and _width_.
 #
-# Also the _ymax_ of the bounding box location is correlated with the _height_ of the image. It is not surprising that
-# _height_ and _width_ have correlation since many of the images are similarly sized.
+# However, the most important correlation to note is the correlation between *object_size* and *class_label*.
+# This tells us that this dataset doesn't do a good job of ensuring that each of the class objects is seen at different distances.
+# Thus, this dataset has bounding box bias - a model can learn class just by the size of the object - which will definitely lead to some shortcut learning and poor generalization.
 #
-# The correlations between _xmin_ and _xmax_ and between _ymin_ and _ymax_ suggests that there is repetition in bounding
-# box width and height across the objects. However, the fact that _pose_ has a value of 0.08 with _class_ means that a few
-# of the classes have specific poses across a fair percentage of the images for that class. An example of this would be
-# most _pottedplant_ images having the same _pose_ value.
-#
-# In addition to analyzing class and other factors, the balance function also analyzes metadata factors with individual
-# classes to identify relationships between only one class and secondary factors.
-#
-# You can visualize the classwise results for balance by setting the _plot_classwise_ parameter to _True_.
+# Let's investigate this further to see if this bias holds across all classes or is concentrated in a few classes.
 
 # %%
-dep.plot(bal, plot_classwise=True)
+dep.plot(bal, plot_classwise=True, figsize=(12, 4.5))
 
 # %% [markdown]
-# The classwise heatmap takes each class against the rest and asks how much of that split every metadata factor
-# accounts for, so a bright cell names a factor that separates one class from the others. Here no factor does: the
-# metadata says little about any individual class beyond what its own cardinality would produce by chance.
+# The classwise heatmap shows that the main culprits of our bounding box bias are the classes - boat, buoy, and swimmer.
 #
-# The class label itself is not a column here — its mutual information with a single class is 1.0 by construction and
-# would say nothing. Read class frequency off {func}`.label_stats` instead.
+# The heatmap also shows us that there is some correlation with _hour_ and _storage_.
+# The correlation with _storage_ tells us that they probably staged the data collection to ensure that they had different setup variations during data collection.
+# The correlation with _hour_ tells us that the model would be able to guess if it should look for the *life_saving_appliances* class based on internal aspects of the image such as brightness or contrast instead of the object itself.
+#
+# To fix the bounding box bias more images at different distances from the object, so that each object appears at different sizes, will need to be collected.
+# To fix the time of day bias more images of the *life_saving_appliances* class and probably the *jetski* class should be collected at varying times of day.
+#
+# Next, let's assess if there is any additional bias by analyzing the datasets diversity.
 
 # %% [markdown]
-# ## Step 4: Assess dataset diversity
+# ## Assess dataset diversity
 
 # %% [markdown]
 # The {class}`.Diversity` evaluator measures the evenness or uniformity of the sampling of metadata factors over a
@@ -254,58 +520,58 @@ dep.plot(bal, plot_classwise=True)
 # The results can be retrieved using the _diversity_index_ attribute of the output.
 
 # %%
-div = Diversity().evaluate(metadata)
+div = Diversity().evaluate(corrected_metadata)
 
 # %% [markdown]
-# Again, it's often easiest to see the differences between the different factors when visualizing them using a bar chart
+# It's often easiest to see the differences between the different factors when visualizing them using a bar chart
 # to show the factor-class analysis.
 
 # %%
-dep.plot(div)
+dep.plot(div, figsize=(10, 5.5))
 
 # %% [markdown]
-# In the results above, the factors _truncated_ and _occluded_ have values near 1, meaning that there is relatively little
-# or no bias in these factors.
+# In the results above, there are many factors that have values over 0.5 indicating a small potential for bias,
+# and _speed_ and *object_size* have values near 1, meaning that there is relatively little or no sampling bias in these factors.
 #
 # The categories of most interest are those that are between 0.4 and 0.1 because this region represents skewed value
 # distributions for the factor.
 #
 # The following factors fall into this category:
 #
-# - _class_
-# - _width_
+# - *class_label*
+# - _altitude_
 # - _height_
-# - _segmented_
-# - _difficult_
+# - _width_
 #
-# These factors contain bias that should be addressed either by adding or removing data to even out the sampling. For
-# instance, the _class_ factor highlights that there is unevenness in the number of data points per class.
+# These factors contain sampling bias which means that there is significantly more of one value in that category than others.
+# For instance, the *class_label* factor highlights that there is unevenness in the number of data points per class.
 #
-# In addition to analyzing class, the diversity function also analyzes metadata factors with individual classes to assess
-# uniformity of metadata factors within a class. You can visualize the classwise results by setting the `plot_classwise`
-# parameter to True.
+# Whether you need to do anything about the low values in _height_ and _width_, depend on many factors including
+# how you perform your pre-processing steps before the model sees the image and whether or not the less common image sizes
+# contain only a select number of classes instead of all classes.
+# The low value in _altitude_ explains a little why there is a large correlation between *class_label* and *object_size* -
+# there isn't very much variety in altitude.
+#
+# The diversity function also analyzes metadata factors by individual classes to assess
+# uniformity of metadata factors within a class. This can help identify specific class biases which may occur.
+# You can visualize the classwise results by setting the `plot_classwise` parameter to True.
 
 # %%
-dep.plot(div, plot_classwise=True)
+dep.plot(div, plot_classwise=True, figsize=(12, 4.5))
 
 # %% [markdown]
 # These results expand the above results on a classwise basis.
 #
-# Things to look for here are large variances for a given factor across the different classes. For example, _pose_ has
-# values ranging from 0.01 to 0.84, which means that a few classes have almost uniform selection of the different _pose_
-# values while other classes essentially only have one _pose_ value. This makes sense as the _bottle_ or _pottedplant_
-# class does not have multiple _pose_ directions, while the _person_ class does.
+# Things to look for here are large variances for a given factor across the different classes. For example, _drone_ has
+# values ranging from 0.55 to 0.10, which means that most of the images of _buoy_ and *life_saving_appliances* were
+# taken with a specific drone, while _swimmer_ was spread out over the different types of drone. This can result in subtle
+# differences in the images that a model can pick up leading to an opportunity for shortcut learning.
 #
-# What needs to be further investigated are things like whether the _sofa_ class should have a _pose_ direction, because a
-# diversity value of 0.4 means that a few of the images do while others do not.
+# The other categories with concerning diversity values are *object_size* and _altitude_ (which were discussed above), and
+# *gimbal_pitch* with that low 0.17 value for *life_saving_appliances* meaning that the images have a near constant perspective of this class.
 #
-# Also, the _cat_ class has a low score signifying that most of the images fall into one or two categories rather than
-# being spread even across the categories. This highlights an error in the data collection process — the value was not
-# specified for most _cat_ images and therefore defaulted to "Unspecified".
-#
-# An alternative error would be a dataset in which the _cat_ images have most cats facing a specific direction, which
-# would require additional data to overcome the bias, but that is not the case for this dataset. It has plenty of cats
-# facing each direction, but only a few of them contain a _pose_ value.
+# Due to the large number of missing metadata in many of the other categories, its hard to say how much the different
+# aspects of the categories could be contributing to bias and shortcut learning.
 
 # %% [markdown]
 # ## Conclusion
@@ -313,7 +579,8 @@ dep.plot(div, plot_classwise=True)
 # %% [markdown]
 # Having analyzed the dataset for bias with multiple metrics, the conclusion is that this dataset has bias. Training a
 # model on this dataset has the potential to learn shortcuts and underperform on operational data if the biases are not
-# representative of biases in the operational dataset.
+# representative of biases in the operational dataset. It also means that a model trained on this dataset, isn't going
+# to generalize very well.
 #
 # The metadata categories identified by the `Balance` and `Diversity` evaluators contain issues such as imbalanced classes
 # and imbalanced parameters per class. DataEval isn't able to tell you exactly why they are imbalanced, but it highlights
@@ -325,26 +592,15 @@ dep.plot(div, plot_classwise=True)
 # Good luck with your data!
 
 # %% [markdown]
-# ## What's next
+# ## Next steps
 #
-# In addition to identifying bias and correlations in a dataset, DataEval offers additional tutorials to help you learn
-# about dataset analysis:
-#
-# - To clean a dataset use the [Data Cleaning Guide](tt_clean_dataset.py).
-# - To identify coverage gaps and outliers use the [Assessing the Data Space Guide](tt_assess_data_space.py).
-# - To monitor data for shifts during operation use the [Data Monitoring Guide](tt_monitor_shift.py).
-#
-# To learn more about the balance and diversity evaluators, see the [Balance](../concepts/DatasetBias.md) and
-# [Diversity](../concepts/DatasetBias.md) concept pages.
-
-# %% [markdown]
-# ## Related how-to guides
-#
-# Apply bias analysis to your own data with these focused, task-oriented guides:
-#
-# - [Apply statistical outputs as intrinsic metadata factors](../notebooks/h2_add_intrinsic_factors.py)
-# - [Compare label distributions between two datasets](../notebooks/h2_measure_label_independence.py)
-# - [Detect undersampled subsets of datasets](../notebooks/h2_detect_undersampling.py)
+# - [Dataset bias concepts](../concepts/DatasetBias.md) — Learn about normalized mutual information and diversity indices for measuring dataset bias.
+# - [Clean dataset tutorial](./tt_clean_dataset.py) — Identify duplicate, corrupt, and low-quality samples to prepare a dataset for model training.
+# - [Assess data space tutorial](./tt_assess_data_space.py) — Identify coverage gaps, undersampled clusters, and outliers in dataset representations.
+# - [Monitor shift tutorial](./tt_monitor_shift.py) — Monitor feature distributions over time to detect operational data drift.
+# - [Add intrinsic factors](./h2_add_intrinsic_factors.py) — Apply statistical image metrics as intrinsic factors in dataset metadata.
+# - [Measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
+# - [Detect undersampling](./h2_detect_undersampling.py) — Identify undersampled subsets and rare feature combinations in dataset metadata.
 
 # %% [markdown]
 # ## On your own

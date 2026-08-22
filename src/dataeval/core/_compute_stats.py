@@ -1023,11 +1023,6 @@ def compute_stats(  # noqa: C901
 
     >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=False)
 
-    Compute statistics for both full images and boxes with per-channel breakdown
-    (``per_channel`` is deprecated — prefer ``channels`` above):
-
-    >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=True, per_channel=True)
-
     Compute background statistics — the scene behind the annotations — alongside the
     whole-image ones:
 

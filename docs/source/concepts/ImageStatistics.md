@@ -68,8 +68,8 @@ it. There is no encoding to decode.
 
 For that data, **visual statistics report NaN**. Not an error: *how bright is this
 elevation map* is a question with no answer, and NaN is how a statistic says so.
-Pixel statistics are unaffected, because the mean of a temperature band is a
-perfectly good mean.
+Pixel statistics (and other statistics that don't rely on an interval) are unaffected,
+because the mean of a temperature band is a perfectly good mean.
 
 Declare the interval to get a reading back:
 
@@ -80,15 +80,11 @@ compute_stats(elevation_data, stats=ImageStats.VISUAL, value_range=(-2000.0, 200
 A declaration says *these are physical values spanning this range*. It implies no bit
 depth, so `DIMENSION_DEPTH` reports NaN for such data whether or not you declare one.
 
-Pixel statistics that need an interval answer NaN too: `PIXEL_HISTOGRAM` and
-`PIXEL_ENTROPY` always, and the rest of the family under
-`normalize_pixel_values=True`, which is a request to divide by a range that does not
-exist. A warning names `value_range` when this happens, because an all-NaN column is
-easy to miss.
+Pixel statistics that need an interval also answer NaN: `PIXEL_HISTOGRAM`,
+`PIXEL_ENTROPY`, and the rest of the statistics under `normalize_pixel_values=True`,
+which is a request to divide by a range that does not exist.
 
-Statistics that need no interval are unaffected. An unnormalized mean of temperature
-readings is a perfectly good mean, and reporting it is the whole point of keeping the
-pixel family in native units.
+When this happens, a warning names `value_range`, because an all-NaN column is easy to miss.
 
 ## Which statistics care about scale at all
 
@@ -105,7 +101,7 @@ are rescaled:
 by the same reference the visual family uses, which makes a pixel *distribution*
 comparable across bit depths.
 
-It does not touch visual statistics, which already are.
+It does not touch visual statistics, which already are scaled.
 
 ## Choosing between them
 

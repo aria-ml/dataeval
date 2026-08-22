@@ -20,7 +20,7 @@
 #
 # Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
 #
-# Relevant personas: Data Engineer, T&E Engineer
+# Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 
 # %% [markdown]
 # ## What you'll do
@@ -111,7 +111,7 @@ from dataeval.flags import ImageStats
 #
 # If this data is already on your computer, change `"./data"` to wherever it is stored and set `download` to `False`.
 #
-# You will construct a [dataset view](h2_build_dataset_views.py) using {class}`.View` with the {class}`.Shuffle` and
+# You will construct a [dataset view](./h2_build_dataset_views.py) using {class}`.View` with the {class}`.Shuffle` and
 # {class}`.Limit` operations to sample 200 of its images so the tutorial runs quickly. They are drawn with a seeded
 # shuffle rather than taken from the front of the split: SeaDrone is ordered by capture, so the first 200 images come
 # from only a couple of sorties and are not representative of the collection. The seed keeps everyone's sample
@@ -694,10 +694,19 @@ print("ready:", metadata.level_counts)
 #
 # ## Next steps
 #
-# - [Metadata Levels](../concepts/MetadataLevels.md) — the full level model, including the four-level graph used by
-#   tracking datasets
-# - [How to reason about factor binning across levels](h2_bin_factors_by_level.py) — why each factor is discretized at
-#   its own level, with the numbers
-# - [How to specify custom statistics on object detection datasets](h2_custom_image_stats_object_detection.py) — the
-#   `compute_stats` flags and region switches from Step 5, on their own terms
-# - [Identify bias and correlations](tt_identify_bias.py) — the bias evaluators used here, in depth
+# - [Metadata Levels](../concepts/MetadataLevels.md) — The full level model, including the four-level graph used by
+#   tracking datasets.
+# - [Identify bias and correlations](./tt_identify_bias.py) — The bias evaluators used here, in depth.
+# - [How to reason about factor binning across levels](./h2_bin_factors_by_level.py) — Why each factor is discretized at
+#   its own level, with the numbers.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — The
+#   `compute_stats` flags and region switches from Step 5, on their own terms.
+#
+# ## On your own
+#
+# Try applying multi-level metadata analysis to your own object detection or tracking dataset:
+#
+# - Create a {class}`.Metadata` object and inspect `metadata.levels` and `metadata.level_counts` to see the hierarchy of your data.
+# - Compare an image-level factor at both the `unit` and `instance` levels using {meth}`.Metadata.at` to evaluate potential aggregation bias.
+# - Use {func}`.compute_stats` with `per_image=True`, `per_target=True`, and `per_background=True` to compute regional factors across your dataset.
+# - Aggregate detection-level metrics up to the image level using {meth}`.Metadata.agg` and run {class}`.Balance` to check for dataset correlations.

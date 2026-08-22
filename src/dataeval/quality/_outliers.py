@@ -963,13 +963,16 @@ class Outliers(Evaluator):
     extractor : FeatureExtractor, optional
         Feature extractor for cluster-based outlier detection. When provided, embeddings
         are extracted and clustered to find semantic/visual outliers in embedding space.
+    batch_size : int or None, default None
+        Batch size for feature extraction during cluster-based detection. If None, uses DataEval
+        default. Must be set by either parameter or global default if extractor is provided.
+    cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
+        Clustering algorithm for cluster-based detection.
     cluster_threshold : ThresholdLike or None, default None
         Threshold configuration for cluster-based outlier detection. When None,
         defaults to ``ZScoreThreshold(upper_multiplier=2.5)``.
         Accepts the same formats as ``outlier_threshold``.
         Only used when ``extractor`` is provided.
-    cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
-        Clustering algorithm for cluster-based detection.
     n_clusters : int, optional
         Expected number of clusters. For HDBSCAN, this is a hint that adjusts
         min_cluster_size. For KMeans, this is the exact number of clusters.
@@ -1092,9 +1095,6 @@ class Outliers(Evaluator):
         outlier_threshold : ThresholdLike | Mapping[str, ThresholdLike] | None, default None
             Threshold configuration. When None, uses ``AdaptiveThreshold(3.5)``
             (Double-MAD with asymmetric bounds). See :class:`Outliers` for full description.
-        cluster_threshold : ThresholdLike or None, default None
-            Threshold configuration for cluster-based detection. When None,
-            defaults to ``ZScoreThreshold(upper_multiplier=2.5)``.
         extractor : FeatureExtractor or None, default None
             Feature extractor for cluster-based outlier detection.
         batch_size : int or None, default None
@@ -1102,6 +1102,9 @@ class Outliers(Evaluator):
             default. Must be set by either parameter or global default if extractor is provided.
         cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
             Clustering algorithm for cluster-based detection.
+        cluster_threshold : ThresholdLike or None, default None
+            Threshold configuration for cluster-based detection. When None,
+            defaults to ``ZScoreThreshold(upper_multiplier=2.5)``.
         n_clusters : int or None, default None
             Expected number of clusters.
         """

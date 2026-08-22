@@ -40,7 +40,7 @@
 # 1. A labeled test image dataset to evaluate the label distribution of
 
 # %% [markdown]
-# ### Getting started
+# ## Getting started
 #
 # Let's import the required libraries needed to set up a minimal working example
 
@@ -97,21 +97,13 @@ assert 0 <= results["chi_squared"] < 4
 assert 0.9 < results["p_value"] <= 1.0
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md)
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to measure train and test dataset divergence](./h2_measure_divergence.py)
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py)
-# - [How to run clustering analysis](./h2_cluster_analysis.py)
-#
-# ### Tutorials
-#
-# - [Monitor shifts in operational data](./tt_monitor_shift.py)
-# - [Assess an unlabeled data space](./tt_assess_data_space.py)
-# - [Identify bias and correlations](./tt_identify_bias.py)
+# - [Distribution Shift](../concepts/DistributionShift.md) — Learn about types of shift and techniques to quantify distribution changes.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational data over time.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate unlabeled image data structure and clustering quality.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
+# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.
+# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find rare or underrepresented clusters in your dataset.
+# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster feature embeddings to inspect data grouping.

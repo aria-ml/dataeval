@@ -59,6 +59,11 @@
 # 1. A Python environment with `dataeval` installed
 # 1. No data of your own; this guide builds a small synthetic dataset in memory
 
+# %% [markdown]
+# ## Getting started
+#
+# First import the required libraries needed to set up the example.
+
 # %% tags=["remove_cell"]
 try:
     import google.colab  # noqa: F401
@@ -285,18 +290,10 @@ print(f"weather over detections: clear={detection_rows.count('clear')}, rainy={d
 #   is about images
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-# - [Acting on Results](../concepts/ActingOnResults.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to apply DataEval's statistical outputs to Metadata](./h2_add_intrinsic_factors.py)
-# - [How to wrap a DataFrame-backed object detection dataset](./h2_wrap_dataframe_od_dataset.py)
-#
-# ### Tutorials
-#
-# - [Identify bias and correlations](./tt_identify_bias.py)
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about bias measurement and factor binning strategies.
+# - [Acting on Results](../concepts/ActingOnResults.md) — Understand strategies for handling biased or imbalanced data factors.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Identify bias and correlations across dataset factor levels.
+# - [How to apply DataEval's statistical outputs to Metadata](./h2_add_intrinsic_factors.py) — Augment dataset metadata with calculated statistical factors.
+# - [How to wrap a DataFrame-backed object detection dataset](./h2_wrap_dataframe_od_dataset.py) — Wrap custom DataFrame object detection datasets for DataEval.

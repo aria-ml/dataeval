@@ -44,7 +44,7 @@
 #    - `dataeval`
 
 # %% [markdown]
-# ### Getting started
+# ## Getting started
 #
 # Let's import the required libraries needed to set up a minimal working example
 
@@ -92,7 +92,7 @@ mnist = MNIST(root="./data/", image_set="train", transforms=transforms, download
 extractor = FlattenExtractor()
 
 # %% [markdown]
-# ## 1. All ten digits
+# ## All ten digits
 #
 # First we measure the ceiling for the full task: telling all ten digits apart. We take a class-balanced subset of 6,000
 # images (600 per digit) so that no class dominates the estimate.
@@ -115,7 +115,7 @@ assert 0.92 < 1 - ber_all["upper_bound"] < 0.95
 # digits are easily confused (4/9, 3/5/8), so no classifier can reliably do better on this data.
 
 # %% [markdown]
-# ## 2. Narrow the task to three digits (1, 4, 9)
+# ## Narrow the task to three digits (1, 4, 9)
 #
 # If the application only needs to distinguish a few digits, the task is easier. We keep just 1, 4, and 9 and, with the
 # same 6,000-image budget concentrated on fewer classes, balance to 2,000 per class.
@@ -138,7 +138,7 @@ assert 0.96 < 1 - ber_149["upper_bound"] < 0.98
 # a property of the _task_, not just the data. But 97% still does not meet our 99% requirement.
 
 # %% [markdown]
-# ## 3. Reformulate as a binary problem (1 vs. not-1)
+# ## Reformulate as a binary problem (1 vs. not-1)
 #
 # Suppose the real question is only "is this a 1?". We collapse the three-digit labels into a binary target and re-check
 # feasibility on the same images.
@@ -172,20 +172,20 @@ assert 0.99 < 1 - ber_binary["upper_bound"] < 0.998
 # you to reformulate it: narrowing the class set (or merging classes) raises the achievable ceiling.
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Performance Limits](../concepts/PerformanceLimits.md)
-# - [Embeddings](../concepts/Embeddings.md)
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
+# ### Concepts
 #
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py)
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py)
-# - [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand Bayes Error Rate and theoretical performance ceilings for classification tasks.
+# - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional space.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias and coverage concepts in DataEval.
 #
 # ### Tutorials
 #
-# - [Introduction to data cleaning](./tt_clean_dataset.py)
+# - [Introduction to data cleaning](./tt_clean_dataset.py) — Identify and clean corrupted, duplicated, or mislabeled samples.
+#
+# ### How-to guides
+#
+# - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model performance curves as a function of dataset size.
+# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented regions in dataset feature space.
+# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Configure global execution options including random seeds and execution devices.

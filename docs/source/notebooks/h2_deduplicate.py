@@ -33,7 +33,7 @@
 # %% [markdown]
 # ### What you will need
 #
-# 1. A python envornment with following packages installed:
+# 1. A python environment with following packages installed:
 #    - dataeval
 #    - maite-datasets
 # 1. A dataset to analyze
@@ -110,7 +110,7 @@ identifyDuplicates = Duplicates()
 results = identifyDuplicates.evaluate(duplicates_ds)
 
 # %% [markdown]
-# The results can be viewd as a DataFrame with exact and near groups enumerated.
+# The results can be viewed as a DataFrame with exact and near groups enumerated.
 
 # %%
 display(results)
@@ -129,24 +129,16 @@ for k, v in duplicates.items():
     assert [v, k] in results.exact
 
 # %% [markdown]
-# ## Related concepts
+# ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md)
-# - [Clustering](../concepts/Clustering.md)
-# - [Acting on Results](../concepts/ActingOnResults.md)
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md)
-#
-# ## See also
-#
-# ### How-to guides
-#
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py)
-# - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py)
-# - [How to run clustering analysis](./h2_cluster_analysis.py)
-# - [How to encode images with ONNX models](./h2_encode_with_onnx.py)
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py)
-#
-# ### Tutorials
-#
-# - [Introduction to data cleaning](./tt_clean_dataset.py)
-# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py)
+# - [Acting on Results](../concepts/ActingOnResults.md) — Learn strategies for addressing dataset issues identified during evaluation.
+# - [Clustering](../concepts/Clustering.md) — Understand clustering techniques for grouping similar data points and detecting patterns.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data quality issues.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Evaluate bias and coverage across metadata factors in your dataset.
+# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
+# - [Introduction to data cleaning](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
+# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors such as dimensions and pixel statistics to dataset metadata.
+# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — Encode image datasets into vector embeddings using ONNX runtime models.
+# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings and factors to discover structural groupings in your data.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Configure custom image statistics across full images, bounding boxes, and backgrounds.
+# - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py) — Plot and visualize dataset anomalies, duplicates, and quality issues.

@@ -1476,7 +1476,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         -------
         Metadata
             A copy whose :attr:`view` is ``level``, sharing this instance's structuring
-            and binning work. The original is untouched.
+            and binning work.
 
         Raises
         ------
@@ -1490,6 +1490,14 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         the metadata is being handed to an evaluator, so that two evaluators can read
         two levels of the same dataset at once.
 
+        The original reports every value it reported before, but it is not left alone:
+        structuring and binning run on it here if they have not run already, so that the
+        copy shares that work instead of repeating it on a store of its own. Binning adds
+        companion columns and bins each factor at its own level, so nothing readable
+        moves — what moves is *when*. A warning a factor would have raised at the copy's
+        first factor access is raised at this call instead, and a binning configuration
+        that cannot be applied fails here rather than there.
+
         Examples
         --------
         >>> metadata = Metadata(dataset)
@@ -1501,6 +1509,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         50
         """
         self._structure()
+        self._bin()
         resolved = self._resolve_level(level)
 
         view = copy.copy(self)
@@ -2086,6 +2095,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         still — neither goes through this.
         """
         self._structure()
+        self._bin()
         if self._flat is None:
             self._flat = self._store.flat()
         return self._flat
@@ -2733,6 +2743,7 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         50
         """
         self._structure()
+        self._bin()
         return self._store.resolve(self._resolve_level(level))
 
     def _empty_projection(self, dtype: Any) -> NDArray[Any]:
@@ -3466,13 +3477,16 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         """Pick the dataframe column a new factor should be written to.
 
         Reserved columns are load-bearing — ``level`` drives every level filter — so a
-        colliding factor is renamed rather than allowed to overwrite one.
+        colliding factor is renamed rather than allowed to overwrite one. So is one named
+        into the namespace binning writes its companions into, which ``taken`` cannot
+        speak for: it holds the columns present *now*, and a companion this factor would
+        be mistaken for may not have been written yet.
         """
         safe = safe_column_name(name)
         if safe != name:
             _logger.warning(
-                f"The factor name '{name}' collides with a reserved metadata column and has been "
-                f"stored as '{safe}' instead.",
+                f"The factor name '{name}' collides with a column name DataEval reserves and has "
+                f"been stored as '{safe}' instead.",
             )
 
         if safe not in taken or overwrite:
