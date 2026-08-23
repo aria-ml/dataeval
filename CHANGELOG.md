@@ -1,45 +1,8 @@
-[//]: # (80617a40fa719cf50a2fd1e834a212f25798a93f)
+[//]: # (eba1858b705a4655280012619f01fbb8fc125752)
 
 # DataEval Change Log
 
-## v1.1.0-rc6
-
-🛠️ **Improvements and Enhancements**
-
-- `80617a40` - [impr] Expose code_names from Metadata
-
-📝 **Miscellaneous**
-
-- `e29313e9` - [docs] Address feedback on concept page prose
-- `000b2d21` - Pre-release v1.1.0-rc5
-
-## v1.1.0-rc5
-
-🛠️ **Improvements and Enhancements**
-
-- `b0470902` - [impr] Metadata binning as Policy
-- `aa7c0a4b` - [impr] Change balance and mutual_info binned behavior
-
-👾 **Fixes**
-
-- `bb541b8d` - [fix] Normalize Linfoot branch by its reachable maximum and clip mixed pairs
-
-📝 **Miscellaneous**
-
-- `a4a61dbe` - [docs] Adjust findings for background object comparison
-- `ab70513b` - [docs] Update binning linfoot ceiling
-- `1b6c4175` - [docs] Update ROADMAP.md with longer-term vision
-- `f1996b53` - [docs] Update roadmap
-- `2c06676a` - [misc] Implement polish and consistency fixes
-- `516e4b40` - [devsecops] Update markdownlint rules
-- `7964e3d2` - [docs] Address docstring inconsistencies and broken links
-- `6006940e` - [docs] Small edits to phrasing for clarity
-- `5075f184` - [devsecops] Remove init script and clear up torchvision dependency
-- `050463ea` - [docs] Remove mention of Conform - not shipped in 1.0
-- `67fee229` - Pre-release v1.1.0-rc4
-- `e95d37f9` - [docs] Add an input requirements page
-
-## v1.1.0-rc4
+## v1.1.0
 
 🌟 **Feature Release**
 
@@ -48,94 +11,6 @@
 - `53780702` - [feat] Add new view transform operations
 - `dfe08764` - [feat] Add per_background statistics measuring the scene behind an image's boxes
 - `dffc4ccf` - [impr] Generalize metadata levels to allow for modalities other than vision
-
-🛠️ **Improvements and Enhancements**
-
-- `2bf18e2d` - Fix some spelling errors
-- `a380758f` - [impr] Normalize logging namespaces to public API
-- `3a5550da` - [feat] Handle equivalence concepts in Ontology
-- `8e4b5f18` - Fix add factors to work with multi-level stats
-- `3d1eedd2` - [feat] Add MOTStructurer and sequence level
-
-👾 **Fixes**
-
-- `577fd466` - [fix] Balance chance correction
-- `2287c08f` - [fix] Typecheck issue in docs
-- `1be1935c` - [fix] Drop and report level splits that hold no values at their level
-- `f4d4a281` - [fix] Return NaN, not zero entropy, for a region that was never measured
-- `94a00d1f` - [fix] Anchor bit depth on the whole datum so a box scales like its image
-
-📝 **Miscellaneous**
-
-- `ce9f14a7` - [docs] Add an input requirements page
-- `3b042c1d` - [docs] Add migration/upgrade guide from v1.0 to v1.1
-- `16d7ff36` - [docs] Shrink execution cost for tutorial
-- `2bce5393` - [devsecops] Return numba cache warm script and move to test
-- `540c55cf` - [docs] Add binning concept page
-- `6d392d69` - [docs] Add how-to guide for detecting drift from model outputs
-- `253a9dc5` - [docs] Enable more robust spellcheck, asterisk emphasis enforcement, and fix oxford commas
-- `e165466a` - [docs] Tweak the grid item card ordering
-- `b0db53db` - [deps] Bump maite-datasets and add typing stubs for typecheck
-- `70969bb9` - [docs] Add background comparison how-to
-- `b690ae10` - [devsecops] Show MR title in preview page
-- `07c5298d` - [docs] Fix markdownlint errors
-- `7e3402cc` - [devsecops] Fix SAST exclusion paths
-- `9ad91d62` - [docs] Add metadata levels concept page
-- `baf6900e` - [docs] Tweak installation notes for better pytorch instructions
-- `857ca296` - [docs] Improve execution time and add more concepts to tutorial
-- `3c0455c2` - [devsecops] Fix pre-release duplicate run
-- `f29117bd` - Pre-release v1.1.0-rc3
-
-## v1.1.0-rc3
-
-👾 **Fixes**
-
-- `0f6ec081` - [fix] Drop parents listing itself as a child as trivial
-
-📝 **Miscellaneous**
-
-- `1ade5252` - [docs] Silence ipykernelapp warnings
-- `3bc47ff5` - [deps] Bump onnxruntime-gpu minimum for py3.14 wheels
-- `40c4aca2` - [deps] Freeze onnxruntime-gpu for cuda 12.X
-- `a56cccac` - Pre-release v1.1.0-rc2
-
-## v1.1.0-rc2
-
-🛠️ **Improvements and Enhancements**
-
-- `fa9acf4f` - [impr] Metadata restructure to prepare for additional dataset modalities
-- `e7af0896` - Enhance Metadata add_factors to allow for combined factors
-
-👾 **Fixes**
-
-- `d5f508bf` - [fix] Additional lint and type rules
-
-📝 **Miscellaneous**
-
-- `e6663c24` - [deps] Bump dependencies
-- `e4a7950f` - [docs] Fix broken xrefs and add a unit test to validate
-- `18f66392` - [devsecops] Prevent accidental resurrection of orphan ipynb files in docs
-- `e8697e31` - [misc] Refactor types to submodule
-- `34ae329c` - [docs] Add validation and trust section to concepts page
-- `b303a6f1` - Pre-release v1.1.0-rc1
-
-## v1.1.0-rc1
-
-🛠️ **Improvements and Enhancements**
-
-- `c51f889c` - [impr] Merge Select and Conform into View
-- `9769eaef` - [impr] Expand input flexibility for all evaluators and helpers
-
-📝 **Miscellaneous**
-
-- `6cb7c0d3` - [deps] Restrict opencv-python to <=4.12.0.88 for FIPS compatibility
-- `78b3ebd3` - [devsecops] Update components to v1.2.0
-- `61c52acf` - Pre-release v1.1.0-rc0
-
-## v1.1.0-rc0
-
-🌟 **Feature Release**
-
 - `ebe557fd` - [feat] Develop representation and coverage evaluators with label/ontology and embedding analysis
 - `d0c4488f` - [feat] Add multi-object tracking (MOT) support: `Track` type, build_tracks, and per-track statistics
 - `42410c52` - [feat] Add detection crop transform to help extract detection embeddings
@@ -164,6 +39,18 @@
 
 🛠️ **Improvements and Enhancements**
 
+- `80617a40` - [impr] Expose code_names from Metadata
+- `b0470902` - [impr] Metadata binning as Policy
+- `aa7c0a4b` - [impr] Change balance and mutual_info binned behavior
+- `2bf18e2d` - Fix some spelling errors
+- `a380758f` - [impr] Normalize logging namespaces to public API
+- `3a5550da` - [feat] Handle equivalence concepts in Ontology
+- `8e4b5f18` - Fix add factors to work with multi-level stats
+- `3d1eedd2` - [feat] Add MOTStructurer and sequence level
+- `fa9acf4f` - [impr] Metadata restructure to prepare for additional dataset modalities
+- `e7af0896` - Enhance Metadata add_factors to allow for combined factors
+- `c51f889c` - [impr] Merge Select and Conform into View
+- `9769eaef` - [impr] Expand input flexibility for all evaluators and helpers
 - `d8824ab4` - [impr] Move data organization related concepts to data module
 - `a6487bea` - [impr] Allow image size overrides per IR requirements
 - `1b2967c9` - [impr] Support ragged inputs and pre/postprocess hooks in predict
@@ -174,9 +61,19 @@
 - `077e5903` - Develop null model metrics for object detection
 - `ed718126` - New sample-size-adaptive threshold for is_continuous()
 - `f1dbe2c2` - Use our standard normalized mutual information in metadata insights.
+- `7efe6a7e` - [impr] Optimize performance on compute_stats
+- `bcb84589` - [impr] Expose source and root datasets from View and remove extraneous attribute from DetectionCrops
 
 👾 **Fixes**
 
+- `bb541b8d` - [fix] Normalize Linfoot branch by its reachable maximum and clip mixed pairs
+- `577fd466` - [fix] Balance chance correction
+- `2287c08f` - [fix] Typecheck issue in docs
+- `1be1935c` - [fix] Drop and report level splits that hold no values at their level
+- `f4d4a281` - [fix] Return NaN, not zero entropy, for a region that was never measured
+- `94a00d1f` - [fix] Anchor bit depth on the whole datum so a box scales like its image
+- `0f6ec081` - [fix] Drop parents listing itself as a child as trivial
+- `d5f508bf` - [fix] Additional lint and type rules
 - `c4a69cf8` - [fix] Counting bug in ClassBalance and update tests
 - `c6a85c26` - [fix] Ensure no device mismatch on mmd and gmm tensors
 - `eaf15b5d` - [fix] Address scipy>=1.18 change for NaN on mannwhitneyu test for zero variance values
@@ -199,9 +96,51 @@
 - `8518c1c4` - [fix] Regression in Metadata handling of classes in datasets with unobserved class labels
 - `2964321b` - [fix] Ensure Metadata index2label mapping is robust
 - `cf3c046a` - [fix] Bump version and update pyproject.toml authors and development status
+- `a6e9f0e0` - [fix] Use integer figsize dimensions in bias tutorial notebook
+- `0943a51b` - [fix] Pass dtype to ensure behavior stable on all versions of NumPy
+- `af841f91` - [fix] Intermittent test failure with uninitialized memory
 
 📝 **Miscellaneous**
 
+- `e29313e9` - [docs] Address feedback on concept page prose
+- `a4a61dbe` - [docs] Adjust findings for background object comparison
+- `ab70513b` - [docs] Update binning linfoot ceiling
+- `1b6c4175` - [docs] Update ROADMAP.md with longer-term vision
+- `f1996b53` - [docs] Update roadmap
+- `2c06676a` - [misc] Implement polish and consistency fixes
+- `516e4b40` - [devsecops] Update markdownlint rules
+- `7964e3d2` - [docs] Address docstring inconsistencies and broken links
+- `6006940e` - [docs] Small edits to phrasing for clarity
+- `5075f184` - [devsecops] Remove init script and clear up torchvision dependency
+- `050463ea` - [docs] Remove mention of Conform - not shipped in 1.0
+- `e95d37f9` - [docs] Add an input requirements page
+- `ce9f14a7` - [docs] Add an input requirements page
+- `3b042c1d` - [docs] Add migration/upgrade guide from v1.0 to v1.1
+- `16d7ff36` - [docs] Shrink execution cost for tutorial
+- `2bce5393` - [devsecops] Return numba cache warm script and move to test
+- `540c55cf` - [docs] Add binning concept page
+- `6d392d69` - [docs] Add how-to guide for detecting drift from model outputs
+- `253a9dc5` - [docs] Enable more robust spellcheck, asterisk emphasis enforcement, and fix oxford commas
+- `e165466a` - [docs] Tweak the grid item card ordering
+- `b0db53db` - [deps] Bump maite-datasets and add typing stubs for typecheck
+- `70969bb9` - [docs] Add background comparison how-to
+- `b690ae10` - [devsecops] Show MR title in preview page
+- `07c5298d` - [docs] Fix markdownlint errors
+- `7e3402cc` - [devsecops] Fix SAST exclusion paths
+- `9ad91d62` - [docs] Add metadata levels concept page
+- `baf6900e` - [docs] Tweak installation notes for better pytorch instructions
+- `857ca296` - [docs] Improve execution time and add more concepts to tutorial
+- `3c0455c2` - [devsecops] Fix pre-release duplicate run
+- `1ade5252` - [docs] Silence ipykernelapp warnings
+- `3bc47ff5` - [deps] Bump onnxruntime-gpu minimum for py3.14 wheels
+- `40c4aca2` - [deps] Freeze onnxruntime-gpu for cuda 12.X
+- `e6663c24` - [deps] Bump dependencies
+- `e4a7950f` - [docs] Fix broken xrefs and add a unit test to validate
+- `18f66392` - [devsecops] Prevent accidental resurrection of orphan ipynb files in docs
+- `e8697e31` - [misc] Refactor types to submodule
+- `34ae329c` - [docs] Add validation and trust section to concepts page
+- `6cb7c0d3` - [deps] Restrict opencv-python to <=4.12.0.88 for FIPS compatibility
+- `78b3ebd3` - [devsecops] Update components to v1.2.0
 - `2d24fa7c` - [test] Address code coverage gaps
 - `f374426c` - [depr] Switch deprecated ClassifierUncertaintyExtractor to use new logic internally
 - `885102d6` - [misc] Change default value for normalize_pixel_values
@@ -251,6 +190,19 @@
 - `6ddc30b1` - [deps] Bump maite-datasets to v0.0.12
 - `d94ea95f` - [devsecops] Update changelog spacing and correct docs trigger for patch releases
 - `a66fb59e` - [devsecops] Ensure tags are fetched for GitLab docs build
+- `e017975f` - [devsecops] Fix release pipeline triggers and changelog bookkeeping
+- `9a6af077` - [test] Fix RNG to avoid intermittent failure
+- `eba1858b` - [doc] Documentation updates
+- `65295535` - [devsecops] Adjust dependencies to match onnx to selected cuda
+- `471e2d0f` - [devsecops] Address code coverage +skipdocsclean
+- `2e6d2aed` - [devsecops] Fix test dependencies
+- `811b4fa1` - [devsecops] Address semgrep findings in docs path +skipdocsclean
+- `794cb0a2` - [devsecops] Add +skipdocsclean trigger to use cached docs run
+- `d132c22b` - [devsecops] Update conda-forge xxhash alias
+- `a3464be5` - [devsecops] Enforce matching torch and torchvision sources
+- `ceeac23a` - [devsecops] Fix typecheck errors in ci components
+- `32868f79` - [devsecops] Bump CUDA version support to match pytorch
+- `3e6e7be6` - [devsecops] Specify explicit channel in conda environment.yml
 
 ## v1.0.0
 
