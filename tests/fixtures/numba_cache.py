@@ -5,11 +5,11 @@ The clustering kernels ported from ``fast_hdbscan`` are decorated with
 from disk (``$NUMBA_CACHE_DIR``) on later runs. Compiling every kernel costs
 ~19s; loading them from a populated cache costs ~0.5s.
 
-Without this fixture each xdist worker pays the compile independently the first
-time a test touches clustering, which both multiplies the cost and skews test
-timings depending on which worker happened to get the first clustering test.
-The fixture elects a single worker to compile while the others wait on a file
-lock, then every worker loads the result.
+Without this each xdist worker pays the compile independently the first time a
+test touches clustering, which both multiplies the cost and skews test timings
+depending on which worker happened to get the first clustering test. Compiling
+in ``pytest_configure`` runs it once in the controller before any worker exists,
+so the workers only ever load the result.
 
 Warming goes through the public call paths rather than invoking the njit
 functions directly. Numba specializes on argument types, so a cache entry only
@@ -44,8 +44,13 @@ EXPECTED = (
 )
 
 
+_warmed = False
+
+
 def _warm() -> None:
     """Run every clustering call path that reaches a cached njit kernel."""
+    global _warmed
+
     from dataeval.core._clusterer import cluster
     from dataeval.core._mst import minimum_spanning_tree
     from dataeval.quality._duplicates import _find_cluster_duplicates
@@ -69,6 +74,8 @@ def _warm() -> None:
     # specializations in addition to the C-contiguous ones above.
     minimum_spanning_tree(np.vstack([rng.random((20, 3)), rng.random((20, 3)) + 1000.0]), k=15)
 
+    _warmed = True
+
 
 def _uncompiled() -> list[str]:
     """Return the qualified names of expected dispatchers with no compiled signature."""
@@ -81,29 +88,27 @@ def _uncompiled() -> list[str]:
     return missing
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _numba_cache(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory) -> None:
-    """Populate the Numba disk cache once per session, then load it in every worker."""
-    # `workerinput` is only set on xdist workers. Reading it from the config
-    # rather than taking xdist's `worker_id` fixture keeps this plugin usable in
-    # environments without xdist, such as the minimum-dependency `deps` session.
-    if not hasattr(request.config, "workerinput"):
-        _warm()
-    else:
-        # Imported here for the same reason: filelock ships with the test group,
-        # and only the parallel path needs it.
-        from filelock import FileLock
+def pytest_configure(config: pytest.Config) -> None:
+    """Compile the cache before xdist spawns its workers."""
+    # `workerinput` is only set on xdist workers, and xdist spawns them from
+    # `pytest_sessionstart`, which runs after this hook -- so this is the
+    # controller and nothing else is running yet. The controller never collects
+    # (`DSession.pytest_collection` short-circuits it), so this is the only
+    # point in a parallel run where the compile is guaranteed to be sequential.
+    # Workers reach the fixture below with `$NUMBA_CACHE_DIR` already populated
+    # and only have to load it.
+    if hasattr(config, "workerinput") or config.option.collectonly:
+        return
+    _warm()
 
-        # getbasetemp() is per worker; its parent is shared across the session.
-        marker = tmp_path_factory.getbasetemp().parent / "numba_cache.warmed"
-        with FileLock(f"{marker}.lock"):
-            cold = not marker.is_file()
-            if cold:
-                _warm()
-                marker.touch()
-        if not cold:
-            # The cache is populated; this only loads it into the worker process.
-            _warm()
+
+@pytest.fixture(scope="session", autouse=True)
+def _numba_cache() -> None:
+    """Load the cache into this process, then check the warm covered every kernel."""
+    # Already warmed in-process by `pytest_configure` unless this is an xdist
+    # worker, where this loads the controller's compiled kernels from disk.
+    if not _warmed:
+        _warm()
 
     missing = _uncompiled()
     if missing:

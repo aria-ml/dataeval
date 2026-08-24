@@ -65,6 +65,30 @@ class TestKeyedAddFactors:
         assert held.to_list() == [0.7, None]
         assert len(held) == md.level_counts["track"]
 
+    def test_a_second_write_folds_into_the_same_column(self):
+        """One sequence per call is what ``track_stats`` invites; it builds one column."""
+        md = _tracking([[[5, 9], [5]], [[5], [5, 9]]])
+        md.add_factors({"track_ids": [5, 9], "item_index": [0, 0], "speed": [0.5, 0.9]}, level="track", key="track_id")
+        assert md._store.frame("track")["speed"].to_list() == [0.5, 0.9, None, None]
+
+        md.add_factors({"track_ids": [5, 9], "item_index": [1, 1], "speed": [1.5, 1.9]}, level="track", key="track_id")
+        assert md._store.frame("track")["speed"].to_list() == [0.5, 0.9, 1.5, 1.9]
+        assert "speed_added" not in md._store.columns
+
+    def test_a_row_written_twice_is_a_real_collision(self):
+        """Two values for one row is a name collision like any other, and is renamed."""
+        md = _tracking([[[5, 9], [5]]])
+        md.add_factors({"track_ids": [5, 9], "speed": [0.5, 0.9]}, level="track", key="track_id")
+        md.add_factors({"track_ids": [5], "speed": [99.0]}, level="track", key="track_id")
+        assert md._store.frame("track")["speed"].to_list() == [0.5, 0.9]
+        assert md._store.frame("track")["speed_added"].to_list() == [99.0, None]
+
+    def test_overwrite_replaces_only_the_rows_the_keys_name(self):
+        md = _tracking([[[5, 9], [5]]])
+        md.add_factors({"track_ids": [5, 9], "speed": [0.5, 0.9]}, level="track", key="track_id")
+        md.add_factors({"track_ids": [5], "speed": [42.0]}, level="track", key="track_id", overwrite=True)
+        assert md._store.frame("track")["speed"].to_list() == [42.0, 0.9]
+
     def test_the_result_is_readable_from_instance_rows(self):
         """A keyed write is an ordinary factor once placed: descendants gather it."""
         md = _tracking([[[7, 3], [7]]])

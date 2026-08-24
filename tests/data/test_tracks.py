@@ -191,6 +191,20 @@ class TestBuildTracks:
         np.testing.assert_array_equal(tracks[3].frame_indices, [0, 1])
         np.testing.assert_array_equal(tracks[7].frame_indices, [0, 2])
 
+    def test_untracked_detections_are_left_out(self):
+        """A negative id belongs to no track; pooling them would invent one."""
+        vt = make_video_target([
+            make_frame([1, -1], [[0, 0, 10, 10], [5, 5, 15, 15]], [0.9, 0.8], [1, 2]),
+            make_frame([-1], [[6, 6, 16, 16]], [0.7], [2]),
+        ])
+        tracks = build_tracks(vt)
+        assert list(tracks.keys()) == [1]
+        np.testing.assert_array_equal(tracks[1].frame_indices, [0])
+
+    def test_a_frame_of_only_untracked_detections_yields_no_tracks(self):
+        vt = make_video_target([make_frame([-1, -1], [[0, 0, 1, 1], [1, 1, 2, 2]], [0.9, 0.8], [0, 0])])
+        assert build_tracks(vt) == {}
+
     def test_track_with_gap(self):
         # Track 7 appears in frame 0 and frame 3 but is absent from 1 and 2.
         vt = make_video_target([

@@ -637,6 +637,59 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
     doctest_namespace["cropped_dataset"] = DetectionCrops(dataset)
 
     # -------------------------------------------------------------------------
+    # Video-related fixtures (transformers mocks)
+    # -------------------------------------------------------------------------
+
+    # A real video transformer takes 224x224 frames, but nothing in the examples looks at a
+    # frame or an embedding value, and the extractor is agnostic to frame resolution. Tiny
+    # frames keep the mock's linear layer to a few hundred thousand weights: at 224x224 it
+    # would be 1.8 billion (7.4 GB), allocated eagerly for every doctest session.
+    video_frame_shape = (16, 16, 3)  # (H, W, C)
+    video_frame_size = 16 * 16 * 3
+
+    class MockVideoModel(torch.nn.Module):
+        """Mock video transformer model that mimics HuggingFace structure."""
+
+        def __init__(self, hidden_size: int = 64, num_frames: int = 8) -> None:
+            super().__init__()
+            self.config = type("Config", (), {"num_frames": num_frames, "hidden_size": hidden_size})()
+            self.encoder = torch.nn.Sequential(
+                torch.nn.Flatten(),
+                torch.nn.Linear(num_frames * video_frame_size, hidden_size),
+            )
+
+        def forward(self, pixel_values):  # noqa: ANN001, ANN202
+            hidden_states = self.encoder(pixel_values)
+            # Return structure similar to HuggingFace BaseModelOutput
+            return type(
+                "ModelOutput",
+                (),
+                {
+                    "last_hidden_state": hidden_states.unsqueeze(1),  # (batch, 1, hidden_size)
+                    "pooler_output": None,
+                },
+            )()
+
+    class MockProcessor:
+        """Mock HuggingFace processor for testing."""
+
+        def __call__(self, frames, return_tensors="pt"):  # noqa: ANN001, ANN204, ARG002
+            # Convert list of frames to tensor
+            # Stack frames: (num_frames, H, W, C) -> (1, num_frames, C, H, W)
+            frames_array = np.stack([np.array(f) for f in frames]) if isinstance(frames, list) else np.array(frames)
+
+            # Convert to tensor and rearrange dimensions
+            tensor = torch.from_numpy(frames_array).float()
+            if tensor.ndim == 4:  # (T, H, W, C)
+                tensor = tensor.permute(3, 0, 1, 2)  # (C, T, H, W)
+
+            return type("ProcessorOutput", (), {"pixel_values": tensor.unsqueeze(0)})()
+
+    doctest_namespace["video_processor"] = MockProcessor()
+    doctest_namespace["video_model"] = MockVideoModel()
+    doctest_namespace["video_dataset"] = [np.random.rand(n, *video_frame_shape).astype(np.float32) for n in (8, 16, 8)]
+
+    # -------------------------------------------------------------------------
     # Prioritize fixtures
     # -------------------------------------------------------------------------
     unlabeled_data = ImageDataset(

@@ -840,7 +840,8 @@ statistical and computational.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored
-  - Single-sequence scope; assumes track identity is already resolved.
+  - Assumes track identity is already resolved: detections carrying no track id
+    take no part, and nothing here re-associates them.
 - - {func}`.phash`, {func}`.phash_d4`, {func}`.dhash`, {func}`.dhash_d4`,
     {func}`.xxhash`
   - Perceptual hashing ([Zauner, 2010](DataIntegrity.md#references)); xxHash

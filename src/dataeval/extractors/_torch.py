@@ -18,6 +18,36 @@ from dataeval.utils.training import PostprocessFn
 _logger = get_logger(__name__)
 
 
+def normalize_transforms(
+    transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None,
+) -> list[Transform[torch.Tensor]]:
+    """Normalize a transform, an iterable of them, or nothing into a list.
+
+    Shared by every torch-backed extractor so the three of them cannot drift on what
+    ``transforms=`` accepts.
+    """
+    if transforms is None:
+        return []
+    if isinstance(transforms, Transform):
+        return [transforms]
+    return list(transforms)
+
+
+def get_valid_layer(layer_name: str, model: torch.nn.Module) -> torch.nn.Module:
+    """Return the named submodule, listing the available names when there is no such layer.
+
+    Shared by every torch-backed extractor so a mistyped ``layer_name`` reports the same
+    way wherever it is passed.
+    """
+    modules_dict = dict(model.named_modules())
+
+    if layer_name not in modules_dict:
+        formatted_layers = "\n".join(f"  {layer}" for layer in modules_dict)
+        raise ValueError(f"Invalid layer '{layer_name}'. Available layers are:\n{formatted_layers}")
+
+    return modules_dict[layer_name]
+
+
 class TorchExtractor(ReprMixin):
     """
     Extracts embeddings from a PyTorch model, with optional intermediate layer hooking.
@@ -144,11 +174,7 @@ class TorchExtractor(ReprMixin):
         transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None,
     ) -> list[Transform[torch.Tensor]]:
         """Normalize transforms to a list."""
-        if transforms is None:
-            return []
-        if isinstance(transforms, Transform):
-            return [transforms]
-        return list(transforms)
+        return normalize_transforms(transforms)
 
     def _hook_fn(self, _module: torch.nn.Module, inputs: tuple[torch.Tensor], output: torch.Tensor) -> None:
         """Forward hook to capture layer input or output."""
@@ -159,13 +185,7 @@ class TorchExtractor(ReprMixin):
 
     def _get_valid_layer(self, layer_name: str, model: torch.nn.Module) -> torch.nn.Module:
         """Validate and return the target layer for hook registration."""
-        modules_dict = dict(model.named_modules())
-
-        if layer_name not in modules_dict:
-            formatted_layers = "\n".join(f"  {layer}" for layer in modules_dict)
-            raise ValueError(f"Invalid layer '{layer_name}'. Available layers are:\n{formatted_layers}")
-
-        return modules_dict[layer_name]
+        return get_valid_layer(layer_name, model)
 
     def __call__(self, data: Any) -> Array:  # noqa: C901
         """

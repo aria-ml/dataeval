@@ -2,7 +2,7 @@
 
 Every other way into :meth:`~dataeval.Metadata.add_factors` hands over values already in a
 level's row order. Per-track statistics do not: :func:`~dataeval.core.track_stats` indexes
-its results by **sorted track id within one sequence**, while a metadata track row is keyed
+its results by **sorted track id within each sequence**, while a metadata track row is keyed
 ``(item_index, track_index)`` with ``track_index`` dense in order of first appearance. The
 two orders coincide only by accident, so attaching one to the other positionally is a
 silent scramble, and building the mapping by hand is the ergonomic complaint the normalized
@@ -58,9 +58,15 @@ def _key_values(factors: Mapping[str, Any], key: str) -> tuple[NDArray[Any], set
 def _item_values(md: "Metadata", factors: Mapping[str, Any], rows: int, key: str) -> NDArray[np.intp]:
     """One source item per incoming row, supplied or inferred.
 
-    ``track_stats`` describes a single sequence and says nothing about which, so a dataset
+    ``track_stats`` measuring a single sequence says nothing about which, so a dataset
     holding exactly one item can supply the answer itself. A dataset holding several cannot:
     track ids restart per sequence, so a bare id names a row in every one of them.
+
+    Which item a value belongs to has to be *said*, and given the whole dataset
+    ``track_stats`` says it — the ``item_index`` it returns is read straight from here.
+    A caller measuring one sequence at a time supplies it instead; those repeated calls fold
+    into one column rather than colliding — see ``Metadata._merge_keyed`` — but each still
+    has to name the item its keys are scoped to.
     """
     if _ITEM in factors:
         return np.asarray(factors[_ITEM], dtype=np.intp).reshape(-1)
@@ -70,8 +76,10 @@ def _item_values(md: "Metadata", factors: Mapping[str, Any], rows: int, key: str
     raise ValueError(
         f"key={key!r} matches on (item_index, {key}), and {key} restarts per item, so values "
         f"for a dataset with {len(items)} items have to say which item each belongs to. Add an "
-        f"'item_index' entry to the factors, or add one item's values per call. track_stats "
-        "describes one sequence at a time.",
+        f"'item_index' entry to the factors — one entry per value, naming the item that value's "
+        f"{key} is scoped to. track_stats given the dataset returns one, so passing its result "
+        "straight through needs nothing added; measuring one sequence at a time means saying "
+        "which sequence each result came from.",
     )
 
 
@@ -80,12 +88,16 @@ def resolve_keyed(
     factors: Mapping[str, Any],
     level: FactorLevel,
     key: str,
-) -> list[tuple[str, FactorLevel, pl.Series]]:
+) -> tuple[list[tuple[str, FactorLevel, pl.Series]], NDArray[np.bool_]]:
     """Place each factor on the rows whose ``(item_index, key)`` its values name.
 
     A row the incoming values do not name is null rather than absent, so the column still
     has one entry per row at ``level`` and every downstream reader — binning, projection,
     the flat frame — sees the shape it expects.
+
+    Which rows *were* named is returned alongside, because it is the difference between a
+    write that leaves the rest of the column alone and one that blanks it. Every factor in
+    a call is placed by the same keys, so one mask covers them all.
 
     Parameters
     ----------
@@ -103,6 +115,8 @@ def resolve_keyed(
     -------
     list[tuple[str, str, pl.Series]]
         One entry per remaining factor, already in the level's row order.
+    NDArray[np.bool_]
+        One flag per row at ``level``, True where the incoming keys named it.
 
     Raises
     ------
@@ -148,4 +162,7 @@ def resolve_keyed(
     source = {pair: position for position, pair in enumerate(incoming)}
     wanted = zip(frame["item_index"].to_list(), frame[key].to_list(), strict=True)
     positions = np.fromiter((source.get(pair, -1) for pair in wanted), dtype=np.intp, count=frame.height)
-    return [(name, level, gather_nulling(name, values, positions)) for name, values in payload.items()]
+    placed: list[tuple[str, FactorLevel, pl.Series]] = [
+        (name, level, gather_nulling(name, values, positions)) for name, values in payload.items()
+    ]
+    return placed, positions >= 0

@@ -16,6 +16,7 @@ __all__ = [
     "ClasswiseUncertaintyExtractor",
     "ClassifierUncertaintyExtractor",
     "ScoresExtractor",
+    "VideoTorchExtractor",
 ]
 
 from dataeval.extractors._bovw import BoVWExtractor
@@ -29,3 +30,4 @@ from dataeval.extractors._uncertainty import (
     ClasswiseUncertaintyExtractor,
     UncertaintyExtractor,
 )
+from dataeval.extractors._videotorch import VideoTorchExtractor
