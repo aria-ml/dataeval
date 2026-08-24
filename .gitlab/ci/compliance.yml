@@ -16,7 +16,7 @@ include:
   - component: gitlab.jatic.net/jatic/devsecops/components/sr-compliance@1.2.0
     inputs:
       package_name: "${PACKAGE_NAME}"
-      tools_used: [pyproject, poetry, ruff]
+      tools_used: [pyproject, ruff]
       generate_environment_yml: false
       conda_env_name: "dataeval"
       conda_package_aliases: "xxhash=python-xxhash"
@@ -31,45 +31,52 @@ include:
       full_execution_on_commit: true
       allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
-    inputs:
-      stage: unit-test
-      full_execution_on_commit: true
-      package_name: "${PACKAGE_NAME}"
-      marker: required
-      dependency: required
-      poetry_install_options: --only main,test
-      allow_failure: true
-
-  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
-    inputs:
-      stage: unit-test
-      full_execution_on_commit: true
-      package_name: "${PACKAGE_NAME}"
-      marker: optional
-      dependency: optional
-      poetry_install_options: --only main,test-onnx --extras=cpu --extras=onnx --extras=opencv --extras=ontology
-      allow_failure: true
-
-  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
-    inputs:
-      stage: unit-test
-      full_execution_on_commit: true
-      package_name: "${PACKAGE_NAME}"
-      marker: optional
-      dependency: required
-      poetry_install_options: --only main,test
-      allow_failure: true
-
-  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
-    inputs:
-      stage: unit-test
-      full_execution_on_commit: true
-      package_name: "${PACKAGE_NAME}"
-      marker: all
-      dependency: required
-      poetry_install_options: --only main,test
-      allow_failure: true
+  # DISABLED -- poetry removal. The 1.2.0 unit-test component drives every job
+  # through `poetry install`, and poetry rejects this project now that the
+  # `[tool.poetry] version` shim is gone (`[project]` declares a dynamic version
+  # via hatch-vcs). The component's `executor` input offers only poetry or tox,
+  # so 27 of its 31 jobs fail with nothing left to test. The real suite runs in
+  # .gitlab/ci/test.yml across all five supported Python versions. Restore these
+  # blocks once the components ship a uv executor.
+  # - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
+  #   inputs:
+  #     stage: unit-test
+  #     full_execution_on_commit: true
+  #     package_name: "${PACKAGE_NAME}"
+  #     marker: required
+  #     dependency: required
+  #     poetry_install_options: --only main,test
+  #     allow_failure: true
+  #
+  # - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
+  #   inputs:
+  #     stage: unit-test
+  #     full_execution_on_commit: true
+  #     package_name: "${PACKAGE_NAME}"
+  #     marker: optional
+  #     dependency: optional
+  #     poetry_install_options: --only main,test-onnx --extras=cpu --extras=onnx --extras=opencv --extras=ontology
+  #     allow_failure: true
+  #
+  # - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
+  #   inputs:
+  #     stage: unit-test
+  #     full_execution_on_commit: true
+  #     package_name: "${PACKAGE_NAME}"
+  #     marker: optional
+  #     dependency: required
+  #     poetry_install_options: --only main,test
+  #     allow_failure: true
+  #
+  # - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
+  #   inputs:
+  #     stage: unit-test
+  #     full_execution_on_commit: true
+  #     package_name: "${PACKAGE_NAME}"
+  #     marker: all
+  #     dependency: required
+  #     poetry_install_options: --only main,test
+  #     allow_failure: true
 
   - component: gitlab.jatic.net/jatic/devsecops/components/tr-compliance@1.2.0
     inputs:
@@ -97,3 +104,25 @@ include:
     inputs:
       full_execution_on_commit: true
       components_branch: 1.2.0
+
+### COMPONENT JOB OVERRIDES ###
+# The sr- and tr-compliance components are kept because most of their jobs still
+# pass; these four shell out to `poetry install` and cannot succeed. GitLab lets
+# an including file override an included job, so disable them individually rather
+# than dropping the whole component. Drop this block when uv support lands.
+
+"install🛠️-with-poetry📖":
+  rules:
+    - when: never
+
+"validate✅-install🛠️-with-poetry📖":
+  rules:
+    - when: never
+
+"validate✅-private🙈-module-compliance📜":
+  rules:
+    - when: never
+
+"execute🔄-pyright🐍✅":
+  rules:
+    - when: never

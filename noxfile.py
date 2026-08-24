@@ -412,7 +412,6 @@ def lock(session: nox.Session) -> None:
         "-o",
         "requirements.dev.txt",
     )
-    session.run("poetry", "lock")
     session.run(
         "p2c",
         "yaml",
@@ -484,4 +483,3 @@ def docsync(session: nox.Session) -> None:
 def check(session: nox.Session) -> None:
     """Validate lock file and exported dependency files are up to date."""
     session.run("uv", "lock", "--check")
-    session.run("poetry", "check", "--lock")

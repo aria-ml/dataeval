@@ -127,42 +127,6 @@ conda install -c conda-forge dataeval
 
 ::::
 
-::::{tab-item} source (poetry)
-
-To install DataEval from source locally on Ubuntu using poetry, begin
-by ensuring poetry is installed in your Python environment.
-
-```bash
-    pip install poetry
-```
-
-Pull the source down and change to the DataEval project directory.
-
-```bash
-    git clone https://github.com/aria-ml/dataeval.git
-    cd dataeval
-```
-
-Install DataEval
-
-```bash
-    poetry install
-```
-
-Poetry resolves `torch` from the CPU wheel index (see `[tool.poetry.source]` in
-`pyproject.toml`), so the Poetry path installs the CPU build of PyTorch. Use
-`uv` if you need a CUDA variant from source.
-
-Now that DataEval is installed, you can run commands in the Poetry virtual
-environment by prefixing shell commands with poetry run, or activate the
-virtual environment directly in the shell.
-
-```bash
-    poetry env activate
-```
-
-::::
-
 ::::{tab-item} source (uv)
 
 To install DataEval from source locally on Ubuntu, you will need

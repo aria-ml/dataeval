@@ -164,20 +164,6 @@ cd dataeval
 > linting, type checking and docs tooling included. See
 > [Development Setup](./CONTRIBUTING.md#development-setup) for the options it takes.
 
-#### **Using Poetry**
-
-Install DataEval.
-
-```bash
-poetry install
-```
-
-Enable Poetry's virtual environment.
-
-```bash
-poetry env activate
-```
-
 #### **Using uv**
 
 Install DataEval with dependencies for development.
