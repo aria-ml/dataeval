@@ -164,6 +164,7 @@ def dev(session: nox.Session) -> None:
         args = parser.parse_args(session.posargs)
     except SystemExit:
         session.error("Usage: nox -s dev -- [-p|--python VERSION] [-d|--device DEVICE] [-n|--name NAME]")
+        raise  # unreachable; keeps `args` bound for type checkers that cannot see nox's NoReturn
 
     if shutil.which("uv") is None:
         session.error("Install uv to continue: https://docs.astral.sh/uv/")

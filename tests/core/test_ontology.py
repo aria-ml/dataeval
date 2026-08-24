@@ -498,6 +498,20 @@ class TestRdfAdapters:
         # the absorbed concept's parent survives the merge
         assert onto.concept("http://example.org/Dog").parents == ("http://example.org/Animal",)
 
+    def test_symmetrically_asserted_equivalence_merges_once(self):
+        # owl:equivalentClass is symmetric, so a reasoner materializes both
+        # directions. Each direction is read on its own subject, so the pair is
+        # unioned twice and the second union has to leave the group it already
+        # formed alone rather than re-parenting it.
+        source = TURTLE + (
+            '\nex:Canid a owl:Class ; rdfs:label "Canid" ; owl:equivalentClass ex:Dog .'
+            "\nex:Dog owl:equivalentClass ex:Canid .\n"
+        )
+        onto = Ontology.from_rdf(source, format="turtle")
+        assert onto.canonical("http://example.org/Dog") == "http://example.org/Canid"
+        assert onto.aliases("http://example.org/Canid") == ("http://example.org/Dog",)
+        assert onto.ids == ("http://example.org/Animal", "http://example.org/Canid")
+
     def test_broader_transitive_builds_the_hierarchy(self):
         # legal SKOS; without reading it a scheme that uses only this predicate
         # loads flat, with every concept a root and no is-a edges at all.

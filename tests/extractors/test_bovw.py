@@ -303,7 +303,9 @@ class TestBoVWEdgeCases:
         np.testing.assert_array_equal(emb1, emb2)
 
 
-@pytest.mark.required
+# `optional`, like the rest of this module: the file is skipped wholesale where
+# opencv is absent, so marking this `required` only hid it from every job that runs.
+@pytest.mark.optional
 def test_construction_without_opencv_names_the_extra(monkeypatch):
     """The lazy cv2 import is caught at construction so the message names the fix."""
     import sys

@@ -34,6 +34,7 @@ from dataeval.types._factors import (
     _relink,
     _validate_acyclic,
 )
+from dataeval.types._track import frame_size
 
 
 class TestSourceIndex:
@@ -243,6 +244,37 @@ class TestTrack:
     def test_repr_includes_class_name(self):
         track = _make_track()
         assert "Track" in repr(track)
+
+
+@pytest.mark.required
+class TestFrameSize:
+    """Tests for ``frame_size``, the single reader of a video frame's dimensions."""
+
+    class _Frame:
+        def __init__(self, pixels):
+            self.pixels = pixels
+
+    def test_reads_width_and_height_from_chw_pixels(self):
+        # MAITE frames are (C, H, W), so the trailing axes are height then width.
+        frame = self._Frame(np.zeros((3, 24, 32), dtype=np.uint8))
+        assert frame_size(frame) == (32, 24)
+
+    def test_accepts_a_bare_two_dimensional_frame(self):
+        frame = self._Frame(np.zeros((24, 32), dtype=np.uint8))
+        assert frame_size(frame) == (32, 24)
+
+    def test_missing_frame_answers_none(self):
+        # `track_stats` passes `next(iter(stream), None)` straight through, so an
+        # empty video stream reaches this as None rather than a frame.
+        assert frame_size(None) == (None, None)
+
+    def test_frame_without_pixels_answers_none(self):
+        # Dispatch does not require the full VideoFrame protocol, so a duck-typed
+        # stream is free to carry no pixels at all.
+        assert frame_size(object()) == (None, None)
+
+    def test_pixels_without_two_axes_answer_none(self):
+        assert frame_size(self._Frame(np.zeros(32, dtype=np.uint8))) == (None, None)
 
 
 class TestReprMixin:
