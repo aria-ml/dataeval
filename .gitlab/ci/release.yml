@@ -91,7 +91,7 @@ validate release label:
   extends: .rules_mr_only
   needs: []
   script:
-    - .gitlab/scripts/validate_release_label.py
+    - uv run python .gitlab/scripts/validate_release_label.py
 
 # This job will only run if all previous stages have succeeded,
 # and it creates a tag that signifies that all testing has passed.
@@ -101,7 +101,7 @@ tag release candidate:
   before_script:
     - uv pip install requests --system
   script:
-    - .gitlab/scripts/update_latest_known_good.py
+    - uv run python .gitlab/scripts/update_latest_known_good.py
 
 # This job cleans up orphan docs-artifacts/* branches
 # associated with merged branches.
@@ -112,7 +112,7 @@ remove docs artifact branches:
   before_script:
     - uv pip install requests --system
   script:
-    - .gitlab/scripts/remove_docs_artifact_branches.py
+    - uv run python .gitlab/scripts/remove_docs_artifact_branches.py
   allow_failure: true
 
 # This job updates the changelog and tags the commit hash with a
@@ -132,7 +132,7 @@ create release:
   before_script:
     - uv pip install requests --system
   script:
-    - .gitlab/scripts/create_release.py
+    - uv run python .gitlab/scripts/create_release.py
 
 # This job creates a pre-release version tag (e.g., v1.0.0-rc0, v1.0.0-rc1)
 # Triggered by setting CREATE_PRE_RELEASE=true in scheduled pipeline
@@ -145,7 +145,7 @@ create pre-release:
   before_script:
     - uv pip install requests --system
   script:
-    - .gitlab/scripts/create_prerelease.py
+    - uv run python .gitlab/scripts/create_prerelease.py
 
 # This job runs verification tests, generates test case markdown files and
 # VCRM, and pushes the artifacts to the DataEval meta repo (project 409).
@@ -167,7 +167,7 @@ publish verification:
     - uv pip install requests pyyaml --system
   script:
     - uvx nox -e verify
-    - .gitlab/scripts/push_verification.py
+    - uv run python .gitlab/scripts/push_verification.py
   artifacts:
     paths:
       - output/metarepo/
@@ -189,18 +189,6 @@ export-merged-sbom:
   variables:
     PRIVATE_TOKEN: $DATAEVAL_BUILD_PAT
 
-# This job creates a release branch on-demand from the latest matching tag.
-# Triggered by setting CREATE_RELEASE_BRANCH=vX.Y in a web pipeline.
-create release branch:
-  stage: release
-  needs: []
-  rules:
-    - if: $CREATE_RELEASE_BRANCH
-  before_script:
-    - uv pip install requests --system
-  script:
-    - .gitlab/scripts/create_release_branch.py
-
 # This job runs automatically on commits to release/v* branches
 # and creates patch releases by updating changelog and tagging
 create patch release:
@@ -211,4 +199,4 @@ create patch release:
   before_script:
     - uv pip install requests --system
   script:
-    - .gitlab/scripts/create_patch_release.py
+    - uv run python .gitlab/scripts/create_patch_release.py

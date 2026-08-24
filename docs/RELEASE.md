@@ -132,18 +132,16 @@ Triggered by setting `CREATE_PRE_RELEASE=true`:
 - Updates changelog and Colab links to the pre-release version
 - An API pipeline on main creates `docs-artifacts/v1.0.0-rc0`
 
-### On-Demand Release Branch Creation
+### Release Branch Creation
 
-Release branches are created on-demand when a patch is needed for an older version, rather
-than being created automatically at release time. This keeps the repository clean and avoids
-accumulating unused branches.
+Release branches are automatically created when a major/minor release is published from `main`.
 
-To create a release branch:
+If a release branch needs to be created manually (e.g., for older historical versions, or if a
+branch was accidentally deleted), it can be created directly via Git or the GitLab UI:
 
-1. Go to GitLab > CI/CD > Run Pipeline
-2. Set variable `CREATE_RELEASE_BRANCH=vX.Y` (e.g., `CREATE_RELEASE_BRANCH=v1.2`)
-3. The pipeline runs **`create_release_branch.py`**, which finds the latest `vX.Y.*` tag
-   and creates `release/vX.Y` from that tag's commit
+1. Create a new branch named `release/vX.Y` (e.g., `release/v1.2`) pointing to the desired tag's
+   commit (e.g., `v1.2.0`).
+2. Push the branch to GitLab.
 
 Once the branch exists:
 
@@ -189,7 +187,6 @@ Every MR targeting `main` must have a release label:
 | ------------------------------- | ------------------------------------------ | -------------------------------------------------- |
 | `create release`                | Scheduled (`CREATE_NEW_RELEASE`)           | Creates version tag on main                        |
 | `create pre-release`            | Scheduled (`CREATE_PRE_RELEASE`)           | Creates pre-release tag on main                    |
-| `create release branch`         | Web UI (`CREATE_RELEASE_BRANCH=vX.Y`)      | Creates release branch from latest tag on demand   |
 | `create patch release`          | Commits to `release/v*`                    | Creates patch version tag                          |
 | `remove docs artifact branches` | Main commits                               | Cleans up artifact branches for merged MRs         |
 | `cherry-pick fixes to releases` | Main commits                               | Auto-cherry-picks fixes to active release branches |
@@ -208,5 +205,4 @@ Every MR targeting `main` must have a release label:
 | `.gitlab/ci/release.yml`                           | Release CI jobs                                                        |
 | `.gitlab/scripts/releasegen.py`                    | Generates changelog and updates Colab links                            |
 | `.gitlab/scripts/create_release.py`                | Orchestrates full releases                                             |
-| `.gitlab/scripts/create_release_branch.py`         | Creates release branches on-demand from tags                           |
 | `.gitlab/scripts/remove_docs_artifact_branches.py` | Cleans up stale artifact branches                                      |

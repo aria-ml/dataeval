@@ -19,6 +19,19 @@ if __name__ == "__main__":
         # Tag before triggering pipeline so push-docs-cache.sh can detect the version tag
         gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag}")
         print(f"Created tag: {version_tag}")
+
+        # Automatically create the release branch for the new major/minor version
+        import re
+
+        match = re.match(r"^(v\d+\.\d+)", version_tag)
+        if match:
+            release_branch = f"release/{match.group(1)}"
+            try:
+                gl.create_repository_branch(release_branch, commit_id)
+                print(f"Created release branch: {release_branch}")
+            except Exception as e:
+                print(f"Warning: Could not create release branch {release_branch}: {e}")
+
         # Trigger API pipeline on main for docs build and artifact publishing
         gl.create_pipeline("main")
         print("Triggered pipeline on main")

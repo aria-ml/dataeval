@@ -150,15 +150,13 @@ git push -u origin cherry-pick/fix-to-v0-74
 
 ### Cutting a Release Branch
 
-**Purpose**: open a `release/vX.Y` line so that release can receive backported fixes independently of `main`
+**Purpose**: Open a `release/vX.Y` line so that a release can receive backported fixes independently of `main`.
 
-**Trigger**: Manual pipeline execution on `main` with `CREATE_RELEASE_BRANCH=vX.Y` (major.minor only, no patch
-number). Run it **after** the `vX.Y.0` tag exists -- the script branches from the newest `vX.Y.*` tag.
+**Automation**: Release branches are automatically cut from the release tag immediately upon major/minor release
+creation inside `.gitlab/scripts/create_release.py`.
 
-**Script**: [`.gitlab/scripts/create_release_branch.py`](.gitlab/scripts/create_release_branch.py)
-
-The job is a no-op if `release/vX.Y` already exists, so it is safe to re-run. Not every release needs a branch;
-cut one only when a shipped version has to be patched while `main` moves on.
+Not every release needs a branch; if you need to manually recreate a release branch or cut one from a historical
+tag, you can simply create a branch named `release/vX.Y` pointing to the desired tag's commit directly in GitLab.
 
 ## Release Labels
 
@@ -298,7 +296,6 @@ All automation scripts are located in [`.gitlab/scripts/`](.gitlab/scripts/):
 | ------------------------------------------------------------------------ | ------------------------------ | ------------------------------------ |
 | [`create_release.py`](.gitlab/scripts/create_release.py)                 | Create major/minor releases    | Manual: `CREATE_NEW_RELEASE=true`    |
 | [`create_prerelease.py`](.gitlab/scripts/create_prerelease.py)           | Create pre-release (rc) tags   | Manual: `CREATE_PRE_RELEASE=true`    |
-| [`create_release_branch.py`](.gitlab/scripts/create_release_branch.py)   | Cut a `release/vX.Y` branch    | Manual: `CREATE_RELEASE_BRANCH=vX.Y` |
 | [`create_patch_release.py`](.gitlab/scripts/create_patch_release.py)     | Create patch releases          | Auto: Commit to `release/v*`         |
 | [`validate_release_label.py`](.gitlab/scripts/validate_release_label.py) | Ensure MRs have release labels | Auto: All MRs to main                |
 | [`releasegen.py`](.gitlab/scripts/releasegen.py)                         | Core release logic & changelog | Called by release scripts            |
@@ -351,7 +348,6 @@ graph TD
 **Requires Manual Action**:
 
 - Triggering major/minor releases (set `CREATE_NEW_RELEASE=true`)
-- Cutting a release branch (set `CREATE_RELEASE_BRANCH=vX.Y`)
 - Creating cherry-pick branches and MRs to backport fixes into release branches
 - Reviewing and merging cherry-pick MRs
 - Approving MRs to main
