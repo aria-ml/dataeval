@@ -12,15 +12,26 @@ stages:
   - validate
   - summary
 
+# uv support lives on the components' `uv-support` branch and is not tagged yet.
+# `components_branch` must match the ref each component is pulled from: these
+# jobs clone the components repo at run time to fetch their helper scripts, and
+# the 1.2.0 tag predates both the uv-aware scripts and the rename of
+# validate-poetry-and-conda. Move all five refs to the tag once it is cut.
 include:
-  - component: gitlab.jatic.net/jatic/devsecops/components/sr-compliance@1.2.0
+  - component: gitlab.jatic.net/jatic/devsecops/components/sr-compliance@uv-support
     inputs:
       package_name: "${PACKAGE_NAME}"
-      tools_used: [pyproject, ruff]
+      tools_used: [pyproject, uv, ruff]
+      package_manager: uv
+      # validate-private-modules only has to import dataeval; the default groups
+      # would drag in docs/type/test tooling. `--extra cpu` keeps torch on the
+      # CPU index (see [tool.uv.sources]) instead of the PyPI CUDA wheel.
+      install_options: --no-default-groups --extra cpu
+      components_branch: uv-support
       generate_environment_yml: false
       conda_env_name: "dataeval"
       conda_package_aliases: "xxhash=python-xxhash"
-      pyproject_format: "pep621"
+      pyproject_format: pep621
       full_execution_on_commit: true
       allow_failure: true
 
@@ -31,56 +42,61 @@ include:
       full_execution_on_commit: true
       allow_failure: true
 
-  # DISABLED -- poetry removal. The 1.2.0 unit-test component drives every job
-  # through `poetry install`, and poetry rejects this project now that the
-  # `[tool.poetry] version` shim is gone (`[project]` declares a dynamic version
-  # via hatch-vcs). The component's `executor` input offers only poetry or tox,
-  # so 27 of its 31 jobs fail with nothing left to test. The real suite runs in
-  # .gitlab/ci/test.yml across all five supported Python versions. Restore these
-  # blocks once the components ship a uv executor.
-  # - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
-  #   inputs:
-  #     stage: unit-test
-  #     full_execution_on_commit: true
-  #     package_name: "${PACKAGE_NAME}"
-  #     marker: required
-  #     dependency: required
-  #     poetry_install_options: --only main,test
-  #     allow_failure: true
-  #
-  # - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
-  #   inputs:
-  #     stage: unit-test
-  #     full_execution_on_commit: true
-  #     package_name: "${PACKAGE_NAME}"
-  #     marker: optional
-  #     dependency: optional
-  #     poetry_install_options: --only main,test-onnx --extras=cpu --extras=onnx --extras=opencv --extras=ontology
-  #     allow_failure: true
-  #
-  # - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
-  #   inputs:
-  #     stage: unit-test
-  #     full_execution_on_commit: true
-  #     package_name: "${PACKAGE_NAME}"
-  #     marker: optional
-  #     dependency: required
-  #     poetry_install_options: --only main,test
-  #     allow_failure: true
-  #
-  # - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@1.2.0
-  #   inputs:
-  #     stage: unit-test
-  #     full_execution_on_commit: true
-  #     package_name: "${PACKAGE_NAME}"
-  #     marker: all
-  #     dependency: required
-  #     poetry_install_options: --only main,test
-  #     allow_failure: true
+  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@uv-support
+    inputs:
+      stage: unit-test
+      full_execution_on_commit: true
+      package_name: "${PACKAGE_NAME}"
+      marker: required
+      dependency: required
+      executor: uv
+      install_options: --no-default-groups --group test --extra cpu
+      components_branch: uv-support
+      allow_failure: true
 
-  - component: gitlab.jatic.net/jatic/devsecops/components/tr-compliance@1.2.0
+  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@uv-support
+    inputs:
+      stage: unit-test
+      full_execution_on_commit: true
+      package_name: "${PACKAGE_NAME}"
+      marker: optional
+      dependency: optional
+      executor: uv
+      install_options: --no-default-groups --group test-onnx --extra cpu --extra onnx --extra opencv --extra ontology
+      components_branch: uv-support
+      allow_failure: true
+
+  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@uv-support
+    inputs:
+      stage: unit-test
+      full_execution_on_commit: true
+      package_name: "${PACKAGE_NAME}"
+      marker: optional
+      dependency: required
+      executor: uv
+      install_options: --no-default-groups --group test --extra cpu
+      components_branch: uv-support
+      allow_failure: true
+
+  - component: gitlab.jatic.net/jatic/devsecops/components/unit-test@uv-support
+    inputs:
+      stage: unit-test
+      full_execution_on_commit: true
+      package_name: "${PACKAGE_NAME}"
+      marker: all
+      dependency: required
+      executor: uv
+      install_options: --no-default-groups --group test --extra cpu
+      components_branch: uv-support
+      allow_failure: true
+
+  - component: gitlab.jatic.net/jatic/devsecops/components/tr-compliance@uv-support
     inputs:
       package_name: "${PACKAGE_NAME}"
+      package_manager: uv
+      # Mirrors the `type` nox session so pyright sees the same environment.
+      install_options: --no-default-groups --group type --extra cpu --extra onnx --extra opencv --extra ontology
+      components_branch: uv-support
       full_execution_on_commit: true
       allow_failure: true
 
@@ -104,25 +120,3 @@ include:
     inputs:
       full_execution_on_commit: true
       components_branch: 1.2.0
-
-### COMPONENT JOB OVERRIDES ###
-# The sr- and tr-compliance components are kept because most of their jobs still
-# pass; these four shell out to `poetry install` and cannot succeed. GitLab lets
-# an including file override an included job, so disable them individually rather
-# than dropping the whole component. Drop this block when uv support lands.
-
-"install🛠️-with-poetry📖":
-  rules:
-    - when: never
-
-"validate✅-install🛠️-with-poetry📖":
-  rules:
-    - when: never
-
-"validate✅-private🙈-module-compliance📜":
-  rules:
-    - when: never
-
-"execute🔄-pyright🐍✅":
-  rules:
-    - when: never

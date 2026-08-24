@@ -109,7 +109,7 @@ docsync = [
 test = [
   "coverage[toml]>=7.6",
   "filelock>=3.20.3",
-  "pytest>=8.3",
+  "pytest>=7.3.1",  # floor capped by the JATIC program standard; uv.lock resolves current
   "pytest-cov>=6.1",
   "pytest-xdist>=3.6.1",
 ]
@@ -118,16 +118,16 @@ test-onnx = [
   "onnxscript>=0.6.0",
 ]
 verify = [
-  "pytest>=8.3",
+  "pytest>=7.3.1",  # floor capped by the JATIC program standard; uv.lock resolves current
   "pyyaml>=6.0",
 ]
 type = [
   "pyright[nodejs]>=1.1.400",
-  "types-requests",
-  "types-pyyaml",
+  "types-requests>=2.31",
+  "types-pyyaml>=6.0",
 ]
 docs = [
-  "numpy>=2.0.2",
+  "numpy>=1.24.2",  # floor capped by the JATIC program standard; uv.lock resolves current
   "certifi>=2024.07.04",
   "dataeval-plots[plotly]>=0.0.6",
   "ipykernel>=6.26.0",
@@ -162,7 +162,7 @@ dev = [
   "nox>=2025.5.1",
   "nox-uv>=0.6.2",
   "pip>=25.1",
-  "jupyter",
+  "jupyter>=1.0",
 ]
 
 [tool.uv]
