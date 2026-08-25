@@ -31,7 +31,7 @@ DataEval addresses the critical need underlying every AI model -- the data.
 The difference between a great dataset and a poor dataset can have drastic
 consequences on AI model performance. Data collected in the wild is noisy,
 often imbalanced, and doesn't always cover the entire spectrum of conditions
-need for deployment. DataEval provides AI practitioners with a library of
+needed for deployment. DataEval provides AI practitioners with a library of
 rigorous, algorithm-backed metrics for performance estimation, bias analysis,
 dataset cleaning and assessment, and data distribution shifts. Throughout
 all stages of the machine learning lifecycle -- from initial data collection
@@ -287,7 +287,7 @@ class MyObjectDetectionDataset(od.Dataset):
 
         self.metadata = mp.DatasetMetadata(
             id="my_object_detection_dataset",
-            index2label={i: f"class_{i}" for i in np.unique(labels)},  # example mapping
+            index2label={i: f"class_{i}" for i in sorted({lab for labs in labels for lab in labs})},  # example mapping
         )
 
     def __len__(self) -> int:
@@ -370,19 +370,19 @@ from dataeval.quality import Duplicates
 extractor = TorchExtractor(Flatten())
 
 # Find near-duplicates using only embedding-based clustering.
-# An aggressive cluster_threshold of 1.5 should produce detections
+# An aggressive cluster_sensitivity of 1.5 should produce detections
 # of near duplicates even with a simple Flatten extractor.
 evaluator = Duplicates(
     flags=ImageStats.NONE,
     cluster_algorithm="hdbscan",
-    cluster_threshold=1.5,
+    cluster_sensitivity=1.5,
     extractor=extractor,
     batch_size=64,
 )
 result = evaluator.evaluate(dataset)
 
-# Near duplicates are grouped into sets of indices that are within
-# the specified cluster_threshold in embedding space.
+# Near duplicates are grouped into sets of indices whose pairwise distances
+# fall below `cluster_sensitivity * cluster_std` in embedding space.
 print(result)
 ```
 
