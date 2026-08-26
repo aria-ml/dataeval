@@ -3814,6 +3814,12 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             Measuring one sequence at a time instead means adding that ``item_index``
             entry by hand, one value per track, before each call.
 
+            The column has to name one row each, which a level's own index column does
+            not always do: ``instance_index`` is dense within a *frame*, so on a tracking
+            dataset it repeats in every sequence and instances are keyed on ``target_index``
+            instead. A column that names several rows is refused, and the error names one
+            that would work.
+
             The key column itself is consumed rather than stored — it says which row a
             value belongs to, not anything about the row. ``track_stats`` returns it as
             ``track_ids``, and both that and the singular column name are accepted. A row
@@ -3837,9 +3843,10 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         ValueError
             When the level is not part of the dataset's schema, when both `level` and
             `source_index` are given, or when `source_index` carries per-channel entries.
-            Under `key`: when it is not a column of that level's rows, when no values for
-            it were supplied, when the keys are not unique, or when the dataset holds
-            several items and the values do not say which they belong to.
+            Under `key`: when it is not a column of that level's rows, when that column
+            does not name one row each, when no values for it were supplied, when the keys
+            are not unique, or when the dataset holds several items and the values do not
+            say which they belong to.
 
         Warns
         -----

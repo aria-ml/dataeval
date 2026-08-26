@@ -429,6 +429,80 @@ distributed rather than only on their range.
 
 See {ref}`binning-levels` for a worked example with real numbers.
 
+## Choosing a level for a video measurement
+
+Video datasets force a choice between four structural levels: a sequence, its
+frames, its tracks, and its detections.
+
+The core rule is: **Store a value at the level where it was measured.** For
+example, store a per-frame metric at the `unit` level, even if you eventually
+want a sequence-level summary. Use {meth}`.Metadata.agg` to compute
+coarser-grained metrics from finer ones. This keeps both the raw measurements
+and the summaries available.
+
+| Measured Entity | Level | How it is indexed |
+| --- | --- | --- |
+| Property of the whole video (e.g., codec, resolution, platform) | `sequence` | Positional |
+| Property of one frame (e.g., brightness, blur, scene cuts) | `unit` | Keyed on `unit_index` |
+| Property of one track (e.g., mean speed, total displacement) | `track` | Keyed on `track_id` |
+| Property of one detection (e.g., box area, confidence, IoU) | `instance` | Positional |
+
+The `unit` and `track` levels are keyed because `unit_index` and `track_id`
+restart in every sequence. DataEval matches them using `(item_index, key)`,
+which you specify via the `key` parameter in {meth}`.Metadata.add_factors`.
+
+### The impact of misaligned storage levels
+
+Storing a measurement away from its native level changes how the data behaves
+during analysis.
+
+- **Storing coarser than measured (Aggregation):** If you store frame-level
+  brightness directly at the `sequence` level, you lose the individual frame
+  variations. Always store readings at their native level first, and use
+  {meth}`.Metadata.agg` to generate summaries (e.g., `.agg("unit", "sequence",
+  pl.col("blur").mean())`). This preserves both individual frame metrics and
+  sequence-level averages for binning.
+- **Storing finer than measured (Replication):** Never replicate a coarser
+  value (like a `sequence` property) manually across finer rows (like `unit` or
+  `instance`). Since DataEval automatically propagates values down the
+  hierarchy, manually replicating them adds redundant data. This distorts
+  analysis and binning by over-representing replicated values.
+- **Storing on sibling branches:** The `unit` (frames) and `track` levels are
+  siblings. You cannot store a per-frame value directly at the `track` level
+  because a track spans multiple frames. Instead, aggregate from `instance` to
+  `track` using {meth}`.Metadata.agg` with the `unique_by="unit"` constraint.
+  This ensures frames with multiple detections do not over-weight the track's
+  average.
+
+### Handling empty frames and untracked detections
+
+Video datasets contain structures that standard image datasets do not:
+
+- **Empty frames:** A frame with no detections still has a `unit` row, but has
+  no `instance` rows. Storing frame-level measurements at the `instance` level
+  silently discards data for all empty frames. Storing them at `unit` keeps the
+  data complete.
+- **Untracked detections:** A detection with no active track (e.g.,
+  `track_id == -1`) belongs to a frame (`unit`) but not to any `track`.
+  Track-level factors will be null on it. If you need to analyze untracked
+  detections, measure and store those factors at the `instance` level.
+
+### Built-in track statistics
+
+DataEval automatically computes two per-track metrics during structuring:
+
+| Column | Meaning | Equal to |
+| --- | --- | --- |
+| `track_length` | Number of frames the track was observed in | `n_appearances` in {func}`.track_stats` |
+| `frame_span` | Inclusive frame span from first to last | `track_duration` in {func}`.track_stats` |
+
+These metrics differ when a track has temporal gaps (e.g., a track visible only
+in frames 0 and 2 has `track_length == 2` and `frame_span == 3`).
+
+Because DataEval computes these automatically, you do not need to recalculate
+them via {func}`.track_stats` or manual aggregation (such as running `pl.len()`
+at the `instance` level).
+
 ## Saving and reading Metadata
 
 Building metadata reads every item of the dataset — decoding images, unpacking

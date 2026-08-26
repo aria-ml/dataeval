@@ -18,6 +18,12 @@ build: it runs in seconds and needs no Sphinx. It covers ``src/`` docstrings as 
 the hand-written pages, which is where the two references this test was written against
 turned out to be broken.
 
+A second failure mode is checked alongside it: a reference whose *markup* is malformed, so
+the role never fires at all and the whole thing renders as literal text. This is the same
+silent loss from the other direction -- the symbol is right, the link still does not exist --
+and it is invisible to the resolution check below, which reads the role out of the source
+without caring whether Sphinx would have parsed it.
+
 Only the two reference forms whose resolution does not depend on context are checked:
 
 * absolute -- ``:class:`~dataeval.data.Embeddings```
@@ -46,6 +52,16 @@ ROOT = Path(__file__).resolve().parent.parent
 # Both role spellings that appear in these sources: reST ``:class:`X``` in ``src/``
 # docstrings and ``.rst`` pages, MyST ``{class}`X``` in the ``.md`` guides and notebooks.
 ROLE = re.compile(r"[:{](?:py:)?(?P<role>func|class|meth|obj|attr|data|mod|exc)[}:]`(?P<body>[^`]+)`")
+# The same marker without its body, for the malformed-markup checks below.
+MARKER = r"[:{](?:py:)?(?:func|class|meth|obj|attr|data|mod|exc)[}:]"
+# ``` `{meth}`.Metadata.agg` ``` -- a backtick before the role makes it a code span holding
+# the word "meth", and the target beside it plain text. Renders as ``{meth}.Metadata.agg` ``.
+WRAPPED_ROLE = re.compile(rf"`{MARKER}`[^`\n]+`")
+# ``` {func} `.label_errors` ``` -- a role and its target are one token; a space between them
+# leaves the role as literal text and the target as an ordinary code span.
+SPACED_ROLE = re.compile(rf"{MARKER}[ \t]+`")
+# Both are deliberately narrow. A bare ``{exc}`` with no backtick after it is *not* flagged:
+# it is far more often an f-string placeholder in ``src/`` than a broken role.
 # ``{meth}`display text <.Ontology.is_a>``` -- the target is what is in the brackets.
 ANGLE = re.compile(r"<(?P<target>[^<>]+)>\s*$")
 
@@ -168,4 +184,54 @@ def test_cross_reference_resolves(source: str, target: str):
         "Sphinx renders an unresolved reference as plain text, so this link is silently "
         "dead. Update it to the symbol's current name, or drop the role if the target is "
         "no longer public."
+    )
+
+
+def _collect_malformed():
+    """Return ``[(relative_path, line, text, why), ...]`` for every broken role marker."""
+    found = []
+    checks = (
+        (WRAPPED_ROLE, "the role is wrapped in backticks, which makes it a code span"),
+        (SPACED_ROLE, "there is whitespace between the role and its target"),
+    )
+    for path in sorted(_iter_source_files()):
+        text = path.read_text(errors="replace")
+        for pattern, why in checks:
+            for match in pattern.finditer(text):
+                line = text.count("\n", 0, match.start()) + 1
+                found.append((path.relative_to(ROOT).as_posix(), line, match.group(0), why))
+    return found
+
+
+MALFORMED = _collect_malformed()
+
+
+@pytest.mark.required
+def test_malformed_detector_is_wired_up():
+    """Guard against the patterns silently matching nothing, as the collector above does."""
+    sample = "See {meth}`.Metadata.agg` and `{meth}`.Metadata.at` and {func} `.compute_stats`."
+    assert len(WRAPPED_ROLE.findall(sample)) == 1, "the wrapped-role pattern stopped matching"
+    assert len(SPACED_ROLE.findall(sample)) == 1, "the spaced-role pattern stopped matching"
+    assert not WRAPPED_ROLE.search("{meth}`.Metadata.agg`"), "a well-formed role must not match"
+    assert not SPACED_ROLE.search("{meth}`.Metadata.agg`"), "a well-formed role must not match"
+    assert not SPACED_ROLE.search('f"{exc} raised"'), "an f-string placeholder must not match"
+
+
+@pytest.mark.required
+def test_no_malformed_role_markup():
+    """Every role marker is spelled so that Sphinx actually parses it as one.
+
+    Not parametrized over the offenders, as ``test_cross_reference_resolves`` is over its
+    references: the intended steady state here is *zero* rows, and a parametrized test with
+    nothing to parametrize reports as skipped rather than passed. One assertion listing
+    every offender always runs, and shows them all at once rather than one per run.
+    """
+    assert not MALFORMED, (
+        "Malformed cross-reference markup:\n"
+        + "\n".join(f"  {source}:{line} contains {text!r} -- {why}" for source, line, text, why in MALFORMED)
+        + (
+            "\nThe role never fires, so Sphinx renders it as literal text and the link is "
+            "silently dead even though the symbol exists. Spell it {role}`.Target`: no backtick "
+            "before the role, no whitespace between it and its target."
+        )
     )

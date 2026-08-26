@@ -422,7 +422,7 @@ outlier detection addresses this case, again contingent on embedding quality.
 Neither approach addresses label quality and fails to detect **label errors** —
 images that are correctly exposed, non-duplicated, and statistically normal but
 assigned the wrong class label. To understand label quality, the functions
-{func}`.label_stats` and {func} `.label_errors` have to be run independently.
+{func}`.label_stats` and {func}`.label_errors` have to be run independently.
 
 The statistical outlier tests flag samples relative to the distribution of the
 dataset being evaluated. Results are therefore dataset-dependent: adding or

@@ -133,6 +133,52 @@ class TestKeyedRejections:
         with pytest.raises(ValueError, match="pass one"):
             md.add_factors({"track_ids": [5]}, level="track", key="track_id", source_index=[])
 
+    def test_a_key_column_that_names_several_rows_is_rejected(self):
+        """``instance_index`` is dense within a *frame*, so it repeats across a sequence.
+
+        Left unchecked this was a silent wrong answer rather than an error: the match is on
+        ``(item_index, key)`` against the frame, so one incoming value landed on every row
+        sharing the pair.
+        """
+        md = _tracking([[[5, 9], [], [9, -1]]])
+        assert md._store.frame("instance")["instance_index"].to_list() == [0, 1, 0, 1], "repeats"
+        with pytest.raises(ValueError, match="does not name one row"):
+            md.add_factors(
+                {"item_index": [0, 0], "instance_index": [0, 1], "x": [1.0, 2.0]},
+                level="instance",
+                key="instance_index",
+            )
+
+    def test_the_rejection_names_a_column_that_would_work(self):
+        md = _tracking([[[5, 9], [], [9, -1]]])
+        with pytest.raises(ValueError, match="target_index"):
+            md.add_factors(
+                {"item_index": [0], "instance_index": [0], "x": [1.0]},
+                level="instance",
+                key="instance_index",
+            )
+
+    def test_the_column_it_names_does_work(self):
+        """The suggestion is computed from the frame, so it has to be usable."""
+        md = _tracking([[[5, 9], [], [9, -1]]])
+        md.add_factors(
+            {"item_index": [0, 0, 0, 0], "target_index": [3, 1, 0, 2], "x": [0.3, 0.1, 0.0, 0.2]},
+            level="instance",
+            key="target_index",
+        )
+        assert md._store.frame("instance")["x"].to_list() == [0.0, 0.1, 0.2, 0.3]
+
+    def test_nothing_is_written_when_the_key_column_is_ambiguous(self):
+        md = _tracking([[[5, 9], [], [9, -1]]])
+        before = set(md._store.columns)
+        with pytest.raises(ValueError, match="does not name one row"):
+            md.add_factors(
+                {"item_index": [0], "instance_index": [0], "x": [1.0]},
+                level="instance",
+                key="instance_index",
+            )
+        assert set(md._store.columns) == before
+
     def test_nothing_is_written_when_the_call_is_rejected(self):
         md = _tracking([[[5, 9]]])
         before = set(md._store.columns)

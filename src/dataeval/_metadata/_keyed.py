@@ -83,6 +83,38 @@ def _item_values(md: "Metadata", factors: Mapping[str, Any], rows: int, key: str
     )
 
 
+def _reject_ambiguous_key(frame: pl.DataFrame, level: FactorLevel, key: str) -> None:
+    """Refuse a key column that does not name one row.
+
+    The incoming keys are checked for uniqueness below, but that is only half of it: the
+    match is on ``(item_index, key)`` against *the frame*, so a key column holding the same
+    pair twice makes one incoming value land on both rows. Unchecked, that is a silent wrong
+    answer rather than an error, and it is reachable from the documented vocabulary — a
+    level's own index column is the obvious thing to reach for, and ``instance_index`` is
+    dense within a *frame* rather than within an item, so it repeats across every sequence.
+
+    The candidates are computed only on the failure path, where the cost is irrelevant and
+    naming a column that would work is worth far more than the scan.
+    """
+    duplicated = int(frame.select(_ITEM, key).is_duplicated().sum())
+    if not duplicated:
+        return
+    usable = [
+        name
+        for name in frame.columns
+        if name not in (_ITEM, "level") and frame.select(_ITEM, name).n_unique() == frame.height
+    ]
+    suggestion = (
+        f" Columns of these rows that do name one row each: {', '.join(usable)}."
+        if usable
+        else " No column of these rows names one row each."
+    )
+    raise ValueError(
+        f"key={key!r} does not name one row of the {level!r} rows: {duplicated} of them share an "
+        f"(item_index, {key}) pair with another, so one value would land on several.{suggestion}",
+    )
+
+
 def resolve_keyed(
     md: "Metadata",
     factors: Mapping[str, Any],
@@ -121,9 +153,10 @@ def resolve_keyed(
     Raises
     ------
     ValueError
-        When ``key`` is not a column of the level's frame, when the factors carry no values
-        for it, when the incoming keys are not unique, or when the dataset holds several
-        items and the values do not say which they belong to.
+        When ``key`` is not a column of the level's frame, when that column does not name
+        one row each, when the factors carry no values for it, when the incoming keys are
+        not unique, or when the dataset holds several items and the values do not say which
+        they belong to.
     ShapeMismatchError
         When the factors disagree with the key column on how many rows they describe.
     """
@@ -133,6 +166,7 @@ def resolve_keyed(
             f"key={key!r} is not a column of the {level!r} rows, which hold {frame.columns}. "
             "The key names the column to match on.",
         )
+    _reject_ambiguous_key(frame, level, key)
 
     keys, consumed = _key_values(factors, key)
     items = _item_values(md, factors, len(keys), key)
