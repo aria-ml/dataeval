@@ -83,6 +83,20 @@ def _item_values(md: "Metadata", factors: Mapping[str, Any], rows: int, key: str
     )
 
 
+def _cannot_name_a_row(dtype: pl.DataType) -> bool:
+    """Whether a column of this dtype is disqualified from being a key.
+
+    A nested column holds several values per row, so it names a row no better than any one
+    of them does — ``box`` is the reachable case, and it sits on every level's rows.
+
+    Checked rather than left to fail on its own, because on the supported polars floor it
+    does not fail cleanly: asking a nested column for its distinct count is unsupported
+    there and surfaces as a panic out of the Rust side, which replaces this module's
+    messages with a stack trace naming polars internals.
+    """
+    return isinstance(dtype, pl.List | pl.Struct | pl.Array)
+
+
 def _reject_ambiguous_key(frame: pl.DataFrame, level: FactorLevel, key: str) -> None:
     """Refuse a key column that does not name one row.
 
@@ -96,13 +110,20 @@ def _reject_ambiguous_key(frame: pl.DataFrame, level: FactorLevel, key: str) -> 
     The candidates are computed only on the failure path, where the cost is irrelevant and
     naming a column that would work is worth far more than the scan.
     """
+    if _cannot_name_a_row(frame.schema[key]):
+        raise ValueError(
+            f"key={key!r} is a {frame.schema[key]} column of the {level!r} rows, which holds several "
+            "values per row rather than one that names it. The key names the column to match on.",
+        )
     duplicated = int(frame.select(_ITEM, key).is_duplicated().sum())
     if not duplicated:
         return
     usable = [
         name
         for name in frame.columns
-        if name not in (_ITEM, "level") and frame.select(_ITEM, name).n_unique() == frame.height
+        if name not in (_ITEM, "level")
+        and not _cannot_name_a_row(frame.schema[name])
+        and frame.select(_ITEM, name).n_unique() == frame.height
     ]
     suggestion = (
         f" Columns of these rows that do name one row each: {', '.join(usable)}."

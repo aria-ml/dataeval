@@ -7,6 +7,7 @@ fixture whose track ids happen to appear in sorted order would pass positionally
 nothing.
 """
 
+import polars as pl
 import pytest
 
 from dataeval import Metadata
@@ -157,6 +158,30 @@ class TestKeyedRejections:
                 level="instance",
                 key="instance_index",
             )
+
+    def test_the_suggestion_skips_columns_that_cannot_be_a_key(self):
+        """A key names a row by one value, so a box could never be one.
+
+        Asking polars for the distinct count of an Array column is unsupported on the
+        supported floor and comes back as a panic out of its Rust side, which replaced this
+        whole message with a stack trace.
+        """
+        md = _tracking([[[5, 9], [], [9, -1]]])
+        assert md._store.frame("instance")["box"].dtype == pl.Array(pl.Float32, 4)
+
+        with pytest.raises(ValueError, match="does not name one row") as raised:
+            md.add_factors(
+                {"item_index": [0], "instance_index": [0], "x": [1.0]},
+                level="instance",
+                key="instance_index",
+            )
+        assert "box" not in str(raised.value)
+
+    def test_a_nested_column_is_refused_as_the_key_itself(self):
+        """The same dtype on the other path: naming it outright, rather than being offered it."""
+        md = _tracking([[[5, 9], [], [9, -1]]])
+        with pytest.raises(ValueError, match=r"key='box' is a .* column .* holds several values per row"):
+            md.add_factors({"item_index": [0], "x": [1.0]}, level="instance", key="box")
 
     def test_the_column_it_names_does_work(self):
         """The suggestion is computed from the frame, so it has to be usable."""
