@@ -373,6 +373,7 @@ iy = "iy"
 fpr = "fpr"
 Pont = "Pont"
 setp = "setp"
+writeable = "writeable"
 
 [tool.typos.files]
 extend-exclude = [
