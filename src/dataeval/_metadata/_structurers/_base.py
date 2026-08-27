@@ -7,6 +7,7 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from dataeval.types import FactorLevel, FactorLevelSchema
+from dataeval.types._task import TaskProfile
 
 # Task identifier of a structuring strategy.
 TASK = Literal["IC", "OD", "MOT", "factors", "unknown"]
@@ -27,6 +28,10 @@ class Structurer:
 
     Attributes
     ----------
+    profile : TaskProfile or None
+        The task's level model, which supplies the four attributes below. Declaring one is
+        how a task subclass declares its levels; ``None`` on the strategies that have no
+        dataset to detect a task from.
     task : str
         Short task identifier, e.g. ``"IC"`` or ``"OD"``.
     levels : FactorLevelSchema
@@ -42,6 +47,12 @@ class Structurer:
         Descriptive only; it never affects structuring.
     """
 
+    # The level model, declared once in ``TASK_PROFILES`` and
+    # copied onto the class by ``__init_subclass__``. A task subclass names its profile and
+    # nothing else; the four attributes below stay declared here so the unspecialized base
+    # and :class:`FactorsStructurer` — which has no dataset and so no profile — still have
+    # them, and so a reader sees the shape without following the indirection.
+    profile: TaskProfile | None = None
     task: TASK = "unknown"
     levels: FactorLevelSchema = FactorLevelSchema.of("unit")
     item_level: FactorLevel = "unit"
@@ -66,6 +77,17 @@ class Structurer:
         no rows. Checking at class creation puts the error on the declaration.
         """
         super().__init_subclass__(**kwargs)
+        # Declared once, in the profile, so that this package and every other reader of the
+        # level model cannot answer "which levels does this task have" differently. Read
+        # from ``__dict__`` rather than the class, so a subclass that names no profile of
+        # its own does not re-copy its parent's.
+        profile = cls.__dict__.get("profile")
+        if profile is not None:
+            cls.task = profile.task
+            cls.levels = profile.levels
+            cls.item_level = profile.item_level
+            cls.label_level = profile.label_level
+            cls.unit_type = profile.unit_type
         for attribute in ("item_level", "label_level"):
             level = getattr(cls, attribute)
             if level not in cls.levels:

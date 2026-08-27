@@ -40,6 +40,35 @@ class Track:
     labels: NDArray[Any]
 
 
+def frame_number(frame: Any, position: int) -> int:
+    """Return a frame's own number within its sequence, or its decode order where it has none.
+
+    One implementation rather than two, for the same reason :func:`frame_size` is: the
+    structuring walk behind :class:`~dataeval.Metadata` records this as ``unit_index``, and
+    ``unit_index`` is what a ``unit``-level :class:`~dataeval.types.SourceIndex` keys on —
+    so a reader numbering a stream differently would answer a Metadata-shaped address with
+    the wrong frame.
+
+    MAITE declares ``frame_index`` on a :obj:`~dataeval.protocols.VideoFrame` and numbers it
+    by position in the yielded stream, but dispatch duck-types the *target* rather than
+    requiring the whole frame protocol, so a stream of bare arrays is a real input. Decode
+    order is what ``frame_index`` means for a conforming stream anyway.
+
+    Parameters
+    ----------
+    frame : Any
+        A decoded video frame, or anything a stream yields.
+    position : int
+        Where the frame sat in its stream, used when it declares no number of its own.
+
+    Returns
+    -------
+    int
+        The frame's number within its sequence.
+    """
+    return int(getattr(frame, "frame_index", position))
+
+
 def frame_size(frame: Any) -> tuple[int | None, int | None]:
     """Pixel width and height of a decoded video frame, or ``(None, None)``.
 
