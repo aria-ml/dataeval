@@ -25,8 +25,8 @@ from dataeval.protocols import (
     ProgressCallback,
     SingleFrameObjectTrackingTarget,
 )
-from dataeval.types import FactorLevelSchema
-from dataeval.types._track import frame_size
+from dataeval.types._task import TASK_PROFILES
+from dataeval.types._track import frame_number, frame_size
 
 _logger = get_logger(__name__)
 
@@ -68,12 +68,8 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
     match. Instance-level factors therefore come only from the target data itself.
     """
 
-    task = "MOT"
-    levels = FactorLevelSchema.of("sequence", "unit", "track", "instance")
-    item_level = "sequence"
-    label_level = "instance"
+    profile = TASK_PROFILES["MOT"]
     multi_target = True
-    unit_type = "frame"
 
     @classmethod
     def _frames_of(
@@ -115,12 +111,12 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             labels, boxes, scores = cls._instance_arrays(frame_target)
             # MAITE's VideoFrame declares frame_index, time_s and pts, but dispatch here
             # duck-types the target rather than requiring the full protocol, so each is
-            # optional. frame_index falls back to decode order, which is what it means for
-            # a conforming stream anyway; a timing has no such stand-in and stays None.
-            # Taken here because the frame is released as soon as this yields.
+            # optional. A timing has no stand-in and stays None; the frame's number has
+            # one, and `frame_number` is where it lives so that every reader of a stream
+            # agrees. Taken here because the frame is released as soon as this yields.
             width, height = frame_size(frame)
             yield FrameRows(
-                getattr(frame, "frame_index", position),
+                frame_number(frame, position),
                 getattr(frame, "time_s", None),
                 getattr(frame, "pts", None),
                 width,

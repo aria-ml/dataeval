@@ -29,7 +29,6 @@ what lets these files be regrouped without touching a caller.
 """
 
 __all__ = [
-    "DISPATCH",
     "IDENTIFIER_COLUMNS",
     "LEGACY_COLUMNS",
     "LEVEL_COLUMNS",
@@ -76,6 +75,6 @@ from dataeval._metadata._structurers._reserved import (
     reserved_block_columns,
     safe_column_name,
 )
-from dataeval._metadata._structurers._select import DISPATCH, TASK_STRUCTURERS, TaskOverride, select_structurer
+from dataeval._metadata._structurers._select import TASK_STRUCTURERS, TaskOverride, select_structurer
 from dataeval._metadata._structurers._source_index import SourceIndexRows
 from dataeval._metadata._structurers._tracking import MOTStructurer

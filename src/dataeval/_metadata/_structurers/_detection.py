@@ -19,7 +19,7 @@ from dataeval._metadata._structurers._propagation import PropagationMixin
 from dataeval._metadata._structurers._reporting import log_items_without_targets
 from dataeval._metadata._structurers._reserved import reserved_block_columns
 from dataeval.protocols import AnnotatedDataset, DatumMetadata, ObjectDetectionTarget, ProgressCallback
-from dataeval.types import FactorLevelSchema
+from dataeval.types._task import TASK_PROFILES
 
 _logger = get_logger(__name__)
 
@@ -27,12 +27,8 @@ _logger = get_logger(__name__)
 class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
     """Object detection over images: items are images, targets are instances."""
 
-    task = "OD"
-    levels = FactorLevelSchema.of("unit", "instance")
-    item_level = "unit"
-    label_level = "instance"
+    profile = TASK_PROFILES["OD"]
     multi_target = True
-    unit_type = "image"
 
     # Object detection called its target rows ``"target"`` through v1.1.0. It is the
     # only task that ever did, so it is the only one that translates the name. This

@@ -17,7 +17,7 @@ from dataeval._metadata._structurers._propagation import PropagationMixin
 from dataeval._metadata._structurers._reporting import log_items_without_targets
 from dataeval._metadata._structurers._reserved import reserved_block_columns
 from dataeval.protocols import AnnotatedDataset, Array, DatumMetadata, ProgressCallback
-from dataeval.types import FactorLevelSchema
+from dataeval.types._task import TASK_PROFILES
 from dataeval.utils._internal import as_numpy
 
 _logger = get_logger(__name__)
@@ -37,11 +37,7 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
     seen through :class:`~dataeval.data.DetectionCrops` is an instance here too.
     """
 
-    task = "IC"
-    levels = FactorLevelSchema.of("unit", "instance")
-    item_level = "unit"
-    label_level = "instance"
-    unit_type = "image"
+    profile = TASK_PROFILES["IC"]
 
     def build(
         self,
