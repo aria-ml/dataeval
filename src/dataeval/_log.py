@@ -30,7 +30,6 @@ _NAMESPACES: dict[str, str] = {
     "dataeval.performance": "dataeval.performance",
     "dataeval.quality": "dataeval.quality",
     "dataeval.scope": "dataeval.scope",
-    "dataeval.selection": "dataeval.selection",
     "dataeval.shift": "dataeval.shift",
     "dataeval.types": "dataeval.types",
     "dataeval.utils": "dataeval.utils",

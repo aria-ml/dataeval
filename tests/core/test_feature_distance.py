@@ -57,7 +57,6 @@ def mock_metadata(
 
     m._project = lambda columns, dtype: Metadata._project(m, columns, dtype)
     m.filter_by_factor = lambda x: Metadata.filter_by_factor(m, x)
-    m.filter_by_factor_type = lambda x: Metadata.filter_by_factor_type(m, x)
 
     return m
 
@@ -81,7 +80,11 @@ class TestFeatureDistance:
         m2 = mock_metadata(continuous_names=factors, continuous_data=RNG.random(shape2))
 
         with caplog.at_level(logging.WARNING):
-            result = feature_distance(m1.filter_by_factor_type("continuous"), m2.filter_by_factor_type("continuous"))
+
+            def continuous(m: Metadata) -> NDArray[Any]:
+                return Metadata.filter_by_factor(m, lambda _, fi: fi.factor_type == "continuous")
+
+            result = feature_distance(continuous(m1), continuous(m2))
 
         assert len(result) == len(factors)
         assert isinstance(result[0]["statistic"], float)

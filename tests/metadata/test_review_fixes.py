@@ -54,7 +54,7 @@ class TestFilterByRowsAndTypes:
     def test_categorical_string_factor_does_not_raise(self):
         """The raw column holds strings; the digitized companion is what casts."""
         md = Metadata(_od_dataset())
-        categorical = md.filter_by_factor_type("categorical")
+        categorical = md.filter_by_factor(lambda _, fi: fi.factor_type == "categorical")
         assert categorical.shape == (6, 1)
         # Two distinct weather values across three images, propagated to their instances.
         assert set(np.unique(categorical).tolist()) == {0.0, 1.0}
@@ -62,7 +62,7 @@ class TestFilterByRowsAndTypes:
     def test_continuous_factors_keep_their_raw_values(self):
         """feature_distance needs real values, not bin indices."""
         md = Metadata(_od_dataset(counts=(2, 2, 2)), continuous_factor_bins={"hour": 3})
-        continuous = md.filter_by_factor_type("continuous")
+        continuous = md.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
         assert continuous.shape == (6, 1)
         assert continuous[:, 0].tolist() == [0.0, 0.0, 1.0, 1.0, 2.0, 2.0]
 
@@ -82,74 +82,18 @@ class TestFilterByRowsAndTypes:
 
 
 @pytest.mark.required
-class TestRenameWarningSite:
-    """The FactorInfo.level warning fires for handouts, not for internal reads."""
+class TestFactorInfoReads:
+    """Internal reads never warn, and the handout answers for what is stored."""
 
     def test_factor_data_does_not_warn(self, recwarn):
         md = Metadata(_od_dataset())
         _ = md.factor_data
         assert not [w for w in recwarn.list if "FactorInfo.level" in str(w.message)]
 
-    def test_warning_survives_an_internal_read(self):
-        """The once-per-instance budget is not spent by factor_data."""
-        md = Metadata(_od_dataset())
-        _ = md.factor_data
-        with pytest.warns(DeprecationWarning, match="FactorInfo.level now reports"):
-            _ = md.factor_info
-
     def test_is_discrete_does_not_warn(self, recwarn):
         md = Metadata(_od_dataset())
         _ = md.is_discrete
         assert not [w for w in recwarn.list if "FactorInfo.level" in str(w.message)]
-
-
-@pytest.mark.required
-class TestAmbiguousAutoLevel:
-    """Levels of equal size must not break add_factors(level="auto")."""
-
-    def test_one_detection_per_image_adds_without_warning(self, recwarn):
-        """Equal row counts that correspond one-to-one are not ambiguous."""
-        md = Metadata(_od_dataset(counts=(1, 1, 1)))
-        assert md.level_counts == {"unit": 3, "instance": 3}
-
-        md.add_factors({"foo": np.arange(3)})
-
-        # The coarsest match wins, as it always has. Either level would put the same
-        # values on the target rows here, so there is nothing to warn about.
-        assert md.factor_info["foo"].level == "unit"
-        assert md.rows_at("unit")["foo"].to_list() == [0, 1, 2]
-        assert not [w for w in recwarn.list if "matches the" in str(w.message)]
-
-    def test_fully_labelled_classification_adds_without_warning(self, recwarn):
-        """The common case: image count == instance count on every labelled IC dataset."""
-        md = Metadata(MockDataset(np.zeros((3, 3, 4, 4)), np.eye(3), [{"a": i} for i in range(3)]))
-        assert md.level_counts == {"unit": 3, "instance": 3}
-
-        md.add_factors({"bright": np.arange(3.0)})
-        assert md.factor_info["bright"].level == "unit"
-        assert not [w for w in recwarn.list if "matches the" in str(w.message)]
-
-    def test_equal_counts_that_do_not_correspond_do_warn(self):
-        """3 images and 3 detections, but spread 0/1/2 — the choice changes the data."""
-        md = Metadata(_od_dataset(counts=(0, 1, 2)))
-        assert md.level_counts == {"unit": 3, "instance": 3}
-
-        with pytest.warns(UserWarning, match="do not correspond one-to-one"):
-            md.add_factors({"foo": np.arange(3)})
-        assert md.factor_info["foo"].level == "unit"
-
-    def test_unambiguous_length_does_not_warn(self, recwarn):
-        md = Metadata(_od_dataset())
-        md.add_factors({"iou": np.arange(6, dtype=np.float64)})
-        assert md.factor_info["iou"].level == "instance"
-        assert not [w for w in recwarn.list if "matches the" in str(w.message)]
-
-    def test_length_matching_no_level_still_raises(self):
-        from dataeval.exceptions import ShapeMismatchError
-
-        md = Metadata(_od_dataset())
-        with pytest.raises(ShapeMismatchError, match="different length"):
-            md.add_factors({"foo": np.arange(99)})
 
 
 @pytest.mark.required
@@ -172,8 +116,7 @@ class TestArrayProtocolConsistency:
 class TestBindResetsLevelState:
     def test_rebinding_clears_the_previous_schema(self):
         md = Metadata(_od_dataset())
-        with pytest.warns(DeprecationWarning, match="FactorInfo.level now reports"):
-            _ = md.factor_info
+        _ = md.factor_info
         assert md.level_counts == {"unit": 3, "instance": 6}
 
         md.bind(MockDataset(np.zeros((2, 3, 4, 4)), np.eye(2)))
@@ -187,15 +130,6 @@ class TestBindResetsLevelState:
 
         # And structuring then answers for the dataset that is actually bound.
         assert md.level_counts == {"unit": 2, "instance": 2}
-
-    def test_rebinding_restores_the_rename_warning(self):
-        md = Metadata(_od_dataset())
-        with pytest.warns(DeprecationWarning, match="FactorInfo.level now reports"):
-            _ = md.factor_info
-
-        md.bind(_od_dataset())
-        with pytest.warns(DeprecationWarning, match="FactorInfo.level now reports"):
-            _ = md.factor_info
 
 
 @pytest.mark.required
@@ -387,14 +321,12 @@ class TestLevelModelIsExposed:
         md = Metadata(_od_dataset())
         md.add_factors({"iou": np.arange(6.0)}, level="instance")
 
-        with pytest.warns(DeprecationWarning, match="FactorInfo.level now reports"):
-            native = md.filter_by_factor(lambda _, fi: fi.level == md.label_level)
+        native = md.filter_by_factor(lambda _, fi: fi.level == md.label_level)
         assert native.shape == (6, 1)
 
     def test_an_empty_selection_still_has_the_view_row_count(self):
         md = Metadata(_od_dataset())
-        with pytest.warns(DeprecationWarning, match="FactorInfo.level now reports"):
-            none_native = md.filter_by_factor(lambda _, fi: fi.level == md.label_level)
+        none_native = md.filter_by_factor(lambda _, fi: fi.level == md.label_level)
         assert none_native.shape == (6, 0)
 
 
@@ -601,14 +533,6 @@ class TestViewAwareAccessors:
         image = md.at("unit")
         assert len(image.item_indices) == image.factor_data.shape[0] == 3
         assert image.item_indices.tolist() == [0, 1, 2]
-
-    def test_at_announces_the_level_rename_on_its_own(self):
-        """A copy is a fresh object in the user's hands and gets its own warning budget."""
-        md = Metadata(_od_dataset())
-        with pytest.warns(DeprecationWarning, match="FactorInfo.level"):
-            md.factor_info  # noqa: B018
-        with pytest.warns(DeprecationWarning, match="FactorInfo.level"):
-            md.at("unit").factor_info  # noqa: B018
 
 
 @pytest.mark.required

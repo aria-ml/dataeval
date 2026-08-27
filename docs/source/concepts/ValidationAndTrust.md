@@ -190,10 +190,6 @@ apply to every row in this table:
     `__call__`). Select a single class's array and pass that to a detector.
     `threshold=0.99` is a policy lever, not a detail: it decides how many classes
     each detection is counted under, with `1.0` meaning winner-take-all.
-- - {class}`.ClassifierUncertaintyExtractor`
-  - Superseded. **Deprecated as of v1.1**, removal scheduled for v1.2.
-  - Use {class}`.UncertaintyExtractor` for per-instance uncertainty or
-    {class}`.ClasswiseUncertaintyExtractor` for the per-class breakdown.
 
 :::
 
@@ -1022,10 +1018,12 @@ Two mechanisms make stability observable rather than a matter of trust:
 - Experimental features raise
   {class}`~dataeval.exceptions.ExperimentalWarning` at runtime and are marked in
   their docstrings — you cannot use one without being told.
-- Deprecated symbols raise {class}`~dataeval.exceptions.DeprecatedWarning`, and
-  a dedicated CI test (`tests/test_deprecated_docs.py`) fails the build if any
-  deprecated public object lacks a `.. deprecated::` directive in its docstring.
-  A deprecated symbol cannot ship silently. Transitional warnings for changed
+- Deprecated symbols raise {class}`~dataeval.exceptions.DeprecatedWarning` when
+  used, and a dedicated CI test (`tests/test_deprecated_docs.py`) fails the build
+  if any deprecated public object lacks a `.. deprecated::` directive in its
+  docstring. A deprecated symbol cannot ship silently. The symbols deprecated in
+  v1.1 (notably `ClassifierUncertaintyExtractor`) were removed in v1.2, so as of
+  this release no deprecated symbol remains. Transitional warnings for changed
   *parameter defaults* are a separate mechanism and use a plain `FutureWarning`
   — see [Changed defaults](#stability-status) below.
 
@@ -1041,13 +1039,6 @@ As of v{{ release }}:
 - `ParityResult` carries the same experimental status but raises nothing on its
   own — it is a `TypedDict` describing {func}`.parity`'s return value, and the
   warning comes from the call that produced it.
-
-**Deprecated** (raises `DeprecatedWarning`; scheduled for removal in v1.2):
-
-- {class}`.ClassifierUncertaintyExtractor` → use
-  {class}`.UncertaintyExtractor` or {class}`.ClasswiseUncertaintyExtractor`
-- `clip_and_pad` → use {func}`.crop_with_fill`, passing `fill=np.nan`
-  and taking the first tuple value
 
 **Changed defaults** (the symbol is not deprecated; only the transitional
 warning goes away):

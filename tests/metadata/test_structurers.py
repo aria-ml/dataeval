@@ -100,7 +100,7 @@ class TestStructurerSelection:
         """The whole pipeline runs without ever loading the item."""
         dataset = MockDataset(["/data/0.png", "/data/1.png"], [_od_target(), _od_target(1)])
         md = Metadata(dataset)
-        assert md.target_data.height == 3
+        assert md.rows_at("instance").height == 3
 
     def test_arbitrary_item_object_with_od_target(self):
         """A lazy loader, a PIL handle — anything that is not an Array is fine."""
@@ -230,11 +230,14 @@ class TestReservedColumnParity:
         # The two differ in structure by design: a dataset knows which items exist and so
         # carries an item level as well, while raw factor arrays are only the target rows.
         for name in ("item_index", "target_index", "class_label", "box"):
-            assert from_factors.target_data[name].to_list() == from_dataset.target_data[name].to_list()
+            assert (
+                from_factors.rows_at(from_factors.label_level)[name].to_list()
+                == from_dataset.rows_at(from_dataset.label_level)[name].to_list()
+            )
 
-        # Each tags its rows with its own target level, which is what target_data filters on.
-        assert from_factors.target_data["level"].to_list() == ["unit"] * 3
-        assert from_dataset.target_data["level"].to_list() == ["instance"] * 3
+        # Each tags its rows with its own target level, which is what rows_at(label_level) returns.
+        assert from_factors.rows_at(from_factors.label_level)["level"].to_list() == ["unit"] * 3
+        assert from_dataset.rows_at(from_dataset.label_level)["level"].to_list() == ["instance"] * 3
 
     def test_from_factors_at_instance_level_keeps_the_same_reserved_columns(self):
         md = Metadata.from_factors({"iou": np.array([0.1, 0.2])}, np.array([0, 1]), level="instance")

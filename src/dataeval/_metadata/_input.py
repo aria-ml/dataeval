@@ -1,20 +1,19 @@
 """Normalizing what a caller passed before anything trusts it.
 
 :meth:`~dataeval.Metadata.from_factors` and :meth:`~dataeval.Metadata.add_factors` accept
-the same shapes of input — a factor mapping, a whole stats result, a retired level
-spelling — and the two must agree on what each one means. These functions are that
-agreement, held once rather than restated on each path, and they are pure: they translate
-and reject, and never touch the metadata they are about to be used on.
+the same shapes of input — a factor mapping, a whole stats result — and the two must
+agree on what each one means. These functions are that agreement, held once rather than
+restated on each path, and they are pure: they translate and reject, and never touch the
+metadata they are about to be used on.
 """
 
 __all__ = []
 
-import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from dataeval.exceptions import ShapeMismatchError
-from dataeval.types import Array1D, FactorLevel, SourceIndex
+from dataeval.types import Array1D, SourceIndex
 
 
 def _is_stats_result(candidate: Any) -> bool:
@@ -68,7 +67,7 @@ def unpack_stats_result(
     """
     if not _is_stats_result(factors):
         return factors, source_index
-    if level is not None and level != "auto":
+    if level is not None:
         raise ValueError(
             f"`level` and the source_index carried by this stats result are mutually exclusive; "
             f"the result already labels each value with what it describes. Pass the result's "
@@ -106,28 +105,3 @@ def build_index2label(
             index2label.setdefault(int(lbl), f"UNDEFINED_CLASS_{int(lbl)}")
         return index2label
     return {int(lbl): str(int(lbl)) for lbl in observed_labels}
-
-
-def resolve_legacy_level(level: str, aliases: Mapping[str, FactorLevel], stacklevel: int, unit_type: str) -> str:
-    """Translate a retired level spelling, warning at the caller's line.
-
-    Shared by the two paths that can be handed one: :meth:`Metadata._resolve_level`,
-    which has a structurer and so knows the task's full alias map, and the factors-only
-    loading path, which is choosing the level a :class:`FactorsStructurer` will be built
-    with and so has only the base map. One function so the two cannot word the
-    deprecation differently.
-    """
-    alias = aliases.get(level)
-    if alias is None:
-        return level
-    # Naive "+ s" pluralization: correct for every current unit_type ("image",
-    # "frame", "item"). A future unit_type needing an irregular plural should be
-    # given one at its declaration site rather than inflected here.
-    warnings.warn(
-        f"Level {level!r} is deprecated and will stop resolving in a future "
-        f"release. It is no longer a level name; pass {alias!r} instead "
-        f"(this dataset's units are {unit_type}s).",
-        DeprecationWarning,
-        stacklevel=stacklevel,
-    )
-    return alias

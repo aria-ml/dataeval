@@ -14,7 +14,6 @@ __all__ = [
     "BoVWExtractor",
     "UncertaintyExtractor",
     "ClasswiseUncertaintyExtractor",
-    "ClassifierUncertaintyExtractor",
     "ScoresExtractor",
     "VideoTorchExtractor",
 ]
@@ -26,7 +25,6 @@ from dataeval.extractors._onnx import OnnxExtractor
 from dataeval.extractors._scores import ScoresExtractor
 from dataeval.extractors._torch import TorchExtractor
 from dataeval.extractors._uncertainty import (
-    ClassifierUncertaintyExtractor,
     ClasswiseUncertaintyExtractor,
     UncertaintyExtractor,
 )

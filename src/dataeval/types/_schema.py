@@ -175,7 +175,7 @@ class ExtractorInfo(BaseModel):
     ----------
     type : str
         Extractor class name (e.g. ``"OnnxExtractor"``, ``"TorchExtractor"``,
-        ``"FlattenExtractor"``, ``"BoVWExtractor"``, ``"ClassifierUncertaintyExtractor"``).
+        ``"FlattenExtractor"``, ``"BoVWExtractor"``, ``"UncertaintyExtractor"``).
     model : ModelInfo or None
         Underlying model artifact. ``None`` for extractors with no model
         (e.g. ``FlattenExtractor``).

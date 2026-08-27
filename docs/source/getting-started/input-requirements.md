@@ -30,8 +30,8 @@ supply and the table below narrows to a handful of candidates.
 
 An extractor is not the same thing as a model. {class}`.FlattenExtractor` and
 {class}`.BoVWExtractor` need no model at all, while {class}`.TorchExtractor`,
-{class}`.OnnxExtractor`, {class}`.ScoresExtractor` and
-{class}`.ClassifierUncertaintyExtractor` wrap one. Only
+{class}`.OnnxExtractor` and
+{class}`.ScoresExtractor` wrap one. Only
 {class}`.DriftReconstruction` and {class}`.OODReconstruction` take a model
 directly, as a constructor argument rather than through the extractor slot.
 

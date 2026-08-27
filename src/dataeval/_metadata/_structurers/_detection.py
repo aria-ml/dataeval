@@ -3,7 +3,6 @@
 __all__ = []
 
 from collections.abc import Mapping
-from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -29,11 +28,6 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
 
     profile = TASK_PROFILES["OD"]
     multi_target = True
-
-    # Object detection called its target rows ``"target"`` through v1.1.0. It is the
-    # only task that ever did, so it is the only one that translates the name. This
-    # overrides rather than merges with the base map, so ``"image"`` is repeated here.
-    legacy_level_aliases = MappingProxyType({"target": "instance", "image": "unit"})
 
     def build(
         self,

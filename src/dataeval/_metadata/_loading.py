@@ -14,14 +14,14 @@ class's surface to what a caller can actually reach.
 __all__ = []
 
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._metadata._columns import split_by_dimensionality
-from dataeval._metadata._input import build_index2label, reject_length_mismatch, resolve_legacy_level
-from dataeval._metadata._structurers import FactorsStructurer, SourceIndexRows, Structurer
+from dataeval._metadata._input import build_index2label, reject_length_mismatch
+from dataeval._metadata._structurers import FactorsStructurer, SourceIndexRows
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, FactorLevel, SourceIndex
 from dataeval.utils._internal import as_numpy
@@ -37,7 +37,7 @@ def _load_factors(
     *,
     index2label: Mapping[int, str] | None,
     item_indices: Array1D[Any] | None,
-    level: FactorLevel | Literal["image"] | None = None,
+    level: FactorLevel | None = None,
     source_index: Sequence[SourceIndex] | None = None,
 ) -> None:
     """Populate structured state directly from raw factor arrays (see ``from_factors``)."""
@@ -78,7 +78,7 @@ def _load_factors_by_length(  # noqa: C901
     class_labels: Array1D[Any] | None,
     *,
     index2label: Mapping[int, str] | None,
-    level: FactorLevel | Literal["image"] | None,
+    level: FactorLevel | None,
     item_indices: Array1D[Any] | None,
 ) -> None:
     """Populate structured state from factor arrays that all describe one level.
@@ -116,18 +116,13 @@ def _load_factors_by_length(  # noqa: C901
         if len(srcidx) != n:
             raise ShapeMismatchError(f"item_indices length {len(srcidx)} does not match row count {n}.")
 
-    # A factors-only instance has a single level, which is therefore both the
-    # item level and the label level. Structuring goes through the same
-    # StructuredData bundle as the dataset path, so the reserved columns have
-    # exactly one producer and cannot drift between the two constructors. No
-    # structurer instance exists yet to resolve a retired spelling against — this
-    # call is what builds one — so this resolves against the base Structurer's
-    # alias map rather than a task-specific one.
-    # caller -> from_factors -> _load_factors -> here -> _resolve_legacy_level.
-    # test_from_factors_blames_caller pins this.
-    requested = resolve_legacy_level(
-        level or "unit", Structurer.legacy_level_aliases, stacklevel=5, unit_type=Structurer.unit_type
-    )
+    # A factors-only instance has a single level, which is therefore both the item
+    # level and the label level. Structuring goes through the same StructuredData
+    # bundle as the dataset path, so the reserved columns have exactly one producer
+    # and cannot drift between the two constructors. No structurer instance exists yet
+    # to resolve the level against — this call is what builds one — so it is declared
+    # directly.
+    requested = level or "unit"
     structurer = FactorsStructurer(requested)  # type: ignore[arg-type]
     data = structurer.build_from_arrays(factor_arrays, labels, srcidx)
 
@@ -148,7 +143,7 @@ def _load_factors_by_source_index(
     class_labels: Array1D[Any] | None,
     *,
     index2label: Mapping[int, str] | None,
-    level: FactorLevel | Literal["image"] | None,
+    level: FactorLevel | None,
     item_indices: Array1D[Any] | None,
     source_index: Sequence[SourceIndex],
 ) -> None:

@@ -103,40 +103,6 @@ class TestAddFactorsFromComputeStats:
         for label, expected in _expected_by_label(result).items():
             assert stored[label] == pytest.approx(expected), f"{label} landed on the wrong row"
 
-    def test_inferred_placement_matches_the_source_index(self, od_dataset):
-        """The default call must agree with the explicit one, value for value.
-
-        ``add_factors(stats["stats"])`` is what the docs show and what v1.1 accepted. It
-        infers placement from array lengths alone, so it is exactly the call that a change
-        to the ordering convention breaks silently.
-        """
-        result = _stats(od_dataset)
-
-        inferred = Metadata(od_dataset)
-        with pytest.deprecated_call():
-            inferred.add_factors(dict(result["stats"]))
-
-        explicit = Metadata(od_dataset)
-        explicit.add_factors(dict(result["stats"]), source_index=result["source_index"])
-
-        assert sorted(inferred.factor_names) == sorted(explicit.factor_names)
-        for column in (c for c in explicit.dataframe.columns if c.endswith("mean")):
-            assert _actual_by_label(inferred, column) == _actual_by_label(explicit, column)
-
-    def test_combined_spelling_matches_the_source_index(self, od_dataset):
-        """The retired ``level="combined"`` must place the same data as its replacement."""
-        result = _stats(od_dataset)
-
-        deprecated = Metadata(od_dataset)
-        with pytest.deprecated_call():
-            deprecated.add_factors(dict(result["stats"]), level="combined")
-
-        explicit = Metadata(od_dataset)
-        explicit.add_factors(dict(result["stats"]), source_index=result["source_index"])
-
-        for column in (c for c in explicit.dataframe.columns if c.endswith("mean")):
-            assert _actual_by_label(deprecated, column) == _actual_by_label(explicit, column)
-
     def test_ic_stats_land_on_image_rows(self, ic_dataset):
         """Classification stats are one per image and must not be split."""
         result = _stats(ic_dataset)
@@ -148,12 +114,12 @@ class TestAddFactorsFromComputeStats:
         assert "mean" in md.dataframe.columns
         assert md.rows_at("unit")["mean"].to_numpy() == pytest.approx(result["stats"]["mean"])
 
-    def test_ic_stats_infer_the_image_level(self, ic_dataset):
-        """One value per image matches the image level's row count, so inference suffices."""
+    def test_ic_stats_land_on_the_unit_level(self, ic_dataset):
+        """Classification stats are one value per image, so the unit level is their home."""
         result = _stats(ic_dataset)
 
         md = Metadata(ic_dataset)
-        md.add_factors(dict(result["stats"]))
+        md.add_factors(dict(result["stats"]), level="unit")
 
         assert md.rows_at("unit")["mean"].to_numpy() == pytest.approx(result["stats"]["mean"])
 
@@ -553,24 +519,6 @@ class TestVacuousSplitsAreReported:
         assert "unit_mean" in md.factor_names
         assert "instance_mean" not in md.factor_names
         assert md.dropped_factors["instance_mean"] == ["no_values_at_level"]
-
-    def test_combined_keeps_both_halves_it_promised(self):
-        """``level="combined"`` names its columns up front, so it keeps them regardless.
-
-        The deprecation warning tells the caller exactly which two columns it will get.
-        Dropping one for holding nothing would rename the result out from under code
-        following that warning, which is the thing ``qualify=True`` exists to prevent.
-        """
-        md = Metadata(_od_dataset([[0], [1], [0]]))
-
-        # Three unit rows with values, three instance rows without.
-        values = np.concatenate([np.arange(3.0), np.full(3, np.nan)])
-        with pytest.deprecated_call():
-            md.add_factors({"foo": values}, level="combined")
-
-        assert "unit_foo" in md.factor_names
-        assert "instance_foo" in md.factor_names
-        assert md.dropped_factors == {}
 
     def test_a_factor_empty_at_every_level_is_kept_whole(self):
         """Dropping every half would make the factor vanish, which is never the answer."""

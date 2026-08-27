@@ -71,7 +71,7 @@ class TestMetadataFactorValueTypes:
     def test_item_factor_values_replicate_across_instances(self, od_dataset_with_varied_types):
         """An image-level factor reaches every instance of that image by propagation."""
         metadata = Metadata(od_dataset_with_varied_types)
-        instances = metadata.target_data
+        instances = metadata.rows_at("instance")
         # The fixture has 2, 1 and 2 detections for images 0, 1 and 2.
         assert instances["item_index"].to_list() == [0, 0, 1, 2, 2]
         assert instances["image_factor"].to_list() == [0, 0, 1, 2, 2]
@@ -90,7 +90,7 @@ class TestMetadataFactorValueTypes:
             [{"iou": [0.1, 0.2]}, {"iou": [0.3]}],
         )
         metadata = Metadata(dataset)
-        assert metadata.target_data["iou"].to_list() == [0.1, 0.2, 0.3]
+        assert metadata.rows_at("instance")["iou"].to_list() == [0.1, 0.2, 0.3]
         # Instance-level values have no image-level counterpart, so image rows are null.
         assert metadata.rows_at("unit")["iou"].to_list() == [None, None]
 

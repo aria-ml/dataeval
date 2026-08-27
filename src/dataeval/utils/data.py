@@ -1,9 +1,10 @@
-"""Deprecated location. Dataset operations moved to :mod:`dataeval.data`.
+"""Dataset validation helpers: what shape a dataset is, and refusing the wrong one.
 
-Importing :func:`split_dataset`, :func:`unzip_dataset`, :class:`TrainValSplit`, or
-:class:`DatasetSplits` from here is deprecated; import them from :mod:`dataeval.data`.
-The validation helpers (:data:`DatasetKind`, :func:`validate_dataset`,
-:func:`requires_maite_dataset`) remain available here.
+The dataset *operations* that once lived here — :func:`split_dataset`,
+:func:`unzip_dataset`, :class:`TrainValSplit`, :class:`DatasetSplits` — moved to
+:mod:`dataeval.data` in v1.1 and stopped being importable from here in v1.2.0. The
+validation helpers below never moved and were never deprecated, so this module remains
+their public home.
 """
 
 __all__ = [
@@ -12,23 +13,4 @@ __all__ = [
     "validate_dataset",
 ]
 
-import warnings
-from typing import Any
-
 from dataeval.utils._validate import DatasetKind, requires_maite_dataset, validate_dataset
-
-_MOVED = ("DatasetSplits", "TrainValSplit", "split_dataset", "unzip_dataset")
-
-
-def __getattr__(name: str) -> Any:
-    if name in _MOVED:
-        warnings.warn(
-            f"dataeval.utils.data.{name} has moved to dataeval.data.{name}; importing it from "
-            "dataeval.utils.data is deprecated and will be removed in v1.2.0.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        import dataeval.data
-
-        return getattr(dataeval.data, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

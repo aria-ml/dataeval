@@ -270,8 +270,8 @@ class TestObjectDetectionSelections:
 
         # Verify nested metadata is processed by Metadata class
         md = Metadata(select)
-        # With dual-key indexing, target_data filters to only target-level rows
-        assert md.target_data["nested"].to_list() == [0, 2, 3, 3]
+        # With dual-key indexing, rows_at(label_level) filters to only target-level rows
+        assert md.rows_at(md.label_level)["nested"].to_list() == [0, 2, 3, 3]
 
     def test_unsupported_target_type_raises_type_error(self):
         """A datum whose target is neither an Array nor an object-detection/segmentation

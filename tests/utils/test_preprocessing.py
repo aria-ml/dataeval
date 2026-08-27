@@ -8,18 +8,15 @@ import pytest
 
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.utils.preprocessing import (
-    BitDepth,
     BoundingBox,
     BoundingBoxFormat,
     ChannelGroup,
     ValueRange,
     boxes_to_mask,
-    clip_and_pad,
     clip_box,
     compute_iou,
     crop_with_fill,
     edge_filter,
-    get_bitdepth,
     get_value_range,
     is_valid_box,
     normalize_image_shape,
@@ -342,9 +339,8 @@ class TestBoxesToMask:
 class TestValueRange:
     """Encoding depth is decoded where there is an encoding, and withheld where there is not.
 
-    The split exists because ``BitDepth`` derived a depth from an observed maximum for
-    every input, which is a decode for integer imagery and arithmetic on an arbitrary
-    number for anything else.
+    The split exists because deriving a depth from an observed maximum is a decode for
+    integer imagery and arithmetic on an arbitrary number for anything else.
     """
 
     @pytest.mark.parametrize(
@@ -420,31 +416,6 @@ class TestValueRange:
 
 @pytest.mark.required
 class TestImageUtils:
-    def test_get_bitdepth_negatives(self):
-        image = np.random.random((3, 28, 28)) - 0.5
-        bitdepth = get_bitdepth(image)
-        assert bitdepth == BitDepth(0, np.min(image), np.max(image))  # type: ignore
-
-    def test_get_bitdepth_float(self):
-        image = np.random.random((3, 28, 28))
-        bitdepth = get_bitdepth(image)
-        assert bitdepth == BitDepth(1, 0, 1)
-
-    def test_get_bitdepth_8bit(self):
-        image = (np.random.random((3, 28, 28)) * (2**8 - 1)).astype(np.uint8)
-        bitdepth = get_bitdepth(image)
-        assert bitdepth == BitDepth(8, 0, (2**8 - 1))
-
-    def test_get_bitdepth_16bit(self):
-        image = (np.random.random((3, 28, 28)) * (2**16 - 1)).astype(np.uint16)
-        bitdepth = get_bitdepth(image)
-        assert bitdepth == BitDepth(16, 0, (2**16 - 1))
-
-    def test_get_bitdepth_64bit(self):
-        image = (np.random.random((3, 28, 28)) * (2**64 - 1)).astype(np.uint64)
-        bitdepth = get_bitdepth(image)
-        assert bitdepth == BitDepth(32, 0, (2**32 - 1))
-
     def test_rescale_noop(self):
         image = np.random.random((3, 28, 28))
         scaled = rescale(image)
@@ -663,22 +634,3 @@ class TestChannelGroupIdentity:
     def test_comparison_with_a_foreign_type_defers(self):
         assert ChannelGroup([0]).__eq__(object()) is NotImplemented
         assert ChannelGroup([0]) != object()
-
-
-@pytest.mark.required
-class TestBitDepthAndClipEdges:
-    def test_all_nan_image_has_no_measurable_depth(self):
-        depth = get_bitdepth(np.full((1, 4, 4), np.nan, dtype=np.float64))
-        assert depth.depth == 0
-        assert math.isnan(depth.pmin)
-        assert math.isnan(depth.pmax)
-
-    def test_clip_and_pad_matches_crop_with_fill(self):
-        """The deprecated spelling is the first element of `crop_with_fill(..., fill=nan)`."""
-        from dataeval.exceptions import DeprecatedWarning
-
-        image = np.arange(3 * 4 * 4, dtype=np.uint8).reshape(3, 4, 4)
-        box = (-1, -1, 3, 3)
-        with pytest.warns(DeprecatedWarning, match="clip_and_pad"):
-            padded = clip_and_pad(image, box)
-        np.testing.assert_array_equal(padded, crop_with_fill(image, box, fill=np.nan, dtype=float)[0])

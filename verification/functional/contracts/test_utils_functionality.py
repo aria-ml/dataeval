@@ -28,8 +28,8 @@ class TestUtilsFunctionality:
         assert isinstance(result, np.ndarray)
         assert result.shape == (2, 2)
 
-    def test_utils_data_loaders_exist(self):
-        from dataeval.utils import data
+    def test_data_operations_module_exists(self):
+        from dataeval import data
 
         assert data is not None
 

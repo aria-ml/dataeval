@@ -633,12 +633,12 @@ need no modality awareness at all.
 
 ```{note}
 Previous versions were image-dataset-centric, and used the terms "image" and "target".
-`"image"` is still accepted wherever a level name is taken — `rows_at("image")`,
-`at("image")`, `view="image"` — and resolves to `"unit"` with a
-`DeprecationWarning`. It is removed in v1.2.0. Level names always read back as
-`"unit"`, so `md.item_level == "image"` is `False` even on an image dataset —
-the level names answer where a fact lives, and {attr}`.Metadata.unit_type`
-answers what the medium is called.
+Those spellings stopped resolving in v1.2.0: `rows_at`, `at` and `view` take a level
+name only, and the retired names raise rather than warn. Level names always read back
+as the level vocabulary — `"unit"` for the media-unit level — so
+`md.item_level == "image"` is `False` even on an image dataset. The level names
+answer where a fact lives, and {attr}`.Metadata.unit_type` answers what the medium
+is called.
 ```
 
 ## Levels and ontologies are different graphs
