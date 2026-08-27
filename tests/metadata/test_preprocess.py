@@ -22,8 +22,8 @@ class TestMDPreprocessingUnit:
         labels = [0, 0, 0]
         bincounts = {"data1": 1}
         output = to_metadata(factors, labels, bincounts)
-        if output.raw_data is not None:
-            cont_factors = output.raw_data.T[0]
+        if output.factor_names:
+            cont_factors = output.rows_at(output.view).select(output.factor_names).to_numpy().T[0]
             assert np.all(cont_factors == [0.1, 0.2, 0.3])
 
     @pytest.mark.parametrize(

@@ -62,7 +62,8 @@ class TestMetadata:
         ds = MockDataset(data, labels, metadata)
         md = Metadata(ds)
 
-        md.add_factors({"a": np.random.random((factors,))})
+        # Ten values sit at the unit level; twenty, one per detection, sit at the instance level.
+        md.add_factors({"a": np.random.random((factors,))}, level="unit" if factors == 10 else "instance")
         assert "a" in md.factor_names
         assert "a" in md.dataframe
 
@@ -135,7 +136,7 @@ class TestMetadata:
         assert "brightness" in original_factors
 
         # Step 2: Add a new factor
-        md.add_factors({"contrast": np.random.rand(50)})
+        md.add_factors({"contrast": np.random.rand(50)}, level="unit")
 
         # Step 3: Access factor_info again - all original factors should still be present
         info2 = md.factor_info
@@ -146,8 +147,8 @@ class TestMetadata:
         assert "contrast" in info2
 
     def test_mismatch_factor_length(self, mock_metadata):
-        with pytest.raises(ShapeMismatchError, match="provided factors have a different length"):
-            mock_metadata.add_factors({"a": np.random.random((20,))})
+        with pytest.raises(ShapeMismatchError, match="must have length"):
+            mock_metadata.add_factors({"a": np.random.random((20,))}, level="unit")
 
     def test_add_empty_factors(self):
         md = Metadata(None)  # type: ignore
@@ -320,7 +321,7 @@ class TestMetadata:
         md._is_structured = True
         md._factors = {"foo"}
         md._exclude = {"foo"}
-        assert md.raw_data.size == 0
+        assert md.factor_data.size == 0
 
     @pytest.mark.parametrize(
         ("is_binned", "exists"),
@@ -407,7 +408,7 @@ class TestMetadata:
         assert "embedding_2d" not in md.factor_info
 
         # Verify that factor_data only includes 1D factors
-        factor_data = md.raw_data
+        factor_data = md.rows_at(md.view).select(md.factor_names).to_numpy()
         assert factor_data.shape == (50, 2)  # 50 samples, 2 1D factors
 
         # Verify that binned_data only includes 1D factors
@@ -429,7 +430,7 @@ class TestMetadata:
             class_labels=RNG.integers(0, 3, size=50),
         )
 
-        md.add_factors({"embedding_2d": RNG.random(size=(50, 10)), "scalar": RNG.random(size=50)})
+        md.add_factors({"embedding_2d": RNG.random(size=(50, 10)), "scalar": RNG.random(size=50)}, level="unit")
 
         assert "embedding_2d" not in md.dataframe.columns
         assert md.dropped_factors["embedding_2d"] == ["multi_dimensional"]
@@ -491,49 +492,23 @@ class TestMetadata:
         # Verify the dimensions match factor_names count
         assert final_binned_shape[1] == len(final_factor_names)
 
-    def test_get_image_factors_not_found(self, get_od_dataset):
-        """Test get_image_factors with non-existent image_idx (line 598)."""
-        images = np.random.random((3, 3, 16, 16))
-        dataset = get_od_dataset(images, 2, True)
-
-        md = Metadata(dataset)
-
-        with pytest.raises(ValueError, match="No image found with index"):
-            md.get_image_factors(999)
-
-    def test_get_target_factors_not_found(self, get_od_dataset):
-        """Test get_target_factors with non-existent indices (line 629)."""
-        images = np.random.random((3, 3, 16, 16))
-        dataset = get_od_dataset(images, 2, True)
-
-        md = Metadata(dataset)
-
-        with pytest.raises(ValueError, match="No target found"):
-            md.get_target_factors(999, 0)
-
-        with pytest.raises(ValueError, match="No target found"):
-            md.get_target_factors(0, 999)
-
-    def test_infer_factor_level_errors(self, get_od_dataset):
-        """Inferring a level fails on lengths matching no level."""
+    def test_add_factors_without_a_destination_fails(self, get_od_dataset):
+        """Inference from array length was removed; the destination has to be stated."""
         images = np.random.random((5, 3, 16, 16))
         md = Metadata(get_od_dataset(images, 2, True))
         md._structure()
 
-        with pytest.raises(ShapeMismatchError, match="different length"):
+        with pytest.raises(ValueError, match="destination"):
             md.add_factors({"a": [1, 2, 3]})
 
-        # Levels are inferred per factor, so a ragged mapping fails on the bad member.
-        with pytest.raises(ShapeMismatchError, match="different length"):
-            md.add_factors({"a": [1] * 5, "b": [1, 2]})
-
-    def test_infer_factor_level_per_factor(self, get_od_dataset):
-        """A mapping mixing levels is placed factor by factor under level="auto"."""
+    def test_add_factors_places_a_mapping_at_one_level(self, get_od_dataset):
+        """``level`` applies to the whole mapping, so mixing levels is one call per level."""
         images = np.random.random((5, 3, 16, 16))
         md = Metadata(get_od_dataset(images, 2, True))
         md._structure()
 
-        md.add_factors({"bright": np.arange(5.0), "iou": np.arange(10.0)})
+        md.add_factors({"bright": np.arange(5.0)}, level="unit")
+        md.add_factors({"iou": np.arange(10.0)}, level="instance")
 
         assert md.factor_info["bright"].level == "unit"
         assert md.factor_info["iou"].level == "instance"
@@ -643,15 +618,6 @@ class TestIdempotentSetters:
         before = metadata.inherited
         metadata.inherited = before
         assert metadata.inherited == before
-
-    def test_setting_target_factors_only_to_its_current_value_is_a_no_op(self, get_od_dataset):
-        metadata = Metadata(get_od_dataset(4, targets_per_image=2))
-        with pytest.warns(DeprecationWarning, match="target_factors_only"):
-            current = metadata.target_factors_only
-        with pytest.warns(DeprecationWarning, match="target_factors_only"):
-            metadata.target_factors_only = current
-        with pytest.warns(DeprecationWarning, match="target_factors_only"):
-            assert metadata.target_factors_only == current
 
 
 @pytest.mark.required

@@ -227,7 +227,7 @@ class TestCorrectOD:
     def test_1based_dataframe(self, od_1based):
         md = Metadata(od_1based, exclude=["id"])
         assert "class_label" in md.dataframe.columns
-        np.testing.assert_array_equal(md.target_data["class_label"].to_numpy(), md.class_labels)
+        np.testing.assert_array_equal(md.rows_at(md.label_level)["class_label"].to_numpy(), md.class_labels)
 
     def test_noncontiguous_class_labels(self, od_noncontiguous):
         """Non-contiguous labels should be preserved as provided."""
@@ -441,7 +441,7 @@ class TestLabelConsistency:
     def test_dataframe_matches_class_labels_od(self, od_1based):
         """DataFrame class_label column should match class_labels property."""
         md = Metadata(od_1based, exclude=["id"])
-        np.testing.assert_array_equal(md.target_data["class_label"].to_numpy(), md.class_labels)
+        np.testing.assert_array_equal(md.rows_at(md.label_level)["class_label"].to_numpy(), md.class_labels)
 
     def test_item_count_od(self, od_1based):
         """item_count should be number of images, not detections."""

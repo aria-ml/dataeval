@@ -3,7 +3,6 @@
 __all__ = []
 
 from collections.abc import Mapping
-from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -53,22 +52,13 @@ class FactorsStructurer(PropagationMixin, Structurer):
         if rows is not None and rows.spans_two_levels:
             self._declare_two_levels()
             return
-        # One level, so it is both the item level and the target level; there is
-        # no distinct target level here and hence no ``"target"`` alias, matching
-        # image classification.
+        # One level, so it is both the item level and the label level, matching image
+        # classification.
         resolved = level if rows is None or len(rows.label_positions) == 0 else "instance"
         self.levels = FactorLevelSchema.of(resolved)
         self.item_level = resolved
         self.label_level = resolved
         self.multi_target = False
-        # The ``"image"`` alias is unconditional on the base class because every *task*
-        # has a unit level for it to resolve to. A factors-only instance need not: its
-        # single level is whatever the caller asked for, and below the unit level the
-        # alias is not merely unused but actively wrong — it would announce that
-        # ``"image"`` is now spelled ``"unit"`` on an instance holding no unit rows,
-        # advice that can never apply and that turns ``rows_at("image")`` into a warning
-        # followed by a failure to resolve.
-        self.legacy_level_aliases = Structurer.legacy_level_aliases if resolved == "unit" else MappingProxyType({})
 
     def _declare_two_levels(self) -> None:
         """Declare the two-block ``unit``/``instance`` shape a source index can address.
@@ -76,18 +66,15 @@ class FactorsStructurer(PropagationMixin, Structurer):
         Items are units and labels are instances, the same pairing every task whose item
         *is* one unit declares; a source index cannot address any other, since it names a
         row by item and target alone and has no way to say which frame or which track.
-        Copied from the declaration rather than restated so the two cannot drift —
-        including the ``"target"`` alias, which a caller reaching this through imported OD
-        stats has every reason to still spell. Borrowing a class-level declaration also
-        borrows the ``__init_subclass__`` check that already validated it. ``unit_type``
-        is deliberately left at the base default: a bare source index says nothing about
-        the medium its items came from.
+        Copied from the declaration rather than restated so the two cannot drift. Borrowing
+        a class-level declaration also borrows the ``__init_subclass__`` check that already
+        validated it. ``unit_type`` is deliberately left at the base default: a bare
+        source index says nothing about the medium its items came from.
         """
         self.levels = ODImageStructurer.levels
         self.item_level = ODImageStructurer.item_level
         self.label_level = ODImageStructurer.label_level
         self.multi_target = ODImageStructurer.multi_target
-        self.legacy_level_aliases = ODImageStructurer.legacy_level_aliases
 
     @classmethod
     def for_shape(cls, item_level: FactorLevel, label_level: FactorLevel) -> "FactorsStructurer":

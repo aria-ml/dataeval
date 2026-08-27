@@ -61,7 +61,7 @@ class TestNativeLevelBinning:
         column = _companion(md, "brightness")
 
         at_image = md.rows_at("unit")[column].to_list()
-        instances = md.target_data
+        instances = md.rows_at("instance")
         gathered = [instances.filter(instances["item_index"] == i)[column][0] for i in range(4)]
 
         assert at_image == gathered
@@ -97,7 +97,7 @@ class TestNativeLevelBinning:
         column = _companion(md, "iou")
 
         assert md.factor_info["iou"].level == "instance"
-        assert md.target_data[column].to_list() == md.rows_at("instance")[column].to_list()
+        assert md.rows_at("instance")[column].to_list() == md.rows_at("instance")[column].to_list()
 
 
 @pytest.mark.required

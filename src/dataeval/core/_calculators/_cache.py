@@ -147,11 +147,6 @@ class CalculatorCache:
         return self.image.shape[0] if self.image.ndim >= 3 else 1
 
     @cached_property
-    def excluded_per_channel(self) -> int:
-        """Pixels per channel that :attr:`exclude` removes from the window. 0 when unset."""
-        return 0 if self.window_mask is None else int(np.count_nonzero(self.window_mask))
-
-    @cached_property
     def excluded_total(self) -> int:
         """Pixel values across all channels that :attr:`exclude` removes from the window.
 
@@ -159,7 +154,9 @@ class CalculatorCache:
         datum: an excluded pixel is neither a hole in the data nor a measurement, so it
         belongs in neither half of such a ratio.
         """
-        return self.excluded_per_channel * self.channel_count
+        if self.window_mask is None:
+            return 0
+        return int(np.count_nonzero(self.window_mask)) * self.channel_count
 
     @cached_property
     def _has_geometry(self) -> bool:

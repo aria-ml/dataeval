@@ -1,6 +1,5 @@
 __all__ = []
 
-import warnings
 from collections.abc import Iterable
 from typing import Any, TypedDict
 
@@ -13,10 +12,8 @@ from sklearn.metrics.cluster import contingency_matrix, expected_mutual_informat
 
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes, get_seed
-from dataeval.core._bin import is_continuous
-from dataeval.exceptions import DeprecatedWarning
 from dataeval.types import Array1D, Array2D
-from dataeval.utils._internal import as_numpy, opt_as_numpy
+from dataeval.utils._internal import as_numpy
 
 _logger = get_logger(__name__)
 
@@ -45,53 +42,6 @@ class MutualInfoResult(TypedDict):
 
     class_to_factor: NDArray[np.float64]
     interfactor: NDArray[np.float64]
-
-
-def _warn_auto_discrete_features() -> None:
-    """Announce that leaving ``discrete_features`` unset is going away.
-
-    The auto-detection reads the column's values, and that is the one thing they cannot
-    answer: a factor cut into six bins and a factor with six categories both arrive as the
-    integers 0-5. :func:`~dataeval.core.is_continuous` calls both discrete, so a binned
-    factor is credited with an alphabet of its own and scored against a ceiling that is
-    really its bin count — the drift :func:`mutual_info` exists to avoid.
-
-    Warned rather than changed, because guessing differently would be no better: nothing in
-    the array distinguishes the two cases. Only the caller knows.
-    """
-    warnings.warn(
-        "Leaving `discrete_features` unset is deprecated and it becomes required in 1.2. "
-        "The values are auto-detected today, which cannot work: a factor cut into six bins "
-        "and a factor with six categories are both the integers 0-5, so a binned factor is "
-        "scored against a ceiling that is really its bin count, and its association with "
-        "another factor shrinks as it is cut more finely.\n"
-        "Pass one bool per factor -- True where the factor's integers stand for values of "
-        "its own, False where you produced them by cutting a range. From a Metadata that is "
-        "`[not b for b in metadata.is_binned]`.",
-        DeprecatedWarning,
-        stacklevel=3,
-    )
-
-
-def _warn_unused_discrete_features() -> None:
-    """Announce that ``discrete_features`` is going away from :func:`mutual_info_classwise`.
-
-    The declaration selects a *denominator*, and this function does not have the choice to
-    make: every row is divided by the entropy of one class against the rest, which belongs
-    to the class label rather than to any factor. There is no factor entropy for the
-    declaration to accept or reject, so it is discarded — the argument is accepted only
-    because the two functions have matched signatures since before that was true.
-    """
-    warnings.warn(
-        "`discrete_features` has no effect on mutual_info_classwise and is removed in v1.2.0. "
-        "Every row here is divided by the entropy of one class against the rest, which "
-        "belongs to the class label rather than to any factor, so there is no factor "
-        "entropy for the declaration to select and it is discarded. Drop the argument.\n"
-        "`mutual_info` does use it -- for the factor-to-factor block, which this function "
-        "does not return -- and there it becomes required in 1.2 rather than being removed.",
-        DeprecatedWarning,
-        stacklevel=3,
-    )
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:
@@ -298,7 +248,7 @@ def _is_coded(column: NDArray[Any]) -> bool:
 def _merge_labels_and_factors(
     class_labels: NDArray[np.intp],
     factor_data: NDArray[np.intp],
-    discrete_features: Iterable[bool] | None,
+    discrete_features: Iterable[bool],
 ) -> tuple[NDArray[np.intp], list[bool], list[bool], list[bool]]:
     """Stack the label axis onto the factors and answer three questions about each column.
 
@@ -321,9 +271,7 @@ def _merge_labels_and_factors(
     treat every value as its own category. ``coded_list`` itself keeps that column coded,
     since a per-row identifier is exactly the case the chance correction exists for.
     """
-    declared_list = [True] + (
-        [not is_continuous(d) for d in factor_data.T] if discrete_features is None else list(discrete_features)
-    )
+    declared_list = [True] + list(discrete_features)
 
     # Use numeric data for MI
     data = np.hstack((class_labels[:, np.newaxis], factor_data))
@@ -341,7 +289,7 @@ def _merge_labels_and_factors(
 def mutual_info(  # noqa: C901
     class_labels: Array1D[int],
     factor_data: Array2D[int | float],
-    discrete_features: Array1D[bool] | None = None,
+    discrete_features: Array1D[bool],
     num_neighbors: int = 5,
 ) -> MutualInfoResult:
     """
@@ -355,7 +303,7 @@ def mutual_info(  # noqa: C901
         Target class labels as integer indices. Can be a 1D list, or array-like object.
     factor_data : Array2D[int | float], shape - (N, F)
         Factor values after binning or digitization. Can be a 2D list, or array-like object.
-    discrete_features : Array1D[bool] | None, shape - (F,), default None
+    discrete_features : Array1D[bool], shape - (F,)
         Whether each factor's set of values is a property of the *variable* rather than of
         how it was processed — True for a category, a count or any factor with a finite
         alphabet of its own, False for one whose values were produced by cutting a
@@ -365,11 +313,10 @@ def mutual_info(  # noqa: C901
         :class:`~dataeval.Metadata` this is ``[not b for b in metadata.is_binned]``. Can be
         a 1D list, or array-like object.
 
-        .. deprecated:: 1.1
-            Leaving this unset warns and becomes an error in 1.2. The auto-detection reads
-            the column's values, and that is the one thing they cannot answer: a factor cut
-            into six bins and a factor with six categories are both the integers 0-5, so a
-            binned factor is credited with an alphabet of its own.
+        .. versionchanged:: 1.2
+            Required. v1.1 auto-detected it when unset, and that guess reads the column's
+            values — the one thing they cannot answer: a factor cut into six bins and a
+            factor with six categories are both the integers 0-5. Only the caller knows.
     num_neighbors : int, default 5
         Number of points to consider as neighbors. Consulted only for columns holding
         measured values, which are the only ones the neighbor-based estimator reads.
@@ -486,9 +433,7 @@ def mutual_info(  # noqa: C901
 
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
     factor_data_np = as_numpy(factor_data, required_ndim=2)
-    discrete_feat_np = opt_as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
-    if discrete_feat_np is None:
-        _warn_auto_discrete_features()
+    discrete_feat_np = as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
 
     _logger.debug("Input shapes: class_labels=%s, factor_data=%s", class_labels_np.shape, factor_data_np.shape)
 
@@ -612,7 +557,6 @@ def mutual_info(  # noqa: C901
 def mutual_info_classwise(
     class_labels: Array1D[int],
     factor_data: Array2D[int | float],
-    discrete_features: Array1D[bool] | None = None,
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
@@ -626,17 +570,6 @@ def mutual_info_classwise(
         Target class labels as integer indices. Can be a 1D list, or array-like object.
     factor_data : Array2D[int | float], shape - (N, F)
         Factor values after binning or digitization. Can be a 2D list, or array-like object.
-    discrete_features : Array1D[bool] | None, shape - (F,), default None
-        Ignored.
-
-        .. deprecated:: 1.1
-            Has no effect and is **removed in v1.2.0**; setting it warns. The declaration
-            selects a denominator, and this function does not have that choice to make:
-            every row is divided by the entropy of one class against the rest, which belongs
-            to the class label rather than to any factor. It is accepted only because the
-            two functions have had matching signatures since before that was true.
-            :func:`mutual_info` does use it, for the factor-to-factor block this function
-            does not return, and there it becomes *required* in 1.2 rather than removed.
     num_neighbors : int, default 5
         Number of points to consider as neighbors. Consulted only for columns holding
         measured values, which are the only ones the neighbor-based estimator reads.
@@ -669,6 +602,13 @@ def mutual_info_classwise(
     shared across the row, and a correction for the mutual information that the factor's
     cardinality would produce by chance.
 
+    .. versionchanged:: 1.2
+        ``discrete_features`` was removed. It was accepted without effect and warned when
+        set: every row here is divided by the entropy of one class against the rest, which
+        belongs to the class label rather than to any factor, so there was no factor
+        entropy for the declaration to select. :func:`mutual_info` does use it, for the
+        factor-to-factor block this function does not return, and there it is required.
+
     Example
     -------
     Return classwise balance (normalized mutual information) of factors with individual class_labels
@@ -691,14 +631,10 @@ def mutual_info_classwise(
 
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
     factor_data_np = as_numpy(factor_data, required_ndim=2)
-    if discrete_features is not None:
-        _warn_unused_discrete_features()
 
     num_neighbors = _validate_num_neighbors(num_neighbors)
-    # Not forwarded, and a constant rather than None: the declaration it produces is
-    # discarded below, and None would sweep `is_continuous` over every column to build a
-    # list nothing reads. Stating that here is what makes "has no effect" true of the code
-    # and not only of the docstring.
+    # A constant rather than a real declaration: the declaration is discarded below, so a
+    # list nothing reads is what gets built.
     data, sklearn_list, coded_list, _ = _merge_labels_and_factors(
         class_labels_np, factor_data_np, np.ones(factor_data_np.shape[1], dtype=np.bool_)
     )

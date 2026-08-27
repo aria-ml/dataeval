@@ -59,10 +59,17 @@ DEPRECATED = _collect_deprecated()
 
 
 @pytest.mark.required
-def test_walker_discovers_known_deprecation():
-    """Guard against the walker silently finding nothing (e.g. import/marker regressions)."""
-    names = [q for q, _ in DEPRECATED]
-    assert any(q.endswith("ClassifierUncertaintyExtractor") for q in names), names
+def test_walker_imports_the_whole_package():
+    """Guard against the walker silently finding nothing (e.g. import/marker regressions).
+
+    ``DEPRECATED`` is legitimately empty whenever nothing is currently deprecated -- it was
+    when the v1.1 deprecations were removed in v1.2 -- so emptiness cannot be the alarm.
+    What can is the walk itself: if ``_iter_modules`` stops reaching the package, the
+    parametrized test below silently covers nothing rather than failing.
+    """
+    walked = {module.__name__ for module in _iter_modules()}
+    assert "dataeval" in walked
+    assert any(name.startswith("dataeval.") for name in walked), sorted(walked)
 
 
 @pytest.mark.required

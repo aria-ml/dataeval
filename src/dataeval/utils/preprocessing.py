@@ -1,7 +1,6 @@
 """Utility functions for preprocessing images and bounding boxes."""
 
 __all__ = [
-    "BitDepth",
     "BoundingBox",
     "BoundingBoxFormat",
     "Box",
@@ -16,7 +15,6 @@ __all__ = [
     "compute_iou",
     "crop_with_fill",
     "edge_filter",
-    "get_bitdepth",
     "get_value_range",
     "is_valid_box",
     "normalize_image_shape",
@@ -38,7 +36,6 @@ import numpy as np
 from numpy.typing import DTypeLike, NDArray
 from scipy.ndimage import convolve, zoom
 
-from dataeval._experimental import deprecated
 from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
 
@@ -472,36 +469,12 @@ def compute_iou(boxes1: NDArray[Any], boxes2: NDArray[Any]) -> NDArray[np.float6
 # ===========================
 
 
-@dataclass
-class BitDepth:
-    """
-    Dataclass representing image bit depth information.
-
-    .. deprecated:: 1.1
-        Use :class:`ValueRange`, which separates the interval statistics are computed
-        against from the encoding depth it was decoded from. Will be removed in v1.2.0.
-
-    Attributes
-    ----------
-    depth : int
-        Bit depth (1, 8, 12, 16, or 32)
-    pmin : float or int
-        Minimum pixel value
-    pmax : float or int
-        Maximum pixel value
-    """
-
-    depth: int
-    pmin: float | int
-    pmax: float | int
-
-
 @dataclass(frozen=True)
 class ValueRange:
     """
     The interval a datum's values occupy, and the encoding depth that interval was decoded from.
 
-    Two separate things, which :class:`BitDepth` conflated. **Encoding depth** is how the
+    Two separate things. **Encoding depth** is how the
     data was stored, and only exists where there is an encoding to decode — integer image
     formats genuinely are power-of-two, so reading one off is a decode rather than a
     guess. **Value range** is the interval :func:`rescale` divides by and a histogram bins
@@ -578,35 +551,6 @@ class ValueRange:
 
 #: The answer where no interval could be established — see :func:`get_value_range` Notes.
 _UNKNOWN_RANGE = ValueRange(np.nan, np.nan, np.nan)
-
-
-@deprecated(since="1.1", removal="1.2.0", alternative="get_value_range")
-def get_bitdepth(image: NDArray[Any]) -> BitDepth:
-    """
-    Approximates the bit depth of the image using the min and max pixel values.
-
-    .. deprecated:: 1.1
-        Use :func:`get_value_range`, which does not fabricate a depth for float data and
-        does not discard the observed range of data holding negative values. Will be
-        removed in v1.2.0.
-
-    Parameters
-    ----------
-    image : NDArray
-        Input image array
-
-    Returns
-    -------
-    BitDepth
-        Bit depth information
-    """
-    if image.size == 0 or np.isnan(image).all():
-        return BitDepth(0, np.nan, np.nan)
-    pmin, pmax = np.nanmin(image), np.nanmax(image)
-    if pmin < 0:
-        return BitDepth(0, pmin, pmax)
-    depth = ([x for x in _BIT_DEPTH if 2**x > pmax] or [max(_BIT_DEPTH)])[0]
-    return BitDepth(depth, 0, 2**depth - 1)
 
 
 def get_value_range(values: NDArray[Any], *, declared: tuple[float, float] | None = None) -> ValueRange:
@@ -1115,34 +1059,6 @@ def crop_with_fill(
         output[..., dy : dy + (sbox[3] - sbox[1]), dx : dx + (sbox[2] - sbox[0])] = region
 
     return output, (x0, y0)
-
-
-@deprecated(since="1.1", removal="1.2.0")
-def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
-    """
-    Extract a region from an image based on a bounding box.
-
-    Clips to image boundaries and pads out-of-bounds areas with np.nan.
-
-    .. deprecated:: 1.1
-        Use :func:`crop_with_fill` and pass ``fill=np.nan`` and take the
-        first tuple value for the equivalent functionality.  Will be
-        removed in v1.2.0.
-
-    Parameters
-    ----------
-    image : NDArray
-        Input image array in format C, H, W (channels first)
-    box : Box
-        Bounding box coordinates as (x0, y0, x1, y1) where (x0, y0) is top-left
-        and (x1, y1) is bottom-right
-
-    Returns
-    -------
-    NDArray
-        The extracted region with out-of-bounds areas padded with np.nan
-    """
-    return crop_with_fill(image, box, fill=np.nan, dtype=float)[0]
 
 
 def resize(image: NDArray[np.uint8], resize_dim: int, use_pil: bool = True) -> NDArray[np.uint8]:

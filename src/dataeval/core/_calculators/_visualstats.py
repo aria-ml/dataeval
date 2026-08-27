@@ -67,13 +67,15 @@ class VisualStatCalculator(Calculator[ImageStats]):
     def percentiles(self) -> NDArray[np.float64]:
         if self._unreadable:
             return self.cache.nan_like((len(QUARTILES),))
-        # Reads the perceptual view, never `scaled`: a visual statistic reports where
-        # values sit between black and white, which `normalize_pixel_values` has no
-        # bearing on.
         return self._whole_percentiles()
 
     def _whole_percentiles(self) -> NDArray[np.float64]:
-        """Quartiles over every value in the view at once."""
+        """Quartiles over every value in the view at once.
+
+        Read off the perceptual view, never `scaled`: a visual statistic reports where
+        values sit between black and white, which `normalize_pixel_values` has no bearing
+        on.
+        """
         counts = self.cache.display_counts
         if counts is not None:
             # Summed across bands, which is the same multiset the flat view would sort.

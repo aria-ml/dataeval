@@ -1,53 +1,17 @@
 __all__ = []
 
-import warnings
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, NamedTuple, Protocol, runtime_checkable
+from typing import Any, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
 from pydantic import BaseModel
 from typing_extensions import TypeIs
 
-from dataeval.exceptions import DeprecatedWarning
 from dataeval.protocols import AnyMetadataLike, LabelsLike, MetadataLike, ValuedMetadataLike
 from dataeval.types._factors import BinSpec, LevelSpec
 
 IGNORE_KEYS = {"self", "config", "__class__"}
-
-
-@runtime_checkable
-class _LegacyMetadataLike(Protocol):
-    """The pre-1.1 :class:`~dataeval.protocols.MetadataLike` shape, with ``is_discrete``.
-
-    Lives here rather than beside the protocol it shadows because :func:`is_metadata_like`
-    is its only consumer, so the whole deprecation — this class, the branch that checks it,
-    and the warning — is deleted from one file in 1.2.
-
-    A container written against the 1.0 protocol has to be *recognized* before it can be
-    told it is out of date. Failing the ``isinstance`` check instead would report it as not
-    being metadata at all, which says nothing about what to fix.
-    """
-
-    @property
-    def factor_names(self) -> Sequence[str]:
-        """Names of the metadata factors."""
-        ...
-
-    @property
-    def factor_data(self) -> NDArray[np.int64]:
-        """Metadata factors in array of shape (n_samples, n_factors)."""
-        ...
-
-    @property
-    def class_labels(self) -> NDArray[np.intp]:
-        """Flat array of class labels with one entry per target/detection."""
-        ...
-
-    @property
-    def is_discrete(self) -> Sequence[bool]:
-        """Whether each factor is discrete (True) or continuous (False)."""
-        ...
 
 
 def get_overrides(local_vars: dict[str, Any], exclude: set[str] | None = None) -> dict[str, Any]:
@@ -109,12 +73,7 @@ def is_metadata_like(candidate: Any) -> TypeIs[MetadataLike]:
     # cycle. By the time this is called the module is already imported.
     from dataeval import Metadata
 
-    if isinstance(candidate, (Metadata, MetadataLike)):
-        return True
-    if isinstance(candidate, _LegacyMetadataLike):
-        _warn_missing_is_binned(type(candidate))
-        return True
-    return False
+    return isinstance(candidate, (Metadata, MetadataLike))
 
 
 def is_any_metadata_like(candidate: Any) -> TypeIs[AnyMetadataLike]:
@@ -156,37 +115,6 @@ def is_labels_like(candidate: Any) -> TypeIs[LabelsLike]:
     from dataeval import Metadata
 
     return isinstance(candidate, (Metadata, LabelsLike))
-
-
-# Types already told about `is_binned`. A container's author writes one class and reuses
-# it, so the class is the unit the message is about; warning per instance would repeat it
-# for every row of a loop without saying anything new.
-_WARNED_LEGACY_METADATA: set[type] = set()
-
-
-def _warn_missing_is_binned(candidate_type: type) -> None:
-    """Tell a pre-1.1 container's author to add ``is_binned``, once per class.
-
-    Raised from :func:`is_metadata_like` rather than from the point of use, because that is
-    the one call every evaluator makes before touching a metadata object, and it runs on the
-    user's own line.
-    """
-    if candidate_type in _WARNED_LEGACY_METADATA:
-        return
-    _WARNED_LEGACY_METADATA.add(candidate_type)
-    warnings.warn(
-        f"{candidate_type.__name__} implements MetadataLike with `is_discrete` but no "
-        "`is_binned`. Support for `is_discrete` is removed in v1.2.0. Add an `is_binned` "
-        "property returning, per factor and aligned with `factor_names`, whether that "
-        "factor's entries in `factor_data` are bin indices (True) rather than codes "
-        "standing for the values themselves (False).\n"
-        "`is_discrete` is being read in its place, which is right for every factor except "
-        "a discrete numeric one you binned anyway -- reported as discrete, but its codes "
-        "cover ranges. That factor is currently scored against a ceiling it does not have, "
-        "which moves its values in `Balance`'s `factors` output.",
-        DeprecatedWarning,
-        stacklevel=3,
-    )
 
 
 def _get_item_indices(metadata: MetadataLike) -> Sequence[int]:
@@ -236,9 +164,9 @@ def _recorded_encodings(metadata: MetadataLike, names: Sequence[str]) -> dict[st
     origin. Same optional-member degradation as :func:`_get_item_indices` and
     :func:`_get_index2label`, and for the same reason: the protocol stays four members.
 
-    ``_factor_info`` rather than the public property, which warns about a level rename on
-    the paths that put a :class:`~dataeval.types.FactorInfo` in a user's hands. Naming a
-    group is not one of those.
+    ``_factor_info`` rather than the public property, which is the documented handout
+    path for :class:`~dataeval.types.FactorInfo` objects. Naming a group is not one of
+    those.
     """
     factor_info = getattr(metadata, "_factor_info", None)
     if factor_info is None:
@@ -398,22 +326,20 @@ def has_own_alphabet(metadata: MetadataLike, indices: Sequence[int]) -> list[boo
 
     Notes
     -----
-    Answered by ``is_binned``, which :class:`~dataeval.protocols.MetadataLike` requires as
-    of 1.1. A container written against the older protocol has only ``is_discrete``, which
-    is read instead; :func:`is_metadata_like` has already warned its author by this point.
-    The two disagree for a discrete numeric factor binned for carrying more levels than the
-    sample supports: it reports ``is_discrete=True`` while its codes cover ranges like any
-    other binned factor, so it is credited with a ceiling it does not have.
+    Answered by ``is_binned``, which :class:`~dataeval.protocols.MetadataLike` requires.
+    The two flags disagree for a discrete numeric factor binned for carrying more levels
+    than the sample supports: it reports ``is_discrete=True`` while its codes cover
+    ranges like any other binned factor, and it is not credited with a ceiling it does
+    not have.
 
-    A factor beyond the end of either sequence is treated as having its own alphabet, which
-    is the conservative answer: it keeps the entropy ceiling and so cannot inflate a
-    reported association.
+    A :class:`~dataeval.protocols.ValuedMetadataLike` keeps no ``is_binned`` at all — its
+    values are measurements by construction — and reads through as having its own
+    alphabet, the conservative answer for the same reason as a factor beyond the end of
+    the sequence: it keeps the entropy ceiling and so cannot inflate a reported
+    association.
     """
-    binned = getattr(metadata, "is_binned", None)
-    if binned is not None:
-        flags = [not bool(value) for value in binned]
-    else:
-        flags = [bool(value) for value in getattr(metadata, "is_discrete", ())]
+    binned = getattr(metadata, "is_binned", ())
+    flags = [not bool(value) for value in binned]
     return [flags[index] if index < len(flags) else True for index in indices]
 
 

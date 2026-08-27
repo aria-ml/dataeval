@@ -455,9 +455,8 @@ class CodedMetadataLike(LabelsLike, Protocol):
         property of the whole container.
 
     .. versionchanged:: 1.1
-        ``is_binned`` replaces ``is_discrete`` as the fourth member. A container
-        providing only ``is_discrete`` is still accepted and warns once; support for it
-        is removed in v1.2.0. See :ref:`metadatalike-is-binned` for what to change and why.
+        ``is_binned`` replaced ``is_discrete`` as the fourth member. See
+        :ref:`metadatalike-is-binned` for what to change and why.
 
     Attributes
     ----------

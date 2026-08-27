@@ -186,7 +186,7 @@ test_cases:
     expected_results:
       - Package imports and basic computation completes without error
       - py.typed marker is present (PEP 561)
-      - All documented subpackages (bias, core, quality, selection, shift, extractors, utils) are installed
+      - All documented subpackages (bias, core, quality, data, shift, extractors, utils) are installed
       - No test files are included in the distributed package
       - Optional extras install and expose expected functionality
 
@@ -267,19 +267,19 @@ test_cases:
     name: Dataset Selection & Filtering
     test_type: Core Functionality
     business_case: >-
-      Verify that Select and its composable selection operators (Limit, Indices,
+      Verify that View and its composable operation steps (Limit, Indices,
       Shuffle, Reverse) correctly transform datasets and support chaining
       multiple operations.
     initial_conditions:
       - DataEval installed
       - Dataset object implementing __getitem__ and __len__
     expected_results:
-      - Select with Limit restricts dataset length correctly
-      - Select with Indices selects specified indices
-      - Select with Shuffle preserves dataset length while reordering
-      - Select with Reverse reverses item order
-      - Select composes multiple operations (e.g., Limit + Shuffle)
-      - Select result is iterable
+      - View with Limit restricts dataset length correctly
+      - View with Indices selects specified indices
+      - View with Shuffle preserves dataset length while reordering
+      - View with Reverse reverses item order
+      - View composes multiple operations (e.g., Limit + Shuffle)
+      - View result is iterable
 
   "7-1":
     name: Feature Extraction
@@ -370,7 +370,7 @@ test_cases:
     initial_conditions:
       - DataEval installed
     expected_results:
-      - utils.data provides working dataset wrappers
+      - data provides working dataset operations
       - utils.thresholds provides ZScore and IQR threshold calculators
       - utils.preprocessing provides image tensor conversion
       - utils.onnx is available for model management

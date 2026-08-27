@@ -18,9 +18,11 @@ v1.1
 :header-rows: 0
 
 - - [](v1.2.md)
-  - **v1.1 to v1.2** — the v1.1 deprecations are removed and `SourceIndex` becomes an
-    address. Per-channel statistic rows go first, replaced by band groups named with
-    `channels=`; `SourceIndex.target` is renamed `key` and its third field becomes `level`.
+  - **v1.1 to v1.2** — the removal of everything v1.1 deprecated (metadata level shims, the
+    `selection` module, `per_channel` and the renamed preprocessing helpers, the
+    `is_discrete` protocol fallback, `discrete_features` and
+    `ClassifierUncertaintyExtractor`), and `SourceIndex` becomes an address:
+    `SourceIndex.target` is renamed `key` and its third field becomes `level`.
 - - [](v1.1.md)
   - **v1.0 to v1.1** — metadata levels, `View` and operations, image statistic scales, and
     chance-corrected `Balance`. Everything deprecated here is removed in v1.2.0.

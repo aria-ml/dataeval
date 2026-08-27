@@ -84,8 +84,8 @@ class Calculator(ABC, Generic[TFlag]):
     ----------
     datum : Any
         The raw data element to compute statistics on.
-    calculator : Calculator
-        A calculator instance that provides preprocessed/transformed views of the datum.
+    cache : CalculatorCache
+        The per-datum cache providing preprocessed/transformed views of the datum.
     """
 
     @abstractmethod

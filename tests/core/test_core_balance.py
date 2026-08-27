@@ -9,7 +9,6 @@ from dataeval.core._mutual_info import (
     mutual_info,
     mutual_info_classwise,
 )
-from dataeval.exceptions import DeprecatedWarning
 
 CLASS_LABELS = np.array([0, 0, 1, 1, 0, 1, 0, 1, 0, 1])
 FACTOR_DATA = np.array(
@@ -66,15 +65,6 @@ class TestBalanceMergeLabelsAndFactors:
     column of ``FACTOR_DATA`` holds integers, so ``coded`` is True throughout however the
     caller declares them.
     """
-
-    def test_without_discrete_features(self):
-        data, sklearn_list, coded, declared = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, None)
-        assert data.shape == (FACTOR_DATA.shape[0], FACTOR_DATA.shape[1] + 1)
-        assert coded == [True, True, True, True]
-        # `is_continuous` calls all three factors discrete; only the sklearn-facing list
-        # demotes the all-distinct third one.
-        assert declared == [True, True, True, True]
-        assert sklearn_list == [True, True, True, False]
 
     def test_provided_discrete_features(self):
         data, sklearn_list, coded, declared = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, [False, True, False])
@@ -347,42 +337,37 @@ class TestBalanceFunctional:
         score = mutual_info(rng.integers(0, 2, size=n), factors, discrete_features=[True, False])
         assert score["interfactor"][0, 1] <= 1.0
 
-    def test_omitting_discrete_features_warns(self):
-        """Auto-detection cannot see binning, so leaving the declaration off is on its way out.
+    def test_omitting_discrete_features_raises(self):
+        """The declaration is required: the auto-detect that used to cover for it cannot work.
 
         A factor cut into bins and a factor with that many categories are the same integers,
-        so nothing in the array separates them; only the caller knows. The guess is kept for
-        one release and announced rather than silently changed.
+        so nothing in the array separates them; only the caller knows. v1.1 guessed and
+        warned; the guess is gone and the argument is required.
         """
-        with pytest.warns(DeprecatedWarning, match="becomes required in 1.2"):
-            mutual_info(CLASS_LABELS, FACTOR_DATA)
+        with pytest.raises(TypeError, match="discrete_features"):
+            mutual_info(CLASS_LABELS, FACTOR_DATA)  # type: ignore[reportCallIssue]
 
-    def test_declaring_discrete_features_does_not_warn(self, recwarn):
-        mutual_info(CLASS_LABELS, FACTOR_DATA, discrete_features=[True, True, True])
-        assert not [w for w in recwarn.list if issubclass(w.category, DeprecatedWarning)]
-
-    def test_classwise_warns_the_other_way_round(self):
-        """The declaration is inert here, so it is *setting* it that warns.
+    def test_classwise_rejects_discrete_features(self):
+        """The argument is gone, not ignored: passing it is a programming error now.
 
         Every row of this output is divided by the entropy of one class against the rest,
-        which belongs to the class label rather than to any factor -- so there is no factor
-        entropy for the declaration to select. It is removed in v1.2.0 rather than made
-        required, which is the opposite of `mutual_info`.
+        which belongs to the class label rather than to any factor -- so there was never a
+        factor entropy for the declaration to select. v1.1 accepted and warned; the argument
+        is removed rather than made required, which is the opposite of `mutual_info`.
         """
-        with pytest.warns(DeprecatedWarning, match="no effect on mutual_info_classwise"):
-            mutual_info_classwise(CLASS_LABELS, FACTOR_DATA, discrete_features=[True, True, True])
+        with pytest.raises(TypeError, match="discrete_features"):
+            mutual_info_classwise(CLASS_LABELS, FACTOR_DATA, discrete_features=[True, True, True])  # type: ignore[reportCallIssue]
 
-    def test_classwise_without_the_argument_does_not_warn(self, recwarn):
-        mutual_info_classwise(CLASS_LABELS, FACTOR_DATA)
-        assert not [w for w in recwarn.list if issubclass(w.category, DeprecatedWarning)]
+    def test_classwise_calls_without_warnings(self, recwarn):
+        """The argument is gone, so a plain call is all there is to check.
 
-    @pytest.mark.parametrize("declaration", [[True, True, True], [False, False, False], [True, False, True]])
-    def test_classwise_result_ignores_the_declaration(self, declaration):
-        """What the deprecation asserts, asserted: the argument cannot move the result."""
-        baseline = mutual_info_classwise(CLASS_LABELS, FACTOR_DATA)
-        with pytest.warns(DeprecatedWarning):
-            declared = mutual_info_classwise(CLASS_LABELS, FACTOR_DATA, discrete_features=declaration)
-        np.testing.assert_array_equal(baseline, declared)
+        Every row of this output is divided by the entropy of one class against the rest,
+        which belongs to the class label rather than to any factor, so the declaration
+        that :func:`mutual_info` still takes had no purchase here at all.
+        """
+        result = mutual_info_classwise(CLASS_LABELS, FACTOR_DATA)
+        assert result.shape == (2, FACTOR_DATA.shape[1] + 1)
+        assert not recwarn.list
 
     def test_constant_factor_zero_norm(self):
         """A constant factor has zero entropy, so its normalization factor is 0 and MI is 0.0."""

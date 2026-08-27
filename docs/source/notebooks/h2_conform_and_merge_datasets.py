@@ -36,9 +36,7 @@
 # ```{note}
 # The dataset-view API is {class}`.View`, built from an ordered pipeline of
 # {class}`.Operation` steps (such as {class}`.Relabel`, {class}`.ClassFilter`, and
-# {class}`.Limit`). The former `Select`/`Selector` names and the `dataeval.selection`
-# module are deprecated aliases and will be removed in a future release — use
-# {class}`.View` and {class}`.Operation` instead.
+# {class}`.Limit`).
 # ```
 
 # %% [markdown]

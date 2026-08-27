@@ -30,7 +30,7 @@ def _holds_no_values(values: NDArray[np.generic]) -> bool:
 
     An empty array is not "no values" in this sense: a level that has no rows holds
     nothing for every factor alike, which says something about the dataset rather than
-    about this factor, and ``level="combined"`` promises its column names regardless.
+    about this factor.
     """
     if values.size == 0:
         return False

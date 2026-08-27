@@ -496,7 +496,7 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     # resolve it against and before _build_factors reads it — the same point in the same
     # order _adopt resolves it.
     if md._view is not None:
-        md._view = md._resolve_level(md._view, stacklevel=4)
+        md._view = md._resolve_level(md._view)
     md._is_structured = True
     md._build_factors()
 

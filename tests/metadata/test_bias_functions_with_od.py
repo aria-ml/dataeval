@@ -136,13 +136,13 @@ class TestMetadataStructureWithBiasFunctions:
         assert len(md.dataframe) == 14
 
         # Image rows
-        image_rows = md.image_data
+        image_rows = md.rows_at("unit")
         assert len(image_rows) == 5
         assert all(image_rows["target_index"].is_null())
         assert image_rows["weather"].to_list() == ["sunny", "rainy", "cloudy", "sunny", "rainy"]
 
         # Target rows
-        target_rows = md.target_data
+        target_rows = md.rows_at("instance")
         assert len(target_rows) == 9
         assert all(target_rows["target_index"].is_not_null())
         assert all(target_rows["weather"].is_not_null())
@@ -157,16 +157,16 @@ class TestMetadataStructureWithBiasFunctions:
         assert len(md.dataframe) == 10
 
         # Every image here is labelled, so the two levels have the same height.
-        assert len(md.target_data) == 5
+        assert len(md.rows_at("instance")) == 5
         assert len(md.rows_at("unit")) == 5
-        assert len(md.image_data) == 5
+        assert len(md.rows_at(md.label_level)) == 5
 
     def test_od_factor_data_uses_target_rows(self, od_dataset_for_bias):
         """Verify factor_data for OD uses target rows (9 rows)."""
         md = Metadata(od_dataset_for_bias)
 
         # factor_data should have 9 rows (one per detection)
-        assert md.raw_data.shape[0] == 9
+        assert md.rows_at(md.view).select(md.factor_names).to_numpy().shape[0] == 9
 
         # class_labels should also have 9 values
         assert len(md.class_labels) == 9
@@ -176,7 +176,7 @@ class TestMetadataStructureWithBiasFunctions:
         md = Metadata(ic_dataset_for_bias)
 
         # factor_data should have 5 rows (one per image)
-        assert md.raw_data.shape[0] == 5
+        assert md.rows_at(md.view).select(md.factor_names).to_numpy().shape[0] == 5
 
         # class_labels should also have 5 values
         assert len(md.class_labels) == 5
@@ -327,17 +327,17 @@ class TestMetadataLikeConsistency:
         """Verify factor_data and class_labels have same length for OD."""
         md = Metadata(od_dataset_for_bias)
 
-        assert md.raw_data.shape[0] == len(md.class_labels)
+        assert md.rows_at(md.view).select(md.factor_names).to_numpy().shape[0] == len(md.class_labels)
         # Should be 9 (number of detections)
-        assert md.raw_data.shape[0] == 9
+        assert md.rows_at(md.view).select(md.factor_names).to_numpy().shape[0] == 9
 
     def test_ic_factor_data_length_matches_class_labels(self, ic_dataset_for_bias):
         """Verify factor_data and class_labels have same length for IC."""
         md = Metadata(ic_dataset_for_bias)
 
-        assert md.raw_data.shape[0] == len(md.class_labels)
+        assert md.rows_at(md.view).select(md.factor_names).to_numpy().shape[0] == len(md.class_labels)
         # Should be 5 (number of images)
-        assert md.raw_data.shape[0] == 5
+        assert md.rows_at(md.view).select(md.factor_names).to_numpy().shape[0] == 5
 
     def test_od_binned_data_length_matches_class_labels(self, od_dataset_for_bias):
         """Verify binned_data and class_labels have same length for OD."""

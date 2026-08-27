@@ -7,12 +7,7 @@ from dataeval.core._compute_stats import compute_stats
 from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, DuplicatesOutput
-from dataeval.quality._duplicates import (
-    SourceIndex,
-    _build_duplicates_dataframe,
-    _find_hash_groups,
-    _merge_near_groups,
-)
+from dataeval.quality._duplicates import SourceIndex, _build_duplicates_dataframe, _find_hash_groups, _merge_near_groups
 
 
 class MockDataset:
@@ -180,10 +175,7 @@ class TestDuplicates:
     def test_duplicates_from_clusters_basic(self):
         """Test basic cluster-based duplicate detection."""
         mock_cluster_result: ClusterResult = {
-            "mst": np.array(
-                [[0, 1, 0.1], [1, 2, 0.05], [2, 3, 0.0], [3, 4, 0.2]],
-                dtype=np.float32,
-            ),
+            "mst": np.array([[0, 1, 0.1], [1, 2, 0.05], [2, 3, 0.0], [3, 4, 0.2]], dtype=np.float32),
             "clusters": np.array([0, 0, 0, 0, 0], dtype=np.intp),
             "linkage_tree": np.array([], dtype=np.float32),
             "membership_strengths": np.array([], dtype=np.float32),

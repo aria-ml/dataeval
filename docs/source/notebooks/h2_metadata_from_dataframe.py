@@ -33,8 +33,8 @@
 #   where each integer stands for a value of its own (a category, a count)
 #
 # ```{note}
-# `is_binned` replaced `is_discrete` in v1.1. A container providing only
-# `is_discrete` still works and warns once; support ends in v1.2. The flag is
+# `is_binned` replaced `is_discrete` in v1.1; containers providing only
+# `is_discrete` stopped being recognized as metadata in v1.2. The flag is
 # read to decide whether a factor's number of distinct codes is a real ceiling
 # on what it can share with another factor — for a binned factor that count
 # describes your bin choice rather than the variable, so it is not used as one.

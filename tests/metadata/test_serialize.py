@@ -714,10 +714,6 @@ class TestFactorsStructurerForShape:
         assert list(structurer.levels) == ["unit"]
         assert structurer.item_level == structurer.label_level == "unit"
 
-    def test_a_level_below_unit_keeps_no_image_alias(self):
-        """Matching ``__init__``: below the unit level the alias can never apply."""
-        assert FactorsStructurer.for_shape("instance", "instance").legacy_level_aliases == {}
-
     def test_the_two_level_shape_matches_what_a_source_index_builds(self):
         built = _source_index_metadata()._structurer
         restored = FactorsStructurer.for_shape("unit", "instance")
@@ -726,7 +722,6 @@ class TestFactorsStructurerForShape:
         assert restored.item_level == built.item_level
         assert restored.label_level == built.label_level
         assert restored.multi_target == built.multi_target
-        assert dict(restored.legacy_level_aliases) == dict(built.legacy_level_aliases)
 
     def test_a_shape_it_never_produces(self):
         with pytest.raises(ValueError, match="is neither"):

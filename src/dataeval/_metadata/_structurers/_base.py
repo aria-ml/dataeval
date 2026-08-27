@@ -2,8 +2,6 @@
 
 __all__ = []
 
-from collections.abc import Mapping
-from types import MappingProxyType
 from typing import Any, Literal
 
 from dataeval.types import FactorLevel, FactorLevelSchema
@@ -63,11 +61,6 @@ class Structurer:
     # messages and reports can name the medium without the level vocabulary having to.
     # A plain ``str`` on purpose — a new modality adds a value here and edits no type.
     unit_type: str = "item"
-    # ``"image"`` was the media-unit level's name through v1.1 and is accepted, with a
-    # warning, until v1.2.0. Declared on the base rather than per subclass because every
-    # task had it; ``"target"`` stays an object-detection-only entry because only object
-    # detection ever reported it.
-    legacy_level_aliases: Mapping[str, FactorLevel] = MappingProxyType({"image": "unit"})
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Reject a subclass whose item or label level sits outside its own schema.

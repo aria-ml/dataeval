@@ -25,7 +25,7 @@ class TestPipInstall:
         from dataeval import config, flags, protocols, types  # noqa: F401
 
     def test_subpackages_importable(self):
-        from dataeval import bias, core, quality, selection, shift  # noqa: F401
+        from dataeval import bias, core, data, quality, shift  # noqa: F401
 
     def test_basic_smoke_test(self):
         """Smoke test: a simple end-to-end calculation completes without error."""
