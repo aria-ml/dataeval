@@ -1,4 +1,4 @@
-"""Dataset organization tools: build views, filter, split, and reshape dataset views."""
+"""Dataset organization tools: build, filter, split and reshape dataset views, and retrieve what an address names."""
 
 __all__ = [
     "ClassBalance",
@@ -14,6 +14,8 @@ __all__ = [
     "Reverse",
     "SelectChannels",
     "Shuffle",
+    "SourceItem",
+    "SourceLocator",
     "TorchvisionTransform",
     "TrainValSplit",
     "View",
@@ -29,6 +31,7 @@ from dataeval.data._crop import Crop
 from dataeval.data._crops import DetectionCrops
 from dataeval.data._indices import Indices
 from dataeval.data._limit import Limit
+from dataeval.data._locate import SourceItem, SourceLocator
 from dataeval.data._merge import merge_datasets
 from dataeval.data._relabel import Relabel
 from dataeval.data._resize import Resize

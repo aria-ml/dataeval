@@ -5,6 +5,7 @@ from __future__ import annotations
 __all__ = []
 
 from collections.abc import Iterator, Mapping
+from types import MappingProxyType
 from typing import Any, Literal, TypeAlias
 
 import numpy as np
@@ -41,20 +42,223 @@ def resolve_fill(pixels: NDArray[Any], channels: int, fill: FillType) -> NDArray
     return pixels.reshape(channels, -1).mean(axis=1)
 
 
-def _validate_params(region: str, padding: float, min_size: int, square: str, fill: str) -> None:  # noqa: C901
-    """Validate the constructor's policy parameters."""
-    if region not in ("object", "context", "surround"):
-        raise ValueError(f"region must be 'object', 'context', or 'surround'; got {region!r}.")
-    if square not in ("off", "expand", "pad"):
-        raise ValueError(f"square must be 'off', 'expand', or 'pad'; got {square!r}.")
-    if fill not in ("mean", "zero"):
-        raise ValueError(f"fill must be 'mean' or 'zero'; got {fill!r}.")
+# Each name and the values it may take. One table rather than three near-identical checks,
+# so a new policy parameter is one entry instead of another branch.
+_POLICY_CHOICES: Mapping[str, tuple[str, ...]] = MappingProxyType({
+    "region": ("object", "context", "surround"),
+    "square": ("off", "expand", "pad"),
+    "fill": ("mean", "zero"),
+})
+
+
+def _validate_policy(region: str, padding: float, square: str, fill: str) -> None:
+    """Validate the four parameters that describe how a box becomes a crop."""
+    for name, value in (("region", region), ("square", square), ("fill", fill)):
+        choices = _POLICY_CHOICES[name]
+        if value not in choices:
+            allowed = ", ".join(repr(choice) for choice in choices)
+            raise ValueError(f"{name} must be one of {allowed}; got {value!r}.")
     if padding < 0:
         raise ValueError(f"padding must be >= 0; got {padding}.")
-    if min_size < 0:
-        raise ValueError(f"min_size must be >= 0; got {min_size}.")
     if region == "surround" and padding <= 0:
         raise ValueError("region='surround' requires padding > 0, otherwise the masked crop is empty.")
+
+
+def _validate_params(region: str, padding: float, min_size: int, square: str, fill: str) -> None:
+    """Validate a crop view's parameters: the policy, plus the filter over which rows exist."""
+    _validate_policy(region, padding, square, fill)
+    if min_size < 0:
+        raise ValueError(f"min_size must be >= 0; got {min_size}.")
+
+
+class CropPolicy:
+    """How a detection's box becomes a crop: region, padding, squaring and fill.
+
+    Split out of :class:`DetectionCrops` so that the two callers who cut a crop from a
+    box — the dataset view, and :meth:`~dataeval.data.SourceItem.crop` on a located
+    detection — cut identical pixels. A crop a user eyeballs while inspecting an outlier
+    is otherwise near but not equal to the crop that outlier's embedding was computed
+    from, which is the kind of discrepancy that costs an afternoon.
+
+    Parameters
+    ----------
+    region : {"object", "context", "surround"}, default "object"
+        Which pixels to keep. ``"object"`` is the box itself, ``"context"`` widens it by
+        `padding`, and ``"surround"`` keeps the widened region with the original box
+        masked out.
+    padding : float, default 0.0
+        Fraction of the box's width and height to add on each side.
+    square : {"off", "expand", "pad"}, default "expand"
+        Whether and how to square the crop. ``"expand"`` extends the shorter side into
+        real pixels; ``"pad"`` centers the real pixels in a square `fill` canvas.
+    fill : {"mean", "zero"}, default "mean"
+        What to put where there are no real pixels, and what to mask with under
+        ``region="surround"``.
+
+    Raises
+    ------
+    ValueError
+        When the four do not describe a crop — ``region="surround"`` without padding being
+        the combination that looks valid and silently masks everything.
+    """
+
+    __slots__ = ("_fill", "_padding", "_region", "_square")
+
+    def __init__(
+        self,
+        region: RegionType = "object",
+        padding: float = 0.0,
+        square: SquareType = "expand",
+        fill: FillType = "mean",
+    ) -> None:
+        _validate_policy(region, padding, square, fill)
+        self._region: RegionType = region
+        self._padding = float(padding)
+        self._square: SquareType = square
+        self._fill: FillType = fill
+
+    @property
+    def region(self) -> RegionType:
+        """Which pixels this policy keeps."""
+        return self._region
+
+    @property
+    def padding(self) -> float:
+        """Fraction of the box's width and height added on each side."""
+        return self._padding
+
+    @property
+    def square(self) -> SquareType:
+        """Whether and how this policy squares the crop."""
+        return self._square
+
+    @property
+    def fill(self) -> FillType:
+        """What this policy puts where there are no real pixels."""
+        return self._fill
+
+    def __repr__(self) -> str:
+        return (
+            f"CropPolicy(region={self._region!r}, padding={self._padding}, "
+            f"square={self._square!r}, fill={self._fill!r})"
+        )
+
+    def _region_to_pixels(
+        self, image_shape: tuple[int, ...], rx0: float, ry0: float, rx1: float, ry1: float
+    ) -> tuple[int, int, int, int]:
+        """Clip a float region to integer pixel bounds via the shared ``clip_box``, never empty."""
+        ix0, iy0, ix1, iy1 = clip_box(image_shape, (rx0, ry0, rx1, ry1))
+        return ix0, iy0, max(ix1, ix0 + 1), max(iy1, iy0 + 1)
+
+    def crop(self, image: NDArray[Any], box: NDArray[np.float64]) -> NDArray[Any]:
+        """Cut one box out of one image, honoring this policy.
+
+        Parameters
+        ----------
+        image : NDArray
+            The image the box was annotated on, as ``(C, H, W)``.
+        box : NDArray
+            The box as ``[x0, y0, x1, y1]`` in absolute pixels of `image`.
+
+        Returns
+        -------
+        NDArray
+            The crop, as ``(C, H, W)``, in `image`'s dtype. Never empty: a box that clips
+            to nothing still yields one pixel.
+        """
+        x0, y0, x1, y1 = (float(v) for v in box)
+
+        # Box widened by `padding` on each side (the region for all crops).
+        pad_x, pad_y = self._padding * (x1 - x0), self._padding * (y1 - y0)
+        rx0, ry0, rx1, ry1 = x0 - pad_x, y0 - pad_y, x1 + pad_x, y1 + pad_y
+
+        if self._square == "off":
+            ix0, iy0, ix1, iy1 = self._region_to_pixels(image.shape, rx0, ry0, rx1, ry1)
+            crop, origin = image[..., iy0:iy1, ix0:ix1].copy(), (ix0, iy0)
+        else:
+            crop, origin = self._square_crop(image, rx0, ry0, rx1, ry1)
+
+        if self._region == "surround":
+            self._mask_box(crop, origin, x0, y0, x1, y1)
+        return crop
+
+    def _square_crop(
+        self, image: NDArray[Any], rx0: float, ry0: float, rx1: float, ry1: float
+    ) -> tuple[NDArray[Any], tuple[int, int]]:
+        """Return a square crop and its (x, y) origin, per the ``square`` strategy.
+
+        ``"expand"`` squares the region by extending the shorter side into real image
+        pixels (shifting the window inward at edges, filling only unavoidable overflow).
+        ``"pad"`` crops only the region's real pixels and centers them in a square ``fill``
+        canvas, so the squaring adds no real background.
+        """
+        if self._square == "pad":
+            return self._pad_crop(image, rx0, ry0, rx1, ry1)
+
+        height, width, channels = image.shape[-2], image.shape[-1], image.shape[0]
+        side = max(int(round(max(rx1 - rx0, ry1 - ry0))), 1)
+
+        # Window top-left centered on the region, then shifted inward to capture real pixels.
+        wx0, wy0 = (rx0 + rx1) / 2 - side / 2, (ry0 + ry1) / 2 - side / 2
+        if side <= width:
+            wx0 = min(max(wx0, 0.0), width - side)
+        if side <= height:
+            wy0 = min(max(wy0, 0.0), height - side)
+        ox, oy = int(round(wx0)), int(round(wy0))
+
+        # Paste the square window's real pixels into a same-size canvas, filling overflow per policy.
+        # Pin the output to the image dtype so the mean fill is cast down (matching the other crop modes).
+        return crop_with_fill(
+            image, (ox, oy, ox + side, oy + side), fill=lambda px: self._fill_values(px, channels), dtype=image.dtype
+        )
+
+    def _pad_crop(
+        self, image: NDArray[Any], rx0: float, ry0: float, rx1: float, ry1: float
+    ) -> tuple[NDArray[Any], tuple[int, int]]:
+        """Crop the region's real pixels and center them in a square ``fill`` canvas."""
+        channels = image.shape[0]
+        ix0, iy0, ix1, iy1 = self._region_to_pixels(image.shape, rx0, ry0, rx1, ry1)
+        region = image[..., iy0:iy1, ix0:ix1]
+        region_h, region_w = region.shape[-2], region.shape[-1]
+        side = max(region_h, region_w)
+
+        offx, offy = (side - region_w) // 2, (side - region_h) // 2
+        crop = np.empty((channels, side, side), dtype=image.dtype)
+        crop[:] = self._fill_values(region, channels).reshape(channels, 1, 1)
+        crop[..., offy : offy + region_h, offx : offx + region_w] = region
+        # Origin maps image coords to canvas coords: image (ix0, iy0) sits at canvas (offx, offy).
+        return crop, (ix0 - offx, iy0 - offy)
+
+    def _mask_box(
+        self, crop: NDArray[Any], origin: tuple[int, int], x0: float, y0: float, x1: float, y1: float
+    ) -> None:
+        """Mask the original box (in crop coordinates) to the fill value, in place.
+
+        Rounds to nearest, matching the crop window this masks within rather than
+        :func:`~dataeval.utils.preprocessing.boxes_to_mask`, which rounds outwards to
+        guarantee it covers every pixel a box touches. The two therefore disagree by up
+        to a one-pixel ring, so a ``region="surround"`` crop and a
+        ``compute_stats(per_background=True)`` background are near but not identical
+        regions.
+        """
+        ox, oy = origin
+        mx0, my0 = max(int(round(x0)) - ox, 0), max(int(round(y0)) - oy, 0)
+        mx1, my1 = min(int(round(x1)) - ox, crop.shape[-1]), min(int(round(y1)) - oy, crop.shape[-2])
+        if mx1 <= mx0 or my1 <= my0:
+            return
+        if self._fill == "zero":
+            crop[..., my0:my1, mx0:mx1] = 0
+            return
+        # Mean over the surrounding ring (the kept pixels), not the box being masked.
+        mask = np.ones(crop.shape[-2:], dtype=bool)
+        mask[my0:my1, mx0:mx1] = False
+        ring = crop[..., mask]
+        fill = ring.mean(axis=-1) if ring.size else np.zeros(crop.shape[0], dtype=np.float64)
+        crop[..., my0:my1, mx0:mx1] = fill.reshape(crop.shape[0], 1, 1).astype(crop.dtype)
+
+    def _fill_values(self, pixels: NDArray[Any], channels: int) -> NDArray[np.float64]:
+        """Per-channel fill, computed from the real pixels available for this crop."""
+        return resolve_fill(pixels, channels, self._fill)
 
 
 class _CropDatumMetadata(DatumMetadata):
@@ -183,11 +387,12 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         _validate_params(region, padding, min_size, square, fill)
 
         self._dataset = dataset
-        self._region: RegionType = region
-        self._padding = float(padding)
         self._min_size = int(min_size)
-        self._square: SquareType = square
-        self._fill: FillType = fill
+        # The algorithm and the four values that describe it both live on the policy, so
+        # that a crop cut here and one cut by SourceItem.crop() are the same pixels and
+        # __repr__ cannot drift from what the view actually does. `min_size` is not on it:
+        # it selects which detections become rows and is no part of cutting one out.
+        self._policy = CropPolicy(region, padding, square, fill)
 
         # One pass to flatten detections into (item, target, label, box) rows, in image then
         # detection order — matching how Metadata flattens OD targets — applying the
@@ -244,6 +449,23 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         return {label: str(label) for label in sorted(observed)}
 
     @property
+    def policy(self) -> CropPolicy:
+        """How this view turns a box into a crop.
+
+        Hand it to :meth:`~dataeval.data.SourceItem.crop` to cut the same pixels an
+        embedding computed here was given, without restating the four parameters:
+
+        >>> import numpy as np
+        >>> from dataeval.data import DetectionCrops, SourceLocator
+        >>> from dataeval.types import SourceIndex
+        >>> crops = DetectionCrops(dataset)
+        >>> found = SourceLocator(dataset)[SourceIndex(0, 0)]
+        >>> np.array_equal(found.crop(policy=crops.policy), crops[0][0])
+        True
+        """
+        return self._policy
+
+    @property
     def source(self) -> ObjectDetectionDataset:
         """The object-detection dataset this wrapper directly wraps -- one link up the chain.
 
@@ -262,7 +484,7 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
 
     def __getitem__(self, index: int) -> DetectionCropDatum:
         item_index, target_index, label, box = self._index_map[index]
-        crop = self._crop(self._read_image(item_index), box)
+        crop = self._policy.crop(self._read_image(item_index), box)
         onehot = np.zeros(self._n_classes, dtype=np.float32)
         onehot[label] = 1.0
         meta: _CropDatumMetadata = {
@@ -279,15 +501,16 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
 
     def __repr__(self) -> str:
         return (
-            f"DetectionCrops(dataset={self._dataset!r}, region={self._region!r}, padding={self._padding}, "
-            f"min_size={self._min_size}, square={self._square!r}, fill={self._fill!r}, len={len(self)})"
+            f"DetectionCrops(dataset={self._dataset!r}, region={self._policy.region!r}, "
+            f"padding={self._policy.padding}, min_size={self._min_size}, square={self._policy.square!r}, "
+            f"fill={self._policy.fill!r}, len={len(self)})"
         )
 
     def __str__(self) -> str:
         title = "DetectionCrops Dataset"
         sep = "-" * len(title)
         return (
-            f"{title}\n{sep}\n    region: {self._region}\n    square: {self._square}\n"
+            f"{title}\n{sep}\n    region: {self._policy.region}\n    square: {self._policy.square}\n"
             f"    crops: {len(self)} ({self.n_dropped} dropped)\n    classes: {len(self._index2label)}\n\n"
             f"{self._dataset}"
         )
@@ -299,106 +522,3 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         image = normalize_image_shape(as_numpy(self._dataset[item_index][0]))
         self._cache_index, self._cache_image = item_index, image
         return image
-
-    def _region_to_pixels(
-        self, image_shape: tuple[int, ...], rx0: float, ry0: float, rx1: float, ry1: float
-    ) -> tuple[int, int, int, int]:
-        """Clip a float region to integer pixel bounds via the shared ``clip_box``, never empty."""
-        ix0, iy0, ix1, iy1 = clip_box(image_shape, (rx0, ry0, rx1, ry1))
-        return ix0, iy0, max(ix1, ix0 + 1), max(iy1, iy0 + 1)
-
-    def _crop(self, image: NDArray[Any], box: NDArray[np.float64]) -> NDArray[Any]:
-        """Crop ``box`` from ``image`` honoring the region / padding / square / fill policy."""
-        x0, y0, x1, y1 = (float(v) for v in box)
-
-        # Box widened by `padding` on each side (the region for all crops).
-        pad_x, pad_y = self._padding * (x1 - x0), self._padding * (y1 - y0)
-        rx0, ry0, rx1, ry1 = x0 - pad_x, y0 - pad_y, x1 + pad_x, y1 + pad_y
-
-        if self._square == "off":
-            ix0, iy0, ix1, iy1 = self._region_to_pixels(image.shape, rx0, ry0, rx1, ry1)
-            crop, origin = image[..., iy0:iy1, ix0:ix1].copy(), (ix0, iy0)
-        else:
-            crop, origin = self._square_crop(image, rx0, ry0, rx1, ry1)
-
-        if self._region == "surround":
-            self._mask_box(crop, origin, x0, y0, x1, y1)
-        return crop
-
-    def _square_crop(
-        self, image: NDArray[Any], rx0: float, ry0: float, rx1: float, ry1: float
-    ) -> tuple[NDArray[Any], tuple[int, int]]:
-        """Return a square crop and its (x, y) origin, per the ``square`` strategy.
-
-        ``"expand"`` squares the region by extending the shorter side into real image
-        pixels (shifting the window inward at edges, filling only unavoidable overflow).
-        ``"pad"`` crops only the region's real pixels and centers them in a square ``fill``
-        canvas, so the squaring adds no real background.
-        """
-        if self._square == "pad":
-            return self._pad_crop(image, rx0, ry0, rx1, ry1)
-
-        height, width, channels = image.shape[-2], image.shape[-1], image.shape[0]
-        side = max(int(round(max(rx1 - rx0, ry1 - ry0))), 1)
-
-        # Window top-left centered on the region, then shifted inward to capture real pixels.
-        wx0, wy0 = (rx0 + rx1) / 2 - side / 2, (ry0 + ry1) / 2 - side / 2
-        if side <= width:
-            wx0 = min(max(wx0, 0.0), width - side)
-        if side <= height:
-            wy0 = min(max(wy0, 0.0), height - side)
-        ox, oy = int(round(wx0)), int(round(wy0))
-
-        # Paste the square window's real pixels into a same-size canvas, filling overflow per policy.
-        # Pin the output to the image dtype so the mean fill is cast down (matching the other crop modes).
-        return crop_with_fill(
-            image, (ox, oy, ox + side, oy + side), fill=lambda px: self._fill_values(px, channels), dtype=image.dtype
-        )
-
-    def _pad_crop(
-        self, image: NDArray[Any], rx0: float, ry0: float, rx1: float, ry1: float
-    ) -> tuple[NDArray[Any], tuple[int, int]]:
-        """Crop the region's real pixels and center them in a square ``fill`` canvas."""
-        channels = image.shape[0]
-        ix0, iy0, ix1, iy1 = self._region_to_pixels(image.shape, rx0, ry0, rx1, ry1)
-        region = image[..., iy0:iy1, ix0:ix1]
-        region_h, region_w = region.shape[-2], region.shape[-1]
-        side = max(region_h, region_w)
-
-        offx, offy = (side - region_w) // 2, (side - region_h) // 2
-        crop = np.empty((channels, side, side), dtype=image.dtype)
-        crop[:] = self._fill_values(region, channels).reshape(channels, 1, 1)
-        crop[..., offy : offy + region_h, offx : offx + region_w] = region
-        # Origin maps image coords to canvas coords: image (ix0, iy0) sits at canvas (offx, offy).
-        return crop, (ix0 - offx, iy0 - offy)
-
-    def _mask_box(
-        self, crop: NDArray[Any], origin: tuple[int, int], x0: float, y0: float, x1: float, y1: float
-    ) -> None:
-        """Mask the original box (in crop coordinates) to the fill value, in place.
-
-        Rounds to nearest, matching the crop window this masks within rather than
-        :func:`~dataeval.utils.preprocessing.boxes_to_mask`, which rounds outwards to
-        guarantee it covers every pixel a box touches. The two therefore disagree by up
-        to a one-pixel ring, so a ``region="surround"`` crop and a
-        ``compute_stats(per_background=True)`` background are near but not identical
-        regions.
-        """
-        ox, oy = origin
-        mx0, my0 = max(int(round(x0)) - ox, 0), max(int(round(y0)) - oy, 0)
-        mx1, my1 = min(int(round(x1)) - ox, crop.shape[-1]), min(int(round(y1)) - oy, crop.shape[-2])
-        if mx1 <= mx0 or my1 <= my0:
-            return
-        if self._fill == "zero":
-            crop[..., my0:my1, mx0:mx1] = 0
-            return
-        # Mean over the surrounding ring (the kept pixels), not the box being masked.
-        mask = np.ones(crop.shape[-2:], dtype=bool)
-        mask[my0:my1, mx0:mx1] = False
-        ring = crop[..., mask]
-        fill = ring.mean(axis=-1) if ring.size else np.zeros(crop.shape[0], dtype=np.float64)
-        crop[..., my0:my1, mx0:mx1] = fill.reshape(crop.shape[0], 1, 1).astype(crop.dtype)
-
-    def _fill_values(self, pixels: NDArray[Any], channels: int) -> NDArray[np.float64]:
-        """Per-channel fill, computed from the real pixels available for this crop."""
-        return resolve_fill(pixels, channels, self._fill)

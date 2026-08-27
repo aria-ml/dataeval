@@ -230,7 +230,7 @@ print("factor_data at unit               :", metadata.at("unit").factor_data.sha
 # ```{important}
 # Prefer using {meth}`.Metadata.at` over directly modifying the {attr}`.Metadata.view` attribute in place.
 # Because evaluators maintain a reference to the original `Metadata` object, changing its view dynamically
-# can silently alter the behavior of previously initialized evaluators. In contrast, {meth}`.at` returns a lightweight,
+# can silently alter the behavior of previously initialized evaluators. In contrast, {meth}`.Metadata.at` returns a lightweight,
 # independent copy that shares underlying binning and structuring computations. This allows you to evaluate multiple
 # levels of the same dataset concurrently without side effects.
 # ```

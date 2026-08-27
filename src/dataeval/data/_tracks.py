@@ -36,7 +36,12 @@ def _build_tracks(tracking_target: MultiobjectTrackingTarget) -> Mapping[int, Tr
 
     untracked = 0
     for frame_idx, frame_target in enumerate(tracking_target.frame_tracks):
-        track_ids = np.asarray(frame_target.track_ids)
+        # A frame holds as many detections as it has labels, and one holding none is
+        # allowed to carry no ``track_ids`` at all — which is what the structuring walk
+        # behind :class:`~dataeval.Metadata` allows, so refusing it here would reject a
+        # target that metadata accepts.
+        count = len(np.asarray(frame_target.labels).reshape(-1))
+        track_ids = np.asarray(getattr(frame_target, "track_ids", ())).reshape(-1)[:count] if count else np.empty(0)
         # Selected up front rather than skipped inside the loop, so the walk below sees
         # only detections that belong to a track.
         tracked = np.flatnonzero(track_ids >= 0)
