@@ -165,8 +165,8 @@ class TestOutliers:
         outliers1.evaluate(dataset, per_image=True, per_target=True)
         # Should have both image-level and target-level stats
         source_indices1 = outliers1.stats["source_index"]
-        has_image_level = any(idx.target is None for idx in source_indices1)
-        has_target_level = any(idx.target is not None for idx in source_indices1)
+        has_image_level = any(idx.key is None for idx in source_indices1)
+        has_target_level = any(idx.key is not None for idx in source_indices1)
         assert has_image_level
         assert has_target_level
 
@@ -175,14 +175,14 @@ class TestOutliers:
         outliers2.evaluate(dataset, per_image=True, per_target=False)
         # Should have only image-level stats
         source_indices2 = outliers2.stats["source_index"]
-        assert all(idx.target is None for idx in source_indices2)
+        assert all(idx.key is None for idx in source_indices2)
 
         # Test with per_image=False, per_target=True
         outliers3 = Outliers(flags=ImageStats.DIMENSION)
         outliers3.evaluate(dataset, per_image=False, per_target=True)
         # Should have only target-level stats
         source_indices3 = outliers3.stats["source_index"]
-        assert all(idx.target is not None for idx in source_indices3)
+        assert all(idx.key is not None for idx in source_indices3)
 
     def test_outliers_from_clusters_basic(self):
         """Test basic cluster-based outlier detection."""
@@ -706,7 +706,7 @@ class TestOutliersCoverageImprovements:
         # Should have image-level stats only
         assert len(outliers.stats["source_index"]) > 0
         # All source indices should have target=None (no boxes in input)
-        assert all(idx.target is None for idx in outliers.stats["source_index"])
+        assert all(idx.key is None for idx in outliers.stats["source_index"])
 
     def test_outliers_from_stats_with_empty_result(self):
         """Test from_stats when no outliers are found."""
@@ -787,9 +787,9 @@ class TestOutliersEdgeCases:
                 "phash": np.array(["abcd1234", "efgh5678", "ijkl9012"], dtype=object),
             },
             "source_index": [
-                SourceIndex(0, None, None),
-                SourceIndex(1, None, None),
-                SourceIndex(2, None, None),
+                SourceIndex(0, None),
+                SourceIndex(1, None),
+                SourceIndex(2, None),
             ],
         }
 
@@ -814,9 +814,9 @@ class TestOutliersEdgeCases:
         mock_stats = {
             "stats": {"brightness": np.array([100.0, 1.0, 100.0])},
             "source_index": [
-                SourceIndex(0, None, None),
-                SourceIndex(1, None, None),  # Outlier (z-score ≈ 1.41)
-                SourceIndex(2, None, None),
+                SourceIndex(0, None),
+                SourceIndex(1, None),  # Outlier (z-score ≈ 1.41)
+                SourceIndex(2, None),
             ],
         }
 
@@ -844,11 +844,11 @@ class TestOutliersEdgeCases:
         # Dataset 2: 3 items (values 10.0, 1000.0, 10.0)
         stats1 = {
             "stats": {"mean": np.array([10.0])},
-            "source_index": [SourceIndex(0, None, None)],
+            "source_index": [SourceIndex(0, None)],
         }
         stats2 = {
             "stats": {"mean": np.array([10.0, 1000.0, 10.0])},
-            "source_index": [SourceIndex(0, None, None), SourceIndex(1, None, None), SourceIndex(2, None, None)],
+            "source_index": [SourceIndex(0, None), SourceIndex(1, None), SourceIndex(2, None)],
         }
 
         output = detector.from_stats([stats1, stats2])  # type: ignore
@@ -918,7 +918,7 @@ class TestOutliersNaNColumns:
         detector = Outliers(outlier_threshold=ZScoreThreshold(1.0))
         mock_stats = {
             "stats": {"nir_mean": np.full(6, np.nan)},
-            "source_index": [SourceIndex(i, None, None) for i in range(6)],
+            "source_index": [SourceIndex(i, None) for i in range(6)],
         }
 
         output = detector.from_stats(mock_stats)  # type: ignore
@@ -931,7 +931,7 @@ class TestOutliersNaNColumns:
         values = np.array([10.0, 10.1, 9.9, 10.2, 9.8, 10.05, np.nan, np.nan, 1000.0])
         mock_stats = {
             "stats": {"nir_mean": values},
-            "source_index": [SourceIndex(i, None, None) for i in range(len(values))],
+            "source_index": [SourceIndex(i, None) for i in range(len(values))],
         }
 
         output = detector.from_stats(mock_stats)  # type: ignore
@@ -947,7 +947,7 @@ class TestOutliersNaNColumns:
             values = np.array(real + [np.nan] * (8 - len(real)))
             mock_stats = {
                 "stats": {"nir_mean": values},
-                "source_index": [SourceIndex(i, None, None) for i in range(len(values))],
+                "source_index": [SourceIndex(i, None) for i in range(len(values))],
             }
 
             output = detector.from_stats(mock_stats)  # type: ignore
@@ -975,9 +975,9 @@ class TestBuildClassIds:
     def test_ic_dataset_1to1(self):
         """IC dataset: each image has exactly one class."""
         source_index = [
-            SourceIndex(0, None, None),
-            SourceIndex(1, None, None),
-            SourceIndex(2, None, None),
+            SourceIndex(0, None),
+            SourceIndex(1, None),
+            SourceIndex(2, None),
         ]
         metadata = MockMetadata(
             class_labels=np.array([0, 1, 0], dtype=np.intp),
@@ -993,11 +993,11 @@ class TestBuildClassIds:
         """OD dataset: target-level entries get correct class."""
         # Image 0 has 2 targets (classes 0, 1), Image 1 has 1 target (class 0)
         source_index = [
-            SourceIndex(0, None, None),  # image-level for img 0
-            SourceIndex(0, 0, None),  # target 0 of img 0
-            SourceIndex(0, 1, None),  # target 1 of img 0
-            SourceIndex(1, None, None),  # image-level for img 1
-            SourceIndex(1, 0, None),  # target 0 of img 1
+            SourceIndex(0, None),  # image-level for img 0
+            SourceIndex(0, 0),  # target 0 of img 0
+            SourceIndex(0, 1),  # target 1 of img 0
+            SourceIndex(1, None),  # image-level for img 1
+            SourceIndex(1, 0),  # target 0 of img 1
         ]
         metadata = MockMetadata(
             class_labels=np.array([0, 1, 0], dtype=np.intp),
@@ -1018,9 +1018,9 @@ class TestBuildClassIds:
     def test_od_single_class_image(self):
         """OD image with all targets same class gets that class for image-level."""
         source_index = [
-            SourceIndex(0, None, None),
-            SourceIndex(0, 0, None),
-            SourceIndex(0, 1, None),
+            SourceIndex(0, None),
+            SourceIndex(0, 0),
+            SourceIndex(0, 1),
         ]
         metadata = MockMetadata(
             class_labels=np.array([1, 1], dtype=np.intp),

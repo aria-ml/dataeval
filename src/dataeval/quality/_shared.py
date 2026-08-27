@@ -12,6 +12,12 @@ from dataeval.core import StatsResult, compute_stats
 from dataeval.data._invalidates import invalidating_sources
 from dataeval.exceptions import StatsInvalidatedWarning
 from dataeval.flags import ImageStats
+from dataeval.types import FactorLevel, SourceIndex
+
+# What :attr:`SourceIndex.kind` reports for a row that is one of an item's labels. An
+# unstated level under a key resolves here on every task, so the evaluators can name the
+# label end without a dataset to resolve against.
+LABEL_KIND = "instance"
 
 
 def _stat_names(stats: ImageStats) -> str:
@@ -154,6 +160,10 @@ def add_dataset_index(  # noqa: C901
     sort_cols = ["dataset_index", "item_index"]
     if "target_index" in df.columns:
         sort_cols.append("target_index")
+    # Part of a row's identity rather than a description of it, so two rows differing only
+    # in level are ordered rather than left tied — polars does not promise a tie's order.
+    if "level" in df.columns:
+        sort_cols.append("level")
     if "metric_name" in df.columns:
         sort_cols.append("metric_name")
 
@@ -166,6 +176,45 @@ def add_dataset_index(  # noqa: C901
         .select(["dataset_index", "item_index"] + existing_cols)
         .sort(sort_cols)
     )
+
+
+def reported_level(source_index: SourceIndex) -> FactorLevel | None:
+    """Return the level to record for an address, or None where its key already says it.
+
+    A result's ``level`` column exists to name the rows `target_index` cannot tell apart:
+    a video frame and a track are both keyed, and nothing but the level separates them.
+    The two *ends* need no such column — a null key is an item's own row and a key is one
+    of its labels — so they are recorded as null and the column drops out entirely on any
+    dataset that has only those two.
+
+    That is what keeps the two spellings of one address producing one frame. The explicit
+    ``SourceIndex(3, 7, "instance")`` and the minimal ``SourceIndex(3, 7)`` name the same
+    row, are grouped and gated the same by :attr:`~dataeval.types.SourceIndex.kind`, and
+    record the same nothing here.
+    """
+    kind = source_index.kind
+    return None if kind == LABEL_KIND else kind
+
+
+def selected_by_flags(source_index: SourceIndex, per_image: bool, per_target: bool) -> bool:
+    """Whether `per_image` / `per_target` select an address.
+
+    The two flags name the two ends of the level graph — an item's own row, and one of its
+    labels — and :attr:`SourceIndex.kind` says which of those an address is, canonically,
+    so the fully explicit spelling of a result is gated exactly as the minimal spelling of
+    the same result is.
+
+    A row *between* the two ends, such as a video frame or a track, is neither, so neither
+    flag has a say over it and it is always selected. Nothing else could happen: there is no
+    flag that names it, and dropping it would answer a caller who supplied per-frame
+    statistics with an empty result and no reason.
+    """
+    kind = source_index.kind
+    if kind is None:
+        return per_image
+    if kind == LABEL_KIND:
+        return per_target
+    return True
 
 
 def drop_null_index_columns(df: pl.DataFrame, columns: Sequence[str]) -> pl.DataFrame:

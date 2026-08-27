@@ -16,16 +16,15 @@ from dataeval.flags import ImageStats
 class PixelStatCalculator(Calculator[ImageStats]):
     """Calculator for pixel-level statistics."""
 
-    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:
+    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
         self.datum = datum
         self.cache = cache
-        self.per_channel_mode = per_channel
         self.warnings: list[str] = []
 
     @cached_property
     def _has_nan(self) -> bool:
         """Check once whether the scaled data contains any NaN values."""
-        values = self.cache.per_channel if self.per_channel_mode else self.cache.scaled
+        values = self.cache.scaled
         if not np.issubdtype(values.dtype, np.inexact):
             # Integer pixels carry no NaN, so every reduction below can take its fast path
             # without the scan. Reachable whenever the view is an in-bounds window of an
@@ -100,10 +99,6 @@ class PixelStatCalculator(Calculator[ImageStats]):
     @cached_property
     def histogram(self) -> NDArray[np.float64]:
         r = self._histogram_range
-        if self.per_channel_mode:
-            counts = np.apply_along_axis(lambda y: np.histogram(y, bins=256, range=r)[0], 1, self.cache.per_channel)
-            self._report_uncounted(int(counts.sum()), self.cache.per_channel, r)
-            return counts
         counts = np.histogram(self.cache.scaled, bins=256, range=r)[0]
         self._report_uncounted(int(counts.sum()), self.cache.scaled, r)
         return counts
@@ -113,49 +108,32 @@ class PixelStatCalculator(Calculator[ImageStats]):
         return ImageStats.PIXEL
 
     def _nan_list(self) -> list[float]:
-        """Return NaN values matching the expected output shape for all-NaN data."""
-        if self.per_channel_mode:
-            return [np.nan] * self.cache.channel_count
+        """Return NaN in the shape every statistic here returns: one value for the row."""
         return [np.nan]
 
     def _mean(self) -> list[float]:
         if self._unmeasured:
             return self._nan_list()
-        if self.per_channel_mode:
-            return self._mean_func(self.cache.per_channel, axis=1).tolist()
         return [float(self._mean_func(self.cache.scaled))]
 
     def _std(self) -> list[float]:
         if self._unmeasured:
             return self._nan_list()
-        if self.per_channel_mode:
-            return self._std_func(self.cache.per_channel, axis=1).tolist()
         return [float(self._std_func(self.cache.scaled))]
 
     def _var(self) -> list[float]:
         if self._unmeasured:
             return self._nan_list()
-        if self.per_channel_mode:
-            return self._var_func(self.cache.per_channel, axis=1).tolist()
         return [float(self._var_func(self.cache.scaled))]
 
     @cached_property
     def _moments(self) -> tuple[Any, Any, Any]:
         """Compute variance (m2), 3rd central moment (m3), and 4th central moment (m4).
 
-        Uses fast .mean() when no NaN, caches only scalars (or per-channel arrays),
-        not full-image-sized intermediates.
+        Uses fast .mean() when no NaN, and caches only the three scalars rather than any
+        full-image-sized intermediate.
         """
         mean_fn = self._mean_func
-        if self.per_channel_mode:
-            data = self.cache.per_channel
-            d = data - mean_fn(data, axis=1, keepdims=True)
-            d2 = d * d
-            m2 = mean_fn(d2, axis=1)
-            m3 = mean_fn(d2 * d, axis=1)
-            np.multiply(d2, d2, out=d2)
-            m4 = mean_fn(d2, axis=1)
-            return m2, m3, m4
         data = self.cache.scaled.ravel()
         d = data - mean_fn(data)
         d2 = d * d
@@ -169,10 +147,6 @@ class PixelStatCalculator(Calculator[ImageStats]):
         if self._unmeasured:
             return self._nan_list()
         m2, m3, _ = self._moments
-        if self.per_channel_mode:
-            s3 = np.float_power(m2, 1.5)
-            s3 = np.where(s3 == 0, 1.0, s3)
-            return (m3 / s3).tolist()
         if m2 == 0:
             return [0.0]
         return [m3 / (m2**1.5)]
@@ -181,11 +155,6 @@ class PixelStatCalculator(Calculator[ImageStats]):
         if self._unmeasured:
             return self._nan_list()
         m2, _, m4 = self._moments
-        if self.per_channel_mode:
-            s4 = m2 * m2
-            s4_safe = np.where(s4 == 0, 1.0, s4)
-            k = m4 / s4_safe - 3.0
-            return np.where(s4 == 0, 0.0, k).tolist()
         if m2 == 0:
             return [0.0]
         return [m4 / (m2 * m2) - 3.0]
@@ -198,13 +167,6 @@ class PixelStatCalculator(Calculator[ImageStats]):
         # absence: an outlier search would flag such an image as genuinely low-entropy.
         if self._unbinnable:
             return self._nan_list()
-        if self.per_channel_mode:
-            h = self.histogram.astype(np.float64)
-            totals = h.sum(axis=1, keepdims=True)
-            totals = np.where(totals == 0, 1.0, totals)
-            h = h / totals
-            with np.errstate(divide="ignore", invalid="ignore"):
-                return (-np.nansum(h * np.log(np.where(h > 0, h, 1.0)), axis=1) + 0.0).tolist()
         h = self.histogram.astype(np.float64)
         total = h.sum()
         if total == 0:
@@ -214,7 +176,7 @@ class PixelStatCalculator(Calculator[ImageStats]):
             return [float(-np.nansum(h * np.log(np.where(h > 0, h, 1.0))) + 0.0)]
 
     def _as_fraction(self, counted: Any) -> list[float]:
-        """Express a per-channel or whole-image count as a fraction of the pixels measured.
+        """Express a count of pixels as a fraction of the pixels measured.
 
         Pixels the cache excluded are in neither half of the ratio: they are not
         measurements, and — although they are NaN in the image, since NaN is how the
@@ -222,11 +184,6 @@ class PixelStatCalculator(Calculator[ImageStats]):
         both the count and the total is what keeps ``missing`` and ``zeros`` reporting
         on the region actually being reduced over rather than on the mask's size.
         """
-        if self.per_channel_mode:
-            total = self.cache.per_channel_raw.shape[1] - self.cache.excluded_per_channel
-            if total <= 0:
-                return [np.nan] * self.cache.channel_count
-            return (np.asarray(counted, dtype=np.float64) / total).tolist()
         total = self.cache.image.size - self.cache.excluded_total
         if total <= 0:
             return [np.nan]
@@ -239,12 +196,9 @@ class PixelStatCalculator(Calculator[ImageStats]):
         # box, or a band group the datum could not supply, reports 1.0. That is the signal
         # a reader needs, and NaN would erase it.
         #
-        # Read off the raw view in both modes. `scaled` is all-NaN wherever no interval
-        # could be established, so counting NaNs in it would report fully present data as
-        # wholly missing the moment `normalize_pixel_values` met a range it could not read.
-        if self.per_channel_mode:
-            nans = np.count_nonzero(np.isnan(self.cache.per_channel_raw), axis=1) - self.cache.excluded_per_channel
-            return self._as_fraction(nans)
+        # Read off the raw view. `scaled` is all-NaN wherever no interval could be
+        # established, so counting NaNs in it would report fully present data as wholly
+        # missing the moment `normalize_pixel_values` met a range it could not read.
         return self._as_fraction(np.count_nonzero(np.isnan(self.cache.image)) - self.cache.excluded_total)
 
     def _zeros(self) -> list[float]:
@@ -255,22 +209,17 @@ class PixelStatCalculator(Calculator[ImageStats]):
             return self._nan_list()
         # Excluded pixels are NaN, never 0, so only the denominator needs correcting here.
         #
-        # Read off the raw view in both modes, as `_missing` is. A zero is a property of
-        # the stored value, and `scaled` shifts by `pmin` — against a declared range that
-        # does not start at zero, a raw 0 lands somewhere in the middle of [0, 1] and the
-        # count would answer a question nobody asked.
-        if self.per_channel_mode:
-            return self._as_fraction(np.count_nonzero(self.cache.per_channel_raw == 0, axis=1))
+        # Read off the raw view, as `_missing` is. A zero is a property of the stored
+        # value, and `scaled` shifts by `pmin` — against a declared range that does not
+        # start at zero, a raw 0 lands somewhere in the middle of [0, 1] and the count
+        # would answer a question nobody asked.
         return self._as_fraction(np.count_nonzero(self.cache.image == 0))
 
     def _histogram(self) -> list[Any]:
         # As _entropy: an all-zero histogram over unmeasured data would read as a real
         # distribution rather than an absent one.
         if self._unbinnable:
-            empty = [np.nan] * 256
-            return [empty] * self.cache.channel_count if self.per_channel_mode else [empty]
-        if self.per_channel_mode:
-            return self.histogram.tolist()
+            return [[np.nan] * 256]
         return [self.histogram.tolist()]
 
     def get_empty_values(self) -> dict[str, Any]:

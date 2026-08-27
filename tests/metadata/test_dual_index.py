@@ -401,14 +401,35 @@ class TestDualKeyIndexing:
         assert md.factor_info["iou"].level == "instance"
         assert md.target_data["iou"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
 
-    def test_add_factors_source_index_rejects_per_channel(self, od_dataset_with_metadata):
-        """Per-channel values are many-per-row and have no single-column form."""
+    def test_a_stated_level_places_where_it_names(self, od_dataset_with_metadata):
+        """The explicit spelling of what the minimal one means, landing identically."""
+        md = Metadata(od_dataset_with_metadata)
+        source_index = [SourceIndex(0, 0, "instance"), SourceIndex(0, 1, "instance"), SourceIndex(1, 0, "instance")]
+        source_index += [SourceIndex(2, i, "instance") for i in range(3)]
+        md.add_factors({"cs": np.arange(6.0)}, source_index=source_index)
+
+        assert md.factor_info["cs"].level == "instance"
+        assert md.target_data["cs"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+
+    @pytest.mark.parametrize("level", ["sequence", "track"])
+    def test_a_level_this_metadata_does_not_have_is_rejected(self, od_dataset_with_metadata, level):
+        """Answered as "no such level" rather than as a row-count mismatch."""
         md = Metadata(od_dataset_with_metadata)
 
-        with pytest.raises(ValueError, match="per-channel"):
+        with pytest.raises(ValueError, match=f"this metadata has no {level} level"):
             md.add_factors(
                 {"cs": np.arange(6.0)},
-                source_index=[SourceIndex(i // 2, None, i % 2) for i in range(6)],
+                source_index=[SourceIndex(i, 0, level) for i in range(6)],
+            )
+        assert "cs" not in md.dataframe.columns
+
+    def test_the_rejection_lists_the_levels_it_does_have(self, od_dataset_with_metadata):
+        md = Metadata(od_dataset_with_metadata)
+
+        with pytest.raises(ValueError, match=r"Its levels are 'unit', 'instance'"):
+            md.add_factors(
+                {"cs": np.arange(6.0)},
+                source_index=[SourceIndex(i, 0, "track") for i in range(6)],
             )
 
     def test_add_factors_source_index_rejects_a_duplicated_row(self, od_dataset_with_metadata):
@@ -421,7 +442,7 @@ class TestDualKeyIndexing:
         """
         md = Metadata(od_dataset_with_metadata)
 
-        with pytest.raises(ValueError, match="names the same item-level row more than once"):
+        with pytest.raises(ValueError, match="names the same unit-level row more than once"):
             md.add_factors(
                 {"x": np.array([10.0, 20.0, 30.0])},
                 source_index=[SourceIndex(0, None), SourceIndex(0, None), SourceIndex(2, None)],
@@ -472,7 +493,6 @@ class TestDualKeyIndexing:
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=False,
-            per_channel=False,
             normalize_pixel_values=False,
         )
         mean_img = img_stats["stats"]["mean"]
@@ -483,7 +503,6 @@ class TestDualKeyIndexing:
             stats=ImageStats.PIXEL_MEAN | ImageStats.DIMENSION,
             per_image=False,
             per_target=True,
-            per_channel=False,
             normalize_pixel_values=False,
         )
         width_tgt = tgt_stats["stats"]["width"]
@@ -496,7 +515,6 @@ class TestDualKeyIndexing:
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
-            per_channel=False,
             normalize_pixel_values=False,
         )
         mean_both = both_stats["stats"]["mean"]
@@ -837,7 +855,6 @@ class TestAddFactorsRobustness:
         results = compute_stats(
             od_dataset_varied_pixels,
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
-            per_channel=False,
             normalize_pixel_values=False,
         )
 
@@ -942,7 +959,7 @@ class TestSourceIndexLevelLimits:
         md = Metadata.from_factors({"a": np.arange(3.0)})
         assert md.item_level == md.label_level
 
-        source_index = [SourceIndex(0, None, None), SourceIndex(0, 0, None), SourceIndex(1, 0, None)]
+        source_index = [SourceIndex(0, None), SourceIndex(0, 0), SourceIndex(1, 0)]
         with pytest.raises(ValueError, match="mixes per-item entries .* with per-label entries"):
             md.add_factors({"bright": np.arange(3.0)}, source_index=source_index)
         assert "bright" not in md.dataframe.columns
@@ -951,7 +968,7 @@ class TestSourceIndexLevelLimits:
         md = Metadata.from_factors({"a": np.arange(3.0)})
         md.add_factors(
             {"bright": np.arange(3.0)},
-            source_index=[SourceIndex(i, None, None) for i in range(3)],
+            source_index=[SourceIndex(i, None) for i in range(3)],
         )
         assert "bright" in md.factor_names
 

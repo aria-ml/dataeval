@@ -16,6 +16,7 @@ the raw-factor path.
 __all__ = []
 
 from collections.abc import Mapping, Sequence
+from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -60,6 +61,26 @@ LEVEL_COLUMNS: tuple[str, ...] = (
 # ``rows_at("instance")["track_id"]`` — and this is also the column a future ``track``
 # level would key its rows on, so nothing has to move when tracks become rows.
 IDENTIFIER_COLUMNS: tuple[str, ...] = ("track_id",)
+
+# How a :class:`~dataeval.types.SourceIndex` names one row at each level: the column its
+# ``key`` holds a value of, within the row's own ``item_index``. ``None`` where the item
+# alone names the row.
+#
+# ``instance`` keys on ``target_index`` and **not** on ``instance_index``, which is the one
+# entry not guessable from the level's name. ``instance_index`` is dense within a *frame*
+# and repeats across the frames of one sequence — see the note above ``LEVEL_COLUMNS`` —
+# so it names one row on an image task and several on a video, which is the worst way for a
+# key to be wrong. ``target_index`` is dense within the item at every level of every task.
+#
+# ``track`` keys on ``track_id`` rather than on the dense ``track_index`` because the id is
+# what a tracker emits and what a caller has in hand; both are unique under
+# ``(item_index, key)``.
+LEVEL_KEY_COLUMNS: Mapping[FactorLevel, str | None] = MappingProxyType({
+    "sequence": None,
+    "unit": "unit_index",
+    "track": "track_id",
+    "instance": "target_index",
+})
 
 # Factor names colliding with any of these are prefixed with ``metadata_``. This is
 # wider than the historical five-column set: the level key columns are just as

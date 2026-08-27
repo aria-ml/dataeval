@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Flag
 from functools import partial
 from itertools import zip_longest
-from typing import Any, Literal, TypedDict, cast, get_args
+from typing import Any, TypedDict, cast, get_args
 
 import numpy as np
 from numpy.typing import NDArray
@@ -127,7 +127,7 @@ class StatsResult(TypedDict):
     Attributes
     ----------
     source_index : Sequence[SourceIndex]
-        Sequence of SourceIndex objects with image/box/channel info.
+        Sequence of SourceIndex objects with image/box info.
     object_count : Sequence[int]
         Sequence of object counts per image.
     invalid_box_count : Sequence[int]
@@ -176,7 +176,6 @@ class BatchPlan:
     calculators: Sequence[tuple[type[Any], Flag]]
     per_image: bool
     per_target: bool
-    per_channel: bool
     normalize_pixel_values: bool
     per_background: bool
     background_calculators: Sequence[tuple[type[Any], Flag]]
@@ -202,7 +201,6 @@ def _collect_calculator_stats(
     calculators: Iterable[tuple[type[Any], Flag]],
     datum: NDArray[Any],
     box: BoundingBox | None,
-    per_channel: bool,
     normalize_pixel_values: bool = False,
     exclude: NDArray[np.bool_] | None = None,
     prefix: str = "",
@@ -245,14 +243,13 @@ def _collect_calculator_stats(
     processor = CalculatorCache(
         datum,
         box,
-        per_channel,
         normalize_pixel_values=normalize_pixel_values,
         exclude=exclude,
         value_range=value_range,
         bands=bands,
     )
     for calculator_cls, flags in calculators:
-        calculator = calculator_cls(datum, processor, per_channel)
+        calculator = calculator_cls(datum, processor)
         computed = calculator.compute(flags, view)
         stats_list.append({f"{prefix}{name}": values for name, values in computed.items()})
         # Collect empty values from this calculator
@@ -298,7 +295,6 @@ def _collect_band_stats(
     band_range: ValueRange,
     box: BoundingBox | None,
     name: str,
-    per_channel: bool,
     *,
     normalize_pixel_values: bool,
     exclude: NDArray[np.bool_] | None,
@@ -317,7 +313,6 @@ def _collect_band_stats(
         calculators,
         datum,
         box,
-        per_channel,
         normalize_pixel_values=normalize_pixel_values,
         exclude=exclude,
         prefix=f"{prefix}{name}_",
@@ -327,65 +322,42 @@ def _collect_band_stats(
     )
 
 
-def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], num_channels: int) -> list[int | None]:
-    """Determine what channel indices are needed based on processor outputs."""
-    channel_indices_needed: set[int | None] = set()
-
-    for output in calculator_output:
-        first_stat_values = next(iter(output.values()))
-        num_elements = len(first_stat_values)
-
-        if num_elements == 1:
-            # Single value per image/box - uses channel=None
-            channel_indices_needed.add(None)
-        elif num_elements == num_channels:
-            # Per-channel values - uses channel=0,1,2,...
-            channel_indices_needed.update(range(num_channels))
-        else:
-            # Unexpected case
-            raise ValueError(
-                f"Processor produced {num_elements} values but image has {num_channels} channels. "
-                f"Expected either 1 (image-level) or {num_channels} (per-channel) values.",
-            )
-
-    # Return ordered list of channel indices (None first, then 0,1,2,...)
-    return sorted(channel_indices_needed, key=lambda x: -1 if x is None else x)
-
-
-def _reconcile_stats(  # noqa: C901
+def _reconcile_stats(
     calculator_output: list[dict[str, list[Any]]],
-    sorted_channels: list[int | None],
-    empty_values_map: dict[str, Any],
 ) -> dict[str, list[Any]]:
-    """
-    Reconcile stats from different processors into a unified structure.
+    """Merge every calculator's output for one row into a single mapping.
 
-    Uses empty values from empty_values_map for stats that don't apply to certain channels.
-    Defaults to np.nan if a stat is not in the empty_values_map.
+    A row's names come from several calculators — the unmasked pass, one per named band
+    group, and the masked pass beside them — each returning one value per name, wrapped in
+    a single-element list so that a name a calculator does not produce stays absent rather
+    than becoming a value.
+
+    Merging is all reconciliation amounts to now that a row is one row. While the
+    per-channel path existed a calculator could return one value per band, and this
+    function placed each at its own position in a row block sized by the datum's channel
+    count; with that path gone there is no second position for a value to land at, and a
+    name produced by two calculators keeps the last one's answer exactly as it did when
+    both wrote to the same ``channel=None`` slot.
+
+    Raises
+    ------
+    ValueError
+        When a calculator returns other than one value per name. Every calculator is
+        expected to reduce its region to a single reading; more than one has nowhere to go
+        and would otherwise be silently truncated to the first.
     """
-    num_entries = len(sorted_channels)
     reconciled_stats: dict[str, list[Any]] = {}
-
     for output in calculator_output:
+        # Checked once per calculator rather than once per name, which is where the
+        # per-channel count check sat and what it cost: every name in one output shares a
+        # length by construction.
         first_stat_values = next(iter(output.values()))
-        num_elements = len(first_stat_values)
-
-        for stat_name, stat_values in output.items():
-            if stat_name not in reconciled_stats:
-                # Use the appropriate empty value for this stat (default to np.nan)
-                empty_value = empty_values_map.get(stat_name, np.nan)
-                reconciled_stats[stat_name] = [empty_value] * num_entries
-
-            if num_elements == 1:
-                # Single value goes to channel=None position
-                none_idx = sorted_channels.index(None)
-                reconciled_stats[stat_name][none_idx] = stat_values[0]
-            else:
-                # Per-channel values go to their respective positions
-                for ch_idx, value in enumerate(stat_values):
-                    ch_pos = sorted_channels.index(ch_idx)
-                    reconciled_stats[stat_name][ch_pos] = value
-
+        if len(first_stat_values) != 1:
+            raise ValueError(
+                f"Calculator produced {len(first_stat_values)} values for a single row; "
+                f"statistics reduce their region to one value each.",
+            )
+        reconciled_stats.update(output)
     return reconciled_stats
 
 
@@ -446,7 +418,6 @@ def _compute_batch(  # noqa: C901
     calculators = plan.calculators
     per_image = plan.per_image
     per_target = plan.per_target
-    per_channel = plan.per_channel
     normalize_pixel_values = plan.normalize_pixel_values
     per_background = plan.per_background
     background_calculators = plan.background_calculators
@@ -534,7 +505,6 @@ def _compute_batch(  # noqa: C901
                 calculators,
                 datum,
                 box,
-                per_channel,
                 normalize_pixel_values=normalize_pixel_values,
                 value_range=value_range,
             )
@@ -554,7 +524,6 @@ def _compute_batch(  # noqa: C901
                     band_range,
                     box,
                     name,
-                    per_channel,
                     normalize_pixel_values=normalize_pixel_values,
                     exclude=None,
                     prefix="",
@@ -571,7 +540,6 @@ def _compute_batch(  # noqa: C901
                 background_calculators,
                 datum,
                 box,
-                per_channel,
                 normalize_pixel_values=normalize_pixel_values,
                 exclude=exclude,
                 prefix=BACKGROUND_PREFIX,
@@ -598,7 +566,6 @@ def _compute_batch(  # noqa: C901
                     band_range,
                     box,
                     name,
-                    per_channel,
                     normalize_pixel_values=normalize_pixel_values,
                     exclude=exclude,
                     prefix=BACKGROUND_PREFIX,
@@ -613,16 +580,11 @@ def _compute_batch(  # noqa: C901
             source = f"{i}" if box is None else f"{i}[{i_b}]"
             warnings_list.append(f"{source}: {w}")
 
-        # Determine what channel indices are needed
-        sorted_channels = _determine_channel_indices(calculator_stats, num_channels)
-
-        # Reconcile stats into unified structure
-        reconciled_stats = _reconcile_stats(calculator_stats, sorted_channels, empty_values_map)
+        # Gather every calculator's output for this row onto one row
+        reconciled_stats = _reconcile_stats(calculator_stats)
         datum_empty_values.update(empty_values_map)
 
-        # Build index lists
-        channel_indices = sorted_channels
-        source = [SourceIndex(i, i_b if box is not None else None, c) for c in channel_indices]
+        source = [SourceIndex(i, i_b if box is not None else None)]
 
         results.append(DatumResult(source_indices=source, stats=reconciled_stats))
 
@@ -704,13 +666,20 @@ def _sort(
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
 ) -> tuple[list[SourceIndex], dict[str, NDArray[Any]]]:
-    """Sort results by (item_index, box_index, channel_index) with None < 0 and convert to numpy arrays."""
+    """Sort results by (item_index, box_index) with None < 0 and convert to numpy arrays.
+
+    No level term: every address ``compute_stats`` emits leaves the level unstated, since
+    it measures a datum and a box without knowing whether the datum is an image or a
+    frame. Two rows therefore never tie on ``(item, key)`` here, and a level a caller
+    states afterwards is theirs to order by — ``SourceIndexRows.parse`` groups by level
+    before it orders within one, so an address that arrives from anywhere is ranked
+    against the rows of its own level rather than against this ordering.
+    """
     sort_indices = sorted(
         range(len(source_indices)),
         key=lambda i: (
             source_indices[i].item,
-            -1 if source_indices[i].target is None else source_indices[i].target,
-            -1 if source_indices[i].channel is None else source_indices[i].channel,
+            -1 if source_indices[i].key is None else source_indices[i].key,
         ),
     )
 
@@ -762,8 +731,7 @@ def compute_stats(  # noqa: C901
     per_image: bool = True,
     per_target: bool = True,
     per_background: bool = False,
-    per_channel: bool = False,
-    channels: Mapping[str, ChannelGroupLike] | Literal[True] | None = None,
+    channels: Mapping[str, ChannelGroupLike] | None = None,
     normalize_pixel_values: bool = _UNSET,  # type: ignore
     value_range: tuple[float, float] | None = None,
     progress_callback: ProgressCallback | None = None,
@@ -823,17 +791,7 @@ def compute_stats(  # noqa: C901
         results from two such datasets be combined.
 
         .. versionadded:: 1.1
-    per_channel : bool, default False
-        If True, compute per-channel statistics on a third source-index axis. If False,
-        statistics are aggregated across all channels.
-
-        .. deprecated:: 1.1
-            Use `channels` instead, which names band groups and returns them as columns
-            that reach :class:`~dataeval.Metadata`. Per-channel rows cannot: a source
-            index addresses an item and a target, and a channel is a third axis with no
-            level to land on, so balance, diversity and parity cannot see a per-channel
-            statistic at all. Will be removed in v1.2.0.
-    channels : Mapping[str, ChannelGroupLike] or True or None, default None
+    channels : Mapping[str, ChannelGroupLike] or None, default None
         Named groups of bands to measure separately, alongside the whole image.
 
         Each group becomes a set of columns named ``<group>_<statistic>`` on the same rows
@@ -858,12 +816,6 @@ def compute_stats(  # noqa: C901
         supply every band a group names, that group's statistics are NaN for it rather
         than reduced over the bands present — one column name means one thing, and a datum
         missing bands is a defect that should read as absent.
-
-        ``channels=True`` is a deprecated spelling of ``per_channel=True`` and returns
-        rows rather than columns; it is removed in v1.2.0 along with the row path. A
-        mapping cannot be combined with ``per_channel=True``
-        and raises: a per-channel row layout is indexed by the datum's own channel count,
-        which a narrower group has no row to land on.
 
         Has no effect on statistics that describe geometry rather than values: a band
         subset does not move a bounding box, so ``rgb_width`` is not produced.
@@ -921,13 +873,13 @@ def compute_stats(  # noqa: C901
     StatsResult
         Mapping containing computed statistics and metadata:
 
-        - source_index: Sequence[SourceIndex] - SourceIndex objects with image/box/channel info
+        - source_index: Sequence[SourceIndex] - SourceIndex objects with image/box info
         - object_count: Sequence[int] - Object counts per image
         - invalid_box_count: Sequence[int] - Invalid box counts per image
         - image_count: int - Total number of images processed
         - stats: Mapping[str, Sequence[Any]] - Mapping of statistic names to sequences of computed values
 
-        Output is sorted by (item_index, box_index, channel_index) ascending,
+        Output is sorted by (item_index, box_index) ascending,
         with None values appearing before 0.
 
     Notes
@@ -1047,24 +999,6 @@ def compute_stats(  # noqa: C901
     if value_range is not None:
         _validate_declared_range(value_range)
 
-    # `channels=True` keeps the shape that can express all-bands-separately rather than
-    # being rebuilt as columns. Column names discovered per datum cannot be reconciled
-    # across ragged data — the aggregation appends by name, so a name absent from one
-    # datum shortens its array and misaligns it — whereas the row path is correct by
-    # construction for a mix of 1- and 3-channel images.
-    if channels is True:
-        channels = None
-        per_channel = True
-    if per_channel:
-        warnings.warn(
-            "Per-channel rows are deprecated since v1.1 and will be removed in v1.2.0: they cannot reach "
-            "Metadata, so balance, diversity and parity cannot see them. Name the bands instead — for "
-            "RGB, channels={'r': 0, 'g': 1, 'b': 2} — which returns columns that work everywhere the "
-            "rows did not.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
     object_count: dict[int, int] = {}
@@ -1110,17 +1044,17 @@ def compute_stats(  # noqa: C901
                 stacklevel=2,
             )
 
-    channel_groups = _resolve_channel_groups(channels or {}, calculators)
-    if channel_groups and per_channel:
-        # Rejected rather than reconciled: a per-channel row layout is indexed by the
-        # datum's own channel count, and a group narrower than that produces a row per
-        # band it names, which the reconciliation cannot place. Caught here because
-        # otherwise it surfaces out of a worker as an unexplained value-count mismatch.
+    if channels is True:
+        # Caught by name rather than left to fail inside `_resolve_channel_groups`, where a
+        # bool reaches `.items()` and reports itself as an AttributeError naming neither the
+        # argument nor its replacement. `channels=True` was the v1.1 spelling of
+        # `per_channel=True`, removed in v1.2 along with the row path it selected.
         raise ValueError(
-            "channels= and per_channel=True cannot be combined: one returns band groups as columns, "
-            "the other returns every channel as its own row, and a group narrower than the datum has "
-            "no row to land on. Use channels= alone — it is what per_channel is deprecated in favor of."
+            "channels=True is removed in v1.2: it was a spelling of per_channel=True, which returned "
+            "one row per channel. Name the bands instead — for RGB, channels={'r': 0, 'g': 1, 'b': 2} "
+            "— which returns them as columns.",
         )
+    channel_groups = _resolve_channel_groups(channels or {}, calculators)
     band_calculators = _calculators_for_view(calculators, ViewKind.BAND) if channel_groups else []
     background_band_calculators = _calculators_for_view(background_calculators, ViewKind.BAND) if channel_groups else []
     if channel_groups and not band_calculators:
@@ -1138,13 +1072,7 @@ def compute_stats(  # noqa: C901
     # Said once per datum that trips it, aggregated with the rest. Only the unnamed view
     # is at risk: a caller who named their bands has already answered the question.
     # Rendered here rather than in the worker: the answer is the same for every datum.
-    # Silent for `per_channel` too, not just for named groups: the row path already measures
-    # each band separately, so nothing was averaged into a single picture and the warning
-    # would describe the opposite of what happened — while pointing at `channels=`, which
-    # cannot be combined with it.
-    wide_band_names = (
-        "" if channel_groups or per_channel else _flag_names(stats & (ImageStats.VISUAL | ImageStats.HASH))
-    )
+    wide_band_names = "" if channel_groups else _flag_names(stats & (ImageStats.VISUAL | ImageStats.HASH))
 
     # Statistics that need an interval, and so go NaN when none can be established. The
     # histogram and its entropy always do; so does the whole visual family, which resolves
@@ -1167,13 +1095,12 @@ def compute_stats(  # noqa: C901
     # Log the individual flags that will be computed
     resolved_names = _flag_list(stats)
     _logger.info(
-        "Starting compute_stats: %d stats [%s], per_image=%s, per_target=%s, per_background=%s, per_channel=%s",
+        "Starting compute_stats: %d stats [%s], per_image=%s, per_target=%s, per_background=%s",
         len(resolved_names),
         ", ".join(resolved_names),
         per_image,
         per_target,
         per_background,
-        per_channel,
     )
 
     total_images = len(data) if isinstance(data, Sized) else None
@@ -1204,7 +1131,6 @@ def compute_stats(  # noqa: C901
                     calculators=calculators,
                     per_image=per_image,
                     per_target=per_target,
-                    per_channel=per_channel,
                     normalize_pixel_values=normalize_pixel_values,
                     per_background=per_background,
                     background_calculators=background_calculators,
@@ -1369,9 +1295,9 @@ def combine_stats_results(  # noqa: C901
             _reject_stat_name_mismatch(combined_stats, stats, position)
             combined_stats = {k: np.concatenate([combined_stats[k], stats[k]]) for k in combined_stats}
 
-        combined_source_index.extend(
-            SourceIndex(item=s.item + offset, target=s.target, channel=s.channel) for s in r["source_index"]
-        )
+        # `_replace` rather than a field-by-field rebuild: only `item` moves, and naming the
+        # two that do not is what makes a future field silently dropped here.
+        combined_source_index.extend(s._replace(item=s.item + offset) for s in r["source_index"])
         offset += len(r["source_index"])
         dataset_steps.append(offset)
 

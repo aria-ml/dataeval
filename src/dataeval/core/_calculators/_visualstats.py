@@ -48,10 +48,9 @@ class VisualStatCalculator(Calculator[ImageStats]):
     between black and white rather than a value in whatever units the sensor wrote.
     """
 
-    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:
+    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
         self.datum = datum
         self.cache = cache
-        self.per_channel_mode = per_channel
 
     @cached_property
     def _unreadable(self) -> bool:
@@ -67,19 +66,11 @@ class VisualStatCalculator(Calculator[ImageStats]):
     @cached_property
     def percentiles(self) -> NDArray[np.float64]:
         if self._unreadable:
-            absent = (self.cache.channel_count, len(QUARTILES)) if self.per_channel_mode else (len(QUARTILES),)
-            return self.cache.nan_like(absent)
-        # Both paths read the perceptual view, never `scaled`: a visual statistic reports
-        # where values sit between black and white, which `normalize_pixel_values` has no
+            return self.cache.nan_like((len(QUARTILES),))
+        # Reads the perceptual view, never `scaled`: a visual statistic reports where
+        # values sit between black and white, which `normalize_pixel_values` has no
         # bearing on.
-        return self._band_percentiles() if self.per_channel_mode else self._whole_percentiles()
-
-    def _band_percentiles(self) -> NDArray[np.float64]:
-        """One row of quartiles per band."""
-        counts = self.cache.display_counts
-        if counts is not None:
-            return np.stack([_percentiles_by_count(band, QUARTILES) for band in counts])
-        return np.nanpercentile(self.cache.per_channel_perceptual, q=QUARTILES, axis=1).T.astype(np.float64)
+        return self._whole_percentiles()
 
     def _whole_percentiles(self) -> NDArray[np.float64]:
         """Quartiles over every value in the view at once."""
@@ -94,21 +85,12 @@ class VisualStatCalculator(Calculator[ImageStats]):
         return ImageStats.VISUAL
 
     def _brightness(self) -> list[float]:
-        if self.per_channel_mode:
-            return self.percentiles[:, 1].tolist()
         return [float(self.percentiles[1])]
 
     def _contrast(self) -> list[float]:
-        if self.per_channel_mode:
-            return (
-                (np.max(self.percentiles, axis=1) - np.min(self.percentiles, axis=1))
-                / (np.mean(self.percentiles, axis=1) + EPSILON)
-            ).tolist()
         return [float(np.max(self.percentiles) - np.min(self.percentiles)) / float(np.mean(self.percentiles) + EPSILON)]
 
     def _darkness(self) -> list[float]:
-        if self.per_channel_mode:
-            return self.percentiles[:, -2].tolist()
         return [float(self.percentiles[-2])]
 
     def _deviation(self, values: NDArray[Any], **kwargs: Any) -> Any:
@@ -122,8 +104,8 @@ class VisualStatCalculator(Calculator[ImageStats]):
     def _sharpness(self) -> list[float]:
         # Sharpness requires 2D spatial data; return NaN for low-dimensional or unreadable data
         if self._unreadable:
-            return [np.nan] * self.cache.channel_count if self.per_channel_mode else [np.nan]
-        grayscale = None if self.per_channel_mode else self.cache.display_grayscale
+            return [np.nan]
+        grayscale = self.cache.display_grayscale
         if grayscale is None:
             return self._sharpness_from_view()
         # Read straight off the window. Reaching this through `perceptual` instead would
@@ -134,7 +116,7 @@ class VisualStatCalculator(Calculator[ImageStats]):
     def _sharpness_from_view(self) -> list[float]:
         """Sharpness off :attr:`~CalculatorCache.perceptual`, for the views no window slice covers."""
         if self.cache.image.ndim < 2:
-            return [np.nan] if not self.per_channel_mode else [np.nan] * self.cache.channel_count
+            return [np.nan]
         # Edge magnitudes off the perceptual view, so the same picture at two bit depths
         # gives one answer. `edge_filter` clips to 0-255, which is the range this lands on.
         perceptual = self.cache.perceptual
@@ -142,16 +124,9 @@ class VisualStatCalculator(Calculator[ImageStats]):
             # 2D data: treat as single-channel image
             return [float(self._deviation(edge_filter(perceptual)))]
         # 3D+ data with channels
-        if self.per_channel_mode:
-            return self._deviation(
-                np.vectorize(edge_filter, signature="(m,n)->(m,n)")(perceptual),
-                axis=(1, 2),
-            ).tolist()
         return [float(self._deviation(edge_filter(np.mean(perceptual, axis=0))))]
 
     def _percentiles(self) -> list[Any]:
-        if self.per_channel_mode:
-            return self.percentiles.tolist()
         return [self.percentiles.tolist()]
 
     def get_empty_values(self) -> dict[str, Any]:

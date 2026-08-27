@@ -24,7 +24,7 @@ class HashStatCalculator(Calculator):
     - dhash: Gradient-based perceptual hash for near duplicates
     """
 
-    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:  # noqa: ARG002
+    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
         self.datum = datum
         self.cache = cache
         self.warnings: list[str] = []

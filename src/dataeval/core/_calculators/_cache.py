@@ -47,8 +47,6 @@ class CalculatorCache:
         The raw data element statistics are computed on.
     box : BoundingBox or None, default None
         Region of the datum to reduce over. None reduces over the whole datum.
-    per_channel : bool, default False
-        Whether the consuming calculators are computing per-channel statistics.
     normalize_pixel_values : bool, default False
         Whether to rescale values to [0, 1] before a *pixel* statistic is computed. Visual
         statistics ignore it — they resolve their own reference, always; see
@@ -82,7 +80,6 @@ class CalculatorCache:
         self,
         datum: Any,
         box: BoundingBox | None = None,
-        per_channel: bool = False,
         normalize_pixel_values: bool = False,
         exclude: NDArray[np.bool_] | None = None,
         value_range: ValueRange | None = None,
@@ -94,7 +91,6 @@ class CalculatorCache:
         self.width: int = datum.shape[-1] if is_spatial else 0
         self.height: int = datum.shape[-2] if is_spatial else 0
         self.shape: tuple[int, ...] = datum.shape
-        self.per_channel_mode = per_channel
         self.normalize_pixel_values = normalize_pixel_values
         self.has_box = box is not None
         self.exclude = exclude
@@ -147,7 +143,7 @@ class CalculatorCache:
 
     @cached_property
     def channel_count(self) -> int:
-        """Number of channels :attr:`image` presents, matching :attr:`per_channel`'s leading axis."""
+        """Number of channels :attr:`image` presents."""
         return self.image.shape[0] if self.image.ndim >= 3 else 1
 
     @cached_property
@@ -446,31 +442,3 @@ class CalculatorCache:
         # value. `edge_filter` already clips there, so without this the family disagrees
         # with itself: sharpness saturates while brightness and darkness run free.
         return np.clip(perceptual, 0.0, 2**_DISPLAY_DEPTH - 1)
-
-    @cached_property
-    def per_channel(self) -> NDArray[Any]:
-        # For data with >= 3 dimensions, reshape as (channels, -1)
-        # For data with < 3 dimensions, treat as single channel
-        return self._flatten_channels(self.scaled)
-
-    @cached_property
-    def per_channel_perceptual(self) -> NDArray[Any]:
-        """:attr:`perceptual` in :attr:`per_channel`'s layout, for per-channel visual statistics."""
-        return self._flatten_channels(self.perceptual)
-
-    @cached_property
-    def per_channel_raw(self) -> NDArray[Any]:
-        """:attr:`image` in :attr:`per_channel`'s layout, untouched by any rescaling.
-
-        What a statistic about the *presence* of values rather than about the values
-        themselves reads — ``missing`` counts NaNs and ``zeros`` counts exact zeros, and
-        neither question is asked of the normalized copy. :attr:`scaled` is not answerable
-        for either: it substitutes all-NaN where no interval could be established, which
-        would read as wholly missing data, and it shifts by ``pmin``, which moves a raw
-        zero off zero for any range that does not start there.
-        """
-        return self._flatten_channels(self.image)
-
-    def _flatten_channels(self, values: NDArray[Any]) -> NDArray[Any]:
-        """Reshape to ``(channels, -1)``, giving lower-dimensional data a channel axis of 1."""
-        return values.reshape(self.channel_count, -1)

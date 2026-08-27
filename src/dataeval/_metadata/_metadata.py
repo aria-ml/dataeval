@@ -49,6 +49,8 @@ from dataeval._metadata._serialize import restore as _restore
 from dataeval._metadata._serialize import save as _save
 from dataeval._metadata._store import LevelStore
 from dataeval._metadata._structurers import (
+    LEVEL_KEY_COLUMNS,
+    LevelRows,
     RowLayout,
     SourceIndexRows,
     StructuredData,
@@ -57,6 +59,7 @@ from dataeval._metadata._structurers import (
     safe_column_name,
     select_structurer,
 )
+from dataeval._metadata._structurers._source_index import _UNKEYED
 from dataeval.core._bin import (
     MIN_LEVEL_BUDGET,
     apply_bin_spec,
@@ -2871,93 +2874,178 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             )
 
     def _split_source_index(self, source_index: Sequence[SourceIndex]) -> dict[FactorLevel, NDArray[np.intp]]:
-        """Group source-index positions by the level each entry describes.
+        """Group source-index positions by the level each entry addresses.
 
-        A :class:`~dataeval.types.SourceIndex` distinguishes two kinds of value — per item
-        (``target`` is None) and per label — so it addresses :attr:`item_level` and
-        :attr:`label_level` and no others. A level between them, such as tracking's
-        ``unit``, needs an explicit ``level=`` instead.
+        A :class:`~dataeval.types.SourceIndex` addresses any level this metadata has. An
+        entry that states one names rows at it directly; one that does not is the
+        task-generic reading — :attr:`item_level` unkeyed, :attr:`label_level` under a key
+        — which is what every producer emits and what the two-level spelling has always
+        meant.
+
+        Rejects a source index carrying both kinds where this metadata's items and labels
+        share a level, since the two cannot be told apart there.
         """
         # Parsing is shared with the dataset-free constructor, so the two spellings of
-        # "place these values by their labels" cannot drift. Only the checks that need
-        # this metadata's own rows live here.
-        rows = SourceIndexRows.parse(source_index)
+        # "place these values by their labels" cannot drift, and an unstated level is
+        # resolved against this metadata's own levels rather than the default two. Only
+        # the checks that need this metadata's own rows live here.
+        rows = SourceIndexRows.parse(source_index, item_level=self._item_level, label_level=self._label_level)
 
         # The two kinds are told apart only by which level they land on, so a schema whose
         # items and labels coincide would merge them into one over-long group and surface
         # as a row-count mismatch. Say what actually happened instead.
-        if self._item_level == self._label_level and rows.spans_two_levels:
+        coinciding = rows.by_level.get(self._item_level) if self._item_level == self._label_level else None
+        if coinciding is not None and np.any(coinciding.keys < 0) and np.any(coinciding.keys >= 0):
             raise ValueError(
-                f"source_index mixes per-item entries (target=None) with per-label entries, but this "
+                f"source_index mixes per-item entries (key=None) with per-label entries, but this "
                 f"metadata's items and its labels are both at the {self._item_level!r} level, so the "
                 "two cannot be placed apart. Add each kind in its own call with an explicit level=.",
             )
 
-        candidates: tuple[tuple[FactorLevel, NDArray[np.intp], NDArray[np.intp], NDArray[np.intp] | None], ...] = (
-            (self._item_level, rows.item_positions, rows.item_ids, None),
-            (self._label_level, rows.label_positions, rows.label_items, rows.label_targets),
-        )
         order: dict[FactorLevel, NDArray[np.intp]] = {}
-        for level, positions, items, targets in candidates:
-            if len(positions) == 0:
+        for level, level_rows in rows.by_level.items():
+            if not len(level_rows):
                 continue
-            self._reject_unmatched_rows(level, items, targets)
-            order[level] = positions
+            self._reject_unknown_level(level)
+            order[level] = self._match_rows(level, level_rows)
         return order
 
-    def _reject_unmatched_rows(
-        self,
-        level: FactorLevel,
-        items: NDArray[np.intp],
-        targets: NDArray[np.intp] | None,
-    ) -> None:
-        """Reject a source index whose entries do not name this level's rows exactly.
+    def _reject_unknown_level(self, level: FactorLevel) -> None:
+        """Reject an address at a level this metadata's task does not have.
 
-        Counting entries is not enough: an index naming one row twice and another not at
-        all has the right count and lands every value somewhere, just not where the caller
-        said. Matching the keys catches it for one comparison per row.
+        Caught before the row match so that the answer is "this dataset has no tracks"
+        rather than "0 rows expected, 4 given", which reads as a length bug in the caller's
+        data rather than as a level that was never there.
+        """
+        if level in self._store.counts:
+            return
+        raise ValueError(
+            f"source_index names {level}-level rows, but this metadata has no {level} level. "
+            f"Its levels are {', '.join(repr(name) for name in self._store.counts)}.",
+        )
+
+    def _address_key_column(self, level: FactorLevel, keyed: bool) -> str | None:
+        """Which column an address's key names at `level`, for this metadata's schema.
+
+        :data:`LEVEL_KEY_COLUMNS` is the canonical table, and it is right wherever a level
+        sits where the canonical graph puts it. Two roles override it, because they are
+        about a level's *place in this schema* rather than about its name:
+
+        - **The item level** is named by its item alone. An unkeyed address there has no
+          key column to compare against, whatever that level is called, and a keyed one is
+          the contradiction `reject_levels_beyond_two` refuses on the constructor path —
+          refused here too, rather than matched on a column the item level's one-row-per-
+          item rows do not distinguish and the key silently discarded.
+        - **The label level** is named by ``target_index``, which is dense within the item
+          at every level of every task and is the column every structurer writes on its
+          label rows. On tracking that agrees with the table; where a schema's label level
+          is not ``instance`` — :meth:`from_factors` builds every row at one level — it is
+          the only column that names those rows at all.
+        """
+        if level == self._item_level and not keyed:
+            return None
+        if level == self._label_level:
+            return "target_index"
+        if level == self._item_level:
+            raise ValueError(
+                f"source_index names {level}-level rows with a key, but {level!r} is this metadata's "
+                "item level and one of its rows is named by its item alone. Drop the key from those "
+                "addresses, or name the level the key belongs to.",
+            )
+        return LEVEL_KEY_COLUMNS[level]
+
+    def _match_rows(self, level: FactorLevel, rows: LevelRows) -> NDArray[np.intp]:
+        """Match a level's addresses against its rows, and say where each row's value is.
+
+        Returns the source-index position supplying each row of the level frame, in frame
+        order — which is what :meth:`_place` gathers with.
+
+        Addresses arrive sorted by ``(item, key)``, which is **not** the order a level's
+        rows sit in: a track's rows follow first appearance while its addresses follow
+        track id, so the two orders coincide only by accident. Ordering the frame's own
+        keys the same way makes them comparable one for one, and inverting that ordering
+        carries the answer back to frame order. One sort of two key columns, and no join.
+
+        Counting entries is not enough to accept them: an index naming one row twice and
+        another not at all has the right count and lands every value somewhere, just not
+        where the caller said. Matching the keys catches it for one comparison per row.
+
+        The key column compared against is the one :meth:`_address_key_column` names for
+        this metadata's schema. A level the item alone names has no key column, and only
+        the items are compared.
+
+        Raises `ShapeMismatchError` when the source index does not describe one value per
+        row at `level`, and `ValueError` when it describes the right number but names rows
+        this metadata does not have.
         """
         counts = self._store.counts
         expected_len = counts.get(level, 0)
-        if len(items) != expected_len:
+        if len(rows) != expected_len:
             raise ShapeMismatchError(
-                f"source_index describes {len(items)} {level}-level values but the "
+                f"source_index describes {len(rows)} {level}-level values but the "
                 f"metadata has {expected_len} {level} rows. Row counts are {dict(counts)}; "
                 "note that a dataset item whose target was empty contributes no rows, so "
                 "Metadata.item_indices, not range(item_count), lists the items that have them.",
             )
 
-        # The two key columns, not rows_at's whole frame, which widens with every factor
-        # already added and compares none of them.
-        frame = self._store.select(level, ("item_index", "target_index")).select(
-            "item_index",
-            # -1 stands in for the null marking a non-target row, as in SourceIndexRows.
-            # Left null, to_numpy() yields float NaN and formatting the error below then
-            # raises "cannot convert float NaN to integer" instead.
-            pl.col("target_index").fill_null(-1),
-        )
-        actual_items = frame["item_index"].to_numpy()
-        actual_targets = None if targets is None else frame["target_index"].to_numpy()
-        mismatched = actual_items != items
-        if actual_targets is not None:
-            mismatched |= actual_targets != targets
+        key_column = self._address_key_column(level, rows.is_keyed)
+        sorted_items, sorted_keys, order = self._sorted_row_keys(level, key_column)
+        mismatched = sorted_items != rows.items
+        if sorted_keys is not None:
+            mismatched |= sorted_keys != rows.keys
         if np.any(mismatched):
             # First few only: a rejected million-row index must not spend longer building
             # its error than the call would have taken to succeed.
             worst = np.flatnonzero(mismatched)[:5]
-            named = [(int(items[i]), None if targets is None else int(targets[i])) for i in worst]
+            named = [(int(rows.items[i]), None if sorted_keys is None else int(rows.keys[i])) for i in worst]
             expected = [
                 (
-                    int(actual_items[i]),
-                    None if actual_targets is None or actual_targets[i] < 0 else int(actual_targets[i]),
+                    int(sorted_items[i]),
+                    None if sorted_keys is None or sorted_keys[i] < 0 else int(sorted_keys[i]),
                 )
                 for i in worst
             ]
+            keyed_by = "" if key_column is None else f" Rows are named (item_index, {key_column})."
             raise ValueError(
                 f"source_index names {level}-level rows this metadata does not have. It has the right "
                 f"number of {level} entries, but {int(np.count_nonzero(mismatched))} of them name {named} "
-                f"where the metadata's rows are {expected}. Every row at a level must be named exactly once.",
+                f"where the metadata's rows are {expected}. Every row at a level must be named exactly "
+                f"once.{keyed_by}",
             )
+
+        gather = np.empty(expected_len, dtype=np.intp)
+        gather[order] = rows.positions
+        return gather
+
+    def _sorted_row_keys(
+        self,
+        level: FactorLevel,
+        key_column: str | None,
+    ) -> tuple[NDArray[np.intp], NDArray[np.intp] | None, NDArray[np.intp]]:
+        """Return a level's rows named as ``(item, key)``, sorted, and the ordering that sorted them.
+
+        Reads the key columns rather than ``rows_at``'s whole frame, which widens with every
+        factor already added and compares none of them. The ordering is returned rather than
+        discarded because it is what carries a matched result back to the order the rows
+        actually sit in.
+        """
+        columns = ("item_index",) if key_column is None else ("item_index", key_column)
+        frame = self._store.select(level, columns)
+        if key_column is None:
+            items = frame["item_index"].to_numpy()
+            order = np.argsort(items, kind="stable")
+            return items[order], None, order
+
+        # The same sentinel a source index carries, shared rather than respelled: this
+        # array is compared against ``LevelRows.keys`` one element at a time, so the two
+        # halves have to mean the same thing by construction. Left null, to_numpy()
+        # yields float NaN and formatting a rejection then raises "cannot convert float
+        # NaN to integer" instead.
+        frame = frame.select("item_index", pl.col(key_column).fill_null(_UNKEYED))
+        items = frame["item_index"].to_numpy()
+        keys = frame[key_column].to_numpy()
+        order = np.lexsort((keys, items))
+        return items[order], keys[order], order
 
     def _build_factors(self) -> None:
         """Build the set of factor names visible at the current view."""
@@ -3790,9 +3878,9 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             `overwrite` is False. If the suffixed name is also taken, an incrementing
             counter is appended (``brightness_added``, ``brightness_added_2``, ...).
         source_index : Sequence[SourceIndex] or None, default None
-            Labels describing what each value in every factor array refers to, as
+            An address per value, saying which row of which level it belongs to, as
             returned by :func:`~dataeval.core.compute_stats`. Mutually exclusive with
-            `level`, which it replaces: each value is placed by its label rather than by
+            `level`, which it replaces: each value is placed by its address rather than by
             its position (see Notes).
         key : str or None, default None
             Column of the named level's rows to match values against, instead of taking
@@ -3842,11 +3930,11 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
             `key`, when they do not match the number of keys.
         ValueError
             When the level is not part of the dataset's schema, when both `level` and
-            `source_index` are given, or when `source_index` carries per-channel entries.
-            Under `key`: when it is not a column of that level's rows, when that column
-            does not name one row each, when no values for it were supplied, when the keys
-            are not unique, or when the dataset holds several items and the values do not
-            say which they belong to.
+            `source_index` are given, or when `source_index` names a level this metadata
+            does not have. Under `key`: when it is not a column of that level's rows, when
+            that column does not name one row each, when no values for it were supplied,
+            when the keys are not unique, or when the dataset holds several items and the
+            values do not say which they belong to.
 
         Warns
         -----
@@ -3879,6 +3967,22 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         both enabled — each factor is split into one factor per level, named
         ``<level>_<name>`` (``unit_brightness``, ``instance_brightness``). Both halves stay
         visible to factor analysis, since unit-level values propagate down to instance rows.
+
+        **An address names a row at any level this metadata has**, and `key` names rows a
+        column at a time. They are the scalar and columnar spellings of one contract, and
+        they agree by construction: a :class:`~dataeval.types.SourceIndex` is
+        ``(item, key, level)``, and ``add_factors(level=..., key=...)`` matches on
+        ``(item_index, key)`` at that level. Which column each level's `key` names is the
+        same table either way — ``unit_index`` for a frame, ``track_id`` for a track,
+        ``target_index`` for a detection, and nothing for a sequence, which its item names
+        outright.
+
+        An address that states no level is the **task-generic** reading: :attr:`item_level`
+        with no key, :attr:`label_level` under one. That is what every producer emits, and
+        it is why ``compute_stats`` output places correctly without knowing whether it
+        measured an image or a video frame. State a level only where an unstated one would
+        resolve to a different one — for a frame or a track — since two spellings of one
+        address are not equal to each other and a result keyed on addresses would hold both.
 
         Multi-dimensional values (vector-valued statistics such as ``histogram``,
         ``percentiles`` or ``center``) have no single-column representation and are skipped

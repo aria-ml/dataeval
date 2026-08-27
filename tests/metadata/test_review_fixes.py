@@ -318,7 +318,7 @@ class TestUnlabeledClassificationItems:
 
         md = Metadata(self._partially_labeled())
         # compute_stats labels one entry per dataset item, including the unlabeled one.
-        source_index = [SourceIndex(i, None, None) for i in range(3)]
+        source_index = [SourceIndex(i, None) for i in range(3)]
         md.add_factors({"sharpness": np.array([10.0, 20.0, 30.0])}, source_index=source_index)
 
         assert md.factor_info["sharpness"].level == "unit"
@@ -331,7 +331,7 @@ class TestUnlabeledClassificationItems:
         from dataeval.types import SourceIndex
 
         md = Metadata(self._partially_labeled())
-        source_index = [SourceIndex(i, None, None) for i in range(2)]
+        source_index = [SourceIndex(i, None) for i in range(2)]
         with pytest.raises(ShapeMismatchError, match="item_indices"):
             md.add_factors({"sharpness": np.arange(2.0)}, source_index=source_index)
 

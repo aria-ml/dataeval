@@ -140,7 +140,7 @@ class TestAddFactorsFromComputeStats:
     def test_ic_stats_land_on_image_rows(self, ic_dataset):
         """Classification stats are one per image and must not be split."""
         result = _stats(ic_dataset)
-        assert all(entry.target is None for entry in result["source_index"])
+        assert all(entry.key is None for entry in result["source_index"])
 
         md = Metadata(ic_dataset)
         md.add_factors(dict(result["stats"]), source_index=result["source_index"])
@@ -168,9 +168,7 @@ class TestAddFactorsFromComputeStats:
         stored = _actual_by_label(md, "unit_mean")
         assert SourceIndex(empty, None) in stored
         assert stored[SourceIndex(empty, None)] == pytest.approx(_expected_by_label(result)[SourceIndex(empty, None)])
-        assert not any(
-            label.item == empty and label.target is not None for label in _actual_by_label(md, "instance_mean")
-        )
+        assert not any(label.item == empty and label.key is not None for label in _actual_by_label(md, "instance_mean"))
 
     def test_vector_valued_stats_are_skipped_not_fatal(self, od_dataset):
         """ImageStats.ALL includes histogram/percentiles/center, which have no column form."""
@@ -354,7 +352,7 @@ class TestFromFactorsFromComputeStats:
         assert "center" in md.dropped_factors
 
     def test_a_duplicated_source_index_is_rejected(self):
-        with pytest.raises(ValueError, match="names the same item-level row more than once"):
+        with pytest.raises(ValueError, match="names the same unit-level row more than once"):
             Metadata.from_factors(
                 {"m": np.arange(3.0)},
                 source_index=[SourceIndex(0), SourceIndex(0), SourceIndex(2)],
@@ -481,7 +479,7 @@ class TestBackgroundStatsImport:
         expected = {
             source: value
             for source, value in zip(result["source_index"], result["stats"]["background_mean"], strict=True)
-            if source.target is None
+            if source.key is None
         }
         assert _distinct(list(expected.values()))
 

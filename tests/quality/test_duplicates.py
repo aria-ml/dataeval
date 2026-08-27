@@ -299,7 +299,7 @@ class TestDuplicates:
         bboxes = [[[0, 0, 50, 50], [50, 50, 100, 100]]]
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
-        result = compute_stats(dataset, stats=ImageStats.HASH, per_image=True, per_target=True, per_channel=False)
+        result = compute_stats(dataset, stats=ImageStats.HASH, per_image=True, per_target=True)
 
         assert len(result["source_index"]) == 3
 
@@ -651,7 +651,7 @@ class TestDuplicatesEdgeCases:
     def test_find_hash_groups_empty_logic(self):
         """Covers _find_hash_groups filtering empty values."""
         stats = {"phash": np.array(["", "abc", "abc", ""])}
-        source_index = [SourceIndex(i, None, None) for i in range(4)]
+        source_index = [SourceIndex(i, None) for i in range(4)]
         indices = [0, 1, 2, 3]
         exact_groups: list[list[int]] = []
 

@@ -32,6 +32,7 @@ __all__ = [
     "IDENTIFIER_COLUMNS",
     "LEGACY_COLUMNS",
     "LEVEL_COLUMNS",
+    "LEVEL_KEY_COLUMNS",
     "RESERVED_COLUMNS",
     "TASK",
     "TASK_STRUCTURERS",
@@ -40,6 +41,7 @@ __all__ = [
     "FrameRows",
     "ICStructurer",
     "InstanceBuildingMixin",
+    "LevelRows",
     "MOTAccumulator",
     "MOTStructurer",
     "ODImageStructurer",
@@ -71,10 +73,11 @@ from dataeval._metadata._structurers._reserved import (
     IDENTIFIER_COLUMNS,
     LEGACY_COLUMNS,
     LEVEL_COLUMNS,
+    LEVEL_KEY_COLUMNS,
     RESERVED_COLUMNS,
     reserved_block_columns,
     safe_column_name,
 )
 from dataeval._metadata._structurers._select import TASK_STRUCTURERS, TaskOverride, select_structurer
-from dataeval._metadata._structurers._source_index import SourceIndexRows
+from dataeval._metadata._structurers._source_index import LevelRows, SourceIndexRows
 from dataeval._metadata._structurers._tracking import MOTStructurer

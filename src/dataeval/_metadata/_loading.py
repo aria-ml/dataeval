@@ -162,7 +162,9 @@ def _load_factors_by_source_index(
     Raises
     ------
     ValueError
-        When `level` or `item_indices` is given alongside the source index.
+        When `level` or `item_indices` is given alongside the source index, or when an
+        address names a level this path cannot build — see
+        :meth:`SourceIndexRows.reject_levels_beyond_two`.
     ShapeMismatchError
         When a factor does not have one value per source-index entry.
     """
@@ -176,6 +178,7 @@ def _load_factors_by_source_index(
     reject_length_mismatch(factor_arrays, source_index)
 
     rows = SourceIndexRows.parse(source_index)
+    rows.reject_levels_beyond_two()
     structurer = FactorsStructurer(rows=rows)
     labels = None if class_labels is None else as_numpy(class_labels, dtype=np.intp).reshape(-1)
     data = structurer.build_from_source_index(factor_arrays, labels)

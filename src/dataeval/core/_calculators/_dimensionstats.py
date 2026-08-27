@@ -15,7 +15,7 @@ from dataeval.flags import ImageStats
 class DimensionStatCalculator(Calculator[ImageStats]):
     """Calculator for dimension and geometry statistics."""
 
-    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:  # noqa: ARG002
+    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
         self.datum = datum
         self.cache = cache
         # Check if this is spatial data (has width and height dimensions)

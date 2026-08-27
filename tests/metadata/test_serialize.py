@@ -80,11 +80,11 @@ def _source_index_metadata():
         {"score": np.array([1.0, 2.0, 3.0, 4.0, 5.0])},
         np.array([0, 1, 0]),
         source_index=[
-            SourceIndex(0, None, None),
-            SourceIndex(0, 0, None),
-            SourceIndex(0, 1, None),
-            SourceIndex(1, None, None),
-            SourceIndex(1, 0, None),
+            SourceIndex(0, None),
+            SourceIndex(0, 0),
+            SourceIndex(0, 1),
+            SourceIndex(1, None),
+            SourceIndex(1, 0),
         ],
     )
 
