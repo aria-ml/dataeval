@@ -86,8 +86,6 @@ class Calculator(ABC, Generic[TFlag]):
         The raw data element to compute statistics on.
     calculator : Calculator
         A calculator instance that provides preprocessed/transformed views of the datum.
-    per_channel : bool, default False
-        Whether to compute statistics per-channel (where applicable).
     """
 
     @abstractmethod
@@ -200,10 +198,10 @@ class Calculator(ABC, Generic[TFlag]):
         Returns
         -------
         dict[str, list[Any]]
-            Dictionary mapping stat names to lists of values. Each stat should return
-            a list, where:
-            - Single value per datum: list of length 1, e.g., [42.0]
-            - Per-channel values: list of length N (number of channels), e.g., [41.0, 42.0, 43.0]
+            Dictionary mapping stat names to lists of values. Every statistic reduces its
+            view to a single reading, so each list holds exactly one value, e.g. ``[42.0]``
+            — the list is what lets a name a calculator does not produce stay absent rather
+            than become a value. A longer list is rejected by ``_reconcile_stats``.
 
             The processor framework will reconcile outputs from multiple calculators.
         """

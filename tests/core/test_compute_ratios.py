@@ -29,14 +29,13 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Calculate ratios
         ratios = compute_ratios(stats)
 
         # Verify we only have box entries (no image entries)
-        assert all(si.target is not None for si in ratios[SOURCE_INDEX])
+        assert all(si.key is not None for si in ratios[SOURCE_INDEX])
 
         # Verify we have 4 box entries (2 boxes per image, 2 images)
         assert len(ratios[SOURCE_INDEX]) == 4
@@ -66,7 +65,6 @@ class TestCalculateRatios:
             stats=ImageStats.PIXEL,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -78,39 +76,6 @@ class TestCalculateRatios:
         assert "mean" in ratios["stats"]
         assert "std" in ratios["stats"]
         assert "var" in ratios["stats"]
-
-    def test_per_channel_ratios(self):
-        """Test ratio calculations with per-channel statistics."""
-        images = [
-            np.random.random((3, 50, 50)),
-        ]
-        boxes = [
-            [[10, 10, 30, 30], [15, 15, 35, 35]],  # 2 boxes
-        ]
-
-        stats = compute_stats(
-            images,
-            boxes=boxes,
-            stats=ImageStats.PIXEL,
-            per_image=True,
-            per_target=True,
-            per_channel=True,
-        )
-
-        ratios = compute_ratios(stats)
-
-        # With per_channel=True and 3 channels, we should have 2 boxes * 3 channels = 6 entries
-        assert len(ratios[SOURCE_INDEX]) == 6
-
-        # Verify channel indices are preserved
-        channels_seen = {si.channel for si in ratios[SOURCE_INDEX]}
-        assert channels_seen == {0, 1, 2}
-
-        # Verify each box has entries for all 3 channels
-        box_0_channels = [si.channel for si in ratios[SOURCE_INDEX] if si.target == 0]
-        box_1_channels = [si.channel for si in ratios[SOURCE_INDEX] if si.target == 1]
-        assert set(box_0_channels) == {0, 1, 2}
-        assert set(box_1_channels) == {0, 1, 2}
 
     def test_visual_ratios(self):
         """Test visual statistics ratio calculations."""
@@ -127,7 +92,6 @@ class TestCalculateRatios:
             stats=ImageStats.VISUAL,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -153,7 +117,6 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -181,7 +144,6 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -207,7 +169,6 @@ class TestCalculateRatios:
             stats=ImageStats.PIXEL,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Custom override that returns a constant
@@ -235,7 +196,6 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=False,
             per_target=True,
-            per_channel=False,
         )
 
         with pytest.raises(ValueError, match="must contain image-level statistics"):
@@ -251,7 +211,6 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=False,
-            per_channel=False,
         )
 
         with pytest.raises(ValueError, match="must contain box-level statistics"):
@@ -284,7 +243,6 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -319,7 +277,6 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -332,7 +289,7 @@ class TestCalculateRatios:
         assert image_indices == [0, 1, 1, 2, 2, 2]
 
         # Verify box indices are correct
-        box_indices = [si.target for si in ratios[SOURCE_INDEX]]
+        box_indices = [si.key for si in ratios[SOURCE_INDEX]]
         assert box_indices == [0, 0, 1, 0, 1, 2]
 
     def test_divide_by_zero_handling(self):
@@ -351,7 +308,6 @@ class TestCalculateRatios:
             stats=ImageStats.PIXEL,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Should not raise error
@@ -378,7 +334,6 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -387,9 +342,8 @@ class TestCalculateRatios:
         for si in ratios[SOURCE_INDEX]:
             assert isinstance(si, SourceIndex)
             assert isinstance(si.item, int)
-            assert isinstance(si.target, int)
-            assert si.target is not None  # All entries should be boxes
-            assert si.channel is None or isinstance(si.channel, int)
+            assert isinstance(si.key, int)
+            assert si.key is not None  # All entries should be boxes
 
     def test_hash_stats_ratios(self):
         """Test that hash statistics work with ratios (even though ratios don't make sense for hashes)."""
@@ -402,7 +356,6 @@ class TestCalculateRatios:
             stats=ImageStats.HASH,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Should not raise error even though hash ratios don't make semantic sense
@@ -422,7 +375,6 @@ class TestCalculateRatios:
             stats=ImageStats.ALL,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -444,7 +396,6 @@ class TestCalculateRatios:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Use empty override map - all stats should use default division
@@ -513,23 +464,6 @@ class TestCalculateRatiosSeparateInputs:
         # Should have 3 box entries total
         assert len(ratios[SOURCE_INDEX]) == 3
 
-    def test_separate_inputs_per_channel(self):
-        """Test separate inputs with per-channel stats."""
-        images = [np.random.random((3, 50, 50))]
-        boxes = [[[10, 10, 30, 30]]]
-
-        img_stats = compute_stats(
-            images, boxes=boxes, stats=ImageStats.PIXEL, per_image=True, per_target=False, per_channel=True
-        )
-        tgt_stats = compute_stats(
-            images, boxes=boxes, stats=ImageStats.PIXEL, per_image=False, per_target=True, per_channel=True
-        )
-
-        ratios = compute_ratios(img_stats, target_stats_output=tgt_stats)
-
-        # Should have 3 entries (1 box * 3 channels)
-        assert len(ratios[SOURCE_INDEX]) == 3
-
     def test_separate_inputs_image_count_mismatch(self):
         """Test that error is raised when image counts don't match."""
         images1 = [np.random.random((3, 50, 50))]
@@ -546,26 +480,6 @@ class TestCalculateRatiosSeparateInputs:
         )
 
         with pytest.raises(ValueError, match="Image count mismatch"):
-            compute_ratios(img_stats, target_stats_output=tgt_stats)
-
-    def test_separate_inputs_channel_mismatch(self):
-        """Test that error is raised when per_channel settings don't match."""
-        images = [np.random.random((3, 50, 50))]
-        boxes = [[[10, 10, 30, 30]]]
-
-        img_stats = compute_stats(
-            images, boxes=boxes, stats=ImageStats.PIXEL, per_image=True, per_target=False, per_channel=True
-        )
-        tgt_stats = compute_stats(
-            images,
-            boxes=boxes,
-            stats=ImageStats.PIXEL,
-            per_image=False,
-            per_target=True,
-            per_channel=False,
-        )
-
-        with pytest.raises(ValueError, match="Channel mismatch"):
             compute_ratios(img_stats, target_stats_output=tgt_stats)
 
     def test_separate_inputs_mismatched_channel_groups(self):
@@ -675,7 +589,6 @@ class TestCalculateRatiosEdgeCases:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -695,7 +608,6 @@ class TestCalculateRatiosEdgeCases:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -715,7 +627,6 @@ class TestCalculateRatiosEdgeCases:
             stats=ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         ratios = compute_ratios(stats)
@@ -753,7 +664,7 @@ class TestBackgroundStatsAreNotRatioed:
         being present and returned a table of NaN instead of saying what was missing.
         """
         stats = self._stats(per_image=False, per_target=True, per_background=True)
-        assert any(si.target is None for si in stats["source_index"])
+        assert any(si.key is None for si in stats["source_index"])
 
         with pytest.raises(ValueError, match="carry background values only"):
             compute_ratios(stats)
@@ -804,3 +715,82 @@ class TestBandColumnsUseTheOverrideMap:
         box_mean = stats["stats"]["rgb_mean"][1]
         img_mean = stats["stats"]["rgb_mean"][0]
         assert ratios["rgb_mean"][0] == pytest.approx(box_mean / img_mean, rel=1e-5)
+
+
+@pytest.mark.required
+class TestLevelsThatContradictTheKeyAreRejected:
+    """A ratio is defined between an item and its targets, and reads which is which off the key.
+
+    A stated level that agrees with the key goes through — that is the fully explicit
+    spelling of an ordinary result. One that contradicts it does not: a keyed `unit`
+    address is a video frame, and left to fall through it would be taken for a box and
+    divided by whatever image row shared its item.
+    """
+
+    @staticmethod
+    def _stats():
+        return compute_stats(
+            [np.random.default_rng(0).random((3, 16, 16))],
+            boxes=[[[2, 2, 12, 12]]],
+            stats=ImageStats.PIXEL_MEAN,
+            normalize_pixel_values=False,
+        )
+
+    def _relevelled(self, item_level, label_level):
+        stats = self._stats()
+        stats["source_index"] = [
+            SourceIndex(si.item, si.key, label_level if si.key is not None else item_level)
+            for si in stats["source_index"]
+        ]
+        return stats
+
+    @pytest.mark.parametrize("item_level", ["sequence", "unit"])
+    def test_a_level_that_agrees_with_the_key_is_accepted(self, item_level):
+        """The fully explicit spelling the SourceIndex docstring documents."""
+        assert "mean" in compute_ratios(self._relevelled(item_level, "instance"))["stats"]
+
+    def test_an_unstated_level_is_still_accepted(self):
+        """The minimal spelling is what producers emit, and it goes through unchanged."""
+        assert "mean" in compute_ratios(self._stats())["stats"]
+
+    @pytest.mark.parametrize("label_level", ["sequence", "unit", "track"])
+    def test_a_keyed_address_at_a_non_label_level_is_rejected(self, label_level):
+        with pytest.raises(ValueError, match="a ratio is only defined between an item and its targets"):
+            compute_ratios(self._relevelled("unit", label_level))
+
+    @pytest.mark.parametrize("item_level", ["track", "instance"])
+    def test_an_unkeyed_address_at_a_non_item_level_is_rejected(self, item_level):
+        with pytest.raises(ValueError, match="a ratio is only defined between an item and its targets"):
+            compute_ratios(self._relevelled(item_level, "instance"))
+
+    def test_the_rejection_says_which_level_and_whether_it_was_keyed(self):
+        with pytest.raises(ValueError, match=r"'track' with a key"):
+            compute_ratios(self._relevelled("unit", "track"))
+
+    def test_the_rejection_names_the_spellings_that_would_work(self):
+        with pytest.raises(ValueError, match=r"unkeyed at 'sequence' or 'unit'.*by a key at 'instance'"):
+            compute_ratios(self._relevelled("unit", "track"))
+
+    def test_the_rejection_names_the_argument(self):
+        with pytest.raises(ValueError, match="stats_output contains addresses"):
+            compute_ratios(self._relevelled("unit", "unit"))
+
+    def test_separate_inputs_are_checked_on_both_sides(self):
+        image_only = compute_stats(
+            [np.random.default_rng(0).random((3, 16, 16))],
+            boxes=[[[2, 2, 12, 12]]],
+            stats=ImageStats.PIXEL_MEAN,
+            per_target=False,
+            normalize_pixel_values=False,
+        )
+        box_only = compute_stats(
+            [np.random.default_rng(0).random((3, 16, 16))],
+            boxes=[[[2, 2, 12, 12]]],
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=False,
+            normalize_pixel_values=False,
+        )
+        box_only["source_index"] = [SourceIndex(si.item, si.key, "track") for si in box_only["source_index"]]
+
+        with pytest.raises(ValueError, match="target_stats_output contains addresses"):
+            compute_ratios(image_only, target_stats_output=box_only)

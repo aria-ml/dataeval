@@ -245,10 +245,10 @@ print(
 # %% [markdown]
 # `nir_mean` is now a factor like any other, so balance, diversity and parity can all see it.
 #
-# This is the reason band groups are columns rather than rows. The older `per_channel=True` returns one row per
+# This is the reason band groups are columns rather than rows. The older `per_channel=True` returned one row per
 # channel, on a third axis of the source index. A source index addresses an item and a target, with no level for a
-# channel to land on, so per-channel statistics can not reach the factor layer at all. `per_channel` is
-# deprecated for this reason; `channels` is its replacement, and for plain RGB the migration is
+# channel to land on, so per-channel statistics could not reach the factor layer at all. `per_channel` was removed
+# in v1.2 for this reason; `channels` is its replacement, and for plain RGB the migration is
 # `channels={"r": 0, "g": 1, "b": 2}`.
 
 # %% [markdown]

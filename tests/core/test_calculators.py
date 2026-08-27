@@ -28,7 +28,7 @@ class TestPixelStats:
         # Create deterministic image
         images = [np.random.random((n_channels, 10, 10))]
 
-        result = compute_stats(images, stats=ImageStats.PIXEL, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.PIXEL)
 
         assert "mean" in result["stats"]
         assert "std" in result["stats"]
@@ -48,7 +48,7 @@ class TestPixelStats:
         """Test pixel statistics with NaN values."""
         images = [np.array([[[np.nan, 0.5], [0.5, 0.5]]])]
 
-        result = compute_stats(images, stats=ImageStats.PIXEL, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.PIXEL)
         assert result["stats"]["missing"][0] > 0
 
     def test_missing_global_mode_counts_all_channels(self):
@@ -71,39 +71,18 @@ class TestPixelStats:
             ),
         ]
 
-        result = compute_stats(images, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.PIXEL_MISSING)
 
         # Global mode should count: 3 NaN values / 12 total values = 0.25
         expected_missing = 3 / 12
         assert result["stats"]["missing"][0] == pytest.approx(expected_missing, abs=1e-4)
-
-    def test_missing_per_channel_mode(self):
-        """Test that per-channel missing calculation is correct."""
-        # Same image as above
-        images = [
-            np.array(
-                [
-                    [[np.nan, 1.0], [1.0, 1.0]],  # Channel 0: 1 NaN / 4 = 0.25
-                    [[np.nan, np.nan], [1.0, 1.0]],  # Channel 1: 2 NaN / 4 = 0.5
-                    [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 NaN / 4 = 0.0
-                ],
-            ),
-        ]
-
-        result = compute_stats(images, stats=ImageStats.PIXEL_MISSING, per_channel=True)
-
-        # Per-channel mode should return list with one value per channel
-        assert len(result["stats"]["missing"]) == 3
-        assert result["stats"]["missing"][0] == pytest.approx(0.25, abs=1e-4)
-        assert result["stats"]["missing"][1] == pytest.approx(0.5, abs=1e-4)
-        assert result["stats"]["missing"][2] == pytest.approx(0.0, abs=1e-4)
 
     def test_missing_single_channel_image(self):
         """Test missing calculation for single-channel image."""
         # Single channel (1, 3, 3) with 2 NaNs out of 9 pixels
         images = [np.array([[[np.nan, 1.0, 1.0], [1.0, np.nan, 1.0], [1.0, 1.0, 1.0]]])]
 
-        result = compute_stats(images, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.PIXEL_MISSING)
 
         # 2 NaNs / 9 total = 0.222...
         expected_missing = 2 / 9
@@ -130,39 +109,18 @@ class TestPixelStats:
             ),
         ]
 
-        result = compute_stats(images, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.PIXEL_ZEROS)
 
         # Global mode should count: 3 zero values / 12 total values = 0.25
         expected_zeros = 3 / 12
         assert result["stats"]["zeros"][0] == pytest.approx(expected_zeros, abs=1e-4)
-
-    def test_zeros_per_channel_mode(self):
-        """Test that per-channel zeros calculation is correct."""
-        # Same image as above
-        images = [
-            np.array(
-                [
-                    [[0.0, 1.0], [1.0, 1.0]],  # Channel 0: 1 zero / 4 = 0.25
-                    [[0.0, 0.0], [1.0, 1.0]],  # Channel 1: 2 zeros / 4 = 0.5
-                    [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 zeros / 4 = 0.0
-                ],
-            ),
-        ]
-
-        result = compute_stats(images, stats=ImageStats.PIXEL_ZEROS, per_channel=True)
-
-        # Per-channel mode should return list with one value per channel
-        assert len(result["stats"]["zeros"]) == 3
-        assert result["stats"]["zeros"][0] == pytest.approx(0.25, abs=1e-4)
-        assert result["stats"]["zeros"][1] == pytest.approx(0.5, abs=1e-4)
-        assert result["stats"]["zeros"][2] == pytest.approx(0.0, abs=1e-4)
 
     def test_zeros_single_channel_image(self):
         """Test zeros calculation for single-channel image."""
         # Single channel (1, 3, 3) with 2 zeros out of 9 pixels
         images = [np.array([[[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.0]]])]
 
-        result = compute_stats(images, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.PIXEL_ZEROS)
 
         # 2 zeros / 9 total = 0.222...
         expected_zeros = 2 / 9
@@ -172,7 +130,7 @@ class TestPixelStats:
         """Test zeros calculation when entire image is zeros."""
         images = [np.zeros((3, 10, 10))]
 
-        result = compute_stats(images, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.PIXEL_ZEROS)
 
         # All pixels are zero, so should be 1.0
         assert result["stats"]["zeros"][0] == pytest.approx(1.0, abs=1e-4)
@@ -181,7 +139,7 @@ class TestPixelStats:
         """Test missing calculation when entire image is NaN."""
         images = [np.full((3, 10, 10), np.nan)]
 
-        result = compute_stats(images, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.PIXEL_MISSING)
 
         # All pixels are NaN, so should be 1.0
         assert result["stats"]["missing"][0] == pytest.approx(1.0, abs=1e-4)
@@ -194,9 +152,9 @@ class TestSkewKurtosisEntropySciPyEquivalence:
     def rng(self):
         return np.random.default_rng(42)
 
-    def _make_calculator(self, image, per_channel=False):
-        cache = CalculatorCache(image, box=None, per_channel=per_channel)
-        return PixelStatCalculator(image, cache, per_channel=per_channel)
+    def _make_calculator(self, image):
+        cache = CalculatorCache(image, box=None)
+        return PixelStatCalculator(image, cache)
 
     # --- Skew ---
 
@@ -206,14 +164,6 @@ class TestSkewKurtosisEntropySciPyEquivalence:
         result = calc._skew()
         expected = float(scipy_skew(calc.cache.scaled.ravel(), nan_policy="omit"))
         assert result[0] == pytest.approx(expected, rel=1e-5)
-
-    def test_skew_matches_scipy_per_channel(self, rng):
-        image = rng.random((3, 32, 32), dtype=np.float64)
-        calc = self._make_calculator(image, per_channel=True)
-        result = calc._skew()
-        for ch in range(3):
-            expected = float(scipy_skew(calc.cache.per_channel[ch], nan_policy="omit"))
-            assert result[ch] == pytest.approx(expected, rel=1e-5)
 
     def test_skew_with_nans(self, rng):
         image = rng.random((1, 20, 20), dtype=np.float64)
@@ -247,14 +197,6 @@ class TestSkewKurtosisEntropySciPyEquivalence:
         result = calc._kurtosis()
         expected = float(scipy_kurtosis(calc.cache.scaled.ravel(), nan_policy="omit"))
         assert result[0] == pytest.approx(expected, rel=1e-5)
-
-    def test_kurtosis_matches_scipy_per_channel(self, rng):
-        image = rng.random((3, 32, 32), dtype=np.float64)
-        calc = self._make_calculator(image, per_channel=True)
-        result = calc._kurtosis()
-        for ch in range(3):
-            expected = float(scipy_kurtosis(calc.cache.per_channel[ch], nan_policy="omit"))
-            assert result[ch] == pytest.approx(expected, rel=1e-5)
 
     def test_kurtosis_with_nans(self, rng):
         image = rng.random((1, 20, 20), dtype=np.float64)
@@ -291,16 +233,6 @@ class TestSkewKurtosisEntropySciPyEquivalence:
         h = h / h.sum()
         expected = float(scipy_entropy(h))
         assert result[0] == pytest.approx(expected, rel=1e-10)
-
-    def test_entropy_matches_scipy_per_channel(self, rng):
-        image = rng.random((3, 32, 32), dtype=np.float64)
-        calc = self._make_calculator(image, per_channel=True)
-        result = calc._entropy()
-        for ch in range(3):
-            h = calc.histogram[ch].astype(np.float64)
-            h = h / h.sum()
-            expected = float(scipy_entropy(h))
-            assert result[ch] == pytest.approx(expected, rel=1e-10)
 
     def test_entropy_uniform_histogram_is_max(self):
         """A perfectly uniform distribution should have maximum entropy = log(256)."""
@@ -372,7 +304,7 @@ class TestVisualStats:
         """Test visual statistics calculation."""
         images = [np.random.random((n_channels, 10, 10))]
 
-        result = compute_stats(images, stats=ImageStats.VISUAL, per_channel=False)
+        result = compute_stats(images, stats=ImageStats.VISUAL)
 
         assert "brightness" in result["stats"]
         assert "contrast" in result["stats"]
@@ -383,34 +315,6 @@ class TestVisualStats:
         assert len(result["stats"]["brightness"]) == 1
         assert result["stats"]["brightness"].dtype == np.float32
         assert len(result["stats"]["percentiles"][0]) == 5  # QUARTILES length
-
-
-class TestPixelStatsPerChannel:
-    @pytest.mark.parametrize("n_channels", [1, 3])
-    def test_process_per_channel(self, n_channels):
-        """Test per-channel pixel statistics."""
-        images = [np.random.random((n_channels, 10, 10))]
-
-        result = compute_stats(images, stats=ImageStats.PIXEL, per_channel=True)
-
-        assert len(result["stats"]["mean"]) == n_channels
-        assert len(result["stats"]["std"]) == n_channels
-        assert len(result["stats"]["histogram"]) == n_channels
-        assert len(result["stats"]["histogram"][0]) == 256
-
-
-class TestVisualStatsPerChannel:
-    @pytest.mark.parametrize("n_channels", [1, 3])
-    def test_process_visual_per_channel(self, n_channels):
-        """Test per-channel visual statistics."""
-        images = [np.random.random((n_channels, 10, 10))]
-
-        result = compute_stats(images, stats=ImageStats.VISUAL, per_channel=True)
-
-        assert len(result["stats"]["brightness"]) == n_channels
-        assert len(result["stats"]["contrast"]) == n_channels
-        assert len(result["stats"]["percentiles"]) == n_channels
-        assert len(result["stats"]["percentiles"][0]) == 5
 
 
 class TestDimensionStatsCalculator:
@@ -586,15 +490,13 @@ class TestPerImagePerBox:
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Should have 1 result (full image)
         assert len(result["stats"]["mean"]) == 1
         assert len(result["source_index"]) == 1
         assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
-        assert result["source_index"][0].channel is None
+        assert result["source_index"][0].key is None
 
     def test_per_image_and_per_target_with_boxes(self):
         """Test per_image=True and per_target=True with boxes provided."""
@@ -612,7 +514,6 @@ class TestPerImagePerBox:
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Should have 3 results: full image + 2 boxes
@@ -621,13 +522,13 @@ class TestPerImagePerBox:
 
         # First should be full image
         assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
+        assert result["source_index"][0].key is None
 
         # Next two should be boxes
         assert result["source_index"][1].item == 0
-        assert result["source_index"][1].target == 0
+        assert result["source_index"][1].key == 0
         assert result["source_index"][2].item == 0
-        assert result["source_index"][2].target == 1
+        assert result["source_index"][2].key == 1
 
     def test_per_target_only_with_boxes(self):
         """Test per_image=False and per_target=True with boxes provided."""
@@ -645,7 +546,6 @@ class TestPerImagePerBox:
             stats=ImageStats.PIXEL_MEAN,
             per_image=False,
             per_target=True,
-            per_channel=False,
         )
 
         # Should have 2 results: only boxes
@@ -654,9 +554,9 @@ class TestPerImagePerBox:
 
         # Both should be boxes (no full image)
         assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target == 0
+        assert result["source_index"][0].key == 0
         assert result["source_index"][1].item == 0
-        assert result["source_index"][1].target == 1
+        assert result["source_index"][1].key == 1
 
     def test_per_image_only_with_boxes_ignored(self):
         """Test per_image=True and per_target=False with boxes provided (boxes ignored)."""
@@ -674,7 +574,6 @@ class TestPerImagePerBox:
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=False,
-            per_channel=False,
         )
 
         # Should have 1 result: only full image (boxes ignored)
@@ -683,52 +582,7 @@ class TestPerImagePerBox:
 
         # Should be full image
         assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
-
-    def test_per_image_and_per_target_with_per_channel(self):
-        """Test per_image=True, per_target=True, and per_channel=True."""
-        images = [np.random.random((3, 100, 100))]
-        boxes = [[BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100))]]
-
-        result = compute_stats(
-            images,
-            boxes=boxes,
-            stats=ImageStats.PIXEL_MEAN,
-            per_image=True,
-            per_target=True,
-            per_channel=True,
-        )
-
-        # Should have 6 results: (full image + 1 box) × 3 channels = 6
-        assert len(result["stats"]["mean"]) == 6
-        assert len(result["source_index"]) == 6
-
-        # Check structure: full image channels first, then box channels
-        # Full image - channel 0, 1, 2
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
-        assert result["source_index"][0].channel == 0
-
-        assert result["source_index"][1].item == 0
-        assert result["source_index"][1].target is None
-        assert result["source_index"][1].channel == 1
-
-        assert result["source_index"][2].item == 0
-        assert result["source_index"][2].target is None
-        assert result["source_index"][2].channel == 2
-
-        # Box - channel 0, 1, 2
-        assert result["source_index"][3].item == 0
-        assert result["source_index"][3].target == 0
-        assert result["source_index"][3].channel == 0
-
-        assert result["source_index"][4].item == 0
-        assert result["source_index"][4].target == 0
-        assert result["source_index"][4].channel == 1
-
-        assert result["source_index"][5].item == 0
-        assert result["source_index"][5].target == 0
-        assert result["source_index"][5].channel == 2
+        assert result["source_index"][0].key is None
 
     def test_multiple_images_per_image_and_per_target(self):
         """Test multiple images with per_image=True and per_target=True."""
@@ -747,7 +601,6 @@ class TestPerImagePerBox:
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Should have 5 results: image0 (1 full + 1 box) + image1 (1 full + 2 boxes)
@@ -756,30 +609,30 @@ class TestPerImagePerBox:
 
         # Image 0: full image
         assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
+        assert result["source_index"][0].key is None
 
         # Image 0: box 0
         assert result["source_index"][1].item == 0
-        assert result["source_index"][1].target == 0
+        assert result["source_index"][1].key == 0
 
         # Image 1: full image
         assert result["source_index"][2].item == 1
-        assert result["source_index"][2].target is None
+        assert result["source_index"][2].key is None
 
         # Image 1: box 0
         assert result["source_index"][3].item == 1
-        assert result["source_index"][3].target == 0
+        assert result["source_index"][3].key == 0
 
         # Image 1: box 1
         assert result["source_index"][4].item == 1
-        assert result["source_index"][4].target == 1
+        assert result["source_index"][4].key == 1
 
     def test_invalid_both_false_raises_error(self):
         """Test that per_image=False and per_target=False raises ValueError."""
         images = [np.random.random((3, 10, 10))]
 
         with pytest.raises(ValueError, match="At least one of 'per_image', 'per_target' or 'per_background'"):
-            compute_stats(images, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=False, per_channel=False)
+            compute_stats(images, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=False)
 
     def test_object_count_tracking(self):
         """Test that object_count is correctly tracked with per_image and per_target."""
@@ -797,7 +650,6 @@ class TestPerImagePerBox:
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Object count should be 2 (number of boxes)
@@ -813,7 +665,7 @@ class TestLowerDimensionalPixelStats:
         # Create 1D data (shape: (length,))
         data = [np.random.random(100)]
 
-        result = compute_stats(data, stats=ImageStats.PIXEL, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.PIXEL)
 
         assert "mean" in result["stats"]
         assert "std" in result["stats"]
@@ -834,7 +686,7 @@ class TestLowerDimensionalPixelStats:
         # Create 2D data (shape: (height, width))
         data = [np.random.random((10, 10))]
 
-        result = compute_stats(data, stats=ImageStats.PIXEL, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.PIXEL)
 
         assert "mean" in result["stats"]
         assert "std" in result["stats"]
@@ -854,30 +706,8 @@ class TestLowerDimensionalPixelStats:
         """Test pixel statistics with 1D data containing NaN values."""
         data = [np.array([np.nan, 0.5, 0.5, 0.5, np.nan])]
 
-        result = compute_stats(data, stats=ImageStats.PIXEL, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.PIXEL)
         assert result["stats"]["missing"][0] > 0
-
-    def test_1d_data_per_channel(self):
-        """Test that 1D data is treated as single channel when per_channel=True."""
-        data = [np.random.random(100)]
-
-        result = compute_stats(data, stats=ImageStats.PIXEL, per_channel=True)
-
-        # Should be treated as 1 channel
-        assert len(result["stats"]["mean"]) == 1
-        assert len(result["stats"]["std"]) == 1
-        assert len(result["stats"]["histogram"]) == 1
-
-    def test_2d_data_per_channel(self):
-        """Test that 2D data is treated as single channel when per_channel=True."""
-        data = [np.random.random((10, 10))]
-
-        result = compute_stats(data, stats=ImageStats.PIXEL, per_channel=True)
-
-        # Should be treated as 1 channel
-        assert len(result["stats"]["mean"]) == 1
-        assert len(result["stats"]["std"]) == 1
-        assert len(result["stats"]["histogram"]) == 1
 
 
 class TestLowerDimensionalVisualStats:
@@ -887,7 +717,7 @@ class TestLowerDimensionalVisualStats:
         """Test visual statistics calculation with 1D data."""
         data = [np.random.random(100)]
 
-        result = compute_stats(data, stats=ImageStats.VISUAL, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.VISUAL)
 
         assert "brightness" in result["stats"]
         assert "contrast" in result["stats"]
@@ -905,7 +735,7 @@ class TestLowerDimensionalVisualStats:
         """Test visual statistics calculation with 2D data."""
         data = [np.random.random((10, 10))]
 
-        result = compute_stats(data, stats=ImageStats.VISUAL, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.VISUAL)
 
         assert "brightness" in result["stats"]
         assert "contrast" in result["stats"]
@@ -919,31 +749,6 @@ class TestLowerDimensionalVisualStats:
         # Sharpness should be computed for 2D data
         assert result["stats"]["sharpness"].dtype == np.float32
         assert not np.isnan(result["stats"]["sharpness"][0])
-
-    def test_1d_data_visual_stats_per_channel(self):
-        """Test visual statistics with 1D data and per_channel=True."""
-        data = [np.random.random(100)]
-
-        result = compute_stats(data, stats=ImageStats.VISUAL, per_channel=True)
-
-        # Should be treated as 1 channel
-        assert len(result["stats"]["brightness"]) == 1
-        assert len(result["stats"]["contrast"]) == 1
-        assert len(result["stats"]["sharpness"]) == 1
-        # Sharpness should be NaN for 1D data
-        assert np.isnan(result["stats"]["sharpness"][0])
-
-    def test_2d_data_visual_stats_per_channel(self):
-        """Test visual statistics with 2D data and per_channel=True."""
-        data = [np.random.random((10, 10))]
-
-        result = compute_stats(data, stats=ImageStats.VISUAL, per_channel=True)
-
-        # Should be treated as 1 channel
-        assert len(result["stats"]["brightness"]) == 1
-        assert len(result["stats"]["contrast"]) == 1
-        assert len(result["stats"]["sharpness"]) == 1
-        assert len(result["stats"]["percentiles"]) == 1
 
 
 class TestLowerDimensionalDimensionStats:
@@ -1022,7 +827,7 @@ class TestLowerDimensionalDimensionStats:
         """Test dimension statistics via compute_stats() with 1D data."""
         data = [np.random.random(100)]
 
-        result = compute_stats(data, stats=ImageStats.DIMENSION, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.DIMENSION)
 
         assert "width" in result["stats"]
         assert "height" in result["stats"]
@@ -1038,7 +843,7 @@ class TestLowerDimensionalDimensionStats:
         """Test dimension statistics via compute_stats() with 2D data."""
         data = [np.random.random((10, 20))]
 
-        result = compute_stats(data, stats=ImageStats.DIMENSION, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.DIMENSION)
 
         assert "width" in result["stats"]
         assert "height" in result["stats"]
@@ -1095,7 +900,7 @@ class TestLowerDimensionalHashStats:
 
         data = [np.random.random(100)]
 
-        result = compute_stats(data, stats=ImageStats.HASH, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.HASH)
 
         assert "xxhash" in result["stats"]
         assert "phash" in result["stats"]
@@ -1125,7 +930,7 @@ class TestLowerDimensionalHashStats:
         """
         data = [np.random.random(100)]
 
-        result = compute_stats(data, stats=ImageStats.HASH, per_channel=False)
+        result = compute_stats(data, stats=ImageStats.HASH)
 
         # phash should return empty string for 1D data
         assert result["stats"]["phash"][0] == ""
@@ -1159,7 +964,7 @@ class TestImageClassificationDataset:
 
         dataset = get_mock_ic_dataset(images, labels)
 
-        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False)
+        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True)
 
         # Should process 3 images without boxes
         assert len(result["stats"]["mean"]) == 3
@@ -1169,8 +974,7 @@ class TestImageClassificationDataset:
         # All should be full images (box=None)
         for i in range(3):
             assert result["source_index"][i].item == i
-            assert result["source_index"][i].target is None
-            assert result["source_index"][i].channel is None
+            assert result["source_index"][i].key is None
 
     def test_ic_dataset_with_explicit_boxes_param(self, get_mock_ic_dataset):
         """Test ImageClassificationDataset with explicit boxes parameter (should be ignored)."""
@@ -1190,39 +994,12 @@ class TestImageClassificationDataset:
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Should process boxes since they are explicitly provided
         assert len(result["stats"]["mean"]) == 4  # 2 images + 2 boxes
         assert len(result["source_index"]) == 4
         assert result["image_count"] == 2
-
-    def test_ic_dataset_per_channel(self, get_mock_ic_dataset):
-        """Test ImageClassificationDataset with per_channel=True."""
-        images = [np.random.random((3, 50, 50)) for _ in range(2)]
-        labels = [0, 1]
-
-        dataset = get_mock_ic_dataset(images, labels)
-
-        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=True)
-
-        # Should have 6 results: 2 images × 3 channels
-        assert len(result["stats"]["mean"]) == 6
-        assert len(result["source_index"]) == 6
-
-        # Check channel ordering for first image
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
-        assert result["source_index"][0].channel == 0
-
-        assert result["source_index"][1].item == 0
-        assert result["source_index"][1].target is None
-        assert result["source_index"][1].channel == 1
-
-        assert result["source_index"][2].item == 0
-        assert result["source_index"][2].target is None
-        assert result["source_index"][2].channel == 2
 
     def test_ic_dataset_multiple_stats(self, get_mock_ic_dataset):
         """Test ImageClassificationDataset with multiple statistics."""
@@ -1231,7 +1008,7 @@ class TestImageClassificationDataset:
 
         dataset = get_mock_ic_dataset(images, labels)
 
-        result = compute_stats(dataset, stats=ImageStats.PIXEL | ImageStats.VISUAL, per_image=True, per_channel=False)
+        result = compute_stats(dataset, stats=ImageStats.PIXEL | ImageStats.VISUAL, per_image=True)
         stats = result["stats"]
 
         # Check pixel stats
@@ -1262,7 +1039,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False)
+        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True)
 
         # Should have: image0 (1 full + 2 boxes) + image1 (1 full + 1 box) = 5 results
         assert len(result["stats"]["mean"]) == 5
@@ -1275,23 +1052,23 @@ class TestObjectDetectionDataset:
 
         # Image 0: full image
         assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
+        assert result["source_index"][0].key is None
 
         # Image 0: box 0
         assert result["source_index"][1].item == 0
-        assert result["source_index"][1].target == 0
+        assert result["source_index"][1].key == 0
 
         # Image 0: box 1
         assert result["source_index"][2].item == 0
-        assert result["source_index"][2].target == 1
+        assert result["source_index"][2].key == 1
 
         # Image 1: full image
         assert result["source_index"][3].item == 1
-        assert result["source_index"][3].target is None
+        assert result["source_index"][3].key is None
 
         # Image 1: box 0
         assert result["source_index"][4].item == 1
-        assert result["source_index"][4].target == 0
+        assert result["source_index"][4].key == 0
 
     def test_od_dataset_per_target_only(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset with per_image=False, per_target=True."""
@@ -1304,9 +1081,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = compute_stats(
-            dataset, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=True, per_channel=False
-        )
+        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=True)
 
         # Should have only boxes: 1 + 2 = 3 results (no full images)
         assert len(result["stats"]["mean"]) == 3
@@ -1314,13 +1089,13 @@ class TestObjectDetectionDataset:
 
         # All should be boxes (no full images)
         assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target == 0
+        assert result["source_index"][0].key == 0
 
         assert result["source_index"][1].item == 1
-        assert result["source_index"][1].target == 0
+        assert result["source_index"][1].key == 0
 
         assert result["source_index"][2].item == 1
-        assert result["source_index"][2].target == 1
+        assert result["source_index"][2].key == 1
 
     def test_od_dataset_per_image_only(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset with per_image=True, per_target=False."""
@@ -1333,9 +1108,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = compute_stats(
-            dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=False, per_channel=False
-        )
+        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=False)
 
         # Should have only full images: 2 results (no boxes)
         assert len(result["stats"]["mean"]) == 2
@@ -1343,42 +1116,10 @@ class TestObjectDetectionDataset:
 
         # All should be full images
         assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
+        assert result["source_index"][0].key is None
 
         assert result["source_index"][1].item == 1
-        assert result["source_index"][1].target is None
-
-    def test_od_dataset_with_per_channel(self, get_mock_od_dataset):
-        """Test ObjectDetectionDataset with per_channel=True."""
-        images = [np.random.random((3, 100, 100))]
-        labels = [[0]]
-        bboxes = [[[10, 10, 50, 50]]]
-
-        dataset = get_mock_od_dataset(images, labels, bboxes)
-
-        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=True)
-
-        # Should have 6 results: (1 full image + 1 box) × 3 channels
-        assert len(result["stats"]["mean"]) == 6
-        assert len(result["source_index"]) == 6
-
-        # Full image - channels 0, 1, 2
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].target is None
-        assert result["source_index"][0].channel == 0
-
-        assert result["source_index"][1].item == 0
-        assert result["source_index"][1].target is None
-        assert result["source_index"][1].channel == 1
-
-        assert result["source_index"][2].item == 0
-        assert result["source_index"][2].target is None
-        assert result["source_index"][2].channel == 2
-
-        # Box - channels 0, 1, 2
-        assert result["source_index"][3].item == 0
-        assert result["source_index"][3].target == 0
-        assert result["source_index"][3].channel == 0
+        assert result["source_index"][1].key is None
 
     def test_od_dataset_with_dimension_stats(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset with dimension statistics for boxes."""
@@ -1388,7 +1129,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = compute_stats(dataset, stats=ImageStats.DIMENSION, per_image=False, per_target=True, per_channel=False)
+        result = compute_stats(dataset, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
 
         # Should have 1 result (just the box)
         assert len(result["source_index"]) == 1
@@ -1421,7 +1162,6 @@ class TestObjectDetectionDataset:
             stats=ImageStats.DIMENSION,
             per_image=False,
             per_target=True,
-            per_channel=False,
         )
 
         # Should use override boxes
@@ -1441,7 +1181,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False)
+        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True)
 
         # Should have: image0 (1 full + 0 boxes) + image1 (1 full + 1 box) = 3 results
         assert len(result["stats"]["mean"]) == 3
@@ -1464,7 +1204,6 @@ class TestObjectDetectionDataset:
             stats=ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.DIMENSION,
             per_image=True,
             per_target=True,
-            per_channel=False,
         )
 
         # Check pixel stats
@@ -1581,17 +1320,17 @@ class TestProgressCallback:
         assert len(result["object_count"]) == 0
         assert len(result["invalid_box_count"]) == 0
 
-    def test_calculate_determine_channel_indices_error(self):
-        """Test _determine_channel_indices raises error for unexpected output (line 190)."""
-        from dataeval.core._compute_stats import _determine_channel_indices
+    def test_channels_true_is_refused_by_name(self):
+        """The v1.1 spelling of per_channel=True says what replaced it, rather than failing inside."""
+        with pytest.raises(ValueError, match="channels=True is removed in v1.2"):
+            compute_stats([np.random.random((3, 8, 8))], stats=ImageStats.PIXEL_MEAN, channels=True)  # type: ignore
 
-        # Create calculator output with unexpected number of elements
-        # (not 1 for image-level, not equal to num_channels for per-channel)
-        calculator_output = [{"stat1": [1, 2, 3]}]  # 3 values but image has 1 channel
-        num_channels = 1
+    def test_reconcile_stats_rejects_multiple_values_for_one_row(self):
+        """A calculator reduces its region to one value; more has nowhere to land."""
+        from dataeval.core._compute_stats import _reconcile_stats
 
-        with pytest.raises(ValueError, match="Processor produced"):
-            _determine_channel_indices(calculator_output, num_channels)
+        with pytest.raises(ValueError, match="produced 3 values for a single row"):
+            _reconcile_stats([{"stat1": [1, 2, 3]}])
 
 
 @pytest.mark.required
@@ -1697,37 +1436,6 @@ class TestCalculatorEmptyValuesDefault:
         assert Calculator.get_empty_values(calculator) == {}
 
 
-class TestVisualStatsAllNanPerChannel:
-    """Cover the all-NaN per-channel branch of VisualStatCalculator.percentiles."""
-
-    def test_percentiles_all_nan_per_channel(self):
-        """All-NaN image in per-channel mode returns a (channels, len(QUARTILES)) NaN array."""
-        image = np.full((3, 10, 10), np.nan)
-        cache = CalculatorCache(image, box=None, per_channel=True)
-        calculator = VisualStatCalculator(image, cache, per_channel=True)
-
-        result = calculator.percentiles
-
-        assert result.shape == (3, len(QUARTILES))
-        assert np.isnan(result).all()
-
-
-class TestPixelStatsAllNanPerChannel:
-    """Cover the per-channel branch of PixelStatCalculator._nan_list()."""
-
-    def test_nan_list_all_nan_per_channel(self):
-        """All-NaN image in per-channel mode returns one NaN per channel."""
-        image = np.full((3, 10, 10), np.nan)
-        cache = CalculatorCache(image, box=None, per_channel=True)
-        calculator = PixelStatCalculator(image, cache, per_channel=True)
-
-        # _mean() short-circuits to _nan_list() when the cache is all-NaN.
-        result = calculator._mean()
-
-        assert len(result) == 3
-        assert all(np.isnan(v) for v in result)
-
-
 class TestDependencyRemoval:
     """Test that computed dependencies are not returned in the output."""
 
@@ -1771,8 +1479,8 @@ class TestPerBackground:
 
         # One row for the image, one for its box - the background added no row.
         assert len(result["source_index"]) == 2
-        assert result["source_index"][0] == SourceIndex(0, None, None)
-        assert result["source_index"][1] == SourceIndex(0, 0, None)
+        assert result["source_index"][0] == SourceIndex(0, None)
+        assert result["source_index"][1] == SourceIndex(0, 0)
         assert set(result["stats"]) == {"mean", "background_mean", "background_fraction"}
 
     def test_background_excludes_the_boxed_pixels(self):
@@ -1826,7 +1534,7 @@ class TestPerBackground:
             normalize_pixel_values=False,
         )
 
-        image_rows = [i for i, s in enumerate(result["source_index"]) if s.target is None]
+        image_rows = [i for i, s in enumerate(result["source_index"]) if s.key is None]
         empty = image_rows[1]
         assert result["stats"]["background_fraction"][empty] == pytest.approx(1.0)
         assert result["stats"]["background_mean"][empty] == pytest.approx(result["stats"]["mean"][empty], abs=1e-3)
@@ -1866,7 +1574,7 @@ class TestPerBackground:
         # Every stat array stays one-to-one with the source index.
         assert all(len(values) == len(result["source_index"]) for values in result["stats"].values())
         for i, source in enumerate(result["source_index"]):
-            if source.target is not None:
+            if source.key is not None:
                 assert np.isnan(result["stats"]["background_mean"][i])
                 assert np.isnan(result["stats"]["background_fraction"][i])
 
@@ -1891,27 +1599,6 @@ class TestPerBackground:
         assert result["stats"]["background_missing"][0] == pytest.approx(0.0)
         assert result["stats"]["background_zeros"][0] == pytest.approx(1.0)
 
-    def test_per_channel_places_fraction_on_the_channel_none_row(self):
-        """A single-valued statistic keeps its channel=None row in per-channel mode."""
-        images = [self._image_with_bright_box()]
-        boxes = [[(0, 0, 10, 10)]]
-
-        result = compute_stats(
-            images,
-            boxes=boxes,
-            stats=ImageStats.PIXEL_MEAN,
-            per_background=True,
-            per_target=False,
-            per_channel=True,
-            normalize_pixel_values=False,
-        )
-
-        by_channel = {s.channel: i for i, s in enumerate(result["source_index"])}
-        assert set(by_channel) == {None, 0, 1, 2}
-        assert result["stats"]["background_fraction"][by_channel[None]] == pytest.approx(0.75)
-        for channel in (0, 1, 2):
-            assert not np.isnan(result["stats"]["background_mean"][by_channel[channel]])
-
     def test_background_only_omits_the_unmasked_stats(self):
         """per_image=False with per_background=True yields the background row alone."""
         images = [self._image_with_bright_box()]
@@ -1929,7 +1616,7 @@ class TestPerBackground:
 
         assert set(result["stats"]) == {"background_mean", "background_fraction"}
         assert len(result["source_index"]) == 1
-        assert result["source_index"][0] == SourceIndex(0, None, None)
+        assert result["source_index"][0] == SourceIndex(0, None)
 
     def test_hash_and_dimension_stats_are_skipped_for_background(self):
         """Statistics that cannot describe a masked region are not computed for it."""
@@ -2727,40 +2414,6 @@ class TestChannelGroupValidation:
 
 
 @pytest.mark.required
-class TestPerChannelDeprecation:
-    """The row shape is kept and deprecated rather than rebuilt badly.
-
-    Column names discovered per datum cannot be reconciled across ragged data — the
-    aggregation appends by name, so a name absent from one datum shortens its array. The
-    row path has no such problem, so it survives until the shape goes.
-    """
-
-    _IMAGE = [np.zeros((3, 8, 8), np.uint8)]
-
-    def test_channels_true_is_the_row_path(self):
-        with pytest.warns(DeprecationWarning, match="Per-channel rows are deprecated"):
-            result = compute_stats(
-                self._IMAGE, stats=ImageStats.PIXEL_MEAN, channels=True, normalize_pixel_values=False
-            )
-
-        assert any(s.channel is not None for s in result["source_index"])
-
-    def test_per_channel_warns_and_is_unchanged(self):
-        with pytest.warns(DeprecationWarning, match="Per-channel rows are deprecated"):
-            old = compute_stats(
-                self._IMAGE, stats=ImageStats.PIXEL_MEAN, per_channel=True, normalize_pixel_values=False
-            )
-        with pytest.warns(DeprecationWarning, match="Per-channel rows are deprecated"):
-            shim = compute_stats(self._IMAGE, stats=ImageStats.PIXEL_MEAN, channels=True, normalize_pixel_values=False)
-
-        assert [s.channel for s in old["source_index"]] == [s.channel for s in shim["source_index"]]
-
-    def test_the_message_carries_the_migration(self):
-        with pytest.warns(DeprecationWarning, match=r"channels=\{'r': 0, 'g': 1, 'b': 2\}"):
-            compute_stats(self._IMAGE, stats=ImageStats.PIXEL_MEAN, per_channel=True, normalize_pixel_values=False)
-
-
-@pytest.mark.required
 class TestWideBandWarning:
     """The unnamed view means *the image as a picture*, only defined for mono or RGB.
 
@@ -2895,10 +2548,9 @@ class TestUnmeasuredViewsAnswerConsistently:
 class TestPresenceStatisticsReadTheRawView:
     """`missing` and `zeros` are claims about the stored values, not about the scaled copy.
 
-    Both are counted over `CalculatorCache.image` in the aggregate path and so must be
-    counted over the same view per channel. `scaled` cannot answer either: it is all-NaN
-    where no interval could be established, and it shifts by `pmin`, which moves a raw zero
-    off zero for any range that does not start there.
+    Both are counted over `CalculatorCache.image`. `scaled` cannot answer either: it is
+    all-NaN where no interval could be established, and it shifts by `pmin`, which moves a
+    raw zero off zero for any range that does not start there.
     """
 
     def test_missing_is_zero_for_present_but_unmeasurable_data(self):
@@ -2907,38 +2559,23 @@ class TestPresenceStatisticsReadTheRawView:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            per_channel = compute_stats(
-                images, stats=ImageStats.PIXEL_MISSING, normalize_pixel_values=True, per_channel=True
-            )["stats"]
-            aggregate = compute_stats(
-                images, stats=ImageStats.PIXEL_MISSING, normalize_pixel_values=True, per_channel=False
-            )["stats"]
+            aggregate = compute_stats(images, stats=ImageStats.PIXEL_MISSING, normalize_pixel_values=True)["stats"]
 
-        assert np.all(np.asarray(per_channel["missing"]) == 0.0), "an unreadable range is not missing data"
-        assert np.all(np.asarray(aggregate["missing"]) == 0.0)
+        assert np.all(np.asarray(aggregate["missing"]) == 0.0), "an unreadable range is not missing data"
 
-    def test_zeros_agrees_across_layouts_under_a_declared_range(self):
+    def test_zeros_under_a_declared_range_starting_below_zero(self):
         """A declared range starting below zero must not move which pixels count as zero."""
         images = np.zeros((1, 3, 4, 4))
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            per_channel = compute_stats(
-                images,
-                stats=ImageStats.PIXEL_ZEROS,
-                normalize_pixel_values=True,
-                value_range=(-100.0, 100.0),
-                per_channel=True,
-            )["stats"]
             aggregate = compute_stats(
                 images,
                 stats=ImageStats.PIXEL_ZEROS,
                 normalize_pixel_values=True,
                 value_range=(-100.0, 100.0),
-                per_channel=False,
             )["stats"]
 
-        assert np.all(np.asarray(per_channel["zeros"]) == pytest.approx(1.0))
         assert np.all(np.asarray(aggregate["zeros"]) == pytest.approx(1.0))
 
 
@@ -2968,26 +2605,21 @@ class TestRegressionsAgainstV1_0:
         assert "mean" in result["stats"]
         assert not np.isnan(result["stats"]["mean"]).all()
 
-    def test_two_dimensional_data_reports_one_channel(self):
-        """A NaN fallback must be sized by the channel count, not by `image.shape[0]`.
+    def test_two_dimensional_data_reports_one_value(self):
+        """A NaN fallback must be one value for the row, not one per row of pixels.
 
         For 2-D data `shape[0]` is the height. The fallbacks only ran on all-NaN input
-        before the value-range work, which reshapes to one channel first; the new
-        unmeasurable-range gates made them reachable for ordinary 2-D input, where
-        emitting H values for a 1-channel datum fails reconciliation outright.
+        before the value-range work; the unmeasurable-range gates made them reachable for
+        ordinary 2-D input, where emitting H values for one datum used to fail
+        reconciliation outright.
         """
         image = np.linspace(-50.0, 50.0, 64).reshape(8, 8)  # 2-D, negative, so no readable range
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            pixel = compute_stats([image], stats=ImageStats.PIXEL_MEAN, per_channel=True, normalize_pixel_values=True)[
-                "stats"
-            ]
-            visual = compute_stats(
-                [image], stats=ImageStats.VISUAL_BRIGHTNESS, per_channel=True, normalize_pixel_values=False
-            )["stats"]
+            pixel = compute_stats([image], stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=True)["stats"]
+            visual = compute_stats([image], stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=False)["stats"]
 
-        # One value per datum, not one per row of pixels.
         assert len(pixel["mean"]) == 1
         assert len(visual["brightness"]) == 1
 
@@ -3085,24 +2717,6 @@ class TestReviewFindings:
         cache = CalculatorCache(image)
 
         assert cache.perceptual is cache.image
-
-    def test_wide_band_warning_is_silent_under_per_channel(self, caplog):
-        """`per_channel=True` already measures each band, so nothing was averaged.
-
-        The warning describes the opposite of what happened and points at `channels=`,
-        which cannot be combined with `per_channel` anyway.
-        """
-        image = (np.random.default_rng(0).random((4, 16, 16)) * 255).astype(np.uint8)
-
-        with caplog.at_level(logging.WARNING, logger="dataeval.core"), warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            compute_stats([image], stats=ImageStats.VISUAL_BRIGHTNESS, per_channel=True, normalize_pixel_values=False)
-        assert "single picture" not in caplog.text
-
-        caplog.clear()
-        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
-            compute_stats([image], stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=False)
-        assert "single picture" in caplog.text, "it must still fire for an unnamed wide-band view"
 
     def test_channel_indices_accept_a_numpy_array(self):
         """`np.arange(3)` is an ordinary way to spell a band selection."""

@@ -226,14 +226,14 @@ class TestResolveIndices:
     def test_resolve_indices_with_single_sourceindex(self, mock_dataset):
         """Test resolving a single SourceIndex."""
         select = View(mock_dataset)
-        source_idx = SourceIndex(item=3, target=None, channel=None)
+        source_idx = SourceIndex(item=3, key=None)
         resolved = select.resolve_indices(source_idx)
         assert resolved == [3]
 
-    def test_resolve_indices_with_sourceindex_with_box_and_channel(self, mock_dataset):
-        """Test that SourceIndex with target and channel uses only the item index."""
+    def test_resolve_indices_with_sourceindex_with_box(self, mock_dataset):
+        """Test that SourceIndex with a target uses only the item index."""
         select = View(mock_dataset)
-        source_idx = SourceIndex(item=7, target=2, channel=1)
+        source_idx = SourceIndex(item=7, key=2)
         resolved = select.resolve_indices(source_idx)
         assert resolved == [7]
 
@@ -247,10 +247,10 @@ class TestResolveIndices:
         """Test resolving a sequence of SourceIndex objects."""
         select = View(mock_dataset)
         source_indices = [
-            SourceIndex(item=0, target=None, channel=None),
-            SourceIndex(item=2, target=1, channel=None),
-            SourceIndex(item=4, target=None, channel=2),
-            SourceIndex(item=6, target=3, channel=1),
+            SourceIndex(item=0, key=None),
+            SourceIndex(item=2, key=1),
+            SourceIndex(item=4, key=None),
+            SourceIndex(item=6, key=3),
         ]
         resolved = select.resolve_indices(source_indices)
         assert resolved == [0, 2, 4, 6]
@@ -260,9 +260,9 @@ class TestResolveIndices:
         select = View(mock_dataset)
         mixed_indices = [
             1,
-            SourceIndex(item=3, target=None, channel=None),
+            SourceIndex(item=3, key=None),
             5,
-            SourceIndex(item=7, target=2, channel=1),
+            SourceIndex(item=7, key=2),
         ]
         resolved = select.resolve_indices(mixed_indices)
         assert resolved == [1, 3, 5, 7]
@@ -333,7 +333,7 @@ class TestResolveIndices:
     def test_resolve_indices_sourceindex_out_of_range(self, mock_dataset):
         """Test that SourceIndex with out-of-range item raises IndexError."""
         select = View(mock_dataset)
-        source_idx = SourceIndex(item=15, target=None, channel=None)
+        source_idx = SourceIndex(item=15, key=None)
 
         with pytest.raises(IndexError, match="Index 15 out of range"):
             select.resolve_indices(source_idx)
@@ -361,10 +361,10 @@ class TestResolveIndices:
         """Test that duplicate SourceIndices are preserved in output."""
         select = View(mock_dataset)
         source_indices = [
-            SourceIndex(item=2, target=None, channel=None),
-            SourceIndex(item=2, target=1, channel=None),
-            SourceIndex(item=5, target=None, channel=None),
-            SourceIndex(item=2, target=None, channel=2),
+            SourceIndex(item=2, key=None),
+            SourceIndex(item=2, key=1),
+            SourceIndex(item=5, key=None),
+            SourceIndex(item=2, key=None),
         ]
         resolved = select.resolve_indices(source_indices)
         assert resolved == [2, 2, 5, 2]

@@ -9,6 +9,7 @@ DataEval retires a deprecated API one minor release after deprecating it, so a g
 :::{toctree}
 :hidden:
 
+v1.2
 v1.1
 :::
 
@@ -16,6 +17,10 @@ v1.1
 :widths: 20 80
 :header-rows: 0
 
+- - [](v1.2.md)
+  - **v1.1 to v1.2** — the v1.1 deprecations are removed and `SourceIndex` becomes an
+    address. Per-channel statistic rows go first, replaced by band groups named with
+    `channels=`; `SourceIndex.target` is renamed `key` and its third field becomes `level`.
 - - [](v1.1.md)
   - **v1.0 to v1.1** — metadata levels, `View` and operations, image statistic scales, and
     chance-corrected `Balance`. Everything deprecated here is removed in v1.2.0.

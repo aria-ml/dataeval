@@ -46,19 +46,14 @@ class TestSourceIndex:
         assert repr(si) == "SourceIndex(5)"
 
     def test_source_index_repr_with_target(self):
-        """Test __repr__ with item and target."""
-        si = SourceIndex(item=5, target=2)
+        """Test __repr__ with item and key."""
+        si = SourceIndex(item=5, key=2)
         assert repr(si) == "SourceIndex(5, 2)"
 
-    def test_source_index_repr_with_channel_no_target(self):
-        """Test __repr__ with item, channel but no target (line 86-87)."""
-        si = SourceIndex(item=5, channel=1)
-        assert repr(si) == "SourceIndex(5, None, 1)"
-
-    def test_source_index_repr_with_target_and_channel(self):
-        """Test __repr__ with item, target, and channel."""
-        si = SourceIndex(item=5, target=2, channel=1)
-        assert repr(si) == "SourceIndex(5, 2, 1)"
+    def test_source_index_repr_with_explicit_none_target(self):
+        """An explicit null target renders the same as an omitted one."""
+        si = SourceIndex(item=5, target=None)
+        assert repr(si) == "SourceIndex(5)"
 
     def test_source_index_str_item_only(self):
         """Test __str__ with only item."""
@@ -66,34 +61,24 @@ class TestSourceIndex:
         assert str(si) == "5"
 
     def test_source_index_str_with_target(self):
-        """Test __str__ with item and target."""
-        si = SourceIndex(item=5, target=2)
+        """Test __str__ with item and key."""
+        si = SourceIndex(item=5, key=2)
         assert str(si) == "5/2"
 
-    def test_source_index_str_with_channel_no_target(self):
-        """Test __str__ with item, channel but no target (line 97-98)."""
-        si = SourceIndex(item=5, channel=1)
-        assert str(si) == "5/-/1"
-
-    def test_source_index_str_with_target_and_channel(self):
-        """Test __str__ with item, target, and channel."""
-        si = SourceIndex(item=5, target=2, channel=1)
-        assert str(si) == "5/2/1"
-
     def test_source_index_equality(self):
-        """Test equality comparison (line 129-140)."""
-        si1 = SourceIndex(item=5, target=2, channel=1)
-        si2 = SourceIndex(item=5, target=2, channel=1)
-        si3 = SourceIndex(item=5, target=2)
-        si4 = SourceIndex(item=6, target=2, channel=1)
+        """Test equality comparison."""
+        si1 = SourceIndex(item=5, key=2)
+        si2 = SourceIndex(item=5, key=2)
+        si3 = SourceIndex(item=5)
+        si4 = SourceIndex(item=6, key=2)
 
         # Test equality
         assert si1 == si2
-        assert si1 != si3  # Different channel
+        assert si1 != si3  # Different target
         assert si1 != si4  # Different item
 
         # Test with non-SourceIndex
-        assert si1 != "5/2/1"
+        assert si1 != "5/2"
         assert si1 != 5
 
     def test_from_string_item_only(self):
@@ -107,24 +92,152 @@ class TestSourceIndex:
         assert si == SourceIndex(0, 3)
 
     def test_from_string_with_none_target(self):
-        """Test from_string with item, None target, and channel (line 134)."""
-        si = SourceIndex.from_string("0/-/1")
-        assert si == SourceIndex(0, None, 1)
-
-    def test_from_string_with_all_fields(self):
-        """Test from_string with item, target, and channel."""
-        si = SourceIndex.from_string("0/3/1")
-        assert si == SourceIndex(0, 3, 1)
-
-    def test_from_string_with_none_channel(self):
-        """Test from_string with item, target, and None channel (line 136)."""
-        si = SourceIndex.from_string("0/3/-")
-        assert si == SourceIndex(0, 3, None)
+        """Test from_string with an explicit null target."""
+        si = SourceIndex.from_string("0/-")
+        assert si == SourceIndex(0, None)
 
     def test_from_string_invalid_too_many_parts(self):
-        """Test from_string with too many parts (line 137-138)."""
+        """Test from_string with too many parts."""
         with pytest.raises(ValueError, match="Invalid SourceIndex string format"):
             SourceIndex.from_string("0/1/2/3")
+
+
+@pytest.mark.required
+class TestSourceIndexIsAnAddress:
+    """`SourceIndex` names one row at one level, and `target` is `key`'s retired spelling."""
+
+    def test_the_target_property_reads_the_key(self):
+        with pytest.warns(DeprecationWarning, match="retired spelling of SourceIndex.key"):
+            assert SourceIndex(3, 7).target == 7
+
+    def test_reading_target_off_an_unkeyed_address_warns_too(self):
+        """It is the spelling that is retired, not the value it happens to return."""
+        with pytest.warns(DeprecationWarning, match="removed in v1.3.0"):
+            assert SourceIndex(3).target is None
+
+    def test_target_constructs_what_key_constructs(self):
+        with pytest.warns(DeprecationWarning, match=r"SourceIndex\(target=\.\.\.\)"):
+            aliased = SourceIndex(item=3, target=7)
+        assert aliased == SourceIndex(item=3, key=7)
+
+    def test_an_explicit_null_target_does_not_warn(self):
+        """Indistinguishable from not passing it, so warning would be noise."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            assert SourceIndex(item=3, target=None) == SourceIndex(3)
+
+    def test_both_spellings_together_are_rejected(self):
+        with pytest.raises(TypeError, match="pass one of key= or target="):
+            SourceIndex(3, key=7, target=7)
+
+    def test_the_named_tuple_machinery_still_works(self):
+        si = SourceIndex(3, 7)
+        assert SourceIndex._fields == ("item", "key", "level")
+        assert si._asdict() == {"item": 3, "key": 7, "level": None}
+        assert si._replace(level="instance") == SourceIndex(3, 7, "instance")
+        assert SourceIndex._make((3, 7, None)) == si
+        assert list(si) == [3, 7, None]
+        assert copy.deepcopy(si) == si
+        assert {si: "x"}[SourceIndex(3, 7)] == "x"
+
+    def test_it_survives_a_pickle_round_trip(self):
+        import pickle
+
+        si = SourceIndex(3, 12, "unit")
+        assert pickle.loads(pickle.dumps(si)) == si
+
+    @pytest.mark.parametrize(
+        ("address", "item_level", "expected"),
+        [
+            (SourceIndex(3), "unit", "unit"),
+            (SourceIndex(3), "sequence", "sequence"),
+            (SourceIndex(3, 7), "unit", "instance"),
+            (SourceIndex(3, 7), "sequence", "instance"),
+            (SourceIndex(3, 12, "unit"), "sequence", "unit"),
+            (SourceIndex(3, 5, "track"), "sequence", "track"),
+        ],
+    )
+    def test_an_unstated_level_resolves_against_the_task(self, address, item_level, expected):
+        """`None` is the task-generic level, not an unknown one."""
+        assert address.resolve(item_level, "instance") == expected
+
+    def test_a_stated_level_wins_over_the_default(self):
+        assert SourceIndex(3, None, "sequence").resolve("unit", "instance") == "sequence"
+
+    def test_two_spellings_of_one_address_are_not_equal(self):
+        """Why producers emit the minimal spelling: these hash apart.
+
+        `resolve` says they name the same row, but a mapping keyed on addresses cannot
+        know that, and `Outliers.issues` is such a mapping.
+        """
+        implicit, explicit = SourceIndex(3, 7), SourceIndex(3, 7, "instance")
+        assert implicit != explicit
+        assert implicit.resolve("unit", "instance") == explicit.resolve("unit", "instance")
+
+
+@pytest.mark.required
+class TestSourceIndexWireFormat:
+    """The string form carries the level and round-trips through `from_string`."""
+
+    @pytest.mark.parametrize("spelling", ["3", "3/7", "3/12/unit", "3/5/track", "3/-/sequence"])
+    def test_round_trip(self, spelling):
+        assert str(SourceIndex.from_string(spelling)) == spelling
+
+    @pytest.mark.parametrize(
+        ("spelling", "expected"),
+        [
+            ("3", SourceIndex(3)),
+            ("3/7", SourceIndex(3, 7)),
+            ("3/-", SourceIndex(3)),
+            ("3/12/unit", SourceIndex(3, 12, "unit")),
+            ("3/-/sequence", SourceIndex(3, None, "sequence")),
+        ],
+    )
+    def test_what_each_spelling_names(self, spelling, expected):
+        assert SourceIndex.from_string(spelling) == expected
+
+    def test_an_unstated_level_is_omitted_rather_than_marked(self):
+        """`-` is needed in the key slot only, which is the one that has to be held open."""
+        assert str(SourceIndex(3, 7)) == "3/7"
+        assert str(SourceIndex(3)) == "3"
+
+    def test_an_empty_string_names_this_type_in_its_rejection(self):
+        """`str.split` never returns nothing, so emptiness arrives as an empty first part."""
+        with pytest.raises(ValueError, match="Invalid SourceIndex string format"):
+            SourceIndex.from_string("")
+
+    def test_a_level_that_is_not_one_is_rejected_on_construction(self):
+        """The v1.1 third positional argument was a channel index, and is silent otherwise.
+
+        `type: ignore` because a checked caller is told statically, which is the other half
+        of the answer; the runtime check is for the callers pyright never sees.
+        """
+        with pytest.raises(ValueError, match="level=2 is not a level"):
+            SourceIndex(0, 1, 2)  # type: ignore[arg-type]
+
+    def test_the_construction_rejection_says_what_the_slot_is_now(self):
+        with pytest.raises(ValueError, match="was a channel index before v1.2"):
+            SourceIndex(0, 1, 2)  # type: ignore[arg-type]
+
+    def test_a_level_that_is_not_one_is_rejected(self):
+        with pytest.raises(ValueError, match="'frame' is not a level"):
+            SourceIndex.from_string("3/1/frame")
+
+    def test_the_rejection_lists_the_levels(self):
+        with pytest.raises(ValueError, match="sequence, unit, track, instance"):
+            SourceIndex.from_string("3/1/frame")
+
+    @pytest.mark.parametrize(
+        ("address", "expected"),
+        [
+            (SourceIndex(3), "SourceIndex(3)"),
+            (SourceIndex(3, 7), "SourceIndex(3, 7)"),
+            (SourceIndex(3, 12, "unit"), "SourceIndex(3, 12, 'unit')"),
+            (SourceIndex(3, None, "sequence"), "SourceIndex(3, None, 'sequence')"),
+        ],
+    )
+    def test_repr_omits_trailing_unstated_fields(self, address, expected):
+        assert repr(address) == expected
 
 
 class TestMappingOutput:

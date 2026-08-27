@@ -6,12 +6,17 @@ video. That producer is the statistics workstream's. What metadata owns is the o
 the landing contract — and these tests stand in for the producer so that contract is pinned
 before it exists rather than retrofitted afterwards.
 
-Issue 9.1 decided that contract: video statistics name their rows with **key columns**,
-not with :class:`~dataeval.types.SourceIndex`. A producer emits one array per level plus
-the columns naming the rows — ``item_index`` alongside ``unit_index`` or ``track_id`` — and
-each level lands in one ``add_factors`` call. ``SourceIndex`` is ``(item, target, channel)``
-and can name a sequence and a detection; it cannot name a frame or a track, and the diamond
-has no single ordering for it to be.
+Issue 9.1 decided that contract: video statistics name their rows with **key columns**. A
+producer emits one array per level plus the columns naming the rows — ``item_index``
+alongside ``unit_index`` or ``track_id`` — and each level lands in one ``add_factors`` call.
+That is the bulk-transfer form and it is what the bulk of this file pins.
+
+``SourceIndex`` has since been pivoted to ``(item, key, level)`` and names a row at any of
+the four levels, which is the *scalar* form of the same contract — one address per value
+rather than one column per level. 9.1 rejected giving the tuple a ``frame`` slot, and that
+still holds: a tuple is an ordering and the level graph is a diamond. An address does not
+order the levels, it names one of them, and lets the row it names carry its own parentage.
+The last two classes here assert the two forms place identically.
 
 Every fixture here uses keys whose order **disagrees** with row order. A fixture where the
 two coincide passes positionally and proves nothing.
@@ -22,6 +27,9 @@ import polars as pl
 import pytest
 
 from dataeval import Metadata
+from dataeval._metadata._structurers import LEVEL_KEY_COLUMNS
+from dataeval.exceptions import ShapeMismatchError
+from dataeval.types import SourceIndex
 from tests.metadata.test_structurers import _mot_dataset
 
 # Two videos exercising the shapes a classification dataset never produces.
@@ -343,3 +351,189 @@ class TestTheProducerShouldNotRecomputeThese:
         rolled = md.agg("instance", "track", pl.len().alias("n_obs"))
         frame = rolled._store.frame("track")
         assert frame["n_obs"].to_list() == frame["track_length"].to_list()
+
+
+@pytest.mark.required
+class TestTheSameRowsAddressedInsteadOfKeyed:
+    """FE-C: one :class:`~dataeval.types.SourceIndex` per value, at any level.
+
+    The keyed columns above are the bulk-transfer form; an address is the scalar one, and
+    both name the same row. Every fixture here keeps the adversarial ordering: addresses
+    arrive in an order no level's rows are in, so a positional write scrambles them.
+    """
+
+    @staticmethod
+    def _addresses(level, keys):
+        """Addresses at `level`, shuffled out of row order by construction."""
+        return [SourceIndex(item, key, level) for item, key in keys]
+
+    def test_frames_are_addressable(self):
+        md = _video()
+        keys = list(zip(_per_frame()["item_index"], _per_frame()["unit_index"], strict=True))
+        md.add_factors({"blur": _per_frame()["blur"]}, source_index=self._addresses("unit", keys))
+
+        assert md._store.frame("unit")["blur"].to_list() == [0.0, 0.1, 0.2, 1.0, 1.1]
+
+    def test_tracks_are_addressable(self):
+        """Track rows follow first appearance and track ids do not, so this is a permutation."""
+        md = _video()
+        keys = list(zip(_per_track()["item_index"], _per_track()["track_ids"], strict=True))
+        md.add_factors({"speed": _per_track()["speed"]}, source_index=self._addresses("track", keys))
+
+        assert md._store.frame("track")["track_id"].to_list() == [5, 9, 7, 3]
+        assert md._store.frame("track")["speed"].to_list() == [0.5, 0.9, 1.7, 1.3]
+
+    def test_sequences_are_addressable(self):
+        md = _video()
+        md.add_factors({"night": [1.0, 0.0]}, source_index=[SourceIndex(1), SourceIndex(0)])
+
+        assert md._store.frame("sequence")["night"].to_list() == [0.0, 1.0]
+
+    def test_detections_are_addressable(self):
+        md = _video()
+        keys = [(0, 3), (0, 1), (1, 2), (0, 0), (1, 0), (0, 2), (1, 1)]
+        md.add_factors({"iou": [0.4, 0.2, 0.7, 0.1, 0.5, 0.3, 0.6]}, source_index=self._addresses("instance", keys))
+
+        assert md._store.frame("instance")["iou"].to_list() == [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+
+    def test_the_key_for_a_detection_is_target_index_not_instance_index(self):
+        """§6.2's trap, as an assertion rather than a claim.
+
+        ``instance_index`` is dense within a *frame* and repeats across the frames of one
+        sequence, so it names one row on an image task and several on a video. A mapping
+        that picked it would pass every image-task test and lose rows on video.
+        """
+        frame = _video()._store.frame("instance")
+
+        assert frame.select("item_index", "instance_index").n_unique() < frame.height
+        assert frame.select("item_index", "target_index").n_unique() == frame.height
+
+    @pytest.mark.parametrize(
+        ("level", "column"),
+        [("sequence", None), ("unit", "unit_index"), ("track", "track_id"), ("instance", "target_index")],
+    )
+    def test_every_level_is_named_by_the_column_the_table_says(self, level, column):
+        """The §6.1 mapping, checked against the rows rather than restated."""
+        assert LEVEL_KEY_COLUMNS[level] == column
+        frame = _video()._store.frame(level)
+        if column is not None:
+            assert frame.select("item_index", column).n_unique() == frame.height
+
+    def test_an_address_is_unique_under_item_level_and_key(self):
+        """Every row of the fixture addressed, over all four levels, no two the same."""
+        md = _video()
+        addresses = [SourceIndex(item, None, "sequence") for item in (0, 1)]
+        addresses += [
+            SourceIndex(item, key, "unit")
+            for item, key in zip(_per_frame()["item_index"], _per_frame()["unit_index"], strict=True)
+        ]
+        addresses += [
+            SourceIndex(item, key, "track")
+            for item, key in zip(_per_track()["item_index"], _per_track()["track_ids"], strict=True)
+        ]
+        detections = [(0, i) for i in range(4)] + [(1, i) for i in range(3)]
+        addresses += [SourceIndex(item, key, "instance") for item, key in detections]
+
+        assert len(addresses) == 18  # 2 sequences, 5 frames, 4 tracks, 7 detections
+        assert len(set(addresses)) == len(addresses)
+        assert sum(md.level_counts[level] for level in ("sequence", "unit", "track", "instance")) == len(addresses)
+
+    def test_the_two_spellings_of_one_address_collide(self):
+        """Why a producer states a level only where it has to: these hash apart.
+
+        An unkeyed address is the item level, so on a video ``SourceIndex(0)`` and
+        ``SourceIndex(0, None, "sequence")`` name one row. Resolving both to that level is
+        what lets the duplicate check see them as the collision they are.
+        """
+        md = _video()
+
+        with pytest.raises(ValueError, match="names the same sequence-level row more than once"):
+            md.add_factors({"night": [0.0, 1.0]}, source_index=[SourceIndex(0), SourceIndex(0, None, "sequence")])
+
+    def test_shuffling_the_addresses_does_not_move_the_values(self):
+        """Order carries no meaning: the address does. Both orders place identically."""
+        keys = list(zip(_per_frame()["item_index"], _per_frame()["unit_index"], strict=True))
+        values = _per_frame()["blur"]
+
+        forward = _video()
+        forward.add_factors({"blur": values}, source_index=self._addresses("unit", keys))
+        backward = _video()
+        backward.add_factors({"blur": values[::-1]}, source_index=self._addresses("unit", keys[::-1]))
+
+        assert forward._store.frame("unit")["blur"].to_list() == backward._store.frame("unit")["blur"].to_list()
+
+    def test_addresses_land_where_the_keyed_columns_land(self):
+        """The two spellings of one contract, asserted against each other."""
+        keyed = _video()
+        keyed.add_factors(_per_track(), level="track", key="track_id")
+
+        addressed = _video()
+        keys = list(zip(_per_track()["item_index"], _per_track()["track_ids"], strict=True))
+        addressed.add_factors({"speed": _per_track()["speed"]}, source_index=self._addresses("track", keys))
+
+        assert keyed._store.frame("track")["speed"].to_list() == addressed._store.frame("track")["speed"].to_list()
+
+
+@pytest.mark.required
+class TestAddressesThisMetadataCannotHonour:
+    """What a level-addressed source index is refused for, and how it says so."""
+
+    def test_a_key_no_row_carries_is_rejected(self):
+        md = _video()
+
+        with pytest.raises(ValueError, match="rows this metadata does not have"):
+            md.add_factors(
+                {"speed": [0.5, 0.9, 1.3, 1.7]},
+                source_index=[SourceIndex(0, 5, "track"), SourceIndex(0, 9, "track")]
+                + [SourceIndex(1, 99, "track"), SourceIndex(1, 7, "track")],
+            )
+
+    def test_the_rejection_says_which_columns_name_a_row(self):
+        md = _video()
+
+        with pytest.raises(ValueError, match=r"named \(item_index, track_id\)"):
+            md.add_factors(
+                {"speed": [0.5, 0.9, 1.3, 1.7]},
+                source_index=[SourceIndex(0, 5, "track"), SourceIndex(0, 9, "track")]
+                + [SourceIndex(1, 99, "track"), SourceIndex(1, 7, "track")],
+            )
+
+    def test_the_wrong_number_of_addresses_is_a_shape_error(self):
+        md = _video()
+
+        with pytest.raises(ShapeMismatchError, match="2 track-level values but the metadata has 4"):
+            md.add_factors(
+                {"speed": [0.5, 0.9]},
+                source_index=[SourceIndex(0, 5, "track"), SourceIndex(0, 9, "track")],
+            )
+
+    def test_nothing_is_written_when_the_addresses_are_refused(self):
+        md = _video()
+        before = set(md._store.columns)
+
+        with pytest.raises(ValueError, match="rows this metadata does not have"):
+            md.add_factors(
+                {"speed": [0.5, 0.9, 1.3, 1.7]},
+                source_index=[SourceIndex(0, 5, "track"), SourceIndex(0, 9, "track")]
+                + [SourceIndex(1, 99, "track"), SourceIndex(1, 7, "track")],
+            )
+        assert set(md._store.columns) == before
+
+    def test_building_from_addresses_cannot_reach_a_level_between(self):
+        """D2: placement widens to every level; construction from addresses does not.
+
+        An address names a row without saying what it sits inside, so nothing in a source
+        index says which frame a detection was seen in.
+        """
+        with pytest.raises(ValueError, match="metadata built from a source index alone"):
+            Metadata.from_factors(
+                {"blur": [0.0, 0.1]},
+                source_index=[SourceIndex(0, 0, "unit"), SourceIndex(0, 1, "unit")],
+            )
+
+    def test_the_construction_rejection_points_at_the_route_that_works(self):
+        with pytest.raises(ValueError, match=r"add_factors\(source_index=\.\.\.\)"):
+            Metadata.from_factors(
+                {"speed": [0.5, 0.9]},
+                source_index=[SourceIndex(0, 5, "track"), SourceIndex(0, 9, "track")],
+            )

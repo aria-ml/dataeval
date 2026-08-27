@@ -440,16 +440,66 @@ want a sequence-level summary. Use {meth}`.Metadata.agg` to compute
 coarser-grained metrics from finer ones. This keeps both the raw measurements
 and the summaries available.
 
-| Measured Entity | Level | How it is indexed |
+| Measured Entity | Level | Which column names a row |
 | --- | --- | --- |
-| Property of the whole video (e.g., codec, resolution, platform) | `sequence` | Positional |
-| Property of one frame (e.g., brightness, blur, scene cuts) | `unit` | Keyed on `unit_index` |
-| Property of one track (e.g., mean speed, total displacement) | `track` | Keyed on `track_id` |
-| Property of one detection (e.g., box area, confidence, IoU) | `instance` | Positional |
+| Property of the whole video (e.g., codec, resolution, platform) | `sequence` | — the item names it |
+| Property of one frame (e.g., brightness, blur, scene cuts) | `unit` | `unit_index` |
+| Property of one track (e.g., mean speed, total displacement) | `track` | `track_id` |
+| Property of one detection (e.g., box area, confidence, IoU) | `instance` | `target_index` |
 
-The `unit` and `track` levels are keyed because `unit_index` and `track_id`
-restart in every sequence. DataEval matches them using `(item_index, key)`,
-which you specify via the `key` parameter in {meth}`.Metadata.add_factors`.
+Every one of those names a row **within its item**, because `unit_index`,
+`track_id` and `target_index` all restart in every sequence. DataEval matches on
+`(item_index, key)` for that reason. A sequence needs no key of its own: there is
+one per item, so the item names it outright.
+
+```{warning}
+The key for a detection is `target_index`, **not** `instance_index`.
+`instance_index` numbers detections within a *frame*, so it repeats across the
+frames of one sequence — it names one row on an image dataset and several on a
+video, which is the worst way for a key to be wrong. `target_index` is dense
+within the item on every task.
+```
+
+### Naming a row: keys or addresses
+
+There are two spellings of that same table, and they agree by construction.
+
+**A column at a time** — the bulk form, and what a producer emitting whole arrays
+uses. Pass the key column alongside the values:
+
+```python
+md.add_factors(
+    {"item_index": [...], "track_id": [...], "speed": [...]},
+    level="track",
+    key="track_id",
+)
+```
+
+**One value at a time** — the scalar form, and what an evaluator's findings come
+back as. A {class}`.SourceIndex` is `(item, key, level)`, an address naming one
+row:
+
+```python
+md.add_factors({"speed": [...]}, source_index=[SourceIndex(0, 5, "track"), ...])
+```
+
+An address that states no level is the **task-generic** reading: the item level
+with no key, the label level under one. `SourceIndex(3)` names image 3 on an
+image dataset and video 3 on a tracking one, and `SourceIndex(3, 7)` names
+detection 7 of item 3 on either. That is what every producer emits, and it is why
+{func}`.compute_stats` output places correctly without knowing which kind of
+dataset it measured.
+
+State a level only where an unstated one would resolve to a different one — for a
+frame or a track. Two spellings of one address are not equal to each other, so a
+result keyed on addresses would hold both.
+
+An address names a row **without saying what it sits inside**, which is what lets
+one tuple reach every level of a diamond. The consequence is that addresses can
+place values into rows that already exist but cannot *build* the rows: nothing in
+a source index says which frame a detection was seen in, so
+{meth}`.Metadata.from_factors` given addresses builds the two-level shape only.
+Construct from the dataset, then place.
 
 ### The impact of misaligned storage levels
 

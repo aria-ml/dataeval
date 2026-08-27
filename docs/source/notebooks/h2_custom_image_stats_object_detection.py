@@ -127,19 +127,21 @@ print(f"Total images processed: {results_image_only['image_count']}")
 # The `source_index` field contains {class}`.SourceIndex` objects that track where each statistic came from:
 #
 # - `item`: The item index in the dataset
-# - `target`: The bounding box index (None for full images)
-# - `channel`: The channel index, populated only by the deprecated per-channel row path (band groups
-#   requested with `channels=` come back as columns instead, so this stays None)
+# - `key`: The bounding box index (None for full images). `target` is its retired spelling.
+# - `level`: Which level `key` addresses, left unstated by `compute_stats` — an unkeyed address is then the
+#   item level and a keyed one the label level
 #
-# That triple is what lets a single result carry values measured over different regions without ever confusing them.
+# That address is what lets a single result carry values measured over different regions without ever confusing
+# them. Band groups requested with `channels=` come back as columns rather than rows, so they need no slot of
+# their own.
 
 # %%
 # Display first 5 source indices
 print("First 5 SourceIndex entries (image-level only):")
 for i, src in enumerate(results_image_only["source_index"][:5]):
-    print(f"  {i}: item={src.item}, target={src.target}, channel={src.channel}")
+    print(f"  {i}: item={src.item}, key={src.key}")
 
-print(f"\nAll entries have target=None: {all(src.target is None for src in results_image_only['source_index'])}")
+print(f"\nAll entries have key=None: {all(src.key is None for src in results_image_only['source_index'])}")
 
 # %% [markdown]
 # ## Statistics on bounding boxes only
@@ -163,7 +165,7 @@ print(f"Total targets processed: {sum(results_target_only['object_count'])}")
 # Display source indices for targets from first image
 print("\nSourceIndex entries for targets in first few images:")
 for i, src in enumerate(results_target_only["source_index"][:5]):
-    print(f"  {i}: image={src.item}, target={src.target}, channel={src.channel}")
+    print(f"  {i}: image={src.item}, key={src.key}")
 
 # %% [markdown]
 # ## Statistics on both full images and bounding boxes
@@ -186,8 +188,8 @@ print(f"Total boxes processed: {sum(results_both['object_count'])}")
 print(f"Statistics calculated for each image: {list(results_both['stats'])}")
 
 # Separate image-level and box-level results
-image_indices = [i for i, src in enumerate(results_both["source_index"]) if src.target is None]
-target_indices = [i for i, src in enumerate(results_both["source_index"]) if src.target is not None]
+image_indices = [i for i, src in enumerate(results_both["source_index"]) if src.key is None]
+target_indices = [i for i, src in enumerate(results_both["source_index"]) if src.key is not None]
 
 print(f"\nImage-level results: {len(image_indices)}")
 print(f"Target-level results: {len(target_indices)}")
@@ -307,7 +309,7 @@ print(f"                back  ={units['unit_background_sharpness'].mean():.1f}")
 # 1. **Guarding the background**: `background_fraction` says how much of an image survived masking, and a background
 #    statistic should not be read without it. Hash and dimension statistics are not computed for the background at all.
 #
-# 1. **SourceIndex Tracking**: The {class}`.SourceIndex` objects allow us to precisely track which image, box, and channel
+# 1. **SourceIndex Tracking**: The {class}`.SourceIndex` objects allow us to precisely track which image and box
 #    each statistic corresponds to.
 #
 # 1. **Handing results to Metadata**: Passing a whole result to {meth}`.Metadata.add_factors` uses that tracking to place

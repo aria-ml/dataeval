@@ -20,13 +20,21 @@ from dataeval.core import (
 )
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, MetadataLike, Threshold, ThresholdLike
-from dataeval.quality._shared import add_dataset_index, checked_compute_stats, drop_null_index_columns
+from dataeval.quality._shared import (
+    LABEL_KIND,
+    add_dataset_index,
+    checked_compute_stats,
+    drop_null_index_columns,
+    reported_level,
+    selected_by_flags,
+)
 from dataeval.types import (
     ArrayND,
     ClusterConfigMixin,
     DataFrameOutput,
     Evaluator,
     EvaluatorConfig,
+    FactorLevel,
     SourceIndex,
     StatsMap,
     set_metadata,
@@ -54,19 +62,20 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
     - dataset_index: int - Index of the originating dataset (only present for multi-dataset output)
     - item_index: int - Index of the outlier item (local to each dataset)
-    - target_index: int | None - Index of the target/detection within the item (None for item-level outliers).
-      This column is omitted when all outliers are item-level (all target_index values would be None).
-    - channel_index: int | None - Index of the image channel (None for aggregated stats).
-      This column is omitted when all stats are aggregated across channels.
-
-      .. deprecated:: 1.1
-         Removed in v1.2.0 with the per-channel row path that populates it. Name band
-         groups with ``compute_stats(channels=...)`` instead: the band is then part of
-         ``metric_name`` (``nir_mean`` rather than ``mean`` on channel 3), and each band
-         is thresholded against its own distribution rather than one pooled across every
-         band of every image.
+    - target_index: int | None - Which row within the item, as its level names it (None for
+      item-level outliers). This is a target/detection index where `level` is absent, and
+      that level's own key where it is present — ``unit_index`` for a video frame,
+      ``track_id`` for a track. The column is omitted when every outlier is item-level.
+    - level: str | None - The level the outlier was detected at, carried through from the
+      statistics' source index. Omitted when no statistic stated one, which is what every
+      producer emits for an image dataset — there, an item-level row and a target-level row
+      are all an address can name, and `target_index` already tells them apart.
     - metric_name: str - Name of the metric that flagged this image/target
     - metric_value: float - Value of the metric for this image/target
+
+    Rows are thresholded **within a level**: a metric's distribution is fitted separately
+    over each kind of row the statistics name, so a per-frame reading is never compared
+    against a spread that includes per-sequence ones.
 
     Attributes
     ----------
@@ -118,6 +127,10 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             cols.insert(0, "dataset_index")
         if "target_index" in self.data().columns:
             cols.append("target_index")
+        if "level" in self.data().columns:
+            # Part of the row's identity, not a description of it: two rows differing only
+            # in level name different rows, at different levels of the same item.
+            cols.append("level")
         return self.data().select(cols).n_unique()
 
     # ------------------------------------------------------------------
@@ -140,14 +153,30 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         """
         df = self.data()
         is_cross = "dataset_index" in df.columns
-        has_targets = "target_index" in df.columns and df["target_index"].null_count() < len(df)
+        has_level = "level" in df.columns
+        # A stated level makes the row an address even with no key: an unkeyed one names
+        # the item's own row, and which level that is is what the column says.
+        has_targets = has_level or ("target_index" in df.columns and df["target_index"].null_count() < len(df))
+
+        def address(row: Mapping[str, Any]) -> SourceIndex:
+            """Return the row's address, spelled as the result that produced it spelled it.
+
+            The level is carried rather than filled in: an unstated one is the task-generic
+            reading, and stating it here would make ``outliers[SourceIndex(0, 3)]`` — the
+            spelling a caller writes — miss the row it names, since two spellings of one
+            address do not hash alike.
+            """
+            return SourceIndex(
+                row["item_index"],
+                row.get("target_index"),
+                row["level"] if has_level else None,
+            )
 
         if is_cross:
             if has_targets:
                 result_cross_target: dict[int, dict[SourceIndex, list[str]]] = {}
                 for row in df.iter_rows(named=True):
-                    si = SourceIndex(row["item_index"], row["target_index"])
-                    result_cross_target.setdefault(row["dataset_index"], {}).setdefault(si, []).append(
+                    result_cross_target.setdefault(row["dataset_index"], {}).setdefault(address(row), []).append(
                         row["metric_name"]
                     )
                 return result_cross_target  # type: ignore[return-value]
@@ -161,8 +190,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         if has_targets:
             result_target: dict[SourceIndex, list[str]] = {}
             for row in df.iter_rows(named=True):
-                si = SourceIndex(row["item_index"], row["target_index"])
-                result_target.setdefault(si, []).append(row["metric_name"])
+                result_target.setdefault(address(row), []).append(row["metric_name"])
             return result_target  # type: ignore[return-value]
 
         result_single: dict[int, list[str]] = {}
@@ -377,11 +405,19 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         # Check if target_index column exists
         has_target_id = "target_index" in self.data().columns
+        # Part of the row's identity, as it is for __len__ and the .outliers accessor: two
+        # rows differing only in level name different rows, and grouping without it would
+        # report a per-frame and a per-track finding on one line.
+        has_level = "level" in self.data().columns
 
-        index_cols = ["item_index", "target_index"] if has_target_id else ["item_index"]
+        index_cols = ["item_index"]
+        if has_target_id:
+            index_cols.append("target_index")
+        if has_level:
+            index_cols.append("level")
 
         # Build schema for known types
-        schema: Any = dict.fromkeys(index_cols, pl.Int64) | {"Total": pl.UInt32}
+        schema: Any = {name: pl.Utf8 if name == "level" else pl.Int64 for name in index_cols} | {"Total": pl.UInt32}
 
         # Handle empty DataFrame case
         if self.data().shape[0] == 0:
@@ -400,10 +436,15 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         # Note: Polars 1.0.0 pivot cannot handle null values in index columns, so we use a placeholder
         temp_null_placeholder = -1
+        temp_level_placeholder = ""
 
         # Replace null target_index with placeholder before pivot (if target_index exists)
         if has_target_id:
             grouped = grouped.with_columns(pl.col("target_index").fill_null(temp_null_placeholder))
+        # The level column is the same story one dtype over: it is null wherever a
+        # statistic stated no level, and the empty string is not a level name.
+        if has_level:
+            grouped = grouped.with_columns(pl.col("level").cast(pl.Utf8).fill_null(temp_level_placeholder))
 
         pivoted = grouped.pivot(on="metric_name", index=index_cols, values="flagged")
 
@@ -419,6 +460,10 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
                 .then(None)
                 .otherwise(pl.col("target_index"))
                 .alias("target_index"),
+            )
+        if has_level:
+            expressions.append(
+                pl.when(pl.col("level") == temp_level_placeholder).then(None).otherwise(pl.col("level")).alias("level"),
             )
 
         if metric_cols:
@@ -478,7 +523,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             outlier_dfs.append(cluster_df)
 
         merged = Outliers._merge_outlier_dfs(outlier_dfs)
-        merged = drop_null_index_columns(merged, ["target_index", "channel_index"])
+        merged = drop_null_index_columns(merged, ["target_index", "level"])
 
         return OutliersOutput(  # type: ignore[return-value]
             merged,
@@ -732,16 +777,21 @@ def _build_class_ids(  # noqa: C901
         image_to_unique_classes[img_idx] = {int(class_labels[k]) for k in label_indices}
 
     for i, si in enumerate(source_index):
-        if si.target is None:
+        kind = si.kind
+        if kind is None:
             # Image-level: assign class only if image has a single unique class
             classes = image_to_unique_classes.get(si.item, set())
             if len(classes) == 1:
                 class_ids[i] = next(iter(classes))
-        else:
+        elif kind == LABEL_KIND and si.key is not None:
             # Target-level: look up the specific target's class
             label_indices = image_to_label_indices.get(si.item, [])
-            if si.target < len(label_indices):
-                class_ids[i] = int(class_labels[label_indices[si.target]])
+            if si.key < len(label_indices):
+                class_ids[i] = int(class_labels[label_indices[si.key]])
+        # A key at any other level is that level's own key — a unit_index or a track_id —
+        # and names no label, so there is no class to look up. Left at -1, the global
+        # bucket, rather than indexing the label list with it and reporting the class of
+        # whichever detection happened to sit at that number.
 
     return class_ids
 
@@ -823,6 +873,28 @@ def _compute_outlier_mask(
     return outlier_mask
 
 
+def _masks_by_level(source_index: Sequence[SourceIndex]) -> list[NDArray[np.bool_]]:
+    """One boolean mask per kind of row the source index names.
+
+    Grouped by :attr:`~dataeval.types.SourceIndex.kind`, which says what an address names
+    without a dataset to resolve it against and reads two spellings of one row as one kind.
+    On the two-way split every producer emits today this returns exactly the item mask and
+    the label mask, in that order; on a source index that states levels it returns one mask
+    per level, so each is thresholded against its own distribution.
+    """
+    # Insertion-ordered, so the item level keeps coming first on the two-way split, which
+    # is the order compute_stats emits and the order the rows are already in. Numbered as
+    # the kinds are seen rather than by looking each up in a list of the distinct ones,
+    # which is a linear scan per entry over a source index holding one entry per detection.
+    codes: dict[FactorLevel | None, int] = {}
+    as_array = np.fromiter(
+        (codes.setdefault(src_idx.kind, len(codes)) for src_idx in source_index),
+        dtype=np.intp,
+        count=len(source_index),
+    )
+    return [as_array == code for code in range(len(codes))]
+
+
 def _detect_outliers(  # noqa: C901
     stats: StatsMap,
     source_index: Sequence[SourceIndex],
@@ -870,19 +942,22 @@ def _detect_outliers(  # noqa: C901
     """
     item_ids: list[int] = []
     target_ids: list[int | None] = []
-    channel_ids: list[int | None] = []
+    levels: list[str | None] = []
     metric_names: list[str] = []
     metric_values: list[float] = []
 
     if len(source_index) > 0:
-        is_image_level = np.array([src_idx.target is None for src_idx in source_index], dtype=bool)
-        is_target_level = ~is_image_level
+        # One mask per kind of row the source index names, rather than the two an
+        # ``(item, target)`` address could ever describe. A threshold is a distribution
+        # fitted to the values under it, so pooling a per-frame reading with a
+        # per-sequence one would compare each against a spread neither belongs to.
+        level_masks = _masks_by_level(source_index)
 
         for stat, values in stats.items():
             if values.ndim == 1 and np.issubdtype(values.dtype, np.number):
                 threshold = _resolve_metric_threshold(outlier_threshold, stat)
 
-                for level_mask in (is_image_level, is_target_level):
+                for level_mask in level_masks:
                     if not np.any(level_mask):
                         continue
 
@@ -893,8 +968,8 @@ def _detect_outliers(  # noqa: C901
                     if np.any(outlier_mask):
                         outlier_indices = level_indices[outlier_mask]
                         item_ids.extend(source_index[idx].item for idx in outlier_indices)
-                        target_ids.extend(source_index[idx].target for idx in outlier_indices)
-                        channel_ids.extend(source_index[idx].channel for idx in outlier_indices)
+                        target_ids.extend(source_index[idx].key for idx in outlier_indices)
+                        levels.extend(reported_level(source_index[idx]) for idx in outlier_indices)
                         metric_names.extend([stat] * len(outlier_indices))
                         metric_values.extend(values[outlier_indices].tolist())
 
@@ -903,7 +978,7 @@ def _detect_outliers(  # noqa: C901
             schema={
                 "item_index": pl.Int64,
                 "target_index": pl.Int64,
-                "channel_index": pl.Int64,
+                "level": pl.Categorical("lexical"),
                 "metric_name": pl.Categorical("lexical"),
                 "metric_value": pl.Float64,
             },
@@ -913,13 +988,15 @@ def _detect_outliers(  # noqa: C901
         {
             "item_index": pl.Series(item_ids, dtype=pl.Int64),
             "target_index": pl.Series(target_ids, dtype=pl.Int64),
-            "channel_index": pl.Series(channel_ids, dtype=pl.Int64),
+            "level": pl.Series(levels, dtype=pl.Categorical("lexical")),
             "metric_name": pl.Series(metric_names, dtype=pl.Categorical("lexical")),
             "metric_value": pl.Series(metric_values, dtype=pl.Float64),
         },
     )
 
-    return df.sort(["item_index", "target_index", "metric_name"])
+    # Level sits between the key and the metric: it is part of which row this is, so two
+    # readings of one item at different levels are ordered rather than left tied.
+    return df.sort(["item_index", "target_index", "level", "metric_name"])
 
 
 class Outliers(Evaluator):
@@ -1203,6 +1280,12 @@ class Outliers(Evaluator):
             When True, the ``.outliers`` accessor uses :class:`SourceIndex` keys;
             when False, it uses plain ``int`` item indices.
 
+            Both flags describe the two-way reading of an address that states no level —
+            an item's own row, or one of its labels. A statistic addressed at a level
+            *between* those, such as a video frame, is neither and is always included; the
+            ``.outliers`` accessor then uses :class:`SourceIndex` keys whatever `per_target`
+            says, since a plain item index cannot name such a row.
+
         Returns
         -------
         OutliersOutput
@@ -1247,18 +1330,19 @@ class Outliers(Evaluator):
         """
         combined_stats, combined_source_index, dataset_steps = combine_stats_results(stats)
 
-        # Filter source_index based on per_image/per_target flags
+        # Filter source_index based on per_image/per_target flags. An address that states
+        # a level is selected by neither and is always kept: the flags name the two ends of
+        # the two-way reading — an item's own row and one of its labels — and a level
+        # between them is not either, so a caller who supplied one has already said which
+        # rows they mean.
         if not (per_image and per_target):
-            mask = np.array([
-                (per_image and si.target is None) or (per_target and si.target is not None)
-                for si in combined_source_index
-            ])
+            mask = np.array([selected_by_flags(si, per_image, per_target) for si in combined_source_index])
             indices = np.flatnonzero(mask)
             combined_source_index = [combined_source_index[i] for i in indices]
             combined_stats = {k: v[indices] for k, v in combined_stats.items()}
 
         outliers_df = self._get_outliers(combined_stats, combined_source_index)
-        outliers_df = drop_null_index_columns(outliers_df, ["target_index", "channel_index"])
+        outliers_df = drop_null_index_columns(outliers_df, ["target_index", "level"])
 
         if dataset_steps:
             outliers_df = add_dataset_index(outliers_df, dataset_steps)
@@ -1356,23 +1440,31 @@ class Outliers(Evaluator):
 
         # Determine which optional columns are present in any DataFrame
         has_target_id = any("target_index" in df.columns for df in outliers_dfs)
-        has_channel_id = any("channel_index" in df.columns for df in outliers_dfs)
+        has_level = any("level" in df.columns for df in outliers_dfs)
+        # Kept rather than selected away: every frame carries it once the caller has been
+        # through add_dataset_index, and dropping it here turned a cross-dataset result
+        # back into a single-dataset one — item indices with nothing saying whose they are.
+        has_dataset_id = all("dataset_index" in df.columns for df in outliers_dfs)
 
-        column_order = ["item_index"]
+        column_order = ["dataset_index"] if has_dataset_id else []
+        column_order.append("item_index")
         if has_target_id:
             column_order.append("target_index")
-        if has_channel_id:
-            column_order.append("channel_index")
+        if has_level:
+            column_order.append("level")
         column_order.extend(["metric_name", "metric_value"])
 
         normalized_dfs: list[pl.DataFrame] = []
         for df in outliers_dfs:
             if has_target_id and "target_index" not in df.columns:
                 df = df.with_columns(pl.lit(None, dtype=pl.Int64).alias("target_index"))
-            if has_channel_id and "channel_index" not in df.columns:
-                df = df.with_columns(pl.lit(None, dtype=pl.Int64).alias("channel_index"))
+            if has_level and "level" not in df.columns:
+                df = df.with_columns(pl.lit(None, dtype=pl.Categorical("lexical")).alias("level"))
             normalized_dfs.append(df.select(column_order))
-        return pl.concat(normalized_dfs).sort(["item_index", "target_index", "metric_name"])
+        # Sorted on the columns that survived, not on a fixed list: an item-level-only
+        # result has no target_index to sort by, and naming it raised ColumnNotFoundError.
+        sort_columns = [name for name in column_order if name != "metric_value"]
+        return pl.concat(normalized_dfs).sort(sort_columns)
 
     @staticmethod
     def _find_outliers_adaptive(
@@ -1710,7 +1802,7 @@ class Outliers(Evaluator):
             outliers_dfs.append(cluster_df)
 
         return OutliersOutput(  # type: ignore[return-value]
-            drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs), ["target_index", "channel_index"]),
+            drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs), ["target_index", "level"]),
             calculation_results=stats_result,
             outlier_threshold=self.outlier_threshold,
             cluster_stats=stored_cluster_stats,
@@ -1759,7 +1851,7 @@ class Outliers(Evaluator):
                 class_ids = _build_class_ids(combined_source_index, metadata)
 
             outliers_df = self._get_outliers(combined_stats, combined_source_index, class_ids)
-            outliers_df = drop_null_index_columns(outliers_df, ["target_index", "channel_index"])
+            outliers_df = drop_null_index_columns(outliers_df, ["target_index", "level"])
             outliers_df = add_dataset_index(outliers_df, dataset_steps)
             outliers_dfs.append(outliers_df)
 
@@ -1790,7 +1882,7 @@ class Outliers(Evaluator):
             outliers_dfs.append(cluster_df)
 
         return OutliersOutput(  # type: ignore[return-value]
-            drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs), ["target_index", "channel_index"]),
+            drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs), ["target_index", "level"]),
             calculation_results=stats_results if stats_results else None,
             outlier_threshold=self.outlier_threshold,
             cluster_stats=stored_cluster_stats,

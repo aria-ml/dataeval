@@ -3,7 +3,7 @@
 __all__ = []
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Generic, Literal, TypeVar, overload
+from typing import Any, Generic, Literal, TypeVar, cast, overload
 
 import numpy as np
 import polars as pl
@@ -14,12 +14,19 @@ from dataeval import Embeddings
 from dataeval.core import ClusterResult, StatsResult, cluster, combine_stats_results
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor
-from dataeval.quality._shared import checked_compute_stats, drop_null_index_columns, get_dataset_step_from_idx
+from dataeval.quality._shared import (
+    LABEL_KIND,
+    checked_compute_stats,
+    drop_null_index_columns,
+    get_dataset_step_from_idx,
+    reported_level,
+)
 from dataeval.types import (
     ClusterConfigMixin,
     DataFrameOutput,
     Evaluator,
     EvaluatorConfig,
+    FactorLevel,
     SourceIndex,
     StatsMap,
     set_metadata,
@@ -82,6 +89,7 @@ _EMPTY_DUPS_SCHEMA: dict[str, pl.DataType | type] = {
     "dup_type": pl.Utf8,
     "item_indices": pl.List(pl.Int64),
     "target_indices": pl.List(pl.Int64),
+    "address_levels": pl.List(pl.Utf8),
     "methods": pl.List(pl.Utf8),
     "orientation": pl.Utf8,
 }
@@ -135,13 +143,13 @@ def _merge_near_groups(  # noqa: C901
         # Keep groups separate - each group has a single method
         groups = [
             (
-                tuple(sorted(group)),
+                tuple(sorted(group, key=_address_order)),
                 frozenset({method}),
                 None if is_unknown else _get_orientation(frozenset({method})),
             )
             for group, method in method_groups
         ]
-        return sorted(groups, key=lambda g: g[0])
+        return sorted(groups, key=lambda g: _group_order(g[0]))
 
     # Merge overlapping groups and union their methods
     # Each entry: (set of indices, set of methods)
@@ -170,14 +178,14 @@ def _merge_near_groups(  # noqa: C901
 
     result = [
         (
-            tuple(sorted(indices)),
+            tuple(sorted(indices, key=_address_order)),
             frozenset(methods),
             None if is_unknown else _get_orientation(frozenset(methods)),
         )
         for indices, methods in merged
         if len(indices) > 1
     ]
-    return sorted(result, key=lambda g: g[0])
+    return sorted(result, key=lambda g: _group_order(g[0]))
 
 
 def _find_cluster_duplicates(
@@ -232,12 +240,69 @@ def _sorted_union_find(index_groups: Any) -> list[list[Any]]:
     return sorted(groups)
 
 
+def _is_between_the_ends(members: Sequence[Any]) -> bool:
+    """Whether a group's members address a level between an item and one of its labels.
+
+    Every member of a group shares a kind by construction — `_detect_hash_duplicates`
+    buckets on it before anything is compared — so the first member answers for all.
+    """
+    first = next((m for m in members if isinstance(m, SourceIndex)), None)
+    return first is not None and first.kind not in (None, LABEL_KIND)
+
+
+def _selected_targets(groups: Sequence[Any], per_target: bool, near: bool = False) -> list[Any]:
+    """Return the label-role groups `per_target` selects, plus every group between the ends.
+
+    `per_image` and `per_target` name the two ends of the level graph — an item's own row,
+    and one of its labels — and a group's kind says which of those it is, canonically, so
+    the fully explicit spelling of a result is gated exactly as the minimal spelling is. A
+    group addressing a level *between* the ends, such as a video frame, is neither, so
+    neither flag has a say over it.
+    """
+    if per_target:
+        return list(groups)
+    return [g for g in groups if _is_between_the_ends(g[0] if near else g)]
+
+
+def _address_order(index: "SourceIndex | int") -> tuple[int, int, str]:
+    """Sort key for a member, whether it is an address or a bare item index.
+
+    An item's own row is reported as a bare index rather than as an address, so a group's
+    members are one or the other and both have to order against the same key.
+    :attr:`~dataeval.types.SourceIndex.sort_key` is that key for an address, and a bare
+    index is the unkeyed address it stands for.
+    """
+    return index.sort_key if isinstance(index, SourceIndex) else (index, -1, "")
+
+
+def _group_order(members: Sequence[Any]) -> list[tuple[int, int, str]]:
+    """Sort key for a whole group, ordering it the way its members order.
+
+    The one spelling of "compare these groups", so that every sort over groups agrees and
+    none of them falls back to comparing addresses as the raw tuples they are.
+    """
+    return [_address_order(member) for member in members]
+
+
+def _member_levels(row: Mapping[str, Any]) -> Sequence[FactorLevel | None]:
+    """Return the level each member's address states, or nulls when the row carries none.
+
+    The column holds whatever the addresses stated, and an address cannot hold a value that
+    is not a level — :class:`~dataeval.types.SourceIndex` rejects one on construction — so
+    what comes back out is a level or nothing.
+    """
+    levels = row.get("address_levels")
+    if levels is None:
+        return [None] * len(row["item_indices"])
+    return cast("Sequence[FactorLevel | None]", levels)
+
+
 def _extract_members(row: Mapping[str, Any], has_targets: bool) -> list[int] | list[SourceIndex]:
     """Extract member indices from a single DataFrame row."""
     if has_targets:
         return [
-            SourceIndex(item=item, target=target)
-            for item, target in zip(row["item_indices"], row["target_indices"], strict=True)
+            SourceIndex(item=item, key=target, level=level)
+            for item, target, level in zip(row["item_indices"], row["target_indices"], _member_levels(row), strict=True)
         ]
     return row["item_indices"]
 
@@ -246,8 +311,11 @@ def _group_by_dataset(row: Mapping[str, Any], has_targets: bool) -> dict[int, li
     """Group a row's members by dataset index."""
     by_ds: dict[int, list[Any]] = {}
     if has_targets:
-        for item, target, ds in zip(row["item_indices"], row["target_indices"], row["dataset_indices"], strict=True):
-            by_ds.setdefault(ds, []).append(SourceIndex(item=item, target=target))
+        members = zip(
+            row["item_indices"], row["target_indices"], _member_levels(row), row["dataset_indices"], strict=True
+        )
+        for item, target, level, ds in members:
+            by_ds.setdefault(ds, []).append(SourceIndex(item=item, key=target, level=level))
     else:
         for item, ds in zip(row["item_indices"], row["dataset_indices"], strict=True):
             by_ds.setdefault(ds, []).append(item)
@@ -282,19 +350,27 @@ def _get_groups_cross(filtered: pl.DataFrame, has_targets: bool, is_near: bool) 
 def _indices_to_row_fields(
     indices: Sequence[Any],
     dataset_steps: Sequence[int] | None,
-) -> tuple[list[int], list[int | None], list[int] | None]:
-    """Extract item_indices, target_indices, and optional dataset_ids from raw indices."""
+) -> tuple[list[int], list[int | None], list[str | None], list[int] | None]:
+    """Destructure a group's members into the row's columns.
+
+    The level is carried out alongside the item and the key rather than dropped, so that
+    :func:`_extract_members` can rebuild the address that went in. Without it a frame comes
+    back as ``SourceIndex(0, 3)``, which names detection 3 of item 0 — a different row.
+    """
     item_indices: list[int] = []
     target_indices: list[int | None] = []
+    levels: list[str | None] = []
     dataset_ids: list[int] = [] if dataset_steps is not None else None  # type: ignore[assignment]
 
     for idx in indices:
         if isinstance(idx, SourceIndex):
             item_idx = idx.item
-            target_idx = idx.target
+            target_idx = idx.key
+            level = reported_level(idx)
         else:
             item_idx = idx
             target_idx = None
+            level = None
 
         if dataset_steps is not None:
             ds_idx, item_idx = get_dataset_step_from_idx(item_idx, dataset_steps)
@@ -302,8 +378,9 @@ def _indices_to_row_fields(
 
         item_indices.append(item_idx)
         target_indices.append(target_idx)
+        levels.append(level)
 
-    return item_indices, target_indices, dataset_ids
+    return item_indices, target_indices, levels, dataset_ids
 
 
 def _make_row(
@@ -316,13 +393,14 @@ def _make_row(
     dataset_steps: Sequence[int] | None,
 ) -> dict[str, Any]:
     """Build a single DataFrame row dict from a duplicate group."""
-    item_ids, target_ids, ds_ids = _indices_to_row_fields(indices, dataset_steps)
+    item_ids, target_ids, address_levels, ds_ids = _indices_to_row_fields(indices, dataset_steps)
     row: dict[str, Any] = {
         "group_id": group_id,
         "level": level,
         "dup_type": dup_type,
         "item_indices": item_ids,
         "target_indices": target_ids,
+        "address_levels": address_levels,
     }
     if ds_ids is not None:
         row["dataset_indices"] = ds_ids
@@ -353,7 +431,11 @@ def _build_duplicates_dataframe(  # noqa: C901
         ("target", target_exact, target_near_method_groups),
     ):
         if exact_groups:
-            for group in sorted(sorted(g) for g in exact_groups):
+            # Members first, then the groups by their own first member: exact groups are
+            # member-disjoint, so the first member already orders them and the whole-group
+            # key would pay `_address_order` once per member for nothing.
+            ordered = [sorted(g, key=_address_order) for g in exact_groups]
+            for group in sorted(ordered, key=lambda g: _address_order(g[0])):
                 rows.append(_make_row(group, group_id, level, "exact", ["xxhash"], None, dataset_steps))
                 group_id += 1
 
@@ -379,12 +461,14 @@ def _build_duplicates_dataframe(  # noqa: C901
             continue
         schema[key] = dtype
 
-    if not rows:
-        return pl.DataFrame(schema=schema)
-
+    # An empty result drops the same optional columns a populated one does. Returning the
+    # full schema here made a clean dataset's frame two columns wider than a dirty one's,
+    # so concatenating results across datasets failed on the width and a consumer testing
+    # for `address_levels` to learn whether the statistics were levelled read True for
+    # every image-task run that happened to find nothing.
     df = pl.DataFrame(rows, schema=schema)
 
-    return drop_null_index_columns(df, ["target_indices"])
+    return drop_null_index_columns(df, ["target_indices", "address_levels"])
 
 
 def _find_hash_groups(
@@ -462,27 +546,47 @@ def _detect_hash_duplicates(
 ]:
     """Extract duplicate groups from hash statistics, separating items and targets.
 
+    Rows are bucketed by :attr:`~dataeval.types.SourceIndex.kind` before anything is
+    compared, so a reading of one kind of row is never hashed against a reading of another
+    — a video frame and a detection inside it are both keyed addresses, and pooling them
+    would call them duplicates of each other. On the two-way split every producer emits
+    today this is exactly the item bucket and the target bucket.
+
+    The two *roles* stay two. A bucket of no kind is an item's own row, reported as a bare
+    item index because that is what names it; every other bucket reports as an address,
+    which is what carries its level.
+
     Returns
     -------
     tuple of ((item_exact, item_method_groups), (target_exact, target_method_groups))
         Raw detection results for item-level and target-level duplicates.
     """
-    item_indices: list[int] = []
-    target_indices: list[int] = []
+    buckets: dict[FactorLevel | None, list[int]] = {}
     for i, src_idx in enumerate(source_index):
-        (target_indices if src_idx.target is not None else item_indices).append(i)
+        buckets.setdefault(src_idx.kind, []).append(i)
 
     hash_methods = ["phash", "dhash", "phash_d4", "dhash_d4"]
 
-    item_exact = _find_exact_groups(stats, item_indices, lambda i: source_index[i].item)
-    item_near = _find_near_group_pairs(stats, source_index, item_indices, item_exact, hash_methods)
+    item_exact: list[Any] = []
+    item_near: MethodGroups = []
+    target_exact: list[Any] = []
+    target_near: MethodGroups = []
+    for kind, indices in buckets.items():
+        if kind is not None:
+            exact = _find_exact_groups(stats, indices, lambda i: source_index[i])
+            target_exact.extend(exact)
+            target_near.extend(
+                _find_near_group_pairs(stats, source_index, indices, exact, hash_methods, use_source_index=True)
+            )
+        else:
+            exact = _find_exact_groups(stats, indices, lambda i: source_index[i].item)
+            item_exact.extend(exact)
+            item_near.extend(_find_near_group_pairs(stats, source_index, indices, exact, hash_methods))
 
-    target_exact = _find_exact_groups(stats, target_indices, lambda i: source_index[i])
-    target_near = _find_near_group_pairs(
-        stats, source_index, target_indices, target_exact, hash_methods, use_source_index=True
-    )
-
-    return (sorted(item_exact) or [], item_near), (sorted(target_exact) or [], target_near)
+    # Ordering is left to :func:`_build_duplicates_dataframe`, the sole consumer, which
+    # sorts the members of every group and then the groups themselves. Sorting here as
+    # well ordered groups whose members were not yet in order, and paid for it twice.
+    return (item_exact, item_near), (target_exact, target_near)
 
 
 def _prepare_hash_inputs(
@@ -507,14 +611,24 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     Wraps a Polars DataFrame of duplicate groups with aggregation helpers
     and threshold-based redetection for cluster duplicates.
 
+    Rows are compared **within a kind of row**: readings are bucketed by what their
+    addresses name before any hash is compared, so a video frame is never called a
+    duplicate of a detection inside it.
+
     DataFrame of duplicate groups with columns:
 
     - group_id: int - Auto-incrementing ID for each duplicate group
-    - level: str - ``"item"`` or ``"target"``
+    - level: str - ``"item"`` or ``"target"``: whether the group's members are whole items
+      or rows inside them. This is the *role* the group was detected in, and its vocabulary
+      is these two words rather than the metadata level names — see `address_levels`.
     - dup_type: str - ``"exact"`` or ``"near"``
     - item_indices: list[int] - Item indices of members in the group
-    - target_indices: list[int] - Target indices within items (only when target-level
-      groups exist, positionally aligned with item_indices)
+    - target_indices: list[int] - Which row within each item, as its level names it (only
+      when target-level groups exist, positionally aligned with item_indices)
+    - address_levels: list[str] - The metadata level each member's address states, or null
+      where it states none. Present only when some statistic stated one, which is what a
+      video producer emits and an image one does not — there, `level` already says
+      everything an address could.
     - methods: list[str] - Detection method names (e.g., ``["phash", "dhash"]``)
     - orientation: str | None - ``"same"``, ``"rotated"``, or None (only present
       when both basic and D4 hashes were computed)
@@ -1131,8 +1245,8 @@ class Duplicates(Evaluator):
         df = _build_duplicates_dataframe(
             (item_exact or None) if per_image else None,
             item_near if per_image else [],
-            (target_exact or None) if per_target else None,
-            target_near if per_target else [],
+            _selected_targets(target_exact, per_target) or None,
+            _selected_targets(target_near, per_target, near=True),
             available_stats,
             self.merge_near_duplicates,
             dataset_steps=dataset_steps,
