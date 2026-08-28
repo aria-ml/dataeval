@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from dataeval.data import merge_datasets
@@ -16,6 +18,26 @@ class _LabeledDataset:
 
     def __getitem__(self, index: int):
         return self._items[index]
+
+
+class _IterableDataset:
+    """Dataset that offers __iter__ as a convenience and carries no metadata.
+
+    Both traits matter: a dataset like this is structurally indistinguishable from a
+    collection of datasets, so it guards against unpacking exploding it into its datums.
+    """
+
+    def __init__(self, tag: str, n: int) -> None:
+        self._items = [(tag, i) for i in range(n)]
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def __getitem__(self, index: int):
+        return self._items[index]
+
+    def __iter__(self):
+        return iter(self._items)
 
 
 @pytest.mark.required
@@ -53,3 +75,97 @@ class TestMergeDatasets:
         i2l = {0: "cat", 1: "dog"}
         merged = merge_datasets(_LabeledDataset("a", 2, i2l), _LabeledDataset("b", 3, i2l))
         assert repr(merged) == "merge_datasets(2 datasets, len=5)"
+
+
+@pytest.mark.required
+class TestMergeDatasetsInputForms:
+    """Datasets may be passed one per argument or packed in a sequence/iterable."""
+
+    I2L = {0: "cat", 1: "dog"}
+
+    def _expected(self):
+        return [("a", 0), ("a", 1), ("b", 0), ("b", 1), ("b", 2)]
+
+    def _datasets(self):
+        return _LabeledDataset("a", 2, self.I2L), _LabeledDataset("b", 3, self.I2L)
+
+    @pytest.mark.parametrize("pack", [list, tuple, iter, lambda ds: (d for d in ds)])
+    def test_packed_matches_unpacked(self, pack):
+        """A list, tuple, iterator or generator of datasets merges like separate arguments."""
+        merged = merge_datasets(pack(self._datasets()))
+        assert len(merged) == 5
+        assert list(iter(merged)) == self._expected()
+        assert merged.metadata.get("index2label") == self.I2L
+        assert repr(merged) == "merge_datasets(2 datasets, len=5)"
+
+    def test_mixed_packed_and_unpacked(self):
+        """Packed and unpacked arguments can be combined, and order is preserved."""
+        a, b = self._datasets()
+        c = _LabeledDataset("c", 1, self.I2L)
+        merged = merge_datasets(a, [b, c])
+        assert list(iter(merged)) == [*self._expected(), ("c", 0)]
+
+    def test_nested_collections_are_flattened(self):
+        """Nesting the collections does not change the result.
+
+        Only one level of packing is part of the declared signature, hence the untyped
+        input; deeper nesting is tolerated rather than advertised.
+        """
+        a, b = self._datasets()
+        nested: list[Any] = [[a], (b,)]
+        assert list(iter(merge_datasets(nested))) == self._expected()
+
+    def test_single_packed_dataset_is_a_view(self):
+        merged = merge_datasets([_LabeledDataset("a", 3, self.I2L)])
+        assert len(merged) == 3
+        assert merged.metadata.get("index2label") == self.I2L
+
+    def test_empty_collection_requires_at_least_one_dataset(self):
+        with pytest.raises(ValueError, match="at least one"):
+            merge_datasets([])
+
+    @pytest.mark.parametrize("bad", [1, None, "dataset"])
+    def test_non_dataset_argument_raises(self, bad):
+        """Anything that is neither a dataset nor a collection of them is rejected."""
+        with pytest.raises(TypeError, match="merge_datasets accepts datasets"):
+            merge_datasets(_LabeledDataset("a", 1, self.I2L), bad)
+
+    def test_iterable_dataset_without_metadata_is_not_unpacked(self):
+        """A dataset with __iter__ and no metadata merges as one dataset, not as a container.
+
+        The declared signature asks for an :class:`~dataeval.protocols.AnnotatedDataset`,
+        hence the untyped inputs; a missing vocabulary is tolerated at runtime (it only
+        warns), so unpacking must not mistake such a dataset for a collection.
+        """
+        a: Any = _IterableDataset("a", 2)
+        b: Any = _IterableDataset("b", 3)
+        with pytest.warns(UserWarning, match="index2label"):
+            merged = merge_datasets(a, b)
+        assert len(merged) == 5
+        assert list(iter(merged)) == self._expected()
+
+    def test_non_dataset_nested_in_a_collection_raises(self):
+        """A bad element is rejected wherever it sits, not only at the top level."""
+        a, b = self._datasets()
+        packed: list[Any] = [a, [b, None]]
+        with pytest.raises(TypeError, match="merge_datasets accepts datasets"):
+            merge_datasets(packed)
+
+    def test_self_referential_collection_raises_type_error(self):
+        """A container holding itself reports the cycle instead of overflowing the stack."""
+        packed: list[Any] = [_LabeledDataset("a", 1, self.I2L)]
+        packed.append(packed)
+        with pytest.raises(TypeError, match="contains itself"):
+            merge_datasets(packed)
+
+    def test_mapping_reports_that_it_yields_keys(self):
+        """Iterating a mapping yields keys, so the error names the mapping, not 'str'."""
+        a, b = self._datasets()
+        by_name: Any = {"a": a, "b": b}
+        with pytest.raises(TypeError, match="pass the values"):
+            merge_datasets(by_name)
+
+    def test_packed_input_still_validates_vocabularies(self):
+        """Validation applies to packed datasets exactly as to unpacked ones."""
+        with pytest.raises(ValueError, match="index2label"):
+            merge_datasets([_LabeledDataset("a", 1, {0: "cat"}), _LabeledDataset("b", 1, {0: "dog"})])
