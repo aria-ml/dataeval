@@ -58,6 +58,7 @@ datasets for machine learning.
 ../notebooks/h2_embed_detection_crops.py
 ../notebooks/h2_cluster_analysis.py
 ../notebooks/h2_deduplicate.py
+../notebooks/h2_deduplicate_video.py
 ../notebooks/h2_visualize_cleaning_issues.py
 ../notebooks/h2_trace_findings_to_source.py
 ../notebooks/h2_custom_image_stats_object_detection.py
@@ -127,6 +128,9 @@ datasets for machine learning.
 - - [](../notebooks/h2_deduplicate.py)
   - Identify and remove duplicates from a PyTorch Dataset
   - [![Open In Colab][colab-badge]][dupe-colab]
+- - [](../notebooks/h2_deduplicate_video.py)
+  - Find duplicate video, train/test leakage, and redundant footage
+  - [![Open In Colab][colab-badge]][vdupe-colab]
 - - [](../notebooks/h2_visualize_cleaning_issues.py)
   - Find negatively impactful images in multiple backgrounds
   - [![Open In Colab][colab-badge]][clean-colab]
@@ -183,6 +187,7 @@ datasets for machine learning.
 [crop-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_embed_detection_crops.ipynb
 [clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_cluster_analysis.ipynb
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_deduplicate.ipynb
+[vdupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_deduplicate_video.ipynb
 [clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_visualize_cleaning_issues.ipynb
 [trace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_trace_findings_to_source.ipynb
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_custom_image_stats_object_detection.ipynb

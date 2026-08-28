@@ -135,6 +135,7 @@ for k, v in duplicates.items():
 # - [Clustering](../concepts/Clustering.md) — Understand clustering techniques for grouping similar data points and detecting patterns.
 # - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data quality issues.
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Evaluate bias and coverage across metadata factors in your dataset.
+# - [How to find duplicate video](./h2_deduplicate_video.py) — Find duplicate footage, train/test leakage, and redundant frames in video and MOT datasets.
 # - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
 # - [Introduction to data cleaning](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
 # - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors such as dimensions and pixel statistics to dataset metadata.

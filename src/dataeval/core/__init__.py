@@ -8,6 +8,8 @@ __all__ = [
     "CoverageResult",
     "DivergenceResult",
     "FeatureDistanceResult",
+    "HashGroupResult",
+    "HashNeighborResult",
     "LabelAlignmentResult",
     "LabelCoverageResult",
     "LabelErrorResult",
@@ -21,8 +23,13 @@ __all__ = [
     "OntologyValidationResult",
     "ParityResult",
     "RankResult",
+    "RedundantRunResult",
+    "SegmentMatchResult",
+    "SequenceFingerprint",
     "StatsResult",
+    "SubsequenceAlignment",
     "TrackStatsResult",
+    "align_subsequence",
     "ber_knn",
     "ber_mst",
     "cluster",
@@ -41,6 +48,9 @@ __all__ = [
     "feature_distance",
     "factor_deviation",
     "factor_predictors",
+    "hamming_distance",
+    "hash_groups",
+    "hash_neighbors",
     "is_continuous",
     "label_alignment",
     "label_coverage",
@@ -48,6 +58,7 @@ __all__ = [
     "label_parity",
     "label_reconciliation",
     "label_stats",
+    "match_segments",
     "minimum_spanning_tree",
     "mutual_info",
     "mutual_info_classwise",
@@ -57,6 +68,7 @@ __all__ = [
     "nullmodel_metrics",
     "nullmodel_recall",
     "ontology_validation",
+    "pack_hashes",
     "parity",
     "phash",
     "phash_d4",
@@ -67,11 +79,15 @@ __all__ = [
     "rank_kmeans_complexity",
     "rank_result_class_balanced",
     "rank_result_stratified",
+    "redundant_runs",
+    "sequence_containment",
+    "sequence_fingerprint",
     "track_stats",
     "xxhash",
     "uap",
 ]
 
+from dataeval.core._alignment import SubsequenceAlignment, align_subsequence
 from dataeval.core._ber import BERResult, ber_knn, ber_mst
 from dataeval.core._bin import is_continuous
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
@@ -81,7 +97,14 @@ from dataeval.core._compute_stats import StatsResult, combine_stats_results, com
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
-from dataeval.core._hash import dhash, dhash_d4, phash, phash_d4, xxhash
+from dataeval.core._hash import dhash, dhash_d4, hamming_distance, phash, phash_d4, xxhash
+from dataeval.core._hash_index import (
+    HashGroupResult,
+    HashNeighborResult,
+    hash_groups,
+    hash_neighbors,
+    pack_hashes,
+)
 from dataeval.core._label_alignment import LabelAlignmentResult, label_alignment
 from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
 from dataeval.core._label_errors import LabelErrorResult, label_errors
@@ -112,5 +135,13 @@ from dataeval.core._rank import (
     rank_result_class_balanced,
     rank_result_stratified,
 )
+from dataeval.core._sequence_match import (
+    SegmentMatchResult,
+    SequenceFingerprint,
+    match_segments,
+    sequence_containment,
+    sequence_fingerprint,
+)
+from dataeval.core._temporal import RedundantRunResult, redundant_runs
 from dataeval.core._track_stats import TrackStatsResult, track_stats
 from dataeval.core._uap import uap
