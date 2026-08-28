@@ -377,12 +377,24 @@ def docs(session: nox.Session) -> None:
         session.run("python", "../../docs/check_notebook_cache.py", "--clean")
 
 
-@session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"], uv_sync_locked=False)
-def lock(session: nox.Session) -> None:
-    """Lock dependencies in "uv.lock". Update dependencies by calling `nox -e lock -- upgrade`."""
-    upgrade_args = ["--upgrade"] if "upgrade" in session.posargs else []
-    session.run("uv", "lock", *upgrade_args)
+# Files derived from pyproject.toml + uv.lock and committed alongside them. They
+# are what the pip and conda install lanes validate against, so a stale copy means
+# those lanes certify an environment nobody ships.
+EXPORTED_DEPENDENCY_FILES = [f"requirements.{variant}.txt" for variant in DEVICE_VARIANTS] + [
+    "requirements.dev.txt",
+    "environment.yml",
+]
 
+
+def _export_dependency_files(session: nox.Session) -> None:
+    """Regenerate `EXPORTED_DEPENDENCY_FILES` from pyproject.toml and uv.lock.
+
+    Shared by ``lock`` and ``check`` so the two cannot disagree about what
+    "up to date" means. The commands must match byte for byte, arguments
+    included: both `uv export` and `p2c` record the invoking command line in the
+    file header, so regenerating with different arguments would differ on the
+    header alone.
+    """
     for variant in DEVICE_VARIANTS:
         out = Path(f"requirements.{variant}.txt")
         session.run(
@@ -425,6 +437,14 @@ def lock(session: nox.Session) -> None:
         "--output",
         "environment.yml",
     )
+
+
+@session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"], uv_sync_locked=False)
+def lock(session: nox.Session) -> None:
+    """Lock dependencies in "uv.lock". Update dependencies by calling `nox -e lock -- upgrade`."""
+    upgrade_args = ["--upgrade"] if "upgrade" in session.posargs else []
+    session.run("uv", "lock", *upgrade_args)
+    _export_dependency_files(session)
 
 
 @session(uv_only_groups=["docsync"], uv_no_install_project=True)
@@ -482,5 +502,17 @@ def docsync(session: nox.Session) -> None:
 
 @session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"])
 def check(session: nox.Session) -> None:
-    """Validate lock file and exported dependency files are up to date."""
+    """Validate lock file and exported dependency files are up to date.
+
+    The exported half of that docstring was previously unenforced: only uv.lock
+    was checked, so the committed requirements.*.txt and environment.yml could
+    drift from pyproject.toml unnoticed -- and the conda lane then validated an
+    environment.yml that no longer matched.
+
+    Regenerating in place rather than into a scratch directory mirrors the `lint`
+    session: a local run repairs the tree, and CI still fails because the diff is
+    non-empty and the container is discarded either way.
+    """
     session.run("uv", "lock", "--check")
+    _export_dependency_files(session)
+    session.run("git", "diff", "--exit-code", "--", *EXPORTED_DEPENDENCY_FILES, external=True)

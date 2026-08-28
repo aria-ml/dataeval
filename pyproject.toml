@@ -266,6 +266,7 @@ reportMissingImports = false
 testpaths = ["tests"]
 filterwarnings = [
   "ignore:The default value of normalize_pixel_values changed:FutureWarning",
+  "ignore:The default value of hash_radius will change:FutureWarning",
   "ignore:Clustering metrics expect discrete values but received continuous values:UserWarning",
 ]
 addopts = [
