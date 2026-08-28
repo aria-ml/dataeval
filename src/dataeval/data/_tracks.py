@@ -9,6 +9,7 @@ import numpy as np
 from dataeval._log import get_logger
 from dataeval.protocols import Dataset, MultiobjectTrackingDataset, MultiobjectTrackingTarget
 from dataeval.types import Track
+from dataeval.types._target import own_class_scores
 
 _logger = get_logger(__name__)
 
@@ -49,8 +50,8 @@ def _build_tracks(tracking_target: MultiobjectTrackingTarget) -> Mapping[int, Tr
         if tracked.size == 0:
             continue
         boxes = np.asarray(frame_target.boxes)
-        scores = np.asarray(frame_target.scores)
-        labels = np.asarray(frame_target.labels)
+        labels = np.asarray(frame_target.labels).reshape(-1)
+        scores = own_class_scores(getattr(frame_target, "scores", None), labels.astype(np.intp))
         for det_idx in tracked.tolist():
             tid = int(track_ids[det_idx])
             _boxes[tid].append(boxes[det_idx].tolist())

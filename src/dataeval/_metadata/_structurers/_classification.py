@@ -39,6 +39,21 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
 
     profile = TASK_PROFILES["IC"]
 
+    def _score_vector(self, target: Any) -> NDArray[Any]:
+        """One datum's class scores, flattened.
+
+        A 0-d target is a class index rather than a vector, and is refused: reshaped to
+        ``(1,)`` its argmax is 0, so every datum would be labelled class 0 with its class
+        index recorded as the confidence.
+        """
+        values = as_numpy(target)
+        if not values.ndim:
+            raise TypeError(
+                f"Encountered a 0-dimensional target for task {self.task}; an image classification "
+                "target is a score vector, one entry per class, not a single class index.",
+            )
+        return values.reshape(-1)
+
     def build(
         self,
         dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]],
@@ -47,7 +62,7 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
     ) -> StructuredData:
         raw: list[Mapping[str, Any]] = []
         labels: list[int] = []
-        scores: list[NDArray[Any]] = []
+        scores: list[float] = []
         srcidx: list[int] = []
 
         count = len(dataset)
@@ -59,10 +74,11 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
                 raise TypeError(
                     f"Encountered unsupported target type {type(target).__name__} for task {self.task}.",
                 )
-            values = as_numpy(target)
+            values = self._score_vector(target)
             if len(values):
-                labels.append(int(np.argmax(values)))
-                scores.append(values)
+                label = int(np.argmax(values))
+                labels.append(label)
+                scores.append(float(values[label]))
                 srcidx.append(i)
             else:
                 unlabeled.append(i)
@@ -71,7 +87,7 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
 
         unit_of_instance = np.asarray(srcidx, dtype=np.intp)
         class_labels = np.asarray(labels, dtype=np.intp)
-        score_values = np.asarray(scores, dtype=np.float32) if scores else np.empty(0, dtype=np.float32)
+        score_values = np.asarray(scores, dtype=np.float32)
         instance_index = running_index(unit_of_instance)
         instance_count = len(unit_of_instance)
 

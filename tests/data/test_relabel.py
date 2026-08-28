@@ -1,12 +1,16 @@
+from typing import cast
+
 import numpy as np
 import pytest
 
-from dataeval import Ontology
+from dataeval import Metadata, Ontology
 from dataeval.core import label_alignment
-from dataeval.data import Operation, Relabel, View
+from dataeval.data import Operation, Relabel, View, merge_datasets
 from dataeval.data._relabel import _label_remap
 from dataeval.exceptions import OntologyError
+from dataeval.protocols import ObjectDetectionTarget
 from dataeval.types import OntologyConcept
+from dataeval.types._target import detection_score
 
 
 def target_ontology() -> Ontology:
@@ -248,3 +252,144 @@ class TestAliasTargets:
         assert dropped == {}
         assert mapping == {0: 0}
         assert index2label == {0: "Auto"}
+
+
+@pytest.mark.required
+class TestRelabelScores:
+    """Per-class scores are indexed by a vocabulary, so conforming labels must conform them.
+
+    Masking alone — all ``MaskedTarget`` does — leaves source-indexed columns beside
+    target-indexed labels, so a detection's score is read from whichever class landed at
+    its new index, or from off the end of the array. Reading the score down to the
+    detection's own class against its *source* label settles it before the vocabulary
+    changes, and leaves a number no vocabulary indexes.
+    """
+
+    def test_od_scores_are_read_down_to_one_per_detection(self, od_dataset):
+        ds = od_dataset([[0, 1]], {0: "car", 1: "boat"}, per_class=True, confidence=0.75)
+        conformed = View(ds, [Relabel({"car": "vehicle", "boat": "watercraft"}, ["watercraft", "vehicle"])])
+        target = conformed[0][1]
+        assert list(np.asarray(target.labels)) == [1, 0]
+        # one confidence per detection, carrying no vocabulary for the new labels to
+        # disagree with — and each detection kept its own number, not its neighbour's
+        np.testing.assert_allclose(np.asarray(target.scores), [0.75, 0.75])
+        for index, label in enumerate(np.asarray(target.labels)):
+            assert detection_score(target, index, int(label)) == pytest.approx(0.75)
+
+    def test_od_dropped_detections_take_their_scores_with_them(self, od_dataset):
+        ds = od_dataset([[0, 1]], {0: "car", 1: "spaceship"}, per_class=True, confidence=0.75)
+        conformed = View(ds, [Relabel({"car": "vehicle"}, ["vehicle"])])
+        target = conformed[0][1]
+        assert list(np.asarray(target.labels)) == [0]
+        np.testing.assert_allclose(np.asarray(target.scores), [0.75])
+
+    def test_od_per_box_scores_are_masked_not_folded(self, od_dataset):
+        """A score that is one per box already carries no vocabulary."""
+        ds = od_dataset([[0, 1]], {0: "car", 1: "spaceship"})
+        conformed = View(ds, [Relabel({"car": "vehicle"}, ["vehicle"])])
+        np.testing.assert_allclose(np.asarray(conformed[0][1].scores), [1.0])
+
+    def test_a_score_survives_relabeling_into_a_wider_vocabulary(self, od_dataset):
+        """The label is a target index by then, so a source-width array cannot be read."""
+        ds = od_dataset([[0, 1]], {0: "car", 1: "bike"}, per_class=True, confidence=0.75)
+        conformed = View(ds, [Relabel({"car": "vehicle", "bike": "cycle"}, ["a", "b", "c", "cycle", "vehicle"])])
+        target = conformed[0][1]
+        assert list(np.asarray(target.labels)) == [4, 3]
+        np.testing.assert_allclose(np.asarray(target.scores), [0.75, 0.75])
+
+    def test_a_non_contiguous_target_vocabulary_costs_nothing(self, od_dataset):
+        """A confidence is a property of the detection, so a sparse vocabulary sizes nothing."""
+        ds = od_dataset([[0, 1]], {0: "car", 1: "bike"}, per_class=True, confidence=0.75)
+        conformed = View(ds, [Relabel({"car": "vehicle", "bike": "cycle"}, {2: "cycle", 50000: "vehicle"})])
+        target = conformed[0][1]
+        assert list(np.asarray(target.labels)) == [50000, 2]
+        assert np.asarray(target.scores).shape == (2,)
+
+    def test_a_score_array_disagreeing_on_the_count_reads_unknown_not_wrong(self):
+        """The regression: the fold *and* the masking both declined, passing raw columns through."""
+
+        class _Mismatched:
+            labels = np.asarray([0, 1], dtype=np.intp)
+            boxes = np.zeros((2, 4), dtype=np.float32)
+            # three score rows for two detections, the disagreement own_class_scores tolerates
+            scores = np.asarray([[0.9, 0.0], [0.0, 0.8], [0.5, 0.5]], dtype=np.float32)
+
+        # a remap that reverses the vocabulary, so reading a score at the new label
+        # rather than the old one would return the other detection's number
+        target, mask = Relabel._conform_detections(_Mismatched(), {0: 1, 1: 0})
+        assert list(np.asarray(target.labels)) == [1, 0]
+        np.testing.assert_allclose(np.asarray(target.scores), [0.9, 0.8])
+        assert mask.tolist() == [True, True]
+
+    def test_a_detection_whose_score_cannot_be_read_conforms_to_unknown(self):
+        """Not to 0.0: the fold's zeros made an unreadable score look like a confident one."""
+
+        class _Narrow:
+            labels = np.asarray([0, 1], dtype=np.intp)
+            boxes = np.zeros((2, 4), dtype=np.float32)
+            # a per-box score stored as a column vector: only class 0 has a column
+            scores = np.asarray([[0.9], [0.8]], dtype=np.float32)
+
+        target, _ = Relabel._conform_detections(_Narrow(), {0: 0, 1: 1})
+        scores = np.asarray(target.scores)
+        assert scores[0] == pytest.approx(0.9)
+        assert np.isnan(scores[1])
+
+    def test_a_target_carrying_no_scores_is_left_without_any(self):
+        """Nothing to conform, and inventing a NaN column would claim the target had one."""
+
+        class _Unscored:
+            labels = np.asarray([0, 1], dtype=np.intp)
+            boxes = np.zeros((2, 4), dtype=np.float32)
+
+        target, _ = Relabel._conform_detections(cast(ObjectDetectionTarget, _Unscored()), {0: 1, 1: 0})
+        assert list(np.asarray(target.labels)) == [1, 0]
+        assert not hasattr(target, "scores")
+
+    def test_a_negative_target_index_is_refused(self, od_dataset):
+        """It has no column to be, and would wrap onto another class's confidence."""
+        ds = od_dataset([[0]], {0: "car"}, per_class=True)
+        with pytest.raises(OntologyError, match="non-negative"):
+            View(ds, [Relabel({"car": "vehicle"}, {-1: "vehicle"})])
+
+    def test_ic_coarsening_sums_the_collapsed_columns(self):
+        # two source classes folding into one target class keep their combined mass, so
+        # the argmax still lands on the coarsened class
+        folded = Relabel._conform_scores(np.array([[0.3, 0.5, 0.2]]), {0: 0, 1: 0, 2: 1}, 2)
+        np.testing.assert_allclose(folded, [[0.8, 0.2]])
+
+    def test_ic_a_source_class_the_scores_have_no_column_for_contributes_nothing(self):
+        folded = Relabel._conform_scores(np.array([0.6]), {0: 0, 3: 1}, 2)
+        np.testing.assert_allclose(folded, [0.6, 0.0])
+
+    def test_datasets_conformed_to_one_vocabulary_merge_and_structure(self, od_dataset):
+        """End to end: the reported failure was np.concatenate on (N, 5) beside (N, 6)."""
+        target = ["car", "truck", "van", "bus", "cycle", "rail"]
+        a = View(
+            od_dataset(
+                [[0, 1], [2], [3, 4]],
+                {0: "sedan", 1: "lorry", 2: "minivan", 3: "coach", 4: "bike"},
+                per_class=True,
+                confidence=0.75,
+            ),
+            [Relabel({"sedan": "car", "lorry": "truck", "minivan": "van", "coach": "bus", "bike": "cycle"}, target)],
+        )
+        b = View(
+            od_dataset(
+                [[0, 5], [1, 2], [3, 4]],
+                {0: "auto", 1: "hgv", 2: "mpv", 3: "omnibus", 4: "cycle", 5: "tram"},
+                per_class=True,
+                confidence=0.75,
+                dataset_id="mock-od-b",
+            ),
+            [
+                Relabel(
+                    {"auto": "car", "hgv": "truck", "mpv": "van", "omnibus": "bus", "cycle": "cycle", "tram": "rail"},
+                    target,
+                )
+            ],
+        )
+        md = Metadata(merge_datasets(a, b))
+        assert md.level_counts["instance"] == 11
+        assert md.rows_at("instance")["score"].to_list() == pytest.approx([0.75] * 11)
+        assert set(md.rows_at("instance")["class_label"].to_list()) == {0, 1, 2, 3, 4, 5}

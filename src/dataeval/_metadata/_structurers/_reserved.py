@@ -141,8 +141,29 @@ def reserved_block_columns(level: FactorLevel, size: int, **values: Any) -> dict
         supplied = values.get(name)
         columns[name] = [None] * size if supplied is None else _as_column(supplied)
     columns.update({name: _as_column(values[name]) for name in _OPTIONAL_COLUMNS if values.get(name) is not None})
+    columns["score"] = _nulled_nans(columns["score"])
     _reject_ragged(level, size, columns)
     return columns
+
+
+def _nulled_nans(values: Sequence[Any] | NDArray[Any]) -> Sequence[Any] | NDArray[Any]:
+    """Spell an unreadable score the way the frame spells every other absent value.
+
+    ``score`` is the one reserved column arriving with a float sentinel: a detection whose
+    confidence cannot be read reads ``nan`` out of ``own_class_scores``. To polars a
+    ``nan`` is a value, not a gap — it passes ``is_null``, it sorts above every real score
+    so a confidence threshold *keeps* it, and it poisons any aggregate over the column.
+    The same block's ``unit`` rows already carry null for the same idea, so a caller
+    testing one level's absent scores would need the other level's spelling.
+
+    Left as an array when there is nothing to respell, since that is the common case and
+    the array reaches polars without boxing a Python object per row.
+    """
+    if isinstance(values, np.ndarray) and values.dtype.kind == "f" and values.ndim == 1:
+        unreadable = np.isnan(values)
+        if unreadable.any():
+            return [None if bad else float(value) for value, bad in zip(values, unreadable, strict=True)]
+    return values
 
 
 def _reject_ragged(level: FactorLevel, size: int, columns: Mapping[str, Sequence[Any] | NDArray[Any]]) -> None:

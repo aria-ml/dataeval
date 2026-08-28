@@ -2045,9 +2045,22 @@ class Metadata(Array, FeatureExtractor):
         -------
         pl.DataFrame
             DataFrame with columns for level, item_index, target_index, class_label,
-            scores, bounding boxes (when applicable), a ``level`` tag naming the
+            score, bounding boxes (when applicable), a ``level`` tag naming the
             level each row belongs to, that level's own key columns, and all
             processed metadata factors.
+
+            ``score`` is one confidence per labelled row — the row's confidence in
+            its **own** class, whichever layout the dataset's targets carried, and
+            null where they carried none to read. A per-class layout is as wide as
+            the vocabulary that produced it, so keeping it whole would make the
+            column's width a property of the dataset's class count and two datasets
+            with different vocabularies impossible to stack into one frame.
+
+            .. versionchanged:: 1.2
+                ``score`` is one ``Float32`` confidence per row. v1.1 stored whatever
+                layout the target carried, so the column was ``Array(Float32,
+                n_classes)`` for a dataset scoring every class — a shape no analysis
+                read and no two vocabularies shared.
 
         See Also
         --------

@@ -18,6 +18,7 @@ from dataeval.data._tracks import build_tracks
 from dataeval.data._view import View
 from dataeval.protocols import DatumMetadata, ObjectDetectionTarget, VideoFrame, is_multiobject_tracking_target
 from dataeval.types import FactorLevel, FactorLevelSchema, SourceIndex, Track
+from dataeval.types._target import detection_score
 from dataeval.utils._internal import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape
 
@@ -345,7 +346,9 @@ class SourceItem:
         """The detection's confidence, or ``None`` where its target carries none.
 
         A ground-truth target scores ``1.0``. Where a target carries per-class scores
-        rather than one per box, this is the score of the box's own class.
+        rather than one per box, this is the score of the box's own class — the same
+        number the metadata frame's ``score`` column holds for this detection, read the
+        same way, so retrieving a row and reading it agree.
 
         Raises
         ------
@@ -1165,7 +1168,7 @@ class SourceLocator:
             raise IndexError(
                 f"{item.address!r} names detection {index}, but there are {len(boxes)} to name.",
             )
-        return boxes[index], int(labels[index]), _score_of(target, index, int(labels[index]))
+        return boxes[index], int(labels[index]), detection_score(target, index, int(labels[index]))
 
     def _tracks_for(self, item_index: int) -> dict[int, Track]:
         """Build (and hold) one sequence's tracks, keyed as a track address keys them."""
@@ -1350,21 +1353,3 @@ def _keyed(item: SourceItem) -> int:
             "states none. Address one of them as SourceIndex(item, key, level).",
         )
     return key
-
-
-def _score_of(target: Any, index: int, label: int) -> float | None:
-    """One detection's confidence, from either score layout a target may carry.
-
-    MAITE allows scores of shape ``(N,)`` — one per box — or ``(N, CLASSES)``, where the
-    box's own class picks the column. A target carrying neither answers None rather than
-    raising: a score is the one field of a detection that is optional in practice.
-    """
-    scores = getattr(target, "scores", None)
-    if scores is None:
-        return None
-    values = as_numpy(scores)
-    if values.ndim == 1:
-        return float(values[index])
-    if values.ndim == 2:
-        return float(values[index, label])
-    return None

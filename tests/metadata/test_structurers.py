@@ -25,12 +25,15 @@ from dataeval.types import FactorInfo, FactorLevelSchema
 from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
 
 
-def _od_target(count: int = 2) -> ObjectDetectionTarget:
-    return ObjectDetectionTarget(
-        np.tile(np.array([[1.0, 1.0, 2.0, 2.0]]), (count, 1)),
-        np.arange(count),
-        np.full(count, 0.5),
-    )
+def _od_target(count: int = 2, classes: int | None = None) -> ObjectDetectionTarget:
+    """``classes`` scores every class rather than every box, the other layout MAITE permits."""
+    labels = np.arange(count)
+    if classes is None:
+        scores = np.full(count, 0.5)
+    else:
+        scores = np.zeros((count, classes), dtype=np.float32)
+        scores[labels[labels < classes], labels[labels < classes]] = 0.75
+    return ObjectDetectionTarget(np.tile(np.array([[1.0, 1.0, 2.0, 2.0]]), (count, 1)), labels, scores)
 
 
 class _Frame:
@@ -825,3 +828,56 @@ class TestRowLayoutPartialAncestry:
 
     def test_a_level_no_block_records_is_not_a_gap(self):
         assert self._layout([0, 0, 1]).partial_ancestry("sequence", "instance") is False
+
+
+@pytest.mark.required
+class TestScoreColumn:
+    """``score`` is one confidence per row, whichever layout the dataset's targets carry.
+
+    A per-class layout is vocabulary-wide, so leaving it in the column made the column's
+    width a property of the dataset's class count — two datasets with different vocabularies
+    could then not be stacked into one frame at all, which is what merging them needs.
+    """
+
+    def test_a_per_box_score_is_the_detections_own(self):
+        md = Metadata(MockDataset([np.zeros((3, 4, 4))] * 2, [_od_target(2)] * 2))
+        assert md.dataframe.schema["score"] == pl.Float32
+        assert md.rows_at("instance")["score"].to_list() == [0.5] * 4
+
+    def test_a_per_class_score_is_read_down_to_the_rows_own_class(self):
+        md = Metadata(MockDataset([np.zeros((3, 4, 4))] * 2, [_od_target(2, classes=3)] * 2))
+        assert md.dataframe.schema["score"] == pl.Float32
+        assert md.rows_at("instance")["score"].to_list() == pytest.approx([0.75] * 4)
+
+    def test_items_scoring_different_vocabularies_still_stack(self):
+        """The regression: np.concatenate rejected (N, 5) beside (N, 6)."""
+        md = Metadata(MockDataset([np.zeros((3, 4, 4))] * 2, [_od_target(2, classes=5), _od_target(1, classes=6)]))
+        assert md.rows_at("instance")["score"].to_list() == pytest.approx([0.75] * 3)
+
+    def test_a_score_that_cannot_be_read_is_null_not_nan(self):
+        """A NaN would pass ``score >= t`` and poison every aggregate over the column."""
+        # two detections, one column: the second box's label has no column of its own
+        md = Metadata(MockDataset([np.zeros((3, 4, 4))], [_od_target(2, classes=1)]))
+        scores = md.rows_at("instance")["score"]
+        assert scores.to_list() == [pytest.approx(0.75), None]
+        assert scores.is_null().to_list() == [False, True]
+        # the spelling the unit rows already used for the same idea
+        assert md.rows_at("unit")["score"].is_null().all()
+
+    def test_a_scalar_classification_target_is_refused(self):
+        """Reshaped to (1,) it would argmax to 0, labelling every item class 0."""
+        md = Metadata(MockDataset([np.zeros((3, 4, 4))] * 2, [np.asarray(3.0), np.asarray(1.0)]))
+        with pytest.raises(TypeError, match="0-dimensional"):
+            _ = md.dataframe
+
+    def test_a_classification_score_is_the_confidence_in_its_own_class(self):
+        targets = [np.array([0.1, 0.9], dtype=np.float32), np.array([0.8, 0.2], dtype=np.float32)]
+        md = Metadata(MockDataset([np.zeros((3, 4, 4))] * 2, targets))
+        assert md.dataframe.schema["score"] == pl.Float32
+        assert md.rows_at("instance")["class_label"].to_list() == [1, 0]
+        assert md.rows_at("instance")["score"].to_list() == pytest.approx([0.9, 0.8])
+
+    def test_a_tracking_score_is_read_the_same_way(self):
+        md = Metadata(_mot_dataset(_SHAPES))
+        assert md.dataframe.schema["score"] == pl.Float32
+        assert md.rows_at("instance")["score"].to_list() == [0.5] * 7

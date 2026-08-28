@@ -34,6 +34,7 @@ from dataeval.types._factors import (
     _relink,
     _validate_acyclic,
 )
+from dataeval.types._target import detection_score, own_class_scores
 from dataeval.types._track import frame_size
 
 
@@ -859,3 +860,74 @@ class TestFactorLevelSchemaIdentity:
     def test_highest_of_nothing_is_an_error(self):
         with pytest.raises(ValueError, match="empty collection"):
             self._schema().highest([])
+
+
+@pytest.mark.required
+class TestOwnClassScores:
+    """Reducing either MAITE score layout to one confidence per detection."""
+
+    @staticmethod
+    def _target(scores: Any) -> Any:
+        return type("T", (), {"scores": scores})()
+
+    def test_per_box_scores_pass_through(self):
+        read = own_class_scores(np.array([0.4, 0.6], dtype=np.float32), np.array([1, 0]))
+        np.testing.assert_allclose(read, [0.4, 0.6])
+
+    def test_per_class_scores_read_the_own_class_column(self):
+        # deliberately not the row's maximum: the question a score answers is "how
+        # confident in what this box is labelled", which class_label already names
+        read = own_class_scores(np.array([[0.2, 0.7], [0.9, 0.1]], dtype=np.float32), np.array([0, 1]))
+        np.testing.assert_allclose(read, [0.2, 0.1])
+
+    def test_label_with_no_column_of_its_own_is_unreadable(self):
+        # the collapsed-column construction, and a target relabeled into a wider
+        # vocabulary: neither can say what this detection scored
+        read = own_class_scores(np.array([[0.2, 0.7]], dtype=np.float32), np.array([5]))
+        assert np.isnan(read[0])
+
+    def test_labels_are_authoritative_on_the_count(self):
+        short = own_class_scores(np.array([0.5], dtype=np.float32), np.array([0, 1, 2]))
+        assert len(short) == 3
+        np.testing.assert_allclose(short[:1], [0.5])
+        assert np.isnan(short[1:]).all()
+
+        long = own_class_scores(np.array([0.1, 0.2, 0.3], dtype=np.float32), np.array([0]))
+        np.testing.assert_allclose(long, [0.1])
+
+    def test_a_target_carrying_no_scores_reads_as_unconfident_not_zero(self):
+        read = own_class_scores(None, np.array([0, 1]))
+        assert np.isnan(read).all()
+
+    def test_no_detections_reads_empty(self):
+        assert len(own_class_scores(np.array([[0.5]]), np.array([], dtype=np.intp))) == 0
+
+    def test_an_unrecognized_layout_is_unreadable(self):
+        read = own_class_scores(np.zeros((1, 2, 2), dtype=np.float32), np.array([0]))
+        assert np.isnan(read).all()
+
+    def test_detection_score_reads_one_the_same_way(self):
+        target = self._target(np.array([[0.2, 0.7], [0.9, 0.1]], dtype=np.float32))
+        assert detection_score(target, 0, 0) == pytest.approx(0.2)
+        assert detection_score(target, 1, 1) == pytest.approx(0.1)
+
+    def test_detection_score_answers_none_where_there_is_nothing_to_read(self):
+        assert detection_score(self._target(None), 0, 0) is None
+        # a label the score array has no column for, rather than an IndexError
+        assert detection_score(self._target(np.array([[0.2, 0.7]])), 0, 5) is None
+        # a detection past the end of the array
+        assert detection_score(self._target(np.array([[0.2, 0.7]])), 3, 0) is None
+        assert detection_score(self._target(np.zeros((1, 2, 2))), 0, 0) is None
+        # a layout with no length at all, which must not raise on its way to None
+        assert detection_score(self._target(np.float32(0.9)), 0, 0) is None
+        # a negative index names no detection; wrapping onto a real box would be worse
+        assert detection_score(self._target(np.array([0.1, 0.2, 0.3])), -2, 0) is None
+
+    def test_detection_score_reads_the_value_the_target_holds(self):
+        """The frame's column is float32 and nullable; this answer is neither."""
+        # not rounded to the column's dtype: a target holding exactly 0.1 answers 0.1
+        assert detection_score(self._target(np.array([[0.1, 0.2]], dtype=np.float64)), 0, 0) == 0.1
+        # a score the target genuinely recorded as nan is not "carries no score"
+        recorded = detection_score(self._target(np.array([[np.nan, 0.5]])), 0, 0)
+        assert recorded is not None
+        assert np.isnan(recorded)

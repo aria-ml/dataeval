@@ -336,3 +336,34 @@ class TestBuildAllTracks:
         # through to the final TypeError guard.
         with pytest.raises(TypeError, match="'source' must be"):
             build_tracks(cast(MultiobjectTrackingTarget, 42))
+
+
+@pytest.mark.required
+class TestBuildTracksScoreLayouts:
+    """A track's scores are read the way every other reader reads a target's.
+
+    MAITE permits ``(N,)`` or ``(N, CLASSES)``. Reading positionally accepted only the
+    first, so a video whose frames scored every class structured into a ``Metadata``
+    cleanly and then raised the moment its tracks were followed — on the same data.
+    """
+
+    def test_a_per_class_frame_is_read_down_to_the_detections_own_class(self):
+        frame = _FakeFrame(
+            track_ids=np.array([1, 2], dtype=np.int64),
+            boxes=np.zeros((2, 4), dtype=np.float32),
+            scores=np.array([[0.9, 0.1], [0.2, 0.8]], dtype=np.float32),
+            labels=np.array([0, 1], dtype=np.int64),
+        )
+        tracks = build_tracks(make_video_target([cast(SingleFrameObjectTrackingTarget, frame)]))
+        assert tracks[1].scores.tolist() == pytest.approx([0.9])
+        assert tracks[2].scores.tolist() == pytest.approx([0.8])
+
+    def test_a_frame_carrying_no_scores_reads_unknown_rather_than_raising(self):
+        class _Unscored:
+            track_ids = np.array([1], dtype=np.int64)
+            boxes = np.zeros((1, 4), dtype=np.float32)
+            labels = np.array([0], dtype=np.int64)
+
+        frame = _Unscored()
+        tracks = build_tracks(make_video_target([cast(SingleFrameObjectTrackingTarget, frame)]))
+        assert np.isnan(tracks[1].scores).all()
