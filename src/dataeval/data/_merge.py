@@ -1,12 +1,23 @@
 __all__ = []
 
 import warnings
-from collections.abc import Iterable, Iterator, Sequence
-from typing import Any, TypeVar
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from typing import Any, NoReturn, TypeVar
 
-from dataeval.protocols import AnnotatedDataset, DatasetMetadata
+from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 
 _TDatum = TypeVar("_TDatum")
+
+_TYPE_ERROR = (
+    "merge_datasets accepts datasets, passed either as separate arguments or packed "
+    "in a sequence or iterable, but got {}."
+)
+_MAPPING_ERROR = (
+    "merge_datasets accepts datasets, passed either as separate arguments or packed "
+    "in a sequence or iterable, but got a {}. Iterating a mapping yields its keys, "
+    "not its values; pass the values (e.g. datasets.values()) instead."
+)
+_CYCLE_ERROR = "merge_datasets cannot expand a collection that contains itself."
 
 
 def _datum_signature(datum: Any) -> tuple[Any, ...]:
@@ -35,6 +46,62 @@ def _peek_datum_signature(dataset: AnnotatedDataset[Any]) -> tuple[Any, ...] | N
         return _datum_signature(dataset[0])
     except Exception:  # noqa: BLE001 - best-effort peek must never fail a merge
         return None
+
+
+def _is_dataset(item: Any) -> bool:
+    """Tell a single dataset apart from a collection of datasets.
+
+    Collection-level ``metadata`` alongside ``__len__``/``__getitem__`` (see
+    :class:`~dataeval.protocols.AnnotatedDataset`) settles it outright. Without it the two
+    are structurally identical — a list of datasets is itself sized and indexable — so the
+    tie is broken the way :func:`~dataeval.data.split_dataset` breaks it: the built-in
+    containers used to pack arguments are registered :class:`collections.abc.Sequence` or
+    :class:`collections.abc.Mapping` types, while datasets that merely implement
+    ``__getitem__``/``__len__`` are not. Iterability is deliberately *not* the test, since
+    datasets routinely offer ``__iter__`` as a convenience; treating those as containers
+    would explode a dataset into its datums. Anything left that is dataset-shaped counts as
+    a dataset even without ``metadata``, since merging tolerates a missing vocabulary.
+    """
+    return isinstance(item, AnnotatedDataset) or (
+        isinstance(item, Dataset) and not isinstance(item, (Sequence, Mapping))
+    )
+
+
+def _is_packed(item: Any) -> bool:
+    """Tell a collection that packs datasets apart from anything else that is not one.
+
+    ``str``/``bytes`` are excluded because they are iterable *and* dataset-shaped, so
+    expanding one would recurse forever (its items are single-character strings), and
+    mappings because iterating one yields its keys, which is never the packing the caller
+    meant. Everything else iterable is a container to expand.
+    """
+    return isinstance(item, Iterable) and not isinstance(item, (str, bytes, Mapping))
+
+
+def _reject(item: Any) -> NoReturn:
+    """Raise for an item that is neither a dataset nor a collection of datasets."""
+    message = _MAPPING_ERROR if isinstance(item, Mapping) else _TYPE_ERROR
+    raise TypeError(message.format(type(item).__name__))
+
+
+def _iter_datasets(items: Iterable[Any], _expanding: frozenset[int] = frozenset()) -> Iterator[AnnotatedDataset[Any]]:
+    """Yield the datasets in ``items``, expanding any packed collections along the way.
+
+    Lets datasets be passed either unpacked (``merge_datasets(a, b)``) or packed in any
+    sequence or iterable (``merge_datasets([a, b])``), in any combination and nesting.
+    ``_expanding`` holds the ids of the collections currently being expanded — each one is
+    still referenced by an enclosing frame, so the ids cannot be reused — which turns a
+    self-referential container into a clear error instead of a ``RecursionError``.
+    """
+    for item in items:
+        if _is_dataset(item):
+            yield item
+        elif _is_packed(item):
+            if id(item) in _expanding:
+                raise TypeError(_CYCLE_ERROR)
+            yield from _iter_datasets(item, _expanding | {id(item)})  # possibly nested
+        else:
+            _reject(item)
 
 
 def _validate_vocabularies(datasets: tuple[AnnotatedDataset[Any], ...]) -> None:
@@ -110,7 +177,9 @@ class _MergedDataset(AnnotatedDataset[_TDatum]):
         return f"merge_datasets({len(self._datasets)} datasets, len={len(self)})"
 
 
-def merge_datasets(*datasets: AnnotatedDataset[_TDatum]) -> AnnotatedDataset[_TDatum]:
+def merge_datasets(
+    *datasets: AnnotatedDataset[_TDatum] | Iterable[AnnotatedDataset[_TDatum]],
+) -> AnnotatedDataset[_TDatum]:
     """
     Concatenate datasets that share a label vocabulary into one dataset view.
 
@@ -124,9 +193,17 @@ def merge_datasets(*datasets: AnnotatedDataset[_TDatum]) -> AnnotatedDataset[_TD
 
     Parameters
     ----------
-    *datasets : AnnotatedDataset
-        Two or more datasets to merge. Each should expose an ``index2label`` in its
-        metadata; when present, all must be equal.
+    *datasets : AnnotatedDataset or Iterable[AnnotatedDataset]
+        Two or more datasets to merge, passed either as separate arguments
+        (``merge_datasets(a, b)``) or packed in a sequence or other iterable
+        (``merge_datasets([a, b])``). Each dataset should expose an ``index2label``
+        in its metadata; when present, all must be equal. Datasets are concatenated in
+        the order given, which for a packed collection is its iteration order — so an
+        unordered container (a ``set``) leaves the concatenation order unspecified.
+
+        .. versionchanged:: 1.2
+            Datasets may be packed in a sequence or other iterable. v1.1 accepted only
+            one dataset per argument, so a list had to be unpacked by the caller.
 
     Returns
     -------
@@ -138,6 +215,9 @@ def merge_datasets(*datasets: AnnotatedDataset[_TDatum]) -> AnnotatedDataset[_TD
     ValueError
         If no datasets are given, or their ``index2label`` mappings differ, or some
         datasets expose an ``index2label`` while others do not.
+    TypeError
+        If an argument is neither a dataset nor a collection of datasets, if a mapping
+        is passed (iterating one yields its keys), or if a collection contains itself.
 
     Warns
     -----
@@ -150,14 +230,16 @@ def merge_datasets(*datasets: AnnotatedDataset[_TDatum]) -> AnnotatedDataset[_TD
     --------
     dataeval.data.View : Build a dataset view (e.g. relabel to a reference vocabulary).
     """
-    if not datasets:
+    # Accept datasets packed in a sequence or iterable as well as passed one per argument.
+    unpacked = tuple(_iter_datasets(datasets))
+    if not unpacked:
         raise ValueError("merge_datasets requires at least one dataset.")
 
     # Enforce a shared label vocabulary (and surface the vacuous-equality case).
-    _validate_vocabularies(datasets)
+    _validate_vocabularies(unpacked)
     # Lightweight datum-shape consistency check (peeks only the first datum of each dataset).
-    _warn_on_datum_shape_mismatch(datasets)
+    _warn_on_datum_shape_mismatch(unpacked)
 
-    metadata = dict(getattr(datasets[0], "metadata", {}))
+    metadata = dict(getattr(unpacked[0], "metadata", {}))
     metadata["id"] = "merged"
-    return _MergedDataset(datasets, DatasetMetadata(**metadata))
+    return _MergedDataset(unpacked, DatasetMetadata(**metadata))
