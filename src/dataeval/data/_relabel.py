@@ -1,5 +1,6 @@
 __all__ = []
 
+import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, TypeAlias, cast
 
@@ -8,7 +9,7 @@ from numpy.typing import NDArray
 
 from dataeval._ontology import Ontology
 from dataeval.data._view import Operation, View
-from dataeval.exceptions import OntologyError
+from dataeval.exceptions import DeprecatedWarning, OntologyError
 from dataeval.protocols import Array, DatasetMetadata, ObjectDetectionTarget
 from dataeval.types._target import own_class_scores
 from dataeval.utils._internal import MaskedTarget, argmax_label, as_numpy, mask_metadata
@@ -113,6 +114,37 @@ class Relabel(Operation):
         (an image-classification datum whose class is OOV is dropped; an
         object-detection detection that is OOV is dropped, and an image left with
         no detections is dropped). ``"raise"`` raises if any source class is OOV.
+    reduce_detection_scores : bool or None, default None
+        How a *detection* target's per-class scores are conformed. ``True`` — the default
+        — reduces them to one confidence per detection, the score of the class the box
+        was labelled with. ``False`` folds them into the target vocabulary instead,
+        keeping a column per target class.
+
+        This is about the conformed *target*: what ``dataset[i][1].scores`` hands back.
+        The fold is an escape hatch for code that needs *a* per-class array for one
+        release; it does not restore v1.1, which left the array source-indexed and
+        source-width, so anything indexing the result has to be rechecked. It also costs
+        what the reduction fixed: a score the source array has no column for folds to
+        ``0.0`` rather than reading as absent, a coarsening sums the classes it collapses
+        rather than answering the detection's own confidence, and the fold is sized by
+        the target's largest index, so a sparse ``Mapping[int, str]`` vocabulary
+        allocates a column per index rather than per class.
+
+        :attr:`~dataeval.Metadata.dataframe`'s ``score`` column is one value per row
+        under either choice — the structuring walk reads a target's scores down the same
+        way whatever layout it is given, so the parameter cannot defer the column's
+        *shape*. It does reach the column's numbers, which are read off the conformed
+        target: the summed mass of a coarsening rather than the detection's own
+        confidence, and ``0.0`` rather than null where the score cannot be read.
+
+        Has no effect on classification targets, which keep the fold in every version:
+        the datum's target *is* its score vector and its label is read back out by argmax.
+
+        .. versionadded:: 1.2
+
+        .. deprecated:: 1.2
+            The parameter spans the change of default and is removed in v1.3, after which
+            detection scores are always reduced. Drop the argument to take the default.
 
     Raises
     ------
@@ -130,8 +162,13 @@ class Relabel(Operation):
       score of the class it was labelled with, taken against its *source* label, which is
       the last moment the columns still mean what the labels say. A confidence is a
       property of the detection, so the result carries no vocabulary, needs no width, and
-      stacks with any other dataset's. A detection whose score cannot be read (a target
-      with no column for its class) conforms to ``nan``, not to ``0.0``.
+      stacks with any other dataset's — including one that scored every box rather than
+      every class, which no single per-class ``score`` column could hold beside it. A
+      detection whose score cannot be read (a target with no column for its class)
+      conforms to ``nan``, not to ``0.0``. ``reduce_detection_scores=False`` folds into
+      the target vocabulary instead, for one release — a layout v1.1 never handed back,
+      and one whose numbers reach the metadata frame's ``score`` column as well as the
+      target.
     - **Image classification.** The datum's target *is* its score vector and the label is
       read back out of it by argmax, so the vector is folded into the target vocabulary
       rather than reduced. Two source classes coarsened into one have their scores summed
@@ -140,13 +177,14 @@ class Relabel(Operation):
       per-class weights whose argmax is the label, not as a distribution.
 
     .. versionchanged:: 1.2
-        Object-detection scores are conformed rather than left in the source vocabulary.
-        v1.1 masked dropped detections out of a per-class score array but left its columns
-        source-indexed, so a conformed detection's score was read from another class's
-        column, and two datasets conformed to one vocabulary kept the two widths they
-        arrived with. A classification fold is also sized by the target's largest index
-        rather than its class count, so a non-contiguous ``Mapping[int, str]`` target no
-        longer raises ``IndexError``.
+        A detection's score is conformed rather than left in the source vocabulary, and is
+        reduced to one confidence rather than folded; ``reduce_detection_scores=False``
+        asks for the fold for one release. v1.1 masked dropped detections out of a
+        per-class score array but left its columns source-indexed, so a conformed
+        detection's score was read from another class's column, and two datasets conformed
+        to one vocabulary kept the two widths they arrived with. A classification fold is
+        also sized by the target's largest index rather than its class count, so a
+        non-contiguous ``Mapping[int, str]`` target no longer raises ``IndexError``.
     """
 
     requires: DatasetKind | None = "any_target"
@@ -157,10 +195,29 @@ class Relabel(Operation):
         target: TargetVocabulary | None = None,
         *,
         on_unmatched: Literal["drop", "raise"] = "drop",
+        reduce_detection_scores: bool | None = None,
     ) -> None:
         self._class_remap = class_remap
         self.target = target
         self.on_unmatched = on_unmatched
+        self.reduce_detection_scores = reduce_detection_scores
+        # Warned here rather than per datum: the caller asked for the old behavior by
+        # name, so the stack points at the call that has to change, and there is no
+        # "did it matter for this dataset" question to answer first.
+        if reduce_detection_scores is False:
+            warnings.warn(
+                "Relabel(reduce_detection_scores=False) folds a detection target's "
+                "per-class scores into the target vocabulary. It will be removed in "
+                "v1.3, after which a detection's score is always reduced to one "
+                "confidence — the score of the class the box was labelled with — which "
+                "carries no vocabulary and lets datasets that scored differently be "
+                "merged. The fold is not v1.1's layout either: v1.1 left the array "
+                "source-indexed, and the fold spells an unreadable score 0.0 where the "
+                "reduction spells it null, in the metadata frame as well as the target.\n"
+                "Drop the argument to take the current default, which already reduces.",
+                DeprecatedWarning,
+                stacklevel=2,
+            )
         self._mapping: dict[int, int] | None = None
         self._dropped: dict[int, str] | None = None
         self._index2label: dict[int, str] | None = None
@@ -222,7 +279,8 @@ class Relabel(Operation):
     def _remap(self, datum: Any) -> Any:
         image, target, metadata = datum
         if isinstance(target, ObjectDetectionTarget):
-            new_target, mask = self._conform_detections(target, self.mapping)
+            reduce = self.reduce_detection_scores is not False
+            new_target, mask = self._conform_detections(target, self.mapping, self._score_width, reduce)
             return image, new_target, mask_metadata(metadata, mask)
         if isinstance(target, Array):
             return image, self._conform_scores(target, self.mapping, self._score_width), metadata
@@ -251,8 +309,26 @@ class Relabel(Operation):
         return folded
 
     @staticmethod
+    def _row_aligned(values: NDArray[Any], count: int) -> NDArray[Any]:
+        """One score row per detection, ``nan`` where the target supplied none.
+
+        Only the fold needs this. The reduction reads against the labels, which already
+        settle the count; folding indexes columns, so a ``scores`` holding a different
+        number of rows has to be squared up first — and squared up rather than declined,
+        since declining would leave the array for :func:`try_mask_object` to decline in
+        turn on the same length test, passing source-vocabulary columns through beside
+        target-vocabulary labels.
+        """
+        if len(values) == count:
+            return values
+        aligned = np.full((count, values.shape[1]), np.nan, dtype=np.float64)
+        rows = min(count, len(values))
+        aligned[:rows] = values[:rows]
+        return aligned
+
+    @staticmethod
     def _conform_detections(
-        target: ObjectDetectionTarget, mapping: Mapping[int, int]
+        target: ObjectDetectionTarget, mapping: Mapping[int, int], width: int = 0, reduce: bool = True
     ) -> tuple[MaskedTarget, NDArray[np.bool_]]:
         """Object detection: drop unmapped detections, and remap the rest with their scores.
 
@@ -269,8 +345,19 @@ class Relabel(Operation):
         overrides: dict[str, Any] = {"labels": new_labels}
         scores = getattr(target, "scores", None)
         if scores is not None:
-            # own_class_scores answers one value per *label*, so this is len(mask) long
-            # whatever shape the target's scores were — including the disagreeing row
-            # count it reads as nan, which masking on its own declines to touch at all.
-            overrides["scores"] = own_class_scores(scores, labels)[mask]
+            values = as_numpy(scores)
+            if reduce:
+                # own_class_scores answers one value per *label*, so this is len(mask) long
+                # whatever shape the target's scores were — including the disagreeing row
+                # count it reads as nan, which masking on its own declines to touch at all.
+                overrides["scores"] = own_class_scores(values, labels)[mask]
+            elif values.ndim == 2:
+                aligned = Relabel._row_aligned(values, len(mask))[mask]
+                overrides["scores"] = Relabel._conform_scores(aligned, mapping, width)
+            elif values.ndim == 1 and len(values) != len(mask):
+                # A per-box score carries no vocabulary, so the fold has nothing to do to
+                # it — but a disagreeing count still has to be squared up here, for the
+                # reason _row_aligned squares the fold's up: masking declines on the same
+                # length test, and would leave more scores than the target has labels.
+                overrides["scores"] = own_class_scores(values, labels)[mask]
         return MaskedTarget(target, mask, overrides), mask

@@ -1,13 +1,15 @@
+import warnings
 from typing import cast
 
 import numpy as np
+import polars as pl
 import pytest
 
 from dataeval import Metadata, Ontology
 from dataeval.core import label_alignment
 from dataeval.data import Operation, Relabel, View, merge_datasets
 from dataeval.data._relabel import _label_remap
-from dataeval.exceptions import OntologyError
+from dataeval.exceptions import DeprecatedWarning, OntologyError
 from dataeval.protocols import ObjectDetectionTarget
 from dataeval.types import OntologyConcept
 from dataeval.types._target import detection_score
@@ -393,3 +395,150 @@ class TestRelabelScores:
         assert md.level_counts["instance"] == 11
         assert md.rows_at("instance")["score"].to_list() == pytest.approx([0.75] * 11)
         assert set(md.rows_at("instance")["class_label"].to_list()) == {0, 1, 2, 3, 4, 5}
+
+
+@pytest.mark.required
+class TestReduceDetectionScoresShim:
+    """The compat parameter spanning the change of default. Removed in v1.3."""
+
+    def test_the_default_reduces(self, od_dataset):
+        ds = od_dataset([[0, 1]], {0: "car", 1: "boat"}, per_class=True, confidence=0.75)
+        remap = {"car": "vehicle", "boat": "watercraft"}
+        target = View(ds, [Relabel(remap, ["watercraft", "vehicle"])])[0][1]
+        np.testing.assert_allclose(np.asarray(target.scores), [0.75, 0.75])
+
+    def test_asking_for_it_explicitly_matches_the_default(self, od_dataset):
+        ds = od_dataset([[0, 1]], {0: "car", 1: "boat"}, per_class=True, confidence=0.75)
+        remap = {"car": "vehicle", "boat": "watercraft"}
+        target = View(ds, [Relabel(remap, ["watercraft", "vehicle"], reduce_detection_scores=True)])[0][1]
+        np.testing.assert_allclose(np.asarray(target.scores), [0.75, 0.75])
+
+    def test_opting_out_folds_into_the_target_vocabulary(self, od_dataset):
+        ds = od_dataset([[0, 1]], {0: "car", 1: "boat"}, per_class=True, confidence=0.75)
+        remap = {"car": "vehicle", "boat": "watercraft"}
+        with pytest.warns(DeprecatedWarning, match="reduce_detection_scores=False"):
+            relabel = Relabel(remap, ["watercraft", "vehicle"], reduce_detection_scores=False)
+        target = View(ds, [relabel])[0][1]
+        # a column per *target* class, each detection's confidence under its new label —
+        # target-indexed and target-width, which is not the array v1.1 handed back
+        np.testing.assert_allclose(np.asarray(target.scores), [[0.0, 0.75], [0.75, 0.0]])
+
+    def test_the_fold_is_target_width_not_the_source_width_v1_1_left_alone(self, od_dataset):
+        """The opt-out is an escape hatch, not a restoration: v1.1's array was source-indexed."""
+        ds = od_dataset([[0, 2]], {0: "a", 1: "b", 2: "c"}, per_class=True, confidence=0.7)
+        with pytest.warns(DeprecatedWarning):
+            relabel = Relabel({"a": "A", "c": "C"}, ["A", "C"], reduce_detection_scores=False)
+        assert np.asarray(View(ds, [relabel])[0][1].scores).shape == (2, 2)  # v1.1 gave (2, 3)
+
+    def test_opting_out_warns_at_the_call_that_has_to_change(self, od_dataset):
+        with pytest.warns(DeprecatedWarning, match="removed in v1.3"):
+            Relabel({"car": "vehicle"}, ["vehicle"], reduce_detection_scores=False)
+
+    @pytest.mark.parametrize("choice", [None, True])
+    def test_taking_the_default_is_silent(self, choice):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            Relabel({"car": "vehicle"}, ["vehicle"], reduce_detection_scores=choice)
+
+    def test_opting_out_leaves_per_box_scores_alone(self, od_dataset):
+        """They carry no vocabulary, so there is nothing for the fold to do."""
+        ds = od_dataset([[0, 1]], {0: "car", 1: "spaceship"})
+        with pytest.warns(DeprecatedWarning):
+            relabel = Relabel({"car": "vehicle"}, ["vehicle"], reduce_detection_scores=False)
+        np.testing.assert_allclose(np.asarray(View(ds, [relabel])[0][1].scores), [1.0])
+
+    def test_opting_out_squares_up_a_disagreeing_row_count(self):
+        """Declining to fold would leave the masking to decline too, on the same test."""
+
+        class _Mismatched:
+            labels = np.asarray([0, 1], dtype=np.intp)
+            boxes = np.zeros((2, 4), dtype=np.float32)
+            scores = np.asarray([[0.9, 0.0], [0.0, 0.8], [0.5, 0.5]], dtype=np.float32)
+
+        target, _ = Relabel._conform_detections(cast(ObjectDetectionTarget, _Mismatched()), {0: 1, 1: 0}, 2, False)
+        scores = np.asarray(target.scores)
+        assert scores[0, 1] == pytest.approx(0.9)
+        assert scores[1, 0] == pytest.approx(0.8)
+
+    def test_opting_out_squares_up_a_disagreeing_per_box_row_count(self):
+        """A per-box array needs no fold, but masking still declines on the same length test."""
+
+        class _Mismatched:
+            labels = np.asarray([0, 1], dtype=np.intp)
+            boxes = np.zeros((2, 4), dtype=np.float32)
+            scores = np.asarray([0.9, 0.8, 0.5], dtype=np.float32)
+
+        target, _ = Relabel._conform_detections(cast(ObjectDetectionTarget, _Mismatched()), {0: 1}, 2, False)
+        assert list(np.asarray(target.labels)) == [1]
+        np.testing.assert_allclose(np.asarray(target.scores), [0.9])
+
+    def test_the_opt_out_does_not_restore_the_metadata_column_s_width(self, od_dataset):
+        """It changes the *target's* layout, not the column's — the structurer reduces either."""
+        ds = od_dataset([[0, 1]], {0: "car", 1: "boat"}, per_class=True, confidence=0.75)
+        remap = {"car": "vehicle", "boat": "watercraft"}
+        with pytest.warns(DeprecatedWarning):
+            opted_out = Relabel(remap, ["watercraft", "vehicle"], reduce_detection_scores=False)
+        view = View(ds, [opted_out])
+        assert np.asarray(view[0][1].scores).shape == (2, 2)
+        assert Metadata(view).dataframe.schema["score"] == pl.Float32
+
+    def test_the_opt_out_does_reach_the_column_s_numbers(self):
+        """The column reads the conformed target, so a coarsening's summed mass lands in it."""
+
+        class _Scored:
+            def __init__(self) -> None:
+                # instance attrs so the MaskedTarget proxy still reads as a detection target
+                self.labels = np.asarray([0], dtype=np.intp)
+                self.boxes = np.zeros((1, 4), dtype=np.float32)
+                self.scores = np.asarray([[0.6, 0.3]], dtype=np.float32)  # sedan 0.6, coupe 0.3
+
+        class _Dataset:
+            metadata = {"id": "coarsened", "index2label": {0: "sedan", 1: "coupe"}}
+
+            def __len__(self) -> int:
+                return 1
+
+            def __getitem__(self, index: int):
+                return np.zeros((3, 4, 4), dtype=np.float32), _Scored(), {"id": index}
+
+        remap = {"sedan": "car", "coupe": "car"}
+        default = Metadata(View(_Dataset(), [Relabel(remap, ["car"])])).rows_at("instance")["score"].to_list()  # type: ignore
+        with pytest.warns(DeprecatedWarning):
+            opted_out = Relabel(remap, ["car"], reduce_detection_scores=False)
+        folded = Metadata(View(_Dataset(), [opted_out])).rows_at("instance")["score"].to_list()  # type: ignore
+        assert default == pytest.approx([0.6])  # the detection's own confidence
+        assert folded == pytest.approx([0.9])  # the coarsening's summed mass, a value no box had
+
+    def test_the_fold_spells_an_unreadable_score_zero_where_the_reduction_spells_it_null(self):
+        """What the escape hatch costs, stated: 0.0 is a confidence, and absent is not one."""
+
+        class _Narrow:
+            labels = np.asarray([0, 1], dtype=np.intp)
+            boxes = np.zeros((2, 4), dtype=np.float32)
+            scores = np.asarray([[0.9], [0.8]], dtype=np.float32)  # only class 0 has a column
+
+        reduced, _ = Relabel._conform_detections(cast(ObjectDetectionTarget, _Narrow()), {0: 0, 1: 1})
+        assert np.isnan(np.asarray(reduced.scores)[1])
+        folded, _ = Relabel._conform_detections(cast(ObjectDetectionTarget, _Narrow()), {0: 0, 1: 1}, 2, False)
+        assert np.asarray(folded.scores)[1, 1] == pytest.approx(0.0)
+
+    def test_mixed_layouts_merge_under_either_choice(self, od_dataset):
+        """Also the structurer's doing: what the merge needed was the reduction, not the flag."""
+        shared = ["car", "truck", "cycle"]
+        with pytest.warns(DeprecatedWarning):
+            folded = Relabel({"sedan": "car", "lorry": "truck"}, shared, reduce_detection_scores=False)
+        per_class = View(od_dataset([[0, 1]], {0: "sedan", 1: "lorry"}, per_class=True), [folded])
+        per_box = View(
+            od_dataset([[0, 1]], {0: "auto", 1: "bike"}, dataset_id="b"),
+            [Relabel({"auto": "car", "bike": "cycle"}, shared)],
+        )
+        assert Metadata(merge_datasets(per_class, per_box)).dataframe.schema["score"] == pl.Float32
+
+    def test_a_classification_dataset_is_unaffected_by_either_choice(self, ic_dataset):
+        """It keeps the fold in every version; the parameter does not reach it."""
+        remap = {"car": "v", "bike": "c"}
+        default = View(ic_dataset([0, 1], {0: "car", 1: "bike"}), [Relabel(remap, ["v", "c"])])[1][1]
+        with pytest.warns(DeprecatedWarning):
+            opted_out = Relabel(remap, ["v", "c"], reduce_detection_scores=False)
+        folded = View(ic_dataset([0, 1], {0: "car", 1: "bike"}), [opted_out])[1][1]
+        np.testing.assert_allclose(np.asarray(default), np.asarray(folded))

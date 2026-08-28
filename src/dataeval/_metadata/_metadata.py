@@ -2060,7 +2060,13 @@ class Metadata(Array, FeatureExtractor):
                 ``score`` is one ``Float32`` confidence per row. v1.1 stored whatever
                 layout the target carried, so the column was ``Array(Float32,
                 n_classes)`` for a dataset scoring every class — a shape no analysis
-                read and no two vocabularies shared.
+                read and no two vocabularies shared. The column is read down this way
+                whatever layout a target carries, so nothing restores its width —
+                :class:`~dataeval.data.Relabel`'s ``reduce_detection_scores=False``
+                changes the conformed target's layout, not this column's. It does change
+                the numbers read out of it, which are this column's: a coarsening's
+                summed mass rather than the detection's own confidence, and ``0.0``
+                rather than null where the score cannot be read.
 
         See Also
         --------
