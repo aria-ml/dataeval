@@ -2068,9 +2068,24 @@ class Metadata(DeprecatedMetadataAPI, Array, FeatureExtractor):
         -------
         pl.DataFrame
             DataFrame with columns for level, item_index, target_index, class_label,
-            scores, bounding boxes (when applicable), a ``level`` tag naming the
+            score, bounding boxes (when applicable), a ``level`` tag naming the
             level each row belongs to, that level's own key columns, and all
             processed metadata factors.
+
+            ``score`` holds whatever layout the dataset's targets carried: one
+            confidence per labelled row, or a per-class array as wide as the
+            vocabulary that produced it.
+
+            .. note::
+                v1.2 reads ``score`` down to one ``Float32`` per row — the row's
+                confidence in its **own** class — and spells an unreadable one as
+                null. A per-class array's width is a property of the dataset's class
+                count, which is why two datasets with different vocabularies cannot
+                be stacked into one frame today. Code recovering per-class
+                probabilities from this column should read them from the target
+                instead. :class:`~dataeval.data.Relabel` takes
+                ``reduce_detection_scores`` to adopt the new column shape now, or to
+                keep this one through v1.2.
 
         See Also
         --------
