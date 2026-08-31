@@ -163,6 +163,53 @@ class TestFiltering:
 
 
 @pytest.mark.required
+class TestSourceMapping:
+    def test_addresses_match_crop_order(self):
+        crops = DetectionCrops(_simple_dataset())
+        assert len(crops.item_indices) == len(crops)
+        assert len(crops.target_indices) == len(crops)
+        # Every address names the detection its crop's own metadata reports.
+        for row in range(len(crops)):
+            datum_metadata = crops[row][2]
+            assert crops.item_indices[row] == datum_metadata.get("source_id", -1)
+            assert crops.target_indices[row] == datum_metadata.get("target", -1)
+
+    def test_dropped_boxes_leave_gaps(self):
+        # min_size=4 drops item 2's 2x2 box, so its addresses skip target 0.
+        crops = DetectionCrops(_simple_dataset(), min_size=4)
+        assert crops.n_dropped == 1
+        assert crops.item_indices.tolist() == [0, 0, 1, 2]
+        assert crops.target_indices.tolist() == [0, 1, 0, 1]
+
+    def test_addresses_diverge_from_detection_level_metadata(self):
+        """The reason these exist: a dropped box desynchronizes crop rows from Metadata rows."""
+        dataset = _simple_dataset()
+        crops = DetectionCrops(dataset, min_size=4)
+        detection_rows = Metadata(dataset).item_indices
+        assert len(detection_rows) == len(crops) + crops.n_dropped
+        assert detection_rows.tolist() != crops.item_indices.tolist()
+
+    def test_source_indices_address_the_same_detections(self):
+        crops = DetectionCrops(_simple_dataset(), min_size=4)
+        assert len(crops.source_indices) == len(crops)
+        assert [address.item for address in crops.source_indices] == crops.item_indices.tolist()
+        assert [address.key for address in crops.source_indices] == crops.target_indices.tolist()
+
+    def test_addresses_are_read_only(self):
+        crops = DetectionCrops(_simple_dataset())
+        with pytest.raises(ValueError, match="read-only"):
+            crops.item_indices[0] = 99
+        with pytest.raises(ValueError, match="read-only"):
+            crops.target_indices[0] = 99
+
+    def test_empty_when_every_box_is_dropped(self):
+        crops = DetectionCrops(_simple_dataset(), min_size=1000)
+        assert len(crops) == 0
+        assert crops.item_indices.tolist() == []
+        assert crops.source_indices == ()
+
+
+@pytest.mark.required
 class TestCropGeometry:
     def test_object_off_returns_exact_box_pixels(self):
         crops = DetectionCrops(_simple_dataset(), region="object", square="off")

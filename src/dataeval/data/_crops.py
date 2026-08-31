@@ -19,6 +19,7 @@ from dataeval.protocols import (
     DatumMetadata,
     ObjectDetectionDataset,
 )
+from dataeval.types._index import SourceIndex
 from dataeval.utils._internal import as_numpy
 from dataeval.utils._validate import requires_maite_dataset
 from dataeval.utils.preprocessing import clip_box, crop_with_fill, normalize_image_shape
@@ -419,6 +420,13 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
 
         self._index_map = index_map
         self._source_ids = source_ids
+        # Address columns, built once here rather than per access: they are read to mask
+        # crop rows (often in a loop), and rebuilding them from the tuples each time would
+        # make that quadratic. Read-only so a caller cannot corrupt the view's own map.
+        self._item_indices = np.fromiter((row[0] for row in index_map), dtype=np.intp, count=len(index_map))
+        self._target_indices = np.fromiter((row[1] for row in index_map), dtype=np.intp, count=len(index_map))
+        self._item_indices.flags.writeable = False
+        self._target_indices.flags.writeable = False
         self.n_dropped: int = n_dropped
         self._index2label: Mapping[int, str] = self._resolve_index2label(observed)
         self._n_classes = (max(self._index2label) + 1) if self._index2label else 0
@@ -473,6 +481,110 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         ``View(DetectionCrops(base))`` is walkable through one public attribute.
         """
         return self._dataset
+
+    @property
+    def item_indices(self) -> NDArray[np.intp]:
+        """Source item each crop was cut from.
+
+        Returns
+        -------
+        NDArray[np.intp]
+            One index per crop, in crop order, giving the position of that crop's source
+            image in :attr:`source`. Read-only.
+
+        See Also
+        --------
+        target_indices : Which detection within its source item each crop was cut from.
+        source_indices : The same addresses as :class:`~dataeval.types.SourceIndex`.
+
+        Notes
+        -----
+        Crops are **not** one-to-one with the source's detections: degenerate and
+        undersized boxes are dropped (see ``min_size`` and :attr:`n_dropped`), so a
+        detection-level array built elsewhere -- :attr:`~dataeval.Metadata.item_indices`
+        over the same dataset, for instance -- spans a longer space and cannot address
+        crop rows. This is the mapping that can, and it is what relates a crop-level
+        result (an embedding, a coverage finding) back to the images that a split, a
+        filter, or an evaluator names.
+
+        Examples
+        --------
+        Select the crop rows belonging to a subset of source images:
+
+        >>> crops = DetectionCrops(dataset)
+        >>> rows = np.flatnonzero(np.isin(crops.item_indices, [0, 1]))
+        >>> crops.item_indices[rows]
+        array([0, 1, 1, 1])
+        """
+        return self._item_indices
+
+    @property
+    def target_indices(self) -> NDArray[np.intp]:
+        """Detection each crop was cut from, within its source item.
+
+        Returns
+        -------
+        NDArray[np.intp]
+            One index per crop, in crop order, giving that crop's position in its source
+            image's target arrays. Read-only.
+
+        See Also
+        --------
+        item_indices : The source item each crop was cut from.
+        source_indices : The same addresses as :class:`~dataeval.types.SourceIndex`.
+
+        Notes
+        -----
+        Paired with :attr:`item_indices` this is the crop's full address in the source:
+        ``(item_indices[i], target_indices[i])`` names the detection crop ``i`` was cut
+        from. Dropped boxes leave gaps, so this is not dense within an item.
+
+        Examples
+        --------
+        >>> crops = DetectionCrops(dataset)
+        >>> crops.target_indices[:4]
+        array([0, 0, 1, 2])
+        """
+        return self._target_indices
+
+    @property
+    def source_indices(self) -> tuple[SourceIndex, ...]:
+        """Address of the detection each crop was cut from.
+
+        Returns
+        -------
+        tuple of SourceIndex
+            One address per crop, in crop order. Each names its source item and the
+            detection within it, at the label level.
+
+        See Also
+        --------
+        item_indices : The source item each crop was cut from, as an array.
+        target_indices : The detection within that item, as an array.
+        policy : The crop policy, so a located detection can be cut the same way.
+
+        Notes
+        -----
+        This is the addressable form of :attr:`item_indices` and :attr:`target_indices`,
+        for handing to :class:`~dataeval.data.SourceLocator` -- the round trip from a
+        crop-level finding back to the pixels it was measured over. Prefer the two arrays
+        when masking crop rows in bulk; prefer these when resolving individual crops.
+
+        Examples
+        --------
+        Resolve a crop back to the detection it came from:
+
+        >>> import numpy as np
+        >>> from dataeval.data import SourceLocator
+        >>> crops = DetectionCrops(dataset)
+        >>> found = SourceLocator(dataset)[crops.source_indices[3]]
+        >>> np.array_equal(found.crop(policy=crops.policy), crops[3][0])
+        True
+        """
+        return tuple(
+            SourceIndex(int(item), int(target))
+            for item, target in zip(self._item_indices, self._target_indices, strict=True)
+        )
 
     @property
     def metadata(self) -> DatasetMetadata:
