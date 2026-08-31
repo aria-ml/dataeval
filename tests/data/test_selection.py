@@ -169,14 +169,14 @@ class TestSelectionClasses:
         select = View(mock_dataset, indices)
         assert len(select) == 5
         assert select.selection == [8, 6, 4, 2, 0]
-        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
+        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0], exclude=False)" in str(select)
 
     def test_indices_repeats(self, mock_dataset):
         indices = Indices([12, 12, 4, 4, 12, 12, 0])
         select = View(mock_dataset, indices)
         assert len(select) == 3
         assert select.selection == [4, 4, 0]
-        assert "Indices(indices=[12, 12, 4, 4, 12, 12, 0])" in str(select)
+        assert "Indices(indices=[12, 12, 4, 4, 12, 12, 0], exclude=False)" in str(select)
 
     def test_indices_with_classfilter(self, mock_dataset):
         class_filter = ClassFilter(classes=[0, 1])
@@ -185,7 +185,7 @@ class TestSelectionClasses:
         assert len(select) == 3
         assert select.selection == [6, 4, 0]
         assert "ClassFilter(classes=[0, 1]" in str(select)
-        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
+        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0], exclude=False)" in str(select)
 
     def test_indices_with_classfilter_layered(self, mock_dataset):
         class_filter = ClassFilter(classes=[0, 1])
@@ -196,7 +196,67 @@ class TestSelectionClasses:
         assert len(select) == 4
         assert select.selection == [6, 4, 2, 0]
         assert "ClassFilter(classes=[0, 1]" in str(select_cf)
-        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
+        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0], exclude=False)" in str(select)
+
+    def test_indices_exclude(self, mock_dataset):
+        indices = Indices([12, 10, 8, 6, 4, 2, 0], exclude=True)
+        select = View(mock_dataset, indices)
+        assert len(select) == 5
+        assert select.selection == [1, 3, 5, 7, 9]
+        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0], exclude=True)" in str(select)
+
+    def test_indices_exclude_repeats(self, mock_dataset):
+        indices = Indices([12, 12, 4, 4, 12, 12, 0], exclude=True)
+        select = View(mock_dataset, indices)
+        assert len(select) == 8
+        assert select.selection == [1, 2, 3, 5, 6, 7, 8, 9]
+        assert "Indices(indices=[12, 12, 4, 4, 12, 12, 0], exclude=True)" in str(select)
+
+    def test_indices_exclude_empty(self, mock_dataset):
+        indices = Indices([], exclude=True)
+        select = View(mock_dataset, indices)
+        assert len(select) == 10
+        assert select.selection == list(range(10))
+
+    def test_indices_exclude_all(self, mock_dataset):
+        indices = Indices(list(range(10)), exclude=True)
+        select = View(mock_dataset, indices)
+        assert len(select) == 0
+        assert select.selection == []
+
+    def test_indices_exclude_with_classfilter(self, mock_dataset):
+        class_filter = ClassFilter(classes=[0, 1])
+        indices = Indices([0, 1, 2], exclude=True)
+        select = View(mock_dataset, [indices, class_filter])
+        assert len(select) == 5
+        assert select.selection == [3, 4, 6, 7, 9]
+
+    def test_indices_order_follows_given_order_over_upstream(self, mock_dataset):
+        # Without exclude, the given order wins even when the upstream view is
+        # in a different (reversed) order.
+        select = View(mock_dataset, [Reverse(), Indices([2, 4, 6, 8, 0])])
+        assert select.selection == [2, 4, 6, 8, 0]
+
+    def test_indices_exclude_preserves_upstream_order(self, mock_dataset):
+        # With exclude, the surviving items keep the *upstream* order (reversed
+        # here), not the order of the excluded indices.
+        select = View(mock_dataset, [Reverse(), Indices([0, 1, 2], exclude=True)])
+        assert select.selection == [9, 8, 7, 6, 5, 4, 3]
+
+    def test_indices_exclude_preserves_upstream_duplicates(self, mock_dataset):
+        # Invert is a filter, not a set operation: duplicates introduced upstream
+        # survive and keep their positions.
+        select = View(mock_dataset, [Indices([5, 5, 7, 3, 3]), Indices([7, 3], exclude=True)])
+        assert select.selection == [5, 5]
+
+    def test_indices_exclude_chained(self, mock_dataset):
+        # Two consecutive excludes compose: the second excludes from the first's
+        # (reordered, filtered) output.
+        select = View(
+            mock_dataset,
+            [Indices([0, 2, 4, 6, 8], exclude=True), Indices([1, 3], exclude=True)],
+        )
+        assert select.selection == [5, 7, 9]
 
 
 @pytest.mark.required
