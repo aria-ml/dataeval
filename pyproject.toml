@@ -122,8 +122,8 @@ verify = [
 ]
 type = [
   "pyright[nodejs]>=1.1.400",
-  "types-requests>=2.31",
-  "types-pyyaml>=6.0",
+  "requests>=2.31",
+  "pyyaml>=6.0",
 ]
 docs = [
   "numpy>=1.24.2",  # floor capped by the JATIC program standard; uv.lock resolves current
