@@ -1,7 +1,7 @@
 __all__ = []
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from typing_extensions import TypeIs
 
 from dataeval.protocols import AnyMetadataLike, LabelsLike, MetadataLike, ValuedMetadataLike
-from dataeval.types._factors import BinSpec, LevelSpec
+from dataeval.types._factors import BinSpec, ClassAxis, LevelSpec
 
 IGNORE_KEYS = {"self", "config", "__class__"}
 
@@ -148,12 +148,31 @@ class LabelAxis(NamedTuple):
         Indices of the factor columns serving as the axis, which the caller must drop
         from the factors it analyses — a factor left in place correlates perfectly with
         itself and reports 1.0.
+    source : {"ground_truth", "derived"}
+        Whether the axis is the dataset's own labels or one a caller defined. What an
+        evaluator whose meaning depends on the labels being real — :class:`~dataeval.scope.Representation`
+        resolves them against an ontology — checks before it runs, and what a result
+        records so that two runs conditioned on different variables can be told apart.
+    level : str or None
+        Level the axis is defined at, or None where the container has no level schema.
+    vocabulary : {"declared", "observed"}
+        Whether the group names come from a vocabulary the caller declared or were read
+        off the values present. See :class:`~dataeval.types.ClassAxis`.
+
+    Notes
+    -----
+    The last three carry defaults, so the four-field construction that predates them still
+    describes a derived axis correctly; only ``source`` had to be stated for the labels
+    themselves.
     """
 
     values: NDArray[np.intp]
     names: Mapping[int, str]
     label: str
     excluded: tuple[int, ...]
+    source: str = "derived"
+    level: str | None = None
+    vocabulary: str = "observed"
 
 
 def _recorded_encodings(metadata: MetadataLike, names: Sequence[str]) -> dict[str, BinSpec | LevelSpec | None]:
@@ -657,6 +676,130 @@ def _axis_codes(metadata: Any, requested: Sequence[str]) -> Any:
     return codes
 
 
+def combine_axis(
+    columns: Sequence[NDArray[Any]],
+    encodings: Sequence["BinSpec | LevelSpec | None"],
+) -> tuple[NDArray[np.intp], dict[int, str]]:
+    """Turn one or more coded columns into a single densely numbered grouping, and name it.
+
+    The shared core of both ways an axis is chosen — :func:`resolve_label_axis` for a
+    ``label=`` naming factors, and :meth:`~dataeval.Metadata.classed_by` for one the
+    metadata carries. Written once because the two must agree: a pivot and the equivalent
+    ``label=`` are the same question, and a caller who gets different numbers from them has
+    no way to tell which is right.
+
+    Parameters
+    ----------
+    columns : Sequence[NDArray]
+        One code column per factor forming the axis, all the same length.
+    encodings : Sequence[BinSpec or LevelSpec or None]
+        Each column's recorded encoding, aligned with ``columns``. The record is what turns
+        a code back into ``"rain"`` or ``"[0, 12.4)"``; a column with none is named by its
+        code.
+
+    Returns
+    -------
+    tuple[NDArray[np.intp], dict[int, str]]
+        Dense codes, one per row, and a display name per code.
+
+    Notes
+    -----
+    Renumbered densely rather than used as-is: the downstream counters index by label value,
+    so a factor whose codes are sparse would size every contingency table by its largest
+    code. That is also why a composite axis is always dataset-relative — the combinations
+    present are read off the data even where each component's alphabet was declared.
+    """
+    # The record says what each code means, and says it the same way whichever kind of
+    # factor produced it — a BinSpec names a range, a LevelSpec names a value. Neither
+    # needs the raw column, which is why a container that kept its encoding can name its
+    # own codes for the first time.
+    lookups = [_code_names(column, encoding) for column, encoding in zip(columns, encodings, strict=True)]
+    if len(columns) == 1:
+        uniques, codes = np.unique(columns[0], return_inverse=True)
+        names = {index: lookups[0].get(int(value), str(int(value))) for index, value in enumerate(uniques)}
+    else:
+        stacked = np.column_stack(columns)
+        uniques, codes = np.unique(stacked, axis=0, return_inverse=True)
+        names = {
+            index: " × ".join(
+                lookup.get(int(value), str(int(value))) for lookup, value in zip(lookups, row, strict=True)
+            )
+            for index, row in enumerate(uniques)
+        }
+    return codes.astype(np.intp).ravel(), names
+
+
+def axis_vocabulary(encodings: Sequence["BinSpec | LevelSpec | None"]) -> Literal["declared", "observed"]:
+    """Whether an axis's group names are portable between datasets.
+
+    ``"declared"`` only where every component's alphabet was fixed before any data was seen
+    — a :class:`~dataeval.types.LevelSpec` the caller declared, or a
+    :class:`~dataeval.types.BinSpec` whose edges they gave. A cut derived from *this*
+    sample's distribution, or one merely ratified after the fact, names its groups off the
+    values that happened to be present, so the same name in another dataset may cover a
+    different range and a missing value shifts the alphabet.
+
+    A composite axis is ``"observed"`` regardless: its combinations are read off the data.
+    """
+    if not encodings:
+        return "observed"
+    if len(encodings) > 1:
+        return "observed"
+    fixed = {
+        LevelSpec: {"declared"},
+        BinSpec: {"edges"},
+    }
+    return (
+        "declared"
+        if all(spec is not None and spec.provenance in fixed[type(spec)] for spec in encodings)
+        else "observed"
+    )
+
+
+def _axis_level(metadata: Any, requested: Sequence[str]) -> str | None:
+    """Level an axis is defined at: the finest of its factors', or None where unknowable.
+
+    The finest rather than the coarsest, because that is where the axis takes one value per
+    entity — a composite of a frame factor and a detection factor is only fully specified on
+    a detection.
+    """
+    factor_info = getattr(metadata, "_factor_info", None)
+    if not factor_info:
+        return None
+    levels = [factor_info[name].level for name in requested if name in factor_info]
+    if not levels:
+        return None
+    schema = getattr(metadata, "_levels", None)
+    order = list(getattr(schema, "levels", ()) or ())
+    return max(levels, key=order.index) if order and all(level in order for level in levels) else levels[0]
+
+
+def _carried_axis(metadata: Any, declared: "ClassAxis | None") -> LabelAxis:
+    """Read the axis a container already carries: its labels, whatever they have been made to mean.
+
+    A pivoted container has resolved its own axis, and ``class_labels`` *is* what it resolved
+    to. Reading its record rather than re-deriving one is what keeps a single answer to "what
+    did this condition on" whichever way the axis was set.
+    """
+    labels = np.asarray(metadata.class_labels, dtype=np.intp)
+    names = _get_index2label(metadata)
+    if declared is None:
+        return LabelAxis(labels, names, "class_label", (), "ground_truth", None, "observed")
+    return LabelAxis(labels, names, declared.name, (), declared.source, declared.level, declared.vocabulary)
+
+
+def _reject_second_axis(declared: "ClassAxis | None", label: str | Sequence[str]) -> None:
+    """Refuse a ``label=`` against a container that has already been given a class axis."""
+    if declared is None or declared.source != "derived":
+        return
+    raise ValueError(
+        f"This metadata is already classed by {declared.name!r}, and `label` names "
+        f"{label!r} to condition on instead — two different answers to the same question. "
+        "Pass label=None to use the axis the metadata carries, or start from the "
+        "un-pivoted metadata to condition on something else.",
+    )
+
+
 def resolve_label_axis(metadata: Any, label: str | Sequence[str] | None) -> LabelAxis:
     """Resolve what a class-conditional statistic should condition on.
 
@@ -691,9 +834,10 @@ def resolve_label_axis(metadata: Any, label: str | Sequence[str] | None) -> Labe
     ValueError
         When ``label`` is an empty sequence, or names a factor the metadata does not have.
     """
+    declared = getattr(metadata, "class_axis_info", None)
     if label is None:
-        labels = np.asarray(metadata.class_labels, dtype=np.intp)
-        return LabelAxis(labels, _get_index2label(metadata), "class_label", ())
+        return _carried_axis(metadata, declared)
+    _reject_second_axis(declared, label)
 
     requested = [label] if isinstance(label, str) else list(label)
     if not requested:
@@ -708,25 +852,45 @@ def resolve_label_axis(metadata: Any, label: str | Sequence[str] | None) -> Labe
 
     indices = tuple(factor_names.index(name) for name in requested)
     data = np.asarray(_axis_codes(metadata, requested))[:, indices]
-    # The record says what each code means, and says it the same way whichever kind of
-    # factor produced it — a BinSpec names a range, a LevelSpec names a value. Neither
-    # needs the raw column, which is why a container that kept its encoding can name its
-    # own codes for the first time.
     encodings = _recorded_encodings(metadata, requested)
-    lookups = [_code_names(data[:, position], encodings.get(name)) for position, name in enumerate(requested)]
-    if len(indices) == 1:
-        # Renumbered densely rather than used as-is: the downstream counters index by
-        # label value, so a factor whose codes are sparse would size every contingency
-        # table by its largest code.
-        uniques, codes = np.unique(data[:, 0], return_inverse=True)
-        names = {index: lookups[0][int(value)] for index, value in enumerate(uniques)}
-    else:
-        uniques, codes = np.unique(data, axis=0, return_inverse=True)
-        names = {
-            index: " × ".join(lookup[int(value)] for lookup, value in zip(lookups, row, strict=True))
-            for index, row in enumerate(uniques)
-        }
-    return LabelAxis(codes.astype(np.intp).ravel(), names, " × ".join(requested), indices)
+    columns = [data[:, position] for position in range(len(requested))]
+    codes, names = combine_axis(columns, [encodings.get(name) for name in requested])
+    return LabelAxis(
+        codes,
+        names,
+        " × ".join(requested),
+        indices,
+        "derived",
+        _axis_level(metadata, requested),
+        axis_vocabulary([encodings.get(name) for name in requested]),
+    )
+
+
+def axis_record(metadata: Any, axis: LabelAxis) -> ClassAxis:
+    """Describe a resolved axis the way a result has to carry it.
+
+    :class:`LabelAxis` is what the statistics need — codes and names. This is what a
+    *reader* needs: which variable produced the numbers, whether it is the dataset's own
+    labels, and how badly it fanned out onto the rows that were counted. Built here rather
+    than in each evaluator so that every result says it the same way.
+
+    ``rows_per_group_entity`` comes from the container's own level counts and is None where
+    it keeps none — a bare :class:`~dataeval.protocols.MetadataLike` has no levels, so there
+    is no fan-out for it to have.
+    """
+    fanout = None
+    counts = getattr(metadata, "level_counts", None)
+    view = getattr(metadata, "view", None)
+    if counts and axis.level is not None and view in counts and counts.get(axis.level):
+        fanout = counts[view] / counts[axis.level]
+    return ClassAxis(
+        name=axis.label,
+        source="ground_truth" if axis.source == "ground_truth" else "derived",
+        level=axis.level,  # pyright: ignore[reportArgumentType]
+        groups=len(axis.names),
+        rows_per_group_entity=fanout,
+        vocabulary="declared" if axis.vocabulary == "declared" else "observed",
+    )
 
 
 def kept_factors(metadata: Any, excluded: Sequence[int]) -> tuple[list[str], list[int]]:
@@ -789,6 +953,29 @@ def factors_excluding(metadata: MetadataLike, excluded: Sequence[int]) -> tuple[
     # Guarded on `excluded`, not on a shape comparison: an empty metadata's factor_data has
     # no second axis to compare against.
     return (data[:, kept] if excluded else data), names, kept
+
+
+def reject_derived_axis(candidate: Any, caller: str) -> None:
+    """Refuse a container whose class axis is not the dataset's own labels.
+
+    For the evaluators whose meaning depends on the labels being real.
+    :class:`~dataeval.scope.Representation` resolves label *names* against an ontology, so
+    a derived axis's names — ``rain``, ``[0, 12.4)`` — match no concept and every leaf
+    reports as missing: an answer that looks like a finding and is an artifact of the
+    question. Refused rather than warned, for the same reason as
+    :func:`reject_filtered_metadata`: nothing downstream can detect it.
+
+    Anything carrying no axis record is ignored, so a caller can offer a dataset, an array
+    or a bare container without checking first.
+    """
+    info = getattr(candidate, "class_axis_info", None)
+    if info is None or info.source != "derived":
+        return
+    raise ValueError(
+        f"{caller} reads class labels as names to resolve against an ontology, and this metadata "
+        f"is classed by {info.name!r} — those groups are not concepts, so every species would "
+        "report as missing. Pass the metadata these labels came from, before classed_by().",
+    )
 
 
 def reject_filtered_metadata(candidate: Any, caller: str) -> None:

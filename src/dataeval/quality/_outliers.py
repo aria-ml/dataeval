@@ -267,6 +267,11 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         item_ids = _get_item_indices(metadata)
         index2label = _get_index2label(metadata)
+        # Whatever the metadata calls a class: a pivoted one groups by its own axis here,
+        # which is what handing this method a metadata rather than a dataset is for. The
+        # ``class_name`` column then holds that axis's group names, so a reader who did not
+        # build the metadata should check ``metadata.class_axis_source`` before reading them
+        # as classes.
         class_names = [index2label[label] for label in metadata.class_labels]
 
         labels_df = pl.DataFrame({"item_index": item_ids, "class_name": class_names})

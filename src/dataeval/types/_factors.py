@@ -1,6 +1,6 @@
 """Factor info and level schema shared by the metadata structuring layer."""
 
-__all__ = ["FactorLevel", "FactorLevelSchema", "FactorInfo", "BinSpec", "LevelSpec"]
+__all__ = ["FactorLevel", "FactorLevelSchema", "FactorInfo", "BinSpec", "LevelSpec", "ClassAxis"]
 
 from collections import deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -630,3 +630,56 @@ class FactorInfo:
     level: FactorLevel = "unit"
     aggregated_from: FactorLevel | None = None
     encoding: BinSpec | LevelSpec | None = None
+
+
+@dataclass(frozen=True)
+class ClassAxis:
+    """What a class-conditional result conditioned on.
+
+    Every evaluator that groups rows by class reads one variable to do it, and until
+    :meth:`~dataeval.Metadata.classed_by` existed that variable was always the dataset's
+    own labels. It no longer is, so a result has to be able to say which variable it was
+    -- otherwise two runs that answered different questions are indistinguishable
+    afterwards, and a reader comparing them attributes a moved score to the data.
+
+    Carried on the output of every class-conditional evaluator and returned by
+    :attr:`~dataeval.Metadata.class_axis_info`, so the same record can be asserted on
+    before a run and read back after one.
+
+    Attributes
+    ----------
+    name : str
+        What the axis is called: ``"class_label"`` for the dataset's own labels, the
+        factor's name for a pivot, or several joined by ``" x "`` for a composite.
+    source : {"ground_truth", "derived"}
+        ``"ground_truth"`` for the dataset's labels; ``"derived"`` for an axis a caller
+        defined out of factors. The field a gate asserts on: an evaluator whose meaning
+        depends on the labels being the dataset's own -- :class:`~dataeval.scope.Representation`
+        resolves them against an ontology -- refuses a ``"derived"`` axis rather than
+        reporting against concepts the names cannot match.
+    level : str or None
+        Level the axis is defined at, or None where the container has no level schema.
+        Read together with ``rows_per_group_entity``: an axis defined above the rows being
+        counted is replicated onto them, and this is what says so.
+    groups : int
+        Number of distinct groups the axis takes, i.e. how many classes the result reports.
+    rows_per_group_entity : float or None
+        Rows counted per entity at the axis's own level -- 1.0 where the axis was read at
+        its own level, and above 1.0 where it fanned out onto descendant rows. A frame-level
+        axis read from detection rows weights each frame by how many detections it holds,
+        and this is the number that says by how much. None where the container cannot say.
+    vocabulary : {"declared", "observed"}
+        Whether the group names come from a vocabulary the caller declared -- through
+        ``factor_levels=`` or a recorded ``encoding=`` -- or were read off the values that
+        happened to be present. ``"observed"`` names are dataset-relative: a set missing
+        ``fog`` yields a different alphabet, so two results are only comparable by name
+        under ``"declared"``. Always ``"observed"`` for a composite axis, whose combinations
+        are read off the data even where each component was declared.
+    """
+
+    name: str
+    source: Literal["ground_truth", "derived"]
+    level: FactorLevel | None = None
+    groups: int = 0
+    rows_per_group_entity: float | None = None
+    vocabulary: Literal["declared", "observed"] = "observed"

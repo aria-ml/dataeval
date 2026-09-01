@@ -8,11 +8,17 @@ import polars as pl
 
 from dataeval import Metadata
 from dataeval._experimental import experimental
-from dataeval._helpers import factor_code_names, factors_excluding, is_metadata_like, resolve_label_axis
+from dataeval._helpers import (
+    axis_record,
+    factor_code_names,
+    factors_excluding,
+    is_metadata_like,
+    resolve_label_axis,
+)
 from dataeval._log import get_logger
 from dataeval.core._parity import parity
 from dataeval.protocols import AnnotatedDataset, MetadataLike
-from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types import ClassAxis, DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _logger = get_logger(__name__)
 
@@ -48,10 +54,20 @@ class ParityOutput(DictOutput):
         binned factor, ``"rain"`` for a categorical one — so the entry says which subset
         to collect more of. A container carrying no encoding record falls back to the
         code as a string.
+    class_axis : ClassAxis or None
+        What this result conditioned on: the dataset's own labels, or an axis a caller
+        defined through :meth:`~dataeval.Metadata.classed_by` or ``label=``. Read
+        ``class_axis.source`` to tell the two apart without parsing a name, and
+        ``class_axis.rows_per_group_entity`` to see whether a coarse axis was replicated
+        onto finer rows. None only on an output built by hand rather than by an
+        evaluator, which is the one case where nothing resolved an axis.
+
+        .. versionadded:: 1.2
     """
 
     factors: pl.DataFrame
     insufficient_data: dict[str, dict[str, dict[str, int]]]
+    class_axis: ClassAxis | None = None
 
 
 @experimental
@@ -170,7 +186,17 @@ class Parity(Evaluator):
     ) -> None:
         super().__init__(locals())
 
-    @set_metadata(state=["score_threshold", "p_value_threshold", "label", "encoding_digest"])
+    @set_metadata(
+        state=[
+            "score_threshold",
+            "p_value_threshold",
+            "label",
+            "class_axis",
+            "class_axis_source",
+            "class_axis_level",
+            "encoding_digest",
+        ]
+    )
     def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> ParityOutput:
         """
         Compute chi-square statistics for the dataset.
@@ -217,6 +243,9 @@ class Parity(Evaluator):
             self.metadata = Metadata(data)
 
         axis = resolve_label_axis(self.metadata, self.label)
+        # Recorded before anything is computed from it: the three scalar members
+        # `set_metadata` stamps read through this, and so does the output's own field.
+        self._axis_record = record = axis_record(self.metadata, axis)
         factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
         class_labels = axis.values
         index2label = axis.names
@@ -281,4 +310,4 @@ class Parity(Evaluator):
             },
         )
 
-        return ParityOutput(factors=factors_df, insufficient_data=insufficient_data)
+        return ParityOutput(factors=factors_df, insufficient_data=insufficient_data, class_axis=record)

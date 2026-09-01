@@ -15,6 +15,7 @@ from sklearn.utils.multiclass import type_of_target
 from dataeval._helpers import is_metadata_like
 from dataeval._log import get_logger
 from dataeval.protocols import AnnotatedDataset, MetadataLike
+from dataeval.types import ClassAxis
 from dataeval.utils._internal import EPSILON
 from dataeval.utils._validate import validate_dataset
 
@@ -49,10 +50,19 @@ class DatasetSplits:
         Indices for the test set
     folds: Sequence[TrainValSplit]
         List of train and validation split indices
+    class_axis: ClassAxis or None
+        What ``stratify=True`` balanced the folds on: the dataset's own labels, or an axis a
+        caller defined with :meth:`~dataeval.Metadata.classed_by`. Folds stratified over a
+        derived axis are balanced over *that* variable and say nothing about the class
+        distribution, so a reader comparing two split sets has to be able to tell which.
+        None where the labels arrived as a raw array.
+
+        .. versionadded:: 1.2
     """
 
     test: NDArray[np.intp]
     folds: Sequence[TrainValSplit]
+    class_axis: ClassAxis | None = None
 
 
 class _KFoldSplitter(Protocol):
@@ -834,4 +844,4 @@ def split_dataset(
         len(folds[0].val) if folds else 0,
     )
 
-    return DatasetSplits(tvs.val, folds)
+    return DatasetSplits(tvs.val, folds, getattr(metadata, "class_axis_info", None))
