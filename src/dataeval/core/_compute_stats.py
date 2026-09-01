@@ -21,7 +21,7 @@ from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.data import unzip_dataset
 from dataeval.flags import ImageStats
-from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback
+from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback, _is_protocol_instance
 from dataeval.types import FactorLevel, SourceIndex, StatsMap
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import (
@@ -1244,7 +1244,7 @@ def compute_stats(  # noqa: C901
     if isinstance(data, Dataset) and len(data) > 0 and isinstance(data[0], tuple):
         datum = cast(tuple, data[0])
         if len(datum) == 3:
-            is_object_detection_dataset = isinstance(datum[1], ObjectDetectionTarget)
+            is_object_detection_dataset = _is_protocol_instance(datum[1], ObjectDetectionTarget)
 
     # Per-box rows only exist where there are boxes to make them from, so `per_target`
     # still degrades. `per_background` does not: an image with nothing annotated has a

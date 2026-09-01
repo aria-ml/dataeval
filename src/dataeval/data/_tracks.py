@@ -1,13 +1,13 @@
 __all__ = []
 
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
-from typing import cast, overload
+from collections.abc import Mapping
+from typing import overload
 
 import numpy as np
 
 from dataeval._log import get_logger
-from dataeval.protocols import Dataset, MultiobjectTrackingDataset, MultiobjectTrackingTarget
+from dataeval.protocols import Dataset, MultiobjectTrackingDataset, MultiobjectTrackingTarget, _is_protocol_instance
 from dataeval.types import Track
 from dataeval.types._target import own_class_scores
 
@@ -109,9 +109,8 @@ def build_tracks(
     with ``add_factors(..., key="track_id")`` names exactly the tracks metadata
     holds.
     """
-    # MultiobjectTrackingTarget is not runtime_checkable
-    if isinstance(getattr(source, "frame_tracks", None), Sequence):
-        return _build_tracks(cast(MultiobjectTrackingTarget, source))
+    if _is_protocol_instance(source, MultiobjectTrackingTarget):
+        return _build_tracks(source)
 
     if isinstance(source, Dataset):
         result: dict[str, Mapping[int, Track]] = {}

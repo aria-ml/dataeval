@@ -16,7 +16,13 @@ from numpy.typing import NDArray
 from dataeval.data._crops import CropPolicy, FillType, RegionType, SquareType
 from dataeval.data._tracks import build_tracks
 from dataeval.data._view import View
-from dataeval.protocols import DatumMetadata, ObjectDetectionTarget, VideoFrame, is_multiobject_tracking_target
+from dataeval.protocols import (
+    DatumMetadata,
+    MultiobjectTrackingTarget,
+    ObjectDetectionTarget,
+    VideoFrame,
+    _is_protocol_instance,
+)
 from dataeval.types import FactorLevel, FactorLevelSchema, SourceIndex, Track
 from dataeval.types._target import detection_score
 from dataeval.utils._internal import as_numpy
@@ -602,10 +608,10 @@ class SourceLocator:
                 "retrieving what its addresses name needs the dataset those arrays came from.",
             )
         target = datum[1]
-        if is_multiobject_tracking_target(target):
+        if _is_protocol_instance(target, MultiobjectTrackingTarget):
             self._detections = True
             return "sequence"
-        self._detections = isinstance(target, ObjectDetectionTarget)
+        self._detections = _is_protocol_instance(target, ObjectDetectionTarget)
         return "unit"
 
     def _reject_detectionless(self, item: SourceItem) -> None:

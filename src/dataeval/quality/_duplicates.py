@@ -36,7 +36,8 @@ from dataeval.protocols import (
     Dataset,
     FeatureExtractor,
     MultiobjectTrackingDataset,
-    is_multiobject_tracking_target,
+    MultiobjectTrackingTarget,
+    _is_protocol_instance,
 )
 from dataeval.quality._shared import (
     LABEL_KIND,
@@ -1800,7 +1801,7 @@ def _is_tracking(data: Any) -> bool:
     if not isinstance(data, Sized) or len(data) == 0:
         return False
     datum = data[0] if isinstance(data, Dataset) else None
-    return isinstance(datum, tuple) and len(datum) == 3 and is_multiobject_tracking_target(datum[1])
+    return isinstance(datum, tuple) and len(datum) == 3 and _is_protocol_instance(datum[1], MultiobjectTrackingTarget)
 
 
 def _warn_strict_radius(hash_radius: int, caller: str) -> None:

@@ -21,7 +21,6 @@ __all__ = [
     "CodedMetadataLike",
     "LabelsLike",
     "LossFn",
-    "is_multiobject_tracking_target",
     "Matcher",
     "MetadataLike",
     "ValuedMetadataLike",
@@ -52,7 +51,9 @@ __all__ = [
 ]
 
 
+import inspect
 from collections.abc import Iterable, Iterator, Mapping, Sequence
+from functools import cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -65,11 +66,10 @@ from typing import (
 
 import maite.protocols
 import maite.protocols.multiobject_tracking
-import maite.protocols.object_detection
 import numpy as np
 import torch
 from numpy.typing import NDArray
-from typing_extensions import Self
+from typing_extensions import Self, TypeIs, get_protocol_members
 
 if TYPE_CHECKING:
     from dataeval.types import Correspondence, OntologyConcept
@@ -82,25 +82,74 @@ if TYPE_CHECKING:
 # constraints, and TypedDict construction behave exactly as the MAITE originals.
 # The docstrings below give a short DataEval-facing summary and link to the
 # canonical MAITE reference via intersphinx.
+#
+# The two *target* protocols below are the exception: they mirror MAITE's members rather
+# than aliasing MAITE's names, because no MAITE name supports ``isinstance`` across the
+# supported range (``maite>=0.9.4``). Neither does so on both versions:
+#
+#                                  MAITE 0.9.4                MAITE 0.10.0
+#   ObjectDetectionTarget          @runtime_checkable         Annotated[Protocol, Is[...]]
+#   MultiobjectTrackingTarget      Protocol, *not* runtime    Annotated[Protocol, Is[...]]
+#
+# ``isinstance`` raises :class:`TypeError` against a bare ``Protocol`` and against an
+# ``Annotated`` alike -- for *every* object handed to it, not only non-conforming ones --
+# so a check written that way fails closed on every dataset. 0.10 moved the underlying
+# ``@runtime_checkable`` protocols behind ``Is[...]`` value predicates (box cardinality,
+# column count) for beartype, an optional MAITE dependency, to enforce; those private
+# classes do not exist under 0.9.4, so importing them would pin the floor to 0.10.
+#
+# Mirroring costs nothing and is what :obj:`SegmentationTarget` below already does.
+# Protocols match structurally, so these stay mutually assignable with MAITE's own targets
+# in either direction and MAITE-conforming objects satisfy them unchanged. DataEval
+# validates target *values* in ``dataeval.utils._validate``, not through the type, so the
+# dropped ``Is[...]`` predicates lose nothing. ``tests/test_protocols.py`` holds the
+# members to MAITE's, so a MAITE release that adds one fails loudly.
 
-ObjectDetectionTarget: TypeAlias = maite.protocols.object_detection.ObjectDetectionTarget
-"""
-Object-detection target for a single image.
 
-- ``boxes`` : :obj:`ArrayLike` of shape (N, 4) - Bounding boxes in (x0, y0, x1, y1) format
-- ``labels`` : :obj:`ArrayLike` of shape (N,) - Class labels for each bounding box
-- ``scores`` : :obj:`ArrayLike` of shape (N,) - Confidence scores for each bounding box
-"""
+@runtime_checkable
+class ObjectDetectionTarget(Protocol):
+    """
+    Object-detection target for a single image.
 
-MultiobjectTrackingTarget: TypeAlias = maite.protocols.multiobject_tracking.MultiobjectTrackingTarget
-"""
-Set of tracked objects over a sequence of video frames.
-"""
+    - ``boxes`` : :obj:`ArrayLike` of shape (N, 4) - Bounding boxes in (x0, y0, x1, y1) format
+    - ``labels`` : :obj:`ArrayLike` of shape (N,) - Class labels for each bounding box
+    - ``scores`` : :obj:`ArrayLike` of shape (N,) - Confidence scores for each bounding box
+    """
+
+    @property
+    def boxes(self) -> "ArrayLike":
+        """:obj:`ArrayLike` of shape (N, 4) in (x0, y0, x1, y1) format."""
+        ...
+
+    @property
+    def labels(self) -> "ArrayLike":
+        """:obj:`ArrayLike` of shape (N,) class labels, one per box."""
+        ...
+
+    @property
+    def scores(self) -> "ArrayLike":
+        """:obj:`ArrayLike` of shape (N,) or (N, n_classes) confidence scores."""
+        ...
+
 
 SingleFrameObjectTrackingTarget: TypeAlias = maite.protocols.multiobject_tracking.SingleFrameObjectTrackingTarget
 """
 Single-frame object-tracking target (tracked objects within one frame).
 """
+
+
+@runtime_checkable
+class MultiobjectTrackingTarget(Protocol):
+    """
+    Set of tracked objects over a sequence of video frames.
+
+    - ``frame_tracks`` : Sequence of :obj:`SingleFrameObjectTrackingTarget` - one per frame
+    """
+
+    @property
+    def frame_tracks(self) -> "Sequence[SingleFrameObjectTrackingTarget]":
+        """Frame-level detections, in sequential frame order."""
+        ...
 
 
 VideoFrame: TypeAlias = maite.protocols.multiobject_tracking.VideoFrame
@@ -114,49 +163,87 @@ Iterable of :obj:`VideoFrame` representing a single video.
 """
 
 
-def is_multiobject_tracking_target(target: Any) -> bool:
-    """Whether a target carries per-frame tracking annotations.
+_MISSING = object()
+_TProtocol = TypeVar("_TProtocol")
 
-    MAITE declares :obj:`MultiobjectTrackingTarget` without ``@runtime_checkable``, so
-    ``isinstance(target, MultiobjectTrackingTarget)`` raises :class:`TypeError` rather
-    than returning False. Code dispatching on task therefore cannot ask the question that
-    way — and a check written that way fails for *every* target it sees, not only for
-    non-tracking ones. This asks it structurally instead.
 
-    The attribute must actually *be* a sequence, as the protocol declares it. Merely
-    existing is too weak a test to dispatch on: attribute-fabricating stand-ins such as
-    :class:`unittest.mock.Mock` answer every ``hasattr`` yes, so a target standing in for
-    a detection target would be taken for a tracking one.
+@cache
+def _protocol_members(protocol: type) -> frozenset[str]:
+    """Return the member names a protocol declares, resolved once per protocol."""
+    return get_protocol_members(protocol)  # pyright: ignore[reportArgumentType]
+
+
+def _is_protocol_instance(obj: Any, protocol: type[_TProtocol]) -> TypeIs[_TProtocol]:
+    """Whether ``obj`` presents every member ``protocol`` declares, on any Python.
+
+    ``isinstance`` against a ``@runtime_checkable`` protocol does not mean the same thing
+    across the supported range. Below Python 3.12 it probes each member with ``hasattr``;
+    from 3.12 on it probes with :func:`inspect.getattr_static`. Two consequences, both of
+    which land on task dispatch, where the answer decides how a whole dataset is read:
+
+    - ``hasattr`` *calls* property getters, so a member that raises anything but
+      :class:`AttributeError` escapes the type test rather than making it answer False --
+      a raising ``boxes`` turns ``isinstance`` into a ``ValueError`` on 3.10 and 3.11 --
+      and a getter that does real work (as the masking proxies behind
+      :class:`~dataeval.data.ClassFilter` do, filtering detections on every read) does it
+      again for the type test.
+    - ``hasattr`` is answered by anything that fabricates attributes on demand, so an
+      attribute-fabricating stand-in lands on whichever task is checked first.
+
+    This gives the 3.12 answer on every supported version, evaluating nothing. It is
+    deliberately used only where a task is being *dispatched*; ``isinstance`` stays
+    everywhere a target is being narrowed for attribute access, as that reads better and
+    the versions cannot disagree about an object that reached it through dispatch.
+
+    It tests member *presence*, which is all a protocol encodes, and never member types: a
+    target whose ``frame_tracks`` is not a sequence still answers True for
+    :obj:`MultiobjectTrackingTarget`. That is the right split -- dispatch names the task a
+    target is *for*, and ``dataeval.utils._validate`` is where a target malformed for that
+    task is reported, with a message naming what is wrong.
 
     Parameters
     ----------
-    target : Any
-        Target object from a MAITE datum, i.e. ``dataset[i][1]``.
+    obj : Any
+        Object to test.
+    protocol : type
+        A :class:`~typing.Protocol` class. It need not be ``@runtime_checkable``, since
+        nothing here defers to ``isinstance``.
 
     Returns
     -------
-    bool
-        True when ``target`` exposes ``frame_tracks`` as a sequence — the one attribute
-        :obj:`MultiobjectTrackingTarget` adds over :obj:`ObjectDetectionTarget`.
+    TypeIs
+        True when every member ``protocol`` declares is present on ``obj``.
 
     Examples
     --------
-    >>> class Tracks:
-    ...     frame_tracks = []
-    >>> is_multiobject_tracking_target(Tracks())
+    >>> from dataeval.protocols import ObjectDetectionTarget
+    >>> class Detection:
+    ...     boxes = np.zeros((2, 4))
+    ...     labels = np.zeros(2)
+    ...     scores = np.zeros(2)
+    >>> _is_protocol_instance(Detection(), ObjectDetectionTarget)
     True
 
-    >>> is_multiobject_tracking_target(np.zeros(3))
-    False
-
-    A stand-in that fabricates attributes on demand is not mistaken for a real one:
+    A stand-in that fabricates attributes on demand is not mistaken for a target, on any
+    version -- where ``isinstance`` would say True below Python 3.12:
 
     >>> from unittest.mock import Mock
-    >>> is_multiobject_tracking_target(Mock())
+    >>> _is_protocol_instance(Mock(), ObjectDetectionTarget)
     False
+
+    A member that raises is seen rather than called, so it cannot escape the test:
+
+    >>> class Guarded:
+    ...     @property
+    ...     def boxes(self):
+    ...         raise ValueError("no boxes above the image level")
+    ...
+    ...     labels = np.zeros(2)
+    ...     scores = np.zeros(2)
+    >>> _is_protocol_instance(Guarded(), ObjectDetectionTarget)
+    True
     """
-    frame_tracks = getattr(target, "frame_tracks", None)
-    return isinstance(frame_tracks, Sequence) and not isinstance(frame_tracks, (str, bytes))
+    return all(inspect.getattr_static(obj, name, _MISSING) is not _MISSING for name in _protocol_members(protocol))
 
 
 DatumMetadata: TypeAlias = maite.protocols.DatumMetadata

@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Literal
 
-from dataeval.protocols import Array, ObjectDetectionTarget, is_multiobject_tracking_target
+from dataeval.protocols import Array, MultiobjectTrackingTarget, ObjectDetectionTarget, _is_protocol_instance
 from dataeval.types._factors import FactorLevel, FactorLevelSchema
 
 # The tasks a dataset can be *detected* as, which is narrower than the set of structuring
@@ -76,12 +76,10 @@ TASK_PROFILES: Mapping[DatasetTask, TaskProfile] = MappingProxyType({
 
 # Target predicates in priority order; the first that matches wins. Most specific first, so
 # the tracking predicate — a *positive* check for its own target type — sits above the
-# detection entry rather than being carved out of it. Tracking is checked structurally:
-# MAITE's ``MultiobjectTrackingTarget`` is not ``@runtime_checkable``, so an instance check
-# against it raises instead of answering.
+# detection entry rather than being carved out of it.
 DISPATCH: tuple[tuple[Callable[[Any], bool], DatasetTask], ...] = (
-    (is_multiobject_tracking_target, "MOT"),
-    (lambda target: isinstance(target, ObjectDetectionTarget), "OD"),
+    (lambda target: _is_protocol_instance(target, MultiobjectTrackingTarget), "MOT"),
+    (lambda target: _is_protocol_instance(target, ObjectDetectionTarget), "OD"),
     (lambda target: isinstance(target, Array), "IC"),
 )
 

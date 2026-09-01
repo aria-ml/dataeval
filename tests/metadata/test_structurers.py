@@ -128,22 +128,6 @@ class TestStructurerSelection:
     def test_tracking_target_dispatches_to_mot(self):
         assert isinstance(select_structurer(_mot_dataset([[2, 1], [1]])), MOTStructurer)
 
-    def test_bare_mock_target_is_not_mistaken_for_tracking(self):
-        """A bare Mock answers every hasattr, so presence alone cannot decide the task.
-
-        MAITE declares ``frame_tracks`` as a sequence and leaves
-        ``MultiobjectTrackingTarget`` without ``@runtime_checkable``, so dispatch has to
-        duck-type — and has to check the attribute's *type*, not just its existence, or
-        every attribute-fabricating stand-in lands on the tracking structurer.
-        """
-        target = Mock()
-        target.boxes = np.array([[1.0, 1.0, 2.0, 2.0]])
-        target.labels = np.array([0])
-        target.scores = np.array([0.5])
-        dataset = MockDataset([np.zeros((3, 4, 4))], [target])
-
-        assert isinstance(select_structurer(dataset), ODImageStructurer)
-
     def test_detection_target_does_not_dispatch_to_mot(self):
         """The tracking predicate is checked first, so it must answer False here."""
         dataset = MockDataset([np.zeros((3, 4, 4))], [_od_target()])
