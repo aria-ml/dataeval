@@ -22,8 +22,9 @@ from dataeval.protocols import (
     AnnotatedDataset,
     Array,
     DatumMetadata,
+    MultiobjectTrackingTarget,
     ObjectDetectionTarget,
-    is_multiobject_tracking_target,
+    _is_protocol_instance,
 )
 
 _logger = get_logger(__name__)
@@ -33,8 +34,8 @@ _logger = get_logger(__name__)
 # ordered most specific first, so the tracking predicate — a *positive* check for its
 # own target type — sits above the detection entry rather than being carved out of it.
 DISPATCH: tuple[tuple[Callable[[Any], bool], type[DatasetStructurer]], ...] = (
-    (is_multiobject_tracking_target, MOTStructurer),
-    (lambda x: isinstance(x, ObjectDetectionTarget), ODImageStructurer),
+    (lambda target: _is_protocol_instance(target, MultiobjectTrackingTarget), MOTStructurer),
+    (lambda target: _is_protocol_instance(target, ObjectDetectionTarget), ODImageStructurer),
     (lambda x: isinstance(x, Array), ICStructurer),
 )
 

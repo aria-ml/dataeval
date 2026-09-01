@@ -38,9 +38,10 @@ from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import (
     Array,
     Dataset,
+    MultiobjectTrackingTarget,
     ObjectDetectionTarget,
     SegmentationTarget,
-    is_multiobject_tracking_target,
+    _is_protocol_instance,
 )
 
 DatasetKind = Literal[
@@ -82,13 +83,11 @@ def aggregate_required_kind(kinds: Iterable[DatasetKind | None]) -> DatasetKind 
 
 # One predicate per target-consuming kind, **most specific first**. The order is what
 # resolves ``any_target`` to a concrete kind, so a target satisfying more than one is
-# reported as the most specific of them. Tracking is checked structurally rather than
-# with ``isinstance``: MAITE's ``MultiobjectTrackingTarget`` is not ``@runtime_checkable``,
-# so an instance check against it raises instead of answering.
+# reported as the most specific of them.
 _TARGET_CHECKS: Mapping[str, Callable[[Any], bool]] = {
-    "multiobject_tracking": is_multiobject_tracking_target,
-    "object_detection": lambda target: isinstance(target, ObjectDetectionTarget),
-    "segmentation": lambda target: isinstance(target, SegmentationTarget),
+    "multiobject_tracking": lambda target: _is_protocol_instance(target, MultiobjectTrackingTarget),
+    "object_detection": lambda target: _is_protocol_instance(target, ObjectDetectionTarget),
+    "segmentation": lambda target: _is_protocol_instance(target, SegmentationTarget),
     "classification": lambda target: isinstance(target, Array),
 }
 
