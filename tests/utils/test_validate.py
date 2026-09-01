@@ -6,6 +6,8 @@ public entry points it guards (:class:`Embeddings`, :class:`Metadata`,
 :class:`View` + :class:`ClassFilter`, ``split_dataset``, ``unzip_dataset``).
 """
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -254,6 +256,178 @@ class TestValidateHelpers:
         # when no frame is available, the caller name defaults to "validate_dataset"
         monkeypatch.setattr(_validate.inspect, "currentframe", lambda: None)
         assert _validate._infer_caller() == "validate_dataset"
+
+
+# ---------- validate_dataset: MOT coverage (per-frame arrays + stream count) ----------
+
+
+@dataclass
+class _FrameTracks:
+    frame_tracks: Sequence[Any]
+
+
+class _MOTLike:
+    """Single-datum MOT dataset with a configurable stream and frame targets."""
+
+    metadata = DatasetMetadata(id="mot_like")
+
+    def __init__(self, stream: Any, frame_targets: Any) -> None:
+        self._stream = stream
+        self._target = _FrameTracks(frame_targets)
+
+    def __len__(self) -> int:
+        return 1
+
+    def __getitem__(self, i: int) -> tuple[Any, _FrameTracks, DatumMetadata]:
+        return self._stream, self._target, DatumMetadata(id=i)
+
+
+def _frame(boxes: Any = (1, 4), labels: Any = (1,), scores: Any = (1,), track_ids: Any = (1,)) -> _FrameTarget:
+    # A None argument deletes the attribute (the default constructor sets all four).
+    t = _FrameTarget()
+    for name, value, dtype in (
+        ("boxes", boxes, np.float32),
+        ("labels", labels, np.intp),
+        ("scores", scores, np.float32),
+        ("track_ids", track_ids, np.intp),
+    ):
+        if value is None:
+            delattr(t, name)
+        else:
+            setattr(t, name, np.zeros(value, dtype=dtype))
+    return t
+
+
+def _frames(n: int) -> list[np.ndarray]:
+    return [np.zeros((3, 8, 8), dtype=np.float32) for _ in range(n)]
+
+
+class TestMOTCoverage:
+    def test_matching_counts_pass(self) -> None:
+        ds = _MOTLike(_frames(2), [_frame(), _frame()])
+        assert validate_dataset(ds, expected="multiobject_tracking") == "multiobject_tracking"
+        # the same checks run when the kind is resolved through any_target
+        assert validate_dataset(ds, expected="any_target") == "multiobject_tracking"
+
+    def test_validation_never_touches_the_stream(self) -> None:
+        # validation is targets-only: a one-shot iterator is left untouched, so a caller's
+        # stream is never drained (or decoded) by the check
+        class _ConsumedStream:
+            def __iter__(self) -> Any:
+                if getattr(self, "used", False):
+                    raise RuntimeError("stream consumed during validation")
+                self.used = True
+                return iter([])
+
+        ds = _MOTLike(_ConsumedStream(), [_frame(), _frame()])
+        assert validate_dataset(ds, expected="multiobject_tracking") == "multiobject_tracking"
+
+    def test_cardinality_mismatch(self) -> None:
+        ds = _MOTLike(_frames(2), [_frame(), _frame(boxes=(2, 4), labels=(1,), scores=(1,), track_ids=(1,))])
+        with pytest.raises(MaiteShapeError, match=r"has boxes with 8 value\(s\) for 1 label\(s\)"):
+            validate_dataset(ds, expected="multiobject_tracking")
+
+    def test_boxes_too_few_values(self) -> None:
+        ds = _MOTLike(_frames(1), [_frame(boxes=(1, 3))])
+        with pytest.raises(MaiteShapeError, match=r"has boxes with 3 value\(s\) for 1 label\(s\)"):
+            validate_dataset(ds, expected="multiobject_tracking")
+
+    def test_transposed_boxes_rejected(self) -> None:
+        # (4, N) has the right value count but the wrong axis order: instance_arrays'
+        # reshape(count, 4) would read every coordinate into the wrong slot, silently
+        ds = _MOTLike(_frames(1), [_frame(boxes=(4, 2), labels=(2,), scores=(2,), track_ids=(2,))])
+        with pytest.raises(MaiteShapeError, match=r"has boxes of shape \(4, 2\) for 2 label\(s\)"):
+            validate_dataset(ds, expected="multiobject_tracking")
+
+    def test_flat_boxes_accepted(self) -> None:
+        # a flat (4N,) buffer reshapes to (N, 4) row-major with coordinates intact
+        ds = _MOTLike(_frames(1), [_frame(boxes=(8,), labels=(2,), scores=(2,), track_ids=(2,))])
+        assert validate_dataset(ds, expected="multiobject_tracking") == "multiobject_tracking"
+
+    def test_short_track_ids_is_not_a_defect(self) -> None:
+        # dataeval reads track_ids against labels, padding -1 where absent -- a frame whose
+        # detections are untracked (short or empty track_ids) is legitimate, not malformed
+        ds = _MOTLike(
+            _frames(1),
+            [_frame(boxes=(2, 4), labels=(2,), scores=(2,), track_ids=(0,))],
+        )
+        assert validate_dataset(ds, expected="multiobject_tracking") == "multiobject_tracking"
+
+    def test_missing_scores_is_not_a_defect(self) -> None:
+        class _NoScores:
+            boxes = np.zeros((1, 4), dtype=np.float32)
+            labels = np.array([0], dtype=np.intp)
+            track_ids = np.array([0], dtype=np.intp)
+
+        ds = _MOTLike(_frames(1), [_NoScores()])
+        assert validate_dataset(ds, expected="multiobject_tracking") == "multiobject_tracking"
+
+    def test_frame_missing_labels(self) -> None:
+        class _NoLabels:
+            boxes = np.zeros((1, 4), dtype=np.float32)
+            scores = np.array([1.0], dtype=np.float32)
+            track_ids = np.array([0], dtype=np.intp)
+
+        ds = _MOTLike(_frames(1), [_NoLabels()])
+        with pytest.raises(MaiteShapeError, match="lacks a required per-frame array"):
+            validate_dataset(ds, expected="multiobject_tracking")
+
+    def test_detection_free_frame_needs_no_boxes(self) -> None:
+        ds = _MOTLike(_frames(1), [_frame(boxes=(0, 4), labels=(0,), scores=(0,), track_ids=(0,))])
+        assert validate_dataset(ds, expected="multiobject_tracking") == "multiobject_tracking"
+
+    def test_error_names_frame_index(self) -> None:
+        ds = _MOTLike(_frames(2), [_frame(), _frame(), _frame(boxes=(1, 3))])
+        with pytest.raises(MaiteShapeError, match=r"whose frame 2 has boxes"):
+            validate_dataset(ds, expected="multiobject_tracking")
+
+    def test_detection_free_frame_may_omit_boxes(self) -> None:
+        # instance_arrays never reads boxes when the label count is 0, so a frame with no
+        # detections is free to omit them entirely -- the validator must agree
+        class _EmptyNoBoxes:
+            labels = np.array([], dtype=np.intp)
+
+        ds = _MOTLike(_frames(1), [_EmptyNoBoxes()])
+        assert validate_dataset(ds, expected="multiobject_tracking") == "multiobject_tracking"
+
+    def test_torch_backed_frame_target_accepted(self) -> None:
+        # as_numpy detaches; np.asarray raises. The validator must read a target exactly
+        # the way the consumer that will read it next does.
+        import torch
+
+        class _TorchFrame:
+            boxes = torch.zeros((1, 4), requires_grad=True)
+            labels = torch.zeros(1, dtype=torch.int64)
+
+        ds = _MOTLike(_frames(1), [_TorchFrame()])
+        assert validate_dataset(ds, expected="multiobject_tracking") == "multiobject_tracking"
+
+    def test_raising_boxes_getter_is_reported(self) -> None:
+        # dispatch sees the member without calling it; this is where a getter that raises
+        # is turned into a shape error rather than escaping as itself
+        class _Guarded:
+            labels = np.array([0], dtype=np.intp)
+
+            @property
+            def boxes(self) -> Any:
+                raise RuntimeError("no boxes above the image level")
+
+        ds = _MOTLike(_frames(1), [_Guarded()])
+        with pytest.raises(MaiteShapeError, match="cannot be read as an array"):
+            validate_dataset(ds, expected="multiobject_tracking")
+
+    def test_shape_error_stays_catchable_as_value_error(self) -> None:
+        # the per-frame checks intercept, at entry, a defect that instance_arrays' reshape
+        # used to raise as ValueError deep in the walk; a caller that caught it there must
+        # keep working now that it is caught earlier
+        ds = _MOTLike(_frames(1), [_frame(boxes=(2, 4), labels=(1,))])
+        with pytest.raises(ValueError, match=r"has boxes with 8 value\(s\) for 1 label\(s\)"):
+            validate_dataset(ds, expected="multiobject_tracking")
+
+    def test_non_sequence_frame_tracks_rejected(self) -> None:
+        ds = _MOTLike(_frames(1), None)
+        with pytest.raises(MaiteShapeError, match="frame_tracks is NoneType"):
+            validate_dataset(ds, expected="multiobject_tracking")
 
 
 # ---------- @requires_maite_dataset ----------

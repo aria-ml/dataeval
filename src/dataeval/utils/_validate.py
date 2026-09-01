@@ -21,6 +21,25 @@ dataset) and checks:
    :class:`~dataeval.protocols.SegmentationTarget` for segmentation,
    :obj:`~dataeval.protocols.MultiobjectTrackingTarget` for multi-object
    tracking, any of the four for ``"any_target"``).
+4. For multi-object tracking (including ``"any_target"`` resolving to it): each
+   ``frame_tracks`` entry is checked against the invariant dataeval's consumers
+   depend on -- ``labels`` establish the detection count and ``boxes`` must be
+   reshapable to ``(N, 4)`` in x0, y0, x1, y1 order with one row per label. This is
+   the permissive reading of maite's ``Is[...]`` predicates, which are inert without
+   beartype: ``scores`` and ``track_ids`` are optional (NaN / ``-1`` fallbacks), so a
+   short or missing ``track_ids`` -- an untracked detection -- is legitimate.
+
+   Targets only: nothing here decodes a frame, and the scan is the probed sequence's
+   alone. It is O(its frame count) -- about 0.5 microseconds per frame, or 50ms for a
+   100k-frame sequence, and roughly 3x that through a masking proxy whose getters
+   re-filter on every read. Deliberately not sampled: a scan that skipped frame 50,000
+   would let exactly the defect this module exists to intercept reach the walk instead.
+
+Whether a video stream yields one frame per frame target is **not** checked here. That
+costs a decode, and the structuring walk behind :class:`~dataeval.Metadata` and
+:class:`~dataeval.data.SequenceFrames` already checks it in both directions for *every*
+sequence, from frames it was going to decode anyway -- where a probe of ``dataset[0]``
+could only ever have checked the first.
 
 On failure, raises :class:`~dataeval.exceptions.MaiteShapeError` with a
 message that names the calling function, what was expected, and what was
@@ -31,8 +50,10 @@ __all__ = ["DatasetKind", "aggregate_required_kind", "requires_maite_dataset", "
 
 import functools
 import inspect
-from collections.abc import Callable, Iterable, Mapping, Sized
+from collections.abc import Callable, Iterable, Mapping, Sequence, Sized
 from typing import Any, Literal, TypeVar, cast, get_args
+
+from numpy.typing import NDArray
 
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import (
@@ -43,6 +64,8 @@ from dataeval.protocols import (
     SegmentationTarget,
     _is_protocol_instance,
 )
+from dataeval.types._target import detection_count
+from dataeval.utils._internal import as_numpy
 
 DatasetKind = Literal[
     "image_only",
@@ -204,8 +227,126 @@ def validate_dataset(  # noqa: C901
         # _target_matches has already established that one of them matches, so the search
         # cannot come up empty. Driven by the same ordered table, so "most specific wins"
         # is declared once rather than restated here.
-        return cast(DatasetKind, next(kind for kind, check in _TARGET_CHECKS.items() if check(target)))
-    return expected
+        kind = cast(DatasetKind, next(kind for kind, check in _TARGET_CHECKS.items() if check(target)))
+    else:
+        kind = expected
+
+    if kind == "multiobject_tracking":
+        _check_mot_coverage(datum[1], where, arg_name)
+    return kind
+
+
+# ---------- multi-object tracking coverage ----------
+
+
+def _unreadable_array(exc: Exception) -> str:
+    """Describe a per-frame array that could not be read, by why it could not be.
+
+    Every read here goes through the same ``as_numpy`` the consumers use, so anything this
+    catches is a target the consumer could not have read either. Deliberately broad: task
+    dispatch answers on member *presence* without evaluating it (see
+    ``protocols._is_protocol_instance``), which leaves this the first place a property
+    getter is actually called -- and the place whose whole job is to turn a target malformed
+    for its task into a MaiteShapeError rather than let the getter's own exception escape.
+    """
+    if isinstance(exc, AttributeError):
+        return f"lacks a required per-frame array ({exc})"
+    return f"has a per-frame array that cannot be read as an array ({exc})"
+
+
+def _mot_frame_problem(frame: Any) -> str | None:
+    """Return a per-frame target defect, or ``None`` when the frame is well-formed.
+
+    Enforces the invariant dataeval's consumers actually depend on, which is the permissive
+    reading of maite's ``Is[...]`` predicates (inert without beartype) and must stay so:
+    ``labels`` establish the detection count and every other per-detection array is read
+    against them -- ``instance_arrays`` reshapes ``boxes`` to ``(N, 4)``, ``track_ids_of``
+    pads a short ``track_ids`` with ``-1``, ``own_class_scores`` reads ``scores`` as
+    optional. A frame whose boxes cannot be read as one row of 4 columns per label is where
+    a detection's position stops meaning the same thing to every reader, so that is what is
+    rejected at the probe; ``scores`` and ``track_ids`` of any length (or absent) are not.
+
+    Reads through ``detection_count`` and ``as_numpy`` -- the same readers
+    ``instance_arrays`` will use next -- rather than a private equivalent, so the validator
+    cannot come to a different verdict about a target than the consumer it is clearing the
+    way for. Boxes are read only *after* the count is known, because a detection-free frame
+    is never asked for them.
+    """
+    try:
+        count = detection_count(frame)
+    except Exception as exc:  # noqa: BLE001 - see _unreadable_array
+        return _unreadable_array(exc)
+    if not count:
+        return None  # a detection-free frame needs no boxes, and is not asked for them
+    try:
+        boxes = as_numpy(frame.boxes)
+    except Exception as exc:  # noqa: BLE001 - see _unreadable_array
+        return _unreadable_array(exc)
+    return _boxes_problem(boxes, count)
+
+
+def _boxes_problem(boxes: NDArray[Any], count: int) -> str | None:
+    """Whether ``boxes`` reads as one (x0, y0, x1, y1) row per label.
+
+    Both halves are needed. The size test is the case where ``instance_arrays``'
+    ``reshape(count, 4)`` would raise deep in the walk; the width test is the case where it
+    would *succeed* and read every coordinate into the wrong slot, which no later reader
+    can detect. A flat ``(4N,)`` buffer is exempt from the width test -- it reshapes
+    row-major with coordinates intact -- which is why ndim 1 is not required to be 4 wide.
+    """
+    if boxes.size != 4 * count:
+        return (
+            f"has boxes with {boxes.size} value(s) for {count} label(s); boxes must be "
+            "reshapable to (N, 4) in x0, y0, x1, y1 order with one row per label"
+        )
+    if boxes.ndim > 1 and boxes.shape[-1] != 4:
+        return (
+            f"has boxes of shape {tuple(boxes.shape)} for {count} label(s); boxes must be "
+            "(N, 4) in x0, y0, x1, y1 order with one row per label, not transposed"
+        )
+    return None
+
+
+def _frame_tracks(target: Any, where: str, arg_name: str) -> Sequence[Any]:
+    """Target's per-frame targets, as a concrete sequence.
+
+    The dispatch-level protocol check answers True on ``frame_tracks`` *presence* alone, so a
+    value that is unreadable or not sequence-like reaches here; that is a shape defect for a
+    tracking consumer and is reported rather than escaped as an AttributeError.
+    """
+    try:
+        tracks = target.frame_tracks
+    except AttributeError as exc:
+        raise MaiteShapeError(
+            f"{where}: argument {arg_name!r} has a MultiobjectTrackingTarget whose frame_tracks "
+            f"is not readable ({exc})."
+        ) from exc
+    if not isinstance(tracks, Sequence):
+        try:
+            tracks = list(tracks)
+        except TypeError:
+            raise MaiteShapeError(
+                f"{where}: argument {arg_name!r} has a MultiobjectTrackingTarget whose frame_tracks "
+                f"is {_describe(tracks)}; expected a sequence of per-frame targets."
+            ) from None
+    return tracks
+
+
+def _check_mot_coverage(target: Any, where: str, arg_name: str) -> None:
+    """Entry-time MOT coverage check: every frame's per-detection arrays agree on a count.
+
+    Targets only -- nothing here touches the stream, so no frame is decoded and a caller's
+    stream is left exactly as it was found. The stream/target frame count is the walk's to
+    check, not the probe's: the walk sees every sequence and already has the frames in hand,
+    where a probe of ``dataset[0]`` would pay a full decode to check one.
+    """
+    tracks = _frame_tracks(target, where, arg_name)
+    for i, frame in enumerate(tracks):
+        problem = _mot_frame_problem(frame)
+        if problem is not None:
+            raise MaiteShapeError(
+                f"{where}: argument {arg_name!r} has a multi-object tracking target whose frame {i} {problem}."
+            )
 
 
 def requires_maite_dataset(  # noqa: C901

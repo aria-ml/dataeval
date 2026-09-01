@@ -13,7 +13,7 @@ __all__ = [
 ]
 
 
-class MaiteShapeError(TypeError):
+class MaiteShapeError(TypeError, ValueError):
     """Raised when a dataset does not match the expected MAITE datum shape.
 
     Public entry points that consume a MAITE-protocol dataset probe
@@ -23,9 +23,13 @@ class MaiteShapeError(TypeError):
     :obj:`~dataeval.protocols.ObjectDetectionTarget` for an object
     detection consumer).
 
-    Inherits from :class:`TypeError` so callers that previously caught the
-    silent ``IndexError``/``TypeError`` from downstream destructuring keep
-    working.
+    Every defect this names is one that used to surface later, from whichever
+    reader first tripped over it; raising it at entry only moves *where* it is
+    reported, so it inherits from both of the types those readers raised and
+    stays catchable either way. ``TypeError`` covers the ``IndexError``/
+    ``TypeError`` from downstream destructuring; ``ValueError`` covers the
+    per-detection array readers, whose reshape against the label count raises
+    ``ValueError`` in the structuring walk.
     """
 
 
