@@ -452,7 +452,8 @@ def compute_ratios(  # noqa: C901
     - For each box, finds its corresponding image stats (box=None, same image)
     - Applies custom calculations from override_map or defaults to simple division
     - Divides each band group column against the image column of the same name, so a
-      ``channels=`` mapping yields ``<group>_<statistic>`` ratios alongside the unprefixed ones
+      ``channels=`` mapping yields ``<group>_<statistic>`` ratios beside whichever unprefixed
+      ones the run produced — a ``stats`` mapping naming no ``None`` view produces none
     - BASE_ATTRS (source_index, object_count, etc.) are preserved for box entries only
 
     Examples

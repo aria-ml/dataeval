@@ -2414,6 +2414,403 @@ class TestChannelGroupValidation:
 
 
 @pytest.mark.required
+class TestPerGroupStats:
+    """`stats` as a mapping asks a different question of each view.
+
+    Bands of one cube are different measurements and rarely deserve the same statistics: a
+    hash of the visible bands identifies a duplicate frame where a hash of the whole cube
+    does not, while a thermal band wants its distribution and nothing else. The mapping is
+    keyed by the prefix the columns carry — a group's name, or None for the unprefixed ones.
+    """
+
+    @staticmethod
+    def _cube():
+        """RGB in 0-255 and NIR in 30000-40000, stacked into one uint16 array."""
+        rng = np.random.default_rng(0)
+        cube = np.empty((4, 32, 32), np.uint16)
+        cube[:3] = rng.integers(0, 256, (3, 32, 32))
+        cube[3] = rng.integers(30000, 40000, (32, 32))
+        return cube
+
+    _CHANNELS = {"rgb": [0, 1, 2], "ir": 3}
+
+    def test_each_view_gets_the_statistics_it_was_given(self):
+        result = compute_stats(
+            [self._cube()],
+            stats={
+                None: ImageStats.DIMENSION_WIDTH,
+                "rgb": ImageStats.HASH_XXHASH,
+                "ir": ImageStats.PIXEL_MEAN,
+            },
+            channels=self._CHANNELS,
+            normalize_pixel_values=False,
+        )["stats"]
+
+        assert set(result) == {"width", "rgb_xxhash", "ir_mean"}
+
+    def test_a_view_with_no_entry_is_not_measured(self):
+        """The mapping is a complete statement, so omitting None drops the unprefixed columns."""
+        result = compute_stats(
+            [self._cube()],
+            stats={"rgb": ImageStats.PIXEL_MEAN, "ir": ImageStats.PIXEL_MEAN},
+            channels=self._CHANNELS,
+            normalize_pixel_values=False,
+        )["stats"]
+
+        assert set(result) == {"rgb_mean", "ir_mean"}
+
+    def test_the_rows_survive_a_view_that_measures_nothing(self):
+        """Dropping every unprefixed column must not drop the addresses they were on."""
+        result = compute_stats(
+            [self._cube()],
+            boxes=[[(4, 4, 20, 20)]],
+            stats={"rgb": ImageStats.PIXEL_MEAN},
+            channels={"rgb": [0, 1, 2]},
+            normalize_pixel_values=False,
+        )
+
+        assert [(s.item, s.key) for s in result["source_index"]] == [(0, None), (0, 0)]
+        assert len(result["stats"]["rgb_mean"]) == 2
+
+    def test_a_mapping_restating_one_flag_set_matches_it(self):
+        """The two spellings are the same request, so they must be the same answer."""
+        single = compute_stats(
+            [self._cube()], stats=ImageStats.PIXEL_MEAN, channels=self._CHANNELS, normalize_pixel_values=False
+        )["stats"]
+        mapped = compute_stats(
+            [self._cube()],
+            stats={None: ImageStats.PIXEL_MEAN, "rgb": ImageStats.PIXEL_MEAN, "ir": ImageStats.PIXEL_MEAN},
+            channels=self._CHANNELS,
+            normalize_pixel_values=False,
+        )["stats"]
+
+        assert set(single) == set(mapped)
+        for name, values in single.items():
+            assert values == pytest.approx(mapped[name])
+
+    def test_a_mapping_matches_one_flag_set_over_a_background(self):
+        """Region and band compose the same way in either spelling, over every statistic.
+
+        The broad case for `test_a_mapping_restating_one_flag_set_matches_it`: the masked
+        band pass narrows the two views in the opposite order from the unmasked one, so it
+        is the pass most able to disagree with the single-flag spelling it replaces.
+        """
+        single = compute_stats(
+            [self._cube()],
+            boxes=[[(4, 4, 20, 20)]],
+            stats=ImageStats.ALL,
+            channels=self._CHANNELS,
+            per_background=True,
+            value_range=(0, 65535),
+            normalize_pixel_values=False,
+        )["stats"]
+        mapped = compute_stats(
+            [self._cube()],
+            boxes=[[(4, 4, 20, 20)]],
+            stats=dict.fromkeys([None, *self._CHANNELS], ImageStats.ALL),
+            channels=self._CHANNELS,
+            per_background=True,
+            value_range=(0, 65535),
+            normalize_pixel_values=False,
+        )["stats"]
+
+        assert set(single) == set(mapped)
+        for name, values in single.items():
+            expected, actual = np.asarray(values), np.asarray(mapped[name])
+            if expected.dtype.kind == "f":
+                np.testing.assert_allclose(actual, expected, equal_nan=True, err_msg=name)
+            else:
+                assert np.array_equal(actual, expected), name
+
+    def test_a_group_keeps_its_own_range_anchor(self):
+        """Per-view flags change what is measured, not what it is measured against."""
+        result = compute_stats(
+            [self._cube()],
+            stats={None: ImageStats.DIMENSION_DEPTH, "rgb": ImageStats.DIMENSION_DEPTH},
+            channels={"rgb": [0, 1, 2]},
+            normalize_pixel_values=False,
+        )["stats"]
+
+        assert result["rgb_depth"][0] == 8, "the visible bands are 8-bit data in a 16-bit container"
+        assert result["depth"][0] == 16
+
+    def test_background_composes_with_a_mapping(self):
+        """Region first, then band — `background_rgb_mean` is still a real quantity."""
+        result = compute_stats(
+            [self._cube()],
+            boxes=[[(4, 4, 20, 20)]],
+            stats={"rgb": ImageStats.PIXEL_MEAN},
+            channels={"rgb": [0, 1, 2]},
+            per_background=True,
+            normalize_pixel_values=False,
+        )["stats"]
+
+        assert set(result) == {"rgb_mean", "background_rgb_mean", "background_fraction"}
+
+    def test_a_group_asking_nothing_of_a_background_is_skipped(self):
+        """A hash is band-variant but not NaN-stable, so it survives one view and not the other."""
+        result = compute_stats(
+            [self._cube()],
+            boxes=[[(4, 4, 20, 20)]],
+            stats={"rgb": ImageStats.HASH_XXHASH, "ir": ImageStats.PIXEL_MEAN},
+            channels=self._CHANNELS,
+            per_background=True,
+            normalize_pixel_values=False,
+        )["stats"]
+
+        assert set(result) == {"rgb_xxhash", "ir_mean", "background_ir_mean", "background_fraction"}
+
+
+@pytest.mark.required
+class TestPerGroupStatsValidation:
+    """A mapping and `channels` name the same views, so they are checked against each other.
+
+    Every input is known before an image is read. Letting the two drift would turn a typo
+    into a silently missing set of columns rather than an error.
+    """
+
+    _IMAGE = [np.zeros((4, 8, 8), np.uint8)]
+
+    def test_a_group_with_no_entry_is_rejected(self):
+        with pytest.raises(ValueError, match="Channel groups with no entry: 'ir'"):
+            compute_stats(
+                self._IMAGE,
+                stats={"rgb": ImageStats.PIXEL_MEAN},
+                channels={"rgb": [0, 1, 2], "ir": 3},
+                normalize_pixel_values=False,
+            )
+
+    def test_an_entry_naming_no_group_is_rejected(self):
+        with pytest.raises(ValueError, match="keys naming no channel group: 'swir'"):
+            compute_stats(
+                self._IMAGE,
+                stats={"rgb": ImageStats.PIXEL_MEAN, "swir": ImageStats.PIXEL_MEAN},
+                channels={"rgb": [0, 1, 2]},
+                normalize_pixel_values=False,
+            )
+
+    def test_a_key_that_names_nothing_is_reported_as_such(self):
+        """A key that is neither a string nor None names no channel group either."""
+        with pytest.raises(ValueError, match="keys naming no channel group"):
+            compute_stats(
+                self._IMAGE,
+                stats={3: ImageStats.PIXEL_MEAN},  # type: ignore
+                channels={"rgb": [0, 1, 2]},
+                normalize_pixel_values=False,
+            )
+
+    def test_a_mapping_with_no_channels_needs_only_the_whole_image_entry(self):
+        result = compute_stats(self._IMAGE, stats={None: ImageStats.DIMENSION_WIDTH}, normalize_pixel_values=False)[
+            "stats"
+        ]
+
+        assert set(result) == {"width"}
+
+    def test_a_statistic_computed_by_no_view_warns(self):
+        """Geometry named only for a band group is produced nowhere, and vanishes silently."""
+        with pytest.warns(UserWarning, match="nothing computes them") as caught:
+            compute_stats(
+                self._IMAGE,
+                stats={"rgb": ImageStats.PIXEL_MEAN | ImageStats.DIMENSION_WIDTH},
+                channels={"rgb": [0, 1, 2]},
+                normalize_pixel_values=False,
+            )
+
+        # The computed half of the message, not just the boilerplate around it: naming
+        # PIXEL_MEAN here would be a lie, since `rgb_mean` is in the result.
+        message = str(caught[0].message)
+        assert "DIMENSION_WIDTH" in message
+        assert "PIXEL_MEAN" not in message
+
+    def test_a_group_asked_only_for_geometry_says_both_things(self):
+        """Two questions, two answers, in the order that survives a strict filter.
+
+        A group asked only for band-invariant statistics is barren — it yields no columns —
+        *and* leaves those statistics computed nowhere. Both are true and they prescribe
+        different remedies, so both are said; the ordering is what decides which one a
+        caller running with warnings-as-errors gets to read.
+        """
+        # `match` satisfies at least one of the recorded warnings; the assertions below
+        # are what pin the pair and their order.
+        with pytest.warns(UserWarning, match="nothing computes them") as caught:
+            compute_stats(
+                self._IMAGE,
+                stats={"rgb": ImageStats.DIMENSION_WIDTH},
+                channels={"rgb": [0, 1, 2]},
+                normalize_pixel_values=False,
+            )
+
+        messages = [str(warning.message) for warning in caught]
+        assert len(messages) == 2
+        assert "nothing computes them" in messages[0]
+        assert "none of the requested statistics vary" in messages[1]
+
+    def test_the_remedy_that_returns_the_column_survives_strict_filters(self):
+        """Barren's remedy changes what the group measures; this one brings `width` back."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            with pytest.raises(UserWarning, match="nothing computes them"):
+                compute_stats(
+                    self._IMAGE,
+                    stats={"rgb": ImageStats.DIMENSION_WIDTH},
+                    channels={"rgb": [0, 1, 2]},
+                    normalize_pixel_values=False,
+                )
+
+    def test_no_warning_when_the_whole_image_entry_asks_for_it(self):
+        """A caller who arranged to get `width` has already answered the question."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            compute_stats(
+                self._IMAGE,
+                stats={None: ImageStats.DIMENSION_WIDTH, "rgb": ImageStats.PIXEL_MEAN | ImageStats.DIMENSION_WIDTH},
+                channels={"rgb": [0, 1, 2]},
+                normalize_pixel_values=False,
+            )
+
+    def test_only_the_barren_group_is_dropped(self):
+        """One group asking for geometry alone must not take its neighbour down with it."""
+        with pytest.warns(UserWarning, match="none of the requested statistics vary") as caught:
+            result = compute_stats(
+                self._IMAGE,
+                stats={
+                    None: ImageStats.DIMENSION_WIDTH,
+                    "rgb": ImageStats.PIXEL_MEAN,
+                    "ir": ImageStats.DIMENSION_WIDTH,
+                },
+                channels={"rgb": [0, 1, 2], "ir": 3},
+                normalize_pixel_values=False,
+            )["stats"]
+
+        assert set(result) == {"width", "rgb_mean"}
+        message = str(caught[0].message)
+        assert "'ir'" in message
+        assert "'rgb'" not in message, "the group that did produce columns must not be named"
+
+    def test_a_group_that_cannot_be_decoded_is_named(self, caplog):
+        """Each group is measured against its own interval, so each is reported on its own."""
+        rng = np.random.default_rng(0)
+        # Band 0 decodes as 8-bit data; band 1 holds negatives, which carry no encoding.
+        cube = np.stack([rng.uniform(0, 255, (8, 8)), rng.uniform(-100, 100, (8, 8))])
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+            compute_stats(
+                [cube],
+                stats={"vis": ImageStats.PIXEL_ENTROPY, "elev": ImageStats.PIXEL_ENTROPY},
+                channels={"vis": 0, "elev": 1},
+                normalize_pixel_values=False,
+            )
+
+        messages = [record.getMessage() for record in caplog.records]
+        assert any("channel group 'elev'" in message for message in messages)
+        assert not any("channel group 'vis'" in message for message in messages)
+
+
+@pytest.mark.required
+class TestEmptyStatsRequest:
+    """A request that asks for nothing says so, however it is spelled.
+
+    Rows with no columns is a valid answer and the one every spelling gives, but it is also
+    what a mapping built from configuration degrades to when the configuration is wrong.
+    Every other path to an empty column set here warns; this one used to be the exception.
+    """
+
+    _IMAGE = [np.zeros((4, 8, 8), np.uint8)]
+
+    @pytest.mark.parametrize(
+        "stats",
+        [ImageStats.NONE, {}, {None: ImageStats.NONE}],
+        ids=["flag", "empty_mapping", "explicit_none"],
+    )
+    def test_a_request_for_nothing_warns(self, stats):
+        with pytest.warns(UserWarning, match="requests no statistics"):
+            result = compute_stats(self._IMAGE, stats=stats, normalize_pixel_values=False)
+
+        assert result["stats"] == {}
+        assert len(result["source_index"]) == 1, "the rows still exist; only the columns are gone"
+
+    def test_a_group_asked_for_nothing_stays_quiet(self):
+        """`ImageStats.NONE` is the only way to define a group without measuring it.
+
+        Keys must match `channels`, so a group cannot simply be left out of the mapping —
+        which makes an empty entry a deliberate statement rather than an oversight, and
+        telling it to request PIXEL, VISUAL or HASH would answer a question it did not ask.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = compute_stats(
+                self._IMAGE,
+                stats={None: ImageStats.DIMENSION_WIDTH, "ir": ImageStats.NONE},
+                channels={"ir": 3},
+                normalize_pixel_values=False,
+            )["stats"]
+
+        assert set(result) == {"width"}
+
+
+@pytest.mark.required
+class TestUnsuppliableGroupIsNamedAsSuch:
+    """A datum missing a group's bands is a different fault from a band it cannot decode.
+
+    Both end in NaN columns, and before they were told apart the first was reported as the
+    second — which mattered because the remedy for an undecodable band is to declare its
+    interval, and declaring one on an absent band silences the message while every column
+    stays NaN.
+    """
+
+    @staticmethod
+    def _ragged():
+        """One 4-band image and one 2-band image, in that order."""
+        rng = np.random.default_rng(0)
+        return [rng.integers(0, 256, (4, 8, 8), np.uint8), rng.integers(0, 256, (2, 8, 8), np.uint8)]
+
+    @staticmethod
+    def _messages(caplog):
+        return [record.getMessage() for record in caplog.records]
+
+    def test_an_absent_band_is_reported_as_absent(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
+            compute_stats(
+                self._ragged(),
+                stats={"ir": ImageStats.PIXEL_ENTROPY},
+                channels={"ir": 3},
+                normalize_pixel_values=False,
+            )
+
+        messages = self._messages(caplog)
+        assert any("names band 3 but the datum carries 2" in message for message in messages)
+        assert not any("no value range could be established" in message for message in messages), (
+            "the encoding remedy does not apply to a band that is not there"
+        )
+
+    def test_declaring_a_range_does_not_silence_it(self, caplog):
+        """The remedy for the other fault must not look like a fix for this one."""
+        from dataeval.utils.preprocessing import ChannelGroup
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
+            result = compute_stats(
+                self._ragged(),
+                stats={"ir": ImageStats.PIXEL_ENTROPY},
+                channels={"ir": ChannelGroup(3, value_range=(0.0, 255.0))},
+                normalize_pixel_values=False,
+            )["stats"]
+
+        assert np.isnan(result["ir_entropy"][1]), "the column is still NaN"
+        assert any("names band 3" in message for message in self._messages(caplog))
+
+    def test_a_suppliable_group_is_not_reported(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
+            compute_stats(
+                self._ragged(),
+                stats={"low": ImageStats.PIXEL_MEAN},
+                channels={"low": [0, 1]},
+                normalize_pixel_values=False,
+            )
+
+        assert not any("names band" in message for message in self._messages(caplog))
+
+
+@pytest.mark.required
 class TestWideBandWarning:
     """The unnamed view means *the image as a picture*, only defined for mono or RGB.
 
@@ -2443,6 +2840,39 @@ class TestWideBandWarning:
                 stats=ImageStats.VISUAL_BRIGHTNESS,
                 normalize_pixel_values=False,
                 channels={"rgb": [0, 1, 2]},
+            )
+
+        assert not self._warned(caplog)
+
+    def test_naming_a_group_that_asks_something_else_does_not(self, caplog):
+        """A mapping can name a group and still ask the whole cube for a picture statistic.
+
+        Naming bands answers the question only for a statistic some group also measures.
+        Here nothing reads a per-band brightness, so the unprefixed one is still a six-band
+        average and still worth saying so.
+        """
+        image = np.zeros((6, 8, 8), np.uint8)
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+            compute_stats(
+                [image],
+                stats={None: ImageStats.VISUAL_BRIGHTNESS, "ir": ImageStats.PIXEL_MEAN},
+                normalize_pixel_values=False,
+                channels={"ir": 5},
+            )
+
+        assert self._warned(caplog)
+
+    def test_a_group_measuring_the_same_statistic_answers_it(self, caplog):
+        """The group produces `ir_brightness`, which is a reading of one band rather than six."""
+        image = np.zeros((6, 8, 8), np.uint8)
+
+        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+            compute_stats(
+                [image],
+                stats={None: ImageStats.VISUAL_BRIGHTNESS, "ir": ImageStats.VISUAL_BRIGHTNESS},
+                normalize_pixel_values=False,
+                channels={"ir": 5},
             )
 
         assert not self._warned(caplog)

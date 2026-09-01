@@ -4,8 +4,9 @@ import warnings
 from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
-from functools import partial
+from functools import partial, reduce
 from itertools import zip_longest
+from operator import or_
 from typing import Any, TypedDict, cast, get_args
 
 import numpy as np
@@ -24,6 +25,7 @@ from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, Progre
 from dataeval.types import FactorLevel, SourceIndex, StatsMap
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import (
+    _UNKNOWN_RANGE,
     BoundingBox,
     BoxLike,
     ChannelGroup,
@@ -48,6 +50,18 @@ Background values share a row with the full image's — both describe the same i
 carry the same :class:`~dataeval.types.SourceIndex` — so they are told apart by name
 rather than by position. Adding a row instead is not available: a source index addresses
 exactly one item-level row per item, and naming it twice is rejected outright.
+"""
+
+
+StatsRequest = Flag | Mapping[str | None, Flag] | Mapping[str, Flag]
+"""What `stats` may be: one flag set for every view, or one flag set per named view.
+
+``Mapping[str, Flag]`` is spelled out beside ``Mapping[str | None, Flag]`` rather than
+being covered by it, because a mapping's key type is invariant. Without it a
+``dict[str, ImageStats]`` assembled a line before the call — the ordinary way to build one
+from configuration, and exactly the mapping-with-no-whole-image-entry the feature exists to
+accept — is rejected by a type checker while the identical dict literal written inline is
+not. Only reads happen here, so accepting the narrower key type is sound.
 """
 
 
@@ -111,6 +125,16 @@ def _band_view(datum: NDArray[Any], indices: tuple[int, ...]) -> NDArray[Any]:
     return _absent_band(len(indices), image.shape[-2:])
 
 
+def _band_count(datum: NDArray[Any]) -> int:
+    """How many bands `datum` carries, counted the way `_band_view` counts them.
+
+    Zero for non-spatial data, which has no band axis and so can satisfy no group. Read
+    once per datum and compared against each group's highest index, rather than asking
+    `_band_view` per group, so the normalization runs once however many groups were named.
+    """
+    return 0 if datum.ndim < 2 else normalize_image_shape(datum).shape[0]
+
+
 def _absent_band(count: int, hw: tuple[int, ...]) -> NDArray[np.float64]:
     """Return the all-NaN stand-in for a band group the datum cannot supply.
 
@@ -157,6 +181,32 @@ class DatumResult:
 
 
 @dataclass(frozen=True)
+class BandPlan:
+    """Everything about one named band group that is the same for every datum.
+
+    One object per group rather than one mapping per fact. The four mappings this replaces
+    were keyed alike but not keyed the *same*: a group dropped as barren left two of them
+    and stayed in the others, and the masked calculators covered only the groups a mask
+    does not destroy — so a reader had to reconstruct which key sets coincided before
+    trusting ``x[name]``, and the worker tested membership of a second mapping to find out.
+    Here those relations are fields, and `_compute_batch` walks one mapping and asks
+    ``band.background_calculators``. That is the argument :class:`BatchPlan` already makes
+    for itself, applied to the level below it.
+
+    `indices` and `value_range` are lifted out of
+    :class:`~dataeval.utils.preprocessing.ChannelGroup` rather than holding one: the worker
+    wants the bands and the interval, and nothing it does needs the validation that class
+    exists to perform.
+    """
+
+    indices: tuple[int, ...]
+    value_range: tuple[float, float] | None
+    calculators: Sequence[tuple[type[Any], Flag]]
+    background_calculators: Sequence[tuple[type[Any], Flag]]
+    unmeasurable_names: str
+
+
+@dataclass(frozen=True)
 class BatchPlan:
     """Everything about a `compute_stats` call that is the same for every datum.
 
@@ -180,9 +230,7 @@ class BatchPlan:
     per_background: bool
     background_calculators: Sequence[tuple[type[Any], Flag]]
     declared_range: tuple[float, float] | None
-    channel_groups: Mapping[str, ChannelGroup]
-    band_calculators: Sequence[tuple[type[Any], Flag]]
-    background_band_calculators: Sequence[tuple[type[Any], Flag]]
+    band_plans: Mapping[str, BandPlan]
     wide_band_names: str
     unmeasurable_names: str
 
@@ -263,7 +311,7 @@ def _collect_calculator_stats(
 
 def _band_ranges(
     datum: NDArray[Any],
-    channel_groups: Mapping[str, ChannelGroup],
+    band_plans: Mapping[str, BandPlan],
     declared_range: tuple[float, float] | None,
 ) -> dict[str, ValueRange]:
     """Return the interval each named group is measured against, read off the whole datum.
@@ -283,8 +331,8 @@ def _band_ranges(
     `CalculatorCache`, which narrows the band axis after cropping.
     """
     return {
-        name: get_value_range(_band_view(datum, group.indices), declared=group.value_range or declared_range)
-        for name, group in channel_groups.items()
+        name: get_value_range(_band_view(datum, band.indices), declared=band.value_range or declared_range)
+        for name, band in band_plans.items()
     }
 
 
@@ -422,9 +470,7 @@ def _compute_batch(  # noqa: C901
     per_background = plan.per_background
     background_calculators = plan.background_calculators
     declared_range = plan.declared_range
-    channel_groups = plan.channel_groups
-    band_calculators = plan.band_calculators
-    background_band_calculators = plan.background_band_calculators
+    band_plans = plan.band_plans
     wide_band_names = plan.wide_band_names
     unmeasurable_names = plan.unmeasurable_names
 
@@ -442,8 +488,13 @@ def _compute_batch(  # noqa: C901
     items = _get_items(boxes, per_image, per_target, per_background)
 
     # Read once per datum rather than once per row: it is a property of the datum, every
-    # view of it shares the value, and finding it costs a scan of the whole array.
-    value_range = get_value_range(datum, declared=declared_range)
+    # view of it shares the value, and finding it costs a scan of the whole array. Not read
+    # at all where nothing consumes it: a `stats` mapping with no ``None`` entry leaves the
+    # unnamed view measuring nothing, and every consumer below is downstream of
+    # `calculators` — the masked pass narrows that list, and `unmeasurable_names` names a
+    # subset of the flags it was built from. A band group is anchored on its own bands and
+    # takes `band_ranges` instead, so it is unaffected either way.
+    value_range = get_value_range(datum, declared=declared_range) if calculators else _UNKNOWN_RANGE
 
     # The unnamed view means *the image as a picture*, which is only defined for mono or
     # RGB. Averaged over RGB+NIR a brightness is not a brightness, and the grayscale
@@ -484,7 +535,36 @@ def _compute_batch(  # noqa: C901
 
     # Read once per datum for the same reason `value_range` is: a group's interval is a
     # property of the datum, and every row below is measured against the same one.
-    band_ranges = _band_ranges(datum, channel_groups, declared_range) if channel_groups else {}
+    band_ranges = _band_ranges(datum, band_plans, declared_range) if band_plans else {}
+
+    # Two unrelated reasons a group's columns come back NaN, told apart before either is
+    # reported. A datum that cannot supply the bands a group names is measured over the
+    # all-NaN stand-in `_band_view` substitutes, and a range read off that stand-in is
+    # unknown for a reason that has nothing to do with encoding — so answering it with the
+    # interval advice below would name a remedy that silences the message and leaves every
+    # column NaN just the same. Asked first, and asked whatever the range says: a declared
+    # interval makes the range knowable without making the bands present.
+    #
+    # The per-group counterpart of the whole-datum warning above, and not covered by it:
+    # each group is measured against its own interval, which `_band_ranges` reads off that
+    # group's bands alone. One cube can carry a knowable range for its visible bands and
+    # none for the reflectance band beside them, so the two are asked separately.
+    bands_present = _band_count(datum) if band_plans else 0
+    for group_name, band in band_plans.items():
+        if max(band.indices) >= bands_present:
+            warnings_list.append(
+                f"{i}: channel group '{group_name}' names band {max(band.indices)} but the datum "
+                f"carries {bands_present}, so every '{group_name}_' statistic is NaN for it. A group "
+                f"is measured all-or-nothing rather than over the bands that are present, since one "
+                f"column name has to mean one thing."
+            )
+        elif band.unmeasurable_names and not band_ranges[group_name].is_known:
+            warnings_list.append(
+                f"{i}: no value range could be established for channel group '{group_name}', so its "
+                f"{band.unmeasurable_names} are NaN. Bands carrying no encoding to decode — a "
+                f"reflectance, elevation or temperature band — need their interval stated: pass "
+                f"channels={{'{group_name}': ChannelGroup(..., value_range=(low, high))}}."
+            )
 
     # Process each item (full image and/or boxes)
     for i_b, box, unmasked, background in items:
@@ -513,15 +593,16 @@ def _compute_batch(  # noqa: C901
             calc_warnings.extend(warns)
 
             # One further pass per named band group, landing as prefixed columns on this
-            # same row. The unnamed view above is always computed alongside them: the
-            # band-invariant statistics need a pass to be emitted from, and a caller
-            # adding channels= to a pipeline reading `brightness` must not lose it.
-            for name, band_range in band_ranges.items():
+            # same row. The unnamed view above is computed alongside them unless a `stats`
+            # mapping deliberately withheld it: the band-invariant statistics need a pass to
+            # be emitted from, and a caller adding channels= to a pipeline reading
+            # `brightness` must not lose it.
+            for name, band in band_plans.items():
                 stats, empties, warns = _collect_band_stats(
-                    band_calculators,
+                    band.calculators,
                     datum,
-                    channel_groups[name].indices,
-                    band_range,
+                    band.indices,
+                    band_ranges[name],
                     box,
                     name,
                     normalize_pixel_values=normalize_pixel_values,
@@ -558,12 +639,17 @@ def _compute_batch(  # noqa: C901
             # Region first, then band: `background_nir_brightness` — is the unannotated
             # scene hot in near-infrared — is a real quantity, and the two views compose
             # rather than competing for one parameter.
-            for name, band_range in band_ranges.items():
+            # A group may survive to the band pass and not to the masked one — a hash is
+            # band-variant but not NaN-stable — which is a fact about the group, so it is
+            # read off the group rather than by asking whether a second mapping holds it.
+            for name, band in band_plans.items():
+                if not band.background_calculators:
+                    continue
                 stats, empties, warns = _collect_band_stats(
-                    background_band_calculators,
+                    band.background_calculators,
                     datum,
-                    channel_groups[name].indices,
-                    band_range,
+                    band.indices,
+                    band_ranges[name],
                     box,
                     name,
                     normalize_pixel_values=normalize_pixel_values,
@@ -644,6 +730,109 @@ def _resolve_channel_groups(
         groups[name] = to_channel_group(group)
 
     return groups
+
+
+def _view_flags(calculators: Sequence[tuple[type[Calculator[Any]], Flag]]) -> Flag:
+    """Total the flags a narrowed calculator list will actually produce a column for."""
+    return reduce(or_, (flags for _, flags in calculators), ImageStats(0))
+
+
+def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, normalize_pixel_values: bool) -> Flag:
+    """Statistics among `flags` that need an interval, and so go NaN when none can be established.
+
+    The histogram and its entropy always do; so does the whole visual family, which resolves
+    the display range, and `depth`, which reports the encoding it decoded. The remaining
+    pixel statistics only when they are being normalized against it. A declared range is
+    always known, so nothing can go unmeasurable for want of one.
+
+    Asked once for the unnamed view and once per band group, since each is measured against
+    its own interval and a cube can carry a decodable range on one group and none on the
+    next — which is why `declared` is a parameter rather than read from the call.
+
+    `missing` is the exception in both halves: it measures the *presence* of data rather
+    than the data, reads off the raw view, and so still answers when nothing could be
+    measured. Naming it would promise a NaN column that never arrives.
+    """
+    if declared is not None:
+        return type(flags)(0)
+    needs_range = flags & (
+        ImageStats.PIXEL_HISTOGRAM | ImageStats.PIXEL_ENTROPY | ImageStats.VISUAL | ImageStats.DIMENSION_DEPTH
+    )
+    if normalize_pixel_values:
+        needs_range |= flags & ImageStats.PIXEL
+    return needs_range & ~ImageStats.PIXEL_MISSING
+
+
+def _names(keys: Iterable[Any]) -> str:
+    """Render a set of mapping keys for a message, in a stable order."""
+    return ", ".join(sorted(map(repr, keys))) or "none"
+
+
+def _check_stats_mapping(stats: Mapping[str | None, Flag], channels: Mapping[str, ChannelGroupLike] | None) -> None:
+    """Check that a stats mapping names exactly the views the call defines.
+
+    Both directions, because neither mistake is one the run can recover from and both are
+    silent if allowed through: a group with no entry would produce no columns, and an entry
+    naming no group would compute nothing, each looking exactly like a statistic that came
+    out empty. Every input is known before an image is read, so the typo fails at the call.
+
+    Both lists are always stated rather than only the non-empty one — the mistake is
+    usually a name spelled two ways, and seeing which side each spelling landed on is the
+    whole of the diagnosis.
+
+    Keys are rendered with ``repr`` rather than compared for type first: a key that is
+    neither a string nor ``None`` names no channel group either, and reporting it that way
+    costs no separate check.
+    """
+    named = {key for key in stats if key is not None}
+    groups = set(channels or {})
+    if named == groups:
+        return
+    raise ValueError(
+        f"a stats mapping states the statistics for each named view, so its keys must be exactly the "
+        f"channel group names, plus None for the whole image. Channel groups with no entry: "
+        f"{_names(groups - named)}; keys naming no channel group: {_names(named - groups)}."
+    )
+
+
+def _resolve_stat_flags(
+    stats: StatsRequest,
+    channels: Mapping[str, ChannelGroupLike] | None,
+) -> tuple[Flag, dict[str, Flag]]:
+    """Split `stats` into the flags for the unnamed view and the flags for each band group.
+
+    A single ``Flag`` is every view's request, which is what `channels` has always meant:
+    each group measures the statistics the image does, restricted to its own bands.
+
+    A mapping states them separately, keyed by the prefix the columns carry — ``None`` for
+    the unprefixed ones, since that is already what an unqualified position means here
+    (:class:`~dataeval.types.SourceIndex` spells "the item itself, not a sub-part" the same
+    way). It is read as a *total* statement: a view with no entry is not measured, so
+    ``{"rgb": ImageStats.PIXEL}`` returns ``rgb_*`` columns and nothing else.
+
+    Deliberately not defaulted to anything derived from the group entries — not their
+    union, and not the statistics no group can answer. Either would make a caller's column
+    set depend on a per-statistic table they cannot see from the call site. The cost is
+    that a mapping stating only groups silently drops geometry, which `compute_stats`
+    warns about where it can see that nothing else asks for it.
+
+    Its named keys must be exactly `channels`' keys — see `_check_stats_mapping`. Two
+    arguments listing the same names is already one more than ideal; letting them drift
+    would turn a typo into a silently missing set of columns rather than an error.
+
+    Returns
+    -------
+    tuple[Flag, dict[str, Flag]]
+        The unnamed view's flags, and one entry per channel group.
+    """
+    if not isinstance(stats, Mapping):
+        return stats, dict.fromkeys(channels or {}, stats)
+    # Read as the wider key type, which both members of the union support: nothing here
+    # writes to the mapping, and looking up `None` in one that cannot hold it simply misses.
+    mapping = cast(Mapping[str | None, Flag], stats)
+    _check_stats_mapping(mapping, channels)
+    group_flags = {name: flags for name, flags in mapping.items() if name is not None}
+    return mapping.get(None, ImageStats(0)), group_flags
 
 
 def _enumerate_datum(
@@ -727,7 +916,7 @@ def compute_stats(  # noqa: C901
     data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
-    stats: Flag = ImageStats.ALL,
+    stats: StatsRequest = ImageStats.ALL,
     per_image: bool = True,
     per_target: bool = True,
     per_background: bool = False,
@@ -745,11 +934,38 @@ def compute_stats(  # noqa: C901
         An iterable of images or a Dataset to compute statistics on.
     boxes : Iterable[Iterable[BoxLike] | None] | None
         Optional bounding boxes for each image. If None, defers to the data provided.
-    stats : ImageStats, default ImageStats.ALL
+    stats : ImageStats or Mapping[str | None, ImageStats], default ImageStats.ALL
         Flags indicating which statistics to compute. Can combine multiple flags
         using bitwise OR (|). Dependencies are resolved automatically for calculation,
         but intermediate/dependency statistics are not included in the output by
         default unless explicitly requested.
+
+        A single flag set is every view's request: each group named in `channels` measures
+        the same statistics the image does, restricted to its own bands.
+
+        A **mapping** asks a different question of each view, keyed by the prefix its
+        columns carry — a channel group's name, or ``None`` for the unprefixed whole-image
+        ones. Bands of one cube are different measurements, and rarely deserve the same
+        ones: a hash of the visible bands identifies a duplicate frame where a hash of the
+        whole cube does not, while a thermal band wants its distribution and nothing else::
+
+            stats = {None: ImageStats.DIMENSION, "rgb": ImageStats.HASH, "ir": ImageStats.PIXEL}
+            channels = {"rgb": [0, 1, 2], "ir": 3}
+
+        The mapping is read as a *complete* statement: a view with no entry is not
+        measured. ``{"rgb": ImageStats.PIXEL}`` therefore returns ``rgb_*`` columns and
+        nothing else — no ``width``, no ``mean``. Nothing is inferred for the missing
+        ``None`` entry, deliberately: any default derived from the group entries would make
+        the column set depend on a per-statistic table that is not visible from the call.
+        A warning names any statistic the mapping asks of a group that cannot vary with a
+        band subset while no whole-image entry asks for it, since that one is computed
+        nowhere.
+
+        Its named keys must be exactly `channels`' keys, checked in both directions; a name
+        in one and not the other is an error rather than a silently missing column set.
+
+        .. versionadded:: 1.2
+            The mapping form.
     per_image : bool, default True
         If True, compute statistics for entire images. When boxes are provided
         and per_image=True, statistics are computed for both the full image and
@@ -811,11 +1027,15 @@ def compute_stats(  # noqa: C901
         `value_range`. Group names must not collide with a statistic name, with
         ``background``, or with a :data:`~dataeval.types.FactorLevel`.
 
-        The unprefixed statistics are always computed as well, so adding `channels` to an
-        existing call never removes a column it already returned. Where an image cannot
-        supply every band a group names, that group's statistics are NaN for it rather
-        than reduced over the bands present — one column name means one thing, and a datum
-        missing bands is a defect that should read as absent.
+        Every group measures the statistics `stats` asks for. Pass `stats` as a mapping
+        keyed by these same names to ask a different question of each.
+
+        The unprefixed statistics are computed as well, so adding `channels` to an existing
+        call never removes a column it already returned — passing `stats` as a mapping is
+        the one way to drop them. Where an image cannot supply every band a group names,
+        that group's statistics are NaN for it rather than reduced over the bands present —
+        one column name means one thing, and a datum missing bands is a defect that should
+        read as absent.
 
         Has no effect on statistics that describe geometry rather than values: a band
         subset does not move a bounding box, so ``rgb_width`` is not produced.
@@ -967,6 +1187,19 @@ def compute_stats(  # noqa: C901
 
     >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL_BASIC, channels={"rgb": [0, 1, 2]})
 
+    Ask a different question of each group, and of the image itself. Four-band cubes,
+    since ``ir`` names a band that three-channel imagery does not carry:
+
+    >>> cubes = [np.concatenate([image, image[:1]]) for image in images]
+    >>> stats = compute_stats(
+    ...     cubes,
+    ...     stats={None: ImageStats.DIMENSION_WIDTH, "rgb": ImageStats.HASH_XXHASH, "ir": ImageStats.PIXEL_MEAN},
+    ...     channels={"rgb": [0, 1, 2], "ir": 3},
+    ...     normalize_pixel_values=False,
+    ... )
+    >>> sorted(stats["stats"])
+    ['ir_mean', 'rgb_xxhash', 'width']
+
     Compute statistics only for bounding boxes (not full images):
 
     >>> stats = compute_stats(images, boxes=boxes, per_image=False, per_target=True)
@@ -1026,24 +1259,6 @@ def compute_stats(  # noqa: C901
     if not per_image and not per_target and not per_background:
         raise ValueError("At least one of 'per_image', 'per_target' or 'per_background' must be True")
 
-    # Get calculators from registry based on flags
-    calculators = CalculatorRegistry.get_calculators(stats)
-
-    # The background reduces over a masked region, which only some statistics survive;
-    # the rest stay available to the image and its boxes, where they still mean something.
-    background_calculators: list[tuple[type[Any], Flag]] = []
-    if per_background:
-        background_calculators = _calculators_for_view(calculators, ViewKind.MASK)
-        if not background_calculators:
-            warnings.warn(
-                f"per_background=True but none of the requested statistics apply to a background region, "
-                f"so only '{BACKGROUND_PREFIX}fraction' will be returned. A background is a region with "
-                f"part of it masked out, which hash statistics are not stable under and which dimension "
-                f"statistics do not describe; request ImageStats.PIXEL or ImageStats.VISUAL for it.",
-                UserWarning,
-                stacklevel=2,
-            )
-
     if channels is True:
         # Caught by name rather than left to fail inside `_resolve_channel_groups`, where a
         # bool reaches `.items()` and reports itself as an AttributeError naming neither the
@@ -1054,46 +1269,156 @@ def compute_stats(  # noqa: C901
             "one row per channel. Name the bands instead — for RGB, channels={'r': 0, 'g': 1, 'b': 2} "
             "— which returns them as columns.",
         )
-    channel_groups = _resolve_channel_groups(channels or {}, calculators)
-    band_calculators = _calculators_for_view(calculators, ViewKind.BAND) if channel_groups else []
-    background_band_calculators = _calculators_for_view(background_calculators, ViewKind.BAND) if channel_groups else []
-    if channel_groups and not band_calculators:
+    # Which statistics each view is asked for. One flag set is every view's request; a
+    # mapping states them separately, keyed by the prefix the columns carry.
+    whole_flags, group_flags = _resolve_stat_flags(stats, channels)
+
+    # Everything the call asks for anywhere. The group-name collision check reads it —
+    # `distance` collides with `distance_center` whichever view produces that column — and
+    # so does the log line, which should say what was requested rather than what one view got.
+    requested = reduce(or_, group_flags.values(), whole_flags)
+
+    # Nothing to compute, said once wherever it came from: ``ImageStats.NONE``, ``{}`` and
+    # ``{None: ImageStats.NONE}`` are three spellings of one request and answer the same
+    # way — every row, no columns. Gated on the request rather than on the calculators it
+    # resolves to, so it stays the single message for a call that asked for nothing and
+    # does not pile onto the barren and stranded warnings below, which speak for a call
+    # that asked for something and name which part of it produced no column.
+    if not requested:
         warnings.warn(
-            f"channels={{{', '.join(repr(name) for name in channel_groups)}}} was given but none of the "
-            f"requested statistics vary with a band subset, so no band columns will be returned. Geometry "
-            f"does not narrow when channels are dropped; request ImageStats.PIXEL, VISUAL or HASH for it.",
+            "stats requests no statistics, so every row will be returned with no columns. "
+            "ImageStats.NONE, an empty mapping and {None: ImageStats.NONE} all mean this — "
+            "name the statistics you want, or drop the compute_stats call.",
             UserWarning,
             stacklevel=2,
         )
-        # Dropped once it is known no column can come of them, so the workers do not slice
-        # every group off every datum and scan each slice for a range nothing will read.
-        channel_groups = {}
 
-    # Said once per datum that trips it, aggregated with the rest. Only the unnamed view
-    # is at risk: a caller who named their bands has already answered the question.
-    # Rendered here rather than in the worker: the answer is the same for every datum.
-    wide_band_names = "" if channel_groups else _flag_names(stats & (ImageStats.VISUAL | ImageStats.HASH))
+    calculators = CalculatorRegistry.get_calculators(whole_flags)
+    channel_groups = _resolve_channel_groups(channels or {}, CalculatorRegistry.get_calculators(requested))
 
-    # Statistics that need an interval, and so go NaN when none can be established. The
-    # histogram and its entropy always do; so does the whole visual family, which resolves
-    # the display range, and `depth`, which reports the encoding it decoded. The remaining
-    # pixel statistics only when they are being normalized against it.
-    # A declared range is always known, so nothing can go unmeasurable for want of one.
-    unmeasurable_flags = ImageStats(0)
-    if value_range is None:
-        unmeasurable_flags = stats & (
-            ImageStats.PIXEL_HISTOGRAM | ImageStats.PIXEL_ENTROPY | ImageStats.VISUAL | ImageStats.DIMENSION_DEPTH
+    # One calculator list per group rather than one shared list, since a mapping may ask a
+    # different question of each. Narrowed to the band view here so a group that turns out
+    # to produce nothing is caught at the call rather than once per datum.
+    band_calculators = {
+        name: _calculators_for_view(CalculatorRegistry.get_calculators(group_flags[name]), ViewKind.BAND)
+        for name in channel_groups
+    }
+    # What those lists amount to in flags, for the questions asked about the *request*
+    # rather than about the work it schedules: which of a group's statistics produce no
+    # column, and which go NaN for want of a value range. Read off the lists rather than
+    # narrowed a second time through the registry, so the two answers cannot drift. Taken
+    # before the barren groups are dropped, since the stranded check below still reads them.
+    band_flags = {name: _view_flags(group_calculators) for name, group_calculators in band_calculators.items()}
+    # Statistics a mapping asks of a band group that no band group can answer, and that its
+    # whole-image entry does not ask for either — so nothing computes them. The loss worth
+    # saying is geometry: a mapping is a total statement, so omitting the ``None`` entry
+    # drops `width` silently rather than wrongly. Empty by construction for a single flag
+    # set, where every view is asked the same question and the last line cancels it.
+    #
+    # Said before the barren warning below, which the one mistake that trips both — a group
+    # asked only for band-invariant statistics, with no whole-image entry — would otherwise
+    # let speak first. The two are different questions, one about a group and one about a
+    # statistic, and both answers are worth having; but under ``-W error`` only the first
+    # survives, and this is the one that names the column that went missing and the entry
+    # that brings it back. Barren's remedy changes what the group measures instead, which
+    # answers a question the caller did not ask.
+    stranded = ImageStats(0)
+    for name, flags in group_flags.items():
+        stranded |= flags & ~band_flags[name]
+    stranded &= ~whole_flags
+    if stranded:
+        warnings.warn(
+            f"{_flag_names(stranded)} do not vary with a band subset, so naming them for a channel "
+            f"group produces no column, and the stats mapping has no whole-image entry asking for "
+            f"them — nothing computes them. Add None: <flags> to the mapping to measure them over "
+            f"the image and its boxes.",
+            UserWarning,
+            stacklevel=2,
         )
-        if normalize_pixel_values:
-            unmeasurable_flags |= stats & ImageStats.PIXEL
-        # `missing` is the exception in both halves: it measures the *presence* of data
-        # rather than the data, reads off the raw view, and so still answers when nothing
-        # could be measured. Naming it here would promise a NaN column that never arrives.
-        unmeasurable_flags &= ~ImageStats.PIXEL_MISSING
-    unmeasurable_names = _flag_names(unmeasurable_flags)
+
+    # A group producing no column is dropped whatever the reason, so the workers do not
+    # slice it off every datum and scan the slice for a range nothing will read. Only the
+    # groups that *asked* for something are worth a word: one handed ``ImageStats.NONE``
+    # said exactly what it wanted, and telling it to request PIXEL, VISUAL or HASH would
+    # answer a question it did not ask. `_check_stats_mapping` makes that the only spelling
+    # of "define this group but do not measure it", so it has to be able to stay quiet.
+    dead = [name for name, group_calculators in band_calculators.items() if not group_calculators]
+    barren = sorted(name for name in dead if group_flags[name])
+    if barren:
+        warnings.warn(
+            f"channel groups {{{_names(barren)}}} were named but none of the requested statistics "
+            f"vary with a band subset, so no band columns will be returned for them. Geometry does "
+            f"not narrow when channels are dropped; request ImageStats.PIXEL, VISUAL or HASH for a "
+            f"group.",
+            UserWarning,
+            stacklevel=2,
+        )
+    for name in dead:
+        del band_calculators[name]
+        del channel_groups[name]
+
+    # The background reduces over a masked region, which only some statistics survive;
+    # the rest stay available to the image and its boxes, where they still mean something.
+    background_calculators: list[tuple[type[Any], Flag]] = []
+    background_band_calculators: dict[str, list[tuple[type[Any], Flag]]] = {}
+    if per_background:
+        background_calculators = _calculators_for_view(calculators, ViewKind.MASK)
+        background_band_calculators = {
+            name: masked
+            for name, group_calculators in band_calculators.items()
+            if (masked := _calculators_for_view(group_calculators, ViewKind.MASK))
+        }
+        if not background_calculators and not background_band_calculators:
+            warnings.warn(
+                f"per_background=True but none of the requested statistics apply to a background region, "
+                f"so only '{BACKGROUND_PREFIX}fraction' will be returned. A background is a region with "
+                f"part of it masked out, which hash statistics are not stable under and which dimension "
+                f"statistics do not describe; request ImageStats.PIXEL or ImageStats.VISUAL for it.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+    # Said once per datum that trips it, aggregated with the rest. Only the unnamed view is
+    # at risk, and only for the statistics no group answers in its place — naming bands
+    # settles the question for a statistic some group also measures, but a mapping can name
+    # a group and still ask the whole cube for a brightness nothing reads per band. Keyed on
+    # what the groups produce rather than on whether any group exists, which was the same
+    # test only while every group was handed the same flags.
+    # Rendered here rather than in the worker: the answer is the same for every datum.
+    covered = reduce(or_, band_flags.values(), ImageStats(0))
+    wide_band_names = _flag_names(whole_flags & (ImageStats.VISUAL | ImageStats.HASH) & ~covered)
+
+    # Statistics that go NaN for want of an interval, named per view: the unnamed one is
+    # measured against the whole datum's range, each group against its own.
+    unmeasurable_names = _flag_names(_unmeasurable_flags(whole_flags, value_range, normalize_pixel_values))
+    band_unmeasurable_names: dict[str, str] = {}
+    for name, group in channel_groups.items():
+        at_risk = _unmeasurable_flags(group_flags[name], group.value_range or value_range, normalize_pixel_values)
+        # Narrowed to the band view so the message names the columns the group produces
+        # rather than every statistic that would need an interval somewhere.
+        group_names = _flag_names(at_risk & band_flags[name])
+        if group_names:
+            band_unmeasurable_names[name] = group_names
+
+    # One object per group, assembled where every part of it is known. The mappings above
+    # are locals with deliberately different key sets — `band_flags` still carries the
+    # groups that were dropped, since the stranded check reads them, and the masked
+    # calculators cover only the groups a mask does not destroy — so reconciling them here
+    # rather than in the worker is what lets `_compute_batch` walk one mapping and read
+    # fields instead of testing membership of four.
+    band_plans = {
+        name: BandPlan(
+            indices=group.indices,
+            value_range=group.value_range,
+            calculators=band_calculators[name],
+            background_calculators=background_band_calculators.get(name, ()),
+            unmeasurable_names=band_unmeasurable_names.get(name, ""),
+        )
+        for name, group in channel_groups.items()
+    }
 
     # Log the individual flags that will be computed
-    resolved_names = _flag_list(stats)
+    resolved_names = _flag_list(requested)
     _logger.info(
         "Starting compute_stats: %d stats [%s], per_image=%s, per_target=%s, per_background=%s",
         len(resolved_names),
@@ -1135,9 +1460,7 @@ def compute_stats(  # noqa: C901
                     per_background=per_background,
                     background_calculators=background_calculators,
                     declared_range=value_range,
-                    channel_groups=channel_groups,
-                    band_calculators=band_calculators,
-                    background_band_calculators=background_band_calculators,
+                    band_plans=band_plans,
                     wide_band_names=wide_band_names,
                     unmeasurable_names=unmeasurable_names,
                 ),
@@ -1272,24 +1595,30 @@ def combine_stats_results(  # noqa: C901
     if len(results) == 1:
         return results[0]["stats"], list(results[0]["source_index"]), []
 
-    combined_stats: StatsMap = {}
+    combined_stats: StatsMap | None = None
     combined_source_index: list[SourceIndex] = []
     dataset_steps: list[int] = []
     offset = 0
 
     for position, r in enumerate(results):
         stats = r["stats"]
-        if not stats:
-            # A result with no rows carries no columns, so there is nothing to concatenate
-            # and nothing to disagree about. An empty split — a filter or a selection that
-            # matched nothing — must not read as "computed with different flags", which is
-            # what comparing its empty name set against a populated one would say.
+        if not r["source_index"]:
+            # A result with no rows has no values to concatenate and no name set worth
+            # comparing. An empty split — a filter or a selection that matched nothing —
+            # must not read as "computed with different flags", which is what comparing its
+            # empty name set against a populated one would say.
+            #
+            # Gated on the rows rather than on the columns, which are not the same question
+            # since a `stats` mapping may name no view that produces a column: such a result
+            # carries rows and no columns, and skipping it would leave every array shorter
+            # than `combined_source_index` with nothing to say so. It reaches the mismatch
+            # check below instead, where a genuine disagreement is what it is.
             #
             # Skipped only for the statistics; it still contributes a `dataset_steps`
             # boundary below, so the boundaries stay one-per-result and a later dataset's
             # index is not silently attributed to this one.
             pass
-        elif not combined_stats:
+        elif combined_stats is None:
             combined_stats = dict(stats)
         else:
             _reject_stat_name_mismatch(combined_stats, stats, position)
@@ -1301,4 +1630,6 @@ def combine_stats_results(  # noqa: C901
         offset += len(r["source_index"])
         dataset_steps.append(offset)
 
-    return combined_stats, combined_source_index, dataset_steps
+    # `None` only where every result was empty, which is an empty result rather than an
+    # absent one — the caller asked for a combination and gets the shape of one.
+    return combined_stats if combined_stats is not None else {}, combined_source_index, dataset_steps
