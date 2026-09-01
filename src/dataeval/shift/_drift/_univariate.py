@@ -514,6 +514,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             threshold=threshold,
             distance=float(np.mean(dist)),
             metric_name=self._metric_name,
+            feature_names=self._feature_names,
             details=_DriftUnivariateStats(
                 p_val=float(np.mean(p_vals)),
                 feature_drift=feature_drift,

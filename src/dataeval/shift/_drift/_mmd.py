@@ -464,6 +464,7 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
             threshold=self.p_val,
             distance=dist,
             metric_name="mmd2",
+            feature_names=self._feature_names,
             details=_DriftMMDStats(
                 p_val=p_val,
                 distance_threshold=distance_threshold,

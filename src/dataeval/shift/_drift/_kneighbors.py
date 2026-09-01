@@ -263,6 +263,7 @@ class DriftKNeighbors(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftKNeigh
             threshold=self._p_val,
             distance=mean_test,
             metric_name="knn_distance",
+            feature_names=self._feature_names,
             details=_DriftKNeighborsStats(
                 p_val=p_val,
                 mean_ref_distance=self._ref_mean,

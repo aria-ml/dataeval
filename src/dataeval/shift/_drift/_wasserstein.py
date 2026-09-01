@@ -417,6 +417,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
             threshold=self.ratio_threshold,
             distance=float(np.mean(ratios)),
             metric_name=self._metric_name,
+            feature_names=self._feature_names,
             details=_DriftWassersteinStats(
                 ratio=float(np.mean(ratios)),
                 feature_drift=feature_drift,

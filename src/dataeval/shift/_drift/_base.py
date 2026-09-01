@@ -3,7 +3,7 @@
 __all__ = []
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, NamedTuple, TypeVar
 
@@ -59,6 +59,16 @@ class DriftOutput(DictOutput, Generic[TDetails]):
     details : TDetails
         Detector-specific statistics (TypedDict) for non-chunked mode,
         or a :class:`polars.DataFrame` of per-chunk results for chunked mode.
+    feature_names : Sequence[str] or None
+        Names of the analyzed features, in the column order of everything ``details``
+        reports per feature -- ``p_vals``, ``feature_drift``, ``feature_importances``.
+        Populated when the detector's ``extractor`` is a
+        :class:`~dataeval.protocols.NamedFeatureExtractor`, such as
+        :class:`~dataeval.Metadata`; None when the features are anonymous, which is the
+        usual case for embeddings.
+
+        A per-feature statistic is otherwise positional, and reading it means rebuilding
+        the extractor's column order by hand.
     """
 
     drifted: bool
@@ -66,6 +76,7 @@ class DriftOutput(DictOutput, Generic[TDetails]):
     distance: float
     metric_name: str
     details: TDetails
+    feature_names: Sequence[str] | None = None
 
 
 @dataclass(frozen=True, repr=False)
@@ -206,6 +217,28 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         DriftOutput
         """
         ...
+
+    @property
+    def _feature_names(self) -> tuple[str, ...] | None:
+        """Column names from the extractor, when it has any to give.
+
+        Notes
+        -----
+        Deliberately duck-typed rather than an ``isinstance`` check against
+        :class:`~dataeval.protocols.NamedFeatureExtractor`. On Python 3.10 and 3.11 a
+        runtime-checkable protocol's instance check calls ``hasattr``, which invokes the
+        property -- so testing an extractor that has not been fitted would raise
+        :class:`~dataeval.exceptions.NotFittedError` out of an ``isinstance`` call rather
+        than answering False.
+        """
+        extractor = getattr(self, "extractor", None)
+        if extractor is None:
+            return None
+        try:
+            names = extractor.feature_names
+        except (AttributeError, NotFittedError):
+            return None
+        return tuple(str(name) for name in names)
 
     def _prepare_data(self, data: Any) -> NDArray[np.float32]:
         """Prepare raw input data for drift detection.
@@ -500,6 +533,7 @@ class ChunkedDrift(Generic[TDetails]):
             threshold=threshold_val,
             distance=distance,
             metric_name=self._detector._metric_name,
+            feature_names=self._detector._feature_names,
             details=df,
         )
 

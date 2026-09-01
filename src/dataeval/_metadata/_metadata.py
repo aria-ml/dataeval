@@ -443,9 +443,13 @@ class Metadata(Array, FeatureExtractor):
     >>> # Create reusable extractor (no dataset bound)
     >>> extractor = Metadata(continuous_factor_bins={"brightness": 10})
     >>>
-    >>> # Use with drift detector
+    >>> # fit() fits the extractor; predict() reuses its encoding, so both sides
+    >>> # of the comparison are cut the same way.
     >>> drift = DriftUnivariate(extractor=extractor).fit(train_dataset)
     >>> result = drift.predict(test_dataset)
+    >>>
+    >>> # The extractor is fitted, so the result can be read by name.
+    >>> dict(zip(result.feature_names, result.details["p_vals"]))  # doctest: +SKIP
 
     Using with a bound dataset:
 
@@ -1235,6 +1239,12 @@ class Metadata(Array, FeatureExtractor):
         Implements the :class:`~dataeval.protocols.FeatureExtractor` protocol,
         allowing this instance to be used directly with drift detectors.
 
+        The first call **fits**: an unbound instance binds to ``data`` and records the
+        encoding derived from it. Every later call only **transforms**, reusing those
+        cuts and vocabularies. This is the contract
+        :class:`~dataeval.extractors.BoVWExtractor` uses, and it is what makes a detector's
+        two sides comparable — see Notes.
+
         Parameters
         ----------
         data : Any or None, default None
@@ -1249,6 +1259,19 @@ class Metadata(Array, FeatureExtractor):
         ------
         NotFittedError
             If data is None and no dataset is bound.
+
+        Notes
+        -----
+        A code is only meaningful against the encoding that produced it. Were each call to
+        cut its own data, bin ``3`` could mean ``(132, 174]`` on the reference and
+        ``(106, inf)`` on the test set, and a detector comparing the two columns would be
+        comparing two alphabets rather than two distributions — silently, since the column
+        count still matches. Fitting once is what prevents that.
+
+        The consequence worth knowing is that this instance is *stateful* after the first
+        call: :attr:`factor_names`, :meth:`encoding` and :attr:`dataframe` all describe the
+        data it fitted on. Construct a separate :class:`Metadata` for an independent fit;
+        :meth:`new` deliberately carries this one's encoding forward.
 
         Example
         -------
@@ -1270,7 +1293,39 @@ class Metadata(Array, FeatureExtractor):
         if self._dataset is not None and data is self._dataset:
             return self.factor_data
 
+        if not self._is_fitted:
+            self._fit(data)
+            return self.factor_data
+
+        # Record before deriving: an encoding this instance only ever held implicitly
+        # would not reach ``new``, and the second dataset would be cut against its own
+        # draw -- the difference this comparison is supposed to be measuring.
+        self._record_encoding()
         return self.new(data).factor_data
+
+    def _fit(self, data: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> None:
+        """Bind to ``data`` and freeze the encoding derived from it.
+
+        Notes
+        -----
+        :meth:`bind` deliberately clears an explicitly chosen :attr:`view`, since the level
+        names a schema it is discarding. Fitting is not a rebind by the user, though -- the
+        configuration is precisely what is being reused -- so the view is carried across.
+        Losing it silently swapped the projected rows for the instance-level default.
+        """
+        view = self._view
+        self.bind(data)
+        self._view = view
+        self._record_encoding()
+
+    def _record_encoding(self) -> None:
+        """Make this instance's encoding explicit so :meth:`new` carries it.
+
+        Idempotent, and a no-op for what this instance has already computed: it names
+        the cuts and vocabularies that binning derived anyway. What it changes is that
+        they survive into derived instances instead of being rediscovered per dataset.
+        """
+        self._encoding = dict(self.encoding())
 
     @property
     def raw(self) -> Sequence[Mapping[str, Any]]:
@@ -2856,6 +2911,30 @@ class Metadata(Array, FeatureExtractor):
         the expensive pass having to run first.
         """
         return self._visible_factors()
+
+    @property
+    def feature_names(self) -> Sequence[str]:
+        """Names of the columns this instance produces as a feature extractor.
+
+        The :class:`~dataeval.protocols.NamedFeatureExtractor` spelling of
+        :attr:`factor_names`, so a detector given this instance as an ``extractor`` can
+        label what it reports per feature instead of returning it positionally.
+
+        Returns
+        -------
+        Sequence[str]
+            Factor names in the column order of :attr:`factor_data`.
+
+        Raises
+        ------
+        NotFittedError
+            If no dataset is bound and no call has fitted this instance.
+
+        See Also
+        --------
+        factor_names : The same names, under the vocabulary the rest of this class uses.
+        """
+        return self.factor_names
 
     def _visible_factors(self) -> list[str]:
         """Return the filtered factor set, structured but not binned.

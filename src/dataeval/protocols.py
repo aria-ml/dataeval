@@ -15,6 +15,7 @@ __all__ = [
     "EvaluationStrategy",
     "EvidenceLowerBoundLossFn",
     "FeatureExtractor",
+    "NamedFeatureExtractor",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
     "CodedMetadataLike",
@@ -785,6 +786,57 @@ class FeatureExtractor(Protocol):
             Extracted features as an array suitable for drift detection.
             Should have shape (n_samples, n_features) or be convertible to
             such a shape.
+        """
+        ...
+
+
+@runtime_checkable
+class NamedFeatureExtractor(FeatureExtractor, Protocol):
+    """
+    Protocol for a feature extractor that can name the columns it produces.
+
+    A plain :class:`FeatureExtractor` returns an unlabelled ``(n_samples, n_features)``
+    array, so anything a detector reports per feature -- a p-value, an importance -- is
+    positional, and the caller has to reconstruct what column ``i`` was. Extractors whose
+    columns *have* names, such as :class:`~dataeval.Metadata`, implement this so a drift
+    result can carry them and be read directly.
+
+    Names are only available once the extractor is fitted, and must be in the column order
+    of the array :meth:`~FeatureExtractor.__call__` returns.
+
+    Example
+    -------
+    >>> from dataeval.protocols import NamedFeatureExtractor
+    >>>
+    >>> class FlightTelemetryExtractor:
+    ...     names = ("altitude", "gimbal_pitch")
+    ...
+    ...     def __call__(self, data: Any, /) -> Array:
+    ...         return np.asarray([[d["altitude"], d["gimbal_pitch"]] for d in data])
+    ...
+    ...     @property
+    ...     def feature_names(self) -> Sequence[str]:
+    ...         return self.names
+    >>>
+    >>> isinstance(FlightTelemetryExtractor(), NamedFeatureExtractor)
+    True
+    """
+
+    @property
+    def feature_names(self) -> Sequence[str]:
+        """
+        Names of the columns this extractor produces.
+
+        Returns
+        -------
+        Sequence[str]
+            One name per column, in the order the extracted array returns them.
+
+        Raises
+        ------
+        NotFittedError
+            May be raised if the extractor has not been fitted and cannot yet know
+            which columns it will produce.
         """
         ...
 

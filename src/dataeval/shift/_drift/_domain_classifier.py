@@ -265,6 +265,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
             threshold=threshold,
             distance=auroc,
             metric_name="auroc",
+            feature_names=self._feature_names,
             details=_DriftDomainClassifierStats(
                 p_val=auroc,
                 fold_aurocs=fold_aurocs,
