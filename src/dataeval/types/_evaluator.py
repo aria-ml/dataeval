@@ -9,6 +9,7 @@ import inspect
 from typing import Any
 
 from dataeval._helpers import apply_config, get_overrides
+from dataeval.types._factors import ClassAxis
 
 
 class ReprMixin:
@@ -52,6 +53,51 @@ class ReprMixin:
 
 class Evaluator:
     """Base class for all evaluators."""
+
+    # Set by an evaluator that resolves its own axis, read by the four properties below.
+    # A class attribute so that every evaluator answers them, including the ones that never
+    # condition on a class and correctly report None.
+    _axis_record: ClassAxis | None = None
+
+    @property
+    def class_axis_info(self) -> ClassAxis | None:
+        """What this evaluator conditioned on, or None where it conditions on nothing.
+
+        The evaluator's own resolution first, then the metadata's. That order is the whole
+        point: ``label=`` names an axis the *evaluator* chose, and reading straight through
+        to the metadata would record ``"class_label"`` for a run that conditioned on
+        ``weather``.
+
+        Named in ``set_metadata(state=...)`` through :attr:`class_axis`,
+        :attr:`class_axis_source` and :attr:`class_axis_level` rather than directly: the
+        execution record flattens anything that is not a scalar, so a record handed to it
+        whole would land as the string ``"ClassAxis"``. The structured form belongs on the
+        output, where nothing flattens it.
+
+        None for an evaluator that has not run, and for one that never conditions on a class.
+        """
+        recorded = self._axis_record
+        if recorded is not None:
+            return recorded
+        return getattr(getattr(self, "metadata", None), "class_axis_info", None)
+
+    @property
+    def class_axis(self) -> str | None:
+        """Name of the variable this evaluator conditioned on, e.g. ``"class_label"`` or ``"weather"``."""
+        info = self.class_axis_info
+        return None if info is None else info.name
+
+    @property
+    def class_axis_source(self) -> str | None:
+        """``"ground_truth"`` for the dataset's own labels, ``"derived"`` for a caller's axis."""
+        info = self.class_axis_info
+        return None if info is None else info.source
+
+    @property
+    def class_axis_level(self) -> str | None:
+        """Level the axis is defined at, which is what says whether it fanned out onto these rows."""
+        info = self.class_axis_info
+        return None if info is None else info.level
 
     @property
     def encoding_digest(self) -> str | None:

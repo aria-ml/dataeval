@@ -20,7 +20,7 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval import Metadata
-from dataeval._helpers import is_labels_like
+from dataeval._helpers import is_labels_like, reject_derived_axis
 from dataeval._log import get_logger
 from dataeval._ontology import Ontology
 from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
@@ -279,6 +279,7 @@ class Representation(Evaluator):
         # declare factors it has none of.
         if isinstance(data, AnnotatedDataset):
             data = Metadata(data)
+        reject_derived_axis(data, "Representation")
         if is_labels_like(data):
             return self._counts_from_labels(data.class_labels, getattr(data, "index2label", None) or index2label)
         # A raw label sequence: count it, then name the observed indices.

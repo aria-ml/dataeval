@@ -75,7 +75,16 @@ from dataeval.protocols import (
     FeatureExtractor,
     ProgressCallback,
 )
-from dataeval.types import Array1D, BinSpec, FactorInfo, FactorLevel, FactorLevelSchema, LevelSpec, SourceIndex
+from dataeval.types import (
+    Array1D,
+    BinSpec,
+    ClassAxis,
+    FactorInfo,
+    FactorLevel,
+    FactorLevelSchema,
+    LevelSpec,
+    SourceIndex,
+)
 from dataeval.utils._validate import requires_maite_dataset
 
 _logger = get_logger(__name__)
@@ -487,6 +496,14 @@ class Metadata(Array, FeatureExtractor):
         # the level against one.
         self._view: FactorLevel | None = view
         self._inherited = inherited
+        # Factor names serving as the class axis; empty means the dataset's own labels.
+        # Set only by classed_by(), and carried onto every derived instance -- a pivot that
+        # reverted after a where() would silently answer a different question than the one
+        # asked, and the result would look ordinary.
+        self._class_axis: tuple[str, ...] = ()
+        # The axis's dense codes and their names, resolved once per view. Cleared by
+        # `_build_factors`, which every move of the view, filter or factor set runs through.
+        self._class_axis_cache: tuple[NDArray[np.intp], Mapping[int, str]] | None = None
 
         self._warn_if_task_unknowable()
 
@@ -936,6 +953,10 @@ class Metadata(Array, FeatureExtractor):
             parts.append(f"exclude={self._exclude!r}")
         if self._include:
             parts.append(f"include={self._include!r}")
+        # Disclosed because it changes what `class_labels` means, which is the kind of
+        # thing a reader inspecting an object needs told rather than left to discover.
+        if self._class_axis:
+            parts.append(f"classed_by={list(self._class_axis)!r}")
         if bound:
             parts.append(f"n={self._count}")
         return f"Metadata({', '.join(parts)})"
@@ -1513,6 +1534,338 @@ class Metadata(Array, FeatureExtractor):
         view._is_binned = False
         view._build_factors()
         return view
+
+    def classed_by(self, *factors: str) -> Self:
+        """Return this metadata read with a factor, or several, as its class axis.
+
+        :meth:`at` moves which rows are read; this moves what counts as a *class*. On the
+        returned instance :attr:`class_labels` are the codes of ``factors``,
+        :attr:`index2label` names those groups, and every evaluator that conditions on a
+        class conditions on them instead — including the ones that never grew a ``label=``
+        parameter, since they read the same two members.
+
+        The dataset's own labels are not lost: they are promoted to a factor named
+        ``class`` at :attr:`label_level`, so the association between the axis a caller
+        defined and the class the dataset ships is the one thing the result now contains.
+        Without it, a pivot answers every question except the first one anybody asks of it.
+
+        Parameters
+        ----------
+        *factors : str
+            One factor name, or several to combine into one composite axis whose groups are
+            the combinations present. Each must be among :attr:`factor_names` — that is,
+            visible at the current :attr:`view`.
+
+        Returns
+        -------
+        Metadata
+            A copy reading the same rows under a different class axis, sharing this
+            instance's structuring and binning work.
+
+        Raises
+        ------
+        ValueError
+            When no factor is named; when a name is not among :attr:`factor_names`; when
+            the named factors are *all* of them, leaving nothing to measure against the
+            axis; or when this metadata is already classed by something.
+
+        See Also
+        --------
+        :attr:`class_axis_info` : What the axis is, for a result to record or a gate to assert
+        :meth:`at` : Read the same metadata at another level
+
+        Notes
+        -----
+        **The axis is read at the view, not at a new label level.** A frame-level factor
+        read from detection rows is replicated onto each detection, so each frame is
+        weighted by how many detections it holds. That is the correct reading for a
+        question about detections and the wrong one for a question about frames;
+        :attr:`class_axis_info` reports the fan-out as ``rows_per_group_entity`` so it is a
+        stated fact rather than a silent weighting, and ``md.at(level).classed_by(...)``
+        counts each entity once instead.
+
+        A metadata built with ``inherited=False`` does not see factors defined above its
+        view at all, so a coarse-level axis is refused there rather than replicated —
+        ``inherited`` is the existing declaration that ancestor values should not be spread
+        onto these rows, and honouring it is why this method needs no gate of its own.
+
+        The pivot survives :meth:`at`, :meth:`where`, :meth:`having` and :meth:`agg`, and is
+        deliberately **not** written by :meth:`save`: like ``view``, ``include`` and
+        ``exclude``, it is how a reader asks their question rather than something the rows
+        say. A restored instance reads the dataset's own labels again.
+
+        Examples
+        --------
+        >>> metadata = Metadata(dataset)
+        >>> by_weather = metadata.classed_by("weather")
+        >>> by_weather.class_axis
+        'weather'
+        >>> sorted(by_weather.index2label.values())
+        ['clear', 'cloudy', 'rainy']
+        >>> "class" in by_weather.factor_names
+        True
+        """
+        self._structure()
+        self._bin()
+
+        if self._class_axis:
+            raise ValueError(
+                f"This metadata is already classed by {self.class_axis!r}. A second pivot would "
+                "have to be resolved against factors the first one consumed, so it is refused: "
+                "start from the metadata these labels came from and name every axis factor at "
+                "once, e.g. classed_by('weather', 'time_of_day').",
+            )
+        if not factors:
+            raise ValueError(
+                "classed_by names the factor(s) to use as the class axis; naming none leaves the "
+                "class axis unchanged, which is what this instance already is.",
+            )
+
+        available = list(self.factor_names)
+        if unknown := [name for name in factors if name not in available]:
+            raise ValueError(self._unusable_axis(unknown, available))
+
+        view = copy.copy(self)
+        # Same copy discipline as `at`: the store is immutable and shared, and what is
+        # copied is every mutable container describing how this instance reads it.
+        view._factors = set(self._factors)
+        view._factor_cache = dict(self._factor_cache)
+        view._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
+        view._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
+        view._aggregated_from = dict(self._aggregated_from)
+        view._identifier_cache = dict(self._identifier_cache)
+        view._encoding = dict(self._encoding)
+        view._class_axis = tuple(dict.fromkeys(factors))
+        view._promote_class_label()
+        view._build_factors()
+        if not view._visible_factors():
+            # Asked of the pivoted instance rather than of this one, because the promoted
+            # class label is a factor of it: an axis that took the only factor a caller had
+            # still leaves the dataset's own labels to measure against.
+            raise ValueError(
+                f"classed_by names every factor this metadata has ({available}), and the class "
+                "labels could not be promoted to take their place, so there is nothing left to "
+                "measure against the axis — a factor serving as the axis is dropped from the "
+                "factors analysed, since it correlates perfectly with itself.",
+            )
+        return view
+
+    def _unusable_axis(self, unknown: Sequence[str], available: Sequence[str]) -> str:
+        """Say why a named axis factor is not available, naming the way out that applies.
+
+        Three ways a name can fail to be a factor here, and each has a different answer.
+        Left as one message rather than three raises because the caller asked one question.
+        """
+        detail = ""
+        defined = [name for name in unknown if any(name in names for names in self._factors_by_level.values())]
+        if defined and not self._inherited:
+            detail = (
+                f" {defined} {'is' if len(defined) == 1 else 'are'} defined above the view "
+                f"{self._view_level!r} and this metadata was built with inherited=False, which is "
+                "what keeps ancestor values off these rows. Read it at its own level with "
+                "md.at(...), or set inherited=True to accept one value per descendant row."
+            )
+        elif defined:
+            detail = (
+                f" {defined} {'is' if len(defined) == 1 else 'are'} defined at a level these rows "
+                f"cannot all read from {self._view_level!r}. Use md.at(...) to read it at its own "
+                "level."
+            )
+        return (
+            f"classed_by names {list(unknown)}, which {'is' if len(unknown) == 1 else 'are'} not "
+            f"among this metadata's factors {list(available)}.{detail}"
+        )
+
+    def _promote_class_label(self) -> None:
+        """Add the dataset's own class labels to this instance as an ordinary factor.
+
+        Written as the label *names* rather than the indices, so the factor digitizes into a
+        :class:`~dataeval.types.LevelSpec` of ``cat``/``dog`` and every code names itself.
+        The index form would digitize just as well and print as bare integers, which is the
+        one thing a factor in a bias report must not do.
+
+        Skipped where the view sits above :attr:`label_level`: there is no class per row
+        there, and inventing one is exactly what :attr:`class_labels` refuses to do. A
+        caller who wants a coarse class factor rolls one up first, e.g.
+        ``agg("instance", "unit", pl.col("class_label").mode().first().alias("dominant"))``.
+        """
+        level = self._label_level
+        if self._unreadable_at(level, self._view_level) is not None:
+            return
+        codes = self._store.column(level, "class_label").to_numpy()
+        index2label = self._index2label
+        values = np.asarray([index2label.get(int(code), str(int(code))) for code in codes], dtype=object)
+        before = set(self._store.columns)
+        self.add_factors({"class": values}, level=level)
+        promoted = next(iter(set(self._store.columns) - before - {binned("class"), digitized("class")}), None)
+        if promoted is not None:
+            # A class label groups rows by construction, whatever its cardinality. Left to
+            # be measured, a dataset with about one instance per class reads as near-unique
+            # and the promoted factor is dropped as an identifier -- silently, since the
+            # caller never named it.
+            self._identifier_cache[promoted] = False
+
+    def _axis_columns(self) -> tuple[list[NDArray[Any]], list["BinSpec | LevelSpec | None"]]:
+        """Read the class axis's code columns off the view's rows, with their encodings.
+
+        Read from ``_factor_cache`` rather than through :attr:`factor_names`, which no longer
+        lists them: a factor serving as the axis is dropped from the factors analysed, and
+        the axis still has to be able to read itself.
+        """
+        columns: list[NDArray[Any]] = []
+        encodings: list[BinSpec | LevelSpec | None] = []
+        view = self._view_level
+        for name in self._class_axis:
+            info = self._factor_cache.get(name)
+            if info is None:
+                raise ValueError(
+                    f"The class axis {name!r} is no longer a factor of this metadata. It was "
+                    "resolved when classed_by() was called, so this means the factor set has been "
+                    "rebuilt without it.",
+                )
+            if (unreadable := self._unreadable_at(info.level, view)) is not None:
+                raise ValueError(
+                    f"class_labels reads the class axis {name!r}, defined at the {info.level!r} "
+                    f"level, and this metadata is viewed at {view!r}: {unreadable}.",
+                )
+            columns.append(self._store.column(view, to_col(name, info)).to_numpy())
+            encodings.append(info.encoding)
+        return columns, encodings
+
+    def _axis_resolution(self) -> tuple[NDArray[np.intp], Mapping[int, str]]:
+        """Resolve the class axis to dense codes and their names, once per view.
+
+        Cached because every class-conditional evaluator reads :attr:`class_labels` and
+        :attr:`index2label` separately, and the cross-product behind a composite axis is not
+        free. Cleared by ``_build_factors``, which is what every move of the view, filter or
+        factor set already runs through.
+        """
+        if self._class_axis_cache is None:
+            # Imported here rather than at module scope: `_helpers` reaches back into this
+            # module, so a module-level import closes the cycle.
+            from dataeval._helpers import combine_axis
+
+            columns, encodings = self._axis_columns()
+            self._class_axis_cache = combine_axis(columns, encodings)
+        return self._class_axis_cache
+
+    def _fanout(self, level: FactorLevel | None) -> float | None:
+        """Rows at the view per entity at ``level``: 1.0 for no fan-out, more where it spread."""
+        if level is None:
+            return None
+        entities = self._store.height(level)
+        return None if entities == 0 else self._store.height(self._view_level) / entities
+
+    @property
+    def class_axis(self) -> str:
+        """Name of the variable :attr:`class_labels` groups rows by.
+
+        Returns
+        -------
+        str
+            ``"class_label"`` for the dataset's own labels, the factor's name for a metadata
+            read through :meth:`classed_by`, or several joined by ``" × "`` for a composite
+            axis.
+
+        Notes
+        -----
+        Never None and never absent, so a caller can record what a run conditioned on
+        without first testing whether an axis was set. :attr:`class_axis_source` is the
+        field to branch on.
+        """
+        self._structure()
+        return " × ".join(self._class_axis) if self._class_axis else "class_label"
+
+    @property
+    def class_axis_source(self) -> str:
+        """Whether the class axis is the dataset's labels or one a caller defined.
+
+        Returns
+        -------
+        str
+            ``"ground_truth"`` or ``"derived"``.
+
+        Notes
+        -----
+        What an evaluator whose meaning depends on the labels being the dataset's own checks
+        before it runs: :class:`~dataeval.scope.Representation` resolves label names against
+        an ontology, and a derived axis's names are not concepts.
+        """
+        self._structure()
+        return "derived" if self._class_axis else "ground_truth"
+
+    @property
+    def class_axis_level(self) -> FactorLevel | None:
+        """Level the class axis is defined at.
+
+        Returns
+        -------
+        FactorLevel or None
+            :attr:`label_level` for the dataset's own labels; the axis factor's own level
+            for a pivot, and the *finest* of them for a composite, since that is where the
+            combination takes one value per entity.
+
+        Notes
+        -----
+        Read together with :attr:`class_axis_info`'s ``rows_per_group_entity``: an axis
+        defined above the rows being counted is replicated onto them, and the two together
+        say by how much.
+        """
+        self._structure()
+        if not self._class_axis:
+            return self._label_level
+        levels: list[FactorLevel] = [
+            self._factor_cache[name].level for name in self._class_axis if name in self._factor_cache
+        ]
+        if not levels:
+            return None
+        order = list(self._levels.levels)
+        return max(levels, key=lambda level: order.index(level))
+
+    @property
+    def class_axis_info(self) -> ClassAxis:
+        """The whole class axis as one record, for a result to carry or a gate to assert on.
+
+        Returns
+        -------
+        ClassAxis
+            What the axis is called, whether it is ground truth or derived, the level it is
+            defined at, how many groups it takes, its fan-out onto the view's rows, and
+            whether its names come from a declared vocabulary.
+
+        Notes
+        -----
+        Every class-conditional evaluator reads this and records it, so a result can say
+        which variable produced it. Two runs conditioned on different variables are
+        otherwise indistinguishable afterwards, and a reader comparing them attributes a
+        moved score to the data.
+
+        Cheap on an un-pivoted instance: the group count comes from :attr:`index2label`
+        rather than from the labels, so this answers at a view where
+        :attr:`class_labels` itself would refuse to.
+        """
+        # Imported here rather than at module scope, for the cycle `_axis_resolution` notes.
+        from dataeval._helpers import axis_vocabulary
+
+        self._structure()
+        if not self._class_axis:
+            return ClassAxis(
+                name="class_label",
+                source="ground_truth",
+                level=self._label_level,
+                groups=len(self._index2label),
+                rows_per_group_entity=self._fanout(self._label_level),
+            )
+        _, names = self._axis_resolution()
+        _, encodings = self._axis_columns()
+        return ClassAxis(
+            name=self.class_axis,
+            source="derived",
+            level=self.class_axis_level,
+            groups=len(names),
+            rows_per_group_entity=self._fanout(self.class_axis_level),
+            vocabulary=axis_vocabulary(encodings),
+        )
 
     def _filtered(self, keep: dict[FactorLevel, NDArray[np.intp]], level: FactorLevel) -> Self:
         """Build the metadata over a set of surviving rows, sharing nothing mutable.
@@ -2640,18 +2993,38 @@ class Metadata(Array, FeatureExtractor):
         factor rows, which is the worst answer this class can give.
         """
         self._structure()
+        # A pivoted instance answers with the axis it was given, at whatever view it is read
+        # at. That is the whole point of :meth:`classed_by`: the refusal below exists because
+        # a frame has no single *dataset* label, and it does have a weather.
+        if self._class_axis:
+            codes, _ = self._axis_resolution()
+            return codes
         view = self._view_level
         if view != self._label_level:
             raise ValueError(
                 f"class_labels is defined at the {self._label_level!r} level, but this metadata is "
                 f"viewed at {view!r}, which has no label per row. Use md.at({self._label_level!r}) "
-                f'for the labels, or read them from rows_at({view!r})["class_label"].',
+                f'for the labels, or read them from rows_at({view!r})["class_label"], or '
+                "classed_by(...) to condition on a factor these rows do have.",
             )
         return self._store.column(view, "class_label").to_numpy().astype(np.intp, copy=False)
 
     @property
     def index2label(self) -> Mapping[int, str]:
+        """Name of each code :attr:`class_labels` can take.
+
+        Returns
+        -------
+        Mapping[int, str]
+            The dataset's own class names, or — on a metadata read through
+            :meth:`classed_by` — the name of each group the class axis takes. Swapped
+            together with :attr:`class_labels`, which is what makes every consumer reading
+            the pair report a pivot correctly without knowing one happened.
+        """
         self._structure()
+        if self._class_axis:
+            _, names = self._axis_resolution()
+            return names
         return self._index2label
 
     @property
@@ -3004,6 +3377,10 @@ class Metadata(Array, FeatureExtractor):
 
     def _build_factors(self) -> None:
         """Build the set of factor names visible at the current view."""
+        # Before the early return: an unstructured instance has no axis to have resolved,
+        # and this is the one point every move of the view, filter or factor set passes
+        # through, which is what makes it the right place to invalidate.
+        self._class_axis_cache = None
         if not self._is_structured:
             self._factors = set()
             return
@@ -3042,7 +3419,11 @@ class Metadata(Array, FeatureExtractor):
         # Assigned before anything is announced. A warning filter turned into an error
         # otherwise raises out of `_structure`, which has already set `_is_structured`, and
         # leaves the instance permanently claiming it has no factors at all.
-        self._factors = usable - identifiers
+        # A factor serving as the class axis is dropped from the factors analysed: left in
+        # place it correlates perfectly with itself and reports 1.0 against the axis. This
+        # is what `label=` achieves per evaluator through `LabelAxis.excluded`; on a pivoted
+        # instance the factor genuinely is not one, so every reader sees the same set.
+        self._factors = usable - identifiers - set(self._class_axis)
         self._announce_identifier_drops(unannounced)
 
     def _identifiers(self, names: set[str]) -> tuple[set[str], list[str]]:

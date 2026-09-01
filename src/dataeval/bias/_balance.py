@@ -9,6 +9,7 @@ import polars as pl
 
 from dataeval import Metadata
 from dataeval._helpers import (
+    axis_record,
     is_any_metadata_like,
     kept_factors,
     resolve_factor_channel,
@@ -17,7 +18,7 @@ from dataeval._helpers import (
 )
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
 from dataeval.protocols import AnnotatedDataset, AnyMetadataLike
-from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types import ClassAxis, DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 DEFAULT_BALANCE_NUM_NEIGHBORS = 5
 DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD = 0.3
@@ -80,11 +81,21 @@ class BalanceOutput(DictOutput):
         - factor_name: str - Name of the metadata factor
         - mi_value: float - Normalized mutual information value
         - is_imbalanced: bool - True if mi_value > class_imbalance_threshold
+    class_axis : ClassAxis or None
+        What this result conditioned on: the dataset's own labels, or an axis a caller
+        defined through :meth:`~dataeval.Metadata.classed_by` or ``label=``. Read
+        ``class_axis.source`` to tell the two apart without parsing a name, and
+        ``class_axis.rows_per_group_entity`` to see whether a coarse axis was replicated
+        onto finer rows. None only on an output built by hand rather than by an
+        evaluator, which is the one case where nothing resolved an axis.
+
+        .. versionadded:: 1.2
     """
 
     balance: pl.DataFrame
     factors: pl.DataFrame
     classwise: pl.DataFrame
+    class_axis: ClassAxis | None = None
 
     @property
     def plot_type(self) -> Literal["balance"]:
@@ -278,6 +289,9 @@ class Balance(Evaluator):
             "class_imbalance_threshold",
             "factor_correlation_threshold",
             "label",
+            "class_axis",
+            "class_axis_source",
+            "class_axis_level",
             "factor_source",
             "encoding_digest",
         ]
@@ -389,6 +403,9 @@ class Balance(Evaluator):
         # analysed against it, since it would otherwise report perfect correlation with
         # itself.
         axis = resolve_label_axis(self.metadata, self.label)
+        # Recorded before anything is computed from it: the three scalar members
+        # `set_metadata` stamps read through this, and so does the output's own field.
+        self._axis_record = record = axis_record(self.metadata, axis)
         factor_names, kept = kept_factors(self.metadata, axis.excluded)
 
         # Which representation each factor is read in, and what that made it. `mutual_info`
@@ -509,4 +526,4 @@ class Balance(Evaluator):
             },
         )
 
-        return BalanceOutput(balance=balance_df, factors=factors_df, classwise=classwise_df)
+        return BalanceOutput(balance=balance_df, factors=factors_df, classwise=classwise_df, class_axis=record)

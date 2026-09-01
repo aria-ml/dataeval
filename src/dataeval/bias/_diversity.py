@@ -8,11 +8,11 @@ import numpy as np
 import polars as pl
 
 from dataeval import Metadata
-from dataeval._helpers import factors_excluding, is_metadata_like, resolve_label_axis
+from dataeval._helpers import axis_record, factors_excluding, is_metadata_like, resolve_label_axis
 from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.protocols import AnnotatedDataset, MetadataLike
-from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types import ClassAxis, DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
@@ -40,10 +40,20 @@ class DiversityOutput(DictOutput):
         - factor_name: str - Name of the metadata factor
         - diversity_value: float - Diversity score for this class-factor combination
         - is_low_diversity: bool - True if diversity_value <= threshold
+    class_axis : ClassAxis or None
+        What this result conditioned on: the dataset's own labels, or an axis a caller
+        defined through :meth:`~dataeval.Metadata.classed_by` or ``label=``. Read
+        ``class_axis.source`` to tell the two apart without parsing a name, and
+        ``class_axis.rows_per_group_entity`` to see whether a coarse axis was replicated
+        onto finer rows. None only on an output built by hand rather than by an
+        evaluator, which is the one case where nothing resolved an axis.
+
+        .. versionadded:: 1.2
     """
 
     factors: pl.DataFrame
     classwise: pl.DataFrame
+    class_axis: ClassAxis | None = None
 
     @property
     def plot_type(self) -> Literal["diversity"]:
@@ -160,7 +170,17 @@ class Diversity(Evaluator):
     ) -> None:
         super().__init__(locals())
 
-    @set_metadata(state=["method", "threshold", "label", "encoding_digest"])
+    @set_metadata(
+        state=[
+            "method",
+            "threshold",
+            "label",
+            "class_axis",
+            "class_axis_source",
+            "class_axis_level",
+            "encoding_digest",
+        ]
+    )
     def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> DiversityOutput:  # noqa: C901
         """
         Compute diversity and classwise diversity for the dataset.
@@ -240,6 +260,9 @@ class Diversity(Evaluator):
         # label level. A factor serving as the axis is dropped from the factors measured
         # against it.
         axis = resolve_label_axis(self.metadata, self.label)
+        # Recorded before anything is computed from it: the three scalar members
+        # `set_metadata` stamps read through this, and so does the output's own field.
+        self._axis_record = record = axis_record(self.metadata, axis)
         factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
         class_lbl = axis.values
         index2label = axis.names
@@ -305,4 +328,4 @@ class Diversity(Evaluator):
             },
         )
 
-        return DiversityOutput(factors=factors_df, classwise=classwise_df)
+        return DiversityOutput(factors=factors_df, classwise=classwise_df, class_axis=record)

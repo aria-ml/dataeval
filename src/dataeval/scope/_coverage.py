@@ -44,7 +44,7 @@ from dataeval.core._completeness import completeness as _completeness
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import AnnotatedDataset, Array, ArrayLike, FeatureExtractor, LabelsLike
-from dataeval.types import DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types import ClassAxis, DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _logger = get_logger(__name__)
 
@@ -90,6 +90,14 @@ class CoverageOutput(DataFrameOutput):
     critical_value_radii : NDArray[np.float32]
         Per-sample distance to the ``num_observations``-th nearest neighbor — the raw
         density signal the uncovered set is thresholded from.
+    class_axis : ClassAxis or None
+        What the ``class`` column of the breakdown holds: the dataset's own labels, or an
+        axis a caller defined with :meth:`~dataeval.Metadata.classed_by`. Read
+        ``class_axis.source`` to tell the two apart — the column reads the same either way,
+        and ``rain`` is a perfectly plausible class name. None where the labels arrived as a
+        raw array, which carries no record of where it came from.
+
+        .. versionadded:: 1.2
     """
 
     def __init__(
@@ -99,11 +107,13 @@ class CoverageOutput(DataFrameOutput):
         uncovered_indices: NDArray[np.intp],
         coverage_radius: float,
         critical_value_radii: NDArray[np.float32],
+        class_axis: ClassAxis | None = None,
     ) -> None:
         super().__init__(data)
         self.uncovered_indices = uncovered_indices
         self.coverage_radius = coverage_radius
         self.critical_value_radii = critical_value_radii
+        self.class_axis = class_axis
 
 
 class Coverage(Evaluator):
@@ -307,6 +317,9 @@ class Coverage(Evaluator):
         # of what is read here, so a container that carries only those is enough.
         if isinstance(dataset, AnnotatedDataset):
             dataset = Metadata(dataset)
+        # Recorded off whatever container the labels actually came from, converted or not:
+        # a pivoted Metadata reports its own axis here, and a raw label array reports none.
+        self._axis_record = getattr(dataset, "class_axis_info", None)
         if is_labels_like(dataset):
             index2label = getattr(dataset, "index2label", None) or {}
             return np.asarray(dataset.class_labels, dtype=np.intp), index2label
@@ -400,7 +413,7 @@ class Coverage(Evaluator):
         # Lowest-dispersion assessable classes first (most worth broadening); unassessable last.
         return sorted(rows, key=lambda row: (not row["assessable"], row["dispersion"] or 0.0, row["class"]))
 
-    @set_metadata
+    @set_metadata(state=["class_axis", "class_axis_source", "class_axis_level"])
     def evaluate(
         self,
         dataset: AnnotatedDataset[Any] | LabelsLike | ArrayLike,
@@ -477,4 +490,5 @@ class Coverage(Evaluator):
             uncovered_indices=coverage["uncovered_indices"],
             coverage_radius=coverage["coverage_radius"],
             critical_value_radii=coverage["critical_value_radii"],
+            class_axis=self._axis_record,
         )
