@@ -286,6 +286,7 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
             threshold=self._p_val,
             distance=mean_test,
             metric_name="reconstruction_error",
+            feature_names=self._feature_names,
             details=_DriftReconstructionStats(
                 p_val=p_val,
                 mean_ref_error=self._ref_mean,

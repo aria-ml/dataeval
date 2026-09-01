@@ -252,6 +252,7 @@ shifts in deployed systems.
 
 ../notebooks/h2_measure_divergence.py
 ../notebooks/h2_measure_label_independence.py
+../notebooks/h2_detect_metadata_drift.py
 ../notebooks/h2_detect_uncertainty_drift.py
 ../notebooks/h2_detect_drift_from_model_outputs.py
 ```
@@ -266,6 +267,10 @@ shifts in deployed systems.
 - - [](../notebooks/h2_measure_label_independence.py)
   - Compare label distributions between 2 datasets
   - [![Open In Colab][colab-badge]][lbl-colab]
+- - [](../notebooks/h2_detect_metadata_drift.py)
+  - Detect drift in named metadata factors with {class}`.Metadata`
+    as a feature extractor, and trace a p-value back to its source
+  - [![Open In Colab][colab-badge]][mdd-colab]
 - - [](../notebooks/h2_detect_uncertainty_drift.py)
   - Detect distribution shift from a MAITE model's prediction
     uncertainty, with no custom decoding
@@ -278,6 +283,7 @@ shifts in deployed systems.
 
 [div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_measure_divergence.ipynb
 [lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_measure_label_independence.ipynb
+[mdd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_detect_metadata_drift.ipynb
 [unc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_detect_uncertainty_drift.ipynb
 [mdo-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_detect_drift_from_model_outputs.ipynb
 

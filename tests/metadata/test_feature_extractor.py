@@ -205,3 +205,89 @@ class TestMetadataItemCount:
         # Count is set during init
         count = metadata.item_count
         assert count == 10
+
+
+class TestMetadataFitOnFirstCall:
+    """Test the fit-on-first-call contract shared with :class:`BoVWExtractor`.
+
+    An unbound ``Metadata`` used as a feature extractor must *fit* on the first call
+    and only *transform* afterwards. Deriving a fresh encoding per call silently
+    compares bin codes that mean different things on either side.
+    """
+
+    def test_first_call_fits_the_instance(self, mock_ds):
+        """The first call binds, so the extractor can describe what it produced."""
+        extractor = Metadata()
+        with pytest.raises(NotFittedError):
+            _ = extractor.factor_names
+
+        extractor(mock_ds)
+
+        assert list(extractor.factor_names)
+        assert extractor.is_bound
+
+    def test_encoding_is_frozen_by_the_first_call(self, mock_ds, mock_ds2):
+        """A second dataset is encoded against the first one's cuts, not its own."""
+        extractor = Metadata()
+        extractor(mock_ds)
+        fitted = extractor.encoding()
+
+        extractor(mock_ds2)
+
+        assert extractor.encoding() == fitted
+
+    def test_second_dataset_reuses_the_fitted_encoding(self, mock_ds, mock_ds2):
+        """The transform of a second dataset matches an explicit shared encoding."""
+        extractor = Metadata()
+        extractor(mock_ds)
+        shared = Metadata(mock_ds2, encoding=extractor.encoding())
+
+        np.testing.assert_array_equal(np.asarray(extractor(mock_ds2)), np.asarray(shared.factor_data))
+
+    def test_columns_are_stable_across_calls(self, mock_ds, mock_ds2):
+        """Both sides must produce the same columns in the same order."""
+        extractor = Metadata()
+        first = np.asarray(extractor(mock_ds))
+        names = list(extractor.factor_names)
+        second = np.asarray(extractor(mock_ds2))
+
+        assert first.shape[1] == second.shape[1] == len(names)
+
+    def test_fitting_preserves_an_explicit_view(self, get_od_dataset):
+        """``bind`` clears an explicit view; the fit path must not.
+
+        Regression test: fitting through ``bind`` alone reset ``view="unit"`` to the
+        instance-level default, which silently pulled per-detection factors into the
+        extracted columns.
+        """
+        dataset = get_od_dataset(10, 2)
+        extractor = Metadata(view="unit")
+
+        extractor(dataset)
+
+        assert extractor.view == "unit"
+        assert list(extractor.factor_names) == list(Metadata(dataset, view="unit").factor_names)
+
+    def test_new_carries_the_fitted_encoding(self, mock_ds, mock_ds2):
+        """``new`` shares the fitted encoding, which is what it exists to do.
+
+        Its own contract is that a derived instance is "configured identically", so
+        once the first call has fitted an encoding, ``new`` must carry it. Building a
+        fresh ``Metadata`` is the way to ask for an independent fit.
+        """
+        extractor = Metadata()
+        extractor(mock_ds)
+
+        derived = extractor.new(mock_ds2)
+
+        assert derived.encoding() == extractor.encoding()
+
+    def test_bound_instance_transforms_other_data(self, mock_ds, mock_ds2):
+        """A bound instance already counts as fitted, so it transforms rather than refits."""
+        metadata = Metadata(mock_ds)
+        _ = metadata.factor_data
+        fitted = metadata.encoding()
+
+        metadata(mock_ds2)
+
+        assert metadata.encoding() == fitted
