@@ -1313,7 +1313,7 @@ def compute_stats(  # noqa: C901
     # whole-image entry does not ask for either — so nothing computes them. The loss worth
     # saying is geometry: a mapping is a total statement, so omitting the ``None`` entry
     # drops `width` silently rather than wrongly. Empty by construction for a single flag
-    # set, where every view is asked the same question and the last line cancels it.
+    # set, where every view is asked the same question and the `~whole_flags` term cancels it.
     #
     # Said before the barren warning below, which the one mistake that trips both — a group
     # asked only for band-invariant statistics, with no whole-image entry — would otherwise
@@ -1322,10 +1322,15 @@ def compute_stats(  # noqa: C901
     # survives, and this is the one that names the column that went missing and the entry
     # that brings it back. Barren's remedy changes what the group measures instead, which
     # answers a question the caller did not ask.
-    stranded = ImageStats(0)
-    for name, flags in group_flags.items():
-        stranded |= flags & ~band_flags[name]
-    stranded &= ~whole_flags
+    # `~whole_flags` is folded into each term rather than applied to the total — the same
+    # set, and it keeps both operands of every `|` a `Flag`, which Python 3.10 needs: its
+    # `enum` has no reflected `__ror__`, so an accumulator typed `ImageStats` cannot take a
+    # `Flag` on the right.
+    stranded = reduce(
+        or_,
+        (flags & ~band_flags[name] & ~whole_flags for name, flags in group_flags.items()),
+        ImageStats(0),
+    )
     if stranded:
         warnings.warn(
             f"{_flag_names(stranded)} do not vary with a band subset, so naming them for a channel "
