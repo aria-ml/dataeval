@@ -3,7 +3,7 @@
 import pytest
 from pydantic import BaseModel
 
-from dataeval._helpers import apply_config, get_overrides
+from dataeval._helpers import apply_config, axis_vocabulary, get_overrides
 
 
 class _Config(BaseModel):
@@ -95,3 +95,13 @@ class TestIsMetadataLike:
 
         assert not is_metadata_like(object())
         assert not is_metadata_like(get_od_dataset(2))
+
+
+@pytest.mark.required
+class TestAxisVocabulary:
+    def test_an_axis_with_no_components_is_observed(self):
+        """Nothing a dataset could have been declared against, so nothing is declared."""
+        assert axis_vocabulary([]) == "observed"
+
+    def test_a_single_component_with_no_spec_is_observed(self):
+        assert axis_vocabulary([None]) == "observed"

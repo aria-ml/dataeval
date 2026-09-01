@@ -16,12 +16,13 @@ from dataeval._metadata._structurers import (
     MOTStructurer,
     ODImageStructurer,
     RowBlock,
+    SourceIndexRows,
     StructuredData,
     Structurer,
     reserved_block_columns,
     select_structurer,
 )
-from dataeval.types import FactorInfo, FactorLevelSchema
+from dataeval.types import FactorInfo, FactorLevelSchema, SourceIndex
 from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
 
 
@@ -865,3 +866,12 @@ class TestScoreColumn:
         md = Metadata(_mot_dataset(_SHAPES))
         assert md.dataframe.schema["score"] == pl.Float32
         assert md.rows_at("instance")["score"].to_list() == [0.5] * 7
+
+
+@pytest.mark.required
+class TestSourceIndexRowsRefusal:
+    def test_a_label_level_row_without_a_key_cannot_be_built_from_addresses(self):
+        """A labelled row that states no key contradicts the two-level reading the build relies on."""
+        rows = SourceIndexRows.parse([SourceIndex(0, None, "instance")])
+        with pytest.raises(ValueError, match="with no key"):
+            rows.reject_levels_beyond_two()

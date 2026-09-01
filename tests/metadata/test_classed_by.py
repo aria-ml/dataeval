@@ -68,6 +68,16 @@ class TestTheAxisMoves:
     def test_the_axis_is_disclosed_by_repr(self):
         assert "classed_by=['weather']" in repr(_flat().classed_by("weather"))
 
+    def test_the_unpivoted_axis_sits_at_the_datasets_own_label_level(self):
+        metadata = _flat()
+        assert metadata.class_axis_level == metadata.label_level
+
+    def test_an_axis_factor_the_cache_no_longer_holds_reports_no_level(self):
+        """The cache is authoritative: a factor it no longer holds has no level to report."""
+        pivot = _flat().classed_by("weather")
+        pivot._factor_cache.pop("weather")
+        assert pivot.class_axis_level is None
+
 
 @pytest.mark.required
 class TestTheClassLabelBecomesAFactor:

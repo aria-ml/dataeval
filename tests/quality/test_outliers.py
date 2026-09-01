@@ -355,6 +355,16 @@ class TestOutliersOutput:
         output = OutliersOutput(combined)
         assert len(output) == 6
 
+    def test_len_counts_a_level_as_part_of_the_rows_identity(self):
+        df = pl.DataFrame(
+            [
+                {"item_index": 0, "metric_name": "a", "metric_value": 1.0, "level": "unit"},
+                {"item_index": 0, "metric_name": "a", "metric_value": 1.0, "level": "sequence"},
+                {"item_index": 1, "metric_name": "a", "metric_value": 1.0, "level": "unit"},
+            ],
+        )
+        assert len(OutliersOutput(df)) == 3
+
     def test_aggregate_by_metric(self):
         """Test aggregate_by_metric returns correct counts."""
         output = OutliersOutput(self.outlier)
@@ -531,6 +541,24 @@ class TestOutliersOutput:
         assert row_2["b"][0] == 0
         assert row_2["c"][0] == 1
         assert row_2["Total"][0] == 2
+
+    def test_aggregate_by_item_keeps_levels_apart(self):
+        """Readings of one item at different levels are different rows, and a null level stays null."""
+        df = pl.DataFrame(
+            [
+                {"item_index": 0, "target_index": None, "metric_name": "a", "metric_value": 1.0, "level": "unit"},
+                {"item_index": 0, "target_index": None, "metric_name": "a", "metric_value": 1.0, "level": "sequence"},
+                {"item_index": 1, "target_index": None, "metric_name": "b", "metric_value": 1.0, "level": None},
+            ],
+        )
+        result = OutliersOutput(df).aggregate_by_item()
+        assert result.shape == (3, 6)
+        assert set(result.columns) == {"item_index", "target_index", "level", "a", "b", "Total"}
+        assert result["level"].dtype == pl.Utf8
+        assert result["level"].to_list() == ["sequence", "unit", None]
+        assert result["Total"].to_list() == [1, 1, 1]
+        assert result["a"].to_list() == [1, 1, 0]
+        assert result["b"].to_list() == [0, 0, 1]
 
     def test_aggregate_by_item_empty(self):
         """Test aggregate_by_item with empty DataFrame."""

@@ -10,6 +10,7 @@ import pytest
 from dataeval.data import (
     AllFrames,
     Crop,
+    FrameCandidate,
     FrameIndices,
     FrameInput,
     FrameRate,
@@ -274,6 +275,34 @@ class TestSelectorContract:
     def test_pixels_are_available_when_declared(self):
         dataset, _ = make_dataset((4,))
         assert len(emit(SequenceFrames(dataset, _PixelNovelty()))) >= 1
+
+    def test_pixels_are_materialized_once_and_then_cached(self):
+        """A second read of the same candidate must not pay for a second decode."""
+
+        class _Frame:
+            def __init__(self):
+                self.reads = 0
+
+            @property
+            def pixels(self):
+                self.reads += 1
+                return np.full((3, 12, 14), 5, dtype=np.uint8)
+
+        frame = _Frame()
+        candidate = FrameCandidate(
+            sequence=SequenceFrames(make_dataset((1,))[0])._sequences[0],
+            position=0,
+            frame_index=0,
+            time_s=None,
+            pts=None,
+            target=make_target(),
+            _frame=frame,
+        )
+        first = candidate.pixels
+        second = candidate.pixels
+        assert first is second, "the second read was not served from the cache"
+        assert frame.reads == 1
+        np.testing.assert_array_equal(first, np.full((3, 12, 14), 5, dtype=np.uint8))
 
     def test_buffering_without_declaring_two_pass_raises_and_names_the_fix(self):
         dataset, _ = make_dataset((6,))
@@ -598,7 +627,12 @@ class TestRedundancySelector:
         dataset = image_dataset(constant_frames([5, 5, 5, 5, 90, 90, 200]))
         emitted = emit(SequenceFrames(dataset, Redundancy(radius=0, method="xxhash")))
         assert [m["frames_represented"] for _, _, m in emitted] == [4.0, 2.0, 1.0]
-        assert sum(m["frames_represented"] for _, _, m in emitted) == 7
+
+    def test_a_frame_that_cannot_be_hashed_is_kept_not_dropped(self):
+        """No digest is no evidence the frame repeated, so the frame is kept."""
+        dataset, _ = make_dataset((3,), shape=(3, 4, 4))
+        emitted = emit(SequenceFrames(dataset, Redundancy(radius=0, method="phash")))
+        assert [m["frame"] for _, _, m in emitted] == [0, 1, 2]
 
     def test_it_declares_that_it_reads_pixels_in_one_pass(self):
         assert Redundancy().needs is FrameInput.PIXELS
@@ -790,6 +824,7 @@ class TestTrackMap:
 
     def test_an_empty_view_has_an_empty_map(self):
         frames = SequenceFrames(make_dataset((4,))[0], FrameIndices({0: []}))
+        assert frames.frame_map.shape == (0, 2)
         assert frames.track_map.shape == (0, 2)
 
 
@@ -1061,3 +1096,11 @@ class TestAddressingTheFrameView:
             SourceLocator(dataset)[SourceIndex(1, 0, "unit")].pixels,
         )
         assert frames.frame_map[4].tolist() == [1, 0]
+
+    def test_frame_refuses_a_level_that_spans_frames(self):
+        dataset, _ = make_dataset((4, 3))
+        locator = SourceLocator(dataset)
+        with pytest.raises(TypeError, match="spans frames"):
+            locator.frame(locator[SourceIndex(0, None, "sequence")])
+        with pytest.raises(TypeError, match="spans frames"):
+            locator.frame(locator[SourceIndex(0, 0, "track")])

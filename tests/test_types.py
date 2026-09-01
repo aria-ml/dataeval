@@ -34,7 +34,7 @@ from dataeval.types._factors import (
     _relink,
     _validate_acyclic,
 )
-from dataeval.types._target import detection_score, own_class_scores
+from dataeval.types._target import detection_count, detection_score, own_class_scores, track_ids_of
 from dataeval.types._track import frame_size
 
 
@@ -361,6 +361,40 @@ class TestTrack:
 
 
 @pytest.mark.required
+class TestDetectionArrays:
+    """Per-detection reads that treat the labels as the authority on how many rows exist."""
+
+    def test_detection_count_counts_labels(self):
+        class _T:
+            labels = np.array([0, 1, 2, 3])
+
+        assert detection_count(_T()) == 4
+
+    def test_detection_count_flattens_a_ragged_label_layout(self):
+        class _T:
+            labels = np.array([[0], [1], [2]])
+
+        assert detection_count(_T()) == 3
+
+    def test_track_ids_of_marks_every_detection_unlinked_when_none_are_given(self):
+        class _T:
+            pass
+
+        np.testing.assert_array_equal(track_ids_of(_T(), 3), [-1, -1, -1])
+
+    def test_track_ids_of_truncates_ids_that_run_past_the_count(self):
+        class _T:
+            track_ids = np.array([1, 2, 3, 4])
+
+        np.testing.assert_array_equal(track_ids_of(_T(), 2), [1, 2])
+
+    def test_track_ids_of_pads_short_ids_with_the_unlinked_marker(self):
+        class _T:
+            track_ids = np.array([1, 2])
+
+        np.testing.assert_array_equal(track_ids_of(_T(), 4), [1, 2, -1, -1])
+
+
 class TestFrameSize:
     """Tests for ``frame_size``, the single reader of a video frame's dimensions."""
 
