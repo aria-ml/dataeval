@@ -726,3 +726,31 @@ class TestFactorsStructurerForShape:
     def test_a_shape_it_never_produces(self):
         with pytest.raises(ValueError, match="is neither"):
             FactorsStructurer.for_shape("sequence", "instance")
+
+
+@pytest.mark.required
+class TestAStructuringPolicySurvivesTheRoundTrip:
+    """``partial_factors`` decides what the rows *are*, so it is written like ``strict``."""
+
+    @staticmethod
+    def _partly_declared():
+        from tests.metadata.test_structurers import _TRACKED, _undeclared
+
+        return _undeclared(_mot_dataset(_TRACKED), 0, 1, "time_s")
+
+    def test_a_restored_instance_reports_the_policy_it_was_structured_under(self, tmp_path):
+        """Reporting the default described a walk that did not happen."""
+        dataset = self._partly_declared()
+        back = _round_trip(Metadata(dataset, partial_factors=True), dataset, tmp_path)
+        assert back.partial_factors is True
+
+    def test_a_new_dataset_from_a_restored_one_is_structured_the_same_way(self, tmp_path):
+        """Otherwise the next dataset silently drops the factors this one kept."""
+        dataset = self._partly_declared()
+        back = _round_trip(Metadata(dataset, partial_factors=True), dataset, tmp_path)
+        assert back.new(dataset).partial_factors is True
+        assert "time_s" in back.new(dataset).dataframe.columns
+
+    def test_the_default_is_still_the_default(self, tmp_path):
+        dataset = _mot_dataset([[1], [1]])
+        assert _round_trip(Metadata(dataset), dataset, tmp_path).partial_factors is False

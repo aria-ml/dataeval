@@ -1,10 +1,19 @@
 """Factor info and level schema shared by the metadata structuring layer."""
 
-__all__ = ["FactorLevel", "FactorLevelSchema", "FactorInfo", "BinSpec", "LevelSpec", "ClassAxis"]
+__all__ = [
+    "AggregationRecord",
+    "Aggregator",
+    "BinSpec",
+    "ClassAxis",
+    "FactorInfo",
+    "FactorLevel",
+    "FactorLevelSchema",
+    "LevelSpec",
+]
 
 from collections import deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Literal, TypeAlias
 
@@ -423,6 +432,48 @@ class FactorLevelSchema:
             routes.extend((parent, *rest) for rest in self.paths(parent, ancestor))
         return tuple(routes)
 
+    def routes_through(
+        self, level: FactorLevel, ancestor: FactorLevel, via: FactorLevel
+    ) -> tuple[tuple[FactorLevel, ...], ...]:
+        """Routes from ``level`` to ``ancestor`` that step through ``via``.
+
+        ``via`` names a level a route passes *through*, so ``level`` itself is not an
+        answer — every route starts there — and saying so is clearer than the "no route
+        passes through it" the general check would otherwise give. ``ancestor`` is an
+        answer, trivially satisfied by every route, and is left alone rather than made a
+        special case.
+
+        A question about the graph, so it is answered by the graph. Both the store, which
+        selects the links to compose, and :meth:`Aggregator.validate`, which has no store,
+        ask it here — which is what lets a declaration be wrong about its route before any
+        dataset is in hand.
+
+        Returns
+        -------
+        tuple[tuple[str, ...], ...]
+            The routes, in :meth:`paths` order.
+
+        Raises
+        ------
+        ValueError
+            When a level is not in this schema, when ``via`` is ``level``, or when no route
+            passes through it.
+        """
+        self.validate(via)
+        if via == level:
+            raise ValueError(
+                f"via={via!r} is the level being linked from, which every route starts at rather "
+                f"than passes through. Name a level between {level!r} and {ancestor!r}, or omit "
+                "via to take every route.",
+            )
+        paths = self.paths(level, ancestor)
+        if selected := tuple(path for path in paths if via in path):
+            return selected
+        raise ValueError(
+            f"No route from {level!r} to {ancestor!r} passes through {via!r}. The levels these "
+            f"routes step through are {sorted({step for path in paths for step in path})}.",
+        )
+
     def descendants(self, level: FactorLevel) -> tuple[FactorLevel, ...]:
         """Levels that inherit from ``level``, in schema order."""
         self.validate(level)
@@ -589,6 +640,22 @@ class LevelSpec:
     levels: tuple[Any, ...]
     provenance: Literal["derived", "accepted", "declared"]
 
+    @property
+    def missing_code(self) -> int:
+        """Code standing for a missing value, above every code the vocabulary describes.
+
+        Derived rather than stored, exactly as :attr:`BinSpec.missing_code` is, so the code
+        space is fixed by the vocabulary rather than by which codes a particular sample
+        happened to fill. Two datasets recorded against one spec therefore share an
+        alphabet whether or not either has a missing value in it, and a filter that removes
+        the last such value does not change the factor's cardinality.
+
+        A missing value is not one of the values, so it does not become a level: a
+        vocabulary is what a code *means*, and "not recorded" means the same thing for every
+        factor rather than something about this one.
+        """
+        return len(self.levels)
+
 
 @dataclass
 class FactorInfo:
@@ -622,6 +689,16 @@ class FactorInfo:
         Where the other fields record *that* a factor was encoded, this records *how* --
         which is what a reader needs to say what a code means, and what a later dataset
         needs to be given the same codes for the same values.
+    missing : int, default 0
+        Rows that recorded no value, and so hold the encoding's reserved missing code
+        rather than one standing for a value.
+
+        Worth reading before a bias result is: no evaluator treats that code differently
+        from any other, so unrecorded rows are scored as a group of their own, sitting in
+        every contingency table beside the groups the factor actually names. That is the
+        honest default -- dropping them would quietly change the population a result
+        describes -- but it is only honest if the number is available, and it is the one
+        thing neither the vocabulary nor the edges say.
     """
 
     factor_type: Literal["categorical", "continuous", "discrete"]
@@ -630,6 +707,317 @@ class FactorInfo:
     level: FactorLevel = "unit"
     aggregated_from: FactorLevel | None = None
     encoding: BinSpec | LevelSpec | None = None
+    missing: int = 0
+
+
+@dataclass(frozen=True)
+class Aggregator:
+    """A named reduction, declared from one level to a level above it.
+
+    A reduction on its own is not a well-formed statement. "Mean brightness" is ambiguous
+    until it says mean over *what*: over the frames of a video, over the detections of a
+    frame, or over the detections of a track are three different numbers from one column,
+    and the middle one is the fan-out that :meth:`~dataeval.Metadata.agg` refuses without
+    ``unique_by``. Carrying the reduction and its level pair in one value is what makes the
+    statement checkable, storable and comparable between runs.
+
+    Everything here except the factor set is decidable against a
+    :class:`FactorLevelSchema` alone, with no dataset, which is what makes this a
+    *declaration* rather than a call. A calculator can declare how its output rolls up
+    beside the calculator, and be wrong about it at import time rather than at analysis
+    time.
+
+    Attributes
+    ----------
+    how : str
+        Name of the reduction, from the reduction registry -- ``"mean"``, ``"count"``,
+        ``"mode"`` and so on. The name carries a contract the raw expression cannot: which
+        value types it applies to, and what it answers for a destination with nothing
+        beneath it.
+    source : str or None
+        Level whose rows are rolled up, or None to infer it per factor from the level the
+        factor is defined at. Inference is what :meth:`~dataeval.Metadata.aggregate`'s
+        keyword form does; naming it is what makes this value complete on its own.
+    target : str
+        Level receiving one value per row. Must sit strictly above ``source``.
+    factors : tuple of str, default ()
+        Factors to roll up. Empty means every factor at ``source`` the reduction's value
+        type admits, resolved against the dataset -- so an unresolved aggregator with an
+        empty set names a *rule*, and its resolved form names the factors that rule chose.
+    unique_by : str or None, default None
+        Count each entity at this level once within a group. Required by a reduction over
+        a column defined above ``source``, which repeats across the fan-out.
+    via : str or None, default None
+        Roll up along routes through this level rather than along every route. Only a
+        diamond offers a choice: ``via="track"`` for an instance-to-sequence roll-up
+        reaches only the detections a tracker linked, which is a different question from
+        the default and not a different spelling of it.
+    order_by : str or None, default None
+        Column a temporal reduction reads the rows in the order of. None infers it from the
+        source level, preferring a wall-clock time over a presentation timestamp over a
+        position. A positional reduction ignores it; a temporal one at a level that has no
+        ordering is refused rather than run against row order, which is not time.
+    options : Mapping[str, Any], default empty
+        Reduction-specific parameters, such as ``longest_run``'s ``tolerance``. Declared per
+        reduction, so an option a reduction does not take raises rather than sitting there
+        inert -- which is why ``tolerance`` is not a field of its own. Reads back as a
+        mapping whatever was passed: the field is normalized on construction, so a caller
+        holding an aggregator never has to test it for ``None``.
+    min_coverage : float, default 1.0
+        Share of the rows beneath a destination that must carry a value for the destination
+        to get an answer rather than a null. The default is the all-or-nothing rule the
+        structurers used to apply to a whole factor, at the granularity of one destination
+        row -- where it can be relaxed. ``0.0`` summarizes whatever is there. Ignored by a
+        reduction that is about missingness rather than distorted by it, such as ``count``.
+    suffix : str or None, default None
+        Override for the output name's suffix. None derives it from ``how`` and ``via``.
+    provenance : {"declared", "derived"}, default "declared"
+        Who chose ``source`` and ``factors``. ``"declared"``: the caller named them.
+        ``"derived"``: :meth:`~dataeval.Metadata.aggregate` inferred them from a dataset,
+        which makes this value a *fit* -- reusable, and reapplied rather than re-derived
+        against a second dataset, exactly as a :class:`BinSpec`'s edges are.
+
+    See Also
+    --------
+    :meth:`~dataeval.Metadata.aggregate` : Roll factors up by name
+    :meth:`~dataeval.Metadata.agg` : The expression-level form beneath it
+    """
+
+    how: str
+    source: FactorLevel | None
+    target: FactorLevel
+    factors: tuple[str, ...] = ()
+    unique_by: FactorLevel | None = None
+    via: FactorLevel | None = None
+    order_by: str | None = None
+    # A factory, not a shared instance: a mappingproxy default is refused by 3.11's
+    # dataclasses, and the field is normalized into a per-instance mapping anyway.
+    options: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}))
+    min_coverage: float = 1.0
+    suffix: str | None = None
+    provenance: Literal["declared", "derived"] = "declared"
+
+    def __post_init__(self) -> None:
+        """Normalize the factor set and refuse the shapes no schema is needed to reject."""
+        validate_coverage(self.min_coverage)
+        if isinstance(self.factors, str):
+            # ``str`` is itself a sequence of str, so a bare name would silently become one
+            # single-character factor per letter -- the same trap ``_as_parents`` guards.
+            raise TypeError(
+                f"factors must be a sequence of factor names, not the bare string {self.factors!r}; "
+                f"pass ({self.factors!r},) for a single factor.",
+            )
+        object.__setattr__(self, "factors", tuple(self.factors))
+        # ``or {}`` because the signature documents ``options`` as optional, and passing the
+        # ``None`` it documents raised ``'NoneType' object is not iterable`` from inside here.
+        object.__setattr__(self, "options", MappingProxyType(dict(self.options or {})))
+        if not self.how:
+            raise ValueError("An aggregator needs a reduction name, e.g. Aggregator('mean', 'unit', 'sequence').")
+        if self.source is not None and self.source == self.target:
+            raise ValueError(
+                f"An aggregator rolls rows up into a level above them, so source and target cannot "
+                f"both be {self.target!r}.",
+            )
+
+    def __hash__(self) -> int:
+        """Hash the declaration, reading ``options`` as the sorted pairs it holds.
+
+        ``frozen=True`` generates a hash over every field, and one of the fields is a
+        mapping -- so a value type whose whole point is being storable and comparable
+        between runs could be compared but never put in a set or used as a dict key, and
+        said so only at the call. Read as pairs it hashes like the rest of the declaration.
+        """
+        return hash((
+            self.how,
+            self.source,
+            self.target,
+            self.factors,
+            self.unique_by,
+            self.via,
+            self.order_by,
+            tuple(sorted(self.options.items())),
+            self.min_coverage,
+            self.suffix,
+            self.provenance,
+        ))
+
+    @property
+    def is_resolved(self) -> bool:
+        """Whether this names a concrete roll-up rather than a rule for finding one."""
+        return self.source is not None and bool(self.factors)
+
+    @property
+    def rolls_from(self) -> FactorLevel:
+        """Source level of a resolved aggregator.
+
+        Separate from :attr:`source` so that a resolved aggregator can be *used* without
+        every call site re-proving that inference has happened. An unresolved one raises
+        rather than answering, since there is no honest answer to give.
+        """
+        if self.source is None:
+            raise ValueError(
+                "This aggregator's source level has not been resolved yet, so it does not have one. "
+                "Resolve it against a dataset, or name the level it rolls up from.",
+            )
+        return self.source
+
+    @property
+    def rolls_by(self) -> str:
+        """Ordering column of a resolved temporal aggregator.
+
+        The counterpart of :attr:`rolls_from`: a resolved temporal roll-up has one, an
+        unresolved or positional one does not, and asking is how a caller stops re-proving
+        it at every use.
+        """
+        if self.order_by is None:
+            raise ValueError(
+                "This aggregator names no ordering column. Only a temporal reduction has one, and "
+                "only once it has been resolved against a dataset.",
+            )
+        return self.order_by
+
+    def name_for(self, factor: str) -> str:
+        """Output name for one rolled-up factor.
+
+        The name is the only durable record of the operation --
+        :class:`FactorInfo` records the level a factor was rolled up *from* and
+        deliberately not what was done to it -- so the route has to appear in it wherever
+        it is not the default. Two roll-ups of one factor to one level by different routes
+        are different questions, and a name that could not tell them apart would leave them
+        distinguished only by a uniqueness suffix.
+        """
+        if self.suffix is not None:
+            return f"{factor}{self.suffix}"
+        return f"{factor}_{self.how}" if self.via is None else f"{factor}_{self.how}_via_{self.via}"
+
+    def validate(self, schema: FactorLevelSchema) -> None:
+        """Check the level pair against a schema, with no dataset.
+
+        ``how`` is the one field this cannot check: the reduction registry lives in the
+        metadata layer, which imports this module rather than the other way round, so the
+        name is checked where the roll-up is resolved. Everything else — the level triple,
+        ``unique_by``, and the route ``via`` names — is decided here, with no dataset.
+
+        Raises
+        ------
+        ValueError
+            When a level is not in the schema, when ``target`` does not sit above
+            ``source``, when ``unique_by`` is neither ``source`` nor above it, or when no
+            route from ``source`` to ``target`` passes through ``via``.
+        """
+        schema.validate(self.target)
+        if self.source is None:
+            # Without a source there is no route to check ``via`` against either: which
+            # branch a factor takes upward depends on the level it is measured at.
+            return
+        schema.validate(self.source)
+        if not schema.is_ancestor(self.target, self.source):
+            raise ValueError(
+                f"An aggregator rolls rows up into a level above them, but {self.target!r} does not "
+                f"sit above {self.source!r} in this level graph. Levels above {self.source!r} are "
+                f"{list(schema.ancestors(self.source))}.",
+            )
+        if (
+            self.unique_by is not None
+            and self.unique_by != self.source
+            and not schema.is_ancestor(self.unique_by, self.source)
+        ):
+            raise ValueError(
+                f"unique_by={self.unique_by!r} must be {self.source!r} itself or one of the levels "
+                f"above it {list(schema.ancestors(self.source))}; it names the entity each row is "
+                "counted once for.",
+            )
+        if self.via is not None:
+            schema.routes_through(self.source, self.target, self.via)
+
+
+def validate_coverage(min_coverage: float) -> None:
+    """Refuse a coverage threshold that is not a share.
+
+    Shared by :class:`Aggregator` and by :meth:`~dataeval.Metadata.agg`, which reach the
+    same engine: a threshold above 1 nulls every destination and then reports a coverage of
+    1.0 alongside, which reads as the data being at fault rather than the argument.
+
+    Raises
+    ------
+    ValueError
+        When the threshold is outside ``[0, 1]``, ``NaN`` included -- a NaN comparison is
+        false in both directions, so it would silently disable the threshold instead.
+    """
+    if not 0.0 <= min_coverage <= 1.0:
+        raise ValueError(
+            f"min_coverage is a share of the rows beneath a destination, so it lies in [0, 1]; got {min_coverage}.",
+        )
+
+
+@dataclass(frozen=True)
+class AggregationRecord:
+    """What one roll-up reached, and how much of it was recorded.
+
+    A rolled-up column cannot explain its own nulls. A destination is null because it had
+    no rows beneath it, or because too few of the rows it did have carried a value, or --
+    if the roll-up was routed through a branch -- because it was never reached at all.
+    Those are three different statements about a dataset and they look identical in the
+    column, so the counts are kept beside it rather than left to be inferred.
+
+    Attributes
+    ----------
+    source : str
+        Level whose rows were rolled up.
+    target : str
+        Level that received one value per row.
+    how : str or None
+        Reduction's name, or None where the roll-up was written as an expression.
+    via : str or None
+        Branch the roll-up was routed through, or None for every route.
+    outputs : tuple of str
+        Factor names produced, after any renaming for collision. ``coverage`` and
+        ``uncovered`` are aligned with this.
+    took_part : int
+        Source rows that had an ancestor at ``target`` and were summarized.
+    no_ancestor : int
+        Source rows excluded for having none. Zero for every complete route; for a routed
+        one, exactly the rows that branch does not reach.
+    childless : int
+        Destination rows with nothing beneath them.
+    coverage : tuple of float
+        Per output, the lowest share of recorded values any destination with rows beneath
+        it saw. This is the number that says which ``min_coverage`` would have been
+        answerable.
+    uncovered : tuple of int
+        Per output, destinations nulled for falling below the threshold.
+    gaps : int
+        Steps in the ordering key larger than the tightest step within the same destination,
+        summed over all of them; 0 for a roll-up that did not read its rows as an ordered
+        series. It counts unevenness whatever caused it — a filter that removed rows, a
+        key-frame selection, or a source that sampled unevenly — because from the ordering
+        key those are the same observation, and a reduction that assumes even spacing is
+        equally wrong in all three.
+    """
+
+    source: FactorLevel
+    target: FactorLevel
+    how: str | None
+    via: FactorLevel | None
+    outputs: tuple[str, ...]
+    took_part: int
+    no_ancestor: int
+    childless: int
+    coverage: tuple[float, ...]
+    uncovered: tuple[int, ...]
+    gaps: int = 0
+
+    def coverage_of(self, output: str) -> float:
+        """Lowest coverage recorded for one of this roll-up's outputs.
+
+        Raises
+        ------
+        ValueError
+            When this roll-up produced no such output.
+        """
+        if output not in self.outputs:
+            raise ValueError(f"{output!r} is not one of this roll-up's outputs {list(self.outputs)}.")
+        return self.coverage[self.outputs.index(output)]
 
 
 @dataclass(frozen=True)

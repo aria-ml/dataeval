@@ -70,6 +70,28 @@ class MOTAccumulator:
                 self.instance_unit_pos.extend([position] * len(rows.labels))
                 self._add_tracks(item, rows, registry)
 
+    def _extend_span(self, position: int, rows: FrameRows) -> None:
+        """Widen a track to take in one more frame, carrying that frame's timing with it.
+
+        Compared rather than "the latest wins": ``frame_index`` comes off the stream and a
+        duck-typed frame is not obliged to number its frames in order.
+
+        The times move *with* the endpoint frames rather than being reduced on their own,
+        so a track's span is the time between the frames that actually bound it. Reduced
+        independently, the two things a missing timestamp can mean are indistinguishable
+        and either answer is wrong for one of them: a min/max over the times that exist
+        silently understates a track whose first or last frame is untimed, and propagating
+        the ``None`` discards a perfectly good span whenever some frame in the *middle*
+        declared no time. Which case it is, is a question only ``frame_index`` can answer,
+        and that is always there.
+        """
+        if rows.frame_index < self.track_first_frame[position]:
+            self.track_first_frame[position] = rows.frame_index
+            self.track_first_time[position] = rows.time_s
+        if rows.frame_index > self.track_last_frame[position]:
+            self.track_last_frame[position] = rows.frame_index
+            self.track_last_time[position] = rows.time_s
+
     def _add_tracks(self, item: int, rows: FrameRows, registry: dict[int, int]) -> None:
         """Attach one frame's detections to their tracks, opening any not yet seen.
 
@@ -94,22 +116,7 @@ class MOTAccumulator:
                 self.track_first_time.append(rows.time_s)
                 self.track_last_time.append(rows.time_s)
             else:
-                # min/max rather than "the latest wins": frame_index comes off the stream
-                # and a duck-typed frame is not obliged to number its frames in order.
-                self.track_first_frame[position] = min(self.track_first_frame[position], rows.frame_index)
-                self.track_last_frame[position] = max(self.track_last_frame[position], rows.frame_index)
-                self.track_first_time[position] = _min_or_none(self.track_first_time[position], rows.time_s)
-                self.track_last_time[position] = _max_or_none(self.track_last_time[position], rows.time_s)
+                self._extend_span(position, rows)
 
             self.track_length[position] += 1
             self.instance_track_pos.append(position)
-
-
-def _min_or_none(current: float | None, candidate: float | None) -> float | None:
-    """Smaller of two optional times, None when either is missing."""
-    return None if current is None or candidate is None else min(current, candidate)
-
-
-def _max_or_none(current: float | None, candidate: float | None) -> float | None:
-    """Larger of two optional times, None when either is missing."""
-    return None if current is None or candidate is None else max(current, candidate)

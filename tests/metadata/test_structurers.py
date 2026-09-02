@@ -22,7 +22,7 @@ from dataeval._metadata._structurers import (
     reserved_block_columns,
     select_structurer,
 )
-from dataeval.types import FactorInfo, FactorLevelSchema, SourceIndex
+from dataeval.types import FactorInfo, FactorLevelSchema, LevelSpec, SourceIndex
 from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
 
 
@@ -75,6 +75,17 @@ class _MOTTarget:
 def _track_ids(per_frame: int | Sequence[int]) -> Sequence[int]:
     """A detection count means ids 0..n-1; an explicit sequence is used as given."""
     return range(per_frame) if isinstance(per_frame, int) else per_frame
+
+
+def _undeclared(dataset, item: int, frame: int, attribute: str):
+    """The same dataset, with one frame no longer declaring one timing.
+
+    A duck-typed video stream is free to declare a timing for some frames and not others,
+    and there is no other way to build one: ``_Frame`` declares all of them and
+    ``_BareFrame`` declares none.
+    """
+    delattr(dataset.data[item][frame], attribute)
+    return dataset
 
 
 def _mot_dataset(shapes, metadata=None, bare_frames: bool = False):
@@ -692,13 +703,85 @@ class TestTrackLevel:
         assert md.rows_at("unit")["pts"].to_list() == [0, 1000, 2000, 0]
 
     def test_a_stream_without_timings_produces_no_timing_factors(self):
-        """All-or-nothing: a partly populated numeric factor cannot be binned."""
+        """A factor *no* frame declares is one the dataset does not carry, not one it half-carries.
+
+        Distinct from the partly-declared case below: an all-null column says nothing its
+        absence does not, so it is still dropped.
+        """
         md = Metadata(_mot_dataset(_TRACKED, bare_frames=True))
         assert "time_s" not in md.dataframe.columns
         assert "pts" not in md.dataframe.columns
         assert "duration_s" not in md.dataframe.columns
         # The rest of the level survives.
         assert md.at("track").rows_at("track")["track_length"].to_list() == [2, 2, 1]
+
+    def test_one_silent_frame_costs_the_whole_factor_by_default(self):
+        """All-or-nothing is still the default, and still what a caller gets unasked."""
+        md = Metadata(_undeclared(_mot_dataset(_TRACKED), 0, 1, "time_s"))
+        assert "time_s" not in md.dataframe.columns
+
+    def test_a_timing_only_some_frames_declare_is_kept_when_asked_for(self):
+        """The frames that declared one keep it; the one that did not reads as missing."""
+        md = Metadata(_undeclared(_mot_dataset(_TRACKED), 0, 1, "time_s"), partial_factors=True)
+        timings = md.rows_at("unit")["time_s"].to_list()
+        assert [timings[0], timings[2], timings[3]] == [0.0, 1.0, 0.0]
+        # NaN rather than null: a float column spells an unrecorded number the way the rest
+        # of the library does, which is what the binning layer reserves a code for.
+        assert np.isnan(timings[1])
+
+    def test_a_partly_declared_timing_keeps_the_dtype_a_complete_one_has(self):
+        """Keeping it changes which rows have values, not what type the column is."""
+        complete = Metadata(_mot_dataset(_TRACKED))
+        partial = Metadata(_undeclared(_mot_dataset(_TRACKED), 0, 1, "pts"), partial_factors=True)
+        assert partial.rows_at("unit")["pts"].dtype == complete.rows_at("unit")["pts"].dtype
+
+    def test_an_untimed_frame_between_the_endpoints_costs_nothing(self):
+        """A span is measured from the frames that bound it, so a gap inside is not a gap.
+
+        Propagating the missing timestamp instead made a single untimed frame anywhere kill
+        ``duration_s`` for the whole dataset — the all-or-nothing outcome, one layer down
+        from where the rule is decided.
+        """
+        md = Metadata(_undeclared(_mot_dataset([[1, 1, 1]]), 0, 1, "time_s"))
+        assert md.rows_at("track")["duration_s"].to_list() == [1.0]
+
+    @pytest.mark.parametrize("frame", [0, 2])
+    def test_an_untimed_endpoint_leaves_the_span_unknown(self, frame):
+        """The track runs past the last reading, and how far is not something the data says.
+
+        Reducing the times on their own could not tell this from the case above, so it
+        answered with the span of the frames that *did* declare one — silently short, with
+        nothing marking it, under the default policy rather than an opt-in.
+        """
+        md = Metadata(_undeclared(_mot_dataset([[1, 1, 1]]), 0, frame, "time_s"))
+        assert "duration_s" not in md.rows_at("track").columns
+
+    def test_a_track_that_cannot_answer_does_not_cost_the_ones_that_can(self):
+        """Which is what ``partial_factors`` is for: the unknown span is a missing value."""
+        md = Metadata(_undeclared(_mot_dataset([[1, 1, 1], [1, 1, 1]]), 0, 2, "time_s"), partial_factors=True)
+        first, second = md.rows_at("track")["duration_s"].to_list()
+        assert np.isnan(first)
+        assert second == 1.0
+
+    def test_the_policy_is_read_the_same_way_for_metadata_keys(self):
+        """One knob, so a walk cannot drop a partly declared key while keeping a timing."""
+        shapes, keys = [[1], [1], [1]], [{"w": "sun"}, {"w": "rain"}, {}]
+        assert "w" not in Metadata(_mot_dataset(shapes, keys)).dataframe.columns
+        kept = Metadata(_mot_dataset(shapes, keys), partial_factors=True)
+        assert kept.rows_at("sequence")["w"].to_list() == ["sun", "rain", None]
+
+    def test_a_missing_category_takes_a_reserved_code_rather_than_a_level(self):
+        """ "Not recorded" is not one of the values, so it does not join the vocabulary."""
+        kept = Metadata(_mot_dataset([[1], [1], [1]], [{"w": "sun"}, {"w": "rain"}, {}]), partial_factors=True)
+        spec = kept.factor_info["w"].encoding
+        assert isinstance(spec, LevelSpec)
+        codes = kept.factor_data[:, list(kept.factor_names).index("w")].tolist()
+        assert spec.levels == ("rain", "sun")
+        assert codes == [1, 0, spec.missing_code]
+
+    def test_the_policy_carries_to_a_new_dataset(self):
+        md = Metadata(_mot_dataset(_TRACKED), partial_factors=True)
+        assert md.new(_mot_dataset(_TRACKED)).partial_factors is True
 
     def test_frame_dimensions_become_unit_level_factors(self):
         """The walk is the only thing that ever holds a decoded frame, so it reads the size."""

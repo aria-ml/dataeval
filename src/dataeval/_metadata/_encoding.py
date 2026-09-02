@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.types import BinSpec, LevelSpec
+from dataeval.types import Aggregator, BinSpec, LevelSpec
 
 # Bumped when the on-disk shape changes in a way an older reader would misread. A
 # descriptor is committed alongside code and read back months later, so it says which
@@ -94,7 +94,19 @@ def apply_level_spec(
     ValueError
         When ``strict`` and the data holds a value the vocabulary does not.
     """
-    distinct, inverse = np.unique(data, return_inverse=True)
+    # Missing values leave before ``np.unique`` sees them, for both of the reasons the
+    # derived path splits them out: it cannot sort ``None`` against a string at all -- it
+    # raises rather than answering, so a partly recorded factor had no way through here --
+    # and a value nobody recorded is not one of the values the factor takes, so it must not
+    # become a level. It takes ``missing_code``, which is what the derived path gives it.
+    flat = data.reshape(-1)
+    missing = np.fromiter((_index_key(value) is _MISSING_KEY for value in flat), dtype=bool, count=flat.size)
+    present = flat[~missing]
+    distinct, inverse = (
+        np.unique(present, return_inverse=True)
+        if present.size
+        else (np.empty(0, dtype=flat.dtype), np.empty(0, dtype=np.intp))
+    )
     # Once, not once per pass over it: ``tolist()`` rebuilds every scalar it returns, and
     # the identity of those scalars is what the NaN key above turns on.
     values = distinct.tolist()
@@ -109,8 +121,13 @@ def apply_level_spec(
         if (key := _index_key(value)) not in index:
             index[key] = len(levels)
             levels.append(value)
-    codes = np.asarray([index[_index_key(value)] for value in values], dtype=np.int64)[inverse]
     grown = replace(spec, levels=tuple(levels)) if len(levels) != len(spec.levels) else spec
+    # A vocabulary that already carries a missing level keeps sending missing rows to it:
+    # an older record round-trips to the codes it was written with rather than being
+    # silently renumbered by this rule.
+    codes = np.full(flat.size, index.get(_MISSING_KEY, grown.missing_code), dtype=np.int64)
+    if present.size:
+        codes[~missing] = np.asarray([index[_index_key(value)] for value in values], dtype=np.int64)[inverse]
     return codes.reshape(data.shape), grown
 
 
@@ -244,6 +261,70 @@ def encoding_from_json(text: str) -> dict[str, FactorEncoding]:
             f"Encoding descriptor is version {version!r}; this DataEval reads version {DESCRIPTOR_VERSION}.",
         )
     return encoding_from_mapping(document.get("factors", {}))
+
+
+def aggregations_to_list(aggregations: Mapping[str, Aggregator]) -> list[dict[str, Any]]:
+    """Render the roll-ups a metadata carries, keyed on the column each produced.
+
+    A list rather than an object, because the order is what makes them replayable: a
+    roll-up onto a level may read a column an earlier one wrote there, so two levels of
+    aggregation only rebuild in the order they were run.
+    """
+    return [
+        {
+            "name": name,
+            "how": aggregator.how,
+            "source": aggregator.source,
+            "target": aggregator.target,
+            "factors": list(aggregator.factors),
+            "unique_by": aggregator.unique_by,
+            "via": aggregator.via,
+            "order_by": aggregator.order_by,
+            "options": {key: _plain_option(value) for key, value in aggregator.options.items()},
+            "min_coverage": aggregator.min_coverage,
+            "suffix": aggregator.suffix,
+            "provenance": aggregator.provenance,
+        }
+        for name, aggregator in aggregations.items()
+    ]
+
+
+def aggregations_from_list(written: Sequence[Mapping[str, Any]]) -> dict[str, Aggregator]:
+    """Read the roll-ups back, in the order they have to be replayed in."""
+    return {
+        entry["name"]: Aggregator(
+            how=entry["how"],
+            source=entry["source"],
+            target=entry["target"],
+            factors=tuple(entry["factors"]),
+            unique_by=entry["unique_by"],
+            via=entry["via"],
+            order_by=entry["order_by"],
+            options={key: _option_from_json(value) for key, value in entry["options"].items()},
+            min_coverage=entry["min_coverage"],
+            suffix=entry["suffix"],
+            provenance=entry["provenance"],
+        )
+        for entry in written
+    }
+
+
+def _plain_option(value: Any) -> Any:
+    """Render one reduction option, which may be a threshold spec nested in tuples."""
+    if isinstance(value, tuple | list):
+        return [_plain_option(item) for item in value]
+    return _as_plain(value)
+
+
+def _option_from_json(value: Any) -> Any:
+    """Read one option back, restoring the tuples a threshold spec is written in.
+
+    JSON has one sequence and :data:`~dataeval.protocols.ThresholdLike` is written in
+    tuples, so a spec read back as lists would no longer match the shape the resolver
+    destructures. A *fitted* tolerance is a bare number and passes through untouched,
+    which is the common case: fitting is what recording a roll-up preserves.
+    """
+    return tuple(_option_from_json(item) for item in value) if isinstance(value, list) else value
 
 
 def bins_to_mapping(bins: Mapping[str, int | Sequence[float]]) -> dict[str, int | list[float | str | None]]:

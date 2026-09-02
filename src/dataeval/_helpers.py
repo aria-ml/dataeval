@@ -309,8 +309,17 @@ def _names_from_level_spec(spec: LevelSpec, uniques: NDArray[Any]) -> dict[int, 
     Exact, and available without reaching the raw column -- which is what lets a factor
     name its own codes from the record alone.
     """
-    levels = spec.levels
-    return {int(code): str(levels[int(code)]) if int(code) < len(levels) else str(code) for code in uniques}
+    return {int(code): _level_name(spec, int(code)) for code in uniques}
+
+
+def _level_name(spec: LevelSpec, code: int) -> str:
+    """Name one code from the vocabulary that produced it."""
+    if code == spec.missing_code:
+        # The same word the bin path uses for the same thing. Left to the fallback below,
+        # a partly recorded factor labelled its unrecorded rows with a bare number sitting
+        # among real category names, reading as a category the data contains.
+        return "missing"
+    return str(spec.levels[code]) if code < len(spec.levels) else str(code)
 
 
 def has_own_alphabet(metadata: MetadataLike, indices: Sequence[int]) -> list[bool]:

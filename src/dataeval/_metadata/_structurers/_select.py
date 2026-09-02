@@ -44,6 +44,8 @@ TASK_STRUCTURERS: Mapping[str, type[DatasetStructurer]] = MappingProxyType(
 def select_structurer(
     dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]],
     task: TaskOverride | None = None,
+    *,
+    partial_factors: bool = False,
 ) -> DatasetStructurer:
     """Choose a structuring strategy for a dataset.
 
@@ -55,6 +57,10 @@ def select_structurer(
         Explicit task override. Matched case-insensitively, so an untyped caller
         may pass ``"od"``. When None the target of the first datum is matched
         against ``dataeval.types._task.DISPATCH``.
+    partial_factors : bool, default False
+        Keep a factor only some rows declare, with the rest missing. Carried on the
+        structurer rather than passed to :meth:`DatasetStructurer.build`, so that every
+        place the walk meets an incompletely declared value reads one answer.
 
     Returns
     -------
@@ -85,11 +91,11 @@ def select_structurer(
         key = str(task).upper()
         if key not in TASK_STRUCTURERS:
             raise ValueError(f"Unknown task {task!r}. Supported tasks are {sorted(TASK_STRUCTURERS)}.")
-        return TASK_STRUCTURERS[key]()
+        return TASK_STRUCTURERS[key](partial_factors=partial_factors)
 
     if not isinstance(dataset, Sized) or len(dataset) == 0:
         _logger.debug("Cannot infer a task from an empty dataset; assuming image classification.")
-        return ICStructurer()
+        return ICStructurer(partial_factors=partial_factors)
 
     # Handed to the chosen structurer so a dataset that decodes on __getitem__ pays
     # for item 0 once, not once here and again on the first iteration of build().
@@ -102,7 +108,7 @@ def select_structurer(
     if task_name is not None:
         structurer = TASK_STRUCTURERS[task_name]
         _logger.debug("Selected %s for target %s", structurer.__name__, type(target))
-        return structurer(first_datum)
+        return structurer(first_datum, partial_factors=partial_factors)
 
     raise TypeError(
         f"Unable to infer a task from target type {type(target).__name__}. "

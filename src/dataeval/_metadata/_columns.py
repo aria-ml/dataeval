@@ -25,6 +25,22 @@ def _flatten_column_vector(values: NDArray[np.generic]) -> NDArray[np.generic]:
     return values.reshape(-1) if values.ndim == 2 and values.shape[1] == 1 else values
 
 
+def missing_mask(values: NDArray[np.generic]) -> NDArray[np.bool_]:
+    """Which rows of a factor's values recorded nothing.
+
+    One definition, because a code only means the same thing in the column, in the record
+    and in the count if the three agree about which rows are absent. ``NaN`` is how this
+    library spells an absent number and ``None`` how an object column spells any absent
+    value; integer, boolean and fixed-width string arrays have neither, so nothing in them
+    is missing.
+    """
+    if values.dtype.kind in "fc":
+        return np.isnan(values)
+    if values.dtype.kind == "O":
+        return np.array([value is None or (isinstance(value, float) and np.isnan(value)) for value in values])
+    return np.zeros(values.shape, dtype=np.bool_)
+
+
 def _holds_no_values(values: NDArray[np.generic]) -> bool:
     """Whether an array of a factor's values at one level holds no value at all.
 
@@ -34,12 +50,9 @@ def _holds_no_values(values: NDArray[np.generic]) -> bool:
     """
     if values.size == 0:
         return False
-    if values.dtype.kind in "fc":
-        return bool(np.isnan(values).all())
-    if values.dtype.kind == "O":
-        return all(value is None or (isinstance(value, float) and np.isnan(value)) for value in values)
-    # Integer, boolean and fixed-width string arrays have no null to be made of.
-    return False
+    # Integer, boolean and fixed-width string arrays have no null to be made of, which
+    # `missing_mask` answers with an all-False mask.
+    return bool(missing_mask(values).all())
 
 
 def drop_vacuous_splits(

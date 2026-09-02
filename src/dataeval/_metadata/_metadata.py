@@ -16,12 +16,13 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval._log import get_logger
-from dataeval._metadata._aggregate import aggregate, validate
+from dataeval._metadata._aggregate import Rolled, aggregate, successive_differences, validate
 from dataeval._metadata._columns import (
     binned,
     digitized,
     drop_vacuous_splits,
     float_col,
+    missing_mask,
     split_by_dimensionality,
     to_col,
 )
@@ -42,6 +43,15 @@ from dataeval._metadata._input import (
 from dataeval._metadata._keyed import resolve_keyed
 from dataeval._metadata._links import to_series
 from dataeval._metadata._loading import _load_factors
+from dataeval._metadata._reductions import (
+    coverage_for,
+    expressions,
+    identity_of,
+    is_gap_sensitive,
+    resolve,
+    tolerance_of,
+    with_tolerance,
+)
 from dataeval._metadata._serialize import restore as _restore
 from dataeval._metadata._serialize import save as _save
 from dataeval._metadata._store import LevelStore
@@ -76,6 +86,8 @@ from dataeval.protocols import (
     ProgressCallback,
 )
 from dataeval.types import (
+    AggregationRecord,
+    Aggregator,
     Array1D,
     BinSpec,
     ClassAxis,
@@ -85,7 +97,9 @@ from dataeval.types import (
     LevelSpec,
     SourceIndex,
 )
+from dataeval.types._factors import validate_coverage
 from dataeval.utils._validate import requires_maite_dataset
+from dataeval.utils.thresholds import resolve_threshold
 
 _logger = get_logger(__name__)
 
@@ -257,6 +271,12 @@ def _unused_bins(spec: BinSpec, codes: NDArray[np.int64]) -> tuple[NDArray[np.in
     return present, note
 
 
+# One grouping's result, with the declaration that produced it. ``None`` on the ``agg``
+# path: an arbitrary polars expression has no serializable form, so a roll-up asked for
+# that way is data rather than a declaration and cannot be replayed onto another dataset.
+_Batch = tuple[FactorLevel, FactorLevel, str | None, FactorLevel | None, Rolled, "Aggregator | None"]
+
+
 def _is_derived_encoding(info: FactorInfo) -> bool:
     """Say whether a factor's encoding was chosen for it rather than by anyone.
 
@@ -265,6 +285,41 @@ def _is_derived_encoding(info: FactorInfo) -> bool:
     exists to let a person ratify.
     """
     return info.encoding is not None and info.encoding.provenance == "derived"
+
+
+def _announce_aggregation(records: Sequence[AggregationRecord]) -> None:
+    """Say out loud when a roll-up answered something a caller would want to qualify.
+
+    A column of nulls is the one result that gives a caller nothing to act on, and under
+    the named surface's all-or-nothing default it is also the likeliest surprise: one
+    unrecorded frame in a sequence is enough. So the line names the threshold that would
+    have been answerable, which is exactly the coverage the record already carries.
+    """
+    for record in records:
+        for output, coverage, uncovered in zip(record.outputs, record.coverage, record.uncovered, strict=True):
+            if not uncovered:
+                continue
+            _logger.info(
+                "%r is null on %d of the %r rows it was rolled up into: their %r rows did not all "
+                "record a value, and the lowest share any of them did was %.3f. Pass a "
+                "min_coverage at or below that to summarize what was recorded.",
+                output,
+                uncovered,
+                record.target,
+                record.source,
+                coverage,
+            )
+        if record.gaps and record.how is not None and is_gap_sensitive(record.how):
+            _logger.info(
+                "%s counts positions, and the %r rows beneath a %r were not evenly spaced: %d step(s) "
+                "in the ordering key were larger than the tightest one. A reading that was never "
+                "taken is not in the series at all, so a run reads straight through where it would "
+                "have been and is reported as longer than it was observed to be.",
+                list(record.outputs),
+                record.source,
+                record.target,
+                record.gaps,
+            )
 
 
 def _is_auto_binned(info: FactorInfo) -> bool:
@@ -474,6 +529,7 @@ class Metadata(Array, FeatureExtractor):
         include: str | Sequence[str] | None = None,
         view: FactorLevel | None = None,
         inherited: bool = True,
+        partial_factors: bool = False,
     ) -> None:
         self._raw: Sequence[Mapping[str, Any]]
 
@@ -489,11 +545,16 @@ class Metadata(Array, FeatureExtractor):
             factor_levels,
         )
         self._strict = strict
+        self._partial_factors = partial_factors
         self._auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = auto_bin_method
 
         if exclude is not None and include is not None:
             raise ValueError("Filters for `exclude` and `include` are mutually exclusive.")
 
+        # Roll-ups this metadata carries, keyed on the factor name each produced and held
+        # in the order they were run, which is the order they have to be replayed in: a
+        # roll-up onto a level may read a column an earlier one wrote there.
+        self._aggregations: dict[str, Aggregator] = {}
         self._exclude = {exclude} if isinstance(exclude, str) else set(exclude or ())
         self._include = {include} if isinstance(include, str) else set(include or ())
         # Validated lazily: there is no schema until structuring, so _adopt resolves
@@ -534,6 +595,7 @@ class Metadata(Array, FeatureExtractor):
         # yet. Was previously a bare annotation, which left it genuinely absent until
         # structuring ran.
         self._dropped_factors: dict[str, list[str]] = {}
+        self._last_aggregation: tuple[AggregationRecord, ...] = ()
         # Whether each column names its rows rather than grouping them. Cached because the
         # answer is a property of the column and `_build_factors` re-runs on every view
         # change, filter and include/exclude set; carried onto derived instances so that a
@@ -605,6 +667,7 @@ class Metadata(Array, FeatureExtractor):
         exclude: str | Sequence[str] | None = None,
         include: str | Sequence[str] | None = None,
         inherited: bool = True,
+        partial_factors: bool = False,
     ) -> Self:
         """Build a :class:`Metadata` from raw factor arrays without a MAITE dataset.
 
@@ -684,6 +747,12 @@ class Metadata(Array, FeatureExtractor):
             instance, which has nothing above its rows. It does apply when `source_index`
             carries both kinds of entry: the ``unit``-level half of each factor is
             readable from the ``instance`` rows only while this is True.
+        partial_factors : bool, default False
+            Keep a factor only some rows declare, giving the rest a missing value. False
+            drops such a factor for every row, which is what this library has always done:
+            a factor present for part of a dataset can mislead an analysis that does not
+            know it is part absent. True is worth asking for when the values that *were*
+            recorded are the point — see :attr:`partial_factors`.
 
         Returns
         -------
@@ -742,6 +811,7 @@ class Metadata(Array, FeatureExtractor):
             exclude=exclude,
             include=include,
             inherited=inherited,
+            partial_factors=partial_factors,
         )
         _load_factors(
             inst,
@@ -972,6 +1042,43 @@ class Metadata(Array, FeatureExtractor):
         task_str = f", task={self._structurer.task}" if self._is_structured else ""
         unit_str = f", units={self._structurer.unit_type}" if self._is_structured else ""
         return f"Metadata(n={self._count}, bound={bound}{task_str}{unit_str}{factor_str})"
+
+    @property
+    def partial_factors(self) -> bool:
+        """Whether a factor only some rows declare is kept, with the rest missing.
+
+        False by default, which drops such a factor for every row: a factor present for part
+        of a dataset can mislead an analysis that does not know it is part absent, and that
+        has always been this library's answer.
+
+        True keeps it, giving the rows that declared nothing a missing value — which the
+        binning layer places in a bin of its own, recorded as
+        :attr:`~dataeval.types.BinSpec.missing_code`. Ask for it when the values that *were*
+        recorded are the point: a sequence-level mean over the frames that declared a
+        timestamp is a perfectly good number, and dropping the factor discards it along with
+        the one frame that did not.
+
+        One policy, read wherever structuring meets an incompletely declared value — a
+        metadata key some items omit, and a timing or dimension some frames omit. Two
+        opposite answers to that question in one pass would be the harder thing to explain.
+
+        Read-only: it decides how the dataset was structured, so changing it afterwards
+        would describe a walk that did not happen. Pass it to the constructor, or to
+        :meth:`new`, which carries it.
+
+        Returns
+        -------
+        bool
+            Whether partly declared factors are kept.
+
+        Examples
+        --------
+        >>> Metadata(dataset).partial_factors
+        False
+        >>> Metadata(dataset, partial_factors=True).partial_factors
+        True
+        """
+        return self._partial_factors
 
     @property
     def is_bound(self) -> bool:
@@ -1220,7 +1327,7 @@ class Metadata(Array, FeatureExtractor):
         # the declared count *and* the BinSpec it resolved to, and `load` restores both, so
         # `md.save(); Metadata.load(...).new(...)` raised on every declared cut.
         bins = {name: spec for name, spec in self._continuous_factor_bins.items() if name not in self._encoding}
-        return self.__class__(
+        fresh = self.__class__(
             dataset,
             task=self._task,
             continuous_factor_bins=bins or None,
@@ -1231,7 +1338,12 @@ class Metadata(Array, FeatureExtractor):
             include=list(self._include) if self._include else None,
             view=self._view,
             inherited=self._inherited,
+            partial_factors=self._partial_factors,
         )
+        # Set rather than passed, so the fresh instance stays unwalked until something asks
+        # it a question; `_adopt` replays them when it does.
+        fresh._aggregations = dict(self._aggregations)
+        return fresh
 
     def __call__(self, data: Any | None = None) -> Array:
         """Extract metadata factors from data.
@@ -1572,16 +1684,7 @@ class Metadata(Array, FeatureExtractor):
 
         view = copy.copy(self)
         # ``_store`` is deliberately shared: it is immutable, so a writer on either side
-        # rebinds its own field. What is copied are the mutable containers describing how
-        # this instance *reads* the store, which a view must own or its FactorInfo is
-        # overwritten the next time either binned.
-        view._factors = set(self._factors)
-        view._factor_cache = dict(self._factor_cache)
-        view._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
-        view._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
-        view._aggregated_from = dict(self._aggregated_from)
-        view._identifier_cache = dict(self._identifier_cache)
-        view._encoding = dict(self._encoding)
+        view = self._derived_copy()
         view._view = resolved
         # The move can expose factors the source never binned — anything below its view —
         # so its "nothing left to process" claim does not carry. _bin() skips a factor
@@ -1680,16 +1783,7 @@ class Metadata(Array, FeatureExtractor):
         if unknown := [name for name in factors if name not in available]:
             raise ValueError(self._unusable_axis(unknown, available))
 
-        view = copy.copy(self)
-        # Same copy discipline as `at`: the store is immutable and shared, and what is
-        # copied is every mutable container describing how this instance reads it.
-        view._factors = set(self._factors)
-        view._factor_cache = dict(self._factor_cache)
-        view._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
-        view._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
-        view._aggregated_from = dict(self._aggregated_from)
-        view._identifier_cache = dict(self._identifier_cache)
-        view._encoding = dict(self._encoding)
+        view = self._derived_copy()
         view._class_axis = tuple(dict.fromkeys(factors))
         view._promote_class_label()
         view._build_factors()
@@ -1930,14 +2024,7 @@ class Metadata(Array, FeatureExtractor):
         ancestor can turn a partly-null column into a total one. Bin edges already
         computed are kept — filtering is not re-structuring.
         """
-        filtered = copy.copy(self)
-        filtered._factors = set(self._factors)
-        filtered._factor_cache = dict(self._factor_cache)
-        filtered._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
-        filtered._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
-        filtered._aggregated_from = dict(self._aggregated_from)
-        filtered._identifier_cache = dict(self._identifier_cache)
-        filtered._encoding = dict(self._encoding)
+        filtered = self._derived_copy()
         filtered._cut_below_items = self._cut_below_items or self._cuts_below_items(keep)
         filtered._store = self._store.restrict(keep)
         filtered._is_filtered = True
@@ -2087,6 +2174,8 @@ class Metadata(Array, FeatureExtractor):
         to_level: FactorLevel,
         *exprs: pl.Expr,
         unique_by: FactorLevel | None = None,
+        empty: Any = None,
+        min_coverage: float = 0.0,
     ) -> Self:
         """Roll ``from_level``'s rows up into a new factor on each ``to_level`` row.
 
@@ -2113,6 +2202,20 @@ class Metadata(Array, FeatureExtractor):
             ``from_level``, and legal for ``from_level`` itself or any level above it —
             including one that is not below ``to_level``, which is what makes
             ``unique_by="unit"`` the answer for an instance-to-track roll-up.
+        empty : Any, default None
+            Answer for a ``to_level`` row with nothing beneath it. None leaves it null,
+            because an expression carries no identity element to fall back on — nothing
+            here can know that ``pl.len()`` of no rows is zero while ``pl.col(x).mean()``
+            of no rows is undefined. :meth:`aggregate` fills this in from the reduction's
+            name, which is the one thing the named form knows that this one does not; pass
+            it here to get the same answer from an expression.
+        min_coverage : float, default 0.0
+            Share of the rows beneath a ``to_level`` row that must carry a value for it to
+            get an answer rather than a null. The default summarizes whatever is there,
+            which is what this method has always done; ``1.0`` is the all-or-nothing rule,
+            at the granularity of one row. :meth:`aggregate` defaults to ``1.0`` instead,
+            because a reduction asked for by name is one whose inputs the caller has not
+            inspected.
 
         Returns
         -------
@@ -2154,34 +2257,472 @@ class Metadata(Array, FeatureExtractor):
         self._structure()
         if not exprs:
             raise ValueError("agg needs at least one expression, e.g. agg(from, to, pl.len().alias('n')).")
+        validate_coverage(min_coverage)
         source = self._resolve_level(from_level)
         target = self._resolve_level(to_level)
         unique = None if unique_by is None else self._resolve_level(unique_by)
         validate(self._store, source, target, exprs, unique)
+        rolled = aggregate(self._store, source, target, exprs, unique, empty=empty, min_coverage=min_coverage)
+        return self._write_rolled([(source, target, None, None, rolled, None)])
 
-        rolled = copy.copy(self)
-        rolled._factors = set(self._factors)
-        rolled._factor_cache = dict(self._factor_cache)
-        rolled._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
-        rolled._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
-        rolled._aggregated_from = dict(self._aggregated_from)
-        rolled._identifier_cache = dict(self._identifier_cache)
-        rolled._encoding = dict(self._encoding)
+    def aggregate(
+        self,
+        *factors: str | Aggregator,
+        level: FactorLevel | None = None,
+        how: str | Mapping[str, str] = "mean",
+        from_level: FactorLevel | None = None,
+    ) -> Self:
+        """Roll factors up into a level above them, by the name of the reduction.
 
-        store = self._store
+        The named form of :meth:`agg`. Where that one takes an expression and asks the
+        caller to know what the fan-out means, this takes a reduction's *name* — and a name
+        carries what an expression cannot: which value types it applies to, and what a
+        destination with nothing beneath it answers. ``"mean"`` over a class label is
+        refused before it is evaluated; ``"count"`` of an empty frame is zero, where
+        ``"mean"`` of one is null.
+
+        The source level is inferred per factor from the level that defines it, so a factor
+        is rolled up from where it was measured unless ``from_level`` says otherwise. That
+        inference is also what keeps the fan-out hazard off this surface entirely: a factor
+        read at its own level has no ancestor column to be weighted by.
+
+        Parameters
+        ----------
+        *factors : str or Aggregator
+            Factors to roll up, and complete declarations to run as given. A declaration
+            carries the modifiers this signature does not — ``via``, ``unique_by``, an
+            output suffix — which live in one place rather than two.
+        level : str or None, default None
+            Destination level, receiving one value per row. Required unless every argument
+            is an :class:`~dataeval.types.Aggregator`, which names its own.
+        how : str or Mapping[str, str], default "mean"
+            Reduction to apply. A mapping gives one per factor, and its keys are the
+            factors when none are named positionally.
+        from_level : str or None, default None
+            Roll up from this level instead of from each factor's own. The advanced case,
+            and the only way this surface can reach a fan-out, which is why
+            ``unique_by`` lives on :class:`~dataeval.types.Aggregator` rather than here.
+
+
+        Returns
+        -------
+        Metadata
+            A new metadata carrying the rolled-up factors at their destination. Neither
+            this instance nor the copy can see the other's later writes.
+
+        Raises
+        ------
+        ValueError
+            When ``how`` names no reduction; when no destination level is given and none
+            can be inferred; when a named factor is unknown, does not sit below the
+            destination, or holds values the reduction does not apply to; or when nothing
+            is left to roll up.
+
+        See Also
+        --------
+        :meth:`agg` : The expression-level form beneath this one
+        :class:`~dataeval.types.Aggregator` : A roll-up declared apart from running it
+
+        Notes
+        -----
+        **Coverage is strict by default here.** ``min_coverage`` is not a keyword on this
+        method — it lives on :class:`~dataeval.types.Aggregator` and defaults to ``1.0``,
+        which is all-or-nothing: a destination whose rows did not *all* record a value
+        answers null rather than summarizing the rest. That is the conservative reading for
+        a reduction asked for by name, whose inputs the caller has not necessarily
+        inspected, and it is the opposite of :meth:`agg`'s default.
+        :attr:`last_aggregation` reports the lowest coverage each output saw, which is the
+        threshold that would have been answerable; pass an
+        :class:`~dataeval.types.Aggregator` to ask for it.
+
+        A rolled-up factor is named ``f"{factor}_{how}"``, and gains ``_via_{via}`` where a
+        declaration routes it through a branch of the level graph.
+        :class:`~dataeval.types.FactorInfo` records the level a factor was rolled up
+        *from* and deliberately not what was done to it, so the name is the only durable
+        record of the operation — which is why the route appears in it.
+
+        Factors defined at different levels fan out to one grouping each. A destination fed
+        from two levels is genuinely two roll-ups, and is done as two.
+
+        Every *factor* can be rolled up, not only the ones the current view admits into
+        factor analysis. Whether a per-track factor is readable on detection rows is a
+        question about *this* view; whether it can be averaged over a sequence is a question
+        about the store, and the second does not depend on the first.
+
+        Reserved columns are not factors and are not reachable here — ``class_label`` among
+        them. A coarse class factor comes from :meth:`agg`, which reads the store's columns
+        directly: ``agg("instance", "unit",
+        pl.col("class_label").mode().first().alias("dominant"))``. A class axis named by
+        :meth:`classed_by` *is* a factor, and does roll up.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> metadata = Metadata(dataset)
+        >>> per_detection = np.full(metadata.level_counts["instance"], 2.0)
+        >>> metadata.add_factors({"box_area": per_detection}, level="instance")
+
+        Roll a per-detection measurement up to one value per image.
+
+        >>> rolled = metadata.aggregate("box_area", level="unit", how="mean")
+        >>> rolled.at("unit").rows_at("unit")["box_area_mean"].to_list()[:3]
+        [2.0, 2.0, 2.0]
+
+        ``count`` answers zero for an image holding no detections where ``mean`` answers
+        null, because the identity element is the reduction's to know and not the caller's.
+
+        >>> counted = metadata.aggregate("box_area", level="unit", how="count")
+        >>> counted.at("unit").rows_at("unit")["box_area_count"].sum()
+        93
+        """
+        self._structure()
+        target = None if level is None else self._resolve_level(level)
+        source = None if from_level is None else self._resolve_level(from_level)
+        return self._write_rolled(self._rolled_batches(self._declarations(factors, target, how, source)))
+
+    def _replay_aggregations(self) -> None:
+        """Re-run the roll-ups this metadata carries, onto the walk that has just finished.
+
+        In the order they were declared, because a roll-up onto a level can read a column
+        an earlier one wrote there — two levels of aggregation are two entries, and the
+        second is only answerable once the first has run. Written onto this instance rather
+        than onto a copy: nothing is being asked here, the walk is simply finishing.
+
+        Each declaration is resolved again rather than trusted. It carries what it fitted
+        to the dataset it came from, and resolving checks that against *this* one: the
+        factor still exists, and the reduction still applies to what it holds.
+        """
+        if not (declared := list(dict.fromkeys(self._aggregations.values()))):
+            return
+        # Cleared first so the replay records them afresh under the names this dataset
+        # gives them, which a collision could make differ from the names it came with.
+        self._aggregations = {}
+        for aggregator in declared:
+            try:
+                batches = self._rolled_batches([aggregator])
+            except ValueError as unanswerable:
+                # A dataset that cannot answer a carried roll-up is not a broken dataset,
+                # and refusing to build the metadata over it would make `new()` unusable
+                # for the ordinary case where the factor was one the caller added rather
+                # than one the walk found. Said out loud, because a column quietly missing
+                # from a pipeline that expects it is the failure this record exists to
+                # prevent.
+                _logger.warning(
+                    "Not replaying the %r roll-up of %s into %r on this dataset: %s",
+                    aggregator.how,
+                    list(aggregator.factors),
+                    aggregator.target,
+                    unanswerable,
+                )
+                continue
+            self._write_rolled(batches, target=self)
+
+    def _rolled_batches(self, declarations: Sequence[Aggregator]) -> list[_Batch]:
+        """Resolve declarations against this dataset and run each grouping they come to.
+
+        Shared by :meth:`aggregate` and by the replay, so a roll-up asked for and the same
+        roll-up read back off a record cannot take different paths to the same column.
+        """
+        levels: dict[str, FactorLevel] = {
+            name: level for level, names in self._factors_by_level.items() for name in names
+        }
+        dtypes = {name: self._store.dtype_of(name) for name in levels}
+        native: dict[FactorLevel, frozenset[str]] = {
+            level: frozenset(self._store.frame(level).columns) for level in self._store.frames
+        }
+        batches: list[_Batch] = []
+        for declaration in declarations:
+            for one in resolve(declaration, self._levels, levels, dtypes, native):
+                for ready in self._with_tolerance(one):
+                    exprs = expressions(ready)
+                    validate(self._store, ready.rolls_from, ready.target, exprs, ready.unique_by, ready.via)
+                    batches.append((
+                        ready.rolls_from,
+                        ready.target,
+                        ready.how,
+                        ready.via,
+                        aggregate(
+                            self._store,
+                            ready.rolls_from,
+                            ready.target,
+                            exprs,
+                            ready.unique_by,
+                            ready.via,
+                            identity_of(ready),
+                            coverage_for(ready),
+                            ready.order_by,
+                        ),
+                        ready,
+                    ))
+        return batches
+
+    def _with_tolerance(self, aggregator: Aggregator) -> list[Aggregator]:
+        """Fix a tolerance to the distance it resolves to, one aggregator per factor.
+
+        A tolerance says how close two consecutive readings have to be to count as
+        unchanged, and the useful way to say it is relative — ``("iqr", (None, 1.5))``
+        transfers between datasets where ``("constant", (None, 0.1))`` is a number somebody
+        measured once. Relative to *what* is the choice that matters: the changes the factor
+        actually shows, pooled across every destination this roll-up produces, so the runs
+        it finds are comparable between them.
+
+        Reading that off the data makes the result a fit, so it comes back
+        ``provenance="derived"`` carrying the number rather than the recipe — and one
+        aggregator per factor, because the number is that factor's.
+
+        A tolerance that is **already a number** is that fit, handed back to be replayed,
+        and is reused rather than refitted. Re-resolving it read the fitted distance as a
+        fresh :data:`~dataeval.protocols.ThresholdLike` — where a bare number means a
+        multiplier on the default — so replaying the aggregator this method returns, which
+        is exactly what recording one is for, raised instead of reapplying it. The bare
+        number a *caller* writes never reaches here: ``resolve`` refuses it on a declaration.
+        """
+        spec = tolerance_of(aggregator)
+        if spec is None or (not isinstance(spec, bool) and isinstance(spec, int | float)):
+            return [aggregator]
+        return [
+            with_tolerance(aggregator, factor, self._fitted_distance(aggregator, factor, spec))
+            for factor in aggregator.factors
+        ]
+
+    def _fitted_distance(self, aggregator: Aggregator, factor: str, spec: Any) -> float:
+        """Resolve one factor's tolerance against the changes it shows, or say why it cannot."""
+        deltas = successive_differences(
+            self._store, aggregator.rolls_from, aggregator.target, aggregator.via, factor, aggregator.rolls_by
+        )
+        if not deltas.size:
+            raise ValueError(
+                f"tolerance={spec!r} is relative to the changes {factor!r} shows between consecutive "
+                f"readings, and this dataset shows none to measure: no {aggregator.target!r} has two "
+                f"{aggregator.rolls_from!r} rows beneath it holding a value and an ordering to read "
+                f"them in. Name the distance outright with ('constant', (None, <distance>)), which "
+                f"needs no sample to resolve.",
+            )
+        lower, upper = resolve_threshold(spec)(deltas)
+        if lower is not None:
+            raise ValueError(
+                f"tolerance={spec!r} names a lower bound as well as an upper one, but "
+                '"close enough to count as unchanged" has only one side. Write it as '
+                "(None, upper).",
+            )
+        # Not ``is None`` alone: a z-score over changes with no spread resolves to NaN, and a
+        # NaN tolerance is not a loose bound but a silent one -- every comparison against it
+        # is False, so nothing breaks a run and each destination reports its whole length as
+        # one unbroken stretch.
+        if upper is None or not np.isfinite(upper):
+            raise ValueError(
+                f"tolerance={spec!r} resolves to {upper!r} against the changes {factor!r} shows, so it "
+                f"says nothing about which of them count as unchanged -- which is what a relative "
+                f"tolerance answers when those changes have no spread to be relative to. Name the "
+                f"distance outright with ('constant', (None, <distance>)).",
+            )
+        return float(upper)
+
+    @staticmethod
+    def _declarations(
+        factors: Sequence[str | Aggregator],
+        target: FactorLevel | None,
+        how: str | Mapping[str, str],
+        source: FactorLevel | None,
+    ) -> list[Aggregator]:
+        """Turn one call's arguments into the declarations it asks for.
+
+        Aggregators passed in are already declarations and are taken as they stand. Names
+        are grouped by the reduction they were given, so a mapping asking for a mean of one
+        factor and a mode of another becomes two declarations rather than two calls. Naming
+        no factor at all is the *rule* form — every factor the reduction admits — which is
+        the one shape that needs no names and still needs a destination.
+
+        Raises
+        ------
+        ValueError
+            When a destination is needed and none was given, or when a mapping does not
+            cover every factor named alongside it.
+        """
+        declared = [factor for factor in factors if isinstance(factor, Aggregator)]
+        named = [factor for factor in factors if isinstance(factor, str)]
+        by_how = Metadata._by_reduction(named, how, bool(declared))
+        if by_how and target is None:
+            raise ValueError(
+                "aggregate needs a destination level, e.g. aggregate(..., level='unit'). Only a "
+                "call made entirely of Aggregators can leave it out, since each names its own.",
+            )
+        return [*declared, *(Aggregator(one, source, target, tuple(names)) for one, names in by_how.items())]  # type: ignore[arg-type]
+
+    @staticmethod
+    def _by_reduction(named: Sequence[str], how: str | Mapping[str, str], has_declared: bool) -> dict[str, list[str]]:
+        """Group the factors a call names by the reduction it asked for them.
+
+        A mapping is the only form that can ask for two reductions at once, and its keys
+        stand in for the factor names when none were given positionally. Naming nothing at
+        all — and passing no aggregator either — is the rule form, which is one group with
+        no factors in it.
+        """
+        if not isinstance(how, Mapping):
+            return {how: list(named)} if named or not has_declared else {}
+        if uncovered := [name for name in named if name not in how]:
+            raise ValueError(
+                f"aggregate was given a reduction per factor, but {uncovered} are not among its "
+                f"keys {sorted(how)}. Name every factor it should cover, or pass a single "
+                "reduction for all of them.",
+            )
+        grouped: dict[str, list[str]] = {}
+        for name in named or list(how):
+            grouped.setdefault(how[name], []).append(name)
+        return grouped
+
+    def _derived_copy(self) -> Self:
+        """Copy this metadata, sharing the store and owning everything mutable around it.
+
+        The store is immutable, so a derived instance shares it safely. What it must *not*
+        share is any container describing how this instance reads that store: the factor
+        set, the binning cache, the drop reasons, the encodings, and the caller's own
+        declarations. One of those left shared and the two instances write over each
+        other's answers, which is the guarantee :meth:`at`, :meth:`classed_by`,
+        :meth:`where`, :meth:`having`, :meth:`agg`, :meth:`aggregate` and :meth:`reencode`
+        all state in their own words.
+
+        One implementation rather than five. The five hand-written copies had drifted to the
+        same three omissions — ``exclude``, ``include`` and ``continuous_factor_bins`` were
+        shared by every one of them, so ``md.at("unit").exclude.add("brightness")`` dropped
+        a factor from the *source* too. They are caller declarations rather than derived
+        state, which is exactly why nothing internal noticed: every setter rebinds its field
+        instead of mutating it, so the leak was reachable only by mutating what the getter
+        hands back.
+
+        A caller that wants the copy to differ overrides after — :meth:`reencode` replaces
+        two of these fields, and takes the copy first so the rest are still its own.
+        """
+        derived = copy.copy(self)
+        derived._factors = set(self._factors)
+        derived._factor_cache = dict(self._factor_cache)
+        derived._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
+        derived._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
+        derived._aggregated_from = dict(self._aggregated_from)
+        derived._identifier_cache = dict(self._identifier_cache)
+        derived._encoding = dict(self._encoding)
+        derived._exclude = set(self._exclude)
+        derived._include = set(self._include)
+        derived._continuous_factor_bins = dict(self._continuous_factor_bins)
+        derived._aggregations = dict(self._aggregations)
+        # ``index2label`` hands this dict straight back, so sharing it let a writer on a
+        # derived view rename a class on the instance it came from and on every other view
+        # of it. Guarded because ``_structure`` is what builds it, and :meth:`new` takes a
+        # copy of an instance that has not been walked yet.
+        if (labels := getattr(self, "_index2label", None)) is not None:
+            derived._index2label = dict(labels)
+        return derived
+
+    def _write_rolled(
+        self,
+        batches: Sequence[_Batch],
+        target: "Self | None" = None,
+    ) -> Self:
+        """Write rolled-up columns onto a copy, one batch per grouping that produced them.
+
+        Shared by :meth:`agg`, which always has one batch, and :meth:`aggregate`, which has
+        one per source level — a sequence-level roll-up over factors living at ``unit`` and
+        at ``track`` is two groupings and lands as two batches. Names are resolved against
+        everything written so far rather than against the store as it was, so two batches
+        cannot claim the same column.
+
+        The record for each batch is built *here* rather than where the columns were
+        computed, because only this point knows what the columns ended up being called: a
+        name that collided is renamed on its way in, and a record naming the name that was
+        asked for would point at no column.
+        """
+        # ``target`` is this instance itself when a stored roll-up is being replayed onto
+        # a metadata that has just walked its dataset: there is no question being asked, so
+        # there is nothing to take a copy for.
+        rolled = self._derived_copy() if target is None else target
+        store = rolled._store
         taken = set(store.columns)
         added: list[tuple[str, FactorLevel]] = []
-        for series in aggregate(self._store, source, target, exprs, unique):
-            name = self._resolve_factor_name(series.name, taken, overwrite=False, append_string="_agg")
-            taken.add(name)
-            store = store.with_column(target, series.rename(name))
-            rolled._aggregated_from[name] = source
-            added.append((name, target))
+        records: list[AggregationRecord] = []
+        for source, destination, how, via, batch, declared in batches:
+            outputs: list[str] = []
+            for series in batch.columns:
+                name = self._resolve_factor_name(series.name, taken, overwrite=False, append_string="_agg")
+                taken.add(name)
+                store = store.with_column(destination, series.rename(name))
+                rolled._aggregated_from[name] = source
+                added.append((name, destination))
+                outputs.append(name)
+                if declared is not None:
+                    # Keyed on the name it produced, so declaring the same roll-up twice
+                    # replaces its entry where it stands rather than appending a second
+                    # column, and the order of the whole is the order it has to be
+                    # replayed in — a roll-up onto a level can read a column an earlier
+                    # one put there.
+                    rolled._aggregations[name] = declared
+            records.append(
+                AggregationRecord(
+                    source=source,
+                    target=destination,
+                    how=how,
+                    via=via,
+                    outputs=tuple(outputs),
+                    took_part=batch.took_part,
+                    no_ancestor=batch.no_ancestor,
+                    childless=batch.childless,
+                    coverage=batch.coverage,
+                    uncovered=batch.uncovered,
+                    gaps=batch.gaps,
+                ),
+            )
+        rolled._last_aggregation = tuple(records)
+        _announce_aggregation(records)
         rolled._store = store
         rolled._register_factor_levels(added)
         rolled._is_binned = False
         rolled._build_factors()
         return rolled
+
+    @property
+    def last_aggregation(self) -> Sequence[AggregationRecord]:
+        """What the most recent roll-up on this metadata reached, one record per grouping.
+
+        Empty on a metadata no roll-up produced, and replaced wholesale by each roll-up, so
+        a chained one reports only its last step.
+
+        A metadata derived from one — by :meth:`at`, :meth:`where` or :meth:`having` —
+        carries the records forward unchanged, so they describe the roll-up **as it ran**
+        rather than the rows that survived: a filter that removes the destinations a record
+        counted leaves the counts describing rows that are no longer there. Records are also
+        not part of the save format, so a loaded metadata keeps the rolled-up columns and
+        their :attr:`~dataeval.types.FactorInfo.aggregated_from` without the counts that
+        explain them.
+
+        A rolled-up column cannot explain its own nulls, and there are three reasons it
+        might hold one. These records are how the answer stays attached to the result:
+        ``no_ancestor`` for rows a routed roll-up never reached, ``childless`` for
+        destinations with nothing beneath them, and ``coverage`` for the ones whose rows
+        did not record enough values to clear ``min_coverage``.
+
+        Returns
+        -------
+        Sequence[AggregationRecord]
+            One record per grouping the roll-up performed, in the order it performed them.
+
+        See Also
+        --------
+        :meth:`aggregate` : Roll factors up by name
+        :meth:`agg` : The expression-level form beneath it
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> metadata = Metadata(dataset)
+        >>> areas = np.full(metadata.level_counts["instance"], 2.0)
+        >>> metadata.add_factors({"box_area": areas}, level="instance")
+        >>> rolled = metadata.aggregate("box_area", level="unit", how="mean")
+        >>> record = rolled.last_aggregation[0]
+        >>> record.source, record.target, record.how
+        ('instance', 'unit', 'mean')
+        >>> record.coverage_of("box_area_mean")
+        1.0
+        """
+        return self._last_aggregation
 
     @property
     def is_filtered(self) -> bool:
@@ -2723,16 +3264,7 @@ class Metadata(Array, FeatureExtractor):
         --------
         accept : Fix a derived placement instead of re-deriving it.
         """
-        fresh = copy.copy(self)
-        # The same copy discipline as :meth:`at`: everything mutable this instance reads
-        # the store through is owned, or the "this one is untouched" promise above holds
-        # only for the two containers that happened to be rebuilt.
-        fresh._factors = set(self._factors)
-        fresh._factor_cache = dict(self._factor_cache)
-        fresh._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
-        fresh._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
-        fresh._aggregated_from = dict(self._aggregated_from)
-        fresh._identifier_cache = dict(self._identifier_cache)
+        fresh = self._derived_copy()
         # Both spellings of a declaration, or neither. ``continuous_factor_bins`` is as much
         # a cut somebody chose as a ``BinSpec`` is, and it is consulted on the re-derived
         # pass, so leaving it in place made ``keep_declared=False`` keep half the
@@ -3574,7 +4106,7 @@ class Metadata(Array, FeatureExtractor):
         if self._dataset is None:
             raise NotFittedError("No dataset bound. Call bind() first.")
 
-        structurer = select_structurer(self._dataset, self._task)
+        structurer = select_structurer(self._dataset, self._task, partial_factors=self._partial_factors)
         datum_count = len(self._dataset) if isinstance(self._dataset, Sized) else 0
         _logger.info("Processing metadata for %d dataset items using %r", datum_count, structurer)
 
@@ -3622,6 +4154,7 @@ class Metadata(Array, FeatureExtractor):
         # columns the store already holds, and the properties read them from there.
         self._dropped_factors = {name: list(reasons) for name, reasons in data.dropped_factors.items()}
         self._is_structured = True
+        self._replay_aggregations()
 
         self._build_factors()
 
@@ -3672,6 +4205,30 @@ class Metadata(Array, FeatureExtractor):
         here is read off the factor's true distribution.
         """
         data = _as_orderable(data)
+        codes, info = self._encode_factor(col, data, factor_bins)
+        # Counted once, off the values, rather than per path off the codes: every path
+        # reserves a code for absence but they reserve different ones, and a reader asking
+        # "how much of this factor was actually recorded" should not have to know which
+        # path ran to find out.
+        info.missing = int(missing_mask(data).sum())
+        if info.missing:
+            _logger.info(
+                "%s of %s rows recorded no value for %r. They hold its encoding's reserved missing "
+                "code, which no evaluator reads differently from any other, so they are scored as a "
+                "group of their own rather than left out.",
+                info.missing,
+                data.shape[0],
+                col,
+            )
+        return codes, info
+
+    def _encode_factor(
+        self,
+        col: str,
+        data: NDArray,
+        factor_bins: Mapping[str, int | Sequence[float]],
+    ) -> tuple[NDArray[np.int64], FactorInfo]:
+        """Choose and apply one factor's encoding, by whichever of the four routes fits."""
         # A recorded encoding is reapplied rather than re-derived. That is the whole of
         # what a descriptor buys: the same value gets the same code in a dataset the cut
         # was never fitted to, so two Metadata built from one record share an alphabet.
@@ -3682,6 +4239,8 @@ class Metadata(Array, FeatureExtractor):
             binned, spec = digitize_data(data, factor_bins[col])
             return binned.astype(np.int64), FactorInfo("continuous", is_binned=True, encoding=spec)
 
+        if not np.issubdtype(data.dtype, np.number):
+            return self._classify_categorical(data)
         distinct, ordinal = np.unique(data, return_inverse=True)
         # No de-duplication argument: one value per entity means no propagated repeats
         # for is_continuous to mistake for discrete support.
@@ -3691,10 +4250,32 @@ class Metadata(Array, FeatureExtractor):
         # a reader sorting the values would expect. The record is what makes that order
         # survive: extending a factor appends to `levels` rather than re-sorting, which is
         # the one thing that keeps a code meaning what it meant.
-        if not np.issubdtype(data.dtype, np.number):
+        return self._classify_numeric(col, data, distinct, ordinal, budget)
+
+    @staticmethod
+    def _classify_categorical(data: NDArray) -> tuple[NDArray[np.int64], FactorInfo]:
+        """Digitize an unordered factor, reserving a code for the rows that recorded nothing.
+
+        A missing value has no place in a *vocabulary*: it is not one of the values the
+        factor takes, and giving it a level would make "not recorded" mean something
+        different for every factor. It takes :attr:`~dataeval.types.LevelSpec.missing_code`
+        instead, which is the same answer the binning path gives a missing number.
+
+        Split out from the ordered path because ``np.unique`` cannot sort ``None`` against a
+        string at all — it raises rather than answering — so a partly recorded string factor
+        had no way through here. Only :attr:`~dataeval.Metadata.partial_factors` can produce
+        one, which is why this arrived with it.
+        """
+        missing = missing_mask(data)
+        if not missing.any():
+            distinct, ordinal = np.unique(data, return_inverse=True)
             spec = LevelSpec(levels=tuple(distinct.tolist()), provenance="derived")
             return ordinal.astype(np.int64), FactorInfo("categorical", is_digitized=True, encoding=spec)
-        return self._classify_numeric(col, data, distinct, ordinal, budget)
+        distinct, present = np.unique(data[~missing], return_inverse=True)
+        spec = LevelSpec(levels=tuple(distinct.tolist()), provenance="derived")
+        codes = np.full(data.shape[0], spec.missing_code, dtype=np.int64)
+        codes[~missing] = present
+        return codes, FactorInfo("categorical", is_digitized=True, encoding=spec)
 
     def _classify_numeric(
         self,
@@ -3718,7 +4299,7 @@ class Metadata(Array, FeatureExtractor):
         # entity and still read as discrete, and scoring one value at a time is what makes
         # such a factor report a correlation with anything it is measured against. Bin it
         # against the same budget a histogram would use.
-        levels = int(distinct.size)
+        levels = int((~missing_mask(distinct)).sum())
         if levels > budget:
             _logger.warning(
                 f"Factor {col} reads as discrete but takes {levels} distinct values over "
@@ -3730,8 +4311,21 @@ class Metadata(Array, FeatureExtractor):
             return binned.astype(np.int64), FactorInfo("discrete", is_binned=True, encoding=spec)
         # Digitized so factor_data holds non-negative integers, which np.bincount in the
         # downstream bias evaluators requires.
-        spec = LevelSpec(levels=tuple(distinct.tolist()), provenance="derived")
-        return ordinal.astype(np.int64), FactorInfo("discrete", is_digitized=True, encoding=spec)
+        #
+        # Absence is not one of the values, here as on the categorical and binned paths.
+        # Left in the vocabulary it was a level named "nan" sitting among real ones, it
+        # made `missing_code` unreachable on the one path of three that never produced it,
+        # and it read as observed occupancy to anything measuring how well a cut fits.
+        # Nothing is renumbered by taking it out: `np.unique` collapses NaN to one entry
+        # and sorts it last, so the code it already held is the code `missing_code` names.
+        missing = missing_mask(data)
+        if not missing.any():
+            spec = LevelSpec(levels=tuple(distinct.tolist()), provenance="derived")
+            return ordinal.astype(np.int64), FactorInfo("discrete", is_digitized=True, encoding=spec)
+        spec = LevelSpec(levels=tuple(distinct[~missing_mask(distinct)].tolist()), provenance="derived")
+        codes = ordinal.astype(np.int64)
+        codes[missing] = spec.missing_code
+        return codes, FactorInfo("discrete", is_digitized=True, encoding=spec)
 
     def _process_factor(
         self,

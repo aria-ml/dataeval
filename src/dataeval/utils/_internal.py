@@ -603,7 +603,7 @@ def _flatten_for_merge(
     ignore_lists: bool,
     fully_qualified: bool,
     targets: int | None,
-) -> tuple[dict[str, list[Any]] | dict[str, Any], dict[str, list[str]]]:
+) -> tuple[dict[str, list[Any]] | dict[str, Any], int, dict[str, list[str]]]:
     flattened, image_repeats, dropped_inner = flatten_metadata(
         metadatum,
         return_dropped=True,
@@ -621,7 +621,40 @@ def _flatten_for_merge(
             )
         if targets != image_repeats:
             flattened = {k: [v] * targets for k, v in flattened.items()}
-    return flattened, dropped_inner
+        image_repeats = targets
+    return flattened, image_repeats, dropped_inner
+
+
+def _was_dropped(column: str, dropped: Mapping[str, set[DropReason]], sep: str = "_") -> bool:
+    """Whether a merged column's key names a path some entry dropped.
+
+    ``dropped`` is keyed by the full path a value was reached by and ``merged`` by the
+    shortened name given to the column, so the two only meet at the tail: a column named
+    ``y`` is the one dropped as ``objs_y``. Matching the whole trailing segment rather than
+    a bare substring keeps ``y`` from answering for ``entropy``.
+    """
+    return bool(dropped.get(column)) or any(
+        reasons and name.endswith(f"{sep}{column}") for name, reasons in dropped.items()
+    )
+
+
+def _simplify_present(values: list[Any]) -> list[Any]:
+    """Simplify the values an entry recorded, leaving the ones it did not as missing.
+
+    :func:`simplify_type` reads every element as a string, so a missing value reaches it as
+    ``None`` and comes back as the *string* ``"None"`` -- which then makes the whole column
+    a string column, since one string forces the widest type. Both are wrong for a column
+    that is simply incomplete: the absence stops being an absence, and the numbers that were
+    recorded stop being numbers.
+
+    Only the partial path routes through here, so a column with no missing values reaches
+    :func:`simplify_type` exactly as it always has.
+    """
+    if not any(value is None for value in values):
+        return simplify_type(values)
+    present = simplify_type([value for value in values if value is not None])
+    filled = iter(present)
+    return [None if value is None else next(filled) for value in values]
 
 
 def _merge(  # noqa: C901
@@ -629,27 +662,65 @@ def _merge(  # noqa: C901
     ignore_lists: bool,
     fully_qualified: bool,
     targets_per_image: Sequence[int] | None,
+    keep_partial: bool = False,
 ) -> tuple[dict[str, list[Any]], dict[str, set[DropReason]]]:
     merged: dict[str, list[Any]] = {}
     isect: set[str] = set()
     union: set[str] = set()
     dropped: dict[str, set[DropReason]] = {}
+    rows = 0
     for i, d in enumerate(dicts):
         targets = None if targets_per_image is None else targets_per_image[i]
         if targets == 0:
             continue
-        flattened, dropped_inner = _flatten_for_merge(d, ignore_lists, fully_qualified, targets)
+        flattened, size, dropped_inner = _flatten_for_merge(d, ignore_lists, fully_qualified, targets)
+        if not size:
+            # An entry that flattens to no rows contributes no values, the same way one
+            # holding no targets is skipped above. Its scalars have nothing to attach to:
+            # appending them anyway advanced a column past `rows`, leaving the merged
+            # columns describing different row counts.
+            for k, v in dropped_inner.items():
+                dropped.setdefault(k, set()).update({DropReason(vv) for vv in v})
+            continue
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
         union.update(flattened.keys())
         for k, v in dropped_inner.items():
             dropped.setdefault(k, set()).update({DropReason(vv) for vv in v})
         for k, v in flattened.items():
-            merged.setdefault(k, []).extend(flattened[k]) if isinstance(v, list) else merged.setdefault(k, []).append(v)
+            column = merged.setdefault(k, [])
+            if keep_partial and len(column) < rows:
+                # First sight of a key some earlier entry did not carry: it owes one
+                # missing value for every row already merged, or it would line up against
+                # the wrong entries from here on.
+                column.extend([None] * (rows - len(column)))
+            column.extend(v) if isinstance(v, list) else column.append(v)
+        rows += int(size)
+        if keep_partial:
+            for column in merged.values():
+                column.extend([None] * (rows - len(column)))
 
-    for k in union - isect:
-        dropped.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
+    if not keep_partial:
+        for k in union - isect:
+            dropped.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
 
-    merged = {k: simplify_type(v) for k, v in merged.items() if k in isect}
+    # An entry that declared none of a key contributes missing values for it rather than
+    # costing every other entry the key -- but only for a key whose *only* problem is that
+    # absence. One dropped for a reason of its own, a nested list among them, stays dropped:
+    # keeping it would resurrect values that were never usable.
+    # Under `keep_partial` a key absent from some entries is never marked at all -- the
+    # `union - isect` pass above is skipped -- so every reason still standing here came from
+    # `flatten_metadata`, which means the key was unusable *within* one entry. Keeping it
+    # rebuilt a column the entry could not fill, and the targets that did record a value
+    # lost it to the padding rather than keeping it.
+    #
+    # Matched by suffix because the two dicts are keyed in different namespaces: `merged`
+    # carries the shortened name `flatten_metadata` chose for the column, `dropped` always
+    # carries the full path it was reached by. On the all-or-nothing path the `union - isect`
+    # pass hides the mismatch by re-dropping the short name; here nothing does, so `y` went
+    # looking for itself under `objs_y` and did not find it.
+    kept = {k for k in merged if not _was_dropped(k, dropped)} if keep_partial else isect
+    simplify = _simplify_present if keep_partial else simplify_type
+    merged = {k: simplify(v) for k, v in merged.items() if k in kept}
     return merged, dropped
 
 
@@ -662,6 +733,7 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
+    keep_partial: bool = False,
 ) -> tuple[dict[str, list[Any]], dict[str, list[str]]]: ...
 
 
@@ -674,6 +746,7 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
+    keep_partial: bool = False,
 ) -> dict[str, list[Any]]: ...
 
 
@@ -686,6 +759,7 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
+    keep_partial: bool = False,
 ) -> tuple[dict[str, NDArray[Any]], dict[str, list[str]]]: ...
 
 
@@ -698,6 +772,7 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
+    keep_partial: bool = False,
 ) -> dict[str, NDArray[Any]]: ...
 
 
@@ -709,6 +784,7 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
+    keep_partial: bool = False,
 ):
     """
     Merge a collection of metadata dictionaries into a single flattened dictionary.
@@ -730,6 +806,17 @@ def merge_metadata(
         Option to return dictionary keys full qualified instead of minimized
     targets_per_image : Sequence[int] or None, default None
         Number of targets for each image metadata entry
+    keep_partial : bool, default False
+        Keep a key only some entries declare, giving the entries that did not declare it a
+        missing value. By default such a key is dropped for every entry, which is the
+        conservative reading -- a factor present for half a dataset can mislead an analysis
+        that does not know it is half absent -- but it discards the half that was recorded,
+        which for a large dataset with one incomplete entry is the whole factor.
+
+        This covers a key some *entries* do not declare. A key inconsistent among the
+        targets *within* one entry is still dropped either way: by the time the mismatch is
+        seen, the values have been flattened into a short list, and which targets it came
+        from is no longer recoverable.
 
     Returns
     -------
@@ -741,7 +828,9 @@ def merge_metadata(
     Notes
     -----
     Nested lists of values and inconsistent keys are dropped in the merged
-    metadata dictionary
+    metadata dictionary, unless ``keep_partial`` asks for the inconsistent ones to be
+    kept with missing values. A nested list is dropped either way: it has no usable
+    values to keep.
 
     Example
     -------
@@ -757,7 +846,7 @@ def merge_metadata(
     if targets_per_image is not None and len(dicts) != len(targets_per_image):
         raise ValueError("Number of targets per image must be equal to number of metadata entries.")
 
-    merged, dropped = _merge(dicts, ignore_lists, fully_qualified, targets_per_image)
+    merged, dropped = _merge(dicts, ignore_lists, fully_qualified, targets_per_image, keep_partial)
 
     output: dict[str, Any] = {k: np.asarray(v) for k, v in merged.items()} if return_numpy else merged
 

@@ -194,10 +194,13 @@ invented value.
 
 **A row may have one parent and not the other.** A detection that no tracker
 linked — conventionally `track_id == -1` — sits in a frame but belongs to no
-track. Per-track factors are null on it. A column that is partly null cannot be
-binned, because discretizing means ordering the values and `None` does not order
-against a number, so such a factor is left out of factor analysis at the instance
-level. Read at its own level, via `md.at("track")`, it is complete and usable.
+track. Per-track factors are null on it, and that null is not a missing
+measurement: it is the statement that this row has no such ancestor. A factor
+that cannot describe every row of a view is left out of factor analysis at that
+view rather than analysed against rows it says nothing about. Read at its own
+level, via `md.at("track")`, it is complete and usable — and it can be rolled up
+into `sequence` (below) whatever the current view happens to be, because that is
+a question about the data rather than about the view.
 
 ```{note}
 Both consequences are visible rather than silent. A factor excluded from factor
@@ -314,8 +317,12 @@ Two rules govern what `agg` will accept.
 
 **A row with no ancestor at the target level takes no part.** An untracked
 detection belongs to no track, so it is neither counted by one nor averaged into
-one. Conversely a target row with nothing beneath it answers **null, not zero** —
+one. Conversely a target row with nothing beneath it answers **null** by default —
 nothing was measured there, which is a different statement from measuring zero.
+An expression carries no identity element to fall back on, so `agg` cannot know
+that `pl.len()` of no rows is zero while `pl.col(x).mean()` of no rows is
+undefined; pass `empty=` to say which it is. {meth}`.Metadata.aggregate`, below,
+knows it from the reduction's name.
 
 **Aggregating an inherited factor requires `unique_by=`.** This is the
 replication problem from the top of this page, arriving from the other direction.
@@ -335,6 +342,191 @@ md.agg("instance", "track", pl.col("unit_brightness").mean(), unique_by="unit")
 Counting rows never trips this, because `pl.len()` reads no columns at all — so
 "how many detections are under this?" is always a question about the source
 level itself.
+
+### Naming the summary: `aggregate`
+
+{meth}`.Metadata.agg` takes an expression and asks you to know what it means.
+{meth}`.Metadata.aggregate` takes the **name** of a reduction, and a name carries
+things an expression cannot:
+
+```python
+rolled = md.aggregate("instance_brightness", level="sequence", how="mean")
+# adds `instance_brightness_mean`, one value per video
+```
+
+The source level is inferred from where each factor is defined, so you say what
+you want and where, not where each number happens to live. Naming several
+factors at different levels is fine — a `sequence` destination fed from `unit`
+and from `track` is genuinely two roll-ups, and is done as two.
+
+A mapping asks for a different reduction per factor, and its keys are the factors
+when none are named:
+
+```python
+md.aggregate(level="unit", how={"instance_brightness": "mean", "occlusion": "mode"})
+```
+
+Naming no factor at all is a **rule** rather than a request: every factor below
+the destination that the reduction applies to.
+
+```python
+md.aggregate(level="sequence", how="mean")  # every numeric factor below `sequence`
+```
+
+The **positional** reductions — the ones that read a bag of values and do not care
+what order they arrive in — are `count`, `n_unique`, `sum`, `mean`, `median`,
+`std`, `var`, `min`, `max`, `mode`, `first`, `last`, `any` and `all`.
+
+### Reading a level as a series
+
+Four more are **temporal**: they are functions of the ordered series rather than
+of the bag, so they need an ordering to exist at all.
+
+- `variability` — mean absolute change per unit of the ordering key. A *rate*, so
+  a series with a frame missing from the middle is not twice as jittery for it.
+  Distinct from `var`, which is order-invariant: a slow illumination drift and a
+  strobing feed can have identical variance and wildly different variability.
+- `trend` — least-squares slope of the values against the ordering key, in units
+  per key unit.
+- `changes` — transitions between consecutive distinct values.
+- `longest_run` — longest consecutive stretch of one value, or of values within
+  `options={"tolerance": ...}` of the last.
+
+The ordering column is inferred from the source level, preferring a wall-clock
+`time_s` over a presentation `pts` over a position, and only a column the level
+holds *itself* is eligible. Name one with `order_by=` on an
+{class}`.Aggregator`. A level that carries no ordering is **refused** rather than
+run against row order, which is an artifact of the walk and not time — so a
+named factor at such a level raises, and the rule form passes the level over.
+
+```python
+from dataeval.types import Aggregator
+
+md.aggregate(Aggregator("variability", "unit", "sequence", ("brightness",)))
+md.aggregate(
+    Aggregator("longest_run", "unit", "sequence", ("brightness",), options={"tolerance": ("iqr", (None, 1.5))})
+)
+```
+
+A tolerance is a {data}`.ThresholdLike`, so a bare number means a multiplier on
+the default rather than a distance; say which you mean —
+`("constant", (None, 0.1))` for 0.1 in the factor's own units, or
+`("iqr", (None, 1.5))` for 1.5 times the spread of the changes actually
+observed. A relative one is read off the data, which makes the resolved
+aggregator a fit: it comes back carrying the number rather than the recipe, so
+replaying it against a second dataset reuses it instead of re-deriving a
+different one.
+
+`changes` and `longest_run` count positions, so an uneven ordering key distorts
+them — a reading that was never taken is not in the series at all, and a run
+reads straight through where it would have been.
+{attr}`.AggregationRecord.gaps` counts the steps larger than the tightest one,
+and DataEval says so at info level.
+
+**A name states which values it is about.** `mean` over a class label is a
+category error that an expression would compute anyway and hand back as a
+number. Asked for by name, it is refused before evaluation, and the refusal says
+what would have worked:
+
+```python
+# `occlusion` is a per-detection string factor
+md.aggregate("occlusion", level="unit", how="mean")
+# ValueError: 'mean' does not apply to 'occlusion', whose values are String;
+# 'mean' takes numeric values. Reductions that apply to 'occlusion' are
+# ['count', 'first', 'last', 'max', 'min', 'mode', 'n_unique'].
+```
+
+A factor you *name* is a request, so a mismatch is refused. A factor selected by
+the rule form is filtered out instead, with a line at info level saying what was
+passed over — selecting is what the rule is for.
+
+**A name is asked for without inspecting its inputs, so it is strict by default.**
+`aggregate` applies `min_coverage=1.0`: a destination whose rows did not *all*
+record a value answers null rather than summarizing the rest. `agg` defaults the
+opposite way, because an expression is written by someone who has looked. Lower
+the threshold with an {class}`.Aggregator`, and read
+{attr}`.Metadata.last_aggregation` to see the coverage that would have been
+answerable.
+
+**A name states what an empty group answers.** `count`, `sum` and `n_unique`
+answer `0`; `any` answers `False` and `all` answers `True`; `mean`, `median`,
+`min`, `max`, `std`, `var`, `mode`, `first` and `last` answer null. A frame
+holding no detections genuinely has zero of them, and just as genuinely has no
+mean of anything — only the reduction knows which.
+
+**A name is the durable record of the operation.** A rolled-up factor is called
+`f"{factor}_{how}"`. {attr}`.FactorInfo.aggregated_from` records the level a
+factor was rolled up *from* and deliberately not what was done to it, so the name
+is what tells `brightness_mean` from `brightness_median`.
+
+Every *factor* can be rolled up, not only the ones the current view admits into
+factor analysis. Whether a per-track factor is readable on detection rows is a
+question about the view; whether it can be averaged over a sequence is a question
+about the data. Reserved columns such as `class_label` are not factors and are
+not reachable by name here — a coarse class factor comes from {meth}`.Metadata.agg`,
+which reads the store's columns directly.
+
+### Choosing a route through the diamond
+
+For a chain there is one way up and nothing to choose. On the tracking diamond a
+detection reaches its sequence two ways — through its frame, and through its
+track — and the two do not agree about untracked detections, because one branch
+has no answer for them.
+
+By default a roll-up takes **every** route, so it reaches a row wherever any
+branch does. `via=` narrows it to one branch:
+
+```python
+from dataeval.types import Aggregator
+
+md.aggregate(Aggregator("mean", "instance", "sequence", ("box_area",)))
+# every detection contributes, through its frame
+
+md.aggregate(Aggregator("mean", "instance", "sequence", ("box_area",), via="track"))
+# only the detections a tracker linked; lands as `box_area_mean_via_track`
+```
+
+These are **different questions, not different spellings of one**. The first asks
+"how much of this, per video"; the second asks "how much of this per video, among
+things a tracker committed to". They differ by exactly the untracked detections,
+and going up in two hops — `instance` to `track`, then `track` to `sequence` —
+gives the second answer, not the first. Roll-up is not associative across a
+branch that stops short.
+
+The route appears in the output name whenever it is not the default, so the two
+cannot be confused once computed. DataEval also logs, at info level, how many
+rows took no part for want of an ancestor — zero for every complete route, and
+exactly the untracked count for a partial one.
+
+```{note}
+Where both branches *do* have an answer they must give the same one. A detection
+whose track sits in one video while its frame sits in another is a contradiction
+rather than a preference, and DataEval raises rather than picking a winner.
+```
+
+### Declaring a roll-up apart from running it
+
+{class}`.Aggregator` is the roll-up as a value: the reduction, the levels it runs
+between, the factors, and the modifiers `aggregate`'s keywords do not carry —
+`via`, `unique_by`, an output suffix. Everything except the factor set is
+checkable against a level graph with no dataset in hand, so a roll-up can be
+declared next to the thing that produces the numbers and be wrong at import time
+rather than at analysis time:
+
+```python
+from dataeval.types import Aggregator, FactorLevelSchema
+
+schema = FactorLevelSchema.of("sequence", "unit", "track", "instance")
+Aggregator("mean", "unit", "sequence").validate(schema)  # no dataset in hand
+Aggregator("mean", "unit", "track").validate(schema)
+# ValueError: ... 'track' does not sit above 'unit' in this level graph.
+```
+
+Leaving `source` as `None` means "infer it per factor", which is what
+`aggregate`'s keyword form does. Resolving that against a dataset reads the
+answer off the data, so the resolved aggregator records itself as `derived` — the
+same distinction {class}`.BinSpec` draws between edges a caller declared and
+edges fitted to a draw.
 
 ## Narrowing the population: `where` and `having`
 
@@ -400,6 +592,51 @@ kept 20 of 93 detections while keeping all 50 images, so it has no item-level
 answer to give — a dataset can hand back an image, not three of its detections —
 and `selected_items` says so rather than returning a subset that does not
 correspond.
+
+## Factors only some rows declare
+
+A dataset does not always record everything for everything. One image's metadata
+omits a key the others carry; one frame of a video declares no timestamp. DataEval's
+answer, by default, is **all-or-nothing**: such a factor is dropped for every row,
+and {attr}`.Metadata.dropped_factors` says so.
+
+That is the conservative reading. A factor present for part of a dataset can
+mislead an analysis that does not know it is part absent — a balance result over
+"the rows that happened to have a value" is a statement about a population nobody
+chose. But it also throws away the part that *was* recorded, which for a large
+dataset with one incomplete entry is the whole factor.
+
+`partial_factors=True` asks for the other reading:
+
+```python
+md = Metadata(dataset, partial_factors=True)
+```
+
+The rows that recorded nothing get a **missing value**, which binning places in a
+bin of its own — {attr}`.BinSpec.missing_code` for a cut,
+{attr}`.LevelSpec.missing_code` for a vocabulary. "Not recorded" never becomes one
+of the factor's values, so it cannot be mistaken for a category the data contains,
+and the code space is fixed by the vocabulary rather than by how much happened to
+be missing in this draw.
+
+It is one policy, read everywhere structuring meets an incompletely declared
+value — a metadata key some items omit, and a per-frame timing some frames omit.
+Two opposite answers to that question in one pass would be the harder thing to
+explain.
+
+```{note}
+A factor **no** row declares is dropped either way. That is a factor the dataset
+does not carry, rather than one it carries incompletely, and an all-null column
+says nothing that its absence does not. The same applies to a key inconsistent
+among the *targets within one item*: by the time the mismatch is visible, which
+targets it came from is no longer recoverable.
+```
+
+Aggregation is where the difference pays off. A sequence-level mean over the 999
+frames that did declare a timestamp is a perfectly good number, and under the
+default the factor was gone before anything could ask for it. See
+{meth}`.Metadata.aggregate`'s `min_coverage`, which decides how much of a
+destination must be recorded for it to answer.
 
 ## Binning happens at a factor's own level
 

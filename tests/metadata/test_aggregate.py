@@ -6,10 +6,15 @@ avoid — it hashes a key per row — so agreeing with it is the statement that 
 grouping loses nothing.
 """
 
+import logging
+
+import numpy as np
 import polars as pl
 import pytest
 
 from dataeval import Metadata
+from dataeval._metadata._aggregate import aggregate, validate
+from dataeval.types import Aggregator
 from tests.metadata.test_structurers import _mot_dataset
 
 # How to name the ancestor a row belongs to, from the row's own reserved columns.
@@ -209,3 +214,177 @@ def test_a_level_the_schema_declares_but_that_has_no_rows_is_rejected(tracking):
 
     with pytest.raises(ValueError, match="agg needs rows at both levels"):
         validate(thinned, gone, list(store.frames)[0], [pl.len()], None)
+
+
+@pytest.mark.required
+class TestViaChangesWhichRowsTakePart:
+    """A roll-up and the same roll-up through a branch are different questions.
+
+    ``instance -> sequence`` reaches every detection through its frame; the same roll-up
+    ``via="track"`` reaches only the ones a tracker linked. Both are correct, so the
+    library states which is being asked rather than letting the graph decide silently.
+    """
+
+    @staticmethod
+    def _store():
+        """Seven detections over two sequences; detection 3 is untracked."""
+        metadata = Metadata(_mot_dataset([[2, 0, [1, -1]], [[0, 2], [1]]]))
+        metadata._structure()
+        return metadata._store
+
+    def test_the_two_routes_differ_by_exactly_the_untracked_count(self):
+        store = self._store()
+        untracked = int((store.link("instance", "track").positions() < 0).sum())
+        assert untracked == 1, "fixture no longer has an untracked detection"
+        every = aggregate(store, "instance", "sequence", [pl.len().alias("n")], None)
+        tracked = aggregate(store, "instance", "sequence", [pl.len().alias("n")], None, via="track")
+        assert sum(every.columns[0].to_list()) - sum(tracked.columns[0].to_list()) == untracked
+
+    def test_rolling_up_in_two_hops_through_a_partial_branch_matches_going_via_it(self):
+        """Non-associativity, stated as an equality: the two-hop answer is the ``via`` answer."""
+        store = self._store()
+        two_hop = aggregate(store, "instance", "track", [pl.len().alias("n")], None)
+        per_track = aggregate(
+            store.with_column("track", two_hop.columns[0]), "track", "sequence", [pl.col("n").sum().alias("n")], None
+        )
+        one_hop = aggregate(store, "instance", "sequence", [pl.len().alias("n")], None, via="track")
+        assert per_track.columns[0].to_list() == one_hop.columns[0].to_list()
+
+    def test_a_total_route_reaches_every_row(self):
+        store = self._store()
+        every = aggregate(store, "instance", "sequence", [pl.len().alias("n")], None)
+        assert sum(every.columns[0].to_list()) == store.height("instance")
+
+    def test_the_rows_that_took_no_part_are_reported(self, caplog):
+        caplog.set_level(logging.INFO, logger="dataeval.metadata")
+        aggregate(self._store(), "instance", "sequence", [pl.len().alias("n")], None, via="track")
+        assert "1 of 7 'instance' row(s) took no part, having no 'sequence' ancestor" in caplog.text
+
+    def test_a_full_roll_up_reports_nothing(self, caplog):
+        caplog.set_level(logging.INFO, logger="dataeval.metadata")
+        aggregate(self._store(), "instance", "sequence", [pl.len().alias("n")], None)
+        assert "took no part" not in caplog.text
+
+    def test_destinations_with_nothing_beneath_them_are_reported(self, caplog):
+        caplog.set_level(logging.INFO, logger="dataeval.metadata")
+        metadata = Metadata(_mot_dataset(FIXTURES["empty_sequence"]))
+        metadata._structure()
+        aggregate(metadata._store, "instance", "unit", [pl.len().alias("n")], None)
+        assert "have nothing beneath them and answer null" in caplog.text
+
+    def test_a_route_that_does_not_exist_is_rejected(self):
+        metadata = Metadata(_mot_dataset([[2, 0, [1, -1]], [[0, 2], [1]]]))
+        metadata._structure()
+        with pytest.raises(ValueError, match="No route from 'instance' to 'unit' passes through 'track'"):
+            validate(metadata._store, "instance", "unit", [pl.len()], None, via="track")
+
+
+@pytest.mark.required
+class TestAnExpressionNamesOneOutput:
+    """Results are read back one per expression, which is what pairs one with its coverage."""
+
+    @pytest.mark.parametrize("expr", ["all", "regex"])
+    def test_a_multi_output_selector_is_refused_by_name(self, expr):
+        """It reached polars' own `output_name()` and came back as a ComputeError about root
+        column names, mentioning neither agg nor the level graph."""
+        metadata = Metadata(_mot_dataset([[2, 1], [1]]))
+        selector = pl.all().mean() if expr == "all" else pl.col("^time.*$").mean()
+        with pytest.raises(ValueError, match="has to name one output column"):
+            metadata.agg("instance", "unit", selector)
+
+    def test_a_named_expression_still_works(self):
+        metadata = Metadata(_mot_dataset([[2, 1], [1]]))
+        rolled = metadata.agg("instance", "unit", pl.len().alias("n_det"))
+        assert rolled.at("unit").rows_at("unit")["n_det"].to_list() == [2, 1, 1]
+
+
+@pytest.mark.required
+class TestARollUpIsRecordedProvenance:
+    """A roll-up is a declaration, not just the column it produced. Recording it is what
+    lets a pipeline be rebuilt over the next dataset rather than described after the fact."""
+
+    @staticmethod
+    def _two_levels():
+        dataset = _mot_dataset([[2, 1], [1]])
+        metadata = Metadata(dataset)
+        metadata._structure()
+        metadata.add_factors({"area": np.arange(float(metadata.level_counts["instance"]))}, level="instance")
+        rolled = metadata.aggregate("area", level="unit", how="mean")
+        return dataset, rolled.aggregate("area_mean", level="sequence", how="max")
+
+    def test_each_output_is_keyed_on_the_column_it_produced(self):
+        _, two = self._two_levels()
+        assert list(two._aggregations) == ["area_mean", "area_mean_max"]
+
+    def test_the_order_is_the_order_they_must_replay_in(self):
+        """The second reads the column the first wrote, so it is only answerable after it."""
+        _, two = self._two_levels()
+        assert [a.how for a in two._aggregations.values()] == ["mean", "max"]
+
+    def test_every_column_a_roll_up_produced_has_an_entry(self):
+        """Keyed on the *output* name rather than the input, because that is what a replay
+        has to rebuild. Running the same roll-up twice writes a second column under the
+        collision name `aggregate` already gives it, and that column gets its own entry —
+        so a replay reproduces exactly the columns the metadata carries, duplicates and all.
+        """
+        dataset = _mot_dataset([[2, 1], [1]])
+        once = Metadata(dataset).aggregate("width", level="sequence", how="mean")
+        twice = once.aggregate("width", level="sequence", how="mean")
+
+        assert list(twice._aggregations) == ["width_mean", "width_mean_agg"]
+        assert set(twice._aggregations) <= set(twice.factor_names)
+
+    def test_both_levels_survive_the_archive(self, tmp_path):
+        dataset, two = self._two_levels()
+        two.save(tmp_path / "m.dem")
+
+        back = Metadata.load(tmp_path / "m.dem", dataset)
+        assert list(back._aggregations) == ["area_mean", "area_mean_max"]
+        assert back.at("sequence").rows_at("sequence")["area_mean_max"].to_list() == [2.0, 3.0]
+
+    def test_the_declaration_comes_back_whole(self, tmp_path):
+        """Not just `how` and `via`, which the generated name already carries."""
+        dataset = _mot_dataset([[2, 1], [1]])
+        declared = Aggregator("mean", "unit", "sequence", ("width",), min_coverage=0.5)
+        Metadata(dataset).aggregate(declared).save(tmp_path / "m.dem")
+
+        (back,) = Metadata.load(tmp_path / "m.dem", dataset)._aggregations.values()
+        assert back.min_coverage == 0.5
+        assert (back.how, back.source, back.target, back.factors) == ("mean", "unit", "sequence", ("width",))
+
+    def test_a_fitted_tolerance_is_reapplied_rather_than_refitted(self, tmp_path):
+        """The number was measured off *this* dataset, which is why it is worth recording."""
+        dataset = _mot_dataset([[1] * 4])
+        metadata = Metadata(dataset)
+        metadata._structure()
+        metadata.add_factors({"b": np.array([0.10, 0.11, 0.12, 0.90])}, level="unit")
+        declared = Aggregator("longest_run", "unit", "sequence", ("b",), options={"tolerance": ("iqr", (None, 1.5))})
+        rolled = metadata.aggregate(declared)
+        (fitted,) = rolled._aggregations.values()
+        rolled.save(tmp_path / "m.dem")
+
+        (back,) = Metadata.load(tmp_path / "m.dem", dataset)._aggregations.values()
+        assert isinstance(back.options["tolerance"], float)
+        assert back == fitted
+
+    def test_it_rebuilds_over_the_next_dataset(self):
+        rolled = Metadata(_mot_dataset([[2, 1], [1]])).aggregate("width", level="sequence", how="mean")
+        following = rolled.new(_mot_dataset([[3, 2], [2], [1]]))
+
+        assert following.at("sequence").rows_at("sequence")["width_mean"].to_list() == [4.0, 4.0, 4.0]
+
+    def test_a_dataset_that_cannot_answer_one_says_so(self, caplog):
+        """Rather than refusing to build, which would make `new()` unusable wherever the
+        factor was one the caller added rather than one the walk found."""
+        dataset, two = self._two_levels()
+        with caplog.at_level(logging.WARNING, logger="dataeval.metadata"):
+            following = two.new(_mot_dataset([[2], [1]]))
+            following._structure()
+
+        assert "Not replaying" in caplog.text
+        assert "area_mean" not in following.factor_names
+
+    def test_an_expression_roll_up_records_nothing(self):
+        """`agg` takes arbitrary polars expressions, which have no serializable form."""
+        rolled = Metadata(_mot_dataset([[2, 1], [1]])).agg("instance", "unit", pl.len().alias("n_det"))
+        assert rolled._aggregations == {}
