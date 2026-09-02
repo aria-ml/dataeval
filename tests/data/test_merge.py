@@ -51,7 +51,7 @@ class _Datum(NamedTuple):
 class _TripleDataset:
     """Datums as MAITE ``(input, target, metadata)`` triples carrying their own id."""
 
-    def __init__(self, tag: str, n: int, index2label: dict[int, str], datum_type=tuple) -> None:
+    def __init__(self, tag: str, n: int, index2label: dict[int, str], datum_type: type = tuple) -> None:
         self._items = [
             datum_type((tag, 0, {"id": i})) if datum_type is tuple else datum_type(tag, 0, {"id": i}) for i in range(n)
         ]

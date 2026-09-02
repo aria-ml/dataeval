@@ -14,6 +14,7 @@ import pytest
 
 from dataeval import Metadata
 from dataeval._metadata._columns import to_col
+from dataeval._metadata._links import LinkIndex
 from dataeval.types import FactorInfo
 from tests.metadata.test_structurers import _mot_dataset
 
@@ -332,3 +333,68 @@ def test_surviving_where_skips_unpopulated_ancestors(tasks):
     mask[0] = True
     survivors = thinned.surviving_where(level, mask)
     assert set(survivors) == {level}
+
+
+@pytest.mark.required
+class TestRouteSelection:
+    """Which branch of the diamond a link follows, and what the branches must agree on."""
+
+    @staticmethod
+    def _tracking():
+        """Seven detections over two sequences; detection 3 is untracked."""
+        metadata = Metadata(_mot_dataset([[2, 0, [1, -1]], [[0, 2], [1]]]))
+        metadata._structure()
+        return metadata._store
+
+    def test_omitting_via_takes_every_route(self):
+        assert self._tracking().link("instance", "sequence").positions().tolist() == [0, 0, 0, 0, 1, 1, 1]
+
+    def test_via_a_partial_branch_excludes_the_rows_it_does_not_reach(self):
+        """The untracked detection has a sequence through its frame and none through a track."""
+        store = self._tracking()
+        assert store.link("instance", "sequence", "track").positions().tolist() == [0, 0, 0, -1, 1, 1, 1]
+
+    def test_via_the_total_branch_matches_the_default(self):
+        store = self._tracking()
+        assert store.link("instance", "sequence", "unit").positions().tolist() == (
+            store.link("instance", "sequence").positions().tolist()
+        )
+
+    def test_via_the_destination_is_satisfied_by_every_route(self):
+        """Trivially true rather than a special case: every route to a level reaches it."""
+        store = self._tracking()
+        assert store.link("instance", "sequence", "sequence").positions().tolist() == (
+            store.link("instance", "sequence").positions().tolist()
+        )
+
+    def test_via_the_source_is_rejected(self):
+        with pytest.raises(ValueError, match="every route starts at rather than passes through"):
+            self._tracking().link("instance", "sequence", "instance")
+
+    def test_via_a_level_no_route_passes_through_is_rejected(self):
+        with pytest.raises(ValueError, match="No route from 'instance' to 'unit' passes through 'track'"):
+            self._tracking().link("instance", "unit", "track")
+
+    def test_via_a_level_the_schema_does_not_have_is_rejected(self):
+        with pytest.raises(ValueError, match="camera"):
+            self._tracking().link("instance", "sequence", "camera")  # type: ignore[arg-type]
+
+    def test_each_route_is_memoized_apart(self):
+        store = self._tracking()
+        default = store.link("instance", "sequence")
+        assert store.link("instance", "sequence") is default
+        assert store.link("instance", "sequence", "track") is not default
+
+    def test_routes_that_contradict_each_other_are_rejected(self):
+        """A row cannot be inside two different sequences, and the link layer says so.
+
+        Detection 3 is the untracked one, so moving it into track 4 — which belongs to the
+        other sequence — makes the two routes place it in two sequences at once. Nothing
+        in the library builds such a store; a caller's own structurer can, which is why
+        this is checked rather than assumed.
+        """
+        store = self._tracking()
+        broken = {**store.links, ("instance", "track"): LinkIndex.of([0, 1, 1, 4, 2, 3, 4], 5)}
+        contradicting = dataclasses.replace(store, links=broken, _composed={})
+        with pytest.raises(ValueError, match="Two routes from 'instance' to 'sequence' disagree"):
+            contradicting.link("instance", "sequence")

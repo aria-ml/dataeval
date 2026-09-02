@@ -144,6 +144,40 @@ def _lookup(table: NDArray[np.intp], positions: NDArray[np.intp], missing: NDArr
     return np.where(missing, -1, table[np.where(missing, 0, positions)])
 
 
+def _require_agreement(left: NDArray[np.intp], right: NDArray[np.intp], context: str) -> None:
+    """Refuse two routes that name different ancestors for the same row.
+
+    Where a level graph offers several routes to one ancestor, the routes are two ways of
+    asking the same question, so they may differ only in *whether* they have an answer —
+    never in what it is. A detection reaches its sequence through its frame and, when a
+    tracker linked it, through its track as well; those two sequences are the same
+    sequence, or the dataset says a row is inside two different ancestors at once.
+
+    Checked rather than assumed, and checked here rather than in a test, because a test
+    pins it for the structurers shipped with the library and says nothing about a caller's
+    own structurer or a hand-built store — which is where a violation will come from. The
+    failure mode it guards is wrong numbers rather than an exception: without this, one
+    route's answer silently wins and every rollup and every propagated factor is computed
+    against a parentage the other route contradicts.
+
+    Raises
+    ------
+    ValueError
+        When some row has an ancestor on both routes and the two disagree.
+    """
+    both = (left >= 0) & (right >= 0)
+    disagreeing = np.flatnonzero(both & (left != right))
+    if not disagreeing.size:
+        return
+    first = int(disagreeing[0])
+    raise ValueError(
+        f"Two routes {context} disagree about {disagreeing.size} row(s): row {first} reaches "
+        f"parent row {int(left[first])} along one route and {int(right[first])} along another. "
+        "Routes to the same ancestor may differ in whether they have an answer, never in what "
+        "it is, so this dataset's links place that row inside two different ancestors at once.",
+    )
+
+
 class LinkIndex(ABC):
     """A positional foreign key from one level's rows to its parent level's.
 
@@ -301,13 +335,21 @@ class LinkIndex(ABC):
         return LinkIndex.of(_lookup(upward.positions(), mine, mine < 0), upward.parent_len)
 
     @staticmethod
-    def first_known(routes: "Sequence[LinkIndex]") -> "LinkIndex":
+    def first_known(routes: "Sequence[LinkIndex]", context: str = "between two levels") -> "LinkIndex":
         """Combine several routes to the same level: the first route that knows wins.
 
         Only a diamond produces more than one route, and they agree wherever both are
         total. They differ exactly where one branch stops short — an untracked detection
         reaches its sequence through its frame but not through a track — so a row's
         ancestor is taken from the earliest route that records one.
+
+        That agreement is **verified** by :func:`_require_agreement` rather than trusted.
+        Verifying it costs the early exit this used to take when the first route was already
+        total. The routes themselves were composed eagerly before and after, so nothing new
+        is *built* — what is paid is a few vectorized passes per further route, and the
+        ``np.where`` short-circuit that exit used to skip. That is charged once per level
+        pair per store, since :meth:`~LevelStore.link` memoizes the result, and it buys the
+        one invariant here whose violation is silent.
 
         Route order is :meth:`~dataeval.types.FactorLevelSchema.paths` order, which is
         canonical parent order at every step. For the tracking diamond that puts the
@@ -319,6 +361,8 @@ class LinkIndex(ABC):
         ----------
         routes : Sequence[LinkIndex]
             Composed links from one level to the same ancestor, in preference order.
+        context : str, default "between two levels"
+            Phrase naming the levels, used only in the disagreement message.
 
         Returns
         -------
@@ -328,7 +372,8 @@ class LinkIndex(ABC):
         Raises
         ------
         ValueError
-            When ``routes`` is empty, or the routes describe different levels.
+            When ``routes`` is empty, when the routes describe different levels, or when
+            two routes name different ancestors for the same row.
         """
         if not routes:
             raise ValueError("Cannot combine an empty set of routes.")
@@ -336,9 +381,9 @@ class LinkIndex(ABC):
             raise ValueError("Every route must run between the same two levels.")
         combined = routes[0].positions()
         for route in routes[1:]:
-            if not np.any(combined < 0):
-                break
-            combined = np.where(combined < 0, route.positions(), combined)
+            positions = route.positions()
+            _require_agreement(combined, positions, context)
+            combined = np.where(combined < 0, positions, combined)
         return LinkIndex.of(combined, routes[0].parent_len)
 
     def _restricted_positions(self, child_keep: NDArray[np.intp], parent_remap: NDArray[np.intp]) -> NDArray[np.intp]:

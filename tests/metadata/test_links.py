@@ -243,6 +243,49 @@ class TestFirstKnown:
         with pytest.raises(ValueError, match="between the same two levels"):
             LinkIndex.first_known([LinkIndex.of([0, 1], 2), LinkIndex.of([0, 1, 1], 2)])
 
+    @staticmethod
+    def _contradicting():
+        """The track route with detection 3 moved into track 1, whose sequence is not its frame's.
+
+        Detection 3's frame is in sequence 0; track 1 is in sequence 1. The two routes
+        therefore place it in two different sequences, which no dataset can mean.
+        """
+        return LinkIndex.of([0, 0, -1, 1, 1], 2).compose(LinkIndex.of([0, 1], 2))
+
+    def test_routes_that_disagree_are_rejected(self):
+        via_unit, _ = self._diamond()
+        with pytest.raises(ValueError, match=r"disagree about 1 row\(s\)"):
+            LinkIndex.first_known([via_unit, self._contradicting()])
+
+    def test_disagreement_is_found_even_when_the_first_route_is_total(self):
+        """The check must not be skippable by the early exit it replaced.
+
+        The ``unit`` route is total, so a combine that stopped as soon as it had every
+        answer would never look at the second route — and a contradiction there is exactly
+        what this refuses. Asserted separately from the case above because that property,
+        not the raise, is what the removed optimization would have broken.
+        """
+        via_unit, _ = self._diamond()
+        assert not (via_unit.positions() < 0).any(), "fixture no longer exercises the total-first case"
+        with pytest.raises(ValueError, match="disagree"):
+            LinkIndex.first_known([via_unit, self._contradicting()])
+
+    def test_the_message_names_the_row_and_both_answers(self):
+        via_unit, _ = self._diamond()
+        with pytest.raises(ValueError, match="row 3 reaches parent row 0 along one route and 1 along another"):
+            LinkIndex.first_known([via_unit, self._contradicting()])
+
+    def test_the_message_carries_the_context_it_was_given(self):
+        via_unit, _ = self._diamond()
+        with pytest.raises(ValueError, match="Two routes from 'instance' to 'sequence' disagree"):
+            LinkIndex.first_known([via_unit, self._contradicting()], "from 'instance' to 'sequence'")
+
+    def test_a_route_that_merely_knows_less_is_not_a_disagreement(self):
+        """The whole point of the union rule: one branch stopping short is not a contradiction."""
+        via_unit, via_track = self._diamond()
+        assert (via_track.positions() < 0).any(), "fixture no longer has a row only one route reaches"
+        assert LinkIndex.first_known([via_unit, via_track]).positions().tolist() == [0, 0, 0, 0, 1]
+
 
 @pytest.mark.required
 class TestCompositionMatchesStoredAncestry:

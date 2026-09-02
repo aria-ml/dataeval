@@ -53,6 +53,8 @@ from numpy.typing import NDArray
 from dataeval._log import get_logger
 from dataeval._metadata._columns import binned, digitized
 from dataeval._metadata._encoding import (
+    aggregations_from_list,
+    aggregations_to_list,
     bins_from_mapping,
     bins_to_mapping,
     encoding_from_mapping,
@@ -166,6 +168,10 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
         "index2label": {str(index): label for index, label in md._index2label.items()},
         "count": int(md._count),
         "dropped_factors": {name: list(reasons) for name, reasons in md._dropped_factors.items()},
+        # The roll-ups, keyed on the column each produced and in the order they ran. The
+        # columns themselves are already in the store; this is what says *how* they were
+        # reached, which is what `new()` needs to rebuild them over another dataset.
+        "aggregations": aggregations_to_list(md._aggregations),
         "aggregated_from": dict(md._aggregated_from),
         # The applied encodings. Companion columns are stripped on the way in and rebuilt on
         # load, so without this a restored instance re-derives its cuts — which loses
@@ -197,6 +203,12 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
         # fails open -- the next dataset's unseen value is appended rather than refused, and
         # nothing says the taxonomy widened.
         "strict": bool(md._strict),
+        # The other structuring policy, written for the same reason. It decides what the
+        # rows *are* -- which partly declared factors exist at all, and which rows of them
+        # read as missing -- so a restored instance that reported the default would describe
+        # a walk that did not happen, and `new()` from it would structure the next dataset
+        # under the opposite rule.
+        "partial_factors": bool(md._partial_factors),
         "is_filtered": bool(md._is_filtered),
         "cut_below_items": bool(md._cut_below_items),
     }
@@ -458,6 +470,7 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     md._count = int(manifest["count"])
     md._dropped_factors = {name: list(reasons) for name, reasons in manifest["dropped_factors"].items()}
     md._aggregated_from = dict(manifest["aggregated_from"])
+    md._aggregations = aggregations_from_list(manifest.get("aggregations", []))
     # Underneath whatever the caller passed, never over it. Binning is configuration rather
     # than data here — ``load(..., continuous_factor_bins=...)`` is meant to re-cut the
     # restored rows — so the archive's record fills in only the factors the reader said
@@ -486,6 +499,9 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     # closes a vocabulary the archive left open, and passing nothing keeps what was written.
     # Optional, so a file from before this existed restores as the permissive default.
     md._strict = md._strict or bool(manifest.get("strict", False))
+    # Underneath the reader's own, like `strict`. Optional, so a file written before this
+    # existed restores as the all-or-nothing default it was structured under.
+    md._partial_factors = md._partial_factors or bool(manifest.get("partial_factors", False))
     md._is_filtered = bool(manifest["is_filtered"])
     md._cut_below_items = bool(manifest["cut_below_items"])
     # Not written, and said so rather than answered as an empty dataset would be.

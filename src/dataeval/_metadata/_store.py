@@ -80,7 +80,9 @@ class LevelStore:
     # every composition, whether or not either has computed one yet. It is the single
     # piece of mutable state inside a frozen value, and it is why nothing may mutate
     # ``links`` in place: a derived link would outlive the edges it came from.
-    _composed: dict[tuple[FactorLevel, FactorLevel], LinkIndex] = field(default_factory=dict, compare=False, repr=False)
+    _composed: dict[tuple[FactorLevel, FactorLevel, FactorLevel | None], LinkIndex] = field(
+        default_factory=dict, compare=False, repr=False
+    )
 
     # ------------------------------------------------------------------ building
 
@@ -164,16 +166,16 @@ class LevelStore:
                 return dtype
         return pl.Null()
 
-    def link(self, level: FactorLevel, ancestor: FactorLevel) -> LinkIndex:
+    def link(self, level: FactorLevel, ancestor: FactorLevel, via: FactorLevel | None = None) -> LinkIndex:
         """Positional link from ``level``'s rows up to ``ancestor``'s.
 
         Where the graph offers several routes — which only the tracking diamond does —
-        each row takes its ancestor from the first route that records one. The routes
-        agree wherever both are total; they differ only where one branch stops short, as
-        it does for a detection no tracker linked, which reaches its sequence through its
-        frame but not through a track. Route order is canonical parent order, which puts
-        the ``unit`` branch first and so reproduces the precedence the structurers have
-        always had.
+        each row takes its ancestor from the first route that records one. The routes are
+        verified to agree wherever both know an answer; they differ only where one branch
+        stops short, as it does for a detection no tracker linked, which reaches its
+        sequence through its frame but not through a track. Route order is canonical
+        parent order, which puts the ``unit`` branch first and so reproduces the
+        precedence the structurers have always had.
 
         Parameters
         ----------
@@ -181,20 +183,28 @@ class LevelStore:
             Level whose rows the link starts from.
         ancestor : str
             Level above it to reach.
+        via : str or None, default None
+            Restrict to routes passing through this level. None takes every route, which
+            is the union of what they know and is total wherever any branch is. Naming a
+            branch instead asks a narrower question — ``via="track"`` for an
+            ``instance -> sequence`` link reaches only the detections a tracker linked —
+            and is why the two are different rollups rather than two spellings of one.
 
         Returns
         -------
         LinkIndex
             One parent position per row at ``level``, ``-1`` where that row has no
-            ancestor there.
+            ancestor there by the selected route(s).
 
         Raises
         ------
         ValueError
-            When ``ancestor`` does not sit above ``level``.
+            When ``ancestor`` does not sit above ``level``; when ``via`` is ``level``
+            itself; when no route to ``ancestor`` passes through ``via``; or when two
+            routes name different ancestors for the same row.
         """
-        key = (level, ancestor)
-        if (stored := self.links.get(key)) is not None:
+        key = (level, ancestor, via)
+        if via is None and (stored := self.links.get((level, ancestor))) is not None:
             return stored
         if (cached := self._composed.get(key)) is not None:
             return cached
@@ -204,7 +214,12 @@ class LevelStore:
                 f"{ancestor!r} is not above {level!r} in this dataset's level graph, so there is "
                 f"no link between them. Levels above {level!r} are {list(self.schema.ancestors(level))}.",
             )
-        composed = LinkIndex.first_known([self._route(level, path) for path in paths])
+        routes = paths if via is None else self.schema.routes_through(level, ancestor, via)
+        through = "" if via is None else f" through {via!r}"
+        composed = LinkIndex.first_known(
+            [self._route(level, path) for path in routes],
+            context=f"from {level!r} to {ancestor!r}{through}",
+        )
         self._composed[key] = composed
         return composed
 

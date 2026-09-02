@@ -791,3 +791,69 @@ class TestPoolWrapperLifecycle:
         with PoolWrapper(processes=1) as pool:
             assert pool._pool is None
             assert sorted(pool.imap_unordered(abs, [-1, -2])) == [1, 2]
+
+
+@pytest.mark.required
+class TestKeepPartialKeys:
+    """A key some entries do not declare: dropped by default, kept with missing values on request."""
+
+    def test_a_key_only_some_entries_declare_is_dropped_by_default(self):
+        merged, dropped = merge_metadata([{"w": "sun"}, {"w": "rain"}, {}], return_dropped=True)
+        assert "w" not in merged
+        assert dropped == {"w": ["inconsistent_key"]}
+
+    def test_keeping_it_gives_the_silent_entries_a_missing_value(self):
+        merged, dropped = merge_metadata([{"w": "sun"}, {"w": "rain"}, {}], return_dropped=True, keep_partial=True)
+        assert merged["w"] == ["sun", "rain", None]
+        assert dropped == {}
+
+    def test_a_key_first_seen_late_is_padded_backwards(self):
+        """Otherwise it lines up against the wrong entries from the row it appears on."""
+        merged = merge_metadata([{"a": 1}, {"a": 2, "b": 9}], keep_partial=True)
+        assert merged["b"] == [None, 9]
+
+    def test_the_values_that_were_recorded_keep_their_type(self):
+        """A missing value reaching ``simplify_type`` came back as the string 'None', which
+        then made the whole column a string column."""
+        merged = merge_metadata([{"a": 1, "c": 9}, {"a": 2}], keep_partial=True)
+        assert merged["c"] == [9, None]
+
+    def test_padding_follows_the_targets_each_entry_contributes(self):
+        merged = merge_metadata(
+            [{"a": [1, 2], "c": 9}, {"a": [3, 4]}],
+            targets_per_image=[2, 2],
+            keep_partial=True,
+        )
+        assert merged["c"] == [9, 9, None, None]
+        assert merged["a"] == [1, 2, 3, 4]
+
+    def test_a_key_dropped_for_a_reason_of_its_own_stays_dropped(self):
+        """Only absence is forgiven. A nested list has no usable values to keep."""
+        merged, dropped = merge_metadata([{"n": [{"x": [[1, 2]]}], "a": 1}], return_dropped=True, keep_partial=True)
+        assert "n_x" not in merged
+        assert dropped
+
+    def test_a_key_inconsistent_within_one_entry_is_still_dropped(self):
+        """`dropped` names the full path and `merged` the shortened column, so `y` went
+        looking for itself under `objs_y`, did not find it, and was rebuilt from padding —
+        destroying the value the one target that recorded it actually held."""
+        merged, dropped = merge_metadata(
+            [{"objs": [{"x": 1, "y": 2}, {"x": 3}]}, {"objs": [{"x": 5, "y": 6}, {"x": 7, "y": 8}]}],
+            return_dropped=True,
+            keep_partial=True,
+        )
+        assert "y" not in merged
+        assert dropped == {"objs_y": ["inconsistent_key"]}
+
+    def test_a_key_whose_name_merely_ends_in_a_dropped_one_survives(self):
+        """Matching the trailing segment rather than a bare substring keeps `y` from
+        answering for `entropy`."""
+        merged = merge_metadata([{"entropy": 1, "y": 2}, {"entropy": 3, "y": 4}], keep_partial=True)
+        assert merged["entropy"] == [1, 3]
+
+    def test_an_entry_contributing_no_rows_contributes_no_values(self):
+        """Its scalars have nothing to attach to: appending them anyway advanced one column
+        past the row count while `_image_index` stayed behind, so the merged columns
+        described different numbers of rows."""
+        merged = merge_metadata([{"a": [], "b": 1}, {"a": [7], "b": 2}], keep_partial=True)
+        assert {len(v) for v in merged.values()} == {1}

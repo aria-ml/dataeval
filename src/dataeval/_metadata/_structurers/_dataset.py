@@ -31,8 +31,25 @@ class DatasetStructurer(Structurer, ABC):
         item twice; handing it back here makes :meth:`build` reuse it.
     """
 
-    def __init__(self, first_datum: tuple[Any, Any, DatumMetadata] | None = None) -> None:
+    def __init__(
+        self,
+        first_datum: tuple[Any, Any, DatumMetadata] | None = None,
+        *,
+        partial_factors: bool = False,
+    ) -> None:
         self._first_datum = first_datum
+        self._partial_factors = partial_factors
+
+    @property
+    def partial_factors(self) -> bool:
+        """Whether a factor only some rows declare is kept, with the rest missing.
+
+        One policy, applied wherever this walk meets an incompletely declared value: a
+        metadata key some items omit, and — for a tracking dataset — a timing or dimension
+        some frames omit. Two opposite answers to that question in one structuring pass
+        would be the harder thing to explain.
+        """
+        return self._partial_factors
 
     def _datum(
         self,
@@ -93,6 +110,7 @@ class DatasetStructurer(Structurer, ABC):
             return_dropped=True,
             ignore_lists=ignore_lists,
             targets_per_image=targets_per_item,
+            keep_partial=self._partial_factors,
         )
         # Drop the merged ``id`` only when a datum actually carried one at its top level:
         # that is the identity :meth:`_item_ids` reads, and it is already on ``item_id``.

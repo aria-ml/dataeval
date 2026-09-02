@@ -135,16 +135,92 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             )
 
     @staticmethod
-    def _frame_factors(rows: MOTAccumulator) -> dict[str, NDArray[Any]]:
-        """Per-frame timings and dimensions, as ``unit``-level factors, when every frame has them.
+    def _recorded(
+        name: str, values: Sequence[Any], dtype: Any, of: str = "frame", *, keep: bool = False
+    ) -> "NDArray[Any] | None":
+        """One factor's column, or None where too few rows declared it to produce one.
 
-        All-or-nothing rather than null-padded, one factor at a time. A partially null
-        numeric factor cannot be binned — sorting it compares None against a float — so a
-        factor present for only some frames would break factor analysis for the whole
-        dataset rather than degrade gracefully. A conforming
-        :obj:`~dataeval.protocols.VideoStream` declares all four, so the all-or-nothing
-        case is the normal one; a duck-typed stream that omits one gets no factor for it
-        and a log line saying so.
+        Two policies, chosen by the caller. **All-or-nothing** — the default — drops a
+        factor any row failed to declare, which is what this walk has always done: the
+        justification was that "a partially populated factor cannot be binned", and while
+        that stopped being true when binning became a policy, a factor present for part of
+        a dataset can still mislead an analysis that does not know it is part absent.
+
+        **Partial** keeps it, giving the rows that declared nothing a missing value; the
+        binning layer places those in a bin of its own and
+        :attr:`~dataeval.types.BinSpec.missing_code` records which one. That is the reading
+        to ask for when a sequence-level mean over the frames that *did* declare a timestamp
+        is the number wanted, and it is opt-in because it changes what a dataset appears to
+        carry.
+
+        A float column carries its missing rows as ``NaN``, which is how this library spells
+        an absent number everywhere else and what the binning layer reserves a code for; an
+        integer column, which has no ``NaN``, carries them as ``None`` and reaches the same
+        ``Int64`` polars dtype a complete one does. Both keep the type the complete case
+        has — inferring it from the values instead would silently give a float factor whose
+        recorded values happen to be whole numbers an ``Int64`` column the moment one row
+        went missing, flipping its encoding from a cut to a vocabulary.
+
+        A factor **no** row declares is dropped under either policy. That is a factor the
+        dataset does not carry, rather than one it carries incompletely, and an all-null
+        column says nothing that its absence does not.
+
+        Parameters
+        ----------
+        name : str
+            Factor name, for the log line.
+        values : Sequence
+            One value per row, None where the row recorded none.
+        dtype : Any
+            Dtype the complete column would have.
+        of : str, default "frame"
+            What a row is, for the log line. This serves both the per-frame factors and the
+            per-track ``duration_s``, and a message saying "frame" about tracks names the
+            wrong rows.
+        keep : bool, default False
+            Keep a factor only some rows declare, rather than dropping it.
+
+        Returns
+        -------
+        NDArray or None
+            The column, or None where nothing declared it.
+        """
+        missing = sum(value is None for value in values)
+        if values and missing == len(values):
+            _logger.info("No %s declares %r, so no %r factor is produced.", of, name, name)
+            return None
+        if not missing:
+            return np.asarray(values, dtype=dtype)
+        if not keep:
+            _logger.info(
+                "%d of %d %s(s) do not declare %r, so no %r factor is produced. Pass "
+                "partial_factors=True to keep it with those rows missing.",
+                missing,
+                len(values),
+                of,
+                name,
+                name,
+            )
+            return None
+        _logger.info(
+            "%d of %d %s(s) do not declare %r; the factor is produced with those rows missing, "
+            "and they bin into the reserved missing code.",
+            missing,
+            len(values),
+            of,
+            name,
+        )
+        if np.issubdtype(np.dtype(dtype), np.floating):
+            return np.asarray([np.nan if value is None else value for value in values], dtype=dtype)
+        return np.asarray(values, dtype=object)
+
+    def _frame_factors(self, rows: MOTAccumulator) -> dict[str, NDArray[Any]]:
+        """Per-frame timings and dimensions, as ``unit``-level factors.
+
+        A conforming :obj:`~dataeval.protocols.VideoStream` declares all four, so the
+        complete case is the normal one. A duck-typed stream that declares one for only some
+        frames gets no factor for it unless ``partial_factors`` asked to keep it; see
+        :meth:`_recorded`.
 
         ``width`` and ``height`` are recorded here because this walk is the only thing that
         ever holds a decoded frame. They are what
@@ -159,28 +235,22 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             ("width", rows.frame_width, np.intp),
             ("height", rows.frame_height, np.intp),
         ):
-            missing = sum(value is None for value in values)
-            if missing:
-                _logger.info(
-                    "%d of %d frame(s) do not declare %r, so no %r factor is produced; a "
-                    "partially populated factor cannot be binned.",
-                    missing,
-                    len(values),
-                    name,
-                    name,
-                )
-                continue
-            factors[name] = np.asarray(values, dtype=dtype)
+            if (column := self._recorded(name, values, dtype, keep=self._partial_factors)) is not None:
+                factors[name] = column
         return factors
 
-    @staticmethod
-    def _track_factors(rows: MOTAccumulator) -> dict[str, NDArray[Any]]:
+    def _track_factors(self, rows: MOTAccumulator) -> dict[str, NDArray[Any]]:
         """Derive per-track factors: how long each track is, and how far it spans.
 
         ``track_length`` counts observations; ``frame_span`` counts frames from first to
         last inclusive. They differ exactly when a track has gaps, which makes the pair
         more informative than either alone. ``duration_s`` is the elapsed time over the
-        same span, and follows the same all-or-nothing rule as the frame timings.
+        same span, and is recorded per track: a track whose first or last frame declared no
+        timestamp has no duration — the span runs past the readings, so how far is not
+        something the data says — while an untimed frame *between* them costs nothing,
+        since the endpoints are what the span is measured from. Whether a track that cannot
+        answer costs the whole dataset its ``duration_s`` is then the same all-or-nothing
+        default the frame timings are subject to.
 
         These two are the same quantities :func:`~dataeval.core.track_stats` returns as
         ``n_appearances`` and ``track_duration``: ``track_length == n_appearances`` and
@@ -200,10 +270,13 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             - np.asarray(rows.track_first_frame, dtype=np.intp)
             + 1,
         }
-        if all(value is not None for value in (*rows.track_first_time, *rows.track_last_time)):
-            factors["duration_s"] = np.asarray(rows.track_last_time, dtype=np.float64) - np.asarray(
-                rows.track_first_time, dtype=np.float64
-            )
+        spans = [
+            None if first is None or last is None else float(last) - float(first)
+            for first, last in zip(rows.track_first_time, rows.track_last_time, strict=True)
+        ]
+        duration = self._recorded("duration_s", spans, np.float64, of="track", keep=self._partial_factors)
+        if duration is not None:
+            factors["duration_s"] = duration
         return factors
 
     @staticmethod

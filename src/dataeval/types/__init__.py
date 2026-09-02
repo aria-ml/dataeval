@@ -1,6 +1,8 @@
 """Data types used in DataEval."""
 
 __all__ = [
+    "AggregationRecord",
+    "Aggregator",
     "Array1D",
     "Array2D",
     "Array3D",
@@ -44,7 +46,16 @@ from dataeval.types._array import Array1D, Array2D, Array3D, Array4D, Array5D, A
 from dataeval.types._config import ClusterConfigMixin, EvaluatorConfig
 from dataeval.types._evaluator import Evaluator, ReprMixin
 from dataeval.types._execution import ExecutionMetadata
-from dataeval.types._factors import BinSpec, ClassAxis, FactorInfo, FactorLevel, FactorLevelSchema, LevelSpec
+from dataeval.types._factors import (
+    AggregationRecord,
+    Aggregator,
+    BinSpec,
+    ClassAxis,
+    FactorInfo,
+    FactorLevel,
+    FactorLevelSchema,
+    LevelSpec,
+)
 from dataeval.types._index import SourceIndex
 from dataeval.types._ontology import AlignmentRelation, Correspondence, OntologyConcept
 from dataeval.types._output import (

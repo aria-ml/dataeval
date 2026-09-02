@@ -15,7 +15,7 @@ import polars as pl
 import pytest
 
 from dataeval import Metadata
-from dataeval._helpers import _edge_format, factor_code_names
+from dataeval._helpers import _code_names, _edge_format, factor_code_names
 from dataeval._metadata._encoding import DESCRIPTOR_VERSION, encoding_from_json, encoding_to_json
 from dataeval._metadata._metadata import _reconcile_encoding
 from dataeval.types import BinSpec, LevelSpec
@@ -735,10 +735,10 @@ class TestASaveBeforeTheFirstReadKeepsTheDeclaration:
 class TestTheRecordSurvivesEveryValueAColumnCanHold:
     """The descriptor is only reviewable if every level a factor can carry fits in JSON.
 
-    Two do not, and both reach the record through ordinary columns: a missing value, which
-    ``json`` writes as a bare ``NaN`` token no other reader accepts, and a binary column,
-    which it refuses outright -- from ``encoding_digest``, which every bias evaluator reads
-    *after* computing its result.
+    The one value that never has to fit is a missing one: it is not a level on any path,
+    so it never reaches the vocabulary to be written as the bare ``NaN`` token no other
+    reader accepts. A binary column does reach it, and ``json`` refuses one outright --
+    from ``encoding_digest``, which every bias evaluator reads *after* computing its result.
     """
 
     def _gapped(self, n=60):
@@ -747,7 +747,13 @@ class TestTheRecordSurvivesEveryValueAColumnCanHold:
         grade[3] = np.nan
         return {"grade": grade}
 
-    def test_a_missing_level_is_written_as_json_any_reader_accepts(self, tmp_path):
+    def test_a_missing_value_is_not_written_as_a_level(self, tmp_path):
+        """It is not one of the values the factor takes, so the vocabulary does not name it.
+
+        Recorded as a level it was a bare ``NaN`` token in the JSON, a level called "nan"
+        beside real ones in every report, and observed occupancy to anything measuring how
+        well a cut fits -- on the one encoding path of three that never reserved a code.
+        """
         path = tmp_path / "encoding.json"
         _md(self._gapped(), n=60).export_encoding(path)
 
@@ -755,10 +761,18 @@ class TestTheRecordSurvivesEveryValueAColumnCanHold:
             raise AssertionError(f"{token} is not JSON")
 
         document = json.loads(path.read_text(), parse_constant=refuse)
-        assert document["factors"]["grade"]["levels"][-1] is None
+        assert document["factors"]["grade"]["levels"] == [0.0, 1.0, 2.0, 3.0]
 
-    def test_the_missing_level_comes_back_as_the_missing_value(self, tmp_path):
-        """`null` has to read back as a gap, or reapplying the record renumbers the factor."""
+    def test_taking_it_out_of_the_vocabulary_renumbers_nothing(self):
+        """`np.unique` collapses NaN to one entry and sorts it last, so the code a missing
+        row already held is exactly the one `missing_code` names."""
+        md = _md(self._gapped(), n=60)
+        codes = md.factor_data[:, list(md.factor_names).index("grade")]
+        assert codes[3] == md.encoding("grade").missing_code
+        assert md.factor_info["grade"].missing == 1
+
+    def test_the_missing_value_comes_back_as_a_missing_value(self, tmp_path):
+        """It has to read back as a gap, or reapplying the record renumbers the factor."""
         path = tmp_path / "encoding.json"
         md = _md(self._gapped(), n=60)
         md.export_encoding(path)
@@ -954,3 +968,33 @@ class TestStrictSurvivesTheArchive:
         _md(_winter()).save(path)
 
         assert Metadata.load(path)._strict is False
+
+
+@pytest.mark.required
+class TestARecordedVocabularyAcceptsAPartlyDeclaredFactor:
+    """The derived path splits missing values out; the replay path has to do the same."""
+
+    @staticmethod
+    def _partly_declared():
+        from tests.metadata.test_structurers import _mot_dataset
+
+        return _mot_dataset([[1], [1], [1]], [{"w": "sun"}, {"w": "rain"}, {}])
+
+    def test_applying_a_declared_vocabulary_does_not_raise(self):
+        """`np.unique` cannot sort None against a string — it raised rather than answering,
+        so a partly recorded factor had no way through the recorded-encoding path at all."""
+        metadata = Metadata(self._partly_declared(), partial_factors=True, factor_levels={"w": ["sun", "rain"]})
+        assert metadata.rows_at("sequence")["w"].to_list() == ["sun", "rain", None]
+
+    def test_the_unrecorded_row_takes_the_reserved_code_rather_than_a_level(self):
+        """A value nobody recorded is not one of the values the factor takes."""
+        metadata = Metadata(self._partly_declared(), partial_factors=True, factor_levels={"w": ["sun", "rain"]})
+        spec = metadata.encoding("w")
+        assert spec.levels == ("sun", "rain")
+        codes = metadata.factor_data[:, list(metadata.factor_names).index("w")]
+        assert codes.tolist()[2] == spec.missing_code
+
+    def test_the_reserved_code_is_named_rather_than_numbered(self):
+        """It rendered as a bare '2' beside real category names, reading as a category."""
+        spec = LevelSpec(levels=("fog", "rain"), provenance="derived")
+        assert _code_names(np.array([0, 1, 2]), spec)[2] == "missing"

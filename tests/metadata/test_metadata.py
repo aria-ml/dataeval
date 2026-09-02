@@ -633,3 +633,61 @@ def test_accept_passes_over_factors_already_ratified(get_od_dataset):
     # Naming them again reaches the skip: their provenance is no longer "derived".
     metadata.accept(*names)
     assert {name: metadata._factor_info[name].encoding for name in names} == accepted
+
+
+@pytest.mark.required
+class TestDerivedCopiesShareNothingMutable:
+    """Every derived instance owns what it reads the store through, including the declarations."""
+
+    @staticmethod
+    def _source(get_od_dataset):
+        metadata = Metadata(get_od_dataset(6, targets_per_image=2, metadata=[{"w": "a", "n": 1.0}] * 6))
+        metadata._structure()
+        metadata.add_factors({"box_area": np.arange(float(metadata.level_counts["instance"]))}, level="instance")
+        return metadata
+
+    @staticmethod
+    def _derive(name, metadata):
+        return {
+            "at": lambda: metadata.at("instance"),
+            "where": lambda: metadata.where(pl.col("n") > 0.0, level="unit"),
+            "having": lambda: metadata.having(pl.col("class_label") >= 0, level="instance"),
+            "classed_by": lambda: metadata.classed_by("w"),
+            "agg": lambda: metadata.agg("instance", "unit", pl.len().alias("n_det")),
+            "aggregate": lambda: metadata.aggregate("box_area", level="unit", how="mean"),
+            "reencode": lambda: metadata.reencode(),
+        }[name]()
+
+    @pytest.mark.parametrize("name", ["at", "where", "having", "classed_by", "agg", "aggregate", "reencode"])
+    def test_renaming_a_class_on_the_copy_does_not_reach_the_source(self, get_od_dataset, name):
+        """``index2label`` hands its dict straight back, which is the same leak shape as the
+        three declarations below — reachable only by mutating what the getter returns."""
+        metadata = self._source(get_od_dataset)
+        derived = self._derive(name, metadata)
+        derived.index2label[999] = "renamed"
+        assert 999 not in metadata.index2label
+
+    @pytest.mark.parametrize("name", ["at", "where", "having", "classed_by", "agg", "aggregate", "reencode"])
+    @pytest.mark.parametrize("declaration", ["exclude", "include", "continuous_factor_bins"])
+    def test_a_declaration_written_on_the_copy_does_not_reach_the_source(self, get_od_dataset, name, declaration):
+        """These three were shared by every derived path, so they were the leak nothing noticed.
+
+        Every setter rebinds its field rather than mutating it, so the only way to reach the
+        shared container is through the getter — which is precisely what a caller does when
+        they add one name to an existing selection.
+        """
+        metadata = self._source(get_od_dataset)
+        derived = self._derive(name, metadata)
+        if declaration == "continuous_factor_bins":
+            derived.continuous_factor_bins["n"] = 3
+            assert dict(metadata.continuous_factor_bins) == {}
+        else:
+            getattr(derived, declaration).add("w")
+            assert getattr(metadata, declaration) == set()
+
+    def test_excluding_on_a_copy_does_not_drop_the_factor_from_the_source(self, get_od_dataset):
+        """The consequence that made it worth fixing rather than documenting."""
+        metadata = self._source(get_od_dataset)
+        before = set(metadata.factor_names)
+        metadata.at("instance").exclude.add("w")
+        assert set(metadata.factor_names) == before
