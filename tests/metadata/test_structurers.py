@@ -231,6 +231,102 @@ class TestReservedColumnParity:
         md = Metadata.from_factors({"iou": np.array([0.1, 0.2])}, np.array([0, 1]), level="instance")
         assert self._reserved(md) == self._reserved(Metadata.from_factors({"a": np.array([1, 2])}))
 
+    def test_from_factors_carries_item_id(self):
+        """No datum means no datum id, so the positional index stands in -- but the column is there.
+
+        Without it ``md.dataframe["item_id"]`` raises on a from_factors Metadata and works on
+        a dataset one, which is exactly the drift the reserved schema exists to prevent.
+        """
+        md = Metadata.from_factors({"a": np.array([1, 2, 3])}, np.array([0, 1, 0]))
+        assert md.dataframe["item_id"].to_list() == md.dataframe["item_index"].to_list() == [0, 1, 2]
+
+    def test_from_factors_carries_item_id_at_both_levels(self):
+        """The two-level shape a source index reaches carries it on unit and instance rows alike."""
+        source_index = [SourceIndex(0, None), SourceIndex(1, None), SourceIndex(0, 0), SourceIndex(1, 0)]
+        md = Metadata.from_factors({"mean": np.array([1.0, 2.0, 3.0, 4.0])}, source_index=source_index)
+
+        assert md.levels == ("unit", "instance")
+        for level in md.levels:
+            rows = md.rows_at(level)
+            assert rows["item_id"].to_list() == rows["item_index"].to_list()
+
+
+@pytest.mark.required
+class TestIdFieldsAreReserved:
+    """The MAITE datum ``id`` is identity, not a factor.
+
+    It is reserved (never binned, never in the factor set), carried on the ``item_id``
+    column at every level so a row can be traced back to its source item, and validated
+    unique.
+    """
+
+    @staticmethod
+    def _ic(n: int, metadata: list | None = None) -> Metadata:
+        labels = np.arange(n) % 2
+        return Metadata(
+            MockDataset(np.zeros((n, 4, 4, 3), dtype=np.uint8), np.eye(2)[labels], metadata),
+            task="IC",
+        )
+
+    def test_default_integer_id_is_not_a_factor(self):
+        # MockDataset defaults each datum's metadata to {"id": idx} — the MAITE default.
+        md = self._ic(5)
+        assert "id" not in md.factor_names
+        assert "item_id" in md.dataframe.columns
+        assert md.at("unit").dataframe["item_id"].to_list()[:5] == [0, 1, 2, 3, 4]
+
+    def test_string_ids_are_carried_not_binned(self):
+        meta = [{"id": f"img-{i}", "camera": "a" if i % 2 else "b"} for i in range(8)]
+        md = self._ic(8, meta)
+        assert "id" not in md.factor_names
+        assert "item_id#" not in md.dataframe.columns  # an id is never cut into bins
+        assert md.at("unit").dataframe["item_id"].to_list()[:3] == ["img-0", "img-1", "img-2"]
+        assert "camera" in md.factor_names
+
+    def test_item_id_reachable_at_the_label_level(self):
+        md = self._ic(6, [{"id": f"img-{i}"} for i in range(6)])
+        rows = md.rows_at(md.label_level)
+        assert "item_id" in rows.columns
+
+    def test_repeated_item_ids_are_kept(self):
+        """A view that draws an item twice repeats its id, and that is the truth about it."""
+        meta = [{"id": i % 2} for i in range(4)]  # 0, 1, 0, 1
+        md = self._ic(4, meta)
+        assert "id" not in md.factor_names
+        assert md.at("unit").dataframe["item_id"].to_list()[:4] == [0, 1, 0, 1]
+
+    def test_missing_ids_fall_back_to_positional(self):
+        md = self._ic(4, [{"camera": "a"} for _ in range(4)])  # no id key at all
+        assert "id" not in md.factor_names
+        assert md.at("unit").dataframe["item_id"].to_list()[:4] == [0, 1, 2, 3]
+
+    def test_a_nested_id_key_is_kept_as_a_factor(self):
+        """Only the datum's *own* id is identity; a nested one is something measured.
+
+        It minimizes to the bare ``id``, so dropping by merged name alone deleted it
+        outright -- and with no entry in ``dropped_factors`` to say where it went.
+        """
+        md = self._ic(4, [{"sensor": {"id": 7 + i}, "camera": "a"} for i in range(4)])
+        assert "metadata_id" in md.factor_names
+        assert md.at("unit").dataframe["item_id"].to_list()[:4] == [0, 1, 2, 3]
+
+    def test_ids_of_mixed_type_are_refused(self):
+        """Left to polars this is a TypeError naming neither the id nor the item."""
+        with pytest.raises(ValueError, match="must all have one type"):
+            _ = self._ic(4, [{"id": 0}, {"id": "a"}, {"id": 2}, {"id": 3}]).factor_names
+
+    def test_an_unhashable_id_is_carried_as_a_list_column(self):
+        """Nothing hashes an id any more, so a list one is a column like any other."""
+        md = self._ic(4, [{"id": [i]} for i in range(4)])
+        assert md.at("unit").dataframe["item_id"].to_list()[:2] == [[0], [1]]
+
+    def test_id_names_are_escaped_from_the_factor_namespace(self):
+        from dataeval._metadata._structurers import safe_column_name
+
+        assert safe_column_name("id") == "metadata_id"
+        assert safe_column_name("item_id") == "metadata_item_id"
+        assert safe_column_name("track_id") == "metadata_track_id"
+
 
 def _two_level_blocks() -> list[RowBlock]:
     """A unit block of 2 and an instance block of 3, wired for propagation."""

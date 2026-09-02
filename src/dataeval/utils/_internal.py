@@ -603,7 +603,7 @@ def _flatten_for_merge(
     ignore_lists: bool,
     fully_qualified: bool,
     targets: int | None,
-) -> tuple[dict[str, list[Any]] | dict[str, Any], int, dict[str, list[str]]]:
+) -> tuple[dict[str, list[Any]] | dict[str, Any], dict[str, list[str]]]:
     flattened, image_repeats, dropped_inner = flatten_metadata(
         metadatum,
         return_dropped=True,
@@ -621,8 +621,7 @@ def _flatten_for_merge(
             )
         if targets != image_repeats:
             flattened = {k: [v] * targets for k, v in flattened.items()}
-        image_repeats = targets
-    return flattened, image_repeats, dropped_inner
+    return flattened, dropped_inner
 
 
 def _merge(  # noqa: C901
@@ -630,17 +629,16 @@ def _merge(  # noqa: C901
     ignore_lists: bool,
     fully_qualified: bool,
     targets_per_image: Sequence[int] | None,
-) -> tuple[dict[str, list[Any]], dict[str, set[DropReason]], NDArray[np.intp]]:
+) -> tuple[dict[str, list[Any]], dict[str, set[DropReason]]]:
     merged: dict[str, list[Any]] = {}
     isect: set[str] = set()
     union: set[str] = set()
-    image_repeats = np.zeros(len(dicts), dtype=np.intp)
     dropped: dict[str, set[DropReason]] = {}
     for i, d in enumerate(dicts):
         targets = None if targets_per_image is None else targets_per_image[i]
         if targets == 0:
             continue
-        flattened, image_repeats[i], dropped_inner = _flatten_for_merge(d, ignore_lists, fully_qualified, targets)
+        flattened, dropped_inner = _flatten_for_merge(d, ignore_lists, fully_qualified, targets)
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
         union.update(flattened.keys())
         for k, v in dropped_inner.items():
@@ -651,19 +649,8 @@ def _merge(  # noqa: C901
     for k in union - isect:
         dropped.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
 
-    if image_repeats.sum() == image_repeats.size:
-        image_indices = np.arange(image_repeats.size)
-    else:
-        image_ids = np.arange(image_repeats.size)
-        image_data = np.concatenate(
-            [np.repeat(image_ids[i], image_repeats[i]) for i in range(image_ids.size)],
-            dtype=np.intp,
-        )
-        _, image_unsorted = np.unique(image_data, return_inverse=True)
-        image_indices = np.sort(image_unsorted)
-
     merged = {k: simplify_type(v) for k, v in merged.items() if k in isect}
-    return merged, dropped, image_indices
+    return merged, dropped
 
 
 @overload
@@ -675,7 +662,6 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
-    image_index_key: str = "_image_index",
 ) -> tuple[dict[str, list[Any]], dict[str, list[str]]]: ...
 
 
@@ -688,7 +674,6 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
-    image_index_key: str = "_image_index",
 ) -> dict[str, list[Any]]: ...
 
 
@@ -701,7 +686,6 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
-    image_index_key: str = "_image_index",
 ) -> tuple[dict[str, NDArray[Any]], dict[str, list[str]]]: ...
 
 
@@ -714,7 +698,6 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
-    image_index_key: str = "_image_index",
 ) -> dict[str, NDArray[Any]]: ...
 
 
@@ -726,15 +709,12 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     targets_per_image: Sequence[int] | None = None,
-    image_index_key: str = "_image_index",
 ):
     """
     Merge a collection of metadata dictionaries into a single flattened dictionary.
 
     Nested dictionaries are flattened, and lists are expanded. Nested lists are
     dropped as the expanding into multiple hierarchical trees is not supported.
-    The function adds an internal "_image_index" key to the metadata dictionary
-    used by the `Metadata` class.
 
     Parameters
     ----------
@@ -750,8 +730,6 @@ def merge_metadata(
         Option to return dictionary keys full qualified instead of minimized
     targets_per_image : Sequence[int] or None, default None
         Number of targets for each image metadata entry
-    image_index_key : str, default "_image_index"
-        User provided metadata key which maps the metadata entry to the source image.
 
     Returns
     -------
@@ -770,7 +748,7 @@ def merge_metadata(
     >>> list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
     >>> reorganized_metadata, dropped_keys = merge_metadata(list_metadata, return_dropped=True)
     >>> reorganized_metadata
-    {'common': [1, 1], 'a': [1, 2], 'b': [3, 4], 'source': ['example', 'example'], '_image_index': [0, 0]}
+    {'common': [1, 1], 'a': [1, 2], 'b': [3, 4], 'source': ['example', 'example']}
     >>> dropped_keys
     {'target_c': ['inconsistent_key']}
     """
@@ -779,12 +757,9 @@ def merge_metadata(
     if targets_per_image is not None and len(dicts) != len(targets_per_image):
         raise ValueError("Number of targets per image must be equal to number of metadata entries.")
 
-    merged, dropped, image_indices = _merge(dicts, ignore_lists, fully_qualified, targets_per_image)
+    merged, dropped = _merge(dicts, ignore_lists, fully_qualified, targets_per_image)
 
     output: dict[str, Any] = {k: np.asarray(v) for k, v in merged.items()} if return_numpy else merged
-
-    if image_index_key not in output:
-        output[image_index_key] = image_indices if return_numpy else image_indices.tolist()
 
     if return_dropped:
         return output, sorted_drop_reasons(dropped)

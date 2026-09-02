@@ -163,11 +163,33 @@ class _MergedDataset(AnnotatedDataset[_TDatum]):
             index += len(self)
         if index < 0 or index >= len(self):
             raise IndexError(f"Index {index} out of range for merged dataset of size {len(self)}")
-        for dataset, length in zip(self._datasets, self._lengths, strict=True):
+        for source, (dataset, length) in enumerate(zip(self._datasets, self._lengths, strict=True)):
             if index < length:
-                return dataset[index]
+                return self._namespaced_id(dataset[index], source)
             index -= length
         raise IndexError(index)  # pragma: no cover - guarded above
+
+    @staticmethod
+    def _namespaced_id(datum: _TDatum, source: int) -> _TDatum:
+        """Re-key a datum's own ``id`` so the merged set's item ids stay unique.
+
+        Two sources can both name an item ``0``, and the merged dataset is itself a valid
+        dataset whose items must be distinguishable. Prefixing the id with the source's
+        position keeps it unique and still traceable to the item it came from. Only the
+        MAITE ``(input, target, metadata)`` triple carries an ``id``; any other shape is
+        handed back untouched.
+        """
+        if isinstance(datum, tuple) and len(datum) == 3 and isinstance(datum[2], Mapping) and "id" in datum[2]:
+            metadata = dict(datum[2])
+            metadata["id"] = f"{source}:{metadata['id']}"
+            # Rebuilt through ``_make`` when the datum is a NamedTuple, so it stays one: a
+            # plain ``(a, b, c)`` would strip the field names a caller reads the datum by,
+            # turning ``datum.metadata`` into an AttributeError on the merged set alone.
+            rebuild = getattr(type(datum), "_make", None)
+            if rebuild is not None:
+                return rebuild((datum[0], datum[1], metadata))
+            return (datum[0], datum[1], metadata)  # type: ignore[return-value]
+        return datum
 
     def __iter__(self) -> Iterator[_TDatum]:
         for i in range(len(self)):
@@ -190,6 +212,16 @@ def merge_datasets(
     to conform datasets to a common reference vocabulary first. Datasets must also
     share a compatible datum shape (e.g. all MAITE ``(input, target, metadata)``
     triples); merging structurally different datums is not supported.
+
+    Each datum's own ``id`` is re-keyed to ``"<position>:<id>"``, where ``position`` is
+    the dataset's place in the merge, so that two sources naming an item ``0`` stay
+    distinguishable — the merged view is itself a dataset, and
+    :class:`~dataeval.Metadata` reads the ``id`` as the item's identity. A datum that
+    carries no ``id`` is passed through untouched.
+
+    .. versionchanged:: 1.2
+        Each datum's ``id`` is prefixed with its source dataset's position. v1.1 passed
+        each source's ids through unchanged, so two sources could name one item.
 
     Parameters
     ----------

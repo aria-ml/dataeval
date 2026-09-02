@@ -329,11 +329,11 @@ class Balance(Evaluator):
 
         Reading the column as a ranking: where an image was taken accounts for a quarter of
         what the class label tells you and when it was taken for a twelfth, while the
-        weather, the camera angle and the image's own id account for none of it. A model
+        weather and the camera angle account for none of it. A model
         trained here could reach for the location instead of the object.
 
         >>> result.balance
-        shape: (6, 2)
+        shape: (5, 2)
         ┌─────────────┬──────────┐
         │ factor_name ┆ mi_value │
         │ ---         ┆ ---      │
@@ -341,47 +341,46 @@ class Balance(Evaluator):
         ╞═════════════╪══════════╡
         │ class_label ┆ 1.0      │
         │ angle       ┆ 0.010253 │
-        │ id          ┆ 0.0      │
         │ location    ┆ 0.244383 │
         │ time_of_day ┆ 0.080863 │
         │ weather     ┆ 0.015113 │
         └─────────────┴──────────┘
 
         >>> result.factors
-        shape: (20, 5)
+        shape: (12, 5)
         ┌─────────────┬─────────────┬──────────┬───────────────┬───────────┐
         │ factor1     ┆ factor2     ┆ mi_value ┆ is_correlated ┆ scored_as │
         │ ---         ┆ ---         ┆ ---      ┆ ---           ┆ ---       │
         │ cat         ┆ cat         ┆ f64      ┆ bool          ┆ cat       │
         ╞═════════════╪═════════════╪══════════╪═══════════════╪═══════════╡
-        │ angle       ┆ id          ┆ 0.017837 ┆ false         ┆ table     │
         │ angle       ┆ location    ┆ 0.071866 ┆ false         ┆ table     │
         │ angle       ┆ time_of_day ┆ 0.014648 ┆ false         ┆ table     │
         │ angle       ┆ weather     ┆ 0.001868 ┆ false         ┆ table     │
-        │ id          ┆ angle       ┆ 0.017837 ┆ false         ┆ table     │
+        │ location    ┆ angle       ┆ 0.071866 ┆ false         ┆ table     │
+        │ location    ┆ time_of_day ┆ 0.422186 ┆ false         ┆ table     │
         │ …           ┆ …           ┆ …        ┆ …             ┆ …         │
+        │ time_of_day ┆ location    ┆ 0.422186 ┆ false         ┆ table     │
         │ time_of_day ┆ weather     ┆ 0.007897 ┆ false         ┆ table     │
         │ weather     ┆ angle       ┆ 0.001868 ┆ false         ┆ table     │
-        │ weather     ┆ id          ┆ 0.0      ┆ false         ┆ table     │
         │ weather     ┆ location    ┆ 0.084927 ┆ false         ┆ table     │
         │ weather     ┆ time_of_day ┆ 0.007897 ┆ false         ┆ table     │
         └─────────────┴─────────────┴──────────┴───────────────┴───────────┘
 
         >>> result.classwise
-        shape: (20, 4)
+        shape: (16, 4)
         ┌────────────┬─────────────┬──────────┬───────────────┐
         │ class_name ┆ factor_name ┆ mi_value ┆ is_imbalanced │
         │ ---        ┆ ---         ┆ ---      ┆ ---           │
         │ cat        ┆ cat         ┆ f64      ┆ bool          │
         ╞════════════╪═════════════╪══════════╪═══════════════╡
         │ boat       ┆ angle       ┆ 0.0      ┆ false         │
-        │ boat       ┆ id          ┆ 0.0      ┆ false         │
         │ boat       ┆ location    ┆ 0.123615 ┆ false         │
         │ boat       ┆ time_of_day ┆ 0.064551 ┆ false         │
         │ boat       ┆ weather     ┆ 0.003375 ┆ false         │
+        │ car        ┆ angle       ┆ 0.001652 ┆ false         │
         │ …          ┆ …           ┆ …        ┆ …             │
+        │ person     ┆ weather     ┆ 0.030806 ┆ false         │
         │ plane      ┆ angle       ┆ 0.0      ┆ false         │
-        │ plane      ┆ id          ┆ 0.0      ┆ false         │
         │ plane      ┆ location    ┆ 0.194114 ┆ false         │
         │ plane      ┆ time_of_day ┆ 0.033996 ┆ false         │
         │ plane      ┆ weather     ┆ 0.0      ┆ false         │

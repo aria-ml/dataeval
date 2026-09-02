@@ -85,10 +85,11 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
         # level and let propagation replicate it instead of storing it twice.
         instance_factors = {name: values for name, values in instance_factors.items() if name not in unit_factors}
 
+        item_ids = self._item_ids(raw)
         unit_block = RowBlock(
             "unit",
             count,
-            reserved_block_columns("unit", count, item_index=list(range(count))),
+            reserved_block_columns("unit", count, item_index=list(range(count)), item_id=item_ids),
             {"unit": self._own_positions(count)},
         )
         # ``instance_index`` is the instance level's own key component; ``target_index`` is the
@@ -102,6 +103,7 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
                 "instance",
                 instances,
                 item_index=unit_of_instance,
+                item_id=self._gather_ids(item_ids, unit_of_instance),
                 target_index=instance_index,
                 class_label=class_labels,
                 score=score_values,

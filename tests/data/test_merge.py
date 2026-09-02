@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, NamedTuple
 
 import pytest
 
@@ -38,6 +38,60 @@ class _IterableDataset:
 
     def __iter__(self):
         return iter(self._items)
+
+
+class _Datum(NamedTuple):
+    """A MAITE triple spelled as a NamedTuple, which callers read by field name."""
+
+    input: str
+    target: int
+    metadata: dict[str, Any]
+
+
+class _TripleDataset:
+    """Datums as MAITE ``(input, target, metadata)`` triples carrying their own id."""
+
+    def __init__(self, tag: str, n: int, index2label: dict[int, str], datum_type=tuple) -> None:
+        self._items = [
+            datum_type((tag, 0, {"id": i})) if datum_type is tuple else datum_type(tag, 0, {"id": i}) for i in range(n)
+        ]
+        self.metadata = DatasetMetadata(id=tag, index2label=dict(index2label))
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def __getitem__(self, index: int):
+        return self._items[index]
+
+
+@pytest.mark.required
+class TestMergedDatumIds:
+    """Two sources can both name an item ``0``; the merged view keeps them apart."""
+
+    i2l = {0: "cat"}
+
+    def test_ids_are_namespaced_by_source_position(self):
+        merged = merge_datasets(_TripleDataset("a", 2, self.i2l), _TripleDataset("b", 2, self.i2l))
+        assert [datum[2]["id"] for datum in merged] == ["0:0", "0:1", "1:0", "1:1"]
+
+    def test_the_source_datum_is_not_mutated(self):
+        source = _TripleDataset("a", 1, self.i2l)
+        _ = merge_datasets(source, _TripleDataset("b", 1, self.i2l))[0]
+        assert source[0][2]["id"] == 0
+
+    def test_a_namedtuple_datum_stays_a_namedtuple(self):
+        """Rebuilding it as a bare tuple would turn ``datum.metadata`` into an AttributeError."""
+        merged = merge_datasets(
+            _TripleDataset("a", 1, self.i2l, _Datum),
+            _TripleDataset("b", 1, self.i2l, _Datum),
+        )
+        datum = merged[1]
+        assert isinstance(datum, _Datum)
+        assert datum.metadata["id"] == "1:0"
+
+    def test_a_datum_without_an_id_is_untouched(self):
+        merged = merge_datasets(_LabeledDataset("a", 1, self.i2l), _LabeledDataset("b", 1, self.i2l))
+        assert merged[1] == ("b", 0)
 
 
 @pytest.mark.required

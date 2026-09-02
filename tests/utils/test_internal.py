@@ -522,7 +522,6 @@ class TestUtilsMetadata:
             "f": [5],
             "g": [6],
             "h": [1],
-            "_image_index": [0],
         }
         assert d == {"c_d": ["nested_list"], "c_h": ["nested_list"]}
 
@@ -540,7 +539,6 @@ class TestUtilsMetadata:
             "d_d_f": [5, 5, 5],
             "d_d_g": [6, 6, 6],
             "d_h": [1, 1, 1],
-            "_image_index": [0, 0, 0],
         }
         assert d == {"c_d_z": ["inconsistent_key"]}
 
@@ -559,7 +557,6 @@ class TestUtilsMetadata:
             "d_d_f": [5, 5, 5],
             "d_d_g": [6, 6, 6],
             "d_h": [1, 1, 1],
-            "_image_index": [0, 0, 0],
         }
 
     @pytest.mark.parametrize("return_numpy", [False, True])
@@ -567,7 +564,6 @@ class TestUtilsMetadata:
         a, d = merge_metadata(self.inconsistent_keys, return_dropped=True, return_numpy=return_numpy)
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 2, 3],
-            "_image_index": [0, 1, 2],
         }
         assert d == {"b": ["inconsistent_key"], "c": ["inconsistent_size"], "d_e_f": ["nested_list"]}
 
@@ -579,7 +575,6 @@ class TestUtilsMetadata:
             "a": [1, 2],
             "b": [3, 4],
             "source": ["example", "example"],
-            "_image_index": [0, 0],
         }
         assert dropped_keys == {"target_c": ["inconsistent_key"]}
 
@@ -689,7 +684,6 @@ class TestUtilsMetadata:
             "xmax": [471, 289, 289, 203, 273, 395, 500, 500, 500, 361, 212],
             "ymax": [420, 167, 167, 35, 121, 237, 188, 282, 375, 375, 357],
             "difficult": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            "_image_index": [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2],
         }
 
     @pytest.mark.filterwarnings("error")
@@ -716,7 +710,6 @@ class TestUtilsMetadata:
             "time": [1.2, 3.4, 5.6],
             "altitude": [235, 6789, 101112],
             "point": [4, 4, 4],
-            "_image_index": [0, 0, 0],
         }
         assert dropped == {}
 
@@ -724,10 +717,6 @@ class TestUtilsMetadata:
         targets_per_image = [1]
         with pytest.raises(ValueError, match="Number of targets per image must be equal"):
             merge_metadata([{"a": 1}, {"a": 2}], targets_per_image=targets_per_image)
-
-    def test_image_index_key_exists_in_output(self):
-        merge_metadatad = merge_metadata([{"a": {"b": 1, "c": 2, "foo": 0}}], image_index_key="foo")
-        assert merge_metadatad["foo"] == [0]
 
     def test_merge_metadata_drop_no_targets(self):
         merge_metadatad = merge_metadata([{"a": 1}, {"a": 2}, {"a": 3}], targets_per_image=[1, 0, 1])

@@ -400,10 +400,12 @@ on, so the verdict and the edges are read off one set of numbers.
 
 A discrete verdict says the factor's support is countable. It does not promise
 the support is *small*, and an integer factor can be discrete while taking a
-value per entity — pixel areas, epoch seconds, identifiers. Scoring one of those
-a value at a time is what makes it report a correlation with anything it is
-measured against, because a contingency table with more cells than observations
-records which cells were hit rather than anything about the factor.
+value per entity — pixel areas, epoch seconds, or a non-reserved identifier-like
+column. Scoring one of those a value at a time is what makes it report a correlation
+with anything it is measured against, because a contingency table with more cells than
+observations records which cells were hit rather than anything about the factor. The
+datum's own `id` is never a factor to begin with — it is reserved and carried on the
+`item_id` column — so this question does not arise for it.
 
 So no numeric factor carries more levels than the sample's level budget,
 `max(20, sqrt(n))`, with `n` counted at the factor's own level.
@@ -748,8 +750,9 @@ number.
 default unit — is affected, and only below a resolution no bin edge on a capture
 time is placed at. What it does change is the *distinct count* of such a column,
 which feeds the continuous/discrete verdict and the near-uniqueness test that
-drops identifiers. If a sub-microsecond difference is one you need kept, cast the
-column to `datetime64[us]` before handing it to {meth}`.Metadata.add_factors`.
+drops a near-unique non-reserved column. If a sub-microsecond difference is one you
+need kept, cast the column to `datetime64[us]` before handing it to
+{meth}`.Metadata.add_factors`.
 
 ### The automatic path announces itself
 

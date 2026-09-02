@@ -271,10 +271,10 @@ analyzes only the factors defined **at** the view itself.
 On an object detection dataset with image metadata plus per-image and
 per-detection brightness from {func}`.compute_stats`:
 
-| view                       | `inherited=True` (default)                                             | `inherited=False`     |
-| -------------------------- | ---------------------------------------------------------------------- | --------------------- |
-| `at("unit")` — 50 rows     | `angle`, `id`, `location`, `time_of_day`, `unit_brightness`, `weather` | *the same six*        |
-| `at("instance")` — 93 rows | all six above, plus `instance_brightness`                              | `instance_brightness` |
+| view                       | `inherited=True` (default)                                       | `inherited=False`     |
+| -------------------------- | ---------------------------------------------------------------- | --------------------- |
+| `at("unit")` — 50 rows     | `angle`, `location`, `time_of_day`, `unit_brightness`, `weather` | *the same five*       |
+| `at("instance")` — 93 rows | all five above, plus `instance_brightness`                       | `instance_brightness` |
 
 Two observations about this example: The row count is set by the view alone — `inherited`
 never changes how many rows there are, only how many columns describe them. And
@@ -302,7 +302,7 @@ rolled = md.agg(
 )
 
 rolled.at("unit").factor_names
-# ['angle', 'id', 'location', 'mean_bright', 'n_detections',
+# ['angle', 'location', 'mean_bright', 'n_detections',
 #  'time_of_day', 'unit_brightness', 'weather']
 ```
 
@@ -451,6 +451,21 @@ Every one of those names a row **within its item**, because `unit_index`,
 `track_id` and `target_index` all restart in every sequence. DataEval matches on
 `(item_index, key)` for that reason. A sequence needs no key of its own: there is
 one per item, so the item names it outright.
+
+The `*_index` columns are DataEval's own *positional* identity: dense, zero-based,
+rebuildable from order alone. They are distinct from the dataset's own identifiers,
+which are **reserved** and never treated as factors. `item_id` carries the datum's
+own `id` — the value MAITE requires on every item — on every row, so any row can be
+traced back to its source item; `track_id` does the same for a tracking observation.
+It is a lookup, not a key: a view that draws one item more than once
+(`ClassBalance` oversampling, `Indices([0, 0, 1])`) puts one id on several rows, and
+that is the truth about where those rows came from. A `Metadata` built from raw
+factors has no datum to ask, so its `item_id` is the positional index.
+
+Neither identifier is binned, correlated, or reported on: an identifier names a
+row, it does not measure the data. A metadata key spelled `id` is carried onto
+`item_id` rather than read as a factor, and a factor that would shadow a reserved
+id name is renamed out of it.
 
 ```{warning}
 The key for a detection is `target_index`, **not** `instance_index`.

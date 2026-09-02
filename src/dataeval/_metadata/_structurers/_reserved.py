@@ -51,16 +51,31 @@ LEVEL_COLUMNS: tuple[str, ...] = (
     "sequence_index",
 )
 
-# Identifiers only some tasks produce. ``track_id`` names the track a tracking detection
-# belongs to, ``-1`` when the detection is untracked.
+# Identifiers: the MAITE component ids, reserved so none of them is binned or correlated
+# as though an identifier were an observed property of the data — exactly what
+# ``item_index`` and ``target_index`` are reserved to prevent.
 #
-# A reserved column rather than a factor, because it is an identifier: as a factor it
-# would be binned and handed to bias and diversity analysis as though a track number
-# were an observed property of the data, which is exactly what ``item_index`` and
-# ``target_index`` are reserved to prevent. It stays fully queryable —
-# ``rows_at("instance")["track_id"]`` — and this is also the column a future ``track``
-# level would key its rows on, so nothing has to move when tracks become rows.
-IDENTIFIER_COLUMNS: tuple[str, ...] = ("track_id",)
+# ``item_id`` is the datum's own ``id`` (see :data:`ID_KEY`): the dataset's identifier for
+# the item, carried on every row so any row can be traced back to its source item.
+# ``track_id`` names the track a tracking detection belongs to, ``-1`` when the detection
+# is untracked; it is also the column a ``track`` level keys its rows on. Each is emitted
+# only when a structurer supplies it, and both stay fully queryable —
+# ``rows_at("instance")["item_id"]``.
+#
+# Only these two, and there is no third to anticipate: MAITE declares an ``id`` on the datum
+# (``DatumMetadata.id``) and a ``track_ids`` on a tracking frame, and nowhere else. A target
+# has ``boxes``, ``labels`` and ``scores`` — no identifier — so its identity is positional
+# (``target_index``, dense within the item) and a ``target_id`` would have nothing to carry.
+# Per-component spellings are therefore left unreserved, by the rule stated above
+# ``LEVEL_COLUMNS``: reserving a name nothing writes costs a dataset carrying it as metadata
+# its own spelling for nothing. Add one here in the commit that starts writing it.
+IDENTIFIER_COLUMNS: tuple[str, ...] = ("item_id", "track_id")
+
+# The MAITE datum's own identifier key. It is the source of the ``item_id`` column above:
+# reserved as a *name* so a metadata key spelled ``id`` is carried onto ``item_id`` rather
+# than binned as a factor, and escaped by :func:`safe_column_name` so a factor that would
+# shadow it is renamed. It is not itself a column this layout writes.
+ID_KEY: str = "id"
 
 # How a :class:`~dataeval.types.SourceIndex` names one row at each level: the column its
 # ``key`` holds a value of, within the row's own ``item_index``. ``None`` where the item
@@ -87,7 +102,7 @@ LEVEL_KEY_COLUMNS: Mapping[FactorLevel, str | None] = MappingProxyType({
 # load-bearing, so a metadata key named ``level`` or ``instance_index`` is renamed
 # rather than allowed to clobber the column. :data:`LEGACY_COLUMNS` still holds the
 # original tuple for callers that need it.
-RESERVED_COLUMNS: tuple[str, ...] = LEGACY_COLUMNS + LEVEL_COLUMNS + IDENTIFIER_COLUMNS
+RESERVED_COLUMNS: tuple[str, ...] = LEGACY_COLUMNS + LEVEL_COLUMNS + IDENTIFIER_COLUMNS + (ID_KEY,)
 
 # Reserved columns a block emits only when it actually has a value for them: the
 # level-key columns, i.e. everything in LEVEL_COLUMNS that is not the level tag itself,
@@ -97,6 +112,13 @@ _OPTIONAL_COLUMNS: tuple[str, ...] = (
     *(name for name in LEVEL_COLUMNS if name != "level"),
     *IDENTIFIER_COLUMNS,
 )
+
+# Columns :func:`reserved_block_columns` can actually write: the always-present legacy set
+# plus the optional level-key and identifier columns. Deliberately narrower than
+# :data:`RESERVED_COLUMNS`, which also holds :data:`ID_KEY` — the ``id`` key is escaped as a
+# name but never written as a column, and a caller passing it should be told so rather than
+# have it dropped silently.
+_EMITTABLE_COLUMNS: tuple[str, ...] = LEGACY_COLUMNS + _OPTIONAL_COLUMNS
 
 
 def reserved_block_columns(level: FactorLevel, size: int, **values: Any) -> dict[str, Sequence[Any] | NDArray[Any]]:
@@ -129,12 +151,15 @@ def reserved_block_columns(level: FactorLevel, size: int, **values: Any) -> dict
     Raises
     ------
     ValueError
-        When a supplied name is not a reserved column, or when a supplied value
-        sequence is not ``size`` long.
+        When a supplied name is not a reserved column a block writes -- ``id`` is
+        reserved as a *name* but is carried on ``item_id``, not written under its own
+        spelling -- or when a supplied value sequence is not ``size`` long.
     """
-    unknown = sorted(set(values) - set(RESERVED_COLUMNS))
+    unknown = sorted(set(values) - set(_EMITTABLE_COLUMNS))
     if unknown:
-        raise ValueError(f"Column(s) {unknown} are not reserved columns {list(RESERVED_COLUMNS)}.")
+        raise ValueError(
+            f"Column(s) {unknown} are not reserved columns a block writes {list(_EMITTABLE_COLUMNS)}.",
+        )
 
     columns: dict[str, Sequence[Any] | NDArray[Any]] = {"level": [level] * size}
     for name in LEGACY_COLUMNS:

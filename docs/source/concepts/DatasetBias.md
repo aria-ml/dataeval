@@ -248,12 +248,14 @@ back to KNN-based estimation ([Kraskov et al., 2004](#ref7);
 the proportion of unique values in a factor. Discreteness is a statement about a
 factor's support rather than a promise that the support is small, so a numeric
 factor that reads as discrete but takes more distinct values than the sample can
-fill — pixel areas, timestamps, identifiers — is binned as well, against the same
-budget a histogram would use. Without that, the contingency table would hold
-more cells than there are observations to fill them. A non-numeric factor has no
-line to place edges on, so it keeps one category per distinct value however many
-there are; a string identifier column is best dropped from the metadata rather
-than measured.
+fill — pixel areas, timestamps, or a non-reserved identifier-like column — is binned
+as well, against the same budget a histogram would use. Without that, the contingency
+table would hold more cells than there are observations to fill them. A non-numeric
+factor has no line to place edges on, so it keeps one category per distinct value
+however many there are; a near-unique string column that is not a reserved id is best
+dropped from the metadata rather than measured. The datum's own `id` never reaches
+this question: it is a reserved identifier carried on the `item_id` column, validated
+unique, and excluded from the factor set.
 
 ```{note}
 Both directions are adjusted for chance, so a factor with many unique values no

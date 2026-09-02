@@ -103,10 +103,11 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
         # propagation do the replicating.
         instance_factors = {name: values for name, values in instance_factors.items() if name not in unit_factors}
 
+        item_ids = self._item_ids(raw)
         unit_block = RowBlock(
             "unit",
             count,
-            reserved_block_columns("unit", count, item_index=list(range(count))),
+            reserved_block_columns("unit", count, item_index=list(range(count)), item_id=item_ids),
             {"unit": self._own_positions(count)},
         )
         instance_block = RowBlock(
@@ -116,6 +117,7 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
                 "instance",
                 instance_count,
                 item_index=unit_of_instance,
+                item_id=self._gather_ids(item_ids, unit_of_instance),
                 # One instance per image at most, so the index within the image is
                 # always 0 — but derive it rather than assume, as object detection does.
                 # ``instance_index`` is the instance level's own key column and is

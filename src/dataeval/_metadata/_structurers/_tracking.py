@@ -311,16 +311,29 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         sequence_factors = without_displaced(sequence_factors, derived, "sequence")
         unit_factors = {**without_displaced(unit_factors, derived, "unit"), **frame_factors}
 
+        item_ids = self._item_ids(raw)
         sequence_block = RowBlock(
             "sequence",
             count,
-            reserved_block_columns("sequence", count, item_index=list(range(count)), sequence_index=list(range(count))),
+            reserved_block_columns(
+                "sequence",
+                count,
+                item_index=list(range(count)),
+                sequence_index=list(range(count)),
+                item_id=item_ids,
+            ),
             {"sequence": self._own_positions(count)},
         )
         unit_block = RowBlock(
             "unit",
             n_frames,
-            reserved_block_columns("unit", n_frames, item_index=sequence_of_frame, unit_index=frame_own_index_arr),
+            reserved_block_columns(
+                "unit",
+                n_frames,
+                item_index=sequence_of_frame,
+                unit_index=frame_own_index_arr,
+                item_id=self._gather_ids(item_ids, sequence_of_frame),
+            ),
             {**self._inherit(sequence_block.ancestor_pos, sequence_of_frame), "unit": self._own_positions(n_frames)},
         )
         track_block = RowBlock(
@@ -331,6 +344,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
                 n_tracks,
                 item_index=sequence_of_track,
                 track_index=track_index,
+                item_id=self._gather_ids(item_ids, sequence_of_track),
                 track_id=np.asarray(rows.track_id, dtype=np.intp),
             ),
             {**self._inherit(sequence_block.ancestor_pos, sequence_of_track), "track": self._own_positions(n_tracks)},
@@ -349,6 +363,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
                 instance_index=instance_index,
                 unit_index=unit_index_of_instance,
                 track_index=track_index_of_instance,
+                item_id=self._gather_ids(item_ids, sequence_of_instance),
                 track_id=track_id_values,
             ),
             # The diamond: two parents, so two inherited maps. The ``unit`` branch supplies

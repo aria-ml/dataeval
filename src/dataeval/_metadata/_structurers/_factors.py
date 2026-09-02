@@ -173,7 +173,14 @@ class FactorsStructurer(PropagationMixin, Structurer):
         """
         level = self.label_level
         size = len(class_labels)
-        columns = reserved_block_columns(level, size, item_index=item_indices, class_label=class_labels, **keyed)
+        # ``item_id`` is the positional item index here. There is no datum to carry an id
+        # of its own, so the index is the only honest identity for the row's source item --
+        # and it is the same fallback ``DatasetStructurer._item_ids`` uses for a dataset
+        # whose datums have none. Emitting it keeps the column unconditional, so a caller
+        # reading ``item_id`` need not ask which path built the Metadata.
+        columns = reserved_block_columns(
+            level, size, item_index=item_indices, item_id=item_indices, class_label=class_labels, **keyed
+        )
         block = RowBlock(level, size, columns, {level: self._own_positions(size)})
         named = {safe_column_name(str(name)): values for name, values in factors.items()}
         return StructuredData([block], {level: named}, {}, [], class_labels, item_indices)
@@ -256,7 +263,7 @@ class FactorsStructurer(PropagationMixin, Structurer):
         unit_block = RowBlock(
             "unit",
             unit_count,
-            reserved_block_columns("unit", unit_count, item_index=rows.item_ids),
+            reserved_block_columns("unit", unit_count, item_index=rows.item_ids, item_id=rows.item_ids),
             {"unit": self._own_positions(unit_count)},
         )
         instance_block = RowBlock(
@@ -266,6 +273,7 @@ class FactorsStructurer(PropagationMixin, Structurer):
                 "instance",
                 instance_count,
                 item_index=rows.label_items,
+                item_id=rows.label_items,
                 target_index=rows.label_targets,
                 class_label=labels,
                 instance_index=rows.label_targets,

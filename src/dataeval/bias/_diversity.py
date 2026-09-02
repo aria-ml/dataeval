@@ -208,7 +208,7 @@ class Diversity(Evaluator):
         >>> diversity = Diversity(method="simpson", threshold=0.5)
         >>> result = diversity.evaluate(metadata)
         >>> result.factors
-        shape: (6, 3)
+        shape: (5, 3)
         ┌─────────────┬─────────────────┬──────────────────┐
         │ factor_name ┆ diversity_value ┆ is_low_diversity │
         │ ---         ┆ ---             ┆ ---              │
@@ -216,27 +216,26 @@ class Diversity(Evaluator):
         ╞═════════════╪═════════════════╪══════════════════╡
         │ class_label ┆ 0.983706        ┆ false            │
         │ angle       ┆ 0.89455         ┆ false            │
-        │ id          ┆ 0.984866        ┆ false            │
         │ location    ┆ 0.824033        ┆ false            │
         │ time_of_day ┆ 0.903475        ┆ false            │
         │ weather     ┆ 0.950688        ┆ false            │
         └─────────────┴─────────────────┴──────────────────┘
 
         >>> result.classwise
-        shape: (20, 4)
+        shape: (16, 4)
         ┌────────────┬─────────────┬─────────────────┬──────────────────┐
         │ class_name ┆ factor_name ┆ diversity_value ┆ is_low_diversity │
         │ ---        ┆ ---         ┆ ---             ┆ ---              │
         │ cat        ┆ cat         ┆ f64             ┆ bool             │
         ╞════════════╪═════════════╪═════════════════╪══════════════════╡
         │ person     ┆ angle       ┆ 0.575269        ┆ false            │
-        │ person     ┆ id          ┆ 0.912791        ┆ false            │
         │ person     ┆ location    ┆ 0.034991        ┆ true             │
         │ person     ┆ time_of_day ┆ 0.532468        ┆ false            │
         │ person     ┆ weather     ┆ 0.833333        ┆ false            │
+        │ car        ┆ angle       ┆ 0.954545        ┆ false            │
         │ …          ┆ …           ┆ …               ┆ …                │
+        │ boat       ┆ weather     ┆ 0.957831        ┆ false            │
         │ plane      ┆ angle       ┆ 0.797153        ┆ false            │
-        │ plane      ┆ id          ┆ 0.973154        ┆ false            │
         │ plane      ┆ location    ┆ 0.683403        ┆ false            │
         │ plane      ┆ time_of_day ┆ 0.875622        ┆ false            │
         │ plane      ┆ weather     ┆ 0.918288        ┆ false            │

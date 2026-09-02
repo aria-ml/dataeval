@@ -92,14 +92,15 @@ class TestAnIntegerColumnIsAlreadyCoded:
 
         Reading its values natively tabulates it at full cardinality, where it reports 1.0
         against everything -- arithmetically correct and useless, and exactly what capping
-        the level count exists to prevent.
+        the level count exists to prevent. ``uid`` stands in for the reserved ``id`` key:
+        the same near-unique integer column under a name the layout does not own.
         """
         rng = np.random.default_rng(4)
-        factors = {"id": np.arange(N), "weather": np.array(["sun", "rain", "fog"])[rng.integers(0, 3, N)]}
+        factors = {"uid": np.arange(N), "weather": np.array(["sun", "rain", "fog"])[rng.integers(0, 3, N)]}
         result = Balance().evaluate(_md(factors))
 
         assert _regimes(result) == {"table"}
-        assert _score(result, "id", "weather") < 0.5
+        assert _score(result, "uid", "weather") < 0.5
 
     def test_a_count_keeps_the_bins_it_was_given(self):
         """Same argument without the pathology: a count is coded whichever array it is in."""
