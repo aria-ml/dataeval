@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
 #     display_name: dataeval
 #     language: python
@@ -217,8 +217,9 @@ print(f"Is an AnnotatedDataset: {isinstance(dataset, AnnotatedDataset)}")
 # %%
 metadata = Metadata(dataset)
 
-# "id" is a per-item identifier, not a meaningful factor for bias analysis
-metadata.exclude = ["id"]
+# The per-item "id" needs no exclusion: it names the datum rather than describing it, so DataEval
+# keeps it out of the factor space on its own (it becomes the reserved `item_id` column, not a
+# factor). The factors are exactly the metadata columns the adapter exposed.
 print(f"Factor names: {metadata.factor_names}")
 
 # %% [markdown]

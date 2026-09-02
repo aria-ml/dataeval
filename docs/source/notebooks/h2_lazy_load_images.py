@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
 #     display_name: dataeval
 #     language: python
@@ -272,7 +272,6 @@ def time_metadata_pass(lazy: bool) -> float:
     dataset = DataFrameDataset(catalog, index2label, lazy=lazy)
     start = time.perf_counter()
     metadata = Metadata(dataset)
-    metadata.exclude = ["id"]
     Balance().evaluate(metadata)
     return time.perf_counter() - start
 

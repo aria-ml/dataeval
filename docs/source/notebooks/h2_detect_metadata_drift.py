@@ -114,9 +114,10 @@ print(f"operational (2021): {len(operational):4d} frames")
 # See [Metadata levels](../concepts/MetadataLevels.md) for details on levels.
 
 # %%
-# Identifiers and per-clip filenames name rows rather than group them;
-# they are not flight conditions.
-EXCLUDE = ["id", "image_id", "storage"]
+# `storage` names the folder each clip came from: it identifies the source rather than
+# describing the flight, so it is excluded. Row identifiers need no manual exclusion - the
+# datum's `id` is kept in DataEval's reserved `item_id` column instead of becoming a factor.
+EXCLUDE = ["storage"]
 
 print(Metadata(reference, view="unit", exclude=EXCLUDE).dropped_factors)
 

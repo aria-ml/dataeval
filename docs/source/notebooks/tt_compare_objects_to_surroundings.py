@@ -407,8 +407,6 @@ capture_metadata = [
     "gimbal_heading",
     "gimbal_pitch",
     "height",
-    "id",
-    "image_id",
     "latitude",
     "longitude",
     "object_id",

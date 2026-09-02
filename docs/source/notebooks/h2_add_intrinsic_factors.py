@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
 #     display_name: dataeval
 #     language: python
@@ -104,7 +104,7 @@ print(f"Factor names: {metadata.factor_names}")
 
 # %%
 # Balance at index 0 is always class
-Balance().evaluate(metadata).balance[2]
+Balance().evaluate(metadata).balance[1]
 
 # %% [markdown]
 # ## Add image statistics to the metadata
@@ -133,8 +133,8 @@ metadata.add_factors(calc_results)
 # continuous. For this example, bin everything into 10 uniform-width bins.
 
 # %%
-# Exclude the id and batch_num as it is not a relevant factor for bias analysis
-metadata.exclude = ["id", "batch_num"]
+# Exclude the batch_num as it is not a relevant factor for bias analysis
+metadata.exclude = ["batch_num"]
 
 # Provide binning for the continuous statistical factors using 5 uniform-width bins for each factor
 keys = ("mean", "std", "var", "skew", "kurtosis", "entropy", "brightness", "darkness", "sharpness", "contrast", "zeros")

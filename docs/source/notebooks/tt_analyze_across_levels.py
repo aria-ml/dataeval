@@ -147,7 +147,7 @@ EXPECTED_COUNTS = {"unit": 200, "instance": 1305}
 
 if dict(metadata.level_counts) != EXPECTED_COUNTS:
     raise AssertionError(
-        f"This tutorial's prose was written against {EXPECTED_COUNTS} (maite-datasets 0.0.18), "
+        f"This tutorial's prose was written against {EXPECTED_COUNTS} (maite-datasets 0.0.21), "
         f"but your dataset yields {dict(metadata.level_counts)}. Every idea below still holds — "
         "levels, weighting, aggregation — but the specific figures quoted will not match your output."
     )
@@ -543,14 +543,15 @@ print(per_image_balance.balance.sort("mi_value", descending=True).head(5))
 # %% [markdown]
 # **The two evaluations produce distinct profiles, and both are correct.**
 #
-# At the object level, the ranking is led by `storage`, `object_id` and `image_id` — identifiers recording which
-# sortie and which frame an object was annotated in. Which class you are looking at is largely a function of which
-# flight you are looking at. Note where `object_size` lands by comparison: near the bottom of the table, well under a
+# At the object level, `class_label` tops the table at 1.0 against itself, and the rest of the ranking is led
+# by `storage` and `object_id` — identifiers recording which sortie an object was annotated in and which object it
+# was — with `altitude` and `gimbal_pitch` in between. Which class you are looking at is largely a function of which
+# flight you are looking at. Note where `object_size` lands by comparison: near the bottom of the table, about a
 # tenth of `storage`'s score. The intuitive guess — that a boat and a swimmer are told apart by how big the box is —
 # is not what this dataset reports.
 #
-# At the image level, those same sortie identifiers lead again, now joined by `longitude`, which records *where the
-# drone was flying*. Object crowding is fundamentally a property of the specific flight sortie, not of the individual
+# At the image level, the `n_objects` axis tops the table at 1.0 against itself, and `storage` leads the rest.
+# Object crowding is fundamentally a property of the specific flight sortie, not of the individual
 # objects. At the detection level that signal is diluted across every individual object in the dataset.
 #
 # This demonstrates the core utility of metadata levels: running the exact same evaluator over the exact same dataset

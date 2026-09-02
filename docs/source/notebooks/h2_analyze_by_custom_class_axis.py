@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
 #     display_name: dataeval
 #     language: python
@@ -176,10 +176,11 @@ class PatrolDataset:
 
 
 dataset = PatrolDataset(60)
-# Declare explicit bin counts for continuous factors to ensure stable comparisons
+# Declare explicit bin counts for continuous factors to ensure stable comparisons. No exclusion of
+# the per-item `id` is needed: it names the datum rather than describing it, so DataEval keeps it
+# out of the factor space on its own (it becomes the reserved `item_id` column, not a factor).
 metadata = Metadata(
     dataset,
-    exclude=["id"],
     continuous_factor_bins={"altitude_m": 3, "box_area": 4},
 )
 

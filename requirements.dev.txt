@@ -1177,9 +1177,9 @@ maite==0.9.5 \
     # via
     #   dataeval
     #   maite-datasets
-maite-datasets==0.0.18 \
-    --hash=sha256:5a9d026f8b5247b82a9809759ee42a24c93ca2f054f36b7ebfc871b5d0404c1e \
-    --hash=sha256:b02d8dc53236926533e93f1fc22318b8717dedabf461d3386ff3280f14f7b1c9
+maite-datasets==0.0.21 \
+    --hash=sha256:44dbfe89116b208c69429316eb7dc8fe3a22178ff504da5a997ca2b132aa340c \
+    --hash=sha256:685bd00160fbbdc39b43163d8c87109b560723bbe7dacb0044382b925c29c022
 markdown-it-py==3.0.0 ; python_full_version < '3.11' \
     --hash=sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1 \
     --hash=sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb

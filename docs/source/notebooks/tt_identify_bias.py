@@ -167,15 +167,16 @@ ds[0][2]
 # The metadata in the dataset is provided as a dictionary entry for each datum, such that the aggregated data is a
 # collection of _N_ metadata dictionaries each with a nested list of _M_ objects in the image.
 #
-# This dataset has 20 metadata categories, and from the *object_id* category highlights that this image has 1 object in it.
+# This dataset has 19 metadata categories, and from the *object_id* category highlights that this image has 1 object in it.
 # From the multiple -1 values, it appears that not every image has a value for every metadata category, which may or may not point towards a bias.
 #
 # Now we'll extract out the metadata for the entire dataset.
 #
 # To do this, we need to first determine if we need to subset our metadata
 # categories by either selecting the factors to include or selecting the factors to exclude (whatever is a easier list to compile).
-# To start we will leave in all of the 20 metadata categories for the bias analysis.
-# We could pull out _id_ and *image_id* now, but let's double check them first to make sure there are no duplicates.
+# To start we will leave in all of the metadata categories for the bias analysis.
+# The one category that never needs a decision is _id_: it names the datum rather than describing it, so
+# DataEval keeps it out of the factor space on its own (it becomes the reserved `item_id` column instead of a factor).
 #
 # Next, we need to determine if and how we want to bin any continuous data.
 # Because we have multiple categories with -1 values, we'll let DataEval handle the binning with it's auto_bin_method.
@@ -222,7 +223,8 @@ print(
 
 
 # %% [markdown]
-# We were right in that both _id_ and *image_id* are purely unique values; *object_id* is also a purely unique value. We will exclude them since they will not contain any bias.
+# *object_id* is a purely unique value, so it cannot contain any bias - we will exclude it. The _id_ needed no
+# checking at all: as noted above, DataEval keeps item identifiers out of the factor space itself.
 #
 # Now to understand the binning. We would like to see close to identical numbers in our print statement above, sets that have very different numbers
 # such as _latitude_ with 478 and 15 inform us that the auto binning didn't do a good job. And we really need to bin the data ourselves.
@@ -247,7 +249,7 @@ display(combined)
 # _Speed_, _xspeed_, _yspeed_, _zspeed_ are all pretty close to 0, so we should be able to separate out the -1 values and
 # then break it down into slow and fast, positive and negative groups.
 #
-# As mentioned above, _drone_, _width_, _height_ and _storage_ are just fine with the default settings, and we're going to drop _id_ and *image_id*.
+# As mentioned above, _drone_, _width_, _height_ and _storage_ are just fine with the default settings, and we're going to drop *object_id*.
 #
 # That leaves *date_time*, _frame_ and *object_size*. *Date_time* has several easy built in ways to bin it - month, day, year, time of day - so we'll just need to choose one.
 # From reading about the dataset, we learn that it was collected over just a couple of days so time of day is probably the most helpful way to bin, so we'll bin according to the hour.
@@ -293,8 +295,8 @@ raw_data.select([
 # :::
 
 # %%
-# Add date_time to the excluded columns and we'll create a new hour column in its place
-metadata.exclude = ["id", "image_id", "object_id", "date_time"]
+# Exclude object_id and date_time, and we'll create a new hour column in place of date_time
+metadata.exclude = ["object_id", "date_time"]
 metadata.continuous_factor_bins = {
     "compass_heading": [-1, 0, 45, 90, 135, 180, 225, 270, 315, 360],
     "gimbal_heading": [-1, 0, 45, 90, 135, 180, 225, 270, 315, 360],

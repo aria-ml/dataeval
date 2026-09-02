@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.5
 #   kernelspec:
 #     display_name: dataeval
 #     language: python
@@ -150,7 +150,7 @@ class CrowdingDataset:
 
 counts = [1] * 20 + [8] * 20
 dataset = CrowdingDataset(counts)
-metadata = Metadata(dataset, auto_bin_method="uniform_count", exclude=["id"])
+metadata = Metadata(dataset, auto_bin_method="uniform_count")
 
 print(f"images:     {metadata.level_counts['unit']}")
 print(f"detections: {metadata.level_counts['instance']}")
@@ -236,7 +236,7 @@ print(f"identical read from either level: {at_unit == gathered}")
 
 # %%
 sparse = CrowdingDataset([2, 1, 2, 0])
-sparse_metadata = Metadata(sparse, exclude=["id"])
+sparse_metadata = Metadata(sparse)
 sparse_bins = companion(sparse_metadata, "altitude_m")
 
 print(f"images:     {sparse_metadata.level_counts['unit']}")
