@@ -14,7 +14,7 @@ from dataeval._metadata._structurers._base import Structurer
 from dataeval._metadata._structurers._data import StructuredData
 from dataeval._metadata._structurers._reserved import ID_KEY, safe_column_name
 from dataeval.protocols import AnnotatedDataset, DatumMetadata, ProgressCallback
-from dataeval.utils._internal import merge_metadata
+from dataeval.utils._internal import _merge, sorted_drop_reasons
 
 _logger = get_logger(__name__)
 
@@ -85,7 +85,7 @@ class DatasetStructurer(Structurer, ABC):
         *,
         ignore_lists: bool,
         targets_per_item: Sequence[int] | None = None,
-    ) -> tuple[Mapping[str, Any], Mapping[str, Sequence[str]]]:
+    ) -> tuple[Mapping[str, Any], Mapping[str, Sequence[str]], Mapping[str, list[Any]]]:
         """Merge per-item metadata dictionaries into flat factor arrays.
 
         Parameters
@@ -102,15 +102,17 @@ class DatasetStructurer(Structurer, ABC):
 
         Returns
         -------
-        tuple[Mapping[str, Any], Mapping[str, Sequence[str]]]
-            The merged factors and the factors that were dropped.
+        tuple[Mapping[str, Any], Mapping[str, Sequence[str]], Mapping[str, list[Any]]]
+            The merged factors, the factors that were dropped, and the values of the
+            columns held back because they mix numbers with text — kept as the dataset
+            wrote them, since nobody has yet said how they should be read.
         """
-        merged, dropped = merge_metadata(
-            raw,
-            return_dropped=True,
-            ignore_lists=ignore_lists,
-            targets_per_image=targets_per_item,
-            keep_partial=self._partial_factors,
+        merged, dropped, unusable = _merge(
+            list(raw),
+            ignore_lists,
+            False,
+            targets_per_item,
+            self._partial_factors,
         )
         # Drop the merged ``id`` only when a datum actually carried one at its top level:
         # that is the identity :meth:`_item_ids` reads, and it is already on ``item_id``.
@@ -120,7 +122,7 @@ class DatasetStructurer(Structurer, ABC):
         # here would delete it with no entry in ``dropped`` to say where it went.
         own_id = any(ID_KEY in mapping for mapping in raw)
         factors = {safe_column_name(k): v for k, v in merged.items() if not (own_id and k == ID_KEY)}
-        return factors, dropped
+        return factors, sorted_drop_reasons(dropped), {safe_column_name(k): v for k, v in unusable.items()}
 
     def _item_ids(self, raw: Sequence[Mapping[str, Any]]) -> Sequence[Any] | NDArray[Any]:
         """Return the datum's own ``id`` per item: reserved identity, not a factor.

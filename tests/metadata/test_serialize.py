@@ -754,3 +754,36 @@ class TestAStructuringPolicySurvivesTheRoundTrip:
     def test_the_default_is_still_the_default(self, tmp_path):
         dataset = _mot_dataset([[1], [1]])
         assert _round_trip(Metadata(dataset), dataset, tmp_path).partial_factors is False
+
+
+@pytest.mark.required
+class TestRetainedValuesSurviveTheArchive:
+    """A column held back for mixing numbers with text is written, unlike ``raw``.
+
+    It is bounded — one value per row of one level — and scalar, because mixing those two
+    is the only way to reach the set-aside. Writing it is what lets a repair be declared
+    against a restored instance that has no dataset to re-read.
+    """
+
+    @staticmethod
+    def _mixed():
+        from tests.metadata.test_structurers import _mot_dataset
+
+        return _mot_dataset([[1], [1], [1]], [{"direction": 1.0}, {"direction": "N"}, {"direction": 2.0}])
+
+    def test_the_values_come_back_with_their_types(self, tmp_path):
+        dataset = self._mixed()
+        original = Metadata(dataset)
+        original._structure()
+        original.save(tmp_path / "md.dem")
+
+        back = Metadata.load(tmp_path / "md.dem", dataset)
+        assert back._unusable_values == {"sequence": {"direction": [1.0, "N", 2.0]}}
+
+    def test_they_are_there_without_a_dataset_to_re_read(self, tmp_path):
+        """Which is the point: a repair can be declared against a restored instance."""
+        original = Metadata(self._mixed())
+        original._structure()
+        original.save(tmp_path / "md.dem")
+
+        assert Metadata.load(tmp_path / "md.dem")._unusable_values["sequence"]["direction"] == [1.0, "N", 2.0]

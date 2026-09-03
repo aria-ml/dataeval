@@ -291,3 +291,93 @@ class TestMetadataFitOnFirstCall:
         metadata(mock_ds2)
 
         assert metadata.encoding() == fitted
+
+
+@pytest.mark.required
+class TestATransformYieldsTheFittedFactorSet:
+    """Which columns a dataset yields is a property of that dataset, so the two sides of a
+    comparison can disagree about them -- and a feature-wise detector lines its columns up
+    positionally, with nothing to notice that they describe different factors."""
+
+    @staticmethod
+    def _mixed_on_the_reference():
+        """A column mixed on the reference and clean on the stream measured against it.
+
+        The shape that started this: only the earlier campaign carried the sentinel, so the
+        reference held the column back and the later stream read it as an ordinary factor.
+        """
+        reference = MockDataset(
+            np.ones((6, 3, 3)),
+            np.ones((6, 3)),
+            [{"a": 1.0 if i % 2 else "N", "z": float(i)} for i in range(6)],
+        )
+        stream = MockDataset(
+            np.ones((4, 3, 3)),
+            np.ones((4, 3)),
+            [{"a": float(i + 5), "z": float(i)} for i in range(4)],
+        )
+        return reference, stream
+
+    def test_the_two_datasets_do_read_different_factor_sets(self):
+        """The premise: without this, there is nothing for the transform to reconcile."""
+        reference, stream = self._mixed_on_the_reference()
+        assert Metadata(reference).factor_names == ["z"]
+        assert Metadata(stream).factor_names == ["a", "z"]
+
+    def test_a_factor_the_reference_never_had_is_left_out(self):
+        """It carries no recorded encoding, so a code in its column would mean nothing."""
+        reference, stream = self._mixed_on_the_reference()
+        extractor = Metadata(reference)
+
+        transformed = np.asarray(extractor(stream))
+
+        assert transformed.shape == (4, 1)
+
+    def test_the_columns_are_the_fitted_factors_and_in_that_order(self):
+        """Read by name rather than by position, so the column that arrives as feature f is
+        the factor the reference called feature f.
+
+        Checked against the stream read under the *reference's* encoding, which is the only
+        thing the codes are meaningful against -- a column re-cut from the stream's own draw
+        would disagree with this one even where the factor is right.
+        """
+        reference = MockDataset(
+            np.ones((6, 3, 3)),
+            np.ones((6, 3)),
+            [{"a": 1.0 if i % 2 else "N", "m": float(i), "z": float(10 - i)} for i in range(6)],
+        )
+        stream = MockDataset(
+            np.ones((4, 3, 3)),
+            np.ones((4, 3)),
+            [{"a": float(100 + i), "m": float(i), "z": float(10 - i)} for i in range(4)],
+        )
+        extractor = Metadata(reference)
+        assert extractor.factor_names == ["m", "z"]
+
+        transformed = np.asarray(extractor(stream))
+
+        # `a` sorts ahead of both, so lining the columns up positionally would put it where
+        # `m` belongs and shift `z` off the end entirely.
+        derived = extractor.new(stream)
+        position = {name: i for i, name in enumerate(derived.factor_names)}
+        assert position["a"] == 0
+        columns = np.asarray(derived.factor_data)
+        expected = columns[:, [position["m"], position["z"]]]
+
+        assert transformed.shape == (4, 2)
+        assert np.array_equal(transformed, expected)
+
+    def test_a_fitted_factor_the_new_data_lacks_raises(self):
+        """There is nothing honest to put in its column, and reading the rest in order would
+        compare each against a different factor."""
+        reference = MockDataset(
+            np.ones((4, 3, 3)),
+            np.ones((4, 3)),
+            [{"a": float(i), "z": float(i)} for i in range(4)],
+        )
+        stream = MockDataset(np.ones((3, 3, 3)), np.ones((3, 3)), [{"z": float(i)} for i in range(3)])
+        extractor = Metadata(reference)
+        assert "a" in extractor.factor_names
+
+        with pytest.raises(ValueError, match=r"yields no column for \['a'\]"):
+            extractor(stream)

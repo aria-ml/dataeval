@@ -385,6 +385,20 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             Second array contains test statistics per feature.
         """
         n_features = reference_data.shape[1]
+        # Feature f of one side is compared against feature f of the other, so the two
+        # sides must be describing the same features in the same order. Counts are the one
+        # part of that this can check, and an unequal count means they are not: the columns
+        # past the first difference each meet a different feature, and every p-value from
+        # there on is reported under a name that did not produce it. Said here rather than
+        # left to the loop, which reads the shorter side and raises nothing.
+        if data.shape[1] != n_features:
+            raise ValueError(
+                f"Reference data has {n_features} features and the data to score has "
+                f"{data.shape[1]}. Feature-wise tests compare them position by position, so "
+                f"differing counts would compare unrelated features. When an extractor is "
+                f"configured, this means it read the two datasets differently -- see "
+                f"Metadata.dropped_factors for what it held back on each.",
+            )
         p_val = np.zeros(n_features, dtype=np.float32)
         dist = np.zeros_like(p_val)
         for f in range(n_features):

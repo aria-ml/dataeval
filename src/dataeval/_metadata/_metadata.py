@@ -1,5 +1,6 @@
 __all__ = []
 
+import bisect
 import copy
 import hashlib
 import inspect
@@ -16,6 +17,7 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval._log import get_logger
+from dataeval._metadata import _corrections as corrections
 from dataeval._metadata._aggregate import Rolled, aggregate, successive_differences, validate
 from dataeval._metadata._columns import (
     binned,
@@ -23,9 +25,11 @@ from dataeval._metadata._columns import (
     drop_vacuous_splits,
     float_col,
     missing_mask,
+    reject_mixed_values,
     split_by_dimensionality,
     to_col,
 )
+from dataeval._metadata._corrections import Correction
 from dataeval._metadata._encoding import (
     FactorEncoding,
     apply_level_spec,
@@ -97,7 +101,8 @@ from dataeval.types import (
     LevelSpec,
     SourceIndex,
 )
-from dataeval.types._factors import validate_coverage
+from dataeval.types._factors import Unusable, validate_coverage
+from dataeval.utils._internal import _promotion_is_lossy, simplify_type, value_kind
 from dataeval.utils._validate import requires_maite_dataset
 from dataeval.utils.thresholds import resolve_threshold
 
@@ -275,6 +280,91 @@ def _unused_bins(spec: BinSpec, codes: NDArray[np.int64]) -> tuple[NDArray[np.in
 # path: an arbitrary polars expression has no serializable form, so a roll-up asked for
 # that way is data rather than a declaration and cannot be replayed onto another dataset.
 _Batch = tuple[FactorLevel, FactorLevel, str | None, FactorLevel | None, Rolled, "Aggregator | None"]
+
+
+# Distinct values kept per kind for a column dropped for naming its rows. Enough to read
+# the spelling off and choose a format from, and far short of the one-per-row set such a
+# column would otherwise report on every access. A column held back for mixing types is not
+# capped: there, the values are what a repair has to name.
+_SAMPLED_VALUES = 32
+
+
+def _kinds(values: Sequence[Any], limit: int | None = None) -> tuple[dict[str, int], dict[str, tuple[Any, ...]], bool]:
+    """Split a held-back column into the values that read as numbers and the rest.
+
+    Grouped by what a value *means* rather than by its Python type, using the same
+    ``value_kind`` that decided to hold the column back, so
+    the report and the rule cannot disagree about which values are the problem. Absent
+    values are not a kind: they are not values, and nothing in a repair addresses them.
+
+    Distinct values keep the spelling the dataset used, since that is what a mapping has
+    to be written against. Sorted by their text form, which orders every kind without
+    needing them to be comparable with each other.
+
+    ``limit`` caps how many distinct values are kept **per kind**, for the one caller whose
+    column is near-unique by definition: a set the size of the column is one no mapping
+    could name, and building and sorting it costs a pass over every row on every read for a
+    report that is chosen from a handful of examples. The counts stay exact either way ---
+    they are what says how big the column is --- and the third return value says whether
+    anything was left out, so the report can declare itself a sample rather than appear to
+    be the whole set.
+    """
+    counts: dict[str, int] = {}
+    windows: dict[str, _SortedWindow] = {}
+    for value in values:
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            continue
+        kind = value_kind(value)
+        counts[kind] = counts.get(kind, 0) + 1
+        windows.setdefault(kind, _SortedWindow(limit)).add(value)
+    sampled = any(window.sampled for window in windows.values())
+    return counts, {kind: window.values() for kind, window in sorted(windows.items())}, sampled
+
+
+class _SortedWindow:
+    """The distinct values of one kind, ordered, and capped without losing the order.
+
+    Capped by *keeping the smallest*, not by keeping whatever arrived first. The two differ
+    in the only way that matters here: a sample of arrivals is a sample of row order, so a
+    value can be common in the column and absent from the report -- a column of timestamps
+    whose unrecorded rows hold ``""`` sorts that value first, but the rows holding it need
+    not arrive in the first few, and taking the values first seen reported timestamps and no
+    sign of it.
+
+    Keeping the smallest makes the report a **prefix** of the uncapped one, since that is
+    sorted the same way. Whatever the cap, the values shown are the values that would have
+    been shown first without it, and a caller reading a few off the front sees the same
+    thing either way.
+    """
+
+    def __init__(self, limit: int | None) -> None:
+        self._limit = limit
+        self._keys: list[str] = []
+        self._values: list[Any] = []
+        self.sampled = False
+
+    def add(self, value: Any) -> None:
+        """Admit one value, evicting the largest kept where that is what the cap requires."""
+        key = repr(value)
+        full = self._limit is not None and len(self._keys) >= self._limit
+        if full and key >= self._keys[-1]:
+            # Beyond the window, so never kept and never compared against it. This is what
+            # bounds the memory: only the values in front are ever held.
+            self.sampled = self.sampled or key > self._keys[-1]
+            return
+        position = bisect.bisect_left(self._keys, key)
+        if position < len(self._keys) and self._keys[position] == key:
+            return
+        self._keys.insert(position, key)
+        self._values.insert(position, value)
+        if self._limit is not None and len(self._keys) > self._limit:
+            self._keys.pop()
+            self._values.pop()
+            self.sampled = True
+
+    def values(self) -> tuple[Any, ...]:
+        """Read the kept values, ordered by their text form."""
+        return tuple(self._values)
 
 
 def _is_derived_encoding(info: FactorInfo) -> bool:
@@ -555,6 +645,13 @@ class Metadata(Array, FeatureExtractor):
         # in the order they were run, which is the order they have to be replayed in: a
         # roll-up onto a level may read a column an earlier one wrote there.
         self._aggregations: dict[str, Aggregator] = {}
+        # Declared corrections, the factors they have turned into columns, and the values
+        # of any factor a correction touched as the dataset wrote them. Declared here
+        # rather than in `_adopt` so that `new()` can carry them onto an instance that has
+        # not walked its dataset yet, and they are applied when it does.
+        self._corrections: tuple[Correction, ...] = ()
+        self._repaired: set[str] = set()
+        self._pristine_values: dict[FactorLevel, dict[str, list[Any]]] = {}
         self._exclude = {exclude} if isinstance(exclude, str) else set(exclude or ())
         self._include = {include} if isinstance(include, str) else set(include or ())
         # Validated lazily: there is no schema until structuring, so _adopt resolves
@@ -1341,7 +1438,8 @@ class Metadata(Array, FeatureExtractor):
             partial_factors=self._partial_factors,
         )
         # Set rather than passed, so the fresh instance stays unwalked until something asks
-        # it a question; `_adopt` replays them when it does.
+        # it a question; `_adopt` applies and replays them when it does.
+        fresh._corrections = self._corrections
         fresh._aggregations = dict(self._aggregations)
         return fresh
 
@@ -1413,7 +1511,50 @@ class Metadata(Array, FeatureExtractor):
         # would not reach ``new``, and the second dataset would be cut against its own
         # draw -- the difference this comparison is supposed to be measuring.
         self._record_encoding()
-        return self.new(data).factor_data
+        return self._transformed(self.new(data))
+
+    def _transformed(self, derived: Self) -> NDArray[np.int64]:
+        """Read a derived instance's factors as *this* one's columns, in this one's order.
+
+        The fitted factor set governs, because a code is only meaningful against the
+        encoding that produced it and this instance is the only thing holding one. Which
+        columns a dataset yields is a property of that dataset: the reference held a mixed
+        column back and the test set, whose rows all happen to agree, does not -- so the
+        same extractor answers 12 columns for one and 14 for the other. Lined up
+        positionally, the second half of every row is then compared against a different
+        factor, and nothing says so: the column *counts* differ but the names are never
+        consulted, and the result is reported under the reference's names.
+
+        So an extra factor is dropped -- it has no recorded encoding, having never been one
+        here -- and a missing one raises, there being nothing honest to put in its column.
+
+        Raises
+        ------
+        ValueError
+            When the new data yields no column for a factor this instance was fitted on.
+        """
+        names = list(self.factor_names)
+        fitted = set(names)
+        derived_names = list(derived.factor_names)
+        columns = {name: position for position, name in enumerate(derived_names)}
+        if missing := [name for name in names if name not in columns]:
+            raise ValueError(
+                f"This metadata was fitted on factors {names}, and the data now passed to it "
+                f"yields no column for {missing}. A factor with no values cannot be compared "
+                f"against one that has them, and reading the remaining columns in order would "
+                f"compare each against a different factor. Its own factors are "
+                f"{derived_names}; see Metadata.dropped_factors for what it held "
+                f"back and why, and Metadata.repair to declare how those columns are read.",
+            )
+        if dropped := [name for name in derived_names if name not in fitted]:
+            _logger.info(
+                "Factors %s are read from this data but were not factors of the fitted "
+                "reference, so they carry no encoding and are left out of the extracted "
+                "columns. Repair them on the reference to have them analysed.",
+                sorted(dropped),
+            )
+        data = derived.factor_data
+        return data[:, [columns[name] for name in names]]
 
     def _fit(self, data: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> None:
         """Bind to ``data`` and freeze the encoding derived from it.
@@ -1682,8 +1823,6 @@ class Metadata(Array, FeatureExtractor):
         self._bin()
         resolved = self._resolve_level(level)
 
-        view = copy.copy(self)
-        # ``_store`` is deliberately shared: it is immutable, so a writer on either side
         view = self._derived_copy()
         view._view = resolved
         # The move can expose factors the source never binned — anything below its view —
@@ -2605,12 +2744,19 @@ class Metadata(Array, FeatureExtractor):
         derived._include = set(self._include)
         derived._continuous_factor_bins = dict(self._continuous_factor_bins)
         derived._aggregations = dict(self._aggregations)
+        derived._repaired = set(self._repaired)
+        derived._pristine_values = {level: dict(columns) for level, columns in self._pristine_values.items()}
         # ``index2label`` hands this dict straight back, so sharing it let a writer on a
         # derived view rename a class on the instance it came from and on every other view
         # of it. Guarded because ``_structure`` is what builds it, and :meth:`new` takes a
         # copy of an instance that has not been walked yet.
         if (labels := getattr(self, "_index2label", None)) is not None:
             derived._index2label = dict(labels)
+        # Same guard, same reason: the held-back values are read by :attr:`unusable` and
+        # written by the archive, and a nested dict shared between two instances is one a
+        # repair on either would apply to both.
+        if (held := getattr(self, "_unusable_values", None)) is not None:
+            derived._unusable_values = {level: dict(columns) for level, columns in held.items()}
         return derived
 
     def _write_rolled(
@@ -3300,7 +3446,7 @@ class Metadata(Array, FeatureExtractor):
         --------
         encoding : Read the records without writing them.
         """
-        Path(path).write_text(encoding_to_json(self.encoding()), encoding="utf-8")
+        Path(path).write_text(encoding_to_json(self.encoding(), self._corrections), encoding="utf-8")
 
     @property
     def dropped_factors(self) -> Mapping[str, Sequence[str]]:
@@ -3336,12 +3482,294 @@ class Metadata(Array, FeatureExtractor):
           be categorical. A merely *wide* vocabulary is kept: a factor whose levels are
           thin for the sample is reported by
           :attr:`~dataeval.bias.ParityOutput.insufficient_data`, not removed.
+          :meth:`repair` is where that smaller vocabulary is declared, and for the usual
+          case of a timestamp :class:`~dataeval.types.ParseDateTime` supplies one.
 
         Every reason is decided during structuring, so this answers the same whatever has
         been accessed before it.
         """
         self._structure()
-        return self._dropped_factors
+        # A factor a repair has turned into a column is no longer dropped, so it stops
+        # being reported as such. The record of *why* it was held back is still in
+        # `unusable` until the repair is dropped again.
+        return {name: reasons for name, reasons in self._dropped_factors.items() if name not in self._repaired}
+
+    @property
+    def repairs(self) -> tuple[Correction, ...]:
+        """Corrections declared against this metadata, in the order they apply.
+
+        Read-only. A correction goes through :meth:`repair`, which checks it against the
+        factors that exist rather than letting one be written into a tuple handed back by
+        a getter and silently do nothing.
+
+        Returns
+        -------
+        tuple[Correction, ...]
+            The declared :class:`~dataeval.types.Remap`,
+            :class:`~dataeval.types.Rescale`, :class:`~dataeval.types.ParseValue` and
+            :class:`~dataeval.types.ParseDateTime` records.
+        """
+        return self._corrections
+
+    def repair(self, corrections: Sequence[Correction]) -> Self:
+        """Declare how a column's values are to be read, and read them that way.
+
+        The repair for a factor :attr:`unusable` reports — a compass recorded sometimes in
+        degrees and sometimes as a bearing, a sentinel band standing for a bad reading — and
+        equally the way to convert a factor that is perfectly readable but in the wrong
+        units. The corrections are applied to the values the walk kept, so this needs no
+        second pass over the dataset and works on a metadata restored from an archive.
+
+        A column dropped for **naming its rows** rather than grouping them — a timestamp,
+        reported by :attr:`dropped_factors` as ``"cardinality_over_budget"`` — is repairable
+        here too, though nothing about its values disagreed. What it lacks is a vocabulary,
+        and :class:`~dataeval.types.ParseDateTime` gives it one by reading each value as the
+        period it falls in. A reading that leaves every row still holding its own value has
+        not made it a factor: it stays dropped, and ``dropped_factors`` goes on saying why.
+
+        Mutating, and returns ``self``. A repair is a declaration about how this dataset is
+        read, which puts it with :meth:`accept` and :attr:`exclude` rather than with
+        :meth:`where` or :meth:`at` — those answer a *question* about rows already read,
+        and take a copy so that two questions cannot interfere.
+
+        The list **replaces** any corrections already declared rather than adding to them,
+        so re-running a cell is safe and what is recorded always matches what was asked
+        for. Use :meth:`unrepair` to drop them.
+
+        Parameters
+        ----------
+        corrections : Sequence[Remap, Rescale, ParseValue or ParseDateTime]
+            The corrections, in the order they apply. One factor may take several — a
+            remap to read its values as numbers and a rescale to convert them — and each
+            names the factor it applies to, so the list is flat.
+
+        Returns
+        -------
+        Metadata
+            This metadata, so calls can be chained.
+
+        Raises
+        ------
+        ValueError
+            When a correction names something that is neither a factor, nor a column held
+            back as unusable, nor one dropped for naming its rows.
+
+        See Also
+        --------
+        unusable : What was held back, and the values a correction has to be written against.
+        unrepair : Drop corrections again.
+
+        Notes
+        -----
+        A column the corrections leave still disagreeing with itself stays unusable and
+        says so, rather than being quietly completed by a rule nobody wrote.
+        """
+        self._structure()
+        self._reject_unknown_corrections(corrections)
+        touched = {correction.factor for correction in (*self._corrections, *corrections)}
+        self._corrections = tuple(corrections)
+        for factor in sorted(touched):
+            self._reread(factor)
+        return self
+
+    def unrepair(self, *factors: str) -> Self:
+        """Drop declared corrections, and read the values as they were written again.
+
+        Parameters
+        ----------
+        *factors : str
+            Factors whose corrections to drop. With none given, every correction is
+            dropped — the usual move when starting over, and the same shape :meth:`accept`
+            uses for the same reason.
+
+        Returns
+        -------
+        Metadata
+            This metadata, so calls can be chained.
+        """
+        keep = [c for c in self._corrections if factors and c.factor not in factors]
+        return self.repair(keep)
+
+    def _reject_unknown_corrections(self, corrections: Sequence[Correction]) -> None:
+        """Refuse a correction naming something this metadata does not have.
+
+        Raises
+        ------
+        ValueError
+            When a factor is neither present, held back, nor dropped for naming its rows.
+        """
+        held = {name for columns in self._unusable_values.values() for name in columns}
+        # A column dropped for naming its rows is correctable too: it was never held back,
+        # because nothing about its values disagreed -- it is simply text with a different
+        # value on every row, and its column is still in the store to be read again. The
+        # other drop reasons are not: a multi-dimensional factor has no single-column form
+        # to correct, and one with no values at its level has nothing to correct.
+        identifiers = {name for name, reasons in self._dropped_factors.items() if "cardinality_over_budget" in reasons}
+        known = set(self._factors) | held | identifiers
+        if unknown := sorted({c.factor for c in corrections} - known):
+            raise ValueError(
+                f"Cannot repair {unknown}: not a factor of this metadata, not held back as "
+                f"unusable, and not dropped for naming its rows. Its factors are "
+                f"{sorted(self._factors)}; held back are {sorted(held)}; dropped for naming "
+                f"their rows are {sorted(identifiers)}.",
+            )
+
+    def _reread(self, factor: str) -> None:
+        """Read one factor's kept values under the corrections now declared.
+
+        Both kinds of factor come through here, because both are the same operation on the
+        same thing: the values as the dataset wrote them, read under whatever rule is in
+        force. A column held back becomes a factor when the rule leaves it agreeing with
+        itself; one that was already a factor is simply rewritten. Reading from the kept
+        values rather than from the current column is what makes the call idempotent —
+        declaring a rescale twice converts the units once.
+        """
+        level, values = self._kept_values(factor)
+        corrected = corrections.apply(values, corrections.for_factor(factor, self._corrections))
+        held = factor in self._unusable_values.get(level, {})
+        # A held-back column disagrees with itself by construction, so a reading that leaves
+        # it disagreeing has not repaired it. A column that reached the store had one type
+        # already: a reading that leaves it mixed has *taken* that away, and writing it would
+        # promote the whole column to text -- an hour read off half the rows and left as text
+        # on the other half is a category set in lexicographic order, and nothing would say
+        # so. Only a reading that introduces the mixture is refused, so a category column
+        # that always spelled some of its values as numerals is rewritten as before.
+        lossy = _promotion_is_lossy(corrected) and (held or not _promotion_is_lossy(list(values)))
+        self._store = self._store.without_columns({factor} & set(self._store.columns))
+        self._reset_bins([factor])
+        if lossy and held:
+            # Still disagreeing with itself, so still not a factor. Left where it was
+            # rather than written as something no reading supports.
+            self._factors.discard(factor)
+            self._factors_by_level.get(level, set()).discard(factor)
+            self._repaired.discard(factor)
+            return
+        # A reading that took a type away from a column that had one is not applied: the
+        # column goes back exactly as the dataset wrote it, and whatever it was before --
+        # a factor, or a name for its rows -- it still is.
+        written = values if lossy else corrected
+        self._store = self._store.with_column(level, to_series(factor, np.asarray(simplify_type(written))))
+        self._factors_by_level.setdefault(level, set()).add(factor)
+        # The column holds different values now, so whether it names its rows or groups them
+        # is a different question and may have a different answer -- reading a timestamp as
+        # the month it falls in is precisely the case where it does. Asked again rather than
+        # read off the answer a structuring pass remembered about the values that were there.
+        self._identifier_cache.pop(factor, None)
+        if self._is_identifier(factor):
+            # A reading that left every row holding its own value has not made this a
+            # factor. It stays dropped, and `dropped_factors` goes on saying why.
+            self._factors.discard(factor)
+            self._repaired.discard(factor)
+            return
+        self._factors.add(factor)
+        if held or "cardinality_over_budget" in self._dropped_factors.get(factor, ()):
+            self._repaired.add(factor)
+
+    def _kept_values(self, factor: str) -> tuple[FactorLevel, list[Any]]:
+        """One factor's values as the dataset wrote them, and the level they sit at.
+
+        A held-back column has them already. One that reached the store is snapshotted the
+        first time a correction names it, so that dropping the correction later restores
+        what was there rather than the corrected column read back as if it were original.
+        """
+        for level, columns in self._unusable_values.items():
+            if factor in columns:
+                return level, list(columns[factor])
+        for level, columns in self._pristine_values.items():
+            if factor in columns:
+                return level, list(columns[factor])
+        level = self._level_of(factor)
+        values = self._store.column(level, factor).to_list()
+        self._pristine_values.setdefault(level, {})[factor] = list(values)
+        return level, list(values)
+
+    def _level_of(self, factor: str) -> FactorLevel:
+        """Level a factor is defined at, read off the level a store column belongs to."""
+        for level, names in self._factors_by_level.items():
+            if factor in names:
+                return level
+        raise ValueError(f"{factor!r} is not a factor of this metadata.")
+
+    @property
+    def unusable(self) -> Mapping[str, Unusable]:
+        """Factors the walk could not read, and what it would take to read them.
+
+        The companion to :attr:`dropped_factors`, which records *that* a factor was
+        dropped and why. This says what is behind the drop: for a column set aside for
+        mixing numbers with text, how many rows read each way and which distinct values
+        they were, which is what a :meth:`repair` has to be written against. A column
+        dropped for naming its rows reports its values the same way — reading a few of them
+        is how the format a :class:`~dataeval.types.ParseDateTime` needs is chosen.
+
+        Nothing further happens to a factor nobody repairs. It is absent from
+        :attr:`factor_names`, :attr:`factor_data` and every evaluator, exactly as an
+        unreadable column already was — there is no gate and no error, and a caller who
+        does not care never has to look.
+
+        Returns
+        -------
+        Mapping[str, Unusable]
+            One entry per factor that could not be read, keyed by name.
+
+        See Also
+        --------
+        dropped_factors : The same set of factors, as names and reasons alone.
+
+        Notes
+        -----
+        A compass column recorded sometimes as degrees and sometimes as a bearing reports
+        ``counts == {"numeric": 2, "text": 2}`` and ``distinct["text"] == ("N", "NE")`` —
+        the two values a mapping has to name for the column to become a factor.
+        """
+        self._structure()
+        entries: dict[str, Unusable] = {
+            # No cap: these values are exactly what a repair has to name, and a column held
+            # back for mixing types has as many of them as it has spellings, not as it has
+            # rows.
+            name: Unusable(("mixed_types",), level, True, *_kinds(values))
+            for level, columns in self._unusable_values.items()
+            for name, values in columns.items()
+            if name not in self._repaired
+        }
+        # Everything else the walk could not use. A column dropped for naming its rows is
+        # the one kind here whose values were kept: nothing about them disagreed, so they
+        # went to the store like any other column's and are still there to be read again.
+        # It reports them, and reports itself repairable, because a reading that gives it a
+        # vocabulary — the period a timestamp falls in — makes it a factor.
+        #
+        # The rest kept nothing. A vector-valued statistic has no single-column form however
+        # it is read, and a key inconsistent within one entry has nothing consistent to keep,
+        # so they report the reason alone and are not repairable.
+        for name, reasons in self._dropped_factors.items():
+            if name in entries or name in self._repaired:
+                continue
+            kept = self._column_values(name) if "cardinality_over_budget" in reasons else None
+            entries[name] = (
+                Unusable(tuple(reasons))
+                if kept is None
+                else Unusable(tuple(reasons), kept[0], True, *_kinds(kept[1], limit=_SAMPLED_VALUES))
+            )
+        return dict(sorted(entries.items()))
+
+    def _column_values(self, factor: str) -> tuple[FactorLevel, list[Any]] | None:
+        """One column's values as the dataset wrote them, or None where this holds no such column.
+
+        A snapshot taken by an earlier repair answers first, because that is what the
+        dataset wrote: a correction that did not make the column a factor still rewrote it,
+        and reporting the rewrite would describe values nobody can write a reading against.
+
+        Read without snapshotting, unlike :meth:`_kept_values`: this answers a question
+        about the metadata rather than declaring a correction against it, and a property
+        that quietly recorded a pristine copy would make reading change what unrepairing
+        later restores.
+        """
+        for level, columns in self._pristine_values.items():
+            if factor in columns:
+                return level, list(columns[factor])
+        for level, names in self._factors_by_level.items():
+            if factor in names and factor in self._store.columns:
+                return level, self._store.column(level, factor).to_list()
+        return None
 
     @property
     def factor_data(self) -> NDArray[np.int64]:
@@ -4153,7 +4581,24 @@ class Metadata(Array, FeatureExtractor):
         # ``class_labels`` and ``item_indices`` are deliberately not stored: both are
         # columns the store already holds, and the properties read them from there.
         self._dropped_factors = {name: list(reasons) for name, reasons in data.dropped_factors.items()}
+        # The values of the columns held back for mixing numbers with text, kept as the
+        # dataset wrote them. They are not factors and are not in the store: a column
+        # nobody has said how to read has no single type for the store to give it. They
+        # wait here so a repair can be applied to them without re-reading the dataset,
+        # and so the counts and distinct values can be reported meanwhile.
+        self._repaired: set[str] = set()
+        self._pristine_values: dict[FactorLevel, dict[str, list[Any]]] = {}
+        self._unusable_values: dict[FactorLevel, dict[str, list[Any]]] = {
+            level: {name: list(values) for name, values in columns.items()}
+            for level, columns in data.unusable.items()
+            if columns
+        }
         self._is_structured = True
+        # Corrections carried in from `new()` are applied now: they were declared against a
+        # walk that had not happened yet, and this is the first moment their values exist.
+        # Before the roll-ups, which may read a column a repair has just made readable.
+        for factor in sorted({correction.factor for correction in self._corrections}):
+            self._reread(factor)
         self._replay_aggregations()
 
         self._build_factors()
@@ -4976,6 +5421,7 @@ class Metadata(Array, FeatureExtractor):
         # factor anywhere in the mapping leaves this instance exactly as it was. The skipped
         # names are likewise only recorded after the resolve loop, since recording mutates.
         kept, skipped = split_by_dimensionality(factors)
+        reject_mixed_values(kept)
 
         taken = set(self._store.columns)
         resolved: list[_ResolvedFactor] = []

@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._metadata._columns import reject_mixed_values
 from dataeval._metadata._structurers._base import Structurer
 from dataeval._metadata._structurers._block import RowBlock
 from dataeval._metadata._structurers._data import StructuredData
@@ -182,6 +183,7 @@ class FactorsStructurer(PropagationMixin, Structurer):
             level, size, item_index=item_indices, item_id=item_indices, class_label=class_labels, **keyed
         )
         block = RowBlock(level, size, columns, {level: self._own_positions(size)})
+        reject_mixed_values(factors)
         named = {safe_column_name(str(name)): values for name, values in factors.items()}
         return StructuredData([block], {level: named}, {}, [], class_labels, item_indices)
 
@@ -283,6 +285,7 @@ class FactorsStructurer(PropagationMixin, Structurer):
                 "instance": self._own_positions(instance_count),
             },
         )
+        reject_mixed_values(factors)
         levelled: dict[FactorLevel, Mapping[str, Any]] = {
             "unit": {safe_column_name(f"unit_{name}"): values[rows.item_positions] for name, values in factors.items()},
             "instance": {

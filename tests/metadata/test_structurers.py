@@ -1054,3 +1054,92 @@ class TestSourceIndexRowsRefusal:
         rows = SourceIndexRows.parse([SourceIndex(0, None, "instance")])
         with pytest.raises(ValueError, match="with no key"):
             rows.reject_levels_beyond_two()
+
+
+@pytest.mark.required
+class TestAMixedMetadataColumnIsNotAFactor:
+    """A column whose values disagree on a type is not a factor until somebody says how to
+    read it. It used to become a String factor silently, so ``1.0`` was scored as the
+    category ``'1'`` by every bias evaluator with nothing saying so."""
+
+    @staticmethod
+    def _mixed():
+        return _mot_dataset(
+            [[1], [1], [1], [1]],
+            [{"direction": 1.0}, {"direction": "N"}, {"direction": 2.0}, {"direction": "NE"}],
+        )
+
+    def test_it_is_absent_from_the_factors(self):
+        assert "direction" not in Metadata(self._mixed()).factor_names
+
+    def test_the_reason_is_recorded(self):
+        assert Metadata(self._mixed()).dropped_factors["direction"] == ["mixed_types"]
+
+    def test_a_clean_categorical_column_is_untouched(self):
+        dataset = _mot_dataset([[1], [1], [1]], [{"w": "sun"}, {"w": "rain"}, {"w": "fog"}])
+        assert Metadata(dataset).rows_at("sequence")["w"].to_list() == ["sun", "rain", "fog"]
+
+    def test_the_values_are_kept_as_the_dataset_wrote_them(self):
+        """Not discarded: a repair is applied to these later, and it is written against
+        the spellings the dataset actually used."""
+        md = Metadata(self._mixed())
+        md._structure()
+        assert md._unusable_values["sequence"]["direction"] == [1.0, "N", 2.0, "NE"]
+
+    def test_a_column_of_numerals_still_reads_as_numbers(self):
+        """Metadata that has been through JSON is all text."""
+        dataset = _mot_dataset([[1], [1], [1]], [{"g": "1"}, {"g": "2"}, {"g": "3"}])
+        assert Metadata(dataset).rows_at("sequence")["g"].to_list() == [1, 2, 3]
+
+    def test_a_clean_numeric_column_is_untouched(self):
+        dataset = _mot_dataset([[1], [1], [1]], [{"alt": 1.0}, {"alt": 2.0}, {"alt": 3.0}])
+        assert Metadata(dataset).rows_at("sequence")["alt"].to_list() == [1.0, 2.0, 3.0]
+
+
+@pytest.mark.required
+class TestUnusableSaysWhatItWouldTakeToReadTheColumn:
+    """``dropped_factors`` records that a factor was dropped; this says what is behind it."""
+
+    @staticmethod
+    def _md(entries):
+        md = Metadata(_mot_dataset([[1]] * len(entries), entries))
+        md._structure()
+        return md
+
+    def test_the_rows_are_counted_by_what_they_read_as(self):
+        """Not by Python type: a numeral is numeric whichever way it is spelled, which is
+        the same rule that set the column aside."""
+        md = self._md([{"d": 1.0}, {"d": "N"}, {"d": 2.0}, {"d": "NE"}])
+        assert md.unusable["d"].counts == {"numeric": 2, "text": 2}
+
+    def test_a_json_column_is_described_by_meaning_not_spelling(self):
+        md = self._md([{"g": "1"}, {"g": "2"}, {"g": "many"}])
+        assert md.unusable["g"].counts == {"numeric": 2, "text": 1}
+
+    def test_the_distinct_values_keep_the_dataset_s_spelling(self):
+        """A repair is written against what is actually in the column."""
+        md = self._md([{"g": "1"}, {"g": "2"}, {"g": "many"}])
+        assert md.unusable["g"].distinct == {"numeric": ("1", "2"), "text": ("many",)}
+
+    def test_the_level_and_repairability_are_reported(self):
+        md = self._md([{"d": 1.0}, {"d": "N"}])
+        assert md.unusable["d"].level == "sequence"
+        assert md.unusable["d"].repairable is True
+
+    def test_a_factor_with_no_values_kept_is_reported_but_not_repairable(self):
+        """A vector-valued statistic has no single-column form however it is read."""
+        md = self._md([{"d": 1.0}, {"d": "N"}])
+        md.add_factors({"hist": np.zeros((2, 4))}, level="sequence")
+
+        assert md.unusable["hist"].reasons == ("multi_dimensional",)
+        assert md.unusable["hist"].repairable is False
+        assert md.unusable["hist"].counts == {}
+
+    def test_a_readable_dataset_has_nothing_unusable(self):
+        assert self._md([{"w": "sun"}, {"w": "rain"}]).unusable == {}
+
+    def test_absent_values_are_not_a_kind(self):
+        """They are not values, and nothing in a repair addresses them."""
+        md = Metadata(_mot_dataset([[1]] * 3, [{"d": 1.0}, {"d": "N"}, {}]), partial_factors=True)
+        md._structure()
+        assert set(md.unusable["d"].counts) <= {"numeric", "text"}

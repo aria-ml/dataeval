@@ -92,16 +92,17 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
         instance_count = len(unit_of_instance)
 
         instances_per_item = np.bincount(unit_of_instance, minlength=count).astype(int).tolist()
-        instance_factors, dropped = self._merge_factors(
+        instance_factors, dropped, instance_unusable = self._merge_factors(
             raw,
             ignore_lists=False,
             targets_per_item=instances_per_item,
         )
-        unit_factors, _ = self._merge_factors(raw, ignore_lists=True)
+        unit_factors, _, unit_unusable = self._merge_factors(raw, ignore_lists=True)
         # Same rule as object detection: a name both merges produced is item metadata
         # replicated onto the target rows, so keep it once at the ``unit`` level and let
         # propagation do the replicating.
         instance_factors = {name: values for name, values in instance_factors.items() if name not in unit_factors}
+        instance_unusable = {name: v for name, v in instance_unusable.items() if name not in unit_unusable}
 
         item_ids = self._item_ids(raw)
         unit_block = RowBlock(
@@ -143,4 +144,5 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
             raw,
             class_labels,
             unit_of_instance,
+            unusable={"unit": unit_unusable, "instance": instance_unusable},
         )

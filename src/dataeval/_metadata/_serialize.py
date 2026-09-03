@@ -57,6 +57,8 @@ from dataeval._metadata._encoding import (
     aggregations_to_list,
     bins_from_mapping,
     bins_to_mapping,
+    corrections_from_list,
+    corrections_to_list,
     encoding_from_mapping,
     encoding_to_mapping,
 )
@@ -132,6 +134,16 @@ def _applied_encodings(md: "Metadata") -> dict[str, Any]:
     }
 
 
+def _plain(value: Any) -> Any:
+    """Render one retained value as something JSON can hold.
+
+    A metadata value may arrive as a NumPy scalar, which ``json`` cannot serialize. Only
+    numbers and text reach here -- a column is set aside for mixing those two -- so
+    unwrapping to the Python value it stands for is the whole conversion.
+    """
+    return value.item() if isinstance(value, np.generic) else value
+
+
 def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
     """Everything about the instance that is not a frame or an edge.
 
@@ -172,6 +184,28 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
         # columns themselves are already in the store; this is what says *how* they were
         # reached, which is what `new()` needs to rebuild them over another dataset.
         "aggregations": aggregations_to_list(md._aggregations),
+        # Written, unlike `raw`, which the format refuses for being unbounded and of
+        # arbitrary type. These are bounded -- one value per row of one level -- and
+        # scalar, because a column only reaches here by mixing numbers with text. Writing
+        # them is what lets a repair be declared against a restored instance that has no
+        # dataset to re-read, which is the whole point of recording repairs at all.
+        # The declared repairs, in the order they apply. Written for the same reason the
+        # held-back values are: a repair is a statement about what the rows are, and one
+        # that did not survive the archive would leave a restored instance reading the
+        # dataset differently from the instance that wrote it.
+        "corrections": corrections_to_list(md._corrections),
+        "unusable": {
+            level: {name: [_plain(value) for value in values] for name, values in columns.items()}
+            for level, columns in md._unusable_values.items()
+        },
+        # The pre-repair values of a factor that was already a column when a correction
+        # named it. Without them a restored instance would read the corrected column back
+        # as though it were what the dataset wrote, and `unrepair` would "restore" the
+        # correction it was undoing.
+        "pristine": {
+            level: {name: [_plain(value) for value in values] for name, values in columns.items()}
+            for level, columns in md._pristine_values.items()
+        },
         "aggregated_from": dict(md._aggregated_from),
         # The applied encodings. Companion columns are stripped on the way in and rebuilt on
         # load, so without this a restored instance re-derives its cuts — which loses
@@ -502,6 +536,24 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     # Underneath the reader's own, like `strict`. Optional, so a file written before this
     # existed restores as the all-or-nothing default it was structured under.
     md._partial_factors = md._partial_factors or bool(manifest.get("partial_factors", False))
+    # The level names come back as plain strings from JSON; the schema they belong to is
+    # the one this manifest just declared, so they are the literals the rest of the code
+    # reads them as.
+    md._corrections = tuple(corrections_from_list(manifest.get("corrections", [])))
+    md._unusable_values = {
+        cast("FactorLevel", level): {name: list(values) for name, values in columns.items()}
+        for level, columns in manifest.get("unusable", {}).items()
+    }
+    md._pristine_values = {
+        cast("FactorLevel", level): {name: list(values) for name, values in columns.items()}
+        for level, columns in manifest.get("pristine", {}).items()
+    }
+    # Derived rather than written: a held-back name can only be a column of the store if a
+    # repair put it there, so the store already says which repairs landed. The other
+    # repairable drop -- a column that named its rows -- is settled below, once the factor
+    # set has been rebuilt and can say whether the reading gave it a vocabulary.
+    held = {name for columns in md._unusable_values.values() for name in columns}
+    md._repaired = held & set(md._store.columns)
     md._is_filtered = bool(manifest["is_filtered"])
     md._cut_below_items = bool(manifest["cut_below_items"])
     # Not written, and said so rather than answered as an empty dataset would be.
@@ -515,6 +567,13 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
         md._view = md._resolve_level(md._view)
     md._is_structured = True
     md._build_factors()
+    # The second repairable drop, derived the same way: a name dropped for naming its rows
+    # can only be a factor again if a reading gave it a vocabulary. Without this the
+    # restored instance reports the same column in `factor_names` and in `dropped_factors`
+    # at once, and `unusable` describes a factor that is being analysed.
+    md._repaired |= {
+        name for name, reasons in md._dropped_factors.items() if "cardinality_over_budget" in reasons
+    } & md._factors
 
 
 def _reject_dataset_mismatch(md: "Metadata", manifest: Mapping[str, Any]) -> None:

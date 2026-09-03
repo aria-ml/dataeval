@@ -9,6 +9,7 @@ that a caller can resolve every column it intends to write before mutating anyth
 
 __all__ = []
 
+from collections import Counter
 from collections.abc import Mapping
 from typing import Any
 
@@ -17,7 +18,7 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.types import Array1D, FactorInfo, FactorLevel
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._internal import _promotion_is_lossy, as_numpy, value_kind
 
 
 def _flatten_column_vector(values: NDArray[np.generic]) -> NDArray[np.generic]:
@@ -37,8 +38,50 @@ def missing_mask(values: NDArray[np.generic]) -> NDArray[np.bool_]:
     if values.dtype.kind in "fc":
         return np.isnan(values)
     if values.dtype.kind == "O":
-        return np.array([value is None or (isinstance(value, float) and np.isnan(value)) for value in values])
+        # Built at the array's own shape and dtype rather than from a list comprehension:
+        # an empty object column gave ``np.array([])`` its default ``float64``, which is not
+        # a mask -- inverting it raises -- and a two-dimensional one gave one answer per
+        # *row* instead of per value.
+        flat = values.reshape(-1)
+        found = np.zeros(flat.size, dtype=np.bool_)
+        for position, value in enumerate(flat):
+            found[position] = value is None or (isinstance(value, float | np.floating) and np.isnan(value))
+        return found.reshape(values.shape)
     return np.zeros(values.shape, dtype=np.bool_)
+
+
+def reject_mixed_values(factors: Mapping[str, Any]) -> None:
+    """Refuse a supplied factor whose values do not agree about what they are.
+
+    The other half of the rule the walk applies to a dataset's own metadata, and the
+    difference is who can act. A column that came *with* the dataset cannot be edited by
+    the caller, so it is held back and offered for repair; an array the caller is holding
+    can be fixed on the spot, and saying so at the call is the only place the message can
+    name the argument that is wrong.
+
+    Left to itself this reached polars as ``unexpected value while building Series of type
+    Float64``, from inside the store, naming neither the factor nor the call.
+
+    Raises
+    ------
+    ValueError
+        When a factor mixes values that read as numbers with values that do not.
+    """
+    for name, values in factors.items():
+        array = np.asarray(values)
+        if array.dtype != object:
+            # Any other dtype is one type by construction; only an object array can hold
+            # values that disagree.
+            continue
+        present = [value for value in array.reshape(-1).tolist() if value is not None]
+        if not _promotion_is_lossy(present):
+            continue
+        counts = Counter(value_kind(value) for value in present)
+        raise ValueError(
+            f"{name!r} holds both numbers and text ({counts['numeric']} numeric, "
+            f"{counts['text']} text), so it has no single value type. Pass values of one "
+            f"type — map the text to numbers, or render the numbers as text.",
+        )
 
 
 def _holds_no_values(values: NDArray[np.generic]) -> bool:

@@ -67,6 +67,7 @@ from maite_datasets.object_detection import SeaDrone
 from dataeval import Metadata
 from dataeval.data import Indices, View
 from dataeval.shift import DriftUnivariate
+from dataeval.types import ParseDateTime, Remap
 
 # Every factor is worth reading; this guide's whole point is the named rows.
 pl.Config.set_tbl_rows(20)
@@ -123,8 +124,41 @@ print(Metadata(reference, view="unit", exclude=EXCLUDE).dropped_factors)
 
 # %% [markdown]
 # You should check {attr}`~.Metadata.dropped_factors` to see why certain factors are
-# excluded. Here, {class}`.Metadata` automatically drops the unique row identifier
-# `date_time` to prevent trivial, perfect drift signals.
+# excluded. Here, {class}`.Metadata` drops three columns for two reasons:
+#
+# - `latitude` and `longitude` are **`mixed_types`**. Most rows hold a numeric coordinate,
+#   but 25 hold the letter `'N'` or `'E'`. The column has no single type, so DataEval holds
+#   it back instead of choosing a reading for you.
+# - `date_time` is **`cardinality_over_budget`**. Every row holds a different timestamp, so
+#   the column names its rows instead of grouping them. It is not numeric, so there is no
+#   order to cut it into groups along.
+#
+# You do not have to accept either drop. {meth}`~.Metadata.repair` lets you declare the
+# reading that turns such a column into a factor, and you will use it twice in this guide.
+# You should handle the `mixed_types` pair now, before the comparison, for the reason below.
+
+# %% [markdown]
+# ## Make both campaigns agree on the factor set
+#
+# Whether a column is held back depends on the data you are reading, not on the extractor.
+# Only the 2020 rows carry the `'N'` and `'E'` values, so the reference holds `latitude` and
+# `longitude` back while the 2021 stream reads them as ordinary factors. One extractor then
+# produces two different factor sets.
+#
+# You should fix this before you run the detector. A feature-wise detector compares feature
+# 0 against feature 0, feature 1 against feature 1, and so on, so both sides must describe
+# the same factors in the same order. Declaring the repair up front guarantees that: the
+# reference reads those columns as numbers, and so does every stream you measure against it.
+
+# %%
+# The letters mean "no reading was taken", which is what `-1` means in the numeric telemetry
+# columns of this dataset, so you can map them to the same value.
+COORDINATES = [Remap("latitude", {"N": -1.0}), Remap("longitude", {"E": -1.0})]
+
+print(Metadata(reference, view="unit", exclude=EXCLUDE).repair(COORDINATES).dropped_factors)
+
+# %% [markdown]
+# Only `date_time` is still dropped, and both campaigns now read the same fourteen factors.
 
 # %% [markdown]
 # ## Build the extractor and run the detector
@@ -135,7 +169,7 @@ print(Metadata(reference, view="unit", exclude=EXCLUDE).dropped_factors)
 # (./h2_control_factor_binning.py) if you need to declare the cuts explicitly.
 
 # %%
-extractor = Metadata(view="unit", exclude=EXCLUDE)
+extractor = Metadata(reference, view="unit", exclude=EXCLUDE).repair(COORDINATES)
 
 detector = DriftUnivariate(method="ks", extractor=extractor).fit(reference)
 result = detector.predict(operational)
@@ -215,23 +249,28 @@ by_year = {y: [i for i in has_telemetry if year_of[i] == y] for y in ("2020", "2
 clean_reference = View(dataset, Indices(by_year["2020"]))
 clean_operational = View(dataset, Indices(by_year["2021"]))
 
-clean_extractor = Metadata(view="unit", exclude=EXCLUDE)
+# Declare the same reading as before, so both passes measure the same fourteen factors.
+clean_extractor = Metadata(clean_reference, view="unit", exclude=EXCLUDE).repair(COORDINATES)
 clean_result = DriftUnivariate(method="ks", extractor=clean_extractor).fit(clean_reference).predict(clean_operational)
 
-comparison = pl.DataFrame({
+# Join on the factor name rather than lining the two results up by position, so the table
+# stays correct even if a pass drops a factor the other kept.
+before_df = pl.DataFrame({"factor": factor_names, "p_before": p_values, "before": feature_drift})
+after_df = pl.DataFrame({
     "factor": list(clean_result.feature_names or []),
-    "p_before": p_values,
     "p_after": np.asarray(clean_result.details["p_vals"]),
-    "before": feature_drift,
     "after": np.asarray(clean_result.details["feature_drift"]),
-}).with_columns(changed=pl.col("before") != pl.col("after"))
+})
+comparison = before_df.join(after_df, on="factor", how="inner").with_columns(
+    changed=pl.col("before") != pl.col("after")
+)
 print(comparison.sort("changed", descending=True))
 
 # %% [markdown]
-# After filtering, you will see four verdicts flip. Specifically, `gimbal_pitch` no longer
-# registers as drifted, confirming the previous result was a false alarm caused by missing
-# data. Conversely, `drone` now clearly registers as drifted, uncovering a genuine change
-# in the airframe mix that was previously obscured.
+# After filtering, you will see four verdicts flip. `gimbal_pitch` no longer registers as
+# drifted, which confirms the earlier result was a false alarm caused by missing data.
+# `drone` now registers as drifted, which shows a real change in the airframe mix that the
+# missing rows had hidden.
 
 # %%
 for label, indices in by_year.items():
@@ -254,6 +293,64 @@ for label, indices in by_year.items():
 # retrieve and view them.
 
 # %% [markdown]
+# ## Read the column that is still dropped
+#
+# One factor is still dropped: `date_time`, held back as `cardinality_over_budget`. You
+# repaired the `mixed_types` pair at the start because the comparison needed them. You
+# should check {attr}`~.Metadata.unusable` to see what is behind a drop and what you have to
+# write a repair against.
+
+# %%
+review = Metadata(reference, view="unit", exclude=EXCLUDE)
+for name, held in review.unusable.items():
+    values = held.distinct.get("text", ())
+    print(f"{name:10s} {held.reasons[0]:26s} repairable={held.repairable}")
+    print(f"{'':10s} counts={dict(held.counts)}  e.g. {values[:2]}")
+
+# %% [markdown]
+# `counts` reports every row as text and no mixture, so nothing about these values
+# disagrees. Every row just holds a different value, so the column names its rows instead of
+# grouping them. It needs a vocabulary, and {class}`~dataeval.types.ParseDateTime` gives it
+# one by reading each value as the period it falls in. You should read the distinct values
+# first to pick the format: these are ISO 8601 with microseconds, which is the default, so
+# you do not need to pass `format=`.
+#
+# You should choose the period carefully, because the campaigns are split by time. An
+# absolute period such as a month or a day separates them completely, which only restates
+# the split. A recurring position does not: every campaign has a 14:00, so
+# `every="hour_of_day"` asks whether the flying moved to a different part of the day.
+
+# %%
+READINGS = [*COORDINATES, ParseDateTime("date_time", every="hour_of_day")]
+
+repaired = Metadata(reference, view="unit", exclude=EXCLUDE).repair(READINGS)
+print("still dropped:", dict(repaired.dropped_factors))
+print("factors:      ", len(repaired.factor_names), "up from", len(factor_names))
+print("date_time now:", sorted(set(repaired.rows_at("unit")["date_time"].to_list())))
+
+# %% [markdown]
+# All three columns are factors now, and `date_time` holds the hour of the day each frame
+# was flown. A repair is a declaration, not a one-off edit to a dataframe. DataEval records
+# it on the metadata, so you can read it back from {attr}`~.Metadata.repairs`, store it with
+# {meth}`~.Metadata.save`, and apply it to next year's campaign without deciding it again.
+# You can drop a repair with {meth}`~.Metadata.unrepair`.
+
+# %%
+time_of_day = DriftUnivariate(method="ks", extractor=repaired).fit(reference).predict(operational)
+by_name = dict(zip(time_of_day.feature_names or [], np.asarray(time_of_day.details["p_vals"]), strict=True))
+print(f"date_time (hour of day)  p = {by_name['date_time']:.3e}")
+
+for year in ("2020", "2021"):
+    hours = Counter(int(m["date_time"][11:13]) for m in datum_metadata if m["date_time"][:4] == year)
+    print(f"  {year}  {dict(sorted(hours.items()))}")
+
+# %% [markdown]
+# The repaired factor reports a real change in collection conditions. The 2020 campaign flew
+# between 12:00 and 15:00, while 2021 started as early as 10:00 and moved most of its flying
+# an hour earlier. Time of day affects sun angle, sea state and thermal contrast, so this
+# tells you something about the collection that the first pass could not report at all.
+
+# %% [markdown]
 # ## What you learned
 #
 # 1. **You will use {class}`.Metadata` as a {class}`~dataeval.protocols.FeatureExtractor`**.
@@ -266,6 +363,15 @@ for label, indices in by_year.items():
 #    positional p-values to specific, named operational conditions.
 # 1. **You will separate real drift from data artifacts**. Investigating the raw underlying
 #    data is necessary to distinguish true changes from missing-data codes.
+# 1. **You should check why a factor was dropped before you accept it**. A column held back
+#    for mixing types or for naming its rows becomes a factor once you declare how to read
+#    it with {meth}`~.Metadata.repair`.
+# 1. **You should declare a repair before you compare two datasets**. Both sides must read
+#    the same factors in the same order, and declaring the reading up front is what makes
+#    them agree.
+# 1. **You should pick a period that a time split cannot explain away**. An absolute period
+#    separates two campaigns on its own; a recurring position such as `every="hour_of_day"`
+#    stays comparable across them.
 
 # %% [markdown]
 # ## Next steps

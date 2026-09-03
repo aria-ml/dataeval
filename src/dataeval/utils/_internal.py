@@ -419,6 +419,41 @@ def simplify_type(data: list[str] | str) -> list[int] | list[float] | list[str] 
     return converted
 
 
+def value_kind(value: Any) -> str:
+    """Whether a value reads as a number or as text.
+
+    The split every judgement about a mixed column turns on, in one place, so that the rule
+    that sets a column aside and the report that describes it cannot disagree about which
+    values are the problem. Read through :func:`simplify_type`, so a numeral is numeric
+    whichever way it is spelled -- metadata that has been through JSON is all text.
+    """
+    return "text" if isinstance(simplify_type(value), str) else "numeric"
+
+
+def _promotion_is_lossy(values: list[Any]) -> bool:
+    """Whether some of these values read as numbers and the rest do not.
+
+    :func:`simplify_type` gives a column one type by promoting every value to the widest one
+    present, and where that widest type is text the promotion is not a widening but a loss:
+    a value that reads as ``1.0`` becomes the *category* ``"1"``, so the column can no longer
+    be binned, ordered or read as continuous, and every bias evaluator scores it as a
+    category set. Nothing said so.
+
+    The question is whether a value **reads** as a number, not whether it arrived as one.
+    Metadata that has been through JSON is all text, so a column of counts is a column of
+    numerals and has to keep working; ``["1", "2", "3"]`` is a numeric column that happens
+    to be spelled in strings, and it resolves to one with nothing held back. What cannot be
+    resolved is a column where only *some* values read as numbers -- ``[1.0, "N", 2.0]`` and
+    ``["1", "2", "many"]`` are the same problem in two spellings, and neither reading is one
+    this library can pick on the caller's behalf.
+
+    A column of values none of which read as numbers is an ordinary category set and is
+    left exactly as it is.
+    """
+    kinds = {value_kind(value) for value in values if value is not None}
+    return kinds == {"numeric", "text"}
+
+
 def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], int]:  # noqa: C901
     """
     Find indices to minimize unique tuple keys.
@@ -451,6 +486,7 @@ def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], i
 class DropReason(Enum):
     INCONSISTENT_KEY = "inconsistent_key"
     INCONSISTENT_SIZE = "inconsistent_size"
+    MIXED_TYPES = "mixed_types"
     NESTED_LIST = "nested_list"
 
 
@@ -522,6 +558,7 @@ def flatten_metadata(
     sep: str = "_",
     ignore_lists: bool = False,
     fully_qualified: bool = False,
+    simplify: bool = True,
 ) -> tuple[dict[str, Any], int, dict[str, list[str]]]: ...
 
 
@@ -532,6 +569,7 @@ def flatten_metadata(
     sep: str = "_",
     ignore_lists: bool = False,
     fully_qualified: bool = False,
+    simplify: bool = True,
 ) -> tuple[dict[str, Any], int]: ...
 
 
@@ -541,6 +579,7 @@ def flatten_metadata(  # noqa: C901
     sep: str = "_",
     ignore_lists: bool = False,
     fully_qualified: bool = False,
+    simplify: bool = True,
 ):
     """
     Flattens a nested metadata dictionary and converts values to numeric values when possible.
@@ -572,7 +611,12 @@ def flatten_metadata(  # noqa: C901
 
     output = {}
     for k, v in expanded.items():
-        cv = simplify_type(v)
+        # ``simplify=False`` leaves the values as the dataset wrote them. `_merge` asks for
+        # that because converting a numeral here is irreversible: once ``"1"`` has become
+        # ``1`` nothing downstream can tell it from a value that arrived as a number, and
+        # telling those apart is exactly what deciding whether a column mixes types needs.
+        # It simplifies the whole column itself once every entry has contributed to it.
+        cv = simplify_type(v) if simplify else v
         if isinstance(cv, list):
             if len(cv) == size:
                 output[k] = cv
@@ -609,6 +653,7 @@ def _flatten_for_merge(
         return_dropped=True,
         ignore_lists=ignore_lists,
         fully_qualified=fully_qualified,
+        simplify=False,
     )
     if targets is not None:
         # check for mismatch in targets per image and force ignore_lists
@@ -618,6 +663,7 @@ def _flatten_for_merge(
                 return_dropped=True,
                 ignore_lists=True,
                 fully_qualified=fully_qualified,
+                simplify=False,
             )
         if targets != image_repeats:
             flattened = {k: [v] * targets for k, v in flattened.items()}
@@ -663,7 +709,7 @@ def _merge(  # noqa: C901
     fully_qualified: bool,
     targets_per_image: Sequence[int] | None,
     keep_partial: bool = False,
-) -> tuple[dict[str, list[Any]], dict[str, set[DropReason]]]:
+) -> tuple[dict[str, list[Any]], dict[str, set[DropReason]], dict[str, list[Any]]]:
     merged: dict[str, list[Any]] = {}
     isect: set[str] = set()
     union: set[str] = set()
@@ -719,9 +765,24 @@ def _merge(  # noqa: C901
     # pass hides the mismatch by re-dropping the short name; here nothing does, so `y` went
     # looking for itself under `objs_y` and did not find it.
     kept = {k for k in merged if not _was_dropped(k, dropped)} if keep_partial else isect
+    # Checked here rather than per entry: one entry usually carries a single scalar for a
+    # key, so the disagreement only becomes visible once every entry's value sits in one
+    # column -- which is also the moment `simplify_type` would resolve it by promoting the
+    # numbers to text.
+    #
+    # Set aside rather than discarded, and left exactly as the dataset wrote them. Python
+    # holds a column of mixed values perfectly well; it is polars that needs one type, and
+    # a column nobody has said how to read has no business being in the factor store yet.
+    # Keeping the values is what lets a repair be applied to them later without re-reading
+    # the dataset, and what lets the counts and distinct values be reported meanwhile.
+    for k in sorted(kept):
+        if _promotion_is_lossy(merged[k]):
+            dropped.setdefault(k, set()).add(DropReason.MIXED_TYPES)
+    unusable = {k: list(merged[k]) for k in sorted(kept) if DropReason.MIXED_TYPES in dropped.get(k, set())}
+    kept = {k for k in kept if k not in unusable}
     simplify = _simplify_present if keep_partial else simplify_type
     merged = {k: simplify(v) for k, v in merged.items() if k in kept}
-    return merged, dropped
+    return merged, dropped, unusable
 
 
 @overload
@@ -846,7 +907,7 @@ def merge_metadata(
     if targets_per_image is not None and len(dicts) != len(targets_per_image):
         raise ValueError("Number of targets per image must be equal to number of metadata entries.")
 
-    merged, dropped = _merge(dicts, ignore_lists, fully_qualified, targets_per_image, keep_partial)
+    merged, dropped, _ = _merge(dicts, ignore_lists, fully_qualified, targets_per_image, keep_partial)
 
     output: dict[str, Any] = {k: np.asarray(v) for k, v in merged.items()} if return_numpy else merged
 

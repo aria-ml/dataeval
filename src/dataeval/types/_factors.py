@@ -9,13 +9,18 @@ __all__ = [
     "FactorLevel",
     "FactorLevelSchema",
     "LevelSpec",
+    "ParseDateTime",
+    "ParseValue",
+    "Remap",
+    "Rescale",
+    "Unusable",
 ]
 
 from collections import deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias, get_args
 
 # Every level name the schema recognizes.
 #
@@ -25,6 +30,10 @@ from typing import Any, Literal, TypeAlias
 # that :class:`~dataeval.Metadata` is designed around, and ``enum.StrEnum`` is
 # unavailable on the supported 3.10 floor.
 FactorLevel: TypeAlias = Literal["sequence", "unit", "track", "instance"]
+
+# Distinct values an ``Unusable`` repr shows per kind before abbreviating. The attribute
+# keeps all of them; this is only how many are worth reading at a glance.
+_SHOWN_VALUES = 8
 
 # The level vocabulary and its edges — the single place both are declared.
 #
@@ -708,6 +717,541 @@ class FactorInfo:
     aggregated_from: FactorLevel | None = None
     encoding: BinSpec | LevelSpec | None = None
     missing: int = 0
+
+
+@dataclass(frozen=True)
+class Remap:
+    """Replace named values, whole ranges of them, or everything left unnamed.
+
+    The correction for a column whose values do not agree about what they are: a compass
+    recorded sometimes in degrees and sometimes as a bearing, a sentinel band standing for
+    a bad reading, a category set that wants collapsing. The mapping *is* the correction —
+    what is declared and what is recorded are one object — so it can be reviewed in a diff
+    and reapplied to the next dataset without being re-decided.
+
+    Attributes
+    ----------
+    factor : str
+        Factor the mapping applies to.
+    mapping : Mapping
+        What each value becomes. A key is one of three things:
+
+        - **a value**, matched exactly as the dataset wrote it;
+        - **a ``(low, high)`` range**, half-open ``[low, high)``, matching any number in
+          it — which is how a sentinel band is retired to one value, and the thing
+          :class:`Rescale` cannot express, since it transforms values rather than
+          replacing them. ``None`` at either end is unbounded;
+        - **``None``**, the catch-all for every value no other key matched. It is what
+          lets a recorded mapping survive a second dataset, which will bring values the
+          first never held.
+
+        A value matched by nothing, where there is no catch-all, is **left as it was** —
+        so a partial mapping is a partial mapping, and a column it leaves mixed simply
+        stays unusable and says so.
+
+        A row that recorded *nothing* is never matched, catch-all included. Absence is not
+        a value, and it keeps the reserved missing code that says a reading was not taken
+        rather than becoming one that says the mapping did not name it.
+    provenance : {"declared"}, default "declared"
+        Always ``"declared"``: a repair is somebody's decision, because DataEval never
+        guesses at a column whose values disagree. Recorded so the descriptor says so
+        rather than leaving a reader to infer it.
+    """
+
+    factor: str
+    mapping: Mapping[Any, Any]
+    provenance: Literal["declared"] = "declared"
+
+    def __post_init__(self) -> None:
+        """Normalize the mapping and refuse the shapes no dataset is needed to reject."""
+        if not self.factor:
+            raise ValueError("A remap needs a factor name, e.g. Remap('direction', {'N': 0}).")
+        if not self.mapping:
+            raise ValueError(
+                f"Remap({self.factor!r}, {{}}) names nothing to replace. Give it at least one "
+                f"value, range or a None catch-all.",
+            )
+        for key in self.mapping:
+            if isinstance(key, tuple):
+                _validate_range(key, f"Remap({self.factor!r})")
+        object.__setattr__(self, "mapping", MappingProxyType(dict(self.mapping)))
+
+    def __hash__(self) -> int:
+        """Hash the declaration, reading the mapping as the pairs it holds.
+
+        ``frozen=True`` generates a hash over every field and one of them is a mapping, so
+        a record whose whole purpose is being stored and compared between runs could be
+        compared but never put in a set -- and would say so only at the call.
+        """
+        return hash((self.factor, tuple(sorted(self.mapping.items(), key=repr)), self.provenance))
+
+
+@dataclass(frozen=True)
+class Rescale:
+    """Apply ``value * multiply + add`` to the values in a range.
+
+    The correction for a column that is readable but in the wrong units: a run of altitudes
+    in feet among metres, a sensor whose readings carry a constant offset, a depth field
+    that switched to millimetres partway through a collection.
+
+    One affine form rather than four operations, because ``multiply`` covers multiply and
+    divide, ``add`` covers add and subtract, and multiplying before adding is the order
+    every unit conversion is already written in.
+
+    Attributes
+    ----------
+    factor : str
+        Factor the adjustment applies to.
+    over : tuple
+        Half-open ``[low, high)`` range of values it applies to, matching the convention
+        binning already uses. ``None`` at either end is unbounded, so ``(None, None)`` is
+        every value and ``(1000, None)`` is everything from 1000 up. A value outside the
+        range is left exactly as it was.
+    multiply : float, default 1.0
+        Factor applied first. Use its reciprocal to divide.
+    add : float, default 0.0
+        Offset applied after multiplying. Use a negative number to subtract.
+    provenance : {"declared"}, default "declared"
+        Always ``"declared"``, for the reason :class:`Remap` gives.
+    """
+
+    factor: str
+    over: tuple[float | None, float | None] = (None, None)
+    multiply: float = 1.0
+    add: float = 0.0
+    provenance: Literal["declared"] = "declared"
+
+    def __post_init__(self) -> None:
+        """Refuse the shapes no dataset is needed to reject."""
+        if not self.factor:
+            raise ValueError("A rescale needs a factor name, e.g. Rescale('altitude', multiply=0.3048).")
+        _validate_range(self.over, f"Rescale({self.factor!r})")
+        if self.multiply == 0:
+            raise ValueError(
+                f"Rescale({self.factor!r}, multiply=0) gives every value in range the same "
+                f"answer, which discards the readings rather than adjusting them. Use "
+                f"Remap({self.factor!r}, {{{self.over!r}: {self.add!r}}}) to say that outright.",
+            )
+
+
+def _validate_range(over: Any, context: str) -> None:
+    """Check a half-open range, wherever one is written.
+
+    Raises
+    ------
+    ValueError
+        When the range is not a pair, or its bounds are the wrong way round.
+    """
+    if not isinstance(over, tuple) or len(over) != 2:
+        raise ValueError(f"{context} range {over!r} must be a (low, high) pair; None at either end is unbounded.")
+    low, high = over
+    if low is not None and high is not None and low > high:
+        raise ValueError(f"{context} range {over!r} runs backwards: its low bound is above its high bound.")
+
+
+# Periods a timestamp can be read as, coarsest first, in two families.
+#
+# A bare name is an **absolute** period and runs once: "2020-08" happened, and no later
+# month is it. An ``x_of_y`` name is a **recurring position** and comes round again: every
+# collection has a 14:00. The distinction is the whole reason both are here -- a dataset
+# split by time separates perfectly on any absolute period, which is a restatement of the
+# split rather than a finding, while the recurring ones stay comparable across the split.
+#
+# A closed vocabulary rather than a free-form pattern because each one has to name a bucket
+# every reader agrees on: a period nobody can spell twice is not one a second collection
+# could be grouped by.
+DateTimeGranularity: TypeAlias = Literal[
+    "year",
+    "quarter",
+    "month",
+    "week",
+    "day",
+    "hour",
+    "month_of_year",
+    "day_of_week",
+    "hour_of_day",
+]
+
+# Spelled once, read by the record that validates against it and the reader that applies it.
+# Taken off the alias rather than repeated beside it, so the annotation a type checker reads
+# and the tuple the constructor checks against cannot drift apart.
+DATETIME_GRANULARITIES: tuple[str, ...] = get_args(DateTimeGranularity)
+
+
+# Units a number can count since the Unix epoch in. Declared rather than guessed, because
+# the same integer is a plausible reading in every one of them -- 1_700_000_000 is a moment
+# in 2023 read as seconds and one in 1970 read as milliseconds, and nothing about the column
+# says which was meant. Seconds is the default because it is what this record *emits* when
+# no period is asked for, so a reading round-trips through its own output.
+EpochUnit: TypeAlias = Literal["s", "ms", "us", "ns"]
+
+EPOCH_UNITS: tuple[str, ...] = get_args(EpochUnit)
+
+# What one of each unit is worth in seconds.
+EPOCH_SECONDS: Mapping[str, float] = MappingProxyType({"s": 1.0, "ms": 1e-3, "us": 1e-6, "ns": 1e-9})
+
+
+def _validated_drops(factor: str, drop: Sequence[str]) -> tuple[str, ...]:
+    """Read a parse's drops as the tuple of substrings they have to be.
+
+    Raises
+    ------
+    ValueError
+        When the drops are a bare string, or any of them is not a non-empty one.
+    """
+    if isinstance(drop, str):
+        raise ValueError(
+            f"ParseValue({factor!r}, drop={drop!r}) reads as a sequence of substrings, and a bare string "
+            f"is ambiguous: {drop!r} could be one substring or {len(drop)} characters. Write the "
+            f"list you mean, e.g. drop=[{drop!r}].",
+        )
+    drops = tuple(drop)
+    if any(not isinstance(item, str) or not item for item in drops):
+        raise ValueError(
+            f"ParseValue({factor!r}) drops {list(drops)!r}: every entry must be a non-empty string. An "
+            f"empty one occurs everywhere and would mean nothing.",
+        )
+    return drops
+
+
+def _validate_separator(factor: str, decimal: str, drops: tuple[str, ...]) -> None:
+    """Check a parse's decimal separator against the drops it is read alongside.
+
+    Raises
+    ------
+    ValueError
+        When the separator is not one character, is itself dropped, or the rule as a whole
+        would leave the values exactly as they are already read.
+    """
+    if len(decimal) != 1:
+        raise ValueError(
+            f"ParseValue({factor!r}, decimal={decimal!r}) must name a single character, e.g. decimal=','.",
+        )
+    if decimal in drops:
+        raise ValueError(
+            f"ParseValue({factor!r}) drops {decimal!r} and also reads it as the decimal separator. Drop "
+            f"it or read it, not both.",
+        )
+    if not drops and decimal == ".":
+        raise ValueError(
+            f"ParseValue({factor!r}) drops nothing and reads '.' as the separator, which is how the "
+            f"values are already read. Name what to remove, e.g. drop=[','].",
+        )
+
+
+@dataclass(frozen=True)
+class ParseValue:
+    """Read text as a value by removing what is not part of it.
+
+    The correction for a column whose numbers are wearing decoration: a thousands separator,
+    a unit written into the cell, a degree sign, a decimal comma. The values *are* numbers —
+    nothing about them is in doubt — but no reading of the text finds them until the
+    decoration is named, so the column is held back for mixing numbers with text.
+
+    Declared as data, never as a function, for the same reason
+    :class:`Remap` is: a correction is committed alongside code, read back months later and
+    reapplied to the next collection. A rule that removes ``","`` says what it does in a
+    diff, and does the same thing on a dataset this one never saw --- which is the whole
+    difference between this and a mapping that would have to name every value in advance.
+
+    This does not decide what the cleaned text *becomes*. The values go back through the
+    same reading every column gets, so text that now spells a number is stored as one and
+    text that still does not is left as text --- and a column its leftovers keep mixed stays
+    unusable and says so, exactly as :class:`Remap` leaves one.
+
+    Attributes
+    ----------
+    factor : str
+        Factor the rule applies to.
+    drop : Sequence[str]
+        Substrings removed from every value, in the order given. Each is removed wherever it
+        occurs, so ``["kg"]`` reads ``"12kg"`` and ``"12 kg"`` alike once ``" "`` is dropped
+        too. Substrings rather than a set of characters, so a rule that removes ``"kg"``
+        cannot also eat the ``k`` of a value it was never meant to touch.
+    decimal : str, default "."
+        The character this column separates a fraction with, swapped for ``"."`` after the
+        drops. One character, and never one that ``drop`` removes --- a rule that deletes the
+        separator and then reads it is two decisions that contradict each other.
+    provenance : {"declared"}, default "declared"
+        Always ``"declared"``, for the reason :class:`Remap` gives.
+
+    Raises
+    ------
+    ValueError
+        When the factor is unnamed, when ``drop`` is given as a bare string rather than a
+        sequence of them, when the rule as written would change nothing, or when ``decimal``
+        is not a single character or is itself dropped.
+
+    See Also
+    --------
+    ParseDateTime : Read text as a timestamp, which needs a calendar rather than a cleanup.
+    Remap : Replace named values outright, where the vocabulary is small and closed.
+
+    Examples
+    --------
+    A thousands separator, and a unit written into the cell:
+
+    >>> ParseValue("count", drop=[","])
+    ParseValue(factor='count', drop=(',',), decimal='.', provenance='declared')
+
+    >>> ParseValue("weight", drop=[" ", "kg"])
+    ParseValue(factor='weight', drop=(' ', 'kg'), decimal='.', provenance='declared')
+
+    A column recorded in a locale that separates fractions with a comma:
+
+    >>> ParseValue("span", decimal=",")
+    ParseValue(factor='span', drop=(), decimal=',', provenance='declared')
+    """
+
+    factor: str
+    drop: Sequence[str] = ()
+    decimal: str = "."
+    provenance: Literal["declared"] = "declared"
+
+    def __post_init__(self) -> None:
+        """Normalize the drops and refuse the shapes no dataset is needed to reject."""
+        if not self.factor:
+            raise ValueError("A parse needs a factor name, e.g. ParseValue('count', drop=[',']).")
+        drop = _validated_drops(self.factor, self.drop)
+        _validate_separator(self.factor, self.decimal, drop)
+        object.__setattr__(self, "drop", drop)
+
+
+@dataclass(frozen=True)
+class ParseDateTime:
+    """Read text as a timestamp, and optionally as the period it falls in.
+
+    The correction for a column of timestamps, which is held back for a reason no cleanup
+    fixes: nearly every row holds a different value, so the column names its rows rather
+    than grouping them, and being text it has no order to be cut along. Reading it as a
+    time gives it both --- an order, and a period each row belongs to.
+
+    A calendar is what separates this from :class:`ParseValue`. Which characters to remove says
+    nothing about whether ``03/04`` is March or April, when a week begins, or which rows
+    share a quarter; those are questions only a format and a granularity answer.
+
+    What the column becomes depends on ``every``, because the answers are different kinds
+    of thing:
+
+    - **An absolute period** --- ``"year"``, ``"quarter"``, ``"month"``, ``"week"``,
+      ``"day"``, ``"hour"`` --- labels each row with the period it falls in, ``"2020-08"``
+      for a month. A closed, readable vocabulary that groups rows, which is what the column
+      was missing.
+    - **A recurring position** --- ``"month_of_year"``, ``"day_of_week"``, ``"hour_of_day"``
+      --- labels it with where in the cycle it sits, ``14`` for a frame flown at 14:20. Read
+      back as the number it is, and cut into bins like any other ordered reading.
+    - **``None``** keeps the instant itself, in seconds since the Unix epoch. Naive
+      timestamps are read as UTC, so the same declaration gives the same number on any
+      machine.
+
+    Which family to reach for is decided by what the timestamp is being compared *across*.
+    A dataset split by time --- a reference campaign and a later one --- separates perfectly
+    on any absolute period, because the period *is* the split, and a factor that drifts by
+    construction restates the question rather than answering it. The recurring positions
+    survive that split intact: every campaign has a 14:00, so "the later campaign started
+    flying earlier in the day" is a finding about collection conditions rather than about
+    the calendar.
+
+    A timestamp is not always text. This reads three spellings of one, so a column keeps its
+    meaning however the dataset recorded it:
+
+    - **Text** is read under ``format``, or as ISO 8601 where none is given.
+    - **A number** is read as a count since the Unix epoch, in the unit ``epoch`` names.
+      Which unit is a declaration rather than a guess: ``1_700_000_000`` is a moment in
+      2023 read as seconds and one in 1970 read as milliseconds, and nothing about the
+      column says which was meant.
+    - **A** :class:`~datetime.datetime` **or** :class:`~datetime.date` is already a moment
+      and is used as it stands. A bare date is read as midnight.
+
+    Anything else is left exactly as it was.
+
+    Attributes
+    ----------
+    factor : str
+        Factor the reading applies to.
+    format : str or None, default None
+        How the text is spelled, as a :meth:`~datetime.datetime.strptime` pattern ---
+        ``"%d/%m/%Y %H:%M"`` for a column no standard describes. ``None`` reads ISO 8601,
+        which is what a timestamp that has been through JSON almost always is. Read only
+        for values that are text.
+    every : str or None, default None
+        Period each row is labelled by, from the two families above. ``None`` keeps the
+        instant. Weeks and weekdays are ISO, so a week belongs to the year holding its
+        Thursday --- ``"2020-W35"`` --- and Monday is ``1`` through Sunday ``7``.
+    epoch : {"s", "ms", "us", "ns"}, default "s"
+        Unit a *numeric* value counts the epoch in. Seconds by default, which is what this
+        record emits when ``every`` is ``None`` --- so a column it has already read comes
+        back through it unchanged in meaning. Read only for values that are numbers, and a
+        boolean is never one of them.
+    provenance : {"declared"}, default "declared"
+        Always ``"declared"``, for the reason :class:`Remap` gives.
+
+    Raises
+    ------
+    ValueError
+        When the factor is unnamed, or ``every`` or ``epoch`` is not one of the values
+        named.
+
+    See Also
+    --------
+    ParseValue : Read text as a value by removing what is not part of it.
+    Remap : Replace named values outright, where the vocabulary is small and closed.
+
+    Notes
+    -----
+    A value the format does not read is left exactly as it was, so a partial reading is a
+    partial reading: a column its leftovers keep mixed stays unusable and says so, rather
+    than being quietly completed by a rule nobody wrote.
+
+    The label is handed back for the same reading every column gets, so one that spells a
+    number is stored as one: ``every="year"`` gives the number 2020 and is cut into bins,
+    while ``every="month"`` gives the category ``"2020-08"``. Both group the rows; they
+    differ in whether the grouping carries an order.
+
+    Examples
+    --------
+    Group a campaign's frames by the month they were flown:
+
+    >>> ParseDateTime("date_time", every="month")
+    ParseDateTime(factor='date_time', format=None, every='month', epoch='s', provenance='declared')
+
+    Compare time of day across campaigns a year apart, which a month could not:
+
+    >>> ParseDateTime("date_time", every="hour_of_day")
+    ParseDateTime(factor='date_time', format=None, every='hour_of_day', epoch='s', provenance='declared')
+
+    Keep the instant, to be cut into bins like any other ordered reading:
+
+    >>> ParseDateTime("date_time")
+    ParseDateTime(factor='date_time', format=None, every=None, epoch='s', provenance='declared')
+
+    A column no standard describes:
+
+    >>> ParseDateTime("logged", format="%d/%m/%Y %H:%M", every="day")
+    ParseDateTime(factor='logged', format='%d/%m/%Y %H:%M', every='day', epoch='s', provenance='declared')
+
+    A column of milliseconds since the epoch, as JavaScript and many logs record them:
+
+    >>> ParseDateTime("logged_ms", epoch="ms", every="day")
+    ParseDateTime(factor='logged_ms', format=None, every='day', epoch='ms', provenance='declared')
+    """
+
+    factor: str
+    format: str | None = None
+    every: DateTimeGranularity | None = None
+    epoch: EpochUnit = "s"
+    provenance: Literal["declared"] = "declared"
+
+    def __post_init__(self) -> None:
+        """Refuse the shapes no dataset is needed to reject."""
+        if not self.factor:
+            raise ValueError("A datetime reading needs a factor name, e.g. ParseDateTime('date_time').")
+        if self.every is not None and self.every not in DATETIME_GRANULARITIES:
+            raise ValueError(
+                f"ParseDateTime({self.factor!r}, every={self.every!r}) is not a period this reads. "
+                f"Use one of {', '.join(DATETIME_GRANULARITIES)}, or None to keep the instant.",
+            )
+        if self.epoch not in EPOCH_UNITS:
+            raise ValueError(
+                f"ParseDateTime({self.factor!r}, epoch={self.epoch!r}) is not a unit this counts in. "
+                f"Use one of {', '.join(EPOCH_UNITS)}.",
+            )
+
+
+@dataclass(frozen=True)
+class Unusable:
+    """A factor the walk could not read, and what it would take to read it.
+
+    A column whose values disagree about their type is not a factor: it has no single type
+    the store could give it, and reading it one way rather than another is a decision only
+    the caller can make. Rather than guess, the walk sets the values aside and describes
+    them here, so the decision can be made from what is actually in the column.
+
+    A column whose values agree perfectly but hold a different one on nearly every row is
+    not a factor either, for the opposite reason: it names its rows rather than grouping
+    them. That one is described here too, because the decision it needs is the same shape
+    --- how to read the values --- even though nothing about them was in doubt.
+
+    Nothing further happens to a factor nobody repairs. It is absent from
+    :attr:`~dataeval.Metadata.factor_names`, from :attr:`~dataeval.Metadata.factor_data`
+    and from every evaluator, exactly as an unreadable column already was -- there is no
+    gate and no error, and a caller who does not care never has to look.
+
+    Attributes
+    ----------
+    reasons : tuple[str, ...]
+        Why the factor could not be read, as recorded in
+        :attr:`~dataeval.Metadata.dropped_factors`. More than one where more than one
+        applies.
+    level : str or None
+        Level the factor would be defined at, where that is known. ``None`` for a factor
+        dropped before any level could be settled on.
+    repairable : bool
+        Whether :meth:`~dataeval.Metadata.repair` can make this a factor. True for a column
+        whose values are kept: one set aside for mixing numbers with text, and one dropped
+        for naming its rows, which a :class:`ParseDateTime` can give a vocabulary to. False
+        where the values are gone or no reading of them would produce a column -- a
+        vector-valued statistic has no single-column form however it is read.
+    counts : Mapping[str, int]
+        Rows that read as ``"numeric"`` and rows that read as ``"text"``. A numeral is
+        numeric whichever way it is spelled, so a column that has been through JSON is
+        described by what its values *mean* rather than by how they were written.
+    distinct : Mapping[str, tuple[Any, ...]]
+        The distinct values behind those counts, in the spelling the dataset used, so that
+        a repair can be written against what is actually there. Sorted within each kind.
+        Every one of them unless ``sampled`` says otherwise.
+    sampled : bool, default False
+        Whether ``distinct`` holds a sample rather than the whole set. True only for a
+        column dropped for naming its rows, where the values are near-unique by definition:
+        the set is the size of the column, no mapping could name it, and a handful of
+        examples is what a reading is actually chosen from. False everywhere else, where
+        the values are the thing a repair has to cover and are reported in full.
+
+    Notes
+    -----
+    The ``repr`` abbreviates long value lists whether or not they were sampled. Where
+    ``sampled`` is False the attribute itself holds all of them, which is what makes it
+    possible to write a mapping that covers the column; a caller that must not guess should
+    read the flag rather than the length.
+    """
+
+    reasons: tuple[str, ...]
+    level: FactorLevel | None = None
+    repairable: bool = False
+    counts: Mapping[str, int] = field(default_factory=lambda: MappingProxyType({}))
+    distinct: Mapping[str, tuple[Any, ...]] = field(default_factory=lambda: MappingProxyType({}))
+    sampled: bool = False
+
+    def __hash__(self) -> int:
+        """Hash the report, reading its two mappings as the pairs they hold.
+
+        ``frozen=True`` generates a hash over every field and two of them are mappings, so a
+        value describing a factor could be compared but never put in a set or used as a dict
+        key -- and would say so only at the call. The same reason :class:`Remap` and
+        :class:`Aggregator` spell theirs out.
+        """
+        return hash((
+            self.reasons,
+            self.level,
+            self.repairable,
+            tuple(sorted(self.counts.items())),
+            tuple(sorted(self.distinct.items(), key=repr)),
+            self.sampled,
+        ))
+
+    def __repr__(self) -> str:
+        """Abbreviate the value lists, which exist to be complete rather than to be read."""
+        shown = {
+            kind: values
+            if len(values) <= _SHOWN_VALUES
+            else (*values[:_SHOWN_VALUES], f"... +{len(values) - _SHOWN_VALUES} more")
+            for kind, values in self.distinct.items()
+        }
+        sampled = ", sampled=True" if self.sampled else ""
+        return (
+            f"Unusable(reasons={self.reasons!r}, level={self.level!r}, "
+            f"repairable={self.repairable!r}, counts={dict(self.counts)!r}, distinct={shown!r}{sampled})"
+        )
 
 
 @dataclass(frozen=True)

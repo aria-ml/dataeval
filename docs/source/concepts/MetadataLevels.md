@@ -433,7 +433,8 @@ what would have worked:
 md.aggregate("occlusion", level="unit", how="mean")
 # ValueError: 'mean' does not apply to 'occlusion', whose values are String;
 # 'mean' takes numeric values. Reductions that apply to 'occlusion' are
-# ['count', 'first', 'last', 'max', 'min', 'mode', 'n_unique'].
+# ['changes', 'count', 'first', 'last', 'longest_run', 'max', 'min', 'mode',
+#  'n_unique'].
 ```
 
 A factor you *name* is a request, so a mismatch is refused. A factor selected by

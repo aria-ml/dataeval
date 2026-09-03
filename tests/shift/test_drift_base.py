@@ -405,3 +405,30 @@ class TestDriftOutputFeatureNames:
 
         assert feature_names
         assert list(feature_names) == list(extractor.factor_names)
+
+
+@pytest.mark.required
+class TestFeatureWiseScoringRefusesMismatchedWidths:
+    """Feature f of one side is compared against feature f of the other, so an unequal
+    count means the columns past the first difference each meet a different feature -- and
+    every p-value from there on would be reported under a name that did not produce it."""
+
+    def test_a_wider_test_set_raises(self):
+        detector = DriftUnivariate(method="ks").fit(np.random.default_rng(0).normal(size=(40, 3)))
+        with pytest.raises(ValueError, match="Reference data has 3 features"):
+            detector.predict(np.random.default_rng(1).normal(size=(40, 5)))
+
+    def test_a_narrower_test_set_raises(self):
+        """The direction the loop would have read straight through, silently."""
+        detector = DriftUnivariate(method="ks").fit(np.random.default_rng(0).normal(size=(40, 5)))
+        with pytest.raises(ValueError, match="Reference data has 5 features"):
+            detector.predict(np.random.default_rng(1).normal(size=(40, 3)))
+
+    def test_the_message_names_both_counts(self):
+        detector = DriftUnivariate(method="ks").fit(np.random.default_rng(0).normal(size=(40, 3)))
+        with pytest.raises(ValueError, match="the data to score has 7"):
+            detector.predict(np.random.default_rng(1).normal(size=(40, 7)))
+
+    def test_matching_widths_are_scored(self):
+        detector = DriftUnivariate(method="ks").fit(np.random.default_rng(0).normal(size=(40, 3)))
+        assert len(detector.predict(np.random.default_rng(1).normal(size=(40, 3))).details["p_vals"]) == 3
