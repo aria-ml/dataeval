@@ -16,9 +16,15 @@ import pytest
 
 from dataeval import Metadata
 from dataeval._helpers import _code_names, _edge_format, factor_code_names
-from dataeval._metadata._encoding import DESCRIPTOR_VERSION, encoding_from_json, encoding_to_json
+from dataeval._metadata._encoding import (
+    DESCRIPTOR_VERSION,
+    corrections_from_json,
+    corrections_from_list,
+    encoding_from_json,
+    encoding_to_json,
+)
 from dataeval._metadata._metadata import _reconcile_encoding
-from dataeval.types import BinSpec, LevelSpec
+from dataeval.types import BinSpec, LevelSpec, ParseDateTime, ParseValue, Remap, Rescale
 
 pytestmark = pytest.mark.filterwarnings("ignore::UserWarning")
 
@@ -998,3 +1004,137 @@ class TestARecordedVocabularyAcceptsAPartlyDeclaredFactor:
         """It rendered as a bare '2' beside real category names, reading as a category."""
         spec = LevelSpec(levels=("fog", "rain"), provenance="derived")
         assert _code_names(np.array([0, 1, 2]), spec)[2] == "missing"
+
+
+@pytest.mark.required
+class TestCorrectionsAreDeclarationsAndRecordsAtOnce:
+    """What is declared and what is written are one object, so a repair can be reviewed in
+    a diff and reapplied to the next dataset without being re-decided."""
+
+    @staticmethod
+    def _corrections():
+        return [
+            Remap("direction", {None: -1, "N": 0, "NE": 45, (-1000, 0): -99}),
+            Rescale("altitude", over=(0, 1000), multiply=0.3048),
+            Rescale("altitude", over=(1000, None), multiply=0.001),
+        ]
+
+    def _round_trip(self, corrections):
+        return corrections_from_json(encoding_to_json({}, corrections))
+
+    def test_they_round_trip_exactly(self):
+        assert self._round_trip(self._corrections()) == self._corrections()
+
+    def test_the_order_they_apply_in_is_kept(self):
+        """An array, not an object: one factor may take several, and order decides."""
+        back = self._round_trip(self._corrections())
+        assert [c.factor for c in back] == ["direction", "altitude", "altitude"]
+        assert [c.over for c in back if isinstance(c, Rescale)] == [(0, 1000), (1000, None)]
+
+    def test_a_numeric_key_does_not_become_text(self):
+        """JSON object keys are strings, so a mapping keyed on 1 written as an object would
+        come back keyed on '1' — the exact confusion corrections exist to resolve."""
+        mapping = [Remap("grade", {1: "low", 2.5: "mid", None: "other"})]
+        (back,) = self._round_trip(mapping)
+        assert isinstance(back, Remap)
+        assert dict(back.mapping) == {1: "low", 2.5: "mid", None: "other"}
+        assert [type(key).__name__ for key in back.mapping] == ["int", "float", "NoneType"]
+
+    def test_the_catch_all_comes_back_as_the_catch_all(self):
+        """``null`` reads as a missing value inside a vocabulary; here it is the key that
+        matches everything unnamed, and has to stay None."""
+        (back,) = self._round_trip([Remap("d", {None: -1})])
+        assert isinstance(back, Remap)
+        assert None in back.mapping
+
+    def test_a_range_key_comes_back_as_a_range(self):
+        (back,) = self._round_trip([Remap("depth", {(-1000, 0): -1})])
+        assert isinstance(back, Remap)
+        assert dict(back.mapping) == {(-1000, 0): -1}
+
+    def test_the_readings_round_trip_exactly(self):
+        """A reading is config: it is written into a descriptor, committed, and replayed."""
+        readings = [
+            ParseValue("count", drop=[",", " kg"], decimal="."),
+            ParseValue("span", decimal=","),
+            ParseDateTime("date_time", every="hour_of_day"),
+            ParseDateTime("logged", format="%d/%m/%Y %H:%M", every="day"),
+            ParseDateTime("stamp"),
+        ]
+        assert self._round_trip(readings) == readings
+
+    def test_a_drop_keeps_its_spelling(self):
+        """An array of substrings, so a multi-character drop does not become characters."""
+        (back,) = self._round_trip([ParseValue("d", drop=["kg"])])
+        assert isinstance(back, ParseValue)
+        assert back.drop == ("kg",)
+
+    def test_the_epoch_unit_round_trips(self):
+        """Which unit a number counts in is a declaration, so it has to survive the file."""
+        (back,) = self._round_trip([ParseDateTime("t", epoch="ms", every="day")])
+        assert isinstance(back, ParseDateTime)
+        assert back.epoch == "ms"
+
+    def test_a_descriptor_written_before_numeric_timestamps_reads_as_seconds(self):
+        """Which is what a reading that only ever touched text would have emitted."""
+        written = [{"kind": "parse_datetime", "factor": "t", "format": None, "every": "day"}]
+        (back,) = corrections_from_list(written)
+        assert isinstance(back, ParseDateTime)
+        assert back.epoch == "s"
+
+    def test_a_kind_this_reader_does_not_have_is_refused_by_name(self):
+        """Which is what a descriptor written by a newer DataEval says to an older one."""
+        document = json.dumps({"version": 2, "factors": {}, "corrections": [{"kind": "parse_ipv6", "factor": "d"}]})
+        with pytest.raises(ValueError, match="kind 'parse_ipv6'"):
+            corrections_from_json(document)
+
+    def test_the_document_carries_both_sections(self):
+        document = json.loads(encoding_to_json({"w": LevelSpec(levels=("rain",), provenance="declared")}, []))
+        assert document["version"] == 2
+        assert set(document) == {"version", "corrections", "factors"}
+
+
+@pytest.mark.required
+class TestADescriptorWrittenBeforeCorrectionsExisted:
+    def test_it_loads_with_no_corrections(self):
+        """Which is what it meant."""
+        v1 = json.dumps({"version": 1, "factors": {"w": {"kind": "levels", "levels": ["rain", "sun"]}}})
+        assert corrections_from_json(v1) == []
+        recorded = encoding_from_json(v1)["w"]
+        assert isinstance(recorded, LevelSpec)
+        assert recorded.levels == ("rain", "sun")
+
+    def test_a_version_from_the_future_is_refused_by_number(self):
+        with pytest.raises(ValueError, match="version 99"):
+            encoding_from_json(json.dumps({"version": 99, "factors": {}}))
+
+
+@pytest.mark.required
+class TestACorrectionRefusesWhatNoDatasetIsNeededToReject:
+    """The shapes that are wrong on their face, caught at construction rather than at use."""
+
+    def test_a_remap_that_names_nothing(self):
+        with pytest.raises(ValueError, match="names nothing to replace"):
+            Remap("d", {})
+
+    def test_a_range_that_runs_backwards(self):
+        with pytest.raises(ValueError, match="runs backwards"):
+            Rescale("d", over=(10, 1))
+
+    def test_a_range_that_is_not_a_pair(self):
+        with pytest.raises(ValueError, match=r"must be a \(low, high\) pair"):
+            Remap("d", {(1, 2, 3): 0})
+
+    def test_a_rescale_that_discards_the_readings(self):
+        """``multiply=0`` gives every value in range the same answer, which is a Remap."""
+        with pytest.raises(ValueError, match="same answer"):
+            Rescale("d", multiply=0)
+
+    @pytest.mark.parametrize("build", [lambda: Remap("", {"a": 1}), lambda: Rescale("")])
+    def test_a_correction_with_no_factor(self, build):
+        with pytest.raises(ValueError, match="needs a factor name"):
+            build()
+
+    def test_a_correction_can_be_put_in_a_set(self):
+        """A frozen dataclass wrapping a mapping is not hashable, and says so at the call."""
+        assert len({Remap("d", {"a": 1}), Remap("d", {"a": 1})}) == 1

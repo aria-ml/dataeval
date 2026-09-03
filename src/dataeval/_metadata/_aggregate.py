@@ -211,7 +211,10 @@ def _reject_multi_output(store: LevelStore, exprs: Sequence[pl.Expr]) -> None:
         When an expression selects more than one column.
     """
     columns = frozenset(store.columns)
-    if selectors := [expr for expr in exprs if not _names_one_output(expr, columns)]:
+    # Rendered with ``str`` rather than interpolated directly: an ``Expr``'s repr carries its
+    # memory address, so the message named a different expression on every run and read as
+    # an internal object rather than as the thing the caller wrote.
+    if selectors := [str(expr) for expr in exprs if not _names_one_output(expr, columns)]:
         raise ValueError(
             f"agg reads one result per expression, so each has to name one output column, but "
             f"{selectors} selects several. Name them one at a time -- pl.col('a').mean().alias('a_mean'), "
@@ -502,6 +505,14 @@ def successive_differences(
     so one number governs the whole roll-up and the runs it finds are comparable between the
     destinations it produces; a per-destination tolerance would make a noisy sequence and a
     clean one report the same run length for different amounts of movement.
+
+    Measured over the **same** series the reduction will scan -- rows that recorded both an
+    ordering key and a value, in key order -- because a tolerance fitted to one distribution
+    and applied to another is not a fit at all. Left in, a row with no ordering key sorted to
+    the front (polars sorts nulls first) and contributed the distance from a reading that is
+    not in the series to the one that starts it, while the difference across an unrecorded
+    value -- which ``_longest_run`` does compare, having dropped it -- never entered the
+    sample, since both diffs touching a null are null.
     """
     groups = store.link(from_level, to_level, via).positions()
     # ``dict.fromkeys`` because a factor may *be* its own ordering: rolling ``time_s`` up
@@ -509,7 +520,9 @@ def successive_differences(
     # series twice raised ``column with name 'time_s' has more than one occurrence``.
     read = [store.column(from_level, name) for name in dict.fromkeys((column, order))]
     frame = _as_missing(pl.DataFrame(read))
-    frame = frame.with_columns(pl.Series(_GROUP, groups)).filter(pl.col(_GROUP) >= 0)
+    frame = frame.with_columns(pl.Series(_GROUP, groups)).filter(
+        (pl.col(_GROUP) >= 0) & pl.col(order).is_not_null() & pl.col(column).is_not_null(),
+    )
     if not frame.height:
         return np.empty(0, dtype=np.float64)
     deltas = frame.select(pl.col(column).sort_by(pl.col(order)).diff().abs().over(_GROUP)).to_series()

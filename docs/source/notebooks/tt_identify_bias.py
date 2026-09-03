@@ -29,6 +29,8 @@
 # ## What you'll do
 #
 # - Use DataEval to identify bias and correlations in the [SeaDronesSee dataset](https://seadronessee.cs.uni-tuebingen.de/)
+# - Check what the default binning produced, and see which columns DataEval could not read
+# - Declare how those columns are read, and declare the bins for every factor
 # - Analyze the results using plots and tables
 
 # %% [markdown]
@@ -36,6 +38,7 @@
 #
 # - You will see how to identify bias and correlations present in a dataset.
 # - You will understand the potential impact on your data and ways to mitigate them.
+# - You will learn to repair a column DataEval held back, rather than accepting the drop.
 
 # %% [markdown]
 # ## What you'll need
@@ -112,6 +115,7 @@ from maite_datasets.object_detection import SeaDrone
 from dataeval import Metadata
 from dataeval.bias import Balance, Diversity
 from dataeval.protocols import CodedMetadataLike
+from dataeval.types import ParseDateTime, Remap
 
 # Show every row of the comparison tables below rather than polars' default window - the
 # rows this guide reasons about would otherwise be the ones elided.
@@ -192,8 +196,13 @@ metadata = Metadata(ds)
 # :::
 
 # %% [markdown]
-# One other thing to note, most of the metadata is image specific not object specific, so we are going to create an image metadata class and then check it's bins.
-# We'll also double check specifically the object_id and object_size metadata. To grab the binned data for the two object metadata categories, the binned version of continuous columns is the category name followed by a `↕`.
+# ### Check what DataEval did on its own
+#
+# Before you configure anything, you should look at what the defaults produced. Most of the metadata is
+# image specific rather than object specific, so you will create an image-level metadata instance and
+# check its bins. You will also check *object_id* and *object_size*, which are recorded per detection.
+# To grab the binned data for those two, the binned version of a continuous column is the category name
+# followed by a `↕`.
 
 # %%
 # Create the image-level metadata instance
@@ -227,7 +236,7 @@ print(
 # checking at all: as noted above, DataEval keeps item identifiers out of the factor space itself.
 #
 # Now to understand the binning. We would like to see close to identical numbers in our print statement above, sets that have very different numbers
-# such as _latitude_ with 478 and 15 inform us that the auto binning didn't do a good job. And we really need to bin the data ourselves.
+# such as _frame_ with 824 and 20 inform us that the auto binning didn't do a good job. And we really need to bin the data ourselves.
 # The categories which appear to be fine are _drone_, _height_, and _width_. _Storage_ appears to be categorical based on when we inspected the metadata above, so it's close enough.
 #
 # So let's get into creating good bins for our data. First lets view the dataframe statistics for the data to get an idea of our value ranges.
@@ -240,30 +249,26 @@ combined = r_desc.join(os_desc, on="statistic", how="full", coalesce=True).renam
 display(combined)
 
 # %% [markdown]
-# Ah! Look closely at _latitude_ and _longitude_ - these columns are likely a mix of numerics and strings forcing everything to be a string.
-# We'll fix that in a minute, but first let's continue analyzing the rest of the columns.
+# You should read this table for the value ranges you will cut into bins.
 #
-# _Altitude_, *compass_heading*, *gimbal_heading*, and *gimbal_pitch* appear to have a significant number of -1 with a scattering of a larger range of values,
-# we'll have to investigate how sparse those other values are.
+# _Altitude_, *compass_heading*, *gimbal_heading*, and *gimbal_pitch* have a significant number of -1
+# with a scattering of a larger range of values, so you will have to check how sparse those other values are.
 #
-# _Speed_, _xspeed_, _yspeed_, _zspeed_ are all pretty close to 0, so we should be able to separate out the -1 values and
-# then break it down into slow and fast, positive and negative groups.
+# _Speed_, _xspeed_, _yspeed_, _zspeed_ are all close to 0, so you can separate out the -1 values and
+# then break the rest into slow and fast, positive and negative groups.
 #
-# As mentioned above, _drone_, _width_, _height_ and _storage_ are just fine with the default settings, and we're going to drop *object_id*.
+# _Drone_, _width_, _height_ and _storage_ are fine with the default settings, and you will drop *object_id*.
 #
-# That leaves *date_time*, _frame_ and *object_size*. *Date_time* has several easy built in ways to bin it - month, day, year, time of day - so we'll just need to choose one.
-# From reading about the dataset, we learn that it was collected over just a couple of days so time of day is probably the most helpful way to bin, so we'll bin according to the hour.
-# For _frame_, we'll choose something simple based on the percentiles from above, let's say every 20% which gives us 5 bins.
-# We'll also do something similar for *object_size* using the percentiles but we'll bin based on every 5% which gives us 20 bins.
+# That leaves _frame_ and *object_size*. For _frame_, you will use the percentiles from above, every 20%,
+# which gives 5 bins. You will do the same for *object_size* every 5%, which gives 20 bins.
 #
-# To address the potential issues with _latitude_ and _longitude_, and to get a better understanding of some of the other categories,
-# let's inspect some of the actual values.
+# Three columns are missing from the table entirely: _latitude_, _longitude_ and *date_time*. They are not
+# factors, so `factors` never named them and `describe` had nothing to report. DataEval held them back
+# instead of guessing at them, and you will get all three back further down.
 
 # %%
-# Inspecting the desired columns
+# Inspecting the columns that are still factors
 raw_data.select([
-    "latitude",
-    "longitude",
     "altitude",
     "compass_heading",
     "gimbal_heading",
@@ -276,27 +281,100 @@ raw_data.select([
 ])
 
 # %% [markdown]
-# Ah, yes! Just what we suspected _latitude_ and _longitude_ are a mix of numerics and strings.
-# From the column statistics above, it appears our strings are "N" and "E", respectively.
-# And from inspecting the data here, it appears that most of the numbers are very close to each other,
-# so let's try binning them by creating a -2 value for the strings and then rounding all of the actual numbers to their integers and see how many bins that gets us.
+# Those are the values behind the ranges above. To see the three columns that are missing, you should
+# check {attr}`~.Metadata.unusable`, which says what is behind each drop and what you have to write a
+# repair against.
+
+# %%
+for name, held in metadata.unusable.items():
+    print(f"{name:10s} {held.reasons[0]:24s} repairable={held.repairable}  counts={dict(held.counts)}")
+    for kind, values in held.distinct.items():
+        print(f"{'':10s}   {kind}: {values[:3]}")
+
+# %% [markdown]
+# Each column reports why it was dropped, whether you can repair it, and the values you have to write
+# that repair against.
 #
-# It appears that *compass_heading* and *gimbal_heading* are in degrees and in the range [0,360] so we can bin into 9 bins - every 45 degrees plus the -1s.
-# It appears the *gimbal_pitch* is similar to the headings and in the range [0,90], so we can bin this into 7 bins - every 15 degrees plus the -1s.
+# _Latitude_ and _longitude_ are held back as `mixed_types`. Each holds 25 rows of the string "N" or
+# "E" alongside its numeric readings, plus a `-1` among those numbers, which is how this dataset
+# records a missing reading. A column with no single type is not a factor, so DataEval sets it aside
+# instead of choosing one of the two readings for you.
 #
-# _Altitude_ appears to have a decent spread and maxes out at ~260, so lets do 11 bins - multiples of 26 plus the -1s.
+# *Date_time* is held back for a different reason. Nothing about its values disagrees - `counts`
+# reports all 1547 rows as text and no mixture. Nearly every row holds a different timestamp, so the
+# column names its rows instead of grouping them. It needs a vocabulary rather than a type.
 #
-# Okay, this brings us to a slight complication, DataEval's Metadata class currently doesn't handle complicated binning strategies
-# like we want to do with our strings so we will have to post-process bin those columns.
-# For everything else, we can go ahead and create our bins.
+# Note the first value in its sample: an empty string, from the rows that recorded no timestamp at
+# all. You will have to say what those mean, because no reading of a timestamp covers them. The
+# sample is capped, which `sampled` reports, but it always shows the values the full list would show
+# first, so a value like this one cannot hide behind the cap.
+
+# %% [markdown]
+# ### Declare how the held-back columns are read
+#
+# You do not have to accept a drop, and you do not have to edit the dataframe yourself to undo one.
+# You will use {meth}`~.Metadata.repair` to declare the reading that turns a held-back column into a
+# factor. Two kinds of record cover everything this dataset needs:
+#
+# - {class}`~dataeval.types.Remap` replaces named values. You will use it to replace the sentinels: "N"
+#   and "E" become `-2`, which keeps the two kinds of missing reading, the string and the numeric `-1`,
+#   separate from each other and from a real coordinate.
+# - {class}`~dataeval.types.ParseDateTime` reads text as a time. With `every="hour_of_day"` it labels
+#   each row with the hour it was collected in, which gives *date_time* the vocabulary it needs. This
+#   dataset was collected over a couple of days, so time of day is the most useful period to group by.
+#
+# You should remap the empty *date_time* strings to `-1` first, matching how the rest of this dataset
+# records a missing reading. `ParseDateTime` then leaves that number alone and reads only the timestamps.
+#
+# You can use the same approach for the `-1` in _xspeed_ and _yspeed_. Those sit in the middle of the
+# real speed range, so no cut separates them from a genuine slow negative reading. Remapping them to
+# `-99` moves them clear, and a bin edge below it gives them a group of their own.
+#
+# A repair is a declaration, not a one-off edit to a dataframe. DataEval records it on the metadata, so
+# you can read it back from {attr}`~.Metadata.repairs`, store it with {meth}`~.Metadata.save`, and apply
+# it to the next dataset without deciding it again.
 #
 # :::{note}
-# We want to process the original metadata variable, not the image_metadata that we were looking at.
+# Declare these on the original `metadata` variable, not on the `image_metadata` view you have been
+# reading. The view was for looking; this is the instance the analysis runs on.
 # :::
 
 # %%
-# Exclude object_id and date_time, and we'll create a new hour column in place of date_time
-metadata.exclude = ["object_id", "date_time"]
+# Exclude object_id - it is purely unique, so it cannot carry bias
+metadata.exclude = ["object_id"]
+
+metadata.repair([
+    # Replace the string sentinels, keeping them distinct from the numeric -1
+    Remap("latitude", {"N": -2.0}),
+    Remap("longitude", {"E": -2.0}),
+    # Give date_time a vocabulary: the hour of the day each frame was collected in
+    Remap("date_time", {"": -1}),
+    ParseDateTime("date_time", every="hour_of_day"),
+    # Move the missing-reading code clear of the real speed range
+    Remap("xspeed", {-1: -99}),
+    Remap("yspeed", {-1: -99}),
+])
+
+print("still dropped:", dict(metadata.dropped_factors))
+
+# %% [markdown]
+# ### Declare the bins
+#
+# Nothing is held back now. A repair says what the values *are*; the bins say how they are *grouped*, so
+# they are a separate decision and you can now make it for every factor in one place - including the
+# three columns DataEval could not read before.
+#
+# The ranges you read off the statistics table earlier are what the cuts are chosen from:
+#
+# - *compass_heading* and *gimbal_heading* are in degrees over [0,360], so 9 bins - every 45 degrees,
+#   plus the -1s.
+# - *gimbal_pitch* is similar but over [0,90], so 7 bins - every 15 degrees, plus the -1s.
+# - _Altitude_ has a decent spread and maxes out at ~260, so 11 bins - multiples of 26, plus the -1s.
+# - _Frame_ and *object_size* use their own percentiles, every 20% and every 5%.
+# - _Latitude_ and _longitude_ need three groups each: the two sentinels and the real coordinates.
+# - _Xspeed_ and _yspeed_ get a bin below `-99` to hold the missing readings you moved there.
+
+# %%
 metadata.continuous_factor_bins = {
     "compass_heading": [-1, 0, 45, 90, 135, 180, 225, 270, 315, 360],
     "gimbal_heading": [-1, 0, 45, 90, 135, 180, 225, 270, 315, 360],
@@ -304,165 +382,35 @@ metadata.continuous_factor_bins = {
     "altitude": [-1, 0, 26, 52, 78, 104, 130, 156, 182, 208, 234, 260],
     "frame": np.quantile(raw_data["frame"], np.linspace(0, 1, 6)).tolist(),
     "speed": [-1, 0, 3, 15],
-    "xspeed": [-15, -5, 0, 5, 15],
-    "yspeed": [-15, -5, 0, 5, 15],
+    # The -99 sentinel gets the first bin; the real readings keep the cuts chosen above
+    "xspeed": [-99, -15, -5, 0, 5, 15],
+    "yspeed": [-99, -15, -5, 0, 5, 15],
     "zspeed": [-5, -0.0001, 0.0001, 5],
+    # Two sentinels and the real coordinates: three groups each
+    "latitude": [-2, -1, 0, 90],
+    "longitude": [-2, -1, 0, 90],
     "object_size": np.quantile(raw_obj_size, np.linspace(0, 1, 21)).tolist(),
 }
 
 # %% [markdown]
-# Now for the post-processing. The binned version of categorical columns is the category name followed by a `#`. For example, the binned version of _latitude_ is _latitude#_.
+# ### Check the repaired and binned result
+#
+# You should check the binning once more before you analyze anything, to confirm that every image-level
+# factor groups its rows sensibly. *Object_size* is recorded per
+# detection, so it is not in this table; you checked it separately above.
+#
+# DataEval warns that some declared cuts hold no rows - `altitude` fills 9 of its 11 bins, and
+# `compass_heading` 8 of 9. That is why the counts below are lower than the bins you declared. The
+# empty bins are the sentinel ranges where this dataset happens to record nothing, which is a fact
+# about the data rather than an error, so you should read them as a finding and leave them alone.
 
 # %%
-df = metadata.dataframe
-
-# Post-process latitude
-# Fix the strings
-df = df.with_columns(
-    pl
-    .when(pl.col("latitude") == "N")
-    .then(pl.lit("-2"))
-    .otherwise(pl.col("latitude"))
-    .cast(pl.Float64)
-    .cast(pl.Int64)
-    .alias("latitude")
-)
-# Bin the data
-df = df.with_columns((pl.col("latitude").rank("dense") - 1).cast(pl.Int64).alias("latitude#"))
-
-# Post-process longitude
-# Fix the strings
-df = df.with_columns(
-    pl
-    .when(pl.col("longitude") == "E")
-    .then(pl.lit("-2"))
-    .otherwise(pl.col("longitude"))
-    .cast(pl.Float64)
-    .cast(pl.Int64)
-    .alias("longitude")
-)
-# Bin the data
-df = df.with_columns((pl.col("longitude").rank("dense") - 1).cast(pl.Int64).alias("longitude#"))
-
-# Post-process date_time
-# Fix the strings
-df = df.with_columns(
-    pl
-    .when(pl.col("date_time") == "")
-    .then(pl.lit(-1))
-    .otherwise(pl.col("date_time").str.to_datetime(strict=False).dt.hour())
-    .fill_null(-1)
-    .alias("hour")
-)
-# Bin the data
-df = df.with_columns((pl.col("hour").rank("dense") - 1).cast(pl.Int64).alias("hour#"))
-
-# Post-process xspeed and yspeed to account for -1 values
-new_max_x = pl.col("xspeed↕").max() + 1
-df = df.with_columns(pl.when(pl.col("xspeed") == -1).then(new_max_x).otherwise(pl.col("xspeed↕")).alias("xspeed↕"))
-new_max_y = pl.col("yspeed↕").max() + 1
-df = df.with_columns(pl.when(pl.col("yspeed") == -1).then(new_max_y).otherwise(pl.col("yspeed↕")).alias("yspeed↕"))
-
-
-# %% [markdown]
-# Now that we have fixed the data, we need to get the data back into a state to pass to our bias functions. We'll create a minimal shell using the {class}`.CodedMetadataLike` protocol.
-
-
-# %%
-class AdjustedMetadata(CodedMetadataLike):
-    def __init__(self, factors, labels, index2label, names, binned):
-        self._factors = factors
-        self._labels = labels
-        self._index2label = index2label
-        self._names = names
-        self._binned = binned
-
-    @property
-    def factor_names(self):
-        return self._names
-
-    @property
-    def factor_data(self):
-        return self._factors
-
-    @property
-    def class_labels(self):
-        return self._labels
-
-    @property
-    def index2label(self):
-        return self._index2label
-
-    @property
-    def is_binned(self):
-        return self._binned
-
-
-corrected_metadata = AdjustedMetadata(
-    factors=df
-    .filter(df["level"] == "instance")
-    .select([  # Only the binned data is needed
-        "altitude↕",
-        "compass_heading↕",
-        "drone#",
-        "frame↕",
-        "gimbal_heading↕",
-        "gimbal_pitch↕",
-        "height#",
-        "hour#",
-        "latitude#",
-        "longitude#",
-        "object_size↕",
-        "speed↕",
-        "storage#",
-        "width#",
-        "xspeed↕",
-        "yspeed↕",
-        "zspeed↕",
-    ])
-    .to_numpy(),
-    labels=df.filter(df["level"] == "instance").select("class_label").to_numpy().squeeze(),
-    index2label=ds.index2label,
-    names=[
-        "altitude",
-        "compass_heading",
-        "drone",
-        "frame",
-        "gimbal_heading",
-        "gimbal_pitch",
-        "height",
-        "hour",
-        "latitude",
-        "longitude",
-        "object_size",
-        "speed",
-        "storage",
-        "width",
-        "xspeed",
-        "yspeed",
-        "zspeed",
-    ],
-    binned=[
-        True,
-        True,
-        False,
-        True,
-        True,
-        True,
-        False,
-        False,
-        False,
-        False,
-        True,
-        True,
-        True,
-        False,
-        False,
-        True,
-        True,
-        True,
-    ],
-)
+repaired = metadata.at("unit")
+print("          Name  - Raw Unique - Bin Unique")
+for name in repaired.factor_names:
+    raw_values = repaired.rows_at("unit")[name]
+    binned = repaired.rows_at("unit")[f"{name}\u2195" if name in metadata.continuous_factor_bins else f"{name}#"]
+    print(f"{name:>15} - {raw_values.n_unique():^10} - {binned.n_unique():^10}")
 
 # %% [markdown]
 # Now that the metadata is ready to go, you can begin analyzing the dataset for bias!
@@ -477,7 +425,7 @@ corrected_metadata = AdjustedMetadata(
 # The results can be retrieved using the _balance_ and _factors_ attributes of the output.
 
 # %%
-bal = Balance().evaluate(corrected_metadata)
+bal = Balance().evaluate(metadata)
 
 # %% [markdown]
 # The information provided by `Balance` may be visually understood with a heat map.
@@ -486,28 +434,62 @@ bal = Balance().evaluate(corrected_metadata)
 dep.plot(bal, figsize=(10, 10))
 
 # %% [markdown]
-# The heatmap shows that *storage* is highly correlated with many of the other factors, while *object_size* is only correlated with few other categories.
-# The greatest correlations are between things that one might expect to be correlated _latitude_ and _longitude_,
-# _drone_ and _storage_, the headings - *compass_heading* and *gimbal_heading*, and the size of the image - _height_ and _width_.
+# The heatmap has one large block in it. The flight telemetry - *gimbal_pitch*, *gimbal_heading*,
+# *compass_heading*, _altitude_, _latitude_, _longitude_ and _speed_ - is correlated with almost
+# everything, at 0.94 to 0.99 within the block. Nothing else comes close, and *object_size* is
+# correlated with nothing at all.
 #
-# However, the most important correlation to note is the correlation between *object_size* and *class_label*.
-# This tells us that this dataset doesn't do a good job of ensuring that each of the class objects is seen at different distances.
-# Thus, this dataset has bounding box bias - a model can learn class just by the size of the object - which will definitely lead to some shortcut learning and poor generalization.
+# You should not read that block as physics. Those columns share their **missing rows**: the same 454
+# frames, 29% of the dataset, record no altitude, no gimbal pitch and no coordinates, and *compass_heading*,
+# *gimbal_heading* and _speed_ are unrecorded on almost exactly the same rows. A factor that is
+# "unrecorded here, unrecorded there" tracks every other factor with the same gaps, so `altitude` at 0.99
+# with `latitude` mostly says the telemetry failed together, not that altitude predicts position. You can
+# see this because you gave the sentinels their own bins; left as ordinary numbers they would have been
+# mixed in with real readings and this structure would not have been visible.
 #
-# Let's investigate this further to see if this bias holds across all classes or is concentrated in a few classes.
+# _Latitude_ and _longitude_ sit at 1.00 for a related reason. You cut each into three groups - two kinds
+# of missing reading and one group holding every real coordinate - so both columns now carry the same
+# information, which is whether a position was recorded and how it failed. They are one column twice.
+#
+# _Drone_ and *storage* are also at 1.00, and *storage* and *date_time* at 0.99. *Storage* names the folder
+# a clip came from, so it is standing in for the collection session: which airframe flew, and when.
+#
+# The two correlations against *class_label* are the ones that matter, and they are the two largest in
+# that row:
+#
+# - **_Storage_ at 0.34.** Which session an image came from predicts what is in it, so the sessions were
+#   not balanced across classes. That is a collection problem rather than a property of the imagery.
+# - **_Object_size_ at 0.29.** This is bounding box bias - a model can learn the class from the size of the
+#   object. It carries more weight than the number alone suggests, because *object_size* is the one factor
+#   correlated with nothing else: it has no other factor to borrow the signal from.
+#
+# Every other factor falls to 0.14 or below.
+#
+# Let's investigate this further to see if these biases hold across all classes or are concentrated in a few.
 
 # %%
 dep.plot(bal, plot_classwise=True, figsize=(12, 5))
 
 # %% [markdown]
-# The classwise heatmap shows that the main culprits of our bounding box bias are the classes - boat, buoy, and swimmer.
+# The classwise heatmap splits each of those findings by class.
 #
-# The heatmap also shows us that there is some correlation with _hour_ and _storage_.
-# The correlation with _storage_ tells us that they probably staged the data collection to ensure that they had different setup variations during data collection.
-# The correlation with _hour_ tells us that the model would be able to guess if it should look for the *life_saving_appliances* class based on internal aspects of the image such as brightness or contrast instead of the object itself.
+# The bounding box bias sits mainly in _boat_ (0.33), _buoy_ (0.28) and _swimmer_ (0.25). Those are the
+# classes whose objects appear at a narrow range of sizes.
 #
-# To fix the bounding box bias more images at different distances from the object, so that each object appears at different sizes, will need to be collected.
-# To fix the time of day bias more images of the *life_saving_appliances* class and probably the *jetski* class should be collected at varying times of day.
+# The session bias sits mainly in *life_saving_appliances* (0.37) and _buoy_ (0.36), which are the two
+# flagged as imbalanced. Those classes were captured in a subset of the sessions rather than across all
+# of them, so a model can pick them out from whatever the session has in common - the airframe, the
+# resolution, the light - instead of from the object.
+#
+# *Date_time*, which you repaired into the hour of the day, tells the same story more narrowly: it reaches
+# 0.28 on *life_saving_appliances* and falls to 0.12 or below on everything else. That class was largely
+# collected at particular times, so a model could guess it from brightness or contrast rather than from
+# the object itself.
+#
+# To fix the bounding box bias, collect more images at different distances from the object, so that each
+# object appears at a range of sizes.
+# To fix the session bias, collect every class across every session rather than concentrating a class in a
+# few, and collect *life_saving_appliances* and _jetski_ at varying times of day.
 #
 # Next, let's assess if there is any additional bias by analyzing the datasets diversity.
 
@@ -522,7 +504,7 @@ dep.plot(bal, plot_classwise=True, figsize=(12, 5))
 # The results can be retrieved using the _diversity_index_ attribute of the output.
 
 # %%
-div = Diversity().evaluate(corrected_metadata)
+div = Diversity().evaluate(metadata)
 
 # %% [markdown]
 # It's often easiest to see the differences between the different factors when visualizing them using a bar chart
@@ -544,6 +526,11 @@ dep.plot(div, figsize=(10, 6))
 # - _altitude_
 # - _height_
 # - _width_
+# - _xspeed_
+# - _latitude_ and _longitude_
+#
+# The last three appear because of how you repaired them. Each is mostly one value with a small sentinel
+# group beside it, which is a skewed distribution, so the evaluator reports it as one.
 #
 # These factors contain sampling bias which means that there is significantly more of one value in that category than others.
 # For instance, the *class_label* factor highlights that there is unevenness in the number of data points per class.
@@ -584,6 +571,15 @@ dep.plot(div, plot_classwise=True, figsize=(12, 5))
 # representative of biases in the operational dataset. It also means that a model trained on this dataset, isn't going
 # to generalize very well.
 #
+# You found three things worth acting on:
+#
+# - **Session bias.** *Storage* is the strongest predictor of class, and it stands in for the collection
+#   session. *Life_saving_appliances* and _buoy_ were captured in a subset of the sessions.
+# - **Bounding box bias.** *Object_size* is the second strongest, and it is the only factor that borrows
+#   no signal from any other, which makes it the cleanest shortcut on offer.
+# - **Missing telemetry.** 29% of frames record no altitude, gimbal pitch or position, and they are the
+#   same frames each time. Any conclusion drawn from those factors describes the recorded subset only.
+#
 # The metadata categories identified by the `Balance` and `Diversity` evaluators contain issues such as imbalanced classes
 # and imbalanced parameters per class. DataEval isn't able to tell you exactly why they are imbalanced, but it highlights
 # the categories that you need to check.
@@ -592,6 +588,73 @@ dep.plot(div, plot_classwise=True, figsize=(12, 5))
 # strengths and limitations. It is designed to help you create representative and reliable datasets.
 #
 # Good luck with your data!
+
+# %% [markdown]
+# ## When a declaration is not enough
+#
+# Every correction above was a declaration - a record that DataEval applies, stores and replays for you.
+# That covers most of what a dataset needs, but not everything. A factor derived from two other columns
+# has no record that describes it.
+#
+# For those cases, DataEval accepts anything that satisfies the {class}`.CodedMetadataLike` protocol. You
+# can bin the data yourself and pass the result to the same evaluators. You should use this only when a
+# repair cannot express what you need, because a declaration reapplies itself to the next dataset and a
+# hand-built array does not.
+
+# %% [markdown]
+# The shell needs five members: the binned factor array, the class labels, the label lookup, the factor
+# names, and which factors are binned. The example below builds a factor from two others - the ratio of an
+# object's size to the altitude it was seen from - and passes it to the same evaluator you used above.
+
+
+# %%
+class AdjustedMetadata(CodedMetadataLike):
+    def __init__(self, factors, labels, index2label, names, binned):
+        self._factors = factors
+        self._labels = labels
+        self._index2label = index2label
+        self._names = names
+        self._binned = binned
+
+    @property
+    def factor_names(self):
+        return self._names
+
+    @property
+    def factor_data(self):
+        return self._factors
+
+    @property
+    def class_labels(self):
+        return self._labels
+
+    @property
+    def index2label(self):
+        return self._index2label
+
+    @property
+    def is_binned(self):
+        return self._binned
+
+
+# One row per detection, which is the level `object_size` is recorded at.
+rows = metadata.rows_at("instance")
+
+# A derived factor: apparent size per metre of altitude, cut into 5 groups. Rows with no altitude
+# reading (-1) take a bin of their own rather than a ratio that would not mean anything.
+ratio = np.where(rows["altitude"].to_numpy() > 0, rows["object_size"].to_numpy() / rows["altitude"].to_numpy(), -1.0)
+edges = np.quantile(ratio[ratio > 0], np.linspace(0, 1, 5))
+derived = np.where(ratio < 0, 0, np.digitize(ratio, edges))
+
+custom_metadata = AdjustedMetadata(
+    factors=np.column_stack([derived, rows["object_size\u2195"].to_numpy()]),
+    labels=rows["class_label"].to_numpy().squeeze(),
+    index2label=ds.index2label,
+    names=["size_per_metre", "object_size"],
+    binned=[True, True],
+)
+
+Balance().evaluate(custom_metadata)
 
 # %% [markdown]
 # ## Next steps

@@ -12,19 +12,28 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.types import Aggregator, BinSpec, LevelSpec
+from dataeval.types import Aggregator, BinSpec, LevelSpec, ParseDateTime, ParseValue, Remap, Rescale
 
 # Bumped when the on-disk shape changes in a way an older reader would misread. A
 # descriptor is committed alongside code and read back months later, so it says which
 # format it is rather than leaving a reader to guess.
-DESCRIPTOR_VERSION = 1
+DESCRIPTOR_VERSION = 2
+
+# Versions this reader accepts. Version 1 predates corrections and loads with none, which
+# is what a file written before they existed meant.
+READABLE_VERSIONS = (1, 2)
 
 FactorEncoding = BinSpec | LevelSpec
+
+# The ways a column's values can be corrected before anything asks what code each one
+# takes. Read as one type wherever a descriptor's ordered correction list is handled.
+Correction = ParseValue | ParseDateTime | Remap | Rescale
 
 # JSON has no literal for an infinite float, and the values Python emits for one
 # (``Infinity``) are not valid JSON that other tools will parse. Spelled as strings so the
@@ -49,7 +58,11 @@ def _index_key(value: Any) -> Any:
     string the renderer writes for it, since JSON has no byte string and a level read back
     as text would otherwise be a second level for the same value.
     """
-    if value is None or (isinstance(value, float) and value != value):
+    # ``np.floating`` as well as ``float``: ``np.float64`` subclasses the builtin but
+    # ``np.float32`` does not, so a half-precision or single-precision NaN read as an
+    # ordinary value here while ``missing_mask`` -- which asks the dtype -- called it
+    # absent, and the count of missing rows disagreed with the codes in the column.
+    if value is None or (isinstance(value, float | np.floating) and value != value):
         return _MISSING_KEY
     if isinstance(value, bytes | bytearray):
         return bytes(value).decode("utf-8", errors="replace")
@@ -183,7 +196,10 @@ def _edge_from_json(edge: float | str | None) -> float:
     return float(edge)
 
 
-def encoding_to_json(encodings: Mapping[str, FactorEncoding | None]) -> str:
+def encoding_to_json(
+    encodings: Mapping[str, FactorEncoding | None],
+    corrections: Sequence[Correction] | None = None,
+) -> str:
     """Render an encoding as the artifact a person reviews.
 
     JSON with sorted keys and a fixed indent, so that the same encoding produces the same
@@ -194,8 +210,17 @@ def encoding_to_json(encodings: Mapping[str, FactorEncoding | None]) -> str:
 
     Factors carrying no record are omitted rather than written as null — a descriptor names
     the factors it has something to say about, and the rest are encoded normally.
+
+    Two sections, because a descriptor answers two questions about a factor: how its values
+    were **read**, and how those values became **codes**. Corrections come first and are an
+    array rather than an object, since they are applied in order and one factor may take
+    several.
     """
-    document = {"version": DESCRIPTOR_VERSION, "factors": encoding_to_mapping(encodings)}
+    document = {
+        "version": DESCRIPTOR_VERSION,
+        "corrections": corrections_to_list(corrections or ()),
+        "factors": encoding_to_mapping(encodings),
+    }
     # ``allow_nan=False`` so that a value the renderer above has no spelling for stops the
     # write instead of putting a bare ``NaN`` or ``Infinity`` token into a file the whole
     # point of which is that other tools can read it.
@@ -247,6 +272,175 @@ def _one_from_json(name: str, entry: Mapping[str, Any]) -> FactorEncoding:
     raise ValueError(f"Encoding for factor {name!r} has kind {kind!r}; expected 'bins' or 'levels'.")
 
 
+def _remap_to_json(correction: Remap) -> dict[str, Any]:
+    """Render a remap. Its mapping is written as pairs, for the reason given above."""
+    return {
+        "kind": "remap",
+        "factor": correction.factor,
+        "map": [[_key_to_json(key), _as_plain(value)] for key, value in correction.mapping.items()],
+        "provenance": correction.provenance,
+    }
+
+
+def _rescale_to_json(correction: Rescale) -> dict[str, Any]:
+    """Render a rescale."""
+    return {
+        "kind": "rescale",
+        "factor": correction.factor,
+        "over": list(correction.over),
+        "multiply": correction.multiply,
+        "add": correction.add,
+        "provenance": correction.provenance,
+    }
+
+
+def _parse_value_to_json(correction: ParseValue) -> dict[str, Any]:
+    """Render a parse. Its drops stay an array, so a substring keeps its spelling."""
+    return {
+        "kind": "parse_value",
+        "factor": correction.factor,
+        "drop": list(correction.drop),
+        "decimal": correction.decimal,
+        "provenance": correction.provenance,
+    }
+
+
+def _parse_datetime_to_json(correction: ParseDateTime) -> dict[str, Any]:
+    """Render a datetime reading."""
+    return {
+        "kind": "parse_datetime",
+        "factor": correction.factor,
+        "format": correction.format,
+        "every": correction.every,
+        "epoch": correction.epoch,
+        "provenance": correction.provenance,
+    }
+
+
+def _remap_from_json(entry: Mapping[str, Any]) -> Remap:
+    """Read a remap back."""
+    return Remap(
+        factor=entry["factor"],
+        mapping={_key_from_json(key): value for key, value in entry["map"]},
+        provenance=entry.get("provenance", "declared"),
+    )
+
+
+def _rescale_from_json(entry: Mapping[str, Any]) -> Rescale:
+    """Read a rescale back."""
+    low, high = entry["over"]
+    return Rescale(
+        factor=entry["factor"],
+        over=(low, high),
+        multiply=entry["multiply"],
+        add=entry["add"],
+        provenance=entry.get("provenance", "declared"),
+    )
+
+
+def _parse_value_from_json(entry: Mapping[str, Any]) -> ParseValue:
+    """Read a parse back."""
+    return ParseValue(
+        factor=entry["factor"],
+        drop=list(entry.get("drop", ())),
+        decimal=entry.get("decimal", "."),
+        provenance=entry.get("provenance", "declared"),
+    )
+
+
+def _parse_datetime_from_json(entry: Mapping[str, Any]) -> ParseDateTime:
+    """Read a datetime reading back."""
+    return ParseDateTime(
+        factor=entry["factor"],
+        format=entry.get("format"),
+        every=entry.get("every"),
+        # Absent in a descriptor written before numeric timestamps were read, where the
+        # reading only ever touched text -- seconds is what it would have emitted.
+        epoch=entry.get("epoch", "s"),
+        provenance=entry.get("provenance", "declared"),
+    )
+
+
+# Both directions of the correction vocabulary, declared together so a kind cannot be
+# written by one and unreadable by the other. A new correction is added in one place.
+_CORRECTION_WRITERS: Mapping[type, Any] = MappingProxyType({
+    Remap: _remap_to_json,
+    Rescale: _rescale_to_json,
+    ParseValue: _parse_value_to_json,
+    ParseDateTime: _parse_datetime_to_json,
+})
+
+_CORRECTION_READERS: Mapping[str, Any] = MappingProxyType({
+    "remap": _remap_from_json,
+    "rescale": _rescale_from_json,
+    "parse_value": _parse_value_from_json,
+    "parse_datetime": _parse_datetime_from_json,
+})
+
+
+def corrections_to_list(corrections: Sequence[Correction]) -> list[dict[str, Any]]:
+    """Render the corrections as plain data, in the order they are applied.
+
+    A remap's mapping is written as **pairs, not as an object**. JSON object keys are
+    strings, so ``{1: "low"}`` would come back as ``{"1": "low"}`` and a mapping keyed on a
+    number would silently become one keyed on text — the exact confusion the corrections
+    exist to resolve. Pairs preserve both sides, which is why ``levels`` is already an array.
+
+    Raises
+    ------
+    ValueError
+        When a correction has no writer here, which would otherwise drop it from the
+        archive and give back a metadata that reads its dataset differently.
+    """
+    written: list[dict[str, Any]] = []
+    for correction in corrections:
+        writer = _CORRECTION_WRITERS.get(type(correction))
+        if writer is None:
+            raise ValueError(
+                f"Correction {correction!r} is a {type(correction).__name__}, which this writer "
+                f"cannot render. It writes {', '.join(kind.__name__ for kind in _CORRECTION_WRITERS)}.",
+            )
+        written.append(writer(correction))
+    return written
+
+
+def corrections_from_list(written: Sequence[Mapping[str, Any]]) -> list[Correction]:
+    """Read corrections back from plain data. The reverse of :func:`corrections_to_list`.
+
+    Raises
+    ------
+    ValueError
+        When an entry names a kind this reader does not have, which is what a descriptor
+        written by a newer DataEval says to an older one.
+    """
+    corrections: list[Correction] = []
+    for entry in written:
+        kind = entry.get("kind")
+        reader = _CORRECTION_READERS.get(str(kind))
+        if reader is None:
+            raise ValueError(
+                f"Correction has kind {kind!r}; expected one of {', '.join(repr(k) for k in _CORRECTION_READERS)}.",
+            )
+        corrections.append(reader(entry))
+    return corrections
+
+
+def _key_to_json(key: Any) -> Any:
+    """Render one mapping key: a range stays a pair, anything else is a plain value."""
+    return [_as_plain(bound) for bound in key] if isinstance(key, tuple) else _as_plain(key)
+
+
+def _key_from_json(key: Any) -> Any:
+    """Read one mapping key back. A JSON array is the range it was written from.
+
+    Read plainly rather than through :func:`_level_from_json`, which reads ``null`` as the
+    missing value a vocabulary reserves a code for. Here ``null`` is the catch-all key and
+    has to come back as ``None``: a correction addresses the values that are *there*, and
+    absence is the one thing it never matches.
+    """
+    return tuple(key) if isinstance(key, list) else key
+
+
 def encoding_from_json(text: str) -> dict[str, FactorEncoding]:
     """Read a descriptor back into records.
 
@@ -255,11 +449,7 @@ def encoding_from_json(text: str) -> dict[str, FactorEncoding]:
     the next dataset is two different vocabularies again.
     """
     document = json.loads(text)
-    version = document.get("version")
-    if version != DESCRIPTOR_VERSION:
-        raise ValueError(
-            f"Encoding descriptor is version {version!r}; this DataEval reads version {DESCRIPTOR_VERSION}.",
-        )
+    _check_version(document)
     return encoding_from_mapping(document.get("factors", {}))
 
 
@@ -325,6 +515,34 @@ def _option_from_json(value: Any) -> Any:
     which is the common case: fitting is what recording a roll-up preserves.
     """
     return tuple(_option_from_json(item) for item in value) if isinstance(value, list) else value
+
+
+def corrections_from_json(text: str) -> list[Correction]:
+    """Read a descriptor's corrections back into records.
+
+    Separate from :func:`encoding_from_json` because the two halves are read by different
+    parts of the walk — corrections decide what the values *are*, long before anything asks
+    what code each one takes.
+    """
+    document = json.loads(text)
+    _check_version(document)
+    return corrections_from_list(document.get("corrections", []))
+
+
+def _check_version(document: Mapping[str, Any]) -> None:
+    """Refuse a descriptor this DataEval cannot read.
+
+    Raises
+    ------
+    ValueError
+        When the version is not one this reader accepts.
+    """
+    version = document.get("version")
+    if version not in READABLE_VERSIONS:
+        raise ValueError(
+            f"Encoding descriptor is version {version!r}; this DataEval reads "
+            f"{' and '.join(str(v) for v in READABLE_VERSIONS)}.",
+        )
 
 
 def bins_to_mapping(bins: Mapping[str, int | Sequence[float]]) -> dict[str, int | list[float | str | None]]:

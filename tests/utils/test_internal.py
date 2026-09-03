@@ -857,3 +857,57 @@ class TestKeepPartialKeys:
         described different numbers of rows."""
         merged = merge_metadata([{"a": [], "b": 1}, {"a": [7], "b": 2}], keep_partial=True)
         assert {len(v) for v in merged.values()} == {1}
+
+
+@pytest.mark.required
+class TestAColumnWhoseValuesDisagreeAboutTheirType:
+    """Promoting numbers to text to unify a column is a loss, not a widening.
+
+    ``simplify_type`` gives a column one type by promoting to the widest one present. Where
+    that is text the promotion turns ``1.0`` into the *category* ``"1"``, so the column can
+    no longer be binned, ordered or read as continuous and every bias evaluator scores it as
+    a category set. It is dropped instead, and offered for repair.
+    """
+
+    def test_numbers_beside_text_are_dropped_rather_than_stringified(self):
+        merged, dropped = merge_metadata(
+            [{"direction": 1.0}, {"direction": "N"}, {"direction": 2.0}], return_dropped=True
+        )
+        assert "direction" not in merged
+        assert dropped == {"direction": ["mixed_types"]}
+
+    def test_a_column_of_numerals_reads_as_numbers(self):
+        """Metadata through JSON is all text, so a column of counts is a column of numerals
+        and has to keep working."""
+        merged = merge_metadata([{"grade": "1"}, {"grade": "2"}, {"grade": "3"}])
+        assert merged["grade"] == [1, 2, 3]
+
+    def test_numerals_beside_a_word_are_the_same_problem_in_another_spelling(self):
+        """``["1", "2", "many"]`` and ``[1.0, "N", 2.0]`` are one case: only some of the
+        values read as numbers, and neither reading is one the library can pick."""
+        merged, dropped = merge_metadata([{"grade": "1"}, {"grade": "2"}, {"grade": "many"}], return_dropped=True)
+        assert "grade" not in merged
+        assert dropped == {"grade": ["mixed_types"]}
+
+    def test_a_numeral_beside_a_number_resolves_to_a_number(self):
+        """Both read as numbers, so nothing is read as a category and nothing is lost."""
+        merged = merge_metadata([{"n": "1"}, {"n": 2.0}])
+        assert merged["n"] == [1, 2]
+
+    @pytest.mark.parametrize("value", [np.int64(1), np.float64(1.0), True])
+    def test_a_value_numpy_or_bool_still_counts_as_a_number(self, value):
+        merged, dropped = merge_metadata([{"d": value}, {"d": "N"}], return_dropped=True)
+        assert dropped == {"d": ["mixed_types"]}
+
+    @pytest.mark.parametrize(
+        "entries",
+        [
+            [{"d": 1}, {"d": 2.0}, {"d": 3}],
+            [{"d": "sun"}, {"d": "rain"}],
+            [{"d": "1"}, {"d": "2"}, {"d": "3"}],
+            [{"objs": [{"x": 1}, {"x": 2}]}, {"objs": [{"x": 3}, {"x": 4}]}],
+        ],
+    )
+    def test_a_column_that_agrees_with_itself_is_untouched(self, entries):
+        _, dropped = merge_metadata(entries, return_dropped=True)
+        assert dropped == {}

@@ -31,7 +31,11 @@ __all__ = [
     "ModelInfo",
     "OntologyConcept",
     "Output",
+    "ParseDateTime",
+    "ParseValue",
+    "Remap",
     "ReprMixin",
+    "Rescale",
     "SCHEMA_VERSION",
     "SelectionInfo",
     "SequenceOutput",
@@ -39,6 +43,7 @@ __all__ = [
     "StatsMap",
     "Track",
     "TransformInfo",
+    "Unusable",
     "set_metadata",
 ]
 
@@ -55,6 +60,11 @@ from dataeval.types._factors import (
     FactorLevel,
     FactorLevelSchema,
     LevelSpec,
+    ParseDateTime,
+    ParseValue,
+    Remap,
+    Rescale,
+    Unusable,
 )
 from dataeval.types._index import SourceIndex
 from dataeval.types._ontology import AlignmentRelation, Correspondence, OntologyConcept
