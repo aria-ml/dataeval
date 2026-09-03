@@ -39,6 +39,16 @@ docs:
         prefix: docs-datasets
       paths:
         - docs/source/notebooks/data
+    # Intersphinx inventories pre-fetched by docs/fetch-intersphinx-inventories.py
+    # (the build reads them from disk and never fetches over the network). Keyed
+    # on conf.py so mapping changes trigger a re-fetch; the script also re-fetches
+    # anything older than its TTL, and falls back to a stale copy if a fetch fails.
+    - key:
+        files:
+          - docs/source/conf.py
+        prefix: intersphinx-inventories
+      paths:
+        - docs/source/_intersphinx
   artifacts:
     paths:
       - output/docs/html/

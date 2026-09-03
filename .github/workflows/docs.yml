@@ -53,6 +53,16 @@ jobs:
       - name: Install dependencies
         run: uv tool install nox --with nox-uv
 
+      - name: Cache intersphinx inventories
+        # Pre-fetched with retries by docs/fetch-intersphinx-inventories.py (run by
+        # the nox docs session); the build reads them from disk and never fetches
+        # over the network. restore-keys gives a stale fallback if conf.py changes.
+        uses: actions/cache@v4
+        with:
+          path: docs/source/_intersphinx
+          key: intersphinx-inventories-${{ hashFiles('docs/source/conf.py') }}
+          restore-keys: intersphinx-inventories-
+
       - name: Build documentation
         run: uvx nox -e docs
         env:

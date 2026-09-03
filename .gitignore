@@ -12,6 +12,10 @@ docs/build/
 docs/source/reference/autoapi
 docs/source/tutorials/notebooks/checkpoints/
 
+# Intersphinx inventories pre-fetched by docs/fetch-intersphinx-inventories.py
+# (cached in CI, keyed on docs/source/conf.py)
+docs/source/_intersphinx/
+
 # Jupyter cache is stored in orphan branches (docs-artifacts/<branch>)
 # See scripts/README.md for details
 .jupyter_cache/

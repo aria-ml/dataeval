@@ -76,13 +76,22 @@ suppress_warnings = ["autoapi.python_import_resolution"]
 # Intersphinx — cross-reference external libraries (e.g. MAITE protocols)
 # ---------------------------------------------------------------------------------
 
+# Intersphinx cross-references to external libraries.
+#
+# IMPORTANT: the *locations* (second element) must be LOCAL files pre-fetched by
+# docs/fetch-intersphinx-inventories.py (run automatically by the nox `docs` session,
+# with retries + a CI cache). The build reads them from disk and never makes live
+# network calls, so intermittent DNS/connect failures can't fail the docs build.
+# The target URI (first element) stays remote — it only controls the external
+# links Sphinx generates. To add an entry: add name -> (target uri,
+# "_intersphinx/<name>.inv") here; the fetch script discovers entries automatically.
 intersphinx_mapping = {
-    "python": ("https://docs.python.org/3/", None),
-    "maite": ("https://mit-ll-ai-technology.github.io/maite/", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
-    "sklearn": ("https://scikit-learn.org/stable/", None),
-    "numpy": ("https://numpy.org/doc/stable/", None),
-    "torch": ("https://pytorch.org/docs/stable/", None),
+    "python": ("https://docs.python.org/3/", "_intersphinx/python.inv"),
+    "maite": ("https://mit-ll-ai-technology.github.io/maite/", "_intersphinx/maite.inv"),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", "_intersphinx/scipy.inv"),
+    "sklearn": ("https://scikit-learn.org/stable/", "_intersphinx/sklearn.inv"),
+    "numpy": ("https://numpy.org/doc/stable/", "_intersphinx/numpy.inv"),
+    "torch": ("https://pytorch.org/docs/stable/", "_intersphinx/torch.inv"),
 }
 
 # ---------------------------------------------------------------------------------

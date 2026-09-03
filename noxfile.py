@@ -348,6 +348,18 @@ def docs(session: nox.Session) -> None:
         # Fetch cached notebook results from orphan artifact branch
         session.run("bash", "docs/fetch-docs-cache.sh", external=True)
 
+    # Pre-fetch intersphinx inventories (with retries + backoff) so the build
+    # reads them from disk and can't fail on an intermittent network blip.
+    session.run(
+        "python",
+        "docs/fetch-intersphinx-inventories.py",
+        "--conf",
+        "docs/source/conf.py",
+        "--src-dir",
+        "docs/source",
+        external=False,
+    )
+
     session.run("rm", "-rf", "output/docs", external=True)
     session.chdir("docs/source")
 
