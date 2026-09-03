@@ -102,8 +102,8 @@ from dataeval.types import (
     SourceIndex,
 )
 from dataeval.types._factors import Unusable, validate_coverage
-from dataeval.utils._internal import _promotion_is_lossy, simplify_type, value_kind
-from dataeval.utils._validate import requires_maite_dataset
+from dataeval.utils._internal import promotion_is_lossy, simplify_type, value_kind
+from dataeval.utils.data import requires_maite_dataset
 from dataeval.utils.thresholds import resolve_threshold
 
 _logger = get_logger(__name__)
@@ -3634,7 +3634,7 @@ class Metadata(Array, FeatureExtractor):
         # on the other half is a category set in lexicographic order, and nothing would say
         # so. Only a reading that introduces the mixture is refused, so a category column
         # that always spelled some of its values as numerals is rewritten as before.
-        lossy = _promotion_is_lossy(corrected) and (held or not _promotion_is_lossy(list(values)))
+        lossy = promotion_is_lossy(corrected) and (held or not promotion_is_lossy(list(values)))
         self._store = self._store.without_columns({factor} & set(self._store.columns))
         self._reset_bins([factor])
         if lossy and held:

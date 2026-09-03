@@ -14,7 +14,7 @@ from dataeval.config import get_seed
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import ArrayND
-from dataeval.utils._internal import flatten_samples, to_numpy
+from dataeval.utils._array import flatten_samples, to_numpy
 
 _logger = get_logger(__name__)
 

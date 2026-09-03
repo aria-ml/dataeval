@@ -7,8 +7,9 @@ import numpy as np
 
 from dataeval.data._view import Operation, View
 from dataeval.protocols import Array, ObjectDetectionTarget, SegmentationTarget
-from dataeval.utils._internal import MaskedTarget, argmax_label, as_numpy, mask_metadata
-from dataeval.utils._validate import DatasetKind
+from dataeval.utils._array import argmax_label, as_numpy
+from dataeval.utils._mask import MaskedTarget, mask_metadata
+from dataeval.utils.data import DatasetKind
 
 
 class ClassFilter(Operation):

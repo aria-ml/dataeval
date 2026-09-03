@@ -16,7 +16,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.protocols import ObjectDetectionTarget, SegmentationTarget
-from dataeval.utils._internal import MaskedTarget, as_numpy, mask_metadata
+from dataeval.utils._array import as_numpy
+from dataeval.utils._mask import MaskedTarget, mask_metadata
 
 
 @dataclass(frozen=True)

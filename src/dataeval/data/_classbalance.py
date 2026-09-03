@@ -10,8 +10,8 @@ from dataeval.config import get_seed
 from dataeval.core._label_stats import label_stats
 from dataeval.data._view import Operation, View
 from dataeval.protocols import AnnotatedDataset, Array, ObjectDetectionTarget, SegmentationTarget
-from dataeval.utils._internal import argmax_label, as_numpy
-from dataeval.utils._validate import DatasetKind
+from dataeval.utils._array import argmax_label, as_numpy
+from dataeval.utils.data import DatasetKind
 
 
 class ClassBalance(Operation):

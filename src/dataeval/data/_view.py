@@ -1,17 +1,31 @@
 __all__ = []
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Any, TypeVar
 
 from dataeval.flags import ImageStats
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
-from dataeval.utils._validate import DatasetKind, aggregate_required_kind, validate_dataset
+from dataeval.utils.data import DatasetKind, validate_dataset
 
 _TDatum = TypeVar("_TDatum")
 
 Transform = Callable[[Any], Any]
+
+
+def _aggregate_required_kind(kinds: Iterable[DatasetKind | None]) -> DatasetKind | None:
+    """Fold per-op MAITE requirements into the single strictest kind to validate.
+
+    ``None`` means no op inspects targets (validation is skipped, keeping image-only
+    datasets usable); a specific kind (``classification`` / ``object_detection`` /
+    ``segmentation`` / ``multiobject_tracking``) wins over the generic ``any_target``.
+    """
+    present: list[DatasetKind] = [k for k in kinds if k is not None]
+    if not present:
+        return None
+    specific: list[DatasetKind] = [k for k in present if k != "any_target"]
+    return specific[0] if specific else "any_target"
 
 
 class Operation(ReprMixin, ABC):
@@ -149,7 +163,7 @@ class View(AnnotatedDataset[_TDatum]):
         self._transforms: list[tuple[Transform, set[int] | None]] = []
 
         # Fail fast if any operation requires a target the source dataset cannot provide.
-        required_kind = aggregate_required_kind(op.requires for op in self._operations)
+        required_kind = _aggregate_required_kind(op.requires for op in self._operations)
         if required_kind is not None and len(dataset) > 0:
             validate_dataset(dataset, expected=required_kind, caller="View")
 

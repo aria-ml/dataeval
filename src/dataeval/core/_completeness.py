@@ -8,7 +8,7 @@ from sklearn.neighbors import NearestNeighbors
 
 from dataeval._log import get_logger
 from dataeval.protocols import Array
-from dataeval.utils._internal import ensure_embeddings
+from dataeval.utils._array import ensure_embeddings
 
 _logger = get_logger(__name__)
 

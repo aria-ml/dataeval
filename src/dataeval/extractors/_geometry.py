@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import iter_images
+from dataeval.utils.data import iter_images
 
 _EPS = 1e-6
 

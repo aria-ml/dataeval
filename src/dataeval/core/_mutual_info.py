@@ -13,7 +13,7 @@ from sklearn.metrics.cluster import contingency_matrix, expected_mutual_informat
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes, get_seed
 from dataeval.types import Array1D, Array2D
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 _logger = get_logger(__name__)
 

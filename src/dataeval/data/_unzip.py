@@ -9,8 +9,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.protocols import Array, Dataset, ObjectDetectionTarget
-from dataeval.utils._internal import as_numpy, unwrap_image
-from dataeval.utils._validate import validate_dataset
+from dataeval.utils._array import as_numpy
+from dataeval.utils.data import unwrap_image, validate_dataset
 from dataeval.utils.preprocessing import BoundingBox
 
 

@@ -12,7 +12,9 @@ from numpy.typing import NDArray
 from dataeval.config import get_max_processes, get_seed
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array
-from dataeval.utils._internal import PoolWrapper, as_numpy, unwrap_image
+from dataeval.utils._array import as_numpy
+from dataeval.utils._internal import PoolWrapper
+from dataeval.utils.data import unwrap_image
 from dataeval.utils.preprocessing import ValueRange, rescale, to_canonical_grayscale
 
 # scikit-learn is a third of `import dataeval`'s cost and only this extractor needs it,

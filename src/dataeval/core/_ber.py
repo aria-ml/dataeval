@@ -9,7 +9,8 @@ from scipy.stats import mode
 from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, ArrayND
-from dataeval.utils._internal import EPSILON, as_numpy
+from dataeval.utils._array import as_numpy
+from dataeval.utils._internal import EPSILON
 
 _logger = get_logger(__name__)
 

@@ -13,7 +13,7 @@ from dataeval.exceptions import NotFittedError
 from dataeval.protocols import ArrayLike, FeatureExtractor
 from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODScoreOutput
 from dataeval.shift._shared._domain_classifier import compute_class1_rates
-from dataeval.utils._internal import flatten_samples
+from dataeval.utils._array import flatten_samples
 
 
 class OODDomainClassifier(ExtractorMixin, BaseOOD):

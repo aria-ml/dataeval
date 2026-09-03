@@ -12,7 +12,8 @@ from dataeval._log import get_logger
 from dataeval.config import get_device
 from dataeval.protocols import Array, DeviceLike, Transform
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import as_numpy, iter_images
+from dataeval.utils._array import as_numpy
+from dataeval.utils.data import iter_images
 from dataeval.utils.training import PostprocessFn
 
 _logger = get_logger(__name__)

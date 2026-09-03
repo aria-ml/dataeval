@@ -18,7 +18,8 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.types import Array1D, FactorInfo, FactorLevel
-from dataeval.utils._internal import _promotion_is_lossy, as_numpy, value_kind
+from dataeval.utils._array import as_numpy
+from dataeval.utils._internal import promotion_is_lossy, value_kind
 
 
 def _flatten_column_vector(values: NDArray[np.generic]) -> NDArray[np.generic]:
@@ -74,7 +75,7 @@ def reject_mixed_values(factors: Mapping[str, Any]) -> None:
             # values that disagree.
             continue
         present = [value for value in array.reshape(-1).tolist() if value is not None]
-        if not _promotion_is_lossy(present):
+        if not promotion_is_lossy(present):
             continue
         counts = Counter(value_kind(value) for value in present)
         raise ValueError(

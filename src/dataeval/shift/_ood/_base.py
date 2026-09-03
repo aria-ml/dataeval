@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import ArrayLike, FeatureExtractor
 from dataeval.types import DictOutput, Evaluator, set_metadata
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 
 @dataclass(frozen=True, repr=False)

@@ -29,8 +29,8 @@ from dataeval.protocols import (
     SingleFrameObjectTrackingTarget,
 )
 from dataeval.types import FactorLevel
-from dataeval.utils._internal import as_numpy
-from dataeval.utils._validate import requires_maite_dataset
+from dataeval.utils._array import as_numpy
+from dataeval.utils.data import requires_maite_dataset
 from dataeval.utils.preprocessing import BoundingBox, normalize_image_shape
 
 _logger = get_logger(__name__)

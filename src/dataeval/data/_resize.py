@@ -12,7 +12,7 @@ from dataeval.data._crops import FillType, resolve_fill
 from dataeval.data._geometry import GeometryMap, rewrite_geometry
 from dataeval.data._view import Operation, View
 from dataeval.flags import ImageStats
-from dataeval.utils._internal import as_numpy, resize_chw
+from dataeval.utils._array import as_numpy, resize_chw
 from dataeval.utils.preprocessing import crop_with_fill, normalize_image_shape
 
 ResizeMode: TypeAlias = Literal["stretch", "pad", "crop"]

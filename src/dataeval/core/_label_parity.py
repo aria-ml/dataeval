@@ -8,7 +8,7 @@ from scipy.stats import chisquare
 
 from dataeval._log import get_logger
 from dataeval.types import Array1D
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 _logger = get_logger(__name__)
 

@@ -17,7 +17,7 @@ from dataeval._log import get_logger
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import ClassAxis
 from dataeval.utils._internal import EPSILON
-from dataeval.utils._validate import validate_dataset
+from dataeval.utils.data import validate_dataset
 
 _logger = get_logger(__name__)
 

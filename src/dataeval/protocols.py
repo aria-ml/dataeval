@@ -101,7 +101,7 @@ if TYPE_CHECKING:
 # Mirroring costs nothing and is what :obj:`SegmentationTarget` below already does.
 # Protocols match structurally, so these stay mutually assignable with MAITE's own targets
 # in either direction and MAITE-conforming objects satisfy them unchanged. DataEval
-# validates target *values* in ``dataeval.utils._validate``, not through the type, so the
+# validates target *values* in ``dataeval.utils.data``, not through the type, so the
 # dropped ``Is[...]`` predicates lose nothing. ``tests/test_protocols.py`` holds the
 # members to MAITE's, so a MAITE release that adds one fails loudly.
 
@@ -198,7 +198,7 @@ def _is_protocol_instance(obj: Any, protocol: type[_TProtocol]) -> TypeIs[_TProt
     It tests member *presence*, which is all a protocol encodes, and never member types: a
     target whose ``frame_tracks`` is not a sequence still answers True for
     :obj:`MultiobjectTrackingTarget`. That is the right split -- dispatch names the task a
-    target is *for*, and ``dataeval.utils._validate`` is where a target malformed for that
+    target is *for*, and ``dataeval.utils.data`` is where a target malformed for that
     task is reported, with a message naming what is wrong.
 
     Parameters

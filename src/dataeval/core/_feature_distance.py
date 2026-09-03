@@ -9,7 +9,7 @@ from scipy.stats import iqr, ks_2samp, wasserstein_distance
 from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, Array2D
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 _logger = get_logger(__name__)
 

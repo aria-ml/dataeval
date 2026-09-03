@@ -39,7 +39,9 @@ from dataeval.types import (
     StatsMap,
     set_metadata,
 )
-from dataeval.utils._internal import EPSILON, flatten_samples, iter_images, to_numpy
+from dataeval.utils._array import flatten_samples, to_numpy
+from dataeval.utils._internal import EPSILON
+from dataeval.utils.data import iter_images
 from dataeval.utils.thresholds import AdaptiveThreshold, ZScoreThreshold, resolve_threshold
 
 DEFAULT_OUTLIERS_FLAGS = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL

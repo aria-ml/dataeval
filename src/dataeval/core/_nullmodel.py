@@ -10,7 +10,7 @@ from typing_extensions import NotRequired
 from dataeval._log import get_logger
 from dataeval.protocols import ArrayLike
 from dataeval.types import Array1D
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import compute_iou
 
 

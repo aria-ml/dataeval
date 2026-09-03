@@ -11,7 +11,7 @@ from scipy.stats import entropy
 
 from dataeval.protocols import Array, FeatureExtractor
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 
 def _prediction_uncertainty(

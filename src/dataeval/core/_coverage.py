@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 from dataeval._log import get_logger
 from dataeval.core._mst import _compute_nearest_neighbors
 from dataeval.types import Array2D
-from dataeval.utils._internal import as_numpy, ensure_embeddings, flatten_samples
+from dataeval.utils._array import as_numpy, ensure_embeddings, flatten_samples
 
 _logger = get_logger(__name__)
 

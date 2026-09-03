@@ -10,7 +10,7 @@ from dataeval import Metadata
 from dataeval.data._classfilter import ClassFilter
 from dataeval.data._view import View
 from dataeval.protocols import ObjectDetectionTarget
-from dataeval.utils._internal import try_mask_object
+from dataeval.utils._mask import try_mask_object
 
 
 @pytest.mark.required

@@ -14,7 +14,7 @@ from dataeval._metadata._structurers._base import Structurer
 from dataeval._metadata._structurers._data import StructuredData
 from dataeval._metadata._structurers._reserved import ID_KEY, safe_column_name
 from dataeval.protocols import AnnotatedDataset, DatumMetadata, ProgressCallback
-from dataeval.utils._internal import _merge, sorted_drop_reasons
+from dataeval.utils._merge import _merge, sorted_drop_reasons
 
 _logger = get_logger(__name__)
 

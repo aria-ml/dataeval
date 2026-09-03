@@ -14,7 +14,8 @@ from numpy.typing import NDArray
 from dataeval.data._view import Operation, View
 from dataeval.flags import ImageStats
 from dataeval.protocols import ObjectDetectionTarget, SegmentationTarget
-from dataeval.utils._internal import MaskedTarget, as_numpy, mask_metadata
+from dataeval.utils._array import as_numpy
+from dataeval.utils._mask import MaskedTarget, mask_metadata
 from dataeval.utils.preprocessing import normalize_image_shape
 
 #: Sample stride for the missing-``id`` content-hash fallback: enough pixels to separate

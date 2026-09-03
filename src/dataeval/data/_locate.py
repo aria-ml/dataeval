@@ -25,7 +25,7 @@ from dataeval.protocols import (
 )
 from dataeval.types import FactorLevel, FactorLevelSchema, SourceIndex, Track
 from dataeval.types._target import detection_score
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape
 
 # Which levels each task's addresses can name, keyed by the task's item level. An address

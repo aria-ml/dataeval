@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 from dataeval._log import get_logger
 from dataeval.core._mst import compute_neighbor_distances
-from dataeval.utils._internal import flatten_samples
+from dataeval.utils._array import flatten_samples
 
 _logger = get_logger(__name__)
 

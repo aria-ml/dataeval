@@ -16,7 +16,7 @@ from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._chunk import BaseChunker, SizeChunker, resolve_chunker
 from dataeval.types import DictOutput, Evaluator, set_metadata
-from dataeval.utils._internal import flatten_samples
+from dataeval.utils._array import flatten_samples
 from dataeval.utils.thresholds import ZScoreThreshold
 
 TDetails = TypeVar("TDetails", Mapping[str, Any], pl.DataFrame)

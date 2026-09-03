@@ -175,7 +175,7 @@ class TestTheTargetProtocolsStayInstanceCheckable:
     (``maite>=0.9.4``): 0.9.x leaves ``MultiobjectTrackingTarget`` un-``runtime_checkable``
     and 0.10 wraps both in ``Annotated[..., Is[...]]``. Either way ``isinstance`` raises
     :class:`TypeError` for *every* object handed to it, so the whole task-dispatch layer
-    (``detect_task``, ``dataeval.utils._validate``, ``ClassFilter``, ``Relabel``, ...)
+    (``detect_task``, ``dataeval.utils.data``, ``ClassFilter``, ``Relabel``, ...)
     fails closed on every dataset rather than on non-conforming ones.
 
     Mirroring is only safe while the members match, so these pin them to MAITE's.

@@ -13,7 +13,8 @@ from numpy.typing import NDArray
 from dataeval._log import get_logger
 from dataeval.protocols import Array, Transform
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import as_numpy, iter_images, resize_chw
+from dataeval.utils._array import as_numpy, resize_chw
+from dataeval.utils.data import iter_images
 
 if TYPE_CHECKING:
     from onnxruntime import InferenceSession

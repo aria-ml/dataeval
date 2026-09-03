@@ -25,8 +25,7 @@ from dataeval.protocols import (
     FeatureExtractor,
     ProgressCallback,
 )
-from dataeval.utils._internal import unwrap_image
-from dataeval.utils._validate import requires_maite_dataset
+from dataeval.utils.data import requires_maite_dataset, unwrap_image
 
 _logger = get_logger(__name__)
 

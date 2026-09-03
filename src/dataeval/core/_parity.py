@@ -11,7 +11,7 @@ from scipy.stats.contingency import chi2_contingency, crosstab
 from dataeval._experimental import experimental
 from dataeval._log import get_logger
 from dataeval.types import Array1D, Array2D
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 _logger = get_logger(__name__)
 

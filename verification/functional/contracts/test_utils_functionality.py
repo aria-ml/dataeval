@@ -4,7 +4,6 @@ Maps to meta repo test cases:
   - TC-12.1: Utility components (Data, Thresholds, Preprocessing, ONNX)
 """
 
-import numpy as np
 import pytest
 
 
@@ -20,16 +19,14 @@ class TestUtilsFunctionality:
         assert threshold.upper_multiplier == 3.0
 
     def test_utils_preprocessing_conversion(self):
-        # to_numpy is in dataeval.utils._internal
-        from dataeval.utils._internal import to_numpy
+        from dataeval.utils.preprocessing import to_int_box
 
-        data = [np.array([1, 2]), np.array([3, 4])]
-        result = to_numpy(data)
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (2, 2)
+        box = (1.2, 2.7, 3.4, 4.9)
+        result = to_int_box(box)
+        assert result == (1, 2, 4, 5)
 
     def test_data_operations_module_exists(self):
-        from dataeval import data
+        from dataeval.utils import data
 
         assert data is not None
 

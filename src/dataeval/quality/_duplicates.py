@@ -56,7 +56,8 @@ from dataeval.types import (
     StatsMap,
     set_metadata,
 )
-from dataeval.utils._internal import flatten_samples, iter_images, to_numpy
+from dataeval.utils._array import flatten_samples, to_numpy
+from dataeval.utils.data import iter_images
 
 _logger = get_logger(__name__)
 

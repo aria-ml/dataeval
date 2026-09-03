@@ -12,8 +12,9 @@ from dataeval.data._view import Operation, View
 from dataeval.exceptions import DeprecatedWarning, OntologyError
 from dataeval.protocols import Array, DatasetMetadata, ObjectDetectionTarget
 from dataeval.types._target import own_class_scores
-from dataeval.utils._internal import MaskedTarget, argmax_label, as_numpy, mask_metadata
-from dataeval.utils._validate import DatasetKind
+from dataeval.utils._array import argmax_label, as_numpy
+from dataeval.utils._mask import MaskedTarget, mask_metadata
+from dataeval.utils.data import DatasetKind
 
 TargetVocabulary: TypeAlias = Ontology | Mapping[int, str] | Sequence[str]
 """A target label vocabulary: an :class:`.Ontology`, an ``index -> label`` mapping,

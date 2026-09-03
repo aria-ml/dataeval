@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 
 from dataeval.data._view import Operation, View
 from dataeval.flags import ImageStats
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import _validate_index_selection, normalize_image_shape
 
 ChannelSelection: TypeAlias = "Sequence[int] | Literal['gray', 'rgb']"

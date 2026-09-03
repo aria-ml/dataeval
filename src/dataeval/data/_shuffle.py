@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from dataeval.data._view import Operation, View
 from dataeval.protocols import Array
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 
 class Shuffle(Operation):

@@ -9,7 +9,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.models._metadata import ModelIOSpec
-from dataeval.utils._internal import ImageOrItem, as_numpy, resize_chw, unwrap_image
+from dataeval.utils._array import as_numpy, resize_chw
+from dataeval.utils.data import AnyDatum, unwrap_image
 
 
 def _to_channels(img: NDArray[Any], channels: str) -> NDArray[Any]:
@@ -36,7 +37,7 @@ def _normalize(img: NDArray[Any]) -> NDArray[np.float32]:
 
 
 def build_model_input(
-    images: Sequence[ImageOrItem],
+    images: Sequence[AnyDatum],
     spec: ModelIOSpec,
     *,
     height: int | None = None,

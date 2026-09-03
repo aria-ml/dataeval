@@ -1,7 +1,7 @@
 import pytest
 
 from dataeval import Metadata
-from dataeval.utils._internal import merge_metadata
+from dataeval.utils._merge import merge_metadata
 from tests.conftest import to_metadata
 
 BIG_SAMPLES_COUNT = 1000

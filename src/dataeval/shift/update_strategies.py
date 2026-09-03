@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 
 from dataeval.protocols import UpdateStrategy
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import flatten_samples
+from dataeval.utils._array import flatten_samples
 
 
 class LastSeenUpdateStrategy(ReprMixin, UpdateStrategy):

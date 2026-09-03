@@ -24,7 +24,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.protocols import ObjectDetectionTarget, SingleFrameObjectTrackingTarget
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 
 def detection_count(target: Any) -> int:

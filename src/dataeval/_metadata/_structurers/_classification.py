@@ -18,7 +18,7 @@ from dataeval._metadata._structurers._reporting import log_items_without_targets
 from dataeval._metadata._structurers._reserved import reserved_block_columns
 from dataeval.protocols import AnnotatedDataset, Array, DatumMetadata, ProgressCallback
 from dataeval.types._task import TASK_PROFILES
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 _logger = get_logger(__name__)
 

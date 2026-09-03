@@ -532,7 +532,7 @@ class TestDatasetProtocol:
         np.testing.assert_array_equal(np.asarray(target.boxes).shape, (2, 4))
 
     def test_satisfies_the_object_detection_shape(self):
-        from dataeval.utils._validate import validate_dataset
+        from dataeval.utils.data import validate_dataset
 
         dataset, _ = make_dataset((3,))
         assert validate_dataset(SequenceFrames(dataset), expected="object_detection") == "object_detection"

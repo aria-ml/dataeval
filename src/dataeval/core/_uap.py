@@ -12,7 +12,7 @@ from sklearn.metrics import average_precision_score
 from dataeval._experimental import experimental
 from dataeval._log import get_logger
 from dataeval.protocols import ArrayLike
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 _logger = get_logger(__name__)
 

@@ -18,7 +18,7 @@ from dataeval._embeddings import Embeddings
 from dataeval.data import ClassFilter, Limit, Operation, Shuffle, View, split_dataset, unzip_dataset
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import DatasetMetadata, DatumMetadata
-from dataeval.utils import _validate
+from dataeval.utils import data
 from dataeval.utils.data import requires_maite_dataset, validate_dataset
 
 # ---------- fixtures ----------
@@ -250,12 +250,12 @@ class TestValidateHelpers:
     def test_target_matches_image_only_is_false(self) -> None:
         # _target_matches is never called with "image_only" through validate_dataset
         # (it is short-circuited earlier), so exercise the fallback directly
-        assert _validate._target_matches(object(), "image_only") is False  # type: ignore[arg-type]
+        assert data._target_matches(object(), "image_only") is False  # type: ignore[arg-type]
 
     def test_infer_caller_without_frame_returns_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # when no frame is available, the caller name defaults to "validate_dataset"
-        monkeypatch.setattr(_validate.inspect, "currentframe", lambda: None)
-        assert _validate._infer_caller() == "validate_dataset"
+        monkeypatch.setattr(data.inspect, "currentframe", lambda: None)
+        assert data._infer_caller() == "validate_dataset"
 
 
 # ---------- validate_dataset: MOT coverage (per-frame arrays + stream count) ----------

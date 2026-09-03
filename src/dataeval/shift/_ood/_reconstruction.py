@@ -22,7 +22,7 @@ from typing_extensions import Self
 from dataeval.protocols import ArrayLike, DeviceLike, FeatureExtractor
 from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODScoreOutput
 from dataeval.shift._shared._reconstruction import ReconstructionScorer
-from dataeval.utils._internal import to_numpy
+from dataeval.utils._array import to_numpy
 
 
 class OODReconstruction(ExtractorMixin, BaseOOD):

@@ -24,7 +24,7 @@ from dataeval._log import get_logger
 from dataeval.flags import ImageStats
 from dataeval.protocols import DatumMetadata, SingleFrameObjectTrackingTarget
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape
 
 _logger = get_logger(__name__)

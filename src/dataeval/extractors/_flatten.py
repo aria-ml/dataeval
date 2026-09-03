@@ -9,7 +9,8 @@ from numpy.typing import NDArray
 
 from dataeval.protocols import Array
 from dataeval.types import ReprMixin
-from dataeval.utils._internal import as_numpy, flatten_samples, iter_images
+from dataeval.utils._array import as_numpy, flatten_samples
+from dataeval.utils.data import iter_images
 
 
 class FlattenExtractor(ReprMixin):

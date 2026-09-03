@@ -24,7 +24,7 @@ from dataeval._metadata._input import build_index2label, reject_length_mismatch
 from dataeval._metadata._structurers import FactorsStructurer, SourceIndexRows
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, FactorLevel, SourceIndex
-from dataeval.utils._internal import as_numpy
+from dataeval.utils._array import as_numpy
 
 if TYPE_CHECKING:
     from dataeval._metadata._metadata import Metadata
