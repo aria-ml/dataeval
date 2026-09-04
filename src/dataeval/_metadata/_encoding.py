@@ -23,11 +23,19 @@ from dataeval.types import Aggregator, BinSpec, LevelSpec, ParseDateTime, ParseV
 # Bumped when the on-disk shape changes in a way an older reader would misread. A
 # descriptor is committed alongside code and read back months later, so it says which
 # format it is rather than leaving a reader to guess.
-DESCRIPTOR_VERSION = 2
+#
+# v1 -- factors only; corrections did not exist.
+# v2 -- corrections added, as ``remap | rescale``.
+# v3 -- the correction vocabulary grew to ``parse_value`` and ``parse_datetime``. The
+#       stamp moves with it: a v2 reader destructures a kind it does not have and refuses
+#       the document, which is precisely what the field exists to say in advance rather
+#       than discover on read.
+DESCRIPTOR_VERSION = 3
 
 # Versions this reader accepts. Version 1 predates corrections and loads with none, which
-# is what a file written before they existed meant.
-READABLE_VERSIONS = (1, 2)
+# is what a file written before they existed meant. Version 2 is read as written: every
+# kind it can name is one this reader still has.
+READABLE_VERSIONS = (1, 2, 3)
 
 FactorEncoding = BinSpec | LevelSpec
 
@@ -539,9 +547,10 @@ def _check_version(document: Mapping[str, Any]) -> None:
     """
     version = document.get("version")
     if version not in READABLE_VERSIONS:
+        readable = [str(v) for v in READABLE_VERSIONS]
         raise ValueError(
             f"Encoding descriptor is version {version!r}; this DataEval reads "
-            f"{' and '.join(str(v) for v in READABLE_VERSIONS)}.",
+            f"{', '.join(readable[:-1])} and {readable[-1]}.",
         )
 
 

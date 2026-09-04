@@ -1090,7 +1090,7 @@ class TestCorrectionsAreDeclarationsAndRecordsAtOnce:
 
     def test_the_document_carries_both_sections(self):
         document = json.loads(encoding_to_json({"w": LevelSpec(levels=("rain",), provenance="declared")}, []))
-        assert document["version"] == 2
+        assert document["version"] == DESCRIPTOR_VERSION
         assert set(document) == {"version", "corrections", "factors"}
 
 
@@ -1138,3 +1138,36 @@ class TestACorrectionRefusesWhatNoDatasetIsNeededToReject:
     def test_a_correction_can_be_put_in_a_set(self):
         """A frozen dataclass wrapping a mapping is not hashable, and says so at the call."""
         assert len({Remap("d", {"a": 1}), Remap("d", {"a": 1})}) == 1
+
+
+@pytest.mark.required
+class TestTheDescriptorVersionTracksItsVocabulary:
+    def test_the_stamp_moved_when_the_correction_kinds_grew(self):
+        """Version 2 was set when a correction was ``remap | rescale``. The vocabulary then
+        grew to four kinds, so a v2 reader rejects a document a v2 writer produces — which
+        is the exact confusion the field exists to prevent."""
+        assert DESCRIPTOR_VERSION == 3
+
+    def test_every_readable_version_is_named_in_the_refusal(self):
+        text = json.dumps({"version": 99, "factors": {}})
+        with pytest.raises(ValueError, match="reads 1, 2 and 3"):
+            encoding_from_json(text)
+
+    def test_a_version_two_document_still_reads(self):
+        """Written on this branch before the stamp moved, and readable: this reader has
+        every kind either version can name."""
+        text = json.dumps({
+            "version": 2,
+            "factors": {},
+            "corrections": [
+                {
+                    "kind": "rescale",
+                    "factor": "d",
+                    "over": [None, None],
+                    "multiply": 2.0,
+                    "add": 0.0,
+                    "provenance": "declared",
+                }
+            ],
+        })
+        assert corrections_from_json(text) == [Rescale("d", multiply=2.0)]

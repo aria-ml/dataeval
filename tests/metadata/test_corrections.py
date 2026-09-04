@@ -12,6 +12,7 @@ import pytest
 
 from dataeval import Metadata
 from dataeval._metadata._corrections import apply
+from dataeval._metadata._encoding import DESCRIPTOR_VERSION
 from dataeval._metadata._metadata import _kinds
 from dataeval.types import ParseDateTime, ParseValue, Remap, Rescale, Unusable
 from tests.metadata.test_structurers import _mot_dataset
@@ -192,7 +193,7 @@ class TestARepairIsRecordedProvenance:
         md.export_encoding(tmp_path / "e.json")
 
         document = json.loads((tmp_path / "e.json").read_text())
-        assert document["version"] == 2
+        assert document["version"] == DESCRIPTOR_VERSION
         assert document["corrections"][0]["factor"] == "d"
 
 
