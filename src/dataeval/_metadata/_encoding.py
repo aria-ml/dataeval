@@ -13,7 +13,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -449,6 +449,13 @@ def _key_from_json(key: Any) -> Any:
     return tuple(key) if isinstance(key, list) else key
 
 
+def _document(text: str) -> Mapping[str, Any]:
+    """Parse a descriptor and refuse one this reader cannot read."""
+    document = json.loads(text)
+    _check_version(document)
+    return document
+
+
 def encoding_from_json(text: str) -> dict[str, FactorEncoding]:
     """Read a descriptor back into records.
 
@@ -456,9 +463,7 @@ def encoding_from_json(text: str) -> dict[str, FactorEncoding]:
     was exported has to be accepted as input, or locking an encoding in and applying it to
     the next dataset is two different vocabularies again.
     """
-    document = json.loads(text)
-    _check_version(document)
-    return encoding_from_mapping(document.get("factors", {}))
+    return encoding_from_mapping(_document(text).get("factors", {}))
 
 
 def aggregations_to_list(aggregations: Mapping[str, Aggregator]) -> list[dict[str, Any]]:
@@ -532,9 +537,7 @@ def corrections_from_json(text: str) -> list[Correction]:
     parts of the walk — corrections decide what the values *are*, long before anything asks
     what code each one takes.
     """
-    document = json.loads(text)
-    _check_version(document)
-    return corrections_from_list(document.get("corrections", []))
+    return corrections_from_list(_document(text).get("corrections", []))
 
 
 def _check_version(document: Mapping[str, Any]) -> None:
@@ -590,16 +593,36 @@ def declared_levels(factor_levels: Mapping[str, Sequence[Any]]) -> dict[str, Lev
     }
 
 
-def read_encoding(source: str | Path | Mapping[str, FactorEncoding]) -> dict[str, FactorEncoding]:
-    """Take an encoding from wherever the caller has one.
+class Descriptor(NamedTuple):
+    """A descriptor's two halves, which answer two questions about a factor.
 
-    A path is read as a descriptor; a mapping is taken as already-parsed records, which is
+    Read together because they are written together and a reader needs both: taking only
+    :attr:`factors` restores the *codes* a repaired column had and leaves the *reading*
+    that produced them behind, so the column comes back as the text it was repaired out of
+    being -- and its restored vocabulary, being append-only, then grows a second spelling
+    of every value it already held.
+    """
+
+    factors: dict[str, FactorEncoding]
+    corrections: list[Correction]
+
+
+def read_descriptor(source: str | Path | Mapping[str, FactorEncoding]) -> Descriptor:
+    """Take a descriptor from wherever the caller has one.
+
+    A path is read as a document, in one read, so the two halves cannot come from
+    different states of the file. A mapping is taken as already-parsed records, which is
     what ``md.encoding()`` returns, so one metadata's encoding can be handed to the next
-    without a file in between.
+    without a file in between -- that is the factors half alone, and it declares no
+    corrections rather than inventing any.
     """
     if isinstance(source, str | Path):
-        return encoding_from_json(Path(source).read_text(encoding="utf-8"))
+        document = _document(Path(source).read_text(encoding="utf-8"))
+        return Descriptor(
+            encoding_from_mapping(document.get("factors", {})),
+            corrections_from_list(document.get("corrections", [])),
+        )
     invalid = sorted(name for name, spec in source.items() if not isinstance(spec, BinSpec | LevelSpec))
     if invalid:
         raise TypeError(f"Encoding entries for {invalid} are not a BinSpec or a LevelSpec.")
-    return dict(source)
+    return Descriptor(dict(source), [])

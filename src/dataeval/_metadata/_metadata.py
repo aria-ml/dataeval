@@ -36,7 +36,7 @@ from dataeval._metadata._encoding import (
     declared_levels,
     encoding_to_json,
     encoding_to_mapping,
-    read_encoding,
+    read_descriptor,
 )
 from dataeval._metadata._filters import evaluate, report_orphaned_rows
 from dataeval._metadata._input import (
@@ -192,7 +192,7 @@ def _reconcile_encoding(
     continuous_factor_bins: Mapping[str, int | Sequence[float]],
     encoding: str | Path | Mapping[str, FactorEncoding] | None,
     factor_levels: Mapping[str, Sequence[Any]] | None,
-) -> dict[str, FactorEncoding]:
+) -> tuple[dict[str, FactorEncoding], tuple[Correction, ...]]:
     """Merge the three ways a caller declares an encoding, refusing any factor named twice.
 
     Per factor, not per argument. What has no good resolution is *one factor* described
@@ -204,8 +204,13 @@ def _reconcile_encoding(
 
     ``continuous_factor_bins`` stays where it is and is applied on its own path; the two
     vocabulary-shaped arguments come back as one mapping.
+
+    A descriptor's corrections come back beside them, untouched by any of the reconciling
+    above: they say what the values *are*, which is a different question from which record
+    encodes them, and no other argument here declares one. Only ``encoding`` can carry
+    them, and only when it is a document -- ``md.encoding()`` is the factors half alone.
     """
-    records: dict[str, FactorEncoding] = read_encoding(encoding) if encoding is not None else {}
+    records, corrections = read_descriptor(encoding) if encoding is not None else ({}, [])
     if overlapping := sorted(set(continuous_factor_bins) & set(records)):
         raise ValueError(
             f"Factors {overlapping} are cut by both `continuous_factor_bins` and `encoding`, and two "
@@ -213,7 +218,7 @@ def _reconcile_encoding(
             "form and carries everything the other does; pass one.",
         )
     if not factor_levels:
-        return records
+        return records, tuple(corrections)
     if overlapping := sorted(set(factor_levels) & set(records)):
         raise ValueError(
             f"Factors {overlapping} have a vocabulary in both `factor_levels` and `encoding`; "
@@ -226,7 +231,7 @@ def _reconcile_encoding(
             "would silently win; declare each factor once.",
         )
     records.update(declared_levels(factor_levels))
-    return records
+    return records, tuple(corrections)
 
 
 def _declared_bins(spec: BinSpec) -> int:
@@ -629,7 +634,7 @@ class Metadata(Array, FeatureExtractor):
         self._task: TaskOverride | None = task
         self._count = len(dataset) if dataset is not None and isinstance(dataset, Sized) else 0
         self._continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else {}
-        self._encoding: dict[str, FactorEncoding] = _reconcile_encoding(
+        self._encoding, declared_corrections = _reconcile_encoding(
             self._continuous_factor_bins,
             encoding,
             factor_levels,
@@ -647,9 +652,10 @@ class Metadata(Array, FeatureExtractor):
         self._aggregations: dict[str, Aggregator] = {}
         # Declared corrections, the factors they have turned into columns, and the values
         # of any factor a correction touched as the dataset wrote them. Declared here
-        # rather than in `_adopt` so that `new()` can carry them onto an instance that has
-        # not walked its dataset yet, and they are applied when it does.
-        self._corrections: tuple[Correction, ...] = ()
+        # rather than in `_adopt` so that a descriptor's corrections and the ones `new()`
+        # carries can both reach an instance that has not walked its dataset yet; `_adopt`
+        # applies them when it does.
+        self._corrections: tuple[Correction, ...] = declared_corrections
         self._repaired: set[str] = set()
         self._pristine_values: dict[FactorLevel, dict[str, list[Any]]] = {}
         self._exclude = {exclude} if isinstance(exclude, str) else set(exclude or ())

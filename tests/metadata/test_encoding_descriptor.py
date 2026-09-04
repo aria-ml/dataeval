@@ -1141,6 +1141,125 @@ class TestACorrectionRefusesWhatNoDatasetIsNeededToReject:
 
 
 @pytest.mark.required
+class TestADescriptorCarriesItsCorrectionsBackIn:
+    """The half of the loop that decides what the values *are*.
+
+    ``export_encoding`` writes corrections, so the descriptor a reviewer commits holds the
+    decision. Reading only the ``factors`` half brings the codes back and leaves the
+    reading behind, which is worse than losing the factor: the column comes back as text
+    it was repaired out of being, silently, through the artifact meant to carry the
+    decision.
+    """
+
+    N = 5
+
+    @staticmethod
+    def _decorated():
+        return {"count": ["1,000", "2,000", "3,000", "4,000", "5,000"]}
+
+    def _md(self, **kwargs):
+        return Metadata.from_factors(
+            self._decorated(),
+            class_labels=np.zeros(self.N, dtype=int),
+            **kwargs,
+        )
+
+    def _exported(self, tmp_path):
+        md = self._md().repair([ParseValue("count", drop=[","])])
+        path = tmp_path / "enc.json"
+        md.export_encoding(path)
+        return md, path
+
+    def test_the_values_come_back_read_the_way_they_were_written(self, tmp_path):
+        md, path = self._exported(tmp_path)
+        assert md.dataframe["count"].to_list() == [1000, 2000, 3000, 4000, 5000]
+
+        assert self._md(encoding=path).dataframe["count"].to_list() == md.dataframe["count"].to_list()
+
+    def test_the_factor_stays_the_type_the_repair_made_it(self, tmp_path):
+        """Five numbers read as five string categories is a different variable, and every
+        bias evaluator scores it differently."""
+        _, path = self._exported(tmp_path)
+        assert self._md(encoding=path).factor_info["count"].factor_type == "discrete"
+
+    def test_the_vocabulary_is_not_doubled_by_the_unrepaired_values(self, tmp_path):
+        """A LevelSpec is append-only. Restoring the repaired vocabulary and then reading
+        the *undecorated* values appended a second spelling of every one of them, leaving
+        half the vocabulary unreachable."""
+        _, path = self._exported(tmp_path)
+        spec = self._md(encoding=path).encoding("count")
+        assert isinstance(spec, LevelSpec)
+        assert spec.levels == (1000, 2000, 3000, 4000, 5000)
+
+    def test_the_corrections_are_reported_as_declared(self, tmp_path):
+        md, path = self._exported(tmp_path)
+        assert self._md(encoding=path).repairs == md.repairs
+
+    def test_an_already_parsed_encoding_declares_no_corrections(self, tmp_path):
+        """``md.encoding()`` is the factors half alone, so handing it over invents nothing."""
+        md, _ = self._exported(tmp_path)
+        assert self._md(encoding=md.encoding()).repairs == ()
+
+    def test_a_descriptor_with_no_corrections_declares_none(self, tmp_path):
+        md = self._md()
+        path = tmp_path / "plain.json"
+        md.export_encoding(path)
+        assert self._md(encoding=path).repairs == ()
+
+
+@pytest.mark.required
+class TestADeclaredDescriptorMeetsAnArchive:
+    """``load`` builds through the constructor and then restores, so the two have to agree
+    about which reading wins."""
+
+    N = 5
+
+    @staticmethod
+    def _decorated():
+        return {"count": ["1,000", "2,000", "3,000", "4,000", "5,000"]}
+
+    def _md(self, **kwargs):
+        return Metadata.from_factors(self._decorated(), class_labels=np.zeros(self.N, dtype=int), **kwargs)
+
+    def test_the_archives_corrections_are_kept_when_none_are_declared(self, tmp_path):
+        md = self._md().repair([ParseValue("count", drop=[","])])
+        archive = tmp_path / "md.dem"
+        md.save(archive)
+
+        back = Metadata.load(archive)
+        assert back.repairs == md.repairs
+        assert back.dataframe["count"].to_list() == [1000, 2000, 3000, 4000, 5000]
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "Open design question, not a decided behaviour. `load` builds through the "
+            "constructor and then restores, and `_restore` overwrites `_corrections` with "
+            "the archive's -- so a descriptor's corrections reach a loaded instance and are "
+            "then dropped. Unlike `_encoding`, `strict` and `partial_factors`, corrections "
+            "cannot simply sit `underneath` the reader's: they are an ordered list rather "
+            "than a per-factor mapping, and applying them needs the `_reread` pass `_adopt` "
+            "runs and `_restore` does not. Settle whether `load(..., encoding=)` should "
+            "apply them, refuse a descriptor that carries them, or leave `repair()` the only "
+            "route -- then make this pass or delete it."
+        ),
+    )
+    def test_a_declared_descriptor_is_applied_over_the_archives(self, tmp_path):
+        """``encoding=`` is applied instead of the archive's for what it names, and a
+        correction recorded but never applied would be the silent half of that."""
+        md = self._md().repair([ParseValue("count", drop=[","])])
+        archive = tmp_path / "md.dem"
+        md.save(archive)
+
+        path = tmp_path / "enc.json"
+        path.write_text(encoding_to_json({}, [Rescale("count", multiply=2.0)]), encoding="utf-8")
+
+        back = Metadata.load(archive, encoding=path)
+        assert back.repairs == (Rescale("count", multiply=2.0),)
+        assert back.dataframe["count"].to_list() == [2000, 4000, 6000, 8000, 10000]
+
+
+@pytest.mark.required
 class TestTheDescriptorVersionTracksItsVocabulary:
     def test_the_stamp_moved_when_the_correction_kinds_grew(self):
         """Version 2 was set when a correction was ``remap | rescale``. The vocabulary then
