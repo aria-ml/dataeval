@@ -46,7 +46,7 @@ class TestCorrectionsAsAConstructorArgument:
         """The argument is the same operation, moved earlier — not a second one."""
         declared = _md(corrections=[ParseValue("count", drop=[","])])
         called = _md()
-        called.repair([ParseValue("count", drop=[","])])
+        called = called.repair([ParseValue("count", drop=[","])])
         assert declared.dataframe["count"].to_list() == called.dataframe["count"].to_list()
         assert declared.repairs == called.repairs
 
@@ -127,7 +127,7 @@ class TestADescriptorsCorrectionsMeetALoad:
 
     def test_a_descriptor_carrying_corrections_is_refused(self, tmp_path):
         seed = _md()
-        seed.repair([ParseValue("count", drop=[","])])
+        seed = seed.repair([ParseValue("count", drop=[","])])
         seed.export_encoding(tmp_path / "enc.json")
         _md().save(tmp_path / "md.dem")
 
@@ -143,7 +143,58 @@ class TestADescriptorsCorrectionsMeetALoad:
     def test_the_constructor_still_reads_them(self, tmp_path):
         """Only `load` refuses; the path a descriptor exists for is unaffected."""
         seed = _md()
-        seed.repair([ParseValue("count", drop=[","])])
+        seed = seed.repair([ParseValue("count", drop=[","])])
         seed.export_encoding(tmp_path / "enc.json")
 
         assert _md(encoding=tmp_path / "enc.json").dataframe["count"].to_list() == [1000, 2000, 3000, 4000, 5000]
+
+
+@pytest.mark.required
+class TestLastAggregationSurvivesTheArchive:
+    """`aggregate` defaults to all-or-nothing coverage, so a roll-up can null most of a
+    column and `AggregationRecord.coverage` is the only thing that says so.
+
+    The manifest wrote `aggregations` — the declarations — but not the records the replay
+    produced, and `load` sets `_is_structured` without replaying. So the diagnostics existed
+    on a cold run and were empty on a warm one, which is exactly where they matter.
+    """
+
+    @staticmethod
+    def _rolled():
+        return Metadata(
+            _mot_dataset([[2, 1], [1]]),
+            aggregations=[Aggregator(how="mean", source="unit", target="sequence", factors=("width",))],
+        )
+
+    def test_a_cold_run_reports_the_records(self):
+        md = self._rolled()
+        assert "width_mean" in md.factor_names
+        assert len(md.last_aggregation) == 1
+
+    def test_they_survive_a_save_and_load(self, tmp_path):
+        md = self._rolled()
+        md.save(tmp_path / "md.dem")
+
+        back = Metadata.load(tmp_path / "md.dem")
+        assert len(back.last_aggregation) == len(md.last_aggregation)
+
+    def test_every_field_round_trips(self, tmp_path):
+        md = self._rolled()
+        md.save(tmp_path / "md.dem")
+
+        (before,) = md.last_aggregation
+        (after,) = Metadata.load(tmp_path / "md.dem").last_aggregation
+        assert after == before
+
+    def test_the_coverage_a_reader_would_act_on_is_there(self, tmp_path):
+        md = self._rolled()
+        md.save(tmp_path / "md.dem")
+
+        (record,) = Metadata.load(tmp_path / "md.dem").last_aggregation
+        assert record.coverage
+        assert record.outputs == ("width_mean",)
+
+    def test_a_run_with_no_roll_ups_reports_none(self, tmp_path):
+        md = Metadata(_mot_dataset([[2, 1], [1]]))
+        md.save(tmp_path / "md.dem")
+        assert Metadata.load(tmp_path / "md.dem").last_aggregation == ()

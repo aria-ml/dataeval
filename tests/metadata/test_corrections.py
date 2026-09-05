@@ -78,7 +78,7 @@ class TestRepairMakesAHeldBackColumnAFactor:
         md = _md([1.0, "N", 2.0, "NE"])
         assert "d" in md.unusable
 
-        md.repair([Remap("d", {None: -1, "N": 0, "NE": 45})])
+        md = md.repair([Remap("d", {None: -1, "N": 0, "NE": 45})])
 
         assert md.unusable == {}
         assert md.rows_at("sequence")["d"].to_list() == [-1, 0, -1, 45]
@@ -87,10 +87,19 @@ class TestRepairMakesAHeldBackColumnAFactor:
         md = _md([1.0, "N"]).repair([Remap("d", {None: -1, "N": 0})])
         assert md.dropped_factors == {}
 
-    def test_it_mutates_and_returns_itself(self):
-        """A declaration about how the dataset is read, not a question about its rows."""
+    def test_it_answers_with_a_copy(self):
+        """As :meth:`aggregate` does. These are the two operations a configuration reaches,
+        and opposite aliasing on them meant one rewrote a memoized instance under its
+        holders and the other did not."""
         md = _md([1.0, "N"])
-        assert md.repair([Remap("d", {None: -1})]) is md
+        assert md.repair([Remap("d", {None: -1})]) is not md
+
+    def test_the_instance_it_was_called_on_is_unchanged(self):
+        """The half that matters: a caller holding the original still reads what it read."""
+        md = _md([1.0, "N"])
+        md.repair([Remap("d", {None: -1})])
+        assert "d" not in md.factor_names
+        assert md.repairs == ()
 
     def test_a_repair_that_leaves_it_mixed_leaves_it_unusable(self):
         """Rather than being quietly completed by a rule nobody wrote."""
@@ -105,7 +114,7 @@ class TestRepairMakesAHeldBackColumnAFactor:
     def test_declaring_again_replaces_rather_than_accumulates(self):
         """So re-running a cell is safe and the record matches what was asked for."""
         md = _md([1.0, "N"]).repair([Remap("d", {None: -1})])
-        md.repair([Remap("d", {None: -9, "N": 0})])
+        md = md.repair([Remap("d", {None: -9, "N": 0})])
         assert len(md.repairs) == 1
         assert md.rows_at("sequence")["d"].to_list() == [-9, 0]
 
@@ -134,7 +143,7 @@ class TestRepairAlsoConvertsAFactorThatWasAlreadyReadable:
 
     def test_dropping_it_restores_what_was_written(self):
         md = self._altitudes().repair(self._both_units())
-        md.unrepair("alt")
+        md = md.unrepair("alt")
         assert md.rows_at("sequence")["alt"].to_list() == [500, 1500, 3000]
 
 
@@ -143,13 +152,13 @@ class TestUnrepair:
     def test_dropping_one_factor_leaves_the_others(self):
         dataset = _mot_dataset([[1]] * 2, [{"d": 1.0, "e": 2.0}, {"d": "N", "e": 4.0}])
         md = Metadata(dataset).repair([Remap("d", {None: -1, "N": 0}), Rescale("e", multiply=10)])
-        md.unrepair("e")
+        md = md.unrepair("e")
         assert [c.factor for c in md.repairs] == ["d"]
         assert md.rows_at("sequence")["e"].to_list() == [2.0, 4.0]
 
     def test_dropping_everything_takes_no_arguments(self):
         md = _md([1.0, "N"]).repair([Remap("d", {None: -1})])
-        md.unrepair()
+        md = md.unrepair()
         assert md.repairs == ()
         assert "d" in md.unusable
 
@@ -175,7 +184,7 @@ class TestARepairIsRecordedProvenance:
         Metadata(dataset).repair([Rescale("alt", multiply=2)]).save(tmp_path / "m.dem")
 
         back = Metadata.load(tmp_path / "m.dem", dataset)
-        back.unrepair()
+        back = back.unrepair()
         assert back.rows_at("sequence")["alt"].to_list() == [500, 1500]
 
     def test_it_carries_to_the_next_dataset(self):
@@ -259,7 +268,7 @@ class TestParseReadsTextAsAValue:
         md = _md([1.0, "2,000", 3.0])
         assert "d" in md.unusable
 
-        md.repair([ParseValue("d", drop=[","])])
+        md = md.repair([ParseValue("d", drop=[","])])
 
         assert md.unusable == {}
         assert md.rows_at("sequence")["d"].to_list() == [1, 2000, 3]
@@ -371,7 +380,7 @@ class TestRepairingAColumnThatNamesItsRows:
         md = _md(_timestamps()).repair([ParseDateTime("d", every="day")])
         assert "d" in md.factor_names
 
-        md.unrepair()
+        md = md.unrepair()
 
         assert md.dropped_factors == {"d": ["cardinality_over_budget"]}
         assert "d" not in md.factor_names
@@ -469,7 +478,7 @@ class TestParseDateTimeReadsEverySpellingOfAMoment:
         """Numeric, so never dropped for naming its rows -- and previously a declaration
         against it was recorded, archived and silently inert."""
         md = _md([1598532778 + hour * 3600 for hour in range(6)])
-        md.repair([ParseDateTime("d", every="hour_of_day")])
+        md = md.repair([ParseDateTime("d", every="hour_of_day")])
         assert sorted(set(md.rows_at("sequence")["d"].to_list())) == [12, 13, 14, 15, 16, 17]
 
 

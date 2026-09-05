@@ -343,7 +343,7 @@ for name, held in metadata.unusable.items():
 # Exclude object_id - it is purely unique, so it cannot carry bias
 metadata.exclude = ["object_id"]
 
-metadata.repair([
+metadata = metadata.repair([
     # Replace the string sentinels, keeping them distinct from the numeric -1
     Remap("latitude", {"N": -2.0}),
     Remap("longitude", {"E": -2.0}),

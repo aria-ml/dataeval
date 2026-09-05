@@ -3607,7 +3607,10 @@ class Metadata(Array, FeatureExtractor):
         Returns
         -------
         Metadata
-            This metadata, so calls can be chained.
+            A new metadata reading its values under these corrections. The instance this is
+            called on is unchanged, as with :meth:`aggregate` — the two are the operations a
+            configuration reaches, and opposite aliasing on them meant a caller holding a
+            memoized instance had it rewritten under them by one and not the other.
 
         Raises
         ------
@@ -3627,11 +3630,14 @@ class Metadata(Array, FeatureExtractor):
         """
         self._structure()
         self._reject_unknown_corrections(corrections)
+        # Every factor either reading touches: the ones these corrections name, and the ones
+        # the previous set named, which have to go back to the values as written.
         touched = {correction.factor for correction in (*self._corrections, *corrections)}
-        self._corrections = tuple(corrections)
+        repaired = self._derived_copy()
+        repaired._corrections = tuple(corrections)
         for factor in sorted(touched):
-            self._reread(factor)
-        return self
+            repaired._reread(factor)
+        return repaired
 
     def unrepair(self, *factors: str) -> Self:
         """Drop declared corrections, and read the values as they were written again.
