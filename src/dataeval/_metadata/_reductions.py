@@ -33,7 +33,7 @@ from typing import Any, Literal
 import polars as pl
 
 from dataeval._log import get_logger
-from dataeval.types import Aggregator, FactorLevel, FactorLevelSchema
+from dataeval.types import REDUCTION_NAMES, Aggregator, FactorLevel, FactorLevelSchema
 
 _logger = get_logger(__name__)
 
@@ -237,6 +237,20 @@ REDUCTIONS: Mapping[str, Reduction] = {
 # ordering read down from an ancestor repeats across the fan-out, which the roll-up would
 # then have to be told how to de-duplicate before it could sort by it.
 ORDERINGS: tuple[str, ...] = ("time_s", "pts", "unit_index")
+
+
+# The vocabulary is declared in `dataeval.types`, beside the field that takes it, because
+# that module cannot import this one. This is the other half of that split: what a caller
+# enumerates and what this registry implements are the same set, proved once at import
+# rather than left to a test somebody remembers to run.
+if set(REDUCTIONS) != set(REDUCTION_NAMES):
+    raise RuntimeError(
+        "The reduction registry and `dataeval.types.REDUCTION_NAMES` disagree: "
+        f"registry-only {sorted(set(REDUCTIONS) - set(REDUCTION_NAMES))}, "
+        f"names-only {sorted(set(REDUCTION_NAMES) - set(REDUCTIONS))}. "
+        "A name a caller can enumerate but not use, or use but not enumerate, is worse "
+        "than neither -- add it to both.",
+    )
 
 
 def lookup(how: str) -> Reduction:

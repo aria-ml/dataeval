@@ -874,8 +874,10 @@ DateTimeGranularity: TypeAlias = Literal[
 
 # Spelled once, read by the record that validates against it and the reader that applies it.
 # Taken off the alias rather than repeated beside it, so the annotation a type checker reads
-# and the tuple the constructor checks against cannot drift apart.
-DATETIME_GRANULARITIES: tuple[str, ...] = get_args(DateTimeGranularity)
+# and the tuple the constructor checks against cannot drift apart. Annotated with the alias
+# rather than `str`, so a caller iterating it to build a schema gets values a type checker
+# will still accept where the alias is required.
+DATETIME_GRANULARITIES: tuple[DateTimeGranularity, ...] = get_args(DateTimeGranularity)
 
 
 # Units a number can count since the Unix epoch in. Declared rather than guessed, because
@@ -885,10 +887,43 @@ DATETIME_GRANULARITIES: tuple[str, ...] = get_args(DateTimeGranularity)
 # no period is asked for, so a reading round-trips through its own output.
 EpochUnit: TypeAlias = Literal["s", "ms", "us", "ns"]
 
-EPOCH_UNITS: tuple[str, ...] = get_args(EpochUnit)
+EPOCH_UNITS: tuple[EpochUnit, ...] = get_args(EpochUnit)
 
 # What one of each unit is worth in seconds.
 EPOCH_SECONDS: Mapping[str, float] = MappingProxyType({"s": 1.0, "ms": 1e-3, "us": 1e-6, "ns": 1e-9})
+
+
+# The reductions a roll-up can be named by. The *names* live here, beside the field that
+# takes them, while the registry that says what each one computes lives in the metadata
+# layer -- which imports this module rather than the other way round, so the vocabulary
+# cannot live there and still be reachable from an `Aggregator`.
+#
+# Declared rather than derived from that registry for the same reason ``how`` is checked
+# where a roll-up is resolved: the two halves are in different layers, and the one a caller
+# needs to *enumerate* is this one. `_reductions` asserts the registry matches at import, so
+# they cannot drift.
+ReductionName: TypeAlias = Literal[
+    "all",
+    "any",
+    "changes",
+    "count",
+    "first",
+    "last",
+    "longest_run",
+    "max",
+    "mean",
+    "median",
+    "min",
+    "mode",
+    "n_unique",
+    "std",
+    "sum",
+    "trend",
+    "var",
+    "variability",
+]
+
+REDUCTION_NAMES: tuple[ReductionName, ...] = get_args(ReductionName)
 
 
 def _validated_drops(factor: str, drop: Sequence[str]) -> tuple[str, ...]:
