@@ -299,6 +299,22 @@ class TestAnExpressionNamesOneOutput:
 
 
 @pytest.mark.required
+class TestACollidingRollUpIsNamedForItsSource:
+    """A second column under the same name has to say what makes it different. The level
+    the values were rolled up from says it; a counter only says the column was second."""
+
+    def test_the_source_level_is_tried_before_a_counter(self):
+        rolled = Metadata(_mot_dataset([[2, 1], [1]]))
+        names = []
+        for _ in range(4):
+            rolled = rolled.aggregate("width", level="sequence", how="mean")
+            names.append(rolled.last_aggregation[0].outputs[0])
+
+        assert names == ["width_mean", "width_mean_agg", "width_mean_agg_unit", "width_mean_agg_unit_2"]
+        assert set(names) <= set(rolled.factor_names)
+
+
+@pytest.mark.required
 class TestARollUpIsRecordedProvenance:
     """A roll-up is a declaration, not just the column it produced. Recording it is what
     lets a pipeline be rebuilt over the next dataset rather than described after the fact."""

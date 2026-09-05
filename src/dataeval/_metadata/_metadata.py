@@ -2794,7 +2794,13 @@ class Metadata(Array, FeatureExtractor):
         for source, destination, how, via, batch, declared in batches:
             outputs: list[str] = []
             for series in batch.columns:
-                name = self._resolve_factor_name(series.name, taken, overwrite=False, append_string="_agg")
+                name = self._resolve_factor_name(
+                    series.name,
+                    taken,
+                    overwrite=False,
+                    append_string="_agg",
+                    qualifier=source,
+                )
                 taken.add(name)
                 store = store.with_column(destination, series.rename(name))
                 rolled._aggregated_from[name] = source
@@ -5064,7 +5070,14 @@ class Metadata(Array, FeatureExtractor):
             return None
         return safe, to_series(safe, values).zip_with(written, existing)
 
-    def _resolve_factor_name(self, name: str, taken: set[str], overwrite: bool, append_string: str) -> str:
+    def _resolve_factor_name(  # noqa: C901
+        self,
+        name: str,
+        taken: set[str],
+        overwrite: bool,
+        append_string: str,
+        qualifier: str = "",
+    ) -> str:
         """Pick the dataframe column a new factor should be written to.
 
         Reserved columns are load-bearing — ``level`` drives every level filter — so a
@@ -5072,6 +5085,9 @@ class Metadata(Array, FeatureExtractor):
         into the namespace binning writes its companions into, which ``taken`` cannot
         speak for: it holds the columns present *now*, and a companion this factor would
         be mistaken for may not have been written yet.
+
+        ``qualifier`` is tried before a counter is: a roll-up naming its source level says
+        which values a column holds then followed by ``_N``.
         """
         safe = safe_column_name(name)
         if safe != name:
@@ -5083,11 +5099,16 @@ class Metadata(Array, FeatureExtractor):
         if safe not in taken or overwrite:
             return safe
 
-        candidate = f"{safe}{append_string}"
-        suffix = 2
+        base = f"{safe}{append_string}"
+        if base in taken and qualifier:
+            base = f"{base}_{qualifier}"
+        if base not in taken:
+            return base
+
+        candidate, suffix = f"{base}_2", 2
         while candidate in taken:
-            candidate = f"{safe}{append_string}_{suffix}"
             suffix += 1
+            candidate = f"{base}_{suffix}"
         return candidate
 
     def _store_native_factors(self, resolved: Sequence[_ResolvedFactor]) -> None:
