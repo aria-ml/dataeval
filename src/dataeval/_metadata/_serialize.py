@@ -61,6 +61,8 @@ from dataeval._metadata._encoding import (
     corrections_to_list,
     encoding_from_mapping,
     encoding_to_mapping,
+    records_from_list,
+    records_to_list,
 )
 from dataeval._metadata._links import LinkIndex
 from dataeval._metadata._store import LevelStore
@@ -184,6 +186,9 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
         # columns themselves are already in the store; this is what says *how* they were
         # reached, which is what `new()` needs to rebuild them over another dataset.
         "aggregations": aggregations_to_list(md._aggregations),
+        # What the replay reported, beside what was declared. `load` restores the rolled
+        # columns without replaying, so these cannot be re-derived on the way back in.
+        "last_aggregation": records_to_list(md._last_aggregation),
         # Written, unlike `raw`, which the format refuses for being unbounded and of
         # arbitrary type. These are bounded -- one value per row of one level -- and
         # scalar, because a column only reaches here by mixing numbers with text. Writing
@@ -505,6 +510,9 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     md._dropped_factors = {name: list(reasons) for name, reasons in manifest["dropped_factors"].items()}
     md._aggregated_from = dict(manifest["aggregated_from"])
     md._aggregations = aggregations_from_list(manifest.get("aggregations", []))
+    # Optional, so an archive written before this existed restores with none rather than
+    # failing -- which is what an absent diagnostic meant anyway.
+    md._last_aggregation = records_from_list(manifest.get("last_aggregation", []))
     # Underneath whatever the caller passed, never over it. Binning is configuration rather
     # than data here — ``load(..., continuous_factor_bins=...)`` is meant to re-cut the
     # restored rows — so the archive's record fills in only the factors the reader said

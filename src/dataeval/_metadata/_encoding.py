@@ -18,7 +18,16 @@ from typing import Any, NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.types import Aggregator, BinSpec, LevelSpec, ParseDateTime, ParseValue, Remap, Rescale
+from dataeval.types import (
+    AggregationRecord,
+    Aggregator,
+    BinSpec,
+    LevelSpec,
+    ParseDateTime,
+    ParseValue,
+    Remap,
+    Rescale,
+)
 
 # Bumped when the on-disk shape changes in a way an older reader would misread. A
 # descriptor is committed alongside code and read back months later, so it says which
@@ -510,6 +519,54 @@ def aggregations_from_list(written: Sequence[Mapping[str, Any]]) -> dict[str, Ag
         )
         for entry in written
     }
+
+
+def records_to_list(records: Sequence[AggregationRecord]) -> list[dict[str, Any]]:
+    """Render what a replay reported, so a restored instance can say the same thing.
+
+    The declarations say what was asked for; these say what happened — how many source rows
+    had an ancestor, how many destinations had nothing beneath them, and the coverage each
+    output achieved. ``aggregate`` defaults to all-or-nothing coverage, so a roll-up can
+    null most of a column and this is the only thing that says so. Written because ``load``
+    restores the rolled columns without replaying, and a diagnostic that exists only on a
+    cold run is one nobody reads.
+    """
+    return [
+        {
+            "source": record.source,
+            "target": record.target,
+            "how": record.how,
+            "via": record.via,
+            "outputs": list(record.outputs),
+            "took_part": record.took_part,
+            "no_ancestor": record.no_ancestor,
+            "childless": record.childless,
+            "coverage": [float(value) for value in record.coverage],
+            "uncovered": [int(value) for value in record.uncovered],
+            "gaps": record.gaps,
+        }
+        for record in records
+    ]
+
+
+def records_from_list(written: Sequence[Mapping[str, Any]]) -> tuple[AggregationRecord, ...]:
+    """Read those records back. The reverse of :func:`records_to_list`."""
+    return tuple(
+        AggregationRecord(
+            source=entry["source"],
+            target=entry["target"],
+            how=entry["how"],
+            via=entry["via"],
+            outputs=tuple(entry["outputs"]),
+            took_part=entry["took_part"],
+            no_ancestor=entry["no_ancestor"],
+            childless=entry["childless"],
+            coverage=tuple(entry["coverage"]),
+            uncovered=tuple(entry["uncovered"]),
+            gaps=entry["gaps"],
+        )
+        for entry in written
+    )
 
 
 def _plain_option(value: Any) -> Any:
