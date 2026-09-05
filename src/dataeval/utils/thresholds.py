@@ -703,6 +703,15 @@ def _make_threshold(
 _DEFAULT_THRESHOLD_TYPE = "adaptive"
 
 
+def _as_tuples(value: Any) -> Any:
+    """Read a spec's lists as tuples, at any depth, leaving everything else alone.
+
+    Only ``list`` is converted. A string is a sequence too, and a :class:`Threshold` is an
+    object with its own meaning; neither is a spec written out longhand.
+    """
+    return tuple(_as_tuples(item) for item in value) if isinstance(value, list) else value
+
+
 def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:  # noqa: C901
     """Convert a :data:`ThresholdLike` value to a :class:`Threshold` instance.
 
@@ -728,6 +737,9 @@ def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:  # noqa:
           ``(2.5, (0.0, 1.0))`` or ``(None, (0.0, 1.0))`` for default
           multiplier.
         - ``Threshold``: returned as-is
+
+        Any of the tuple forms may be written as lists, which is how a spec read back from
+        JSON or YAML arrives.
 
     Returns
     -------
@@ -788,6 +800,12 @@ def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:  # noqa:
         return value
     if isinstance(value, str):
         return _resolve_cls(value)()
+    # Read as the tuples it was written as. Every branch below asks `isinstance(..., tuple)`,
+    # and neither JSON nor YAML has a tuple -- so a spec that travelled through a config file
+    # arrived as nested lists, fell past all of them, and resolved to the default. That is
+    # the worst failure this function can have: the right shape, quietly the wrong threshold,
+    # and an error later about a bound nobody wrote.
+    value = _as_tuples(value)
     if isinstance(value, tuple):
         if isinstance(value[0], str):
             name: str = value[0]

@@ -727,3 +727,45 @@ class TestAdaptiveThreshold:
         # Left half is all 5.0 so left MAD=0, but global fallback provides bounds
         assert lower is not None
         assert upper is not None
+
+
+@pytest.mark.required
+class TestASpecReadFromJsonOrYaml:
+    """Neither format has a tuple, so a spec written in a config arrives as nested lists.
+
+    Every branch of ``resolve_threshold`` tested ``isinstance(value, tuple)``, so a list
+    fell past all of them to the default — the wrong threshold, silently, and then an error
+    about a bound the author never wrote. Lists are read as the tuples they were written as.
+    """
+
+    def test_a_named_threshold_with_bounds(self):
+        assert resolve_threshold(["iqr", [None, 1.5]]) == resolve_threshold(("iqr", (None, 1.5)))
+
+    def test_it_is_the_named_class_not_the_default(self):
+        """The failure this replaces: the right shape, quietly the wrong threshold."""
+        assert isinstance(resolve_threshold(["iqr", [None, 1.5]]), IQRThreshold)
+
+    def test_bare_bounds(self):
+        assert resolve_threshold([None, 5.0]) == resolve_threshold((None, 5.0))
+
+    def test_a_named_threshold_with_bounds_and_limits(self):
+        assert resolve_threshold(["zscore", [1.0, 3.5], [0.0, 1.0]]) == resolve_threshold((
+            "zscore",
+            (1.0, 3.5),
+            (0.0, 1.0),
+        ))
+
+    def test_default_threshold_with_limits(self):
+        assert resolve_threshold([2.5, [0.0, 1.0]]) == resolve_threshold((2.5, (0.0, 1.0)))
+
+    def test_a_mixed_spelling_reads_the_same(self):
+        """A caller may build one half in Python and read the other from a file."""
+        assert resolve_threshold(("iqr", [None, 1.5])) == resolve_threshold(("iqr", (None, 1.5)))
+
+    def test_the_forms_that_were_never_sequences_are_untouched(self):
+        for spec in (None, "iqr", 2.5):
+            assert resolve_threshold(spec) == resolve_threshold(spec)
+
+    def test_a_threshold_instance_still_passes_through(self):
+        threshold = IQRThreshold()
+        assert resolve_threshold(threshold) is threshold
