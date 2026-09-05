@@ -1210,7 +1210,14 @@ class TestADescriptorCarriesItsCorrectionsBackIn:
 @pytest.mark.required
 class TestADeclaredDescriptorMeetsAnArchive:
     """``load`` builds through the constructor and then restores, so the two have to agree
-    about which reading wins."""
+    about which reading wins.
+
+    Settled: a descriptor's corrections are **refused** on this path. The archive already
+    holds its values read the way it was built, and restoring brings that reading back —
+    there is no resolution between the two, because the rows cannot be re-read from a
+    reading that was never applied to them. ``corrections=`` is the explicit route, and
+    ``repair`` after loading is the other.
+    """
 
     N = 5
 
@@ -1230,33 +1237,22 @@ class TestADeclaredDescriptorMeetsAnArchive:
         assert back.repairs == md.repairs
         assert back.dataframe["count"].to_list() == [1000, 2000, 3000, 4000, 5000]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Open design question, not a decided behaviour. `load` builds through the "
-            "constructor and then restores, and `_restore` overwrites `_corrections` with "
-            "the archive's -- so a descriptor's corrections reach a loaded instance and are "
-            "then dropped. Unlike `_encoding`, `strict` and `partial_factors`, corrections "
-            "cannot simply sit `underneath` the reader's: they are an ordered list rather "
-            "than a per-factor mapping, and applying them needs the `_reread` pass `_adopt` "
-            "runs and `_restore` does not. Settle whether `load(..., encoding=)` should "
-            "apply them, refuse a descriptor that carries them, or leave `repair()` the only "
-            "route -- then make this pass or delete it."
-        ),
-    )
-    def test_a_declared_descriptor_is_applied_over_the_archives(self, tmp_path):
-        """``encoding=`` is applied instead of the archive's for what it names, and a
-        correction recorded but never applied would be the silent half of that."""
-        md = self._md().repair([ParseValue("count", drop=[","])])
-        archive = tmp_path / "md.dem"
-        md.save(archive)
-
+    def test_a_descriptor_carrying_corrections_is_refused(self, tmp_path):
+        """Refused rather than read and silently dropped, which is what happened before."""
         path = tmp_path / "enc.json"
         path.write_text(encoding_to_json({}, [Rescale("count", multiply=2.0)]), encoding="utf-8")
+        self._md().save(tmp_path / "md.dem")
 
-        back = Metadata.load(archive, encoding=path)
-        assert back.repairs == (Rescale("count", multiply=2.0),)
-        assert back.dataframe["count"].to_list() == [2000, 4000, 6000, 8000, 10000]
+        with pytest.raises(ValueError, match="cannot apply them"):
+            Metadata.load(tmp_path / "md.dem", encoding=path)
+
+    def test_the_refusal_names_the_way_to_say_it(self):
+        """An error that only forbids leaves the caller stuck."""
+        import inspect
+
+        from dataeval._metadata._metadata import _reject_corrections_from_descriptor
+
+        assert "corrections=" in inspect.getsource(_reject_corrections_from_descriptor)
 
 
 @pytest.mark.required

@@ -188,6 +188,25 @@ def _was_were(names: Sequence[str]) -> str:
     return "was" if len(names) == 1 else "were"
 
 
+def _reject_corrections_from_descriptor(encoding: "str | Path | Mapping[str, FactorEncoding] | None") -> None:
+    """Refuse a descriptor whose corrections `load` could only read and then discard.
+
+    Raises
+    ------
+    ValueError
+        When `encoding` names a document carrying a non-empty ``corrections`` array.
+    """
+    if not isinstance(encoding, str | Path):
+        return
+    if read_descriptor(encoding).corrections:
+        raise ValueError(
+            f"The encoding descriptor {str(encoding)!r} carries corrections, and `load` cannot apply "
+            "them: the archive already holds its values read the way it was built, and restoring "
+            "brings that reading back. Pass `corrections=` to say the reading explicitly, or load "
+            "the archive and call `repair`.",
+        )
+
+
 def _reconcile_encoding(
     continuous_factor_bins: Mapping[str, int | Sequence[float]],
     encoding: str | Path | Mapping[str, FactorEncoding] | None,
@@ -625,6 +644,8 @@ class Metadata(Array, FeatureExtractor):
         view: FactorLevel | None = None,
         inherited: bool = True,
         partial_factors: bool = False,
+        corrections: Sequence[Correction] | None = None,
+        aggregations: Sequence[Aggregator] | None = None,
     ) -> None:
         self._raw: Sequence[Mapping[str, Any]]
 
@@ -650,12 +671,21 @@ class Metadata(Array, FeatureExtractor):
         # in the order they were run, which is the order they have to be replayed in: a
         # roll-up onto a level may read a column an earlier one wrote there.
         self._aggregations: dict[str, Aggregator] = {}
+        # Roll-ups the caller declared, held apart from the resolved ones above until the
+        # walk happens. Separate because `_aggregations` is keyed on the column each roll-up
+        # *produced*, which is not known until it runs -- and that mapping is what `save`
+        # writes, so a placeholder key would reach the archive.
+        self._declared_aggregations: tuple[Aggregator, ...] = tuple(aggregations or ())
         # Declared corrections, the factors they have turned into columns, and the values
         # of any factor a correction touched as the dataset wrote them. Declared here
         # rather than in `_adopt` so that a descriptor's corrections and the ones `new()`
         # carries can both reach an instance that has not walked its dataset yet; `_adopt`
         # applies them when it does.
-        self._corrections: tuple[Correction, ...] = declared_corrections
+        self._corrections: tuple[Correction, ...] = (*declared_corrections, *(corrections or ()))
+        # What this caller asked for, as opposed to what a descriptor or an archive
+        # supplied. `_restore` needs the difference: an archive fills in only where the
+        # reader said nothing.
+        self._declared_corrections: tuple[Correction, ...] = tuple(corrections or ())
         self._repaired: set[str] = set()
         self._pristine_values: dict[FactorLevel, dict[str, list[Any]]] = {}
         self._exclude = {exclude} if isinstance(exclude, str) else set(exclude or ())
@@ -771,6 +801,8 @@ class Metadata(Array, FeatureExtractor):
         include: str | Sequence[str] | None = None,
         inherited: bool = True,
         partial_factors: bool = False,
+        corrections: Sequence[Correction] | None = None,
+        aggregations: Sequence[Aggregator] | None = None,
     ) -> Self:
         """Build a :class:`Metadata` from raw factor arrays without a MAITE dataset.
 
@@ -915,6 +947,8 @@ class Metadata(Array, FeatureExtractor):
             include=include,
             inherited=inherited,
             partial_factors=partial_factors,
+            corrections=corrections,
+            aggregations=aggregations,
         )
         _load_factors(
             inst,
@@ -941,6 +975,7 @@ class Metadata(Array, FeatureExtractor):
         include: str | Sequence[str] | None = None,
         view: FactorLevel | None = None,
         inherited: bool = True,
+        partial_factors: bool = False,
     ) -> Self:
         """
         Read metadata previously written by :meth:`save`, skipping the walk over the dataset.
@@ -1047,6 +1082,12 @@ class Metadata(Array, FeatureExtractor):
         >>> reloaded.level_counts == md.level_counts
         True
         """
+        # An archive already holds its rows read the way it was built, and `_restore`
+        # brings back the corrections that produced them. A descriptor handed in here
+        # carries corrections of its own, and there is no resolution between the two: the
+        # rows cannot be re-read from a reading that was never applied to them. Refused
+        # rather than silently dropped, which is what happened before.
+        _reject_corrections_from_descriptor(encoding)
         inst = cls(
             dataset,
             continuous_factor_bins=continuous_factor_bins,
@@ -1057,6 +1098,7 @@ class Metadata(Array, FeatureExtractor):
             include=include,
             view=view,
             inherited=inherited,
+            partial_factors=partial_factors,
         )
         _restore(inst, path)
         return inst
@@ -2537,7 +2579,14 @@ class Metadata(Array, FeatureExtractor):
         to the dataset it came from, and resolving checks that against *this* one: the
         factor still exists, and the reduction still applies to what it holds.
         """
-        if not (declared := list(dict.fromkeys(self._aggregations.values()))):
+        carried = list(dict.fromkeys(self._aggregations.values()))
+        # Declared last: a roll-up the caller asked for may read a column one carried in
+        # from `new()` has just written.
+        declared = [*carried, *(a for a in self._declared_aggregations if a not in carried)]
+        # Consumed rather than kept: `_aggregations` carries them from here on, and leaving
+        # these would run them a second time on any later re-adopt.
+        self._declared_aggregations = ()
+        if not declared:
             return
         # Cleared first so the replay records them afresh under the names this dataset
         # gives them, which a collision could make differ from the names it came with.
