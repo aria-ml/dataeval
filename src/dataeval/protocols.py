@@ -1552,14 +1552,15 @@ class Matcher(Protocol):
         ...
 
 
-ThresholdBounds: TypeAlias = float | tuple[float | None, float | None] | None
-ThresholdLimits: TypeAlias = tuple[float | None, float | None]
+ThresholdBounds: TypeAlias = float | tuple[float | None, float | None] | list[float | None] | None
+ThresholdLimits: TypeAlias = tuple[float | None, float | None] | list[float | None]
 ThresholdLike: TypeAlias = (
     str
     | ThresholdBounds
     | tuple[str, ThresholdBounds]
     | tuple[str, ThresholdBounds | None, ThresholdLimits]
     | tuple[ThresholdBounds | None, ThresholdLimits]
+    | list[str | ThresholdBounds]
     | Threshold
 )
 """Type alias for threshold specifications.
@@ -1576,4 +1577,7 @@ Values default to modified z-score thresholds if not provided.
 - ``tuple[bounds | None, (lower_limit, upper_limit)]``: default threshold with bounds and limit clamping,
   e.g. ``(2.5, (0.0, 1.0))`` or ``(None, (0.0, 1.0))`` for default multiplier
 - ``Threshold``: a fully configured Threshold instance
+
+Any of the tuple forms may be written as lists, at any depth, which is how a spec read back
+from JSON or YAML arrives.
 """
