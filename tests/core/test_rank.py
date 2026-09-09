@@ -9,6 +9,7 @@ from dataeval.core._clusterer import (
     _DistanceSorter,
     _KNNSorter,
 )
+from dataeval.core._rank import _normalize, rank_knn
 
 
 class TestClusters:
@@ -121,3 +122,44 @@ def test_stratified_ranking_needs_scores():
     result = RankResult(indices=np.arange(5, dtype=np.intp), scores=None)
     with pytest.raises(ValueError, match="Ranking scores are necessary for stratified policy"):
         rank_result_stratified(result, num_bins=4)
+
+
+@pytest.mark.required
+class TestIntegerFeatureMatrices:
+    """The ranking core accepts integer feature matrices, not just float embeddings.
+
+    ``Metadata`` implements the ``Array`` protocol over ``factor_data``, which is int64
+    bin codes, and ``Prioritize.evaluate`` hands an ``Array`` straight to these functions.
+    """
+
+    def test_normalize_promotes_integer_input(self):
+        embeddings = np.arange(20, dtype=np.int64).reshape(10, 2)
+        normalized = _normalize(embeddings)
+        assert np.issubdtype(normalized.dtype, np.floating)
+        np.testing.assert_allclose(normalized, embeddings / np.max(np.linalg.norm(embeddings, axis=1)))
+
+    def test_normalize_preserves_float32(self):
+        """Promotion must not silently double the memory of a float32 embedding matrix."""
+        embeddings = np.random.random((10, 2)).astype(np.float32)
+        assert _normalize(embeddings).dtype == np.float32
+
+    def test_normalize_does_not_mutate_input(self):
+        embeddings = np.random.random((10, 2))
+        original = embeddings.copy()
+        _normalize(embeddings)
+        np.testing.assert_array_equal(embeddings, original)
+
+    def test_rank_knn_ranks_integers_as_their_float_equivalent(self):
+        rng = np.random.default_rng(0)
+        embeddings = rng.integers(0, 10, (30, 4))
+        result = rank_knn(embeddings, k=3)
+        expected = rank_knn(embeddings.astype(np.float64), k=3)
+        assert result["indices"].tolist() == expected["indices"].tolist()
+
+    def test_rank_knn_accepts_integer_reference(self):
+        """``reference`` is normalized separately, so it needs the same promotion."""
+        rng = np.random.default_rng(0)
+        embeddings = rng.integers(0, 10, (30, 4))
+        reference = rng.integers(0, 10, (30, 4))
+        result = rank_knn(embeddings, k=3, reference=reference)
+        assert result["indices"].shape == (30,)

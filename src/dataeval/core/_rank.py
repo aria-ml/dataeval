@@ -36,22 +36,29 @@ class RankResult(TypedDict):
     scores: NDArray[np.float32] | None
 
 
-def _normalize(embeddings: NDArray[np.floating[Any]]) -> NDArray[np.floating[Any]]:
-    """Normalize embeddings by maximum L2 norm."""
-    emb = embeddings.copy()
+def _normalize(embeddings: NDArray[np.number[Any]]) -> NDArray[np.floating[Any]]:
+    """Normalize a feature matrix by its maximum L2 norm.
+
+    The input need not be floating point: ``Metadata`` presents its factors as int64
+    bin codes, and :meth:`~dataeval.scope.Prioritize.evaluate` passes whatever ``Array``
+    it is handed straight through. Promoting to float here rather than dividing in place
+    keeps that matrix rankable; a float matrix keeps its own precision, so a float32
+    embedding matrix is not silently widened to float64.
+    """
+    emb = np.array(embeddings, dtype=np.result_type(embeddings.dtype, np.float32))
     emb /= max(np.max(np.linalg.norm(emb, axis=1)), EPSILON)
     return emb
 
 
 def _rank_base(
-    embeddings: NDArray[np.floating[Any]],
+    embeddings: NDArray[np.number[Any]],
     *,
     method: Literal["knn", "kmeans_distance", "kmeans_complexity", "hdbscan_distance", "hdbscan_complexity"],
     k: int | None = None,
     c: int | None = None,
     n_init: int | Literal["auto"] = "auto",
     max_cluster_size: int | None = None,
-    reference: NDArray[np.floating[Any]] | None = None,
+    reference: NDArray[np.number[Any]] | None = None,
 ) -> RankResult:
     """Perform the core ranking without policy application."""
     _logger.info(
@@ -100,9 +107,9 @@ def _rank_base(
 
 
 def rank_knn(
-    embeddings: NDArray[np.floating[Any]],
+    embeddings: NDArray[np.number[Any]],
     k: int | None = None,
-    reference: NDArray[np.floating[Any]] | None = None,
+    reference: NDArray[np.number[Any]] | None = None,
 ) -> RankResult:
     """
     Rank samples using k-nearest neighbors distance.
@@ -112,12 +119,14 @@ def rank_knn(
 
     Parameters
     ----------
-    embeddings : NDArray[np.floating]
-        Embedding vectors to rank, shape (n_samples, n_features).
+    embeddings : NDArray[np.number]
+        Feature vectors to rank, shape (n_samples, n_features). Integer matrices
+        are accepted alongside float ones, so binned :class:`~dataeval.Metadata`
+        factors rank as readily as embeddings.
     k : int | None, default None
         Number of nearest neighbors. If None, uses sqrt(n_samples).
-    reference : NDArray[np.floating] | None, default None
-        Reference embeddings for comparative ranking. If provided, samples
+    reference : NDArray[np.number] | None, default None
+        Reference features for comparative ranking. If provided, samples
         are ranked by distance to the reference set rather than to each other.
 
     Returns
@@ -156,10 +165,10 @@ def rank_knn(
 
 
 def rank_kmeans_distance(
-    embeddings: NDArray[np.floating[Any]],
+    embeddings: NDArray[np.number[Any]],
     c: int | None = None,
     n_init: int | Literal["auto"] = "auto",
-    reference: NDArray[np.floating[Any]] | None = None,
+    reference: NDArray[np.number[Any]] | None = None,
 ) -> RankResult:
     """
     Rank samples using distance to cluster centers.
@@ -169,14 +178,16 @@ def rank_kmeans_distance(
 
     Parameters
     ----------
-    embeddings : NDArray[np.floating]
-        Embedding vectors to rank, shape (n_samples, n_features).
+    embeddings : NDArray[np.number]
+        Feature vectors to rank, shape (n_samples, n_features). Integer matrices
+        are accepted alongside float ones, so binned :class:`~dataeval.Metadata`
+        factors rank as readily as embeddings.
     c : int | None, default None
         Number of clusters. If None, uses sqrt(n_samples).
     n_init : int | "auto", default "auto"
         Number of K-means initializations.
-    reference : NDArray[np.floating] | None, default None
-        Reference embeddings for comparative ranking. If provided, samples
+    reference : NDArray[np.number] | None, default None
+        Reference features for comparative ranking. If provided, samples
         are ranked relative to the reference set rather than themselves.
 
     Returns
@@ -211,10 +222,10 @@ def rank_kmeans_distance(
 
 
 def rank_kmeans_complexity(
-    embeddings: NDArray[np.floating[Any]],
+    embeddings: NDArray[np.number[Any]],
     c: int | None = None,
     n_init: int | Literal["auto"] = "auto",
-    reference: NDArray[np.floating[Any]] | None = None,
+    reference: NDArray[np.number[Any]] | None = None,
 ) -> RankResult:
     """
     Rank samples using cluster complexity weighting.
@@ -227,14 +238,16 @@ def rank_kmeans_complexity(
 
     Parameters
     ----------
-    embeddings : NDArray[np.floating]
-        Embedding vectors to rank, shape (n_samples, n_features).
+    embeddings : NDArray[np.number]
+        Feature vectors to rank, shape (n_samples, n_features). Integer matrices
+        are accepted alongside float ones, so binned :class:`~dataeval.Metadata`
+        factors rank as readily as embeddings.
     c : int | None, default None
         Number of clusters. If None, uses sqrt(n_samples).
     n_init : int | "auto", default "auto"
         Number of K-means initializations.
-    reference : NDArray[np.floating] | None, default None
-        Reference embeddings for comparative ranking. If provided, samples
+    reference : NDArray[np.number] | None, default None
+        Reference features for comparative ranking. If provided, samples
         are ranked relative to the reference set rather than themselves.
 
     Returns
@@ -269,10 +282,10 @@ def rank_kmeans_complexity(
 
 
 def rank_hdbscan_distance(
-    embeddings: NDArray[np.floating[Any]],
+    embeddings: NDArray[np.number[Any]],
     c: int | None = None,
     max_cluster_size: int | None = None,
-    reference: NDArray[np.floating[Any]] | None = None,
+    reference: NDArray[np.number[Any]] | None = None,
 ) -> RankResult:
     """
     Rank samples using distance to HDBSCAN cluster centers.
@@ -282,15 +295,17 @@ def rank_hdbscan_distance(
 
     Parameters
     ----------
-    embeddings : NDArray[np.floating]
-        Embedding vectors to rank, shape (n_samples, n_features).
+    embeddings : NDArray[np.number]
+        Feature vectors to rank, shape (n_samples, n_features). Integer matrices
+        are accepted alongside float ones, so binned :class:`~dataeval.Metadata`
+        factors rank as readily as embeddings.
     c : int | None, default None
         Expected number of clusters (used as hint for min_cluster_size).
         If None, uses sqrt(n_samples).
     max_cluster_size : int | None, default None
         Maximum size limit for identified clusters.
-    reference : NDArray[np.floating] | None, default None
-        Reference embeddings for comparative ranking. If provided, samples
+    reference : NDArray[np.number] | None, default None
+        Reference features for comparative ranking. If provided, samples
         are ranked relative to the reference set rather than themselves.
 
     Returns
@@ -328,10 +343,10 @@ def rank_hdbscan_distance(
 
 
 def rank_hdbscan_complexity(
-    embeddings: NDArray[np.floating[Any]],
+    embeddings: NDArray[np.number[Any]],
     c: int | None = None,
     max_cluster_size: int | None = None,
-    reference: NDArray[np.floating[Any]] | None = None,
+    reference: NDArray[np.number[Any]] | None = None,
 ) -> RankResult:
     """
     Rank samples using HDBSCAN cluster complexity weighting.
@@ -344,15 +359,17 @@ def rank_hdbscan_complexity(
 
     Parameters
     ----------
-    embeddings : NDArray[np.floating]
-        Embedding vectors to rank, shape (n_samples, n_features).
+    embeddings : NDArray[np.number]
+        Feature vectors to rank, shape (n_samples, n_features). Integer matrices
+        are accepted alongside float ones, so binned :class:`~dataeval.Metadata`
+        factors rank as readily as embeddings.
     c : int | None, default None
         Expected number of clusters (used as hint for min_cluster_size).
         If None, uses sqrt(n_samples).
     max_cluster_size : int | None, default None
         Maximum size limit for identified clusters.
-    reference : NDArray[np.floating] | None, default None
-        Reference embeddings for comparative ranking. If provided, samples
+    reference : NDArray[np.number] | None, default None
+        Reference features for comparative ranking. If provided, samples
         are ranked relative to the reference set rather than themselves.
 
     Returns
