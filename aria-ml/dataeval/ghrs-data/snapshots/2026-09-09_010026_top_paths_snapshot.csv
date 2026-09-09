@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,59,31
+/aria-ml/dataeval/releases,30,1
+/aria-ml/dataeval/tags,27,1
+/aria-ml/dataeval/graphs/contributors,7,3
+/aria-ml/dataeval/blob/main/docs/concepts/BER.md,2,2
+/aria-ml/dataeval/blob/main/prototype/split_dataset.py,2,2
+/aria-ml/dataeval/blob/06ed03972a4b1750ddc81ecd538d31232a5af3e0/.github/workflows/publish.yml,1,1
+/aria-ml/dataeval/blob/dc5c1b2526f1b3ea35b09ec4f5d5d3a9936abade/.github/workflows/publish.yml,1,1
+/aria-ml/dataeval/blob/main/.gitlab-ci.yml,1,1
+/aria-ml/dataeval/blob/main/LICENSE,1,1
