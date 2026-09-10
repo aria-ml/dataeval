@@ -186,8 +186,7 @@ print(f"drifted: {result.drifted}   {feature_drift.sum()} of {len(feature_drift)
 # corresponding metadata factors.
 
 # %%
-# None when an extractor has no names to give (embeddings); Metadata always does.
-factor_names = list(result.feature_names or [])
+factor_names = list(result.feature_names)
 
 drift_table = pl.DataFrame({"factor": factor_names, "p_value": p_values, "drifted": feature_drift}).sort("p_value")
 print(drift_table)
@@ -257,7 +256,7 @@ clean_result = DriftUnivariate(method="ks", extractor=clean_extractor).fit(clean
 # stays correct even if a pass drops a factor the other kept.
 before_df = pl.DataFrame({"factor": factor_names, "p_before": p_values, "before": feature_drift})
 after_df = pl.DataFrame({
-    "factor": list(clean_result.feature_names or []),
+    "factor": list(clean_result.feature_names),
     "p_after": np.asarray(clean_result.details["p_vals"]),
     "after": np.asarray(clean_result.details["feature_drift"]),
 })
@@ -337,7 +336,7 @@ print("date_time now:", sorted(set(repaired.rows_at("unit")["date_time"].to_list
 
 # %%
 time_of_day = DriftUnivariate(method="ks", extractor=repaired).fit(reference).predict(operational)
-by_name = dict(zip(time_of_day.feature_names or [], np.asarray(time_of_day.details["p_vals"]), strict=True))
+by_name = dict(zip(time_of_day.feature_names, np.asarray(time_of_day.details["p_vals"]), strict=True))
 print(f"date_time (hour of day)  p = {by_name['date_time']:.3e}")
 
 for year in ("2020", "2021"):
