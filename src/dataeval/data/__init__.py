@@ -7,6 +7,7 @@ __all__ = [
     "Crop",
     "DatasetSplits",
     "DetectionCrops",
+    "EvenlySpaced",
     "FrameCandidate",
     "FrameIndices",
     "FrameInput",
@@ -18,6 +19,7 @@ __all__ = [
     "Operation",
     "Redundancy",
     "Relabel",
+    "Representative",
     "Resize",
     "Reverse",
     "SelectChannels",
@@ -51,6 +53,7 @@ from dataeval.data._reverse import Reverse
 from dataeval.data._selectchannels import SelectChannels
 from dataeval.data._selectors import (
     AllFrames,
+    EvenlySpaced,
     FrameCandidate,
     FrameIndices,
     FrameInput,
@@ -58,6 +61,7 @@ from dataeval.data._selectors import (
     FrameSelector,
     FrameVerdict,
     Redundancy,
+    Representative,
     SequenceInfo,
     Stride,
 )

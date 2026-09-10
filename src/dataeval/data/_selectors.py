@@ -11,6 +11,7 @@ What a selector decides is consumed by :class:`~dataeval.data.SequenceFrames`.
 
 __all__ = []
 
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -18,11 +19,13 @@ from enum import Flag, auto
 from typing import Any
 
 import numpy as np
+import xxhash as xxh
 from numpy.typing import NDArray
 
 from dataeval._log import get_logger
+from dataeval.config import get_seed, resolve_batch_size
 from dataeval.flags import ImageStats
-from dataeval.protocols import DatumMetadata, SingleFrameObjectTrackingTarget
+from dataeval.protocols import DatumMetadata, FeatureExtractor, SingleFrameObjectTrackingTarget
 from dataeval.types import ReprMixin
 from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape
@@ -269,16 +272,98 @@ class AllFrames(FrameSelector):
         return (FrameVerdict(frame.position) for frame in frames)
 
 
-class Stride(FrameSelector):
-    """Keep every ``n``-th frame.
+def _bin_picks(edges: NDArray[np.intp], rng: np.random.Generator | None) -> NDArray[np.intp]:
+    """One position per ``[start, end)`` bin: its start, or a uniform draw when jittering."""
+    starts, ends = edges[:-1], edges[1:]
+    if rng is None:
+        return starts.astype(np.intp)
+    return rng.integers(starts, ends).astype(np.intp)
+
+
+class _Binned(FrameSelector, ABC):
+    """A selector that cuts a sequence into bins and keeps one frame from each.
+
+    The two rules for sizing those bins -- a fixed bin *size* (:class:`Stride`) and a fixed bin
+    *count* (:class:`EvenlySpaced`) -- are the only difference between the subclasses, so the
+    jitter, seeding and replay behaviour they share lives here.
+
+    Because bins are contiguous and each kept frame stands for its own bin, the default
+    :attr:`FrameVerdict.weight` -- the gap to the next kept frame -- is already right, and no
+    subclass declares one.
+    """
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def __init__(self, jitter: bool, seed: int | None) -> None:
+        self.jitter: bool = bool(jitter)
+        # The global fallback is resolved at selection time, not here: a selector is declared
+        # before the configuration it will eventually run under.
+        self.seed: int | None = None if seed is None else int(seed)
+
+    @abstractmethod
+    def _edges(self, n_frames: int) -> NDArray[np.intp]:
+        """Bin edges spanning ``[0, n_frames]``, ascending and strictly increasing."""
+        ...
+
+    def _rng(self, info: SequenceInfo) -> np.random.Generator | None:
+        """Return a generator keyed to this sequence, or None when the selector does not jitter.
+
+        Keyed on :attr:`SequenceInfo.source_id` rather than :attr:`SequenceInfo.index`, so a
+        sequence draws the same frames however the dataset around it is filtered or reordered. A
+        generator drawn once for the whole dataset would instead make a video's key frames depend
+        on how many videos happened to precede it.
+        """
+        if not self.jitter:
+            return None
+        seed = get_seed() if self.seed is None else self.seed
+        if seed is None:
+            return np.random.default_rng()
+        source_id = info.source_id
+        # Anything that is not already valid seed entropy -- a string, or a negative integer id --
+        # is folded through a digest, which is stable across processes as `hash` is not.
+        if isinstance(source_id, int) and source_id >= 0:
+            key = source_id
+        else:
+            key = xxh.xxh64_intdigest(str(source_id).encode())
+        return np.random.default_rng([seed, key])
+
+    def plan(self, info: SequenceInfo) -> NDArray[np.intp]:
+        """Return one position per bin, decided from the sequence's frame count alone."""
+        return _bin_picks(self._edges(info.n_frames), self._rng(info))
+
+    def select(self, frames: Iterator[FrameCandidate]) -> Iterator[FrameVerdict]:
+        """Keep the positions :meth:`plan` names, resolved once per sequence."""
+        wanted: set[int] | None = None
+        for frame in frames:
+            if wanted is None:
+                # Resolved once per sequence rather than per frame, as FrameIndices does: `in`
+                # over an array is a scan, which over a sequence of frames is quadratic.
+                wanted = set(self.plan(frame.sequence).tolist())
+            if frame.position in wanted:
+                yield FrameVerdict(frame.position)
+
+
+class Stride(_Binned):
+    """Keep one frame out of every ``step``.
 
     The cheapest way to thin a sequence, and decided from position alone, so a view built on it
     knows its own length without decoding anything.
 
+    Left unjittered this keeps positions ``0, step, 2 * step, ...``, which is a frame rate
+    reduction: what survives is still perfectly periodic, so a frame remains predictable from its
+    neighbours. ``jitter=True`` keeps a *random* frame from each block of ``step`` instead, which
+    breaks that periodicity while leaving the spacing about the same -- the difference between
+    thinning a video and sampling one.
+
     Parameters
     ----------
     step : int
-        Keep positions ``0, step, 2 * step, ...``. Must be at least 1.
+        Width of each block, in frames. Must be at least 1.
+    jitter : bool, default False
+        Draw a uniformly random position from each block rather than always taking its first.
+    seed : int or None, default None
+        Seed for the jitter. ``None`` falls back to :func:`~dataeval.config.get_seed`, and
+        selection is not reproducible when that is unset too. Ignored when ``jitter`` is False.
 
     Raises
     ------
@@ -287,28 +372,134 @@ class Stride(FrameSelector):
 
     See Also
     --------
+    :class:`EvenlySpaced` : Keep a fixed number of frames per sequence, whatever its length
     :class:`FrameRate` : Thin to a target rate using real timestamps rather than frame counts
+
+    Notes
+    -----
+    Each sequence is jittered from a generator keyed on its ``source_id``, so a sequence draws the
+    same frames however the dataset around it is filtered or reordered -- see :class:`_Binned`.
 
     Examples
     --------
     >>> from dataeval.data import SequenceFrames, Stride
     >>> frames = SequenceFrames(mot_dataset, Stride(5))  # doctest: +SKIP
+
+    One random frame per 5, rather than every 5th:
+
+    >>> frames = SequenceFrames(mot_dataset, Stride(5, jitter=True, seed=0))  # doctest: +SKIP
     """
 
-    needs: FrameInput = FrameInput.STRUCTURE
-
-    def __init__(self, step: int) -> None:
+    def __init__(self, step: int, jitter: bool = False, seed: int | None = None) -> None:
         if step < 1:
             raise ValueError(f"Stride: step must be at least 1; got {step}.")
+        super().__init__(jitter, seed)
         self.step: int = int(step)
 
-    def plan(self, info: SequenceInfo) -> NDArray[np.intp]:
-        """Return every ``step``-th position."""
-        return np.arange(0, info.n_frames, self.step, dtype=np.intp)
+    def _edges(self, n_frames: int) -> NDArray[np.intp]:
+        """Blocks of ``step`` frames, the last one short where the sequence does not divide."""
+        return np.append(np.arange(0, n_frames, self.step, dtype=np.intp), np.intp(n_frames))
 
     def select(self, frames: Iterator[FrameCandidate]) -> Iterator[FrameVerdict]:
-        """Keep each frame whose position is a multiple of ``step``."""
-        return (FrameVerdict(frame.position) for frame in frames if frame.position % self.step == 0)
+        """Keep each frame whose position is a multiple of ``step``, or the shared bin walk.
+
+        Unjittered, which block a frame falls in and whether it is that block's first frame are
+        both answerable from the position alone -- so this needs neither the sequence's frame
+        count nor a materialized set of every kept position, which for a long sequence at a small
+        ``step`` would be millions of integers held to answer a modulo. Jittered, the pick within
+        a block is not positional and the shared bin walk decides it.
+        """
+        if self.jitter:
+            yield from super().select(frames)
+            return
+        for frame in frames:
+            if frame.position % self.step == 0:
+                yield FrameVerdict(frame.position)
+
+
+class EvenlySpaced(_Binned):
+    """Keep ``count`` frames per sequence, spread across its whole length.
+
+    Where :class:`Stride` fixes the *spacing* and lets the count follow from how long a sequence
+    is, this fixes the *count* and lets the spacing follow. That is what keeps a long video from
+    drowning out a short one in any per-frame statistic, which is the usual reason to want it.
+
+    The trade is that the same ``count`` means different things for different sequences: two
+    videos of the same content at different lengths yield frames of different independence, since
+    the shorter one's are drawn closer together.
+
+    Parameters
+    ----------
+    count : int
+        How many frames to keep per sequence. Must be at least 1. A sequence with fewer than
+        ``count`` frames contributes every frame instead.
+    jitter : bool, default False
+        Draw a uniformly random position from each bin rather than always taking its first.
+    seed : int or None, default None
+        Seed for the jitter. ``None`` falls back to :func:`~dataeval.config.get_seed`, and
+        selection is not reproducible when that is unset too. Ignored when ``jitter`` is False.
+
+    Raises
+    ------
+    ValueError
+        If ``count`` is less than 1.
+
+    Warns
+    -----
+    UserWarning
+        If a sequence has fewer than ``count`` frames (all of its frames are kept).
+
+    See Also
+    --------
+    :class:`Stride` : Fix the spacing instead, and let the count follow the sequence's length
+
+    Notes
+    -----
+    Each sequence is jittered from a generator keyed on its ``source_id``, so a sequence draws the
+    same frames however the dataset around it is filtered or reordered -- see :class:`_Binned`.
+
+    Examples
+    --------
+    >>> from dataeval.data import EvenlySpaced, SequenceFrames
+    >>> frames = SequenceFrames(mot_dataset, EvenlySpaced(8))  # doctest: +SKIP
+
+    One random frame from each of 8 equal spans, rather than the first of each:
+
+    >>> frames = SequenceFrames(mot_dataset, EvenlySpaced(8, jitter=True, seed=0))  # doctest: +SKIP
+    """
+
+    def __init__(self, count: int, jitter: bool = False, seed: int | None = None) -> None:
+        if count < 1:
+            raise ValueError(f"EvenlySpaced: count must be at least 1; got {count}.")
+        super().__init__(jitter, seed)
+        self.count: int = int(count)
+
+    def plan(self, info: SequenceInfo) -> NDArray[np.intp]:
+        """Return one position per bin, decided from the sequence's frame count alone."""
+        if info.n_frames < self.count:
+            _logger.warning(
+                "EvenlySpaced: sequence %d (id=%r) has %d frame(s), fewer than requested count %d; keeping all frames.",
+                info.index,
+                info.source_id,
+                info.n_frames,
+                self.count,
+            )
+            warnings.warn(
+                f"EvenlySpaced: sequence {info.index} (id={info.source_id!r}) has {info.n_frames} frame(s), "
+                f"fewer than requested count {self.count}; keeping all frames.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return super().plan(info)
+
+    def _edges(self, n_frames: int) -> NDArray[np.intp]:
+        """``count`` bins of near-equal width, capped at one bin per frame for a short sequence."""
+        n_bins = min(self.count, n_frames)
+        edges = np.linspace(0, n_frames, n_bins + 1).round().astype(np.intp)
+        # Rounding cannot collapse neighbouring edges once n_bins <= n_frames, but a collapsed bin
+        # would be an empty draw range rather than a wrong answer, so it is ruled out rather than
+        # reasoned about.
+        return np.unique(edges)
 
 
 class FrameIndices(FrameSelector):
@@ -520,3 +711,259 @@ class FrameRate(FrameSelector):
                 sequence.n_frames,
                 sequence.index,
             )
+
+
+_MEDIAN_SAMPLE = 2000
+"""Frames used to estimate a sequence's median pairwise distance.
+
+The estimate needs a length scale, not an exact quantile, and the full pairwise set is quadratic:
+a 5-minute sequence at 30fps would spend gigabytes to refine a number that decides a kernel width.
+The sample is taken by even stride, so it stays deterministic and spans the whole sequence.
+"""
+
+_DISTANCE_CHUNK = 512
+"""Columns of the kernel matrix computed at once when accumulating the density estimate."""
+
+
+def _sq_distances(x: NDArray[Any], y: NDArray[Any]) -> NDArray[Any]:
+    """Squared euclidean distances between every row of ``x`` and every row of ``y``."""
+    # `einsum` rather than `(x ** 2).sum(1)`: the row norms are wanted, not a squared copy of the
+    # whole matrix, and this is called once per chunk over the same `x`.
+    distances = np.einsum("ij,ij->i", x, x)[:, None] + np.einsum("ij,ij->i", y, y)[None, :] - 2 * x @ y.T
+    # Expansion can land a hair below zero for near-identical rows; a negative squared distance
+    # would come back NaN from the square root.
+    return np.maximum(distances, 0.0)
+
+
+def _median_bandwidth(embeddings: NDArray[Any]) -> float:
+    """Estimate a kernel width by the median heuristic: ``median pairwise distance / sqrt(2)``.
+
+    The same estimator :class:`~dataeval.shift.DriftMMD` uses (``sigma_median``), so a kernel width
+    means the same thing whether a sequence is being sampled or compared.
+
+    A sequence that is mostly one static shot has more than half its pairs at distance zero, and
+    the plain median then comes back zero -- a zero-width kernel, which throws away the very
+    frames that *do* differ. In that case alone the scale is read off the pairs that differ
+    instead, leaving the estimate untouched wherever it already had a scale to report. Zero
+    survives only when no two frames differ at all, which is what
+    :meth:`Representative._indistinguishable` is for.
+    """
+    from scipy.spatial.distance import pdist
+
+    # Ceiling division, so the sample really is capped at _MEDIAN_SAMPLE rows rather than at
+    # nearly twice it.
+    sample = embeddings[:: max(1, -(-len(embeddings) // _MEDIAN_SAMPLE))]
+    distances = pdist(sample)
+    median = float(np.median(distances)) if distances.size else 0.0
+    if median == 0.0:
+        distinct = distances[distances > 0]
+        median = float(np.median(distinct)) if distinct.size else 0.0
+    return median / np.sqrt(2.0)
+
+
+def _kernel_herd(embeddings: NDArray[Any], count: int, bandwidth: float) -> tuple[list[int], NDArray[Any]]:
+    """Greedily pick ``count`` rows whose kernel mean best matches that of the whole set.
+
+    At each step the pick maximizes (mean similarity to every row) minus (mean similarity to what
+    is already picked). The first term is a kernel density estimate, so picks are drawn toward
+    well-populated regions; the second repels each pick from the last, so a dense region gets
+    several spread-out representatives rather than the same row over and over.
+
+    The kernel matrix is never materialized. Only its row means and one column per pick are
+    needed, and both can be accumulated a chunk at a time -- which is the difference between
+    working and exhausting memory on a sequence of more than a few thousand frames.
+
+    Returns the chosen row indices, in selection order, and the weight of each: how many rows are
+    nearer to it than to any other pick. Those weights sum to the number of rows by construction.
+    """
+    n = len(embeddings)
+    count = min(count, n)
+    gamma = 1.0 / (2 * bandwidth**2)
+
+    density = np.zeros(n)
+    for start in range(0, n, _DISTANCE_CHUNK):
+        chunk = embeddings[start : start + _DISTANCE_CHUNK]
+        density += np.exp(-gamma * _sq_distances(embeddings, chunk)).sum(1)
+    density /= n
+
+    chosen: list[int] = []
+    columns: list[NDArray[Any]] = []
+    picked_similarity = np.zeros(n)
+    for step in range(count):
+        # The subtraction always makes a fresh array, so `density` is never written to.
+        scores = density - picked_similarity / max(step, 1)
+        scores[chosen] = -np.inf  # never pick the same frame twice
+        nearest = int(np.argmax(scores))
+        chosen.append(nearest)
+        # Kept rather than recomputed: this column is also what decides which pick owns each row.
+        columns.append(_sq_distances(embeddings, embeddings[nearest : nearest + 1]).ravel())
+        picked_similarity += np.exp(-gamma * columns[-1])
+
+    owner = np.stack(columns, axis=1).argmin(axis=1)
+    return chosen, np.bincount(owner, minlength=count).astype(np.float64)
+
+
+class Representative(FrameSelector):
+    """Keep ``count`` frames chosen to represent how a sequence *looks*, not where frames fall in it.
+
+    The other selectors thin a sequence by position or timestamp, which spends the same number of
+    frames on a minute of stillness as on a minute where everything changes. This one describes
+    every frame, then picks the subset whose spread through descriptor space matches the whole
+    sequence's -- so a long static stretch yields one frame and a busy stretch yields several,
+    without anyone having to say in advance which is which.
+
+    The method is kernel herding [1]_ [2]_: repeatedly take the frame that is most typical of the
+    sequence and least like what has already been taken. Being a greedy argmax it is
+    deterministic -- the same sequence and ``count`` always give the same frames.
+
+    Because a kept frame stands for others scattered through the sequence rather than for a
+    contiguous run, each verdict carries an explicit :attr:`FrameVerdict.weight`: the number of
+    frames nearer to it than to any other kept frame. Those weights still sum to the sequence's
+    frame count, so per-frame statistics stay correctly weighted.
+
+    Parameters
+    ----------
+    count : int
+        How many frames to keep per sequence. Must be at least 1. A sequence with fewer than
+        ``count`` frames contributes every frame.
+    extractor : FeatureExtractor or None, default None
+        What describes a frame. ``None`` uses :class:`~dataeval.extractors.FlattenExtractor`,
+        which needs no model but compares raw pixels; a pretrained
+        :class:`~dataeval.extractors.TorchExtractor` is what makes "looks alike" mean anything
+        beyond that, and is worth the cost here.
+    bandwidth : float or None, default None
+        Kernel width, in descriptor-space distance. ``None`` derives it per sequence by the
+        median heuristic, which needs no tuning and adapts to how much a given sequence varies.
+    batch_size : int or None, default None
+        How many frames are described at once. ``None`` resolves the extractor's own batch size,
+        then the global one -- see :func:`~dataeval.config.get_batch_size`.
+
+    Raises
+    ------
+    ValueError
+        If ``count`` is less than 1, or ``bandwidth`` is given and not positive.
+
+    See Also
+    --------
+    :class:`Redundancy` : Drop frames carrying nothing new, decided one frame at a time
+    :class:`EvenlySpaced` : Keep a fixed number of frames by position rather than by appearance
+
+    Notes
+    -----
+    This is a buffering selector: it cannot choose any frame before it has described all of them,
+    so each sequence is walked twice and the view cannot know its own length without walking it.
+    Only descriptors are held between the passes, never pixels.
+
+    Prefer a bandwidth left at ``None``. A kernel much wider than the median pairwise distance
+    cannot tell neighbouring frames apart, and herding then picks *adjacent* frames at a
+    sequence's extremes -- the opposite of what a representative subset is for.
+
+    What is matched is the *distribution*, so budget follows mass rather than variety: a stretch
+    holding two thirds of a sequence's frames draws about two thirds of the picks even if nothing
+    in it moves. That is what makes the kept frames a stand-in for the whole sequence, but it means
+    a long enough identical run can draw a second, redundant pick -- which then carries a weight of
+    zero, since every frame nearer to it is nearer to the first. Use :class:`Redundancy` instead
+    when collapsing repetition, rather than representing it, is the goal.
+
+    References
+    ----------
+    .. [1] Chen, Y., Welling, M., & Smola, A. (2010). Super-Samples from Kernel Herding.
+           *UAI 2010*, 109-116. arXiv:1203.3472
+    .. [2] Bach, F., Lacoste-Julien, S., & Obozinski, G. (2012). On the Equivalence Between
+           Herding and Conditional Gradient Algorithms. arXiv:1203.4523
+
+    Examples
+    --------
+    >>> from dataeval.data import Representative, SequenceFrames
+    >>> frames = SequenceFrames(mot_dataset, Representative(8))  # doctest: +SKIP
+
+    Describing frames with a pretrained model rather than raw pixels:
+
+    >>> from dataeval.extractors import TorchExtractor
+    >>> selector = Representative(8, extractor=TorchExtractor(model))  # doctest: +SKIP
+    """
+
+    needs: FrameInput = FrameInput.PIXELS
+    two_pass: bool = True
+
+    def __init__(
+        self,
+        count: int,
+        extractor: FeatureExtractor | None = None,
+        bandwidth: float | None = None,
+        batch_size: int | None = None,
+    ) -> None:
+        if count < 1:
+            raise ValueError(f"Representative: count must be at least 1; got {count}.")
+        if bandwidth is not None and not bandwidth > 0:  # `not >` rather than `<=`, so NaN is caught
+            raise ValueError(f"Representative: bandwidth must be positive; got {bandwidth}.")
+        from dataeval.extractors import FlattenExtractor
+
+        self.count: int = int(count)
+        self.extractor: FeatureExtractor = FlattenExtractor() if extractor is None else extractor
+        self.bandwidth: float | None = None if bandwidth is None else float(bandwidth)
+        if batch_size is not None:
+            resolve_batch_size(batch_size)  # validated now; rejects a non-positive size early
+        # The global fallback is resolved at selection time, not here: a selector is declared
+        # before the configuration it will eventually run under.
+        self.batch_size: int | None = batch_size
+
+    def _describe(self, batch: list[NDArray[Any]]) -> NDArray[Any]:
+        """Describe one batch of frames, flattened to one row each."""
+        return as_numpy(self.extractor(np.stack(batch))).reshape(len(batch), -1)
+
+    def _walk(self, frames: Iterator[FrameCandidate]) -> tuple[SequenceInfo | None, list[int], NDArray[Any]]:
+        """Describe every frame of a sequence, holding descriptors and positions but never pixels.
+
+        The extractor is called a batch at a time rather than a frame at a time, so a model pays
+        its per-call overhead once per batch; each batch's pixels are released as soon as it has
+        been described.
+        """
+        size = resolve_batch_size(self.batch_size, getattr(self.extractor, "batch_size", None))
+        sequence: SequenceInfo | None = None
+        positions: list[int] = []
+        described: list[NDArray[Any]] = []
+        batch: list[NDArray[Any]] = []
+        for frame in frames:
+            sequence = frame.sequence
+            positions.append(frame.position)
+            batch.append(frame.pixels)
+            if len(batch) == size:
+                described.append(self._describe(batch))
+                batch = []
+        if batch:
+            described.append(self._describe(batch))
+        embeddings = np.concatenate(described, dtype=np.float64) if described else np.empty((0, 0))
+        return sequence, positions, embeddings
+
+    def _indistinguishable(self, sequence: SequenceInfo, n_frames: int) -> tuple[list[int], NDArray[Any]]:
+        """Keep the first frames when every frame describes identically.
+
+        A zero-width kernel makes every subset equally representative and every score NaN, so the
+        choice is made here rather than left to an argmax over undefined numbers.
+        """
+        kept = list(range(min(self.count, n_frames)))
+        _logger.info(
+            "Representative: every frame of sequence %d describes identically; kept the first %d "
+            "rather than choosing between indistinguishable frames.",
+            sequence.index,
+            len(kept),
+        )
+        return kept, np.full(len(kept), n_frames / len(kept))
+
+    def select(self, frames: Iterator[FrameCandidate]) -> Iterator[FrameVerdict]:
+        """Describe every frame of the sequence, then yield the representative subset in order."""
+        sequence, positions, embeddings = self._walk(frames)
+        if sequence is None:
+            return
+
+        bandwidth = self.bandwidth if self.bandwidth is not None else _median_bandwidth(embeddings)
+        kept, weights = (
+            _kernel_herd(embeddings, self.count, bandwidth)
+            if bandwidth > 0
+            else self._indistinguishable(sequence, len(positions))
+        )
+
+        weight_of = dict(zip(kept, weights, strict=True))
+        for index in sorted(weight_of):
+            yield FrameVerdict(positions[index], weight=float(weight_of[index]))

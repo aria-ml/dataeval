@@ -1,5 +1,6 @@
 """Tests for presenting a tracking dataset as an object-detection dataset of frames."""
 
+import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
@@ -10,6 +11,7 @@ import pytest
 from dataeval.data import (
     AllFrames,
     Crop,
+    EvenlySpaced,
     FrameCandidate,
     FrameIndices,
     FrameInput,
@@ -19,8 +21,10 @@ from dataeval.data import (
     Indices,
     Operation,
     Redundancy,
+    Representative,
     Reverse,
     SequenceFrames,
+    SequenceInfo,
     SourceLocator,
     Stride,
     View,
@@ -56,8 +60,17 @@ class _FakeVideoTarget:
 class _FakeFrame:
     """A decoded frame whose pixels are materialized only when read."""
 
-    def __init__(self, index: int, shape: tuple[int, ...], time_s: float | None, pts: int | None, counter: dict):
+    def __init__(
+        self,
+        index: int,
+        shape: tuple[int, ...],
+        time_s: float | None,
+        pts: int | None,
+        counter: dict,
+        value: int | None = None,
+    ):
         self.frame_index = index
+        self._value = index if value is None else value
         self._shape = shape
         self._counter = counter
         if time_s is not None:
@@ -68,13 +81,14 @@ class _FakeFrame:
     @property
     def pixels(self) -> np.ndarray:
         self._counter["pixels"] += 1
-        return np.full(self._shape, self.frame_index % 251, dtype=np.uint8)
+        return np.full(self._shape, self._value % 251, dtype=np.uint8)
 
 
 class _CountingStream:
     """A VideoStream that records how many times it is iterated and how far."""
 
-    def __init__(self, n_frames, shape, counter, timed=True, index=0, extra=0):
+    def __init__(self, n_frames, shape, counter, timed=True, index=0, extra=0, still_until=None):
+        self._still_until = still_until
         self._n = n_frames
         self._shape = shape
         self._counter = counter
@@ -92,6 +106,9 @@ class _CountingStream:
                 (i / 30.0) if self._timed else None,
                 (i * 1001) if self._timed else None,
                 self._counter,
+                # Frames before `still_until` are pixel-identical, so a sequence can hold a static
+                # stretch followed by one where every frame differs.
+                value=0 if self._still_until is not None and i < self._still_until else i,
             )
 
 
@@ -119,14 +136,16 @@ def make_target(n_dets: int = 2) -> SingleFrameObjectTrackingTarget:
     )
 
 
-def make_dataset(frame_counts=(6, 4), shape=(3, 12, 14), timed=True, extra=0, counters=None):
+def make_dataset(frame_counts=(6, 4), shape=(3, 12, 14), timed=True, extra=0, counters=None, still_until=None):
     """A tracking dataset whose streams report how often they are walked."""
     counters = [] if counters is None else counters
     data: list[MultiobjectTrackingDatum] = []
     for seq, n in enumerate(frame_counts):
         counter = {"iterations": 0, "frames": 0, "pixels": 0}
         counters.append(counter)
-        stream = _CountingStream(n, shape, counter, timed=timed, index=seq, extra=extra if seq == 0 else 0)
+        stream = _CountingStream(
+            n, shape, counter, timed=timed, index=seq, extra=extra if seq == 0 else 0, still_until=still_until
+        )
         target = _FakeVideoTarget(frame_tracks=[make_target() for _ in range(n)])
         data.append((
             cast(Any, stream),
@@ -178,6 +197,11 @@ class _ReservedName(FrameSelector):
 
 
 # --------------------------------------------------------------------------------------
+
+
+def _info(index: int, source_id: str, n_frames: int) -> SequenceInfo:
+    """A SequenceInfo for driving a selector's `select` directly, outside SequenceFrames."""
+    return SequenceInfo(index, source_id, n_frames, cast(DatumMetadata, {}))
 
 
 def emit(frames: SequenceFrames) -> list[tuple[Any, Any, dict[str, Any]]]:
@@ -387,6 +411,182 @@ class TestShippedSelectors:
         """Thinning on a guessed frame rate would make every derived timing quietly wrong."""
         dataset, _ = make_dataset((6,), timed=False)
         assert len(emit(SequenceFrames(dataset, FrameRate(1.0)))) == 6
+
+
+@pytest.mark.required
+class TestBinnedSelectors:
+    """Stride and EvenlySpaced: the two rules for sizing a bin, jittered and not."""
+
+    @pytest.mark.parametrize(("count", "expected"), [(1, [0]), (2, [0, 3]), (3, [0, 2, 4]), (6, [0, 1, 2, 3, 4, 5])])
+    def test_evenly_spaced_spans_the_sequence(self, count, expected):
+        dataset, _ = make_dataset((6,))
+        emitted = emit(SequenceFrames(dataset, EvenlySpaced(count)))
+        assert [meta["frame"] for _, _, meta in emitted] == expected
+
+    def test_evenly_spaced_is_constant_per_sequence_where_stride_is_not(self):
+        """The whole point of fixing the count: a long video cannot drown out a short one."""
+        dataset, _ = make_dataset((12, 4))
+        even = SequenceFrames(dataset, EvenlySpaced(3)).frame_map
+        strided = SequenceFrames(dataset, Stride(3)).frame_map
+        assert np.bincount(even[:, 0]).tolist() == [3, 3]
+        assert np.bincount(strided[:, 0]).tolist() == [4, 2]
+
+    def test_evenly_spaced_short_sequence_warns_and_contributes_every_frame(self, caplog):
+        dataset, _ = make_dataset((3,))
+        with caplog.at_level(logging.WARNING), pytest.warns(UserWarning, match="fewer than requested count 10"):
+            frames = SequenceFrames(dataset, EvenlySpaced(10))
+        assert len(frames) == 3
+        assert "EvenlySpaced: sequence 0" in caplog.text
+        assert "fewer than requested count 10" in caplog.text
+
+    def test_evenly_spaced_rejects_non_positive(self):
+        with pytest.raises(ValueError, match="at least 1"):
+            EvenlySpaced(0)
+
+    @pytest.mark.parametrize(("selector", "step"), [(Stride, 3), (EvenlySpaced, 4)], ids=["stride", "evenly_spaced"])
+    def test_jitter_keeps_one_frame_per_bin(self, selector, step):
+        """Jitter moves the pick within its bin; it does not change how many bins there are."""
+        dataset, _ = make_dataset((12,))
+        plain = SequenceFrames(dataset, selector(step)).frame_map
+        jittered = SequenceFrames(dataset, selector(step, jitter=True, seed=0)).frame_map
+        assert len(jittered) == len(plain)
+        # one pick per [start, start + 3) bin, since 12 frames / 4 bins == stride 3
+        for (_, picked), (_, start) in zip(jittered, plain, strict=True):
+            assert start <= picked < start + 3
+
+    @pytest.mark.parametrize("selector", [Stride, EvenlySpaced])
+    def test_jitter_is_reproducible_under_a_seed(self, selector):
+        dataset, _ = make_dataset((40, 25))
+        first = SequenceFrames(dataset, selector(4, jitter=True, seed=7)).frame_map
+        second = SequenceFrames(dataset, selector(4, jitter=True, seed=7)).frame_map
+        np.testing.assert_array_equal(first, second)
+
+    @pytest.mark.parametrize("selector", [Stride, EvenlySpaced])
+    def test_different_seeds_differ(self, selector):
+        dataset, _ = make_dataset((60,))
+        first = SequenceFrames(dataset, selector(3, jitter=True, seed=1)).frame_map
+        second = SequenceFrames(dataset, selector(3, jitter=True, seed=2)).frame_map
+        assert not np.array_equal(first, second)
+
+    @pytest.mark.parametrize("selector", [Stride, EvenlySpaced])
+    def test_jitter_survives_reordering_the_dataset_around_a_sequence(self, selector):
+        """Keyed on source_id, so a video's key frames do not depend on what precedes it."""
+        dataset, _ = make_dataset((9, 9, 9))
+        straight = SequenceFrames(dataset, selector(3, jitter=True, seed=0))
+        reversed_ = SequenceFrames(View(dataset, Reverse()), selector(3, jitter=True, seed=0))
+
+        def frames_of(view, source_id):
+            return [meta["frame"] for _, _, meta in emit(view) if meta["source_id"] == source_id]
+
+        assert frames_of(straight, "vid2") == frames_of(reversed_, "vid2")
+
+    @pytest.mark.parametrize(("selector", "arg"), [(Stride, 2), (EvenlySpaced, 5)], ids=["stride", "evenly_spaced"])
+    def test_jitter_plans_without_decoding(self, selector, arg):
+        """Jitter is still a decision from structure alone, so length stays free."""
+        dataset, counters = make_dataset((10,))
+        frames = SequenceFrames(dataset, selector(arg, jitter=True, seed=0))
+        assert len(frames) == 5
+        assert counters[0]["pixels"] == 0
+
+    @pytest.mark.parametrize("selector", [Stride, EvenlySpaced])
+    def test_streaming_select_agrees_with_the_plan(self, selector):
+        """`plan` is a shortcut, not an alternative -- `select` must reach the same frames."""
+        chosen = selector(3, jitter=True, seed=5)
+        dataset, _ = make_dataset((14, 8))
+        planned = SequenceFrames(dataset, chosen).frame_map
+
+        streamed = []
+        for info in [_info(0, "vid0", 14), _info(1, "vid1", 8)]:
+            candidates = iter([
+                FrameCandidate(info, position, position, None, None, make_target()) for position in range(info.n_frames)
+            ])
+            streamed += [(info.index, v.position) for v in chosen.select(candidates)]
+        np.testing.assert_array_equal(planned, np.array(streamed))
+
+
+@pytest.mark.required
+class TestRepresentativeSelector:
+    """Kernel herding over frame descriptors: chosen by appearance, not by position."""
+
+    def test_keeps_the_requested_count(self):
+        dataset, _ = make_dataset((12,))
+        assert len(emit(SequenceFrames(dataset, Representative(4, batch_size=4)))) == 4
+
+    def test_short_sequence_contributes_every_frame(self):
+        dataset, _ = make_dataset((3,))
+        assert len(emit(SequenceFrames(dataset, Representative(10, batch_size=4)))) == 3
+
+    def test_verdicts_arrive_in_position_order(self):
+        dataset, _ = make_dataset((16,))
+        frames = [meta["frame"] for _, _, meta in emit(SequenceFrames(dataset, Representative(5, batch_size=4)))]
+        assert frames == sorted(frames)
+
+    def test_is_deterministic(self):
+        """A greedy argmax, so the same sequence and count always give the same frames."""
+        dataset, _ = make_dataset((14,))
+        first = SequenceFrames(dataset, Representative(5, batch_size=4)).frame_map
+        second = SequenceFrames(dataset, Representative(5, batch_size=4)).frame_map
+        np.testing.assert_array_equal(first, second)
+
+    @pytest.mark.parametrize("batch_size", [1, 3, 5, 100])
+    def test_batching_does_not_change_the_answer(self, batch_size):
+        """Batching is how frames are described, not what they are described as."""
+        dataset, _ = make_dataset((15,))
+        expected = SequenceFrames(dataset, Representative(4, batch_size=15)).frame_map
+        np.testing.assert_array_equal(
+            SequenceFrames(dataset, Representative(4, batch_size=batch_size)).frame_map, expected
+        )
+
+    def test_weights_sum_to_the_frame_count(self):
+        """A kept frame stands for a scattered set, so it declares what it stands for."""
+        dataset, _ = make_dataset((12,))
+        emitted = emit(SequenceFrames(dataset, Representative(4, batch_size=4)))
+        assert sum(meta["frames_represented"] for _, _, meta in emitted) == pytest.approx(12)
+
+    def test_spends_more_of_its_budget_where_the_content_changes(self):
+        """The reason to select on appearance rather than position."""
+        # 16 pixel-identical frames, then 8 that each differ.
+        dataset, _ = make_dataset((24,), shape=(3, 8, 8), still_until=16)
+
+        def in_tail(selector):
+            emitted = emit(SequenceFrames(dataset, selector))
+            return sum(meta["frame"] >= 16 for _, _, meta in emitted)
+
+        assert in_tail(Representative(4, batch_size=8)) > in_tail(EvenlySpaced(4))
+
+    def test_weights_follow_the_mass_a_frame_stands_for(self):
+        """A frame representing a long static stretch has to count for more than one showing once."""
+        dataset, _ = make_dataset((24,), shape=(3, 8, 8), still_until=16)
+        emitted = emit(SequenceFrames(dataset, Representative(4, batch_size=8)))
+        weights = {meta["frame"]: meta["frames_represented"] for _, _, meta in emitted}
+        static = sum(weight for frame, weight in weights.items() if frame < 16)
+        assert static == pytest.approx(16)
+        assert sum(weights.values()) == pytest.approx(24)
+
+    def test_identical_frames_keep_the_first(self):
+        """A zero-width kernel cannot choose, so the choice is made explicitly rather than by NaN."""
+        dataset, _ = make_dataset((10,), shape=(3, 8, 8), still_until=10)
+        emitted = emit(SequenceFrames(dataset, Representative(3, batch_size=4)))
+        assert [meta["frame"] for _, _, meta in emitted] == [0, 1, 2]
+        assert sum(meta["frames_represented"] for _, _, meta in emitted) == pytest.approx(10)
+
+    def test_declares_that_it_reads_pixels_and_buffers(self):
+        selector = Representative(3)
+        assert selector.needs == FrameInput.PIXELS
+        assert selector.two_pass is True
+        assert selector.plan(_info(0, "vid0", 10)) is None
+
+    def test_rejects_bad_arguments(self):
+        with pytest.raises(ValueError, match="at least 1"):
+            Representative(0)
+        with pytest.raises(ValueError, match="bandwidth must be positive"):
+            Representative(4, bandwidth=-1.0)
+
+    def test_an_explicit_bandwidth_is_honoured(self):
+        dataset, _ = make_dataset((16,))
+        wide = SequenceFrames(dataset, Representative(5, bandwidth=1e6, batch_size=8)).frame_map
+        narrow = SequenceFrames(dataset, Representative(5, bandwidth=1e-2, batch_size=8)).frame_map
+        assert not np.array_equal(wide, narrow)
 
 
 @pytest.mark.required
