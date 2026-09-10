@@ -349,17 +349,17 @@ class TestDriftOutputFeatureNames:
         rng = np.random.default_rng(0)
         detector = DriftUnivariate().fit(rng.standard_normal((50, 4)).astype(np.float32))
 
-        assert detector.predict(rng.standard_normal((30, 4)).astype(np.float32)).feature_names is None
+        assert detector.predict(rng.standard_normal((30, 4)).astype(np.float32)).feature_names == ()
 
     def test_names_absent_for_an_anonymous_extractor(self):
-        """An extractor with no ``feature_names`` leaves the field None rather than raising."""
+        """An extractor with no ``feature_names`` leaves the field empty rather than raising."""
         from dataeval.extractors import FlattenExtractor
         from dataeval.shift import DriftUnivariate
 
         rng = np.random.default_rng(0)
         detector = DriftUnivariate(extractor=FlattenExtractor()).fit(rng.standard_normal((50, 2, 2)).astype(np.float32))
 
-        assert detector.predict(rng.standard_normal((30, 2, 2)).astype(np.float32)).feature_names is None
+        assert detector.predict(rng.standard_normal((30, 2, 2)).astype(np.float32)).feature_names == ()
 
     def test_names_match_metadata_factors(self, metadata_dataset):
         """A Metadata extractor labels the axis its own factor order defines."""
@@ -369,12 +369,11 @@ class TestDriftOutputFeatureNames:
         extractor = Metadata()
         result = DriftUnivariate(extractor=extractor).fit(metadata_dataset).predict(metadata_dataset)
 
-        assert result.feature_names is not None
         assert list(result.feature_names) == list(extractor.factor_names)
         assert len(result.feature_names) == len(result.details["p_vals"])
 
     def test_unfitted_named_extractor_does_not_raise(self):
-        """Resolving names must answer None, not propagate NotFittedError.
+        """Resolving names must answer empty, not propagate NotFittedError.
 
         On Python 3.10/3.11 a runtime-checkable protocol's instance check calls
         ``hasattr``, which would invoke the property and raise. The lookup is duck-typed
@@ -391,7 +390,7 @@ class TestDriftOutputFeatureNames:
                 raise NotFittedError("not fitted")
 
         detector = DriftUnivariate(extractor=Unfitted())
-        assert detector._feature_names is None
+        assert detector._feature_names == ()
 
     def test_chunked_result_carries_names(self, metadata_dataset):
         """The chunked wrapper reports the wrapped detector's names."""

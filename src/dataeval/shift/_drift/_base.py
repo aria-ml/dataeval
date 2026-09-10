@@ -59,16 +59,12 @@ class DriftOutput(DictOutput, Generic[TDetails]):
     details : TDetails
         Detector-specific statistics (TypedDict) for non-chunked mode,
         or a :class:`polars.DataFrame` of per-chunk results for chunked mode.
-    feature_names : Sequence[str] or None
-        Names of the analyzed features, in the column order of everything ``details``
-        reports per feature -- ``p_vals``, ``feature_drift``, ``feature_importances``.
+    feature_names : Sequence[str]
+        Names of the analyzed features, matching the column order of per-feature
+        statistics in ``details`` (e.g., ``p_vals``, ``feature_drift``).
         Populated when the detector's ``extractor`` is a
         :class:`~dataeval.protocols.NamedFeatureExtractor`, such as
-        :class:`~dataeval.Metadata`; None when the features are anonymous, which is the
-        usual case for embeddings.
-
-        A per-feature statistic is otherwise positional, and reading it means rebuilding
-        the extractor's column order by hand.
+        :class:`~dataeval.Metadata`; empty otherwise.
     """
 
     drifted: bool
@@ -76,7 +72,7 @@ class DriftOutput(DictOutput, Generic[TDetails]):
     distance: float
     metric_name: str
     details: TDetails
-    feature_names: Sequence[str] | None = None
+    feature_names: Sequence[str] = ()
 
 
 @dataclass(frozen=True, repr=False)
@@ -219,7 +215,7 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         ...
 
     @property
-    def _feature_names(self) -> tuple[str, ...] | None:
+    def _feature_names(self) -> tuple[str, ...]:
         """Column names from the extractor, when it has any to give.
 
         Notes
@@ -233,11 +229,11 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         """
         extractor = getattr(self, "extractor", None)
         if extractor is None:
-            return None
+            return ()
         try:
             names = extractor.feature_names
         except (AttributeError, NotFittedError):
-            return None
+            return ()
         return tuple(str(name) for name in names)
 
     def _prepare_data(self, data: Any) -> NDArray[np.float32]:
