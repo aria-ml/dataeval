@@ -537,3 +537,55 @@ class TestAddressesThisMetadataCannotHonour:
                 {"speed": [0.5, 0.9]},
                 source_index=[SourceIndex(0, 5, "track"), SourceIndex(0, 9, "track")],
             )
+
+
+@pytest.mark.required
+class TestEntityCounts:
+    """How many entities a level offers over the rows currently being read."""
+
+    def test_the_view_level_counts_one_per_row(self):
+        md = _measured(_video())
+        md.view = "instance"
+        assert list(md._entity_counts(["instance"])) == [7]
+
+    def test_a_level_above_counts_what_the_rows_reach(self):
+        """A per-sequence factor on detection rows stands over two sequences, not seven rows.
+
+        `unit` answers four where the dataset holds five frames, because one of them holds
+        no detections: from detection rows that frame is never an ancestor, and a per-frame
+        factor's value there is not an observation these rows made. It is the level's rows
+        *reachable from here*, not the level's rows.
+        """
+        md = _measured(_video())
+        md.view = "instance"
+        assert md.level_counts == {"sequence": 2, "unit": 5, "track": 4, "instance": 7}
+        assert list(md._entity_counts(["sequence", "unit", "track", "instance"])) == [2, 4, 4, 7]
+
+    def test_a_row_with_no_ancestor_is_not_counted(self):
+        """Detection 3 has no track, so `track` reaches three of the four tracks from here.
+
+        The fixture's second frame of the first sequence holds an untracked detection, and
+        a factor defined at `track` has no value on it at all -- so it is not an observation
+        of that factor and must not be counted as one.
+        """
+        md = _measured(_video())
+        md.view = "instance"
+        positions = md._store.link("instance", "track").positions()
+        assert (positions < 0).any(), "fixture no longer holds an untracked detection"
+        assert md._entity_counts(["track"])[0] == len(set(positions[positions >= 0]))
+
+    def test_a_sibling_level_falls_back_to_the_rows(self):
+        """`unit` and `track` are siblings, so neither reaches the other.
+
+        Such a factor is kept out of factor analysis long before this, so the answer only
+        has to be the one that changes nothing.
+        """
+        md = _measured(_video())
+        md.view = "track"
+        assert md._entity_counts(["unit"])[0] == md.level_counts["track"]
+
+    def test_the_count_follows_the_view(self):
+        """Read at their own level, per-sequence factors stand over one entity per row."""
+        md = _measured(_video())
+        md.view = "sequence"
+        assert list(md._entity_counts(["sequence"])) == [2]

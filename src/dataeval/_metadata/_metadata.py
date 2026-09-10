@@ -4284,6 +4284,41 @@ class Metadata(Array, FeatureExtractor):
         levels: list[FactorLevel] = [level for level, names in self._factors_by_level.items() if name in names]
         return self._levels.highest(levels) if levels else self._item_level
 
+    def _entity_counts(self, levels: Sequence[FactorLevel]) -> NDArray[np.intp]:
+        """How many distinct entities each level offers, counted over the current view's rows.
+
+        A factor defined above the view repeats once per descendant row, so the view's row
+        count overstates how many independent observations of it there are: a per-sequence
+        factor read on detection rows takes one value per sequence however many detections
+        that sequence holds. What this counts is the number of entities the factor could
+        have varied *between*, which is what a chance correction over it has to be taken
+        against — the correction's whole business is what the values could have done by
+        luck, and replicated values had no chance to do anything.
+
+        A level equal to the view counts one entity per row. A level above it counts the
+        ancestors those rows actually reach, so a row with no ancestor there contributes
+        nothing — it carries no value for such a factor either. A level the view cannot
+        read, or that this dataset declares without producing rows for, falls back to the
+        row count, which is the answer that changes nothing; :meth:`_unreadable_at` has
+        already kept the factors that could reach either case out of factor analysis.
+
+        Answered per level rather than per factor because factors sharing a level share the
+        count, and the link behind it is the expensive part.
+        """
+        self._structure()
+        view = self._view_level
+        height = self._store.height(view)
+        cache: dict[FactorLevel, int] = {}
+        for level in levels:
+            if level in cache:
+                continue
+            if level == view or level not in self._store.frames or not self._levels.propagates_to(level, view):
+                cache[level] = height
+                continue
+            positions = self._store.link(view, level).positions()
+            cache[level] = int(np.unique(positions[positions >= 0]).size)
+        return np.array([cache[level] for level in levels], dtype=np.intp)
+
     def _resolve_level(self, level: FactorLevel) -> FactorLevel:
         """Validate a caller-supplied level name against this dataset's level schema.
 
