@@ -19,28 +19,26 @@
 # %% [markdown]
 # ## Problem statement
 #
-# Deduplicating a video corpus differs significantly from deduplicating static images. Videos naturally
-# consist of sequential, highly correlated frames. Consequently, frame-level comparison alone is
-# insufficient for identifying video-level duplication. You must analyze the relationship between
-# entire sequences to answer key structural questions, including:
+# Deduplicating video is not the same as deduplicating images. The frames of a video are sequential and highly
+# correlated, so comparing frames alone cannot tell you whether two videos are the same video. You have to compare
+# whole sequences to answer questions such as:
 #
-# - Is training footage present in the test split, causing data leakage?
-# - Is the same video sequence stored under multiple filenames, or compressed with different codecs?
-# - What portion of the video contains unique motion or information, and what portion represents static scenes?
-# - Has the footage been resampled or repackaged at a different frame rate, disrupting frame-by-frame alignment?
-# - Is a single object annotated under multiple track identifiers?
+# - Is training footage also sitting in the test split?
+# - Is the same footage stored twice, under two filenames or two codecs?
+# - How much of a sequence carries new information, and how much of it is static?
+# - Was the footage resampled or repackaged at another frame rate, so the frames no longer line up one to one?
+# - Is one object annotated twice, under two track identifiers?
 #
-# The :class:`~dataeval.quality.Duplicates` class detects these five conditions across a multi-object tracking (MOT)
-# dataset. In this guide, you will construct a sample corpus, simulate duplication scenarios, and extract the
-# corresponding detection results.
+# The :class:`~dataeval.quality.Duplicates` class answers these questions for a multi-object tracking (MOT) dataset.
+# In this guide you will build a small corpus with known duplicates, run each detection against it, and read the
+# results.
 
 # %% [markdown]
 # ### When to use
 #
-# Use this guide when you are working with full-motion video (FMV) or any multi-object tracking (MOT) dataset, and you
-# must understand the corpus composition before splitting your data or training a model. For static image datasets,
-# you can refer to [How to identify duplicates](./h2_deduplicate.py), which utilizes the same class for simpler,
-# image-level scenarios.
+# Use this guide when you work with full-motion video (FMV) or any multi-object tracking (MOT) dataset and you need to
+# know what the corpus contains before you split it or train on it. For still images, use
+# [How to identify duplicates](./h2_deduplicate.py), which covers the same class on simpler, image-level cases.
 
 # %% [markdown]
 # ### What you will need
@@ -92,11 +90,15 @@ pl.Config.set_tbl_width_chars(160)
 # %% [markdown]
 # ## Building a corpus with known duplicates
 #
-# Because standard FMV datasets with labeled duplicates are not readily available, you will synthesize four short
-# sequences ("patrols") containing a textured ground plane with two objects tracking across it. Each scene is
-# configured with a unique, low-frequency spatial layout. This design is necessary because perceptual hashing
-# algorithms compress frames into low-frequency representations; consequently, two frames with identical coarse layouts
-# but different high-frequency textures can produce identical hashes despite appearing distinct.
+# FMV datasets with labeled duplicates are not readily available, so you will synthesize four short sequences. Each
+# one is a textured ground plane with two objects moving across it, and each one is given a different coarse layout.
+#
+# The layouts differ because of how perceptual hashing works. The hash resizes a frame, runs a discrete cosine
+# transform over it, and keeps only the lowest-frequency coefficients. What survives is the coarse layout of the
+# frame. Everything finer than that is discarded, which covers sensor noise and compression artifacts but also grain,
+# fine texture and small detail. That is what makes the hash useful here, since a re-encoded frame hashes to the same
+# value as its source and you are left comparing content rather than bytes. It also means two frames that share a
+# coarse layout hash alike even when their fine detail differs, so distinct scenes need distinct layouts.
 
 # %%
 HEIGHT, WIDTH = 72, 96
@@ -123,20 +125,20 @@ def scene(seed: int, n_frames: int) -> list[np.ndarray]:
 
 
 def transcode(frames: list[np.ndarray], seed: int) -> list[np.ndarray]:
-    """The same footage through another codec: same content, different bytes."""
+    """The same footage re-encoded: the same content, different pixel values."""
     rng = np.random.default_rng(seed)
     return [np.clip(f.astype(np.float64) + rng.normal(0, 6, f.shape), 0, 255).astype(np.uint8) for f in frames]
 
 
 # %% [markdown]
-# A MAITE multi-object tracking datum is a `(VideoStream, MultiobjectTrackingTarget, metadata)` tuple. The video stream
-# operates as an iterable of frames rather than an indexable sequence. Because locating frame *k* requires decoding all
-# preceding frames, DataEval streams video sequentially instead of indexing it directly.
+# A MAITE multi-object tracking datum is a `(VideoStream, MultiobjectTrackingTarget, metadata)` tuple. The video
+# stream is an iterable of frames rather than an indexable sequence. Reaching frame *k* means decoding every frame
+# before it, so DataEval streams video sequentially instead of indexing into it.
 
 
 # %%
 def boxes_at(frame_index: int) -> SingleFrameObjectTrackingTargetTuple:
-    """Two tracked objects following the same paths the pixels do."""
+    """Two tracked objects, boxed where the frame index puts them."""
     corners, tracks = [], []
     for track, speed, y0 in ((0, 1.4, 0.30), (1, 0.9, 0.68)):
         cx = (6 + frame_index * speed * 1.6) % (WIDTH - 12) + 6
@@ -151,7 +153,7 @@ def boxes_at(frame_index: int) -> SingleFrameObjectTrackingTargetTuple:
 
 
 class VideoStream:
-    """An iterable of decoded frames, standing in for a file a decoder would walk."""
+    """An iterable of decoded frames, in place of the file a decoder would read."""
 
     def __init__(self, frames: list[np.ndarray], fps: float = 30.0) -> None:
         self._frames, self._fps = frames, fps
@@ -184,69 +186,81 @@ class VideoDataset:
 
 
 # %% [markdown]
-# The synthesized corpus consists of four training sequences with three distinct duplication relationships:
+# The corpus holds four training sequences with three kinds of duplication built into them:
 #
-# | # | Sequence | Description |
+# | # | Sequence | Contents |
 # | --- | --- | --- |
-# | 0 | `patrol_alpha` | 60 frames of baseline footage |
-# | 1 | `patrol_alpha_transcode` | A transcoded version of sequence 0, simulating codec variation |
-# | 2 | `patrol_bravo` | Distinct footage containing a static sequence where the camera dwells on a frame for 20 frames |
-# | 3 | `patrol_charlie` | Distinct footage with no overlapping content |
+# | 0 | `sequence_a` | 60 frames of baseline footage |
+# | 1 | `sequence_a_transcode` | Sequence 0 re-encoded: the same footage, different pixel values |
+# | 2 | `sequence_b` | Different footage, holding on one frame for 20 frames |
+# | 3 | `sequence_c` | Different footage that reuses frames 5-24 of sequence 0 as its own frames 15-34 |
 #
-# And one test sequence: a 20-frame clip extracted from `patrol_alpha` and transcoded. You will use this sequence to
-# detect, analyze, and resolve data leakage.
+# It also holds one test sequence: a 20-frame clip cut from `sequence_a` and re-encoded. You will use that sequence
+# to find, measure and remove a data leak.
+#
+# Sequences 0 and 1 duplicate each other end to end. Sequence 3 covers the case where part of one sequence duplicates
+# part of another, which the class reports the same way whether the two sequences sit in one split or across two.
 
 # %%
-alpha = scene(1, 60)
-bravo = scene(5, 40)
-bravo_stare = bravo[:15] + [bravo[15]] * 20 + bravo[16:]
+frames_a = scene(1, 60)
+frames_b = scene(5, 40)
+frames_b_dwell = frames_b[:15] + [frames_b[15]] * 20 + frames_b[16:]
+frames_c = scene(12, 45)
+frames_c_reuse = frames_c[:15] + transcode(frames_a[5:25], seed=7) + frames_c[15:30]
 
 train = VideoDataset(
     {
-        "patrol_alpha": alpha,
-        "patrol_alpha_transcode": transcode(alpha, seed=9),
-        "patrol_bravo": bravo_stare,
-        "patrol_charlie": scene(12, 45),
+        "sequence_a": frames_a,
+        "sequence_a_transcode": transcode(frames_a, seed=9),
+        "sequence_b": frames_b_dwell,
+        "sequence_c": frames_c_reuse,
     },
     dataset_id="train",
 )
-test = VideoDataset({"eval_clip": transcode(alpha[30:50], seed=3)}, dataset_id="test")
+test = VideoDataset({"test_clip": transcode(frames_a[30:50], seed=3)}, dataset_id="test")
 
 # %% [markdown]
 # ## Adjusting settings for video datasets
 #
-# The `hash_radius` parameter specifies the maximum Hamming distance (in bits) between two perceptual hashes for their
-# corresponding frames to be classified as identical. It defaults to `0`, representing a strict, bit-for-bit match.
-# While a default of `0` is appropriate for static image datasets where duplicated files (such as a re-saved PNG) are
-# often bitwise identical, transcoded video frames almost always exhibit compression artifacts, noise, and other minor
-# variations that prevent an exact match.
+# `hash_radius` is the largest Hamming distance, in bits, at which two frame hashes still count as the same frame. It
+# defaults to `0`, an exact match across all 64 bits of the hash. That default suits still images, where a duplicated
+# file is often byte for byte identical. Re-encoded video is not: compression artifacts and noise move a bit or two
+# in most frames, and only some frames survive an exact match.
 #
-# If you retain the default setting for video data, the evaluation will not necessarily fail to find duplicates;
-# instead, it may yield incomplete, inaccurate, or misleading matches that are difficult to detect.
+# Leaving the default in place does not make the evaluation miss video duplicates outright, and it does not report
+# relations that are not there. It finds fewer of the frames that make up each relation, so the spans and containment
+# it reports understate the relation it did find.
+#
+# The sequences here are short, so the code below also lowers `min_segment_frames` from its default of `30` to `10`.
+# Otherwise the 20-frame stretch that sequence 3 reuses falls below the reporting threshold.
 
 # %%
-strict = Duplicates().evaluate(train)
-relaxed = Duplicates(hash_radius=6).evaluate(train)
+strict = Duplicates(min_segment_frames=10).evaluate(train)
+relaxed = Duplicates(hash_radius=6, min_segment_frames=10).evaluate(train)
 
 for name, result in (("hash_radius=0", strict), ("hash_radius=6", relaxed)):
-    row = result.sequences.data().row(0, named=True)
+    row = result.sequences.data().filter(pl.col("item_indices") == [0, 1]).row(0, named=True)
     print(
         f"{name}: sequences {row['item_indices']} share frames "
         f"{row['span_start'][0]}-{row['span_end'][0]}, containment {[round(c, 2) for c in row['containment']]}"
     )
 
 # %% [markdown]
-# Both configurations identify the relationship. However, the strict evaluation (`hash_radius=0`) reports that the two
-# sequences share approximately half of their frames, whereas one is actually an end-to-end copy of the other. Because
-# only a subset of the transcoded frames happened to produce identical hashes under strict matching, this partial result
-# could be misinterpreted as a complete and accurate finding.
+# Both settings find the relationship between sequences 0 and 1. Under `hash_radius=0`, roughly half the frames match
+# and the pair reads as a partial overlap, because only some of the re-encoded frames happened to hash identically.
+# Sequence 1 is a copy of sequence 0 from end to end, which is what `hash_radius=6` reports.
 #
-# This under-reporting also distorts the leakage measurement, where detection accuracy is critical:
+# A partial overlap is a valid finding in its own right, and sequence 3 is one. The problem here is the extent. Read
+# the strict result as it stands and you would keep a sequence that is a full copy of one you already have.
+#
+# The same under-reporting shrinks a leakage measurement, where the extent is what you act on:
 
 # %%
+extent = {}
 for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
     found = Duplicates(hash_radius=radius, min_segment_frames=10).evaluate(train, test)
     row = found.sequences.data().filter(pl.col("dataset_indices").list.n_unique() > 1).row(0, named=True)
+    extent[radius] = row
     print(
         f"{name}: train frames {row['span_start'][0]}-{row['span_end'][0]} "
         f"== test frames {row['span_start'][1]}-{row['span_end'][1]}"
@@ -254,20 +268,19 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
     )
 
 # %% [markdown]
-# Using the default configuration, the test clip appears to be only 60% duplicated from training footage and maps to
-# incorrect frames. In reality, the test clip is a 100% duplicate spanning frames 30–49 of the training sequence.
-# Relying on the strict result would lead you to remove the wrong frames, leaving the majority of the data leak intact.
+# The strict run pairs train frames 39-48 with test frames 9-18. Those frames do correspond: test frame 9 is train
+# frame 39, and the offset of 30 is the same one the relaxed run reports. The strict run has found a correct stretch.
+# It has found half of one. The whole test clip comes from train frames 30-49, so acting on the strict result alone
+# drops 10 frames and leaves the other 10 leaked frames in the test split.
 #
 # ```{note}
-# When evaluating video datasets, start with `hash_radius=6`. DataEval defines a Hamming distance of 1–5 bits as
-# "highly similar" and 6–10 bits as "potentially similar." In video-hashing literature, the operational threshold is
-# typically ≤30 out of 256 bits, which corresponds to approximately 10% of the hash code. The default remains `0` to
-# ensure consistency with static image evaluation, as a dynamically altered default would introduce unpredictable
-# behavior during execution.
+# Start at `hash_radius=6` for video. The perceptual hash is 64 bits wide. DataEval reads a distance of 1-5 bits as
+# highly similar and 6-10 bits as possibly similar, and published video hashing work puts its threshold near 10% of
+# the hash length, which is about 6 bits here. The default stays at `0` so that the parameter means the same thing on
+# every dataset, rather than changing behavior depending on what it was handed.
 #
-# The `Duplicates` class automatically logs a warning when it processes video data with a `hash_radius` of `0`. You can
-# enable logging to observe this warning by configuring the standard library `logging` module as described in
-# [How to configure logging](./h2_configure_logging.py):
+# `Duplicates` logs a warning when it runs on video with `hash_radius=0`. To see it, configure the standard library
+# `logging` module as described in [How to configure logging](./h2_configure_logging.py):
 #
 # ```python
 # import logging
@@ -278,33 +291,40 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
 # %% [markdown]
 # ## Triaging the corpus
 #
-# You can begin by reviewing the high-level summary, which provides one row per sequence, lists key metrics, and
-# highlights potential areas of concern.
+# Start with the per-sequence summary. It gives one row per sequence and tells you which sequences are worth
+# investigating.
 
 # %%
 summary = relaxed.aggregate_by_sequence()
 display(summary)
 
 # %% [markdown]
-# This summary exposes two primary metrics that analyze distinct duplication characteristics:
+# Two of these columns measure duplication:
 #
-# - **`redundant_fraction`**: Measures self-redundancy, representing the fraction of frames that do not introduce new
-#   information relative to their immediate predecessors. In this example, sequence 2 scores the highest due to the
-#   simulated 20-frame static camera dwell.
-# - **`duplicate_frames` / `shared_with`**: Measures cross-sequence duplication, representing the frames that match
-#   other video sequences in the corpus. Sequences 0 and 1 report 100% overlap with each other because they represent
-#   identical footage, while sequences 2 and 3 share no frames with other sequences.
+# - `redundant_fraction` measures self-redundancy: the fraction of frames that carry nothing new over the frames
+#   immediately before them. Sequence 2 scores highest, from its 20-frame camera dwell.
+# - `duplicate_frames` measures cross-sequence duplication: frames of this sequence that also appear in a
+#   different sequence. Sequences 0 and 1 report all 60 of their frames, since each is a copy of the other. Sequence 3
+#   reports the 20 frames it reuses from sequence 0, and sequence 2 reports none.
 #
-# Note that `duplicate_frames` only includes matches found in *different* sequences. Because consecutive frames in
-# almost any video naturally resemble one another within standard `hash_radius` limits, treating consecutive
-# self-similarity as cross-sequence duplication would incorrectly classify an entirely unique corpus as fully
-# duplicated.
+# The other two are counts rather than identifiers:
+#
+# - `shared_with` is how many other sequences this one shares content with, not which ones. Sequence 0 reads `2`,
+#   because sequence 1 copies it whole and sequence 3 reuses a stretch of it. Read the sequence-level rows below to
+#   find out which sequences those are.
+# - `group_count` is how many duplicate groups touch this sequence, counting the redundant runs inside it. It
+#   tells you how fragmented the findings are, not how much footage is duplicated: one long dwell is a single group,
+#   while the same number of frames spread over ten short runs is ten.
+#
+# `duplicate_frames` counts only frames matched in another sequence. Consecutive frames of almost any video
+# resemble one another within a usable `hash_radius`, so counting that resemblance here would make a corpus of
+# unrelated videos read as fully duplicated. It is self-redundancy, and `redundant_fraction` already reports it.
 
 # %% [markdown]
 # ## Identifying sequence-level duplicates
 #
-# The triage table indicates that sequence 0 shares content with another sequence. To determine which sequence it
-# matches, quantify the overlap, and analyze the match details, you can inspect the sequence-level DataFrame.
+# The summary tells you that a sequence shares content. It does not tell you which sequence it shares with, how much,
+# or where. The sequence-level rows answer that.
 
 # %%
 display(
@@ -314,24 +334,35 @@ display(
 )
 
 # %% [markdown]
-# The resulting row indicates that sequences 0 and 1 overlap from frame 0 to frame 59, with each sequence fully
-# containing the other (`containment` is `[1.0, 1.0]`) at a mean Hamming distance of approximately 1 bit. This pattern
-# is characteristic of a re-encoded video. To deduplicate, you can retain one sequence and discard the duplicate.
+# The three rows cover two different relationships:
 #
-# The `dup_type` column categorizes the detected duplication relationships:
+# - Sequences 0 and 1 overlap from frame 0 to frame 59, and each one fully contains the other (`containment` is
+#   `[1.0, 1.0]`) at a mean distance of about 1 bit per frame. That is a re-encode of the same footage. Keep one of
+#   the two and drop the other.
+# - Sequences 0 and 3 share a 20-frame stretch: frames 5-24 of sequence 0 are frames 15-34 of sequence 3. Neither
+#   sequence contains the other, and `containment` sits near `0.4` on both sides. This is the case where part of one
+#   sequence duplicates part of another, and it is reported the same way inside one dataset as it is across two.
+# - The third row is that same stretch found against sequence 1, which is itself a copy of sequence 0. A reused clip
+#   is reported against every copy of its source.
+#
+# `containment` is the share of each sequence's frames that matched, counted over every match rather than over the
+# reported span alone. It can sit slightly above the span length divided by the sequence length when frames outside
+# the span match too at an offset that does not extend the segment.
+#
+# The `dup_type` column names the kind of relationship:
 #
 # | `dup_type` | Description |
 # | --- | --- |
-# | `exact` | The two sequences contain identical frames in the identical order. |
-# | `segment` | The sequences overlap over a continuous interval at a fixed frame offset. |
-# | `aligned` | The sequences overlap but do not advance at the same rate, indicating a speed edit (see below). |
-# | `redundant` | A continuous run within a single sequence that carries no new information relative to preceding frames. |
+# | `exact` | The two sequences hold identical frames in identical order. |
+# | `segment` | The two sequences run together over a continuous stretch at a fixed frame offset. |
+# | `aligned` | The two sequences run together but not at the same rate, which is a speed edit. See below. |
+# | `redundant` | A continuous run inside one sequence that carries nothing new over the frames before it. |
 
 # %% [markdown]
 # ## Detecting train-test leakage
 #
-# Data leakage across training and test splits can artificially inflate model performance metrics. You can pass both
-# splits to the `evaluate` method, and the `dataset_indices` column will specify the origin of each matching sequence.
+# Footage shared between the training and test splits inflates your measured performance. Pass both splits to
+# `evaluate`, and the `dataset_indices` column records which split each side of a match came from.
 
 # %%
 leakage = Duplicates(hash_radius=6, min_segment_frames=10).evaluate(train, test)
@@ -339,20 +370,17 @@ leaks = leakage.crossing.aggregate_by_pair("sequence")
 display(leaks)
 
 # %% [markdown]
-# The `.crossing` attribute filters the results to retain only duplication relationships that span the dataset
-# boundary. The `aggregate_by_pair` method formats this data into a pair-wise view, displaying one row per matching
-# pair and placing the containment metrics for each dataset in separate columns.
+# The `.crossing` attribute keeps only the relationships that cross the dataset boundary. `aggregate_by_pair` gives
+# one row per matching pair and puts each dataset's containment in its own column.
 #
-# This directional containment is critical because duplication is often asymmetric. For instance, a `containment_a` of
-# `0.4` alongside a `containment_b` of `1.0` indicates that the overlapping segment comprises 40% of the training
-# sequence but 100% of the test clip. Traditional symmetric similarity scores, transitive duplicate groups, and
-# single-value similarity metrics cannot represent this asymmetry, often obscuring the fact that a test sequence is
-# entirely leaked.
+# Read the two containment columns together, because duplication between a long video and a short clip is asymmetric.
+# A `containment_a` of `0.4` against a `containment_b` of `1.0` says the shared stretch is 40% of the training
+# sequence and 100% of the test clip. A single symmetric similarity score cannot say that, and a transitive duplicate
+# group loses it entirely, which is how a fully leaked test sequence goes unnoticed.
 #
-# The second row correctly identifies the same overlapping clip within the transcoded sequence.
+# The second row is the same clip found in the transcoded training sequence.
 #
-# To retrieve the specific frame intervals, you can refer to the sequence-level rows, where frame spans are reported
-# in the original source-video coordinate space:
+# For the frame numbers themselves, read the sequence-level rows. Spans are reported in source-video coordinates:
 
 # %%
 for row in leakage.sequences.data().filter(pl.col("dataset_indices").list.n_unique() > 1).iter_rows(named=True):
@@ -365,17 +393,15 @@ for row in leakage.sequences.data().filter(pl.col("dataset_indices").list.n_uniq
 
 # %% [markdown]
 # ```{important}
-# Reported spans use **source-video frame numbers**, which align with the coordinates in `unit_indices`. This ensures
-# that seeking to a reported frame in a video player correctly locates the duplicate segment, regardless of any frame
-# sampling rates applied during evaluation.
+# Spans are reported as source-video frame numbers, matching the coordinates in `unit_indices`. Seeking to a reported
+# frame in a video player lands on the duplicated footage, whatever frame sampling the evaluation used.
 # ```
 
 # %% [markdown]
 # ## Identifying redundant video segments
 #
-# While the `redundant_fraction` provides a high-level summary of self-redundancy, you must locate the specific
-# intervals to act on this information. You can filter for redundant rows, sort them by sequence length, and identify
-# periods of static camera dwell.
+# `redundant_fraction` tells you how much of a sequence repeats itself. To act on it you need the intervals. Filter
+# for the redundant rows and sort them by length.
 
 # %%
 runs = (
@@ -389,31 +415,28 @@ runs = (
 display(runs.head(4))
 
 # %% [markdown]
-# The longest sequence is 20 frames with a `mean_distance` of `0.0`, representing the static camera dwell simulated in
-# sequence 2. Other redundant runs are shorter and exhibit mean Hamming distances of 2–4 bits, which typically indicates
-# standard slow-motion footage rather than a static camera. You should distinguish between these two patterns: a static
-# camera dwell represents redundant frames that increase storage, increase annotation costs, and add no information,
-# whereas slow-motion footage continues to capture dynamic changes.
+# The longest run is the 20 frames of sequence 2, at a `mean_distance` of `0.0`. That is the camera dwell, where the
+# same frame repeats exactly. The shorter runs sit at 2 to 4 bits, which is slow footage rather than a held camera.
+# Treat the two differently: a dwell costs you storage and annotation for frames that add nothing, while slow footage
+# is still moving and still carries information.
 #
-# This distinction is why `aggregate_by_sequence` reports the `longest_run` alongside the `redundant_fraction`. Two
-# sequences can exhibit the same redundant fraction but represent entirely different physical scenarios, such as a
-# single prolonged static dwell versus a scene that moves continuously but slowly:
+# This is why `aggregate_by_sequence` reports `longest_run` next to `redundant_fraction`. Two sequences can score the
+# same fraction and be nothing alike, one holding still once and the other moving slowly throughout:
 
 # %%
 display(summary.select("sequence", "redundant_fraction", "longest_run"))
-#
-# A static run of *k* frames can be reduced to a single frame without a loss of semantic content. The `redundant_frames`
-# metric quantifies this potential reduction. However, you should evaluate these frames carefully before removing them:
-# temporal dwell can carry valuable signal, and an object tracker trained exclusively on moving targets may fail to
-# detect stationary objects.
+
+# %% [markdown]
+# A static run of *k* frames can be cut to a single frame without losing content, and `redundant_frames` counts what
+# that would save. Check before you cut: dwell time can be signal, and a tracker trained only on moving objects can
+# fail on stationary ones.
 
 # %% [markdown]
 # ## Detecting repackaged or resampled footage
 #
-# Segment matching assumes a constant frame offset between sequences. If you re-export or resample a video at a
-# different frame rate, the frame offset changes continuously. This causes the overlapping segment to appear as highly
-# fragmented matches that fall below the minimum reporting threshold, resulting in no duplicates being detected under
-# default settings.
+# Segment matching looks for a constant frame offset between two sequences. Re-export or resample a video at another
+# frame rate and that offset drifts, so the shared footage arrives as fragments too short to report and the default
+# settings find nothing.
 
 # %%
 source = scene(1, 40)
@@ -432,27 +455,23 @@ display(
 )
 
 # %% [markdown]
-# The `verify_alignment` parameter enables **dynamic time warping (DTW)**, which aligns non-linearly matching sequences
-# regardless of rate variations. The resulting `aligned` row shows the baseline source sequence aligning with the
-# slowed export sequence at a mean distance of slightly over one bit per frame.
+# `verify_alignment` turns on dynamic time warping, which matches two sequences that run together without keeping
+# step. The `aligned` row pairs the source with the slowed export at a mean distance of a little over one bit per
+# frame.
 #
-# The value assigned to `verify_alignment` represents the maximum average Hamming distance permitted per aligned
-# frame. A threshold of `8` is a recommended starting point for perceptual hashes. This alignment check is disabled by
-# default because dynamic time warping has quadratic time complexity, whereas the standard segment search is
-# near-linear. To maximize efficiency, DataEval only applies warping to sequence pairs that cannot be resolved by the
-# segment search.
+# The value you give `verify_alignment` is the largest mean Hamming distance per aligned frame you will accept. Start
+# at `8` for perceptual hashes. The check is off by default because warping is quadratic in the two sequence lengths,
+# against a near-linear segment search. DataEval runs it only on the pairs the segment search could not explain.
 
 # %% [markdown]
 # ## Identifying duplicated annotations
 #
-# At a finer granularity, you can analyze tracks—which are sequences of cropped object images tracked across
-# consecutive frames. By setting `levels="track"`, you can use the same detection engine to identify duplicated
-# tracks, such as a single object annotated under multiple track identifiers, a track duplicated due to a reused video
-# clip, or other track-level duplication patterns.
+# A track is one object followed across consecutive frames. Setting `levels="track"` hashes the cropped object images
+# instead of whole frames and looks for the same relationships between tracks that it looks for between sequences.
+# Two tracks match when their crops match over a stretch of frames.
 #
-# The `levels` parameter specifies the target granularities for evaluation, and any omitted levels are skipped. In this
-# configuration, DataEval skips frame-level evaluation entirely and computes only track-level relationships, optimizing
-# execution time.
+# `levels` names the granularities to evaluate, and any level you leave out is not computed. This run skips
+# frame-level work entirely and reports track relationships only.
 
 # %%
 tracked = Duplicates(hash_radius=6, min_track_frames=10).evaluate(train, levels="track")
@@ -461,30 +480,41 @@ display(
 )
 
 # %% [markdown]
-# The `track_indices` column displays the track identifiers exactly as provided in your annotations, rather than
-# applying an internal renumbering scheme. This allows you to locate the flagged tracks directly in your source data. In
-# this example, each row correctly pairs sequence 0 with sequence 1 because the copied sequence retains its original
-# track annotations.
+# Every row pairs sequence 0 with sequence 1, because the copy carries the same annotations as its source. The
+# `track_indices` column gives the identifiers as they appear in your annotations rather than an internal
+# renumbering, so you can find the flagged tracks in the source data.
 #
-# You can configure the minimum length of a duplicated track using `min_track_frames` (which defaults to `5`), separate
-# from `min_segment_frames`. While 30 frames is a typical threshold for detecting a duplicated video sequence, a much
-# shorter threshold is appropriate for tracking individual objects.
+# What a track match means depends on where the two tracks sit:
+#
+# - In two different sequences, as here, the underlying footage is shared. Either a clip was reused, or objects
+#   were copy-pasted between clips as augmentation. The annotations are not wrong, so do not re-annotate them. Remove
+#   the reused clip, or, if the objects were pasted in deliberately, record that and leave the tracks alone.
+# - In one sequence, over the same frames, two identifiers are following one object. Merge the identifiers in the
+#   annotations.
+#
+# Track matching compares appearance, so it finds tracks that show the same object over the same frames. It does not
+# find a track split along time, where one object is identifier 4 for thirty frames and identifier 9 afterwards: the
+# two halves show different frames of the object and hash differently. Finding those needs temporal reasoning over
+# the annotations rather than appearance matching.
+#
+# `min_track_frames` sets the shortest matching stretch to report and defaults to `5`, separately from
+# `min_segment_frames`. Thirty frames is a reasonable bar for a shared video clip. A single object tracked for
+# thirty frames is already a long track.
 #
 # ```{note}
-# The `levels` parameter and the `per_image`/`per_target` parameters represent alternative interfaces for configuring
-# evaluation granularity. Specifying `per_target=True` is equivalent to requesting track-level relationships, as it
-# prompts the package to compute crop-level hashes. You should avoid passing both `levels` and `per_image`/`per_target`
-# simultaneously, as doing so will raise a configuration error rather than resolving the parameters implicitly.
+# The `levels` parameter and the `per_image`/`per_target` parameters are two ways of asking for the same thing.
+# `per_target=True` is equivalent to asking for track-level relationships, since it computes the crop-level hashes
+# they read. Do not pass both: `Duplicates` raises a configuration error rather than reconciling them for you.
 # ```
 
 # %% [markdown]
 # ## Mapping results back to the dataset
 #
-# All detected duplicates are reported in **source-video coordinates**, specified by a sequence index and frame numbers.
-# To visualize these duplicate frames, extract specific sequences, or construct a new dataset split excluding the
-# duplicates, you can use the :class:`~dataeval.data.FrameIndices` class, which is compatible with `frame_sample`.
+# Every duplicate is reported in source-video coordinates, as a sequence index and frame numbers. To view the
+# duplicated frames, pull out a sequence, or build a split without them, pass those coordinates to
+# :class:`~dataeval.data.FrameIndices`, which `frame_sample` accepts.
 #
-# For example, you can extract the leaked training sequence 0, frames 30–49:
+# To pull the leaked stretch, frames 30-49 of training sequence 0:
 
 # %%
 row = leakage.crossing.sequences.data().row(0, named=True)
@@ -500,9 +530,8 @@ meta = dict(metadata)
 print(f"first of them: frame {meta['frame']} of sequence {meta['sequence']}, pixels {pixels.shape}")
 
 # %% [markdown]
-# You can use the same selector to define the **complement** of the duplicates, representing the unique footage you
-# want to retain. DataEval identifies the overlapping segments, leaving the final splitting and filtering decisions to
-# your discretion.
+# The same selector gives you the complement, the footage you want to keep. DataEval reports where the sequences
+# overlap; which side to cut is your decision.
 
 # %%
 n_frames = len(train[sequence][1].frame_tracks)
@@ -511,8 +540,8 @@ without_leak = SequenceFrames(train, FrameIndices({sequence: keep}))
 print(f"sequence {sequence} without the shared stretch: {len(without_leak)} of {n_frames} frames")
 
 # %% [markdown]
-# You can apply this workflow to group members. Because `result.frames.exact` returns a list of `(sequence, frame)`
-# pairs, you can aggregate them by sequence and pass the mapping to `FrameIndices`:
+# Group members work the same way. `result.frames.exact` returns a list of `(sequence, frame)` pairs, so collect them
+# by sequence and hand the mapping to `FrameIndices`:
 #
 # ```python
 # from collections import defaultdict
@@ -526,57 +555,66 @@ print(f"sequence {sequence} without the shared stretch: {len(without_leak)} of {
 # ```
 #
 # ```{note}
-# The `FrameIndices` class utilizes lazy execution; consequently, constructing a view does not trigger expensive frame
-# decoding until the data is accessed, although calling `len()` remains an efficient operation. Frames are always
-# returned in ascending chronological order per sequence, regardless of their specification order, because video
-# streams are read sequentially forwards without rewinding.
+# `FrameIndices` is lazy. Building a view decodes nothing until you read from it, and `len()` stays cheap. Frames
+# come back in ascending order per sequence whatever order you list them in, because video streams are read forwards
+# without rewinding.
 # ```
 
 # %% [markdown]
 # ## Acting on the results
 #
-# The detected duplication patterns map onto several typical dataset curation decisions:
+# The relationships map onto a handful of curation decisions:
 #
-# | Detection Scenario | Recommended Action |
+# | What you found | What to do |
 # | --- | --- |
-# | `containment` near `[1.0, 1.0]` between two sequences | Identical video sequence. Discard one duplicate, and retain the sequence with higher-quality annotations. |
-# | Lopsided `containment` across splits | Data leakage. Remove the overlapping frames from the test split, or partition the dataset by sequence. |
-# | High `redundant_fraction` | Resample the sequence using `frame_sample` instead of deleting frames, first verifying that the static dwell does not carry meaningful signal. |
-# | `aligned` relationship | Repackaged or resampled footage. Treat the aligned segment as a duplicate of the source sequence. |
-# | Track-level duplicates | Annotation error. Correct the track identifiers in the labeling metadata. |
+# | `containment` near `[1.0, 1.0]` between two sequences | The same footage stored twice. Keep one, preferring the copy with better annotations. |
+# | Lopsided `containment` across two splits | Leakage. Cut the shared frames from the test split, or split by sequence instead. |
+# | A `segment` shared by two sequences in one split | A reused clip. Keep one copy of the stretch, or keep both and make sure the split keeps them together. |
+# | High `redundant_fraction` | Thin the sequence with `frame_sample` rather than deleting frames, after checking that the dwell is not itself signal. |
+# | An `aligned` relationship | Repackaged or resampled footage. Treat the aligned stretch as a duplicate of the source. |
+# | A track match across two sequences | Shared footage, not a labeling error. Remove the reused clip, or record it if the objects were pasted in as augmentation. |
+# | A track match inside one sequence | Two identifiers on one object. Merge them in the annotations. |
 #
-# When partitioning your data, you should always split **by sequence**. The `SequenceFrames` class exposes `sequence` as
-# a unit-level metadata attribute. Using `split_dataset(..., split_on=["sequence"])` ensures that all frames of a given
-# video sequence remain grouped on a single side of the split, which prevents you from accidentally reintroducing the
-# data leakage identified during evaluation.
+# Split by sequence. `SequenceFrames` exposes `sequence` as a unit-level metadata attribute, so
+# `split_dataset(..., split_on=["sequence"])` keeps every frame of a video on one side of the split and stops you
+# reintroducing the leakage you just found.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
 # hash_radius matters: the strict default under-reports the relation rather than missing it
-assert strict.sequences.data().row(0, named=True)["containment"][0] < 0.6
-assert relaxed.sequences.data().shape[0] == 1
+strict_pair = strict.sequences.data().filter(pl.col("item_indices") == [0, 1]).row(0, named=True)
+assert strict_pair["containment"][0] < 0.6
 
-# one relation, not one per diagonal
-alpha_row = relaxed.sequences.data().row(0, named=True)
-assert alpha_row["item_indices"] == [0, 1]
-assert alpha_row["containment"] == [1.0, 1.0]
+# three relations: the whole-sequence copy, and the reused clip against both copies of its source
+assert relaxed.sequences.data().shape[0] == 3
+copied = relaxed.sequences.data().filter(pl.col("item_indices") == [0, 1]).row(0, named=True)
+assert copied["containment"] == [1.0, 1.0]
+reused = relaxed.sequences.data().filter(pl.col("item_indices") == [0, 3]).row(0, named=True)
+assert (reused["span_start"], reused["span_end"]) == ([5, 15], [24, 34])
+assert max(reused["containment"]) < 0.5
+
+# the strict run finds a correct stretch of the leak, not a wrong one, and finds half of it
+assert (extent[0]["span_start"][0], extent[0]["span_end"][0]) == (39, 48)
+assert (extent[0]["span_start"][1], extent[0]["span_end"][1]) == (9, 18)
+assert extent[6]["containment"][1] == 1.0
+assert extent[0]["containment"][1] < 0.7
 
 # self-repetition is not cross-sequence duplication
-assert summary["duplicate_frames"].to_list() == [60, 60, 0, 0]
-assert summary["shared_with"].to_list() == [1, 1, 0, 0]
+assert summary["duplicate_frames"].to_list() == [60, 60, 0, 20]
+assert summary["shared_with"].to_list() == [2, 2, 0, 2]
 assert summary["redundant_fraction"].to_list()[2] == max(summary["redundant_fraction"].to_list())
 
 # leakage: the test clip is entirely drawn from training footage
 assert leaks.shape[0] >= 1
-first = leaks.row(0, named=True)
-assert (first["dataset_a"], first["dataset_b"]) == (0, 1)
-assert first["containment_b"] == 1.0
-assert first["containment_a"] < 0.5
+first_leak = leaks.row(0, named=True)
+assert (first_leak["dataset_a"], first_leak["dataset_b"]) == (0, 1)
+assert first_leak["containment_b"] == 1.0
+assert first_leak["containment_a"] < 0.5
 spans = leakage.sequences.data().filter(pl.col("dataset_indices").list.n_unique() > 1).row(0, named=True)
 assert (spans["span_start"][0], spans["span_end"][0]) == (30, 49)
 assert (spans["span_start"][1], spans["span_end"][1]) == (0, 19)
 
-# the stare is the longest redundant run, and it is exact
+# the dwell is the longest redundant run, and it repeats exactly
 assert runs.row(0, named=True)["run_length"] == 20
 assert runs.row(0, named=True)["mean_distance"] == 0.0
 
@@ -591,7 +629,7 @@ assert meta["frame"] == 30
 assert meta["sequence"] == 0
 assert len(without_leak) == 40
 
-# tracks travelled with the copied clip
+# the tracks came with the copied sequence
 assert tracked.tracks.data().shape[0] > 0
 assert all(row == [0, 1] for row in tracked.tracks.data()["item_indices"].to_list())
 # a level not asked for is not searched for
