@@ -64,13 +64,81 @@ def _validate_num_neighbors(num_neighbors: int) -> int:
     return num_neighbors
 
 
+def _validate_effective_n(
+    effective_n: Array1D[int] | None,
+    num_columns: int,
+    num_rows: int,
+) -> NDArray[np.intp] | None:
+    """Check a caller's entity counts against the table they describe.
+
+    A wrong length is refused rather than trimmed or padded, because it means the caller's
+    column list and this call's are not the same list, and either repair would score some
+    factor against another factor's entity count — a silent answer to a question nobody
+    asked. Counts above the row count are clamped instead: a column cannot vary over more
+    entities than there are rows carrying it, and a caller reading a filtered view can
+    arrive here with a stale total without having said anything false about the level.
+    """
+    if effective_n is None:
+        return None
+    counts = as_numpy(effective_n, dtype=np.intp, required_ndim=1)
+    if counts.shape[0] != num_columns:
+        raise ValueError(
+            f"effective_n has {counts.shape[0]} entries for {num_columns} columns. It is indexed "
+            "like `class_to_factor` — the class label at 0 and factor i of `factor_data` at i+1 — "
+            f"so it needs one entry per factor plus one, {num_columns} in all.",
+        )
+    if np.any(counts < 1):
+        raise ValueError(
+            f"effective_n holds {int(counts.min())}, and a column stands over at least one entity. "
+            "Zero usually means a level was counted on rows that cannot reach it.",
+        )
+    return np.minimum(counts, num_rows)
+
+
 def _entropy_of(values: NDArray[Any]) -> float:
     """Entropy of a discrete sample in nats, read off its observed value counts."""
     _, counts = np.unique(values, return_counts=True)
     return float(entropy(counts / counts.sum()))
 
 
-def _adjusted_share(target: NDArray[Any], factor: NDArray[Any], target_entropy: float) -> float:
+def _chance_correction(contingency: Any, n_effective: int | None) -> float:
+    """Mutual information expected under independence, at an effective sample size.
+
+    The floor a correction subtracts is set by how many independent observations the table
+    was built from, and that is not always its row count. A factor defined above the rows
+    being read repeats once per descendant — a per-sequence factor on detection rows takes
+    one value per sequence, arriving once per detection — so the same values are counted
+    many times over with no new draw behind them. Left uncorrected, the expectation falls
+    by the fan-out and the pair reads as informative when it is only repetitive.
+    ``n_effective`` is the count of entities behind the table where the caller knows it,
+    and None keeps the row count, which is right whenever every row is its own draw.
+
+    ``expected_mutual_information`` reads the table's **margins** as well as ``n_samples``,
+    and the two have to agree. Handing it a smaller ``n`` beside margins that still sum to
+    the row count does not apply a stronger correction — it drives the expectation toward
+    zero and so removes the correction that was there, which is the wrong direction twice
+    over. At a fan-out of two it returns two thirds of the row-count answer; by a fan-out
+    of ten it returns exactly nothing. Rescaling the table is what makes ``n`` bind, and it
+    leaves the observed mutual information alone, that being a function of the table's
+    proportions and not of its scale.
+    """
+    total = int(contingency.sum())
+    if n_effective is None or n_effective >= total:
+        return float(expected_mutual_information(contingency, total))
+    if n_effective < 2:
+        # One entity is one observation of everything at once: nothing could have varied,
+        # so nothing could have lined up by luck, and the hypergeometric sum has no range
+        # to run over.
+        return 0.0
+    return float(expected_mutual_information(contingency * (n_effective / total), n_effective))
+
+
+def _adjusted_share(
+    target: NDArray[Any],
+    factor: NDArray[Any],
+    target_entropy: float,
+    n_effective: int | None = None,
+) -> float:
     """
     Share of a target's entropy that a discretized factor removes, corrected for chance.
 
@@ -89,7 +157,7 @@ def _adjusted_share(target: NDArray[Any], factor: NDArray[Any], target_entropy: 
     """
     contingency = contingency_matrix(target, factor, sparse=True)
     observed = float(mutual_info_score(None, None, contingency=contingency))
-    expected = float(expected_mutual_information(contingency, target.shape[0]))
+    expected = _chance_correction(contingency, n_effective)
     denominator = target_entropy - expected
     # A factor holding a value per entity leaves every cell of the table with a single
     # observation, so the target is recovered exactly and the expectation rises to meet
@@ -111,6 +179,7 @@ def _adjusted_association(
     second_bound: float,
     first_entropy: float,
     second_entropy: float,
+    n_effective: int | None = None,
 ) -> float:
     """
     Association between two tabulable factors, corrected for chance.
@@ -152,7 +221,7 @@ def _adjusted_association(
     """
     contingency = contingency_matrix(first, second, sparse=True)
     observed = float(mutual_info_score(None, None, contingency=contingency))
-    expected = float(expected_mutual_information(contingency, first.shape[0]))
+    expected = _chance_correction(contingency, n_effective)
     # Clamped before either branch: the correction can drive an independent pair slightly
     # below zero, which the entropy branch clips away but the Linfoot branch would turn
     # into a small positive value by way of a negative exponent.
@@ -175,11 +244,29 @@ def _adjusted_association(
     return float(np.clip(adjusted / denominator, 0.0, 1.0))
 
 
+def _pair_n(effective_n: NDArray[np.intp] | None, first: int, second: int) -> int | None:
+    """Entities behind a pair of columns: the larger of the two counts.
+
+    The finer factor governs. Where one nests inside the other — a per-sequence factor
+    against a per-detection one — the pair takes a distinct value per *detection*, so the
+    detections are the draws and the sequences are not a ceiling on them. Taking the
+    smaller would correct a pair that is already right, and over-correct it by about as
+    much as leaving the replicated pair uncorrected gets it wrong.
+
+    Two factors on incomparable branches — a per-frame factor against a per-track one, which
+    meet only on detection rows — have no nesting between them, and the larger of the two
+    counts understates the distinct combinations their rows carry. That direction leaves the
+    correction too large rather than too small, which is the safe way to be wrong.
+    """
+    return None if effective_n is None else int(max(effective_n[first], effective_n[second]))
+
+
 def _target_to_factor(
     target: NDArray[Any],
     data: NDArray[np.intp],
     coded_list: list[bool],
     raw_mi: NDArray[Any],
+    effective_n: NDArray[np.intp] | None = None,
 ) -> NDArray[np.float64]:
     """
     Score every factor by how much of one target's uncertainty it removes.
@@ -220,7 +307,7 @@ def _target_to_factor(
         return row
     for j in range(1, len(coded_list)):
         share = (
-            _adjusted_share(target, data[:, j], target_entropy)
+            _adjusted_share(target, data[:, j], target_entropy, _pair_n(effective_n, 0, j))
             if coded_list[j]
             else float(np.clip(float(raw_mi[j]) / target_entropy, 0.0, 1.0))
         )
@@ -291,6 +378,7 @@ def mutual_info(  # noqa: C901
     factor_data: Array2D[int | float],
     discrete_features: Array1D[bool],
     num_neighbors: int = 5,
+    effective_n: Array1D[int] | None = None,
 ) -> MutualInfoResult:
     """
     Compute normalized mutual information between factors, transformed to lie in [0, 1].
@@ -320,6 +408,17 @@ def mutual_info(  # noqa: C901
     num_neighbors : int, default 5
         Number of points to consider as neighbors. Consulted only for columns holding
         measured values, which are the only ones the neighbor-based estimator reads.
+    effective_n : Array1D[int] or None, default None
+        How many distinct entities stand behind each column — the class label at index 0
+        and factor ``i`` of ``factor_data`` at index ``i+1``. None counts every row as its
+        own draw, which is right whenever the rows are one level of one dataset. It is
+        wrong where a column was replicated onto finer rows than it was measured at: a
+        per-sequence factor read on detection rows takes one value per sequence, and
+        counting a detection apiece inflates the chance correction's ``n`` by the fan-out.
+        From a :class:`~dataeval.Metadata` this is the entity count at each factor's own
+        level. See Notes.
+
+        .. versionadded:: 1.2
 
     Returns
     -------
@@ -388,6 +487,16 @@ def mutual_info(  # noqa: C901
     the class are independent, enough that an identifier column can outrank a genuine
     effect; see ``_adjusted_share``.
 
+    The size of that correction depends on how many independent observations the table was
+    built from, which is what ``effective_n`` is for. A pair takes the **larger** of its two
+    columns' counts, because the finer of the two governs how many distinct combinations the
+    rows can carry. Two columns replicated from the same coarse level are the case this
+    exists for: with a hundred sequences read on ten thousand detection rows, two independent
+    per-sequence factors score a chance-corrected 0.03 on average against a truth of zero,
+    and at ten sequences over the same rows they reach 0.39 and cross a 0.5 correlation
+    threshold one run in three. A pair mixing levels is already right at the row count and
+    is left there, since the larger count *is* the row count.
+
     References
     ----------
     [1] `Linfoot, E.H. (1957). "An Informational Measure of Correlation." Information and
@@ -441,6 +550,7 @@ def mutual_info(  # noqa: C901
     data, sklearn_list, coded_list, declared_list = _merge_labels_and_factors(
         class_labels_np, factor_data_np, discrete_feat_np
     )
+    effective_n_np = _validate_effective_n(effective_n, len(coded_list), data.shape[0])
     # Counts columns of `data`, which is the class label followed by the F factors, so this
     # is F+1. `class_to_factor` is returned at this length; `interfactor` drops the class.
     num_columns = len(coded_list)
@@ -525,7 +635,13 @@ def mutual_info(  # noqa: C901
             if not coded_list[j]:
                 continue
             adjusted = _adjusted_association(
-                data[:, i], data[:, j], norm_factor[i], norm_factor[j], entropies[i], entropies[j]
+                data[:, i],
+                data[:, j],
+                norm_factor[i],
+                norm_factor[j],
+                entropies[i],
+                entropies[j],
+                _pair_n(effective_n_np, i, j),
             )
             interfactor[i - 1, j - 1] = interfactor[j - 1, i - 1] = adjusted
 
@@ -540,7 +656,7 @@ def mutual_info(  # noqa: C901
     # Between two factors neither side is privileged, so that block is scored against the
     # smaller of the two entropies. The class-to-factor row asks a directed question --
     # how much of the class label does this factor account for -- and is scored accordingly.
-    class_to_factor = _target_to_factor(data[:, 0], data, coded_list, raw_mi)
+    class_to_factor = _target_to_factor(data[:, 0], data, coded_list, raw_mi, effective_n_np)
 
     _logger.info(
         "Mutual info calculation complete: %d factors, mean class_to_factor NMI=%.4f",
@@ -558,6 +674,7 @@ def mutual_info_classwise(
     class_labels: Array1D[int],
     factor_data: Array2D[int | float],
     num_neighbors: int = 5,
+    effective_n: Array1D[int] | None = None,
 ) -> NDArray[np.float64]:
     """
     Compute normalized mutual information (NMI) between factors.
@@ -573,6 +690,14 @@ def mutual_info_classwise(
     num_neighbors : int, default 5
         Number of points to consider as neighbors. Consulted only for columns holding
         measured values, which are the only ones the neighbor-based estimator reads.
+    effective_n : Array1D[int] or None, default None
+        How many distinct entities stand behind each column, the class label at index 0 and
+        factor ``i`` of ``factor_data`` at index ``i+1``. Every row of the result is scored
+        against one class taken against the rest, and that split lives at the class label's
+        own level however coarse the factor beside it, so the counts matter here in the same
+        way and for the same reason as in :func:`mutual_info`.
+
+        .. versionadded:: 1.2
 
     Returns
     -------
@@ -641,6 +766,7 @@ def mutual_info_classwise(
     # Columns of `data`: the class label followed by the F factors, so F+1. Each returned
     # row is this wide, with the class label's self-MI at index 0.
     num_columns = len(coded_list)
+    effective_n_np = _validate_effective_n(effective_n, num_columns, data.shape[0])
     u_classes = np.unique(class_labels_np)
     num_classes = len(u_classes)
 
@@ -675,7 +801,8 @@ def mutual_info_classwise(
     # Like that row it divides by the target's entropy rather than the factor's, so it does
     # not move with a factor's bin count and `discrete_features` does not reach it.
     normalized = np.stack([
-        _target_to_factor(tgt_bin[:, idx], data, coded_list, classwise_mi[idx]) for idx in range(num_classes)
+        _target_to_factor(tgt_bin[:, idx], data, coded_list, classwise_mi[idx], effective_n_np)
+        for idx in range(num_classes)
     ])
 
     _logger.info("Mutual info classwise calculation complete: %d classes x %d factors", num_classes, num_columns - 1)

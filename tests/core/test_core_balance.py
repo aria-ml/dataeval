@@ -2,9 +2,12 @@ import logging
 
 import numpy as np
 import pytest
+from sklearn.metrics.cluster import contingency_matrix
 
 from dataeval.core._mutual_info import (
+    _chance_correction,
     _merge_labels_and_factors,
+    _validate_effective_n,
     _validate_num_neighbors,
     mutual_info,
     mutual_info_classwise,
@@ -379,3 +382,145 @@ class TestBalanceFunctional:
         assert result["interfactor"][0, 0] == 0.0
         # class-to-constant-factor MI is also driven to 0.0.
         assert result["class_to_factor"][1] == 0.0
+
+
+@pytest.mark.required
+class TestValidateEffectiveN:
+    """The entity counts a caller may hand `mutual_info` for its chance correction."""
+
+    def test_none_is_the_row_count(self):
+        """Saying nothing keeps the behaviour that predates the argument."""
+        assert _validate_effective_n(None, 4, 10) is None
+
+    def test_length_must_match_the_columns(self):
+        """Indexed like `class_to_factor`, so it is one per factor plus one for the label."""
+        with pytest.raises(ValueError, match="3 entries for 4 columns"):
+            _validate_effective_n([10, 10, 10], 4, 100)
+
+    def test_zero_is_refused(self):
+        """A column stands over at least one entity; zero means a level was miscounted."""
+        with pytest.raises(ValueError, match="a column stands over at least one entity"):
+            _validate_effective_n([10, 0, 5, 5], 4, 100)
+
+    def test_counts_are_clamped_to_the_rows(self):
+        """A count above the row count cannot be met, and says nothing false about the level."""
+        clamped = _validate_effective_n([50, 5, 9], 3, 9)
+        assert clamped is not None
+        assert list(clamped) == [9, 5, 9]
+
+
+@pytest.mark.required
+class TestChanceCorrectionEffectiveN:
+    """The correction's `n` is the entities behind the table, not always its rows."""
+
+    def test_rescaling_is_what_makes_n_bind(self):
+        """`expected_mutual_information` reads the margins too, so the two have to agree.
+
+        Handing it a smaller `n` beside an unrescaled table does not correct harder -- it
+        drives the expectation to zero and removes the correction that was already there.
+        Pinned here because that failure is silent: it moves the reported score in the same
+        direction the defect does, so a fix that forgot the rescale would look like no fix
+        at all rather than like a mistake.
+        """
+        from sklearn.metrics.cluster import expected_mutual_information
+
+        rng = np.random.default_rng(0)
+        first = rng.integers(0, 3, 100).repeat(100)
+        second = rng.integers(0, 4, 100).repeat(100)
+        table = contingency_matrix(first, second, sparse=True)
+
+        at_rows = _chance_correction(table, None)
+        unscaled = float(expected_mutual_information(table, 100))
+        rescaled = _chance_correction(table, 100)
+
+        assert at_rows > 0.0
+        assert unscaled == 0.0
+        # Rescaling moves it two orders of magnitude the other way, which is the fan-out.
+        assert rescaled > at_rows * 50
+
+    def test_a_single_entity_corrects_to_nothing(self):
+        """One entity observed many times had no chance to line up by luck or otherwise."""
+        table = contingency_matrix(np.zeros(10, dtype=np.intp), np.arange(10) % 3, sparse=True)
+        assert _chance_correction(table, 1) == 0.0
+
+    def test_counts_at_or_above_the_rows_keep_the_row_count(self):
+        """The ordinary case is left exactly where it was."""
+        table = contingency_matrix(CLASS_LABELS, FACTOR_DATA[:, 0], sparse=True)
+        assert _chance_correction(table, 10) == _chance_correction(table, None)
+        assert _chance_correction(table, 400) == _chance_correction(table, None)
+
+
+@pytest.mark.required
+class TestMutualInfoEffectiveN:
+    """Replicated columns are scored against the entities behind them."""
+
+    @staticmethod
+    def _replicated(seed, sequences=10, fan_out=100):
+        """Two independent per-sequence factors, propagated onto every descendant row."""
+        rng = np.random.default_rng(seed)
+        first = rng.integers(0, 3, sequences)
+        second = rng.integers(0, 4, sequences)
+        labels = rng.integers(0, 2, sequences * fan_out)
+        factors = np.column_stack([first.repeat(fan_out), second.repeat(fan_out)])
+        return first, second, labels, factors
+
+    def test_replication_reads_as_correlation_without_it(self):
+        """The defect this argument exists for, stated as the test that would have caught it."""
+        _, _, labels, factors = self._replicated(seed=1)
+        uncorrected = mutual_info(labels, factors, [True, True])["interfactor"][0, 1]
+        assert uncorrected > 0.4
+
+    def test_the_entity_count_recovers_the_answer_read_one_row_per_entity(self):
+        """The whole claim: the same data, read at two levels, scores the same.
+
+        Reading the factors on their own rows is what the propagated view is trying to be
+        an account of, so agreement with it is the correctness criterion -- not merely
+        that the number went down.
+        """
+        for seed in range(8):
+            first, second, labels, factors = self._replicated(seed)
+            sequences = len(first)
+            isolated = mutual_info(labels[:sequences], np.column_stack([first, second]), [True, True])["interfactor"][
+                0, 1
+            ]
+            propagated = mutual_info(labels, factors, [True, True], effective_n=[len(labels), sequences, sequences])[
+                "interfactor"
+            ][0, 1]
+            assert propagated == pytest.approx(isolated, abs=1e-9), f"seed {seed}"
+
+    def test_a_pair_takes_the_larger_of_its_two_counts(self):
+        """The finer factor governs: a mixed pair is already right at the row count.
+
+        Taking the smaller would correct a pair that never needed it, and by about as much
+        as leaving the replicated pair uncorrected gets that one wrong.
+        """
+        rng = np.random.default_rng(3)
+        sequences, fan_out = 10, 100
+        rows = sequences * fan_out
+        coarse = rng.integers(0, 3, sequences).repeat(fan_out)
+        fine = rng.integers(0, 4, rows)
+        labels = rng.integers(0, 2, rows)
+        factors = np.column_stack([coarse, fine])
+
+        at_rows = mutual_info(labels, factors, [True, True])["interfactor"][0, 1]
+        with_counts = mutual_info(labels, factors, [True, True], effective_n=[rows, sequences, rows])["interfactor"][
+            0, 1
+        ]
+        assert with_counts == pytest.approx(at_rows, abs=1e-9)
+
+    def test_classwise_is_corrected_on_the_same_terms(self):
+        """Each row takes one class against the rest, and that split still lives on the rows."""
+        _, _, labels, factors = self._replicated(seed=1)
+        sequences = 10
+        plain = mutual_info_classwise(labels, factors)
+        counted = mutual_info_classwise(labels, factors, effective_n=[len(labels), sequences, sequences])
+        assert counted.shape == plain.shape
+        assert np.all(counted[:, 1:] <= plain[:, 1:] + 1e-9)
+
+    def test_a_flat_count_changes_nothing(self):
+        """Every column standing over every row is the case the correction already handled."""
+        rows = FACTOR_DATA.shape[0]
+        plain = mutual_info(CLASS_LABELS, FACTOR_DATA, [True, True, True])
+        counted = mutual_info(CLASS_LABELS, FACTOR_DATA, [True, True, True], effective_n=[rows] * 4)
+        assert np.allclose(plain["interfactor"], counted["interfactor"])
+        assert np.allclose(plain["class_to_factor"], counted["class_to_factor"])
