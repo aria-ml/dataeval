@@ -169,7 +169,7 @@ def ensure_inventory(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").partition("\n")[0])
     parser.add_argument("--conf", default="docs/source/conf.py", help="path to Sphinx conf.py")
     parser.add_argument(
         "--src-dir",

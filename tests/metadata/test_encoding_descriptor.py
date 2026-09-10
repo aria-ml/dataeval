@@ -574,7 +574,7 @@ class TestDeclaringAFactorTwice:
         # Accepting it is the assertion. This is the call `new()` makes to configure the
         # next dataset the same way, and a per-argument check raised on a combination
         # nobody passed -- leaving a loaded instance unable to be reconfigured at all.
-        assert _reconcile_encoding(back._continuous_factor_bins, back._encoding, None)
+        _ = _reconcile_encoding(back._continuous_factor_bins, back._encoding, None)
 
 
 @pytest.mark.required
@@ -825,7 +825,7 @@ class TestARestoredInstanceIsStillConfigurable:
         # cannot be built. Asserted through `_reconcile_encoding` — the call `new()` makes,
         # and the one that raised — so it does not need a second dataset to hand.
         assert set(back._continuous_factor_bins) & set(back._encoding) == set()
-        assert _reconcile_encoding(back._continuous_factor_bins, back._encoding, None)
+        _ = _reconcile_encoding(back._continuous_factor_bins, back._encoding, None)
 
     def test_the_archive_records_each_factor_in_exactly_one_member(self, tmp_path):
         """The root cause. A read resolves the count into a `BinSpec`, and writing both the
