@@ -10,6 +10,7 @@ import polars as pl
 from dataeval import Metadata
 from dataeval._helpers import (
     axis_record,
+    effective_entity_counts,
     is_any_metadata_like,
     kept_factors,
     resolve_factor_channel,
@@ -59,6 +60,19 @@ class BalanceOutput(DictOutput):
           it could have shared, so a duplicated factor reads 1.0 at any cut; what the
           binning cost is in the numerator, and a coarsely cut pair reports less than a
           finely cut one on the same values. See :func:`~dataeval.core.mutual_info`.
+
+          The chance correction is taken against the entities a pair varies over rather
+          than the rows carrying it, which differs for a factor read below the level it
+          was measured at — per-image factors on detection rows, per-sequence factors on
+          frame rows. Such a factor takes one value per image or per sequence however many
+          rows repeat it, and correcting against the rows reports the pair as correlated in
+          proportion to the fan-out.
+
+          .. versionchanged:: 1.2
+              Pairs of factors defined above the level being read score lower, and
+              independent ones now score near zero where they previously rose with the
+              fan-out. Pairs at the level being read are unchanged, as are ``balance``
+              and ``classwise``.
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
         - scored_as: str - Which of the three regimes produced ``mi_value``, since the
           number alone does not say. ``"table"`` where both factors were read as codes
@@ -353,17 +367,17 @@ class Balance(Evaluator):
         │ ---         ┆ ---         ┆ ---      ┆ ---           ┆ ---       │
         │ cat         ┆ cat         ┆ f64      ┆ bool          ┆ cat       │
         ╞═════════════╪═════════════╪══════════╪═══════════════╪═══════════╡
-        │ angle       ┆ location    ┆ 0.071866 ┆ false         ┆ table     │
-        │ angle       ┆ time_of_day ┆ 0.014648 ┆ false         ┆ table     │
-        │ angle       ┆ weather     ┆ 0.001868 ┆ false         ┆ table     │
-        │ location    ┆ angle       ┆ 0.071866 ┆ false         ┆ table     │
-        │ location    ┆ time_of_day ┆ 0.422186 ┆ false         ┆ table     │
+        │ angle       ┆ location    ┆ 0.036702 ┆ false         ┆ table     │
+        │ angle       ┆ time_of_day ┆ 0.0      ┆ false         ┆ table     │
+        │ angle       ┆ weather     ┆ 0.0      ┆ false         ┆ table     │
+        │ location    ┆ angle       ┆ 0.036702 ┆ false         ┆ table     │
+        │ location    ┆ time_of_day ┆ 0.394533 ┆ false         ┆ table     │
         │ …           ┆ …           ┆ …        ┆ …             ┆ …         │
-        │ time_of_day ┆ location    ┆ 0.422186 ┆ false         ┆ table     │
-        │ time_of_day ┆ weather     ┆ 0.007897 ┆ false         ┆ table     │
-        │ weather     ┆ angle       ┆ 0.001868 ┆ false         ┆ table     │
-        │ weather     ┆ location    ┆ 0.084927 ┆ false         ┆ table     │
-        │ weather     ┆ time_of_day ┆ 0.007897 ┆ false         ┆ table     │
+        │ time_of_day ┆ location    ┆ 0.394533 ┆ false         ┆ table     │
+        │ time_of_day ┆ weather     ┆ 0.0      ┆ false         ┆ table     │
+        │ weather     ┆ angle       ┆ 0.0      ┆ false         ┆ table     │
+        │ weather     ┆ location    ┆ 0.051296 ┆ false         ┆ table     │
+        │ weather     ┆ time_of_day ┆ 0.0      ┆ false         ┆ table     │
         └─────────────┴─────────────┴──────────┴───────────────┴───────────┘
 
         >>> result.classwise
@@ -417,7 +431,15 @@ class Balance(Evaluator):
         # it makes `factors` move with the draw.
         channel = resolve_factor_channel(self.metadata, self.factor_source, factor_names, kept)
 
-        mi = mutual_info(axis.values, channel.data, channel.own_alphabet, self.num_neighbors)
+        # How many entities each column varies over, which is not the row count for a factor
+        # read below the level it was measured at. A per-sequence factor on detection rows
+        # repeats once per detection, and a chance correction taken against those detections
+        # shrinks by the fan-out -- so two unrelated per-sequence factors read as correlated
+        # in proportion to how many detections their sequences held. None where the question
+        # does not arise, which is every single-level dataset.
+        effective_n = effective_entity_counts(self.metadata, axis, factor_names)
+
+        mi = mutual_info(axis.values, channel.data, channel.own_alphabet, self.num_neighbors, effective_n)
 
         # The same columns the pairwise block read. `factor_source` is one setting and it
         # governs the whole output: reporting `classwise` off the codes while `factors`
@@ -425,7 +447,9 @@ class Balance(Evaluator):
         # saying which was which. `own_alphabet` is deliberately not passed on -- each row
         # here is divided by the entropy of one class against the rest, so there is no
         # factor entropy for the declaration to select.
-        classwise = mutual_info_classwise(axis.values, channel.data, num_neighbors=self.num_neighbors)
+        classwise = mutual_info_classwise(
+            axis.values, channel.data, num_neighbors=self.num_neighbors, effective_n=effective_n
+        )
 
         index2label = axis.names
 

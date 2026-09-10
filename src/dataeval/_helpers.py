@@ -940,6 +940,48 @@ def kept_factors(metadata: Any, excluded: Sequence[int]) -> tuple[list[str], lis
     return [names[index] for index in kept], kept
 
 
+def effective_entity_counts(metadata: Any, axis: LabelAxis, names: Sequence[str]) -> NDArray[np.intp] | None:
+    """How many distinct entities stand behind each column a mutual-information call reads.
+
+    Indexed the way ``class_to_factor`` is: the label axis at 0 and ``names[i]`` at ``i+1``.
+
+    A factor defined above the rows being read arrives replicated once per descendant row,
+    which is what makes this different from the row count. The chance correction is taken
+    against the number of draws behind a table, and replicated values were not drawn again;
+    counting them as though they were shrinks the correction by the fan-out and reports a
+    pair of per-sequence factors as correlated on the strength of how many detections each
+    sequence happened to hold.
+
+    Returns
+    -------
+    NDArray[np.intp] or None
+        None where the question does not arise or cannot be answered: a container with no
+        level schema, one that cannot name a factor's level, or a dataset whose factors all
+        sit at the level being read — which is every single-level dataset, and so every
+        image-based one. None is what leaves the chance correction on the row count, so a
+        container that says nothing about levels is scored exactly as it was before.
+    """
+    counter = getattr(metadata, "_entity_counts", None)
+    info = getattr(metadata, "factor_info", None)
+    if counter is None or info is None or axis.level is None:
+        return None
+    levels = [axis.level]
+    for name in names:
+        entry = info.get(name)
+        level = None if entry is None else getattr(entry, "level", None)
+        if level is None:
+            # One unplaceable factor is enough to stop: scoring the rest against their own
+            # levels while this one keeps the row count would put two different corrections
+            # in one matrix with nothing in the output saying which cell got which.
+            return None
+        levels.append(level)
+    counts = np.asarray(counter(levels), dtype=np.intp)
+    # Every column standing over at least as many entities as there are rows is the ordinary
+    # case, and it is the one the correction already handles. Answering None there keeps the
+    # arithmetic below untouched rather than passing counts that would clamp to the same thing.
+    return None if bool(np.all(counts >= len(axis.values))) else counts
+
+
 def factors_excluding(metadata: MetadataLike, excluded: Sequence[int]) -> tuple[NDArray[Any], list[str], list[int]]:
     """Drop the label axis's own columns from the metadata's coded factors.
 
