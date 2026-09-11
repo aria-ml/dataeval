@@ -365,22 +365,31 @@ class TestParityAcrossLevels:
             md = self._built(seed)
             assert self._scored(md) == pytest.approx(self._scored(md.at("unit")), abs=1e-9), f"seed {seed}"
 
-    def test_the_insufficient_data_flag_is_not_suppressed_by_replication(self):
-        """The flag compares counts against 5, and replication is what hides a thin cell.
+    def test_the_sufficiency_check_is_not_suppressed_by_replication(self):
+        """Cochran's criterion reads expected counts, and replication inflates every one.
 
-        Two images in a category read as eighty observations at a fan-out of forty, so the
-        warning this exists to raise is exactly the one that goes quiet. Counts are
-        fractional once scaled, because what they count is images rather than detections.
+        Eight brightness levels against two weather values over sixty images is sixteen
+        cells holding 3.75 images each -- thin enough that the approximation does not hold.
+        Spread over the twenty-four hundred detection rows those images carry, the same
+        cells hold 150 apiece and the check goes quiet on a table nothing was added to.
         """
-        md = self._built(0)
-        flagged = Parity(label="weather").evaluate(md).insufficient_data
-        assert flagged == Parity(label="weather").evaluate(md.at("unit")).insufficient_data
-        assert any(
-            isinstance(count, float)
-            for classes in flagged.values()
-            for counts in classes.values()
-            for count in counts.values()
+        rng = np.random.default_rng(0)
+        md = Metadata(_detections(60, 40))
+        md._structure()
+        md.add_factors(
+            {
+                "brightness": rng.integers(0, 8, 60).astype(np.int64),
+                "weather": rng.integers(0, 2, 60).astype(np.int64),
+            },
+            level="unit",
         )
+        flagged = Parity(label="weather").evaluate(md).insufficient_data
+        assert flagged, "sixty images over sixteen cells is too thin to trust"
+        assert flagged == Parity(label="weather").evaluate(md.at("unit")).insufficient_data
+        # Expected counts, not observed ones, so they are fractional by nature.
+        counts = [c for cats in flagged.values() for classes in cats.values() for c in classes.values()]
+        assert all(isinstance(count, float) for count in counts)
+        assert all(count < 5.0 for count in counts)
 
     def test_a_single_level_dataset_is_untouched(self):
         """Every factor at the level being read is the case that never needed correcting."""

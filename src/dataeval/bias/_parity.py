@@ -44,12 +44,13 @@ class ParityOutput(DictOutput):
         DataFrame with columns:
         - factor_name: str - Name of the metadata factor
         - score: float - Bias-Corrected Cramér's V statistic
-        - p_value: float - P-value from G-test (Log-Likelihood Ratio)
+        - p_value: float - P-value from Pearson's chi-square test of independence
         - is_significant: bool - True if score >= score_threshold AND p_value <= p_value_threshold
-        - has_insufficient_data: bool - True if any cells have < 5 samples
-    insufficient_data : dict[str, dict[str, dict[str, int]]]
-        Dictionary flagging specific data subsets with low sample counts (< 5).
-        Structure: {factor_name: {factor_level_name: {class_label: count}}}.
+        - has_insufficient_data: bool - True if the table is too thin to trust the test
+    insufficient_data : dict[str, dict[str, dict[str, float]]]
+        For each factor whose table breaches Cochran's criterion, the cells whose
+        *expected* count falls below 5.
+        Structure: {factor_name: {factor_level_name: {class_label: expected_count}}}.
 
         The factor's level is named from its recorded encoding — ``"[0, 12.4)"`` for a
         binned factor, ``"rain"`` for a categorical one — so the entry says which subset
@@ -67,7 +68,7 @@ class ParityOutput(DictOutput):
     """
 
     factors: pl.DataFrame
-    insufficient_data: dict[str, dict[str, dict[str, int]]]
+    insufficient_data: dict[str, dict[str, dict[str, float]]]
     class_axis: ClassAxis | None = None
 
 
@@ -80,11 +81,11 @@ class Parity(Evaluator):
        This feature is experimental and may change or be removed in future releases.
 
     This function measures the association between metadata factors and class labels
-    to identify potential bias or spurious correlations. It assumes an equal distribution
-    of metadata factors within the dataset.
+    to identify potential bias or spurious correlations. Both margins are conditioned on,
+    so no distribution is assumed for either the factor or the class labels.
 
-    The calculation uses the G-test (Log-Likelihood Ratio) for the statistical test
-    and applies the Bergsma (2013) bias correction to the Cramér's V statistic.
+    The calculation uses Pearson's chi-square for the statistical test and applies the
+    Bergsma (2013) bias correction to the Cramér's V statistic.
     This correction provides a more accurate estimate of association strength than
     standard Cramér's V, particularly for finite samples or large contingency tables.
 
@@ -125,10 +126,13 @@ class Parity(Evaluator):
 
     **Methodology:**
     1. Constructs a contingency matrix for each factor against class labels.
-    2. Identifies and flags cells with counts < 5 (insufficient data).
-    3. Removes rows with zero sums to prevent calculation errors.
-    4. Performs a G-test (Log-Likelihood Ratio) instead of Pearson's Chi-Squared.
-    5. Computes Cramér's V with Bergsma's bias correction.
+    2. Performs Pearson's chi-square test of independence.
+    3. Flags the factor where Cochran's criterion on the expected counts is breached.
+    4. Computes Cramér's V with Bergsma's bias correction.
+
+    Pearson rather than the G-test because the G-test is anti-conservative on thin tables --
+    rejecting independent data at 26.5% against a nominal 5% at two observations per cell --
+    and because Cramér's V is defined on Pearson's statistic. See :func:`~dataeval.core.parity`.
 
     References
     ----------
@@ -230,10 +234,10 @@ class Parity(Evaluator):
         │ ---         ┆ ---      ┆ ---        ┆ ---            ┆ ---                   │
         │ cat         ┆ f64      ┆ f64        ┆ bool           ┆ bool                  │
         ╞═════════════╪══════════╪════════════╪════════════════╪═══════════════════════╡
-        │ angle       ┆ 0.123336 ┆ 0.183186   ┆ false          ┆ true                  │
-        │ location    ┆ 0.475116 ┆ 1.5062e-11 ┆ true           ┆ true                  │
-        │ time_of_day ┆ 0.275172 ┆ 0.000526   ┆ false          ┆ true                  │
-        │ weather     ┆ 0.147734 ┆ 0.123125   ┆ false          ┆ true                  │
+        │ angle       ┆ 0.086175 ┆ 0.284044   ┆ false          ┆ false                 │
+        │ location    ┆ 0.494213 ┆ 1.5656e-12 ┆ true           ┆ true                  │
+        │ time_of_day ┆ 0.278762 ┆ 0.000427   ┆ false          ┆ true                  │
+        │ weather     ┆ 0.154338 ┆ 0.108807   ┆ false          ┆ false                 │
         └─────────────┴──────────┴────────────┴────────────────┴───────────────────────┘
         """  # noqa: E501
         # Convert AnnotatedDataset to Metadata if needed
@@ -249,7 +253,7 @@ class Parity(Evaluator):
         factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
         # How many entities each column varies over, which is not the row count for a factor
         # read below the level it was measured at. A per-image factor on detection rows
-        # repeats once per detection, and a G-test given those detections as evidence
+        # repeats once per detection, and a test given those detections as evidence
         # rejects independence on the strength of the fan-out alone. None where the question
         # does not arise, which is every single-level dataset.
         effective_n = effective_entity_counts(self.metadata, axis, factor_names)
@@ -276,8 +280,9 @@ class Parity(Evaluator):
 
         if insufficient_data:
             _logger.warning(
-                f"Factors {list(insufficient_data)} did not meet the recommended "
-                "5 occurrences for each value-label combination.",
+                f"Factors {list(insufficient_data)} hold tables too thin for the chi-square "
+                "approximation (Cochran's criterion on the expected counts); their p-values "
+                "are not reliable.",
             )
 
         # Create factors DataFrame - build as columnar data
