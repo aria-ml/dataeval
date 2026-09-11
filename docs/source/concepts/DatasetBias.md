@@ -315,10 +315,8 @@ for large contingency tables and finite samples than the standard Cramér's V
 correction.
 
 Statistical significance is assessed with Pearson's chi-squared test of
-independence, which is the statistic Cramér's V is defined on and which holds its
-nominal error rate on thin contingency tables where the G-test does not. Both a
-score threshold (default: 0.3) and a p-value threshold (default: 0.05) must be
-exceeded before a factor is flagged as correlated.
+independence. Both a score threshold (default: 0.3) and a p-value threshold
+(default: 0.05) must be exceeded before a factor is flagged as correlated.
 
 ```{important}
 Parity requires a minimum of 5 samples per cell in the contingency table

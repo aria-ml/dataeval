@@ -196,7 +196,7 @@ class TestParity:
 
 @pytest.mark.required
 class TestParityEffectiveN:
-    """The G-test's evidence is the entities behind the table, not always its rows."""
+    """Verify parity calculation with effective entity counts."""
 
     @staticmethod
     def _replicated(seed, entities=60, fan_out=40):
@@ -213,16 +213,12 @@ class TestParityEffectiveN:
         )
 
     def test_replication_alone_rejects_independence_without_it(self):
-        """The defect this argument exists for, pinned so it cannot come back quietly.
-
-        The statistic is linear in the table's total, so a fan-out of forty multiplies the
-        evidence for a difference that is not there and the p-value collapses.
-        """
+        """Verify that replicated rows without effective_n artificially inflate significance."""
         wide, wide_labels, _, _, _ = self._replicated(0)
         assert float(parity(wide, wide_labels)["p_values"][0]) < 1e-20
 
     def test_scaling_to_the_entities_restores_the_honest_test(self):
-        """Both statistics land exactly where one row per entity puts them."""
+        """Verify scaling to effective entities matches un-replicated results."""
         for seed in range(6):
             wide, wide_labels, narrow, narrow_labels, entities = self._replicated(seed)
             scaled = parity(wide, wide_labels, [entities, entities])
@@ -231,7 +227,7 @@ class TestParityEffectiveN:
             assert float(scaled["scores"][0]) == pytest.approx(float(honest["scores"][0]), abs=1e-12)
 
     def test_none_leaves_every_output_where_it_was(self):
-        """The ordinary single-level call is not to be disturbed by the argument existing."""
+        """Verify effective_n=None preserves default row-based behavior."""
         rng = np.random.default_rng(0)
         factors = rng.integers(0, 3, (500, 2)).astype(np.intp)
         labels = rng.integers(0, 2, 500).astype(np.intp)
@@ -240,7 +236,7 @@ class TestParityEffectiveN:
         assert_array_almost_equal(without["scores"], with_none["scores"])
 
     def test_counts_at_or_above_the_rows_change_nothing(self):
-        """A count that cannot be met is clamped, not applied."""
+        """Verify counts at or above row count do not change results."""
         rng = np.random.default_rng(0)
         factors = rng.integers(0, 3, (200, 1)).astype(np.intp)
         labels = rng.integers(0, 2, 200).astype(np.intp)
@@ -249,7 +245,7 @@ class TestParityEffectiveN:
         )
 
     def test_a_thin_cell_stays_flagged_once_it_is_scaled(self):
-        """Replication is what hides a thin cell, so the flag has to read the scaled table."""
+        """Verify insufficient data flags operate on scaled contingency tables."""
         factor = np.repeat(np.array([0, 0, 1, 1, 1, 1]), 40)[:, None].astype(np.intp)
         labels = np.repeat(np.array([0, 1, 0, 1, 0, 1]), 40).astype(np.intp)
         # Unscaled, every cell holds 40 or 80 and nothing is flagged.
@@ -260,7 +256,7 @@ class TestParityEffectiveN:
         assert all(isinstance(count, float) for count in counts), "scaled counts are entities, not rows"
 
     def test_the_length_must_match_the_columns_plus_the_axis(self):
-        """One entry per factor plus one for the labels, which is what the pairs index into."""
+        """Verify effective_n length matches factor columns plus class labels."""
         rng = np.random.default_rng(0)
         factors = rng.integers(0, 3, (50, 2)).astype(np.intp)
         labels = rng.integers(0, 2, 50).astype(np.intp)
@@ -270,7 +266,7 @@ class TestParityEffectiveN:
 
 @pytest.mark.required
 class TestPearsonRatherThanG:
-    """Both outputs are defined on Pearson's statistic, and behave only there."""
+    """Verify Pearson chi-square behavior across table densities."""
 
     @staticmethod
     def _null_rejection_rate(r, k, n, trials=1500, seed=0):
@@ -283,31 +279,22 @@ class TestPearsonRatherThanG:
         return rejected / trials
 
     def test_the_test_holds_its_level_on_a_thin_table(self):
-        """Independent data, thirty-two levels against three classes, two observations a cell.
-
-        The G-test rejected 26.5% of the time here against a nominal 5%, which is the regime
-        an auto-binned continuous factor lands in rather than an exotic one. Bounded loosely
-        because it is a simulation, but 0.265 is far outside this.
-        """
+        """Verify test maintains nominal significance level on sparse tables."""
         assert self._null_rejection_rate(32, 3, 200) < 0.08
 
     def test_it_holds_its_level_on_a_dense_table_too(self):
-        """The change is not bought by making the test conservative everywhere."""
+        """Verify test maintains nominal significance level on dense tables."""
         assert 0.02 < self._null_rejection_rate(3, 3, 600) < 0.08
 
     def test_perfect_association_is_exactly_one(self):
-        """Cramér's V has 1.0 as its maximum, and the G statistic is not bounded to give it.
-
-        Read off G with no continuity correction a perfect 5x5 at n=20 reaches 1.06, and with
-        scipy's default correction a perfect 2x2 reads 0.77. Neither is a Cramér's V.
-        """
+        """Verify Cramér's V reaches 1.0 for perfect association."""
         for categories, n in [(2, 10), (3, 30), (5, 20)]:
             values = (np.arange(n) % categories).astype(np.intp)
             score = float(parity(values[:, None], values)["scores"][0])
             assert score == pytest.approx(1.0), f"{categories} categories at n={n}"
 
     def test_the_score_never_exceeds_one(self):
-        """The documented range is [0, 1] and nothing may leave it."""
+        """Verify Cramér's V stays bounded in [0, 1]."""
         rng = np.random.default_rng(0)
         for _ in range(300):
             n = int(rng.integers(8, 60))
@@ -318,7 +305,7 @@ class TestPearsonRatherThanG:
 
 @pytest.mark.required
 class TestCochranCriterion:
-    """Sufficiency is a property of the expected counts, not the observed ones."""
+    """Verify Cochran sufficiency criterion based on expected counts."""
 
     @staticmethod
     def _from_table(table):
@@ -331,12 +318,7 @@ class TestCochranCriterion:
         return np.array(factor, dtype=np.intp)[:, None], np.array(labels, dtype=np.intp)
 
     def test_a_table_the_observed_rule_could_not_see_is_flagged(self):
-        """Perfect association with one six-observation category: min expected 0.175.
-
-        Every cell is either large or exactly zero, so no observed count falls between 1 and
-        5 and the old rule -- which also skipped zeros -- raised nothing at all, on a table
-        where five of nine expected counts are below five.
-        """
+        """Verify tables with low expected counts are flagged even if observed counts are zero."""
         factor, labels = self._from_table([[100, 0, 0], [0, 100, 0], [0, 0, 6]])
         flagged = parity(factor, labels)["insufficient_data"]
         assert flagged, "Cochran is breached here and the old observed-count rule was silent"
@@ -344,25 +326,16 @@ class TestCochranCriterion:
         assert smallest == pytest.approx(0.175, abs=1e-3)
 
     def test_a_table_with_small_observed_counts_but_ample_expected_is_not_flagged(self):
-        """Two cells hold three observations and every expected count is twenty-five.
-
-        The approximation is in no trouble; the old rule warned anyway, which trains a reader
-        to ignore the warning.
-        """
+        """Verify tables with small observed counts but sufficient expected counts are not flagged."""
         factor, labels = self._from_table([[47, 3], [3, 47]])
         assert not parity(factor, labels)["insufficient_data"]
 
     def test_a_single_expected_count_below_one_is_enough(self):
-        """Cochran's floor fires on its own, with the share rule satisfied.
-
-        Margins of 494/494/12 by 475/475/50 put one expected count at 0.6 and leave the
-        other eight above five, so one cell in nine is under the threshold -- inside the
-        one-fifth the share rule allows. Only the floor catches this table.
-        """
+        """Verify table is flagged if any expected count is below 1.0."""
         factor, labels = self._from_table([[235, 235, 24], [235, 235, 24], [5, 5, 2]])
         assert parity(factor, labels)["insufficient_data"]
 
     def test_a_fifth_of_cells_below_five_is_tolerated(self):
-        """The other half of the rule is a share, not an absolute: one cell in six is under it."""
+        """Verify table is not flagged when at most 20% of expected counts are below 5.0."""
         factor, labels = self._from_table([[40, 40, 40], [40, 40, 40]])
         assert not parity(factor, labels)["insufficient_data"]

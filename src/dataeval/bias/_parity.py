@@ -46,16 +46,13 @@ class ParityOutput(DictOutput):
         - score: float - Bias-Corrected Cramér's V statistic
         - p_value: float - P-value from Pearson's chi-square test of independence
         - is_significant: bool - True if score >= score_threshold AND p_value <= p_value_threshold
-        - has_insufficient_data: bool - True if the table is too thin to trust the test
+        - has_insufficient_data: bool - True if contingency table fails Cochran's sufficiency criterion
     insufficient_data : dict[str, dict[str, dict[str, float]]]
         For each factor whose table breaches Cochran's criterion, the cells whose
         *expected* count falls below 5.
         Structure: {factor_name: {factor_level_name: {class_label: expected_count}}}.
 
-        The factor's level is named from its recorded encoding — ``"[0, 12.4)"`` for a
-        binned factor, ``"rain"`` for a categorical one — so the entry says which subset
-        to collect more of. A container carrying no encoding record falls back to the
-        code as a string.
+        Factor levels use decoded names when available, or category codes as strings otherwise.
     class_axis : ClassAxis or None
         What this result conditioned on: the dataset's own labels, or an axis a caller
         defined through :meth:`~dataeval.Metadata.classed_by` or ``label=``. Read
@@ -130,9 +127,8 @@ class Parity(Evaluator):
     3. Flags the factor where Cochran's criterion on the expected counts is breached.
     4. Computes Cramér's V with Bergsma's bias correction.
 
-    Pearson rather than the G-test because the G-test is anti-conservative on thin tables --
-    rejecting independent data at 26.5% against a nominal 5% at two observations per cell --
-    and because Cramér's V is defined on Pearson's statistic. See :func:`~dataeval.core.parity`.
+    Pearson's chi-square is used rather than the G-test to control false positive rates
+    on sparse tables and ensure Cramér's V remains bounded in [0, 1]. See :func:`~dataeval.core.parity`.
 
     References
     ----------
@@ -251,11 +247,7 @@ class Parity(Evaluator):
         # `set_metadata` stamps read through this, and so does the output's own field.
         self._axis_record = record = axis_record(self.metadata, axis)
         factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
-        # How many entities each column varies over, which is not the row count for a factor
-        # read below the level it was measured at. A per-image factor on detection rows
-        # repeats once per detection, and a test given those detections as evidence
-        # rejects independence on the strength of the fan-out alone. None where the question
-        # does not arise, which is every single-level dataset.
+        # Retrieve effective entity counts for hierarchical factors; None for single-level datasets.
         effective_n = effective_entity_counts(self.metadata, axis, factor_names)
         class_labels = axis.values
         index2label = axis.names
@@ -265,10 +257,7 @@ class Parity(Evaluator):
 
         output = parity(factor_data, class_labels, effective_n)
 
-        # The factor's level is resolved the way the class label already was. This is the
-        # only output that hands a user a bare code, and a bare code cannot be acted on:
-        # knowing that `illum_lux = 3` is under-sampled says nothing about which lighting
-        # to go and collect.
+        # Resolve factor category codes to descriptive level names when available.
         level_names = factor_code_names(self.metadata, factor_data, factor_names)
         insufficient_data = {
             factor_names[k]: {

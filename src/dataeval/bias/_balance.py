@@ -61,18 +61,14 @@ class BalanceOutput(DictOutput):
           binning cost is in the numerator, and a coarsely cut pair reports less than a
           finely cut one on the same values. See :func:`~dataeval.core.mutual_info`.
 
-          The chance correction is taken against the entities a pair varies over rather
-          than the rows carrying it, which differs for a factor read below the level it
-          was measured at — per-image factors on detection rows, per-sequence factors on
-          frame rows. Such a factor takes one value per image or per sequence however many
-          rows repeat it, and correcting against the rows reports the pair as correlated in
-          proportion to the fan-out.
+          The chance correction uses effective entity counts when factors are defined
+          at coarser hierarchy levels than the current view, preventing artificial
+          correlation from repeated rows.
 
           .. versionchanged:: 1.2
               Pairs of factors defined above the level being read score lower, and
-              independent ones now score near zero where they previously rose with the
-              fan-out. Pairs at the level being read are unchanged, as are ``balance``
-              and ``classwise``.
+              independent ones now score near zero. Pairs at the level being read are
+              unchanged, as are ``balance`` and ``classwise``.
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
         - scored_as: str - Which of the three regimes produced ``mi_value``, since the
           number alone does not say. ``"table"`` where both factors were read as codes
@@ -431,12 +427,7 @@ class Balance(Evaluator):
         # it makes `factors` move with the draw.
         channel = resolve_factor_channel(self.metadata, self.factor_source, factor_names, kept)
 
-        # How many entities each column varies over, which is not the row count for a factor
-        # read below the level it was measured at. A per-sequence factor on detection rows
-        # repeats once per detection, and a chance correction taken against those detections
-        # shrinks by the fan-out -- so two unrelated per-sequence factors read as correlated
-        # in proportion to how many detections their sequences held. None where the question
-        # does not arise, which is every single-level dataset.
+        # Retrieve effective entity counts for hierarchical factors; None for single-level datasets.
         effective_n = effective_entity_counts(self.metadata, axis, factor_names)
 
         mi = mutual_info(axis.values, channel.data, channel.own_alphabet, self.num_neighbors, effective_n)

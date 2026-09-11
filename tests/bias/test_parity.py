@@ -319,7 +319,7 @@ def _detections(images, per_image):
 
 @pytest.mark.required
 class TestParityAcrossLevels:
-    """A factor read below the level it was measured at is not one observation per row."""
+    """Verify Parity evaluation across hierarchical dataset levels."""
 
     @staticmethod
     def _scored(md):
@@ -343,36 +343,18 @@ class TestParityAcrossLevels:
         return md
 
     def test_independence_is_not_rejected_on_replication_alone(self):
-        """Sixty images over twenty-four hundred detections, with nothing shared.
-
-        The G-test statistic is linear in the table's total, so the fan-out multiplies the
-        evidence for a difference that is not there. Read against the detections instead,
-        every one of these seeds rejected independence, the strongest at p=4e-90.
-        """
+        """Verify independent factors replicated across levels do not reject independence."""
         rejected = [p for _, p in (self._scored(self._built(seed)) for seed in range(8)) if p < 0.05]
         assert len(rejected) <= 1, f"rejected {len(rejected)} of 8 independent pairs"
 
     def test_both_statistics_are_what_reading_one_row_per_image_gives(self):
-        """The propagated view is an account of the per-image one, and now agrees with it.
-
-        Stronger than asserting the p-value rose: it fixes *which* number is right, so a
-        correction that overshot fails here just as a missing one does. Cramér's V is
-        included because it moves too -- it divides by ``n`` and survives the scaling, but
-        its Bergsma correction subtracts a term in ``1/(n-1)`` that an inflated ``n``
-        shrinks away.
-        """
+        """Verify statistics computed across levels match single-level evaluation."""
         for seed in range(6):
             md = self._built(seed)
             assert self._scored(md) == pytest.approx(self._scored(md.at("unit")), abs=1e-9), f"seed {seed}"
 
     def test_the_sufficiency_check_is_not_suppressed_by_replication(self):
-        """Cochran's criterion reads expected counts, and replication inflates every one.
-
-        Eight brightness levels against two weather values over sixty images is sixteen
-        cells holding 3.75 images each -- thin enough that the approximation does not hold.
-        Spread over the twenty-four hundred detection rows those images carry, the same
-        cells hold 150 apiece and the check goes quiet on a table nothing was added to.
-        """
+        """Verify Cochran sufficiency check is not masked by row replication."""
         rng = np.random.default_rng(0)
         md = Metadata(_detections(60, 40))
         md._structure()
@@ -392,7 +374,7 @@ class TestParityAcrossLevels:
         assert all(count < 5.0 for count in counts)
 
     def test_a_single_level_dataset_is_untouched(self):
-        """Every factor at the level being read is the case that never needed correcting."""
+        """Verify single-level datasets are unaffected by effective_n scaling."""
         rng = np.random.default_rng(0)
         factors = {
             "brightness": rng.integers(0, 3, 200).astype(np.int64),

@@ -74,25 +74,11 @@ def _entropy_of(values: NDArray[Any]) -> float:
 
 
 def _chance_correction(contingency: Any, n_effective: int | None) -> float:
-    """Mutual information expected under independence, at an effective sample size.
+    """Mutual information expected under independence, rescaled to effective sample size.
 
-    The floor a correction subtracts is set by how many independent observations the table
-    was built from, and that is not always its row count. A factor defined above the rows
-    being read repeats once per descendant — a per-sequence factor on detection rows takes
-    one value per sequence, arriving once per detection — so the same values are counted
-    many times over with no new draw behind them. Left uncorrected, the expectation falls
-    by the fan-out and the pair reads as informative when it is only repetitive.
-    ``n_effective`` is the count of entities behind the table where the caller knows it,
-    and None keeps the row count, which is right whenever every row is its own draw.
-
-    ``expected_mutual_information`` reads the table's **margins** as well as ``n_samples``,
-    and the two have to agree. Handing it a smaller ``n`` beside margins that still sum to
-    the row count does not apply a stronger correction — it drives the expectation toward
-    zero and so removes the correction that was there, which is the wrong direction twice
-    over. At a fan-out of two it returns two thirds of the row-count answer; by a fan-out
-    of ten it returns exactly nothing. Rescaling the table is what makes ``n`` bind, and it
-    leaves the observed mutual information alone, that being a function of the table's
-    proportions and not of its scale.
+    Adjusts contingency table margins to ``n_effective`` when evaluating factors across
+    hierarchical levels. If None or greater than or equal to total samples, the table
+    sum is used.
     """
     total = int(contingency.sum())
     if n_effective is None or n_effective >= total:
@@ -131,14 +117,8 @@ def _adjusted_share(
     observed = float(mutual_info_score(None, None, contingency=contingency))
     expected = _chance_correction(contingency, n_effective)
     denominator = target_entropy - expected
-    # A factor holding a value per entity leaves every cell of the table with a single
-    # observation, so the target is recovered exactly and the expectation rises to meet
-    # the target's own entropy. Both sides of the ratio collapse to rounding error, and
-    # their quotient lands near 1.0 on the sign of that error -- an identifier column
-    # would report itself as the dataset's strongest factor. It generalizes to nothing, so
-    # it is scored as nothing. A factor that genuinely determines the target keeps its
-    # cells populated and leaves the expectation well below the entropy, so this does not
-    # catch it.
+    # High-cardinality factors (e.g. unique identifiers) yield expected MI close to
+    # target entropy, causing denominator collapse.
     if denominator <= target_entropy * 1e-6:
         return 0.0
     return float(np.clip((observed - expected) / denominator, 0.0, 1.0))
@@ -364,14 +344,10 @@ def mutual_info(  # noqa: C901
         Number of points to consider as neighbors. Consulted only for columns holding
         measured values, which are the only ones the neighbor-based estimator reads.
     effective_n : Array1D[int] or None, default None
-        How many distinct entities stand behind each column — the class label at index 0
-        and factor ``i`` of ``factor_data`` at index ``i+1``. None counts every row as its
-        own draw, which is right whenever the rows are one level of one dataset. It is
-        wrong where a column was replicated onto finer rows than it was measured at: a
-        per-sequence factor read on detection rows takes one value per sequence, and
-        counting a detection apiece inflates the chance correction's ``n`` by the fan-out.
-        From a :class:`~dataeval.Metadata` this is the entity count at each factor's own
-        level. See Notes.
+        Number of distinct entities for each column (class label at index 0,
+        factor columns at indices 1 to n). Used to scale the chance correction
+        when factors are defined across hierarchical levels. If None, row counts are used.
+        See Notes.
 
         .. versionadded:: 1.2
 
@@ -442,15 +418,9 @@ def mutual_info(  # noqa: C901
     the class are independent, enough that an identifier column can outrank a genuine
     effect; see ``_adjusted_share``.
 
-    The size of that correction depends on how many independent observations the table was
-    built from, which is what ``effective_n`` is for. A pair takes the **larger** of its two
-    columns' counts, because the finer of the two governs how many distinct combinations the
-    rows can carry. Two columns replicated from the same coarse level are the case this
-    exists for: with a hundred sequences read on ten thousand detection rows, two independent
-    per-sequence factors score a chance-corrected 0.03 on average against a truth of zero,
-    and at ten sequences over the same rows they reach 0.39 and cross a 0.5 correlation
-    threshold one run in three. A pair mixing levels is already right at the row count and
-    is left there, since the larger count *is* the row count.
+    The size of the chance correction depends on the sample size of independent draws,
+    specified via ``effective_n``. For pairwise associations, the effective count is the
+    maximum entity count between the two columns, reflecting the finer level of granularity.
 
     References
     ----------
@@ -646,11 +616,9 @@ def mutual_info_classwise(
         Number of points to consider as neighbors. Consulted only for columns holding
         measured values, which are the only ones the neighbor-based estimator reads.
     effective_n : Array1D[int] or None, default None
-        How many distinct entities stand behind each column, the class label at index 0 and
-        factor ``i`` of ``factor_data`` at index ``i+1``. Every row of the result is scored
-        against one class taken against the rest, and that split lives at the class label's
-        own level however coarse the factor beside it, so the counts matter here in the same
-        way and for the same reason as in :func:`mutual_info`.
+        Number of distinct entities for each column (class label at index 0,
+        factor columns at indices 1 to n). Used to scale chance corrections for
+        hierarchical factors. If None, row counts are used.
 
         .. versionadded:: 1.2
 

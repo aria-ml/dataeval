@@ -1,14 +1,9 @@
-"""How many independent observations stand behind a contingency table.
+"""Helpers for computing and applying effective sample size to contingency tables.
 
-A statistic read off a contingency table is corrected against the number of draws the
-table was built from, and that is not always its row count. A factor defined above the
-rows being read arrives replicated once per descendant — a per-sequence factor on
-detection rows takes one value per sequence and arrives once per detection — so the same
-values are counted many times over with no new draw behind them.
-
-Shared by ``dataeval.core._mutual_info`` and ``dataeval.core._parity``, which correct
-different statistics against the same count and would otherwise each carry their own copy
-of the reasoning.
+When metadata factors are defined at coarser hierarchy levels than the rows being
+evaluated (e.g. per-sequence factors evaluated on per-detection rows), repeated
+observations artificially inflate sample size. These functions validate, combine,
+and rescale contingency tables to reflect independent entity counts.
 """
 
 __all__ = []
@@ -27,14 +22,10 @@ def validate_effective_n(
     num_columns: int,
     num_rows: int,
 ) -> NDArray[np.intp] | None:
-    """Check a caller's entity counts against the table they describe.
+    """Check effective sample size counts against the contingency table dimensions.
 
-    A wrong length is refused rather than trimmed or padded, because it means the caller's
-    column list and this call's are not the same list, and either repair would score some
-    factor against another factor's entity count — a silent answer to a question nobody
-    asked. Counts above the row count are clamped instead: a column cannot vary over more
-    entities than there are rows carrying it, and a caller reading a filtered view can
-    arrive here with a stale total without having said anything false about the level.
+    Ensures ``effective_n`` matches ``num_columns`` and contains positive values.
+    Counts exceeding ``num_rows`` are clamped to ``num_rows``.
     """
     if effective_n is None:
         return None
@@ -54,18 +45,10 @@ def validate_effective_n(
 
 
 def pair_n(effective_n: NDArray[np.intp] | None, first: int, second: int) -> int | None:
-    """Entities behind a pair of columns: the larger of the two counts.
+    """Return the effective sample size for a pair of columns.
 
-    The finer factor governs. Where one nests inside the other — a per-sequence factor
-    against a per-detection one — the pair takes a distinct value per *detection*, so the
-    detections are the draws and the sequences are not a ceiling on them. Taking the
-    smaller would correct a pair that is already right, and over-correct it by about as
-    much as leaving the replicated pair uncorrected gets it wrong.
-
-    Two factors on incomparable branches — a per-frame factor against a per-track one, which
-    meet only on detection rows — have no nesting between them, and the larger of the two
-    counts understates the distinct combinations their rows carry. That direction leaves the
-    correction too large rather than too small, which is the safe way to be wrong.
+    Selects the maximum of the two column entity counts, representing the finer
+    level of granularity between them.
     """
     return None if effective_n is None else int(max(effective_n[first], effective_n[second]))
 
@@ -73,18 +56,9 @@ def pair_n(effective_n: NDArray[np.intp] | None, first: int, second: int) -> int
 def rescaled(table: Any, n_effective: int | None) -> Any:
     """Scale a table so its total is ``n_effective``, where that is fewer than it holds.
 
-    Rescaling is what makes an effective ``n`` bind, and forgetting it is the failure mode
-    worth naming. Both statistics corrected here read a table's **margins** as well as its
-    ``n``: the G-test takes its whole statistic from the counts, and
-    ``expected_mutual_information`` sums over ranges the margins set. Handing either a
-    smaller ``n`` beside margins that still sum to the row count does not correct harder —
-    it answers a question about a table nobody built, and moves the result in the same
-    direction the replication did. The correction then looks applied and is not.
-
-    Scaling every cell by one factor leaves the table's proportions alone, so what the
-    statistic reads as *association* does not move; only what it reads as *evidence* does,
-    which is the whole intent. A total already at or below ``n_effective`` is returned
-    untouched, which is the ordinary single-level case and every caller passing None.
+    Preserves cell proportions while adjusting marginal totals so that sample-size
+    dependent statistics reflect ``n_effective``. If ``n_effective`` is None or
+    greater than or equal to the table sum, the table is returned unchanged.
     """
     if n_effective is None:
         return table

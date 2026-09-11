@@ -197,7 +197,7 @@ def _sequences(count, per_sequence):
 
 @pytest.mark.required
 class TestBalanceAcrossLevels:
-    """A factor read below the level it was measured at is not one observation per row."""
+    """Verify Balance evaluation across hierarchical dataset levels."""
 
     @staticmethod
     def _pair(md):
@@ -222,25 +222,13 @@ class TestBalanceAcrossLevels:
         return md, values
 
     def test_independent_per_sequence_factors_are_not_reported_as_correlated(self):
-        """Forty sequences over a thousand detections, with nothing shared between the factors.
-
-        The values repeat twenty-five times each and never vary within a sequence, so there
-        are forty observations of this pair however many rows carry them. Read against the
-        rows instead, this pair averaged 0.06 and reached 0.15 -- and at ten sequences over
-        the same thousand rows it crossed the 0.5 threshold one run in three.
-        """
+        """Verify independent per-sequence factors do not report spurious correlation."""
         scored = [self._pair(self._built(seed)[0]) for seed in range(12)]
         assert not any(flagged for _, flagged in scored)
         assert max(score for score, _ in scored) < 0.1
 
     def test_the_score_is_what_reading_one_row_per_sequence_gives(self):
-        """The propagated view is an account of the sequence-level one, and now agrees with it.
-
-        Stronger than asserting the number fell: it fixes *which* number is right, so a
-        correction that overshot fails here just as a missing one does. The comparison is
-        built rather than taken from `at("sequence")`, because the class labels this
-        evaluator conditions on live at `instance` and do not roll up.
-        """
+        """Verify cross-level balance score matches evaluation at the factor's own level."""
         for seed in range(6):
             md, values = self._built(seed)
             propagated, _ = self._pair(md)
@@ -251,7 +239,7 @@ class TestBalanceAcrossLevels:
             assert propagated == pytest.approx(isolated, abs=1e-9), f"seed {seed}"
 
     def test_a_single_level_dataset_is_untouched(self):
-        """Every factor at the level being read is the case that never needed correcting."""
+        """Verify single-level datasets are unaffected by effective_n scaling."""
         rng = np.random.default_rng(0)
         factors = {
             "weather": rng.integers(0, 3, 200).astype(np.int64),

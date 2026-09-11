@@ -4285,25 +4285,10 @@ class Metadata(Array, FeatureExtractor):
         return self._levels.highest(levels) if levels else self._item_level
 
     def _entity_counts(self, levels: Sequence[FactorLevel]) -> NDArray[np.intp]:
-        """How many distinct entities each level offers, counted over the current view's rows.
+        """Count distinct entities accessible from the current view for given levels.
 
-        A factor defined above the view repeats once per descendant row, so the view's row
-        count overstates how many independent observations of it there are: a per-sequence
-        factor read on detection rows takes one value per sequence however many detections
-        that sequence holds. What this counts is the number of entities the factor could
-        have varied *between*, which is what a chance correction over it has to be taken
-        against — the correction's whole business is what the values could have done by
-        luck, and replicated values had no chance to do anything.
-
-        A level equal to the view counts one entity per row. A level above it counts the
-        ancestors those rows actually reach, so a row with no ancestor there contributes
-        nothing — it carries no value for such a factor either. A level the view cannot
-        read, or that this dataset declares without producing rows for, falls back to the
-        row count, which is the answer that changes nothing; :meth:`_unreadable_at` has
-        already kept the factors that could reach either case out of factor analysis.
-
-        Answered per level rather than per factor because factors sharing a level share the
-        count, and the link behind it is the expensive part.
+        Levels at or above the current view count reachable ancestors. Unrelated or
+        unreachable levels fall back to the view row count.
         """
         self._structure()
         view = self._view_level
