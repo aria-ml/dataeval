@@ -303,3 +303,93 @@ class TestInsufficientDataNamesItsLevels:
         result = Parity().evaluate(bare)
         for levels in result.insufficient_data.values():
             assert all(isinstance(name, str) for name in levels)
+
+
+def _detections(images, per_image):
+    """An object detection dataset of `images` images, each holding `per_image` detections."""
+    from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
+
+    rng = np.random.default_rng(0)
+    boxes = np.tile(np.array([[1.0, 1.0, 2.0, 2.0]]), (per_image, 1))
+    targets = [
+        ObjectDetectionTarget(boxes, rng.integers(0, 2, per_image), np.full(per_image, 0.5)) for _ in range(images)
+    ]
+    return MockDataset(list(range(images)), targets)
+
+
+@pytest.mark.required
+class TestParityAcrossLevels:
+    """A factor read below the level it was measured at is not one observation per row."""
+
+    @staticmethod
+    def _scored(md):
+        factors = Parity(label="weather").evaluate(md).factors
+        row = factors.filter(pl.col("factor_name") == "brightness")
+        return float(row["score"][0]), float(row["p_value"][0])
+
+    @staticmethod
+    def _built(seed, images=60, per_image=40):
+        """Two independent per-image factors, read on detection rows."""
+        rng = np.random.default_rng(seed)
+        md = Metadata(_detections(images, per_image))
+        md._structure()
+        md.add_factors(
+            {
+                "brightness": rng.integers(0, 3, images).astype(np.int64),
+                "weather": rng.integers(0, 3, images).astype(np.int64),
+            },
+            level="unit",
+        )
+        return md
+
+    def test_independence_is_not_rejected_on_replication_alone(self):
+        """Sixty images over twenty-four hundred detections, with nothing shared.
+
+        The G-test statistic is linear in the table's total, so the fan-out multiplies the
+        evidence for a difference that is not there. Read against the detections instead,
+        every one of these seeds rejected independence, the strongest at p=4e-90.
+        """
+        rejected = [p for _, p in (self._scored(self._built(seed)) for seed in range(8)) if p < 0.05]
+        assert len(rejected) <= 1, f"rejected {len(rejected)} of 8 independent pairs"
+
+    def test_both_statistics_are_what_reading_one_row_per_image_gives(self):
+        """The propagated view is an account of the per-image one, and now agrees with it.
+
+        Stronger than asserting the p-value rose: it fixes *which* number is right, so a
+        correction that overshot fails here just as a missing one does. Cramér's V is
+        included because it moves too -- it divides by ``n`` and survives the scaling, but
+        its Bergsma correction subtracts a term in ``1/(n-1)`` that an inflated ``n``
+        shrinks away.
+        """
+        for seed in range(6):
+            md = self._built(seed)
+            assert self._scored(md) == pytest.approx(self._scored(md.at("unit")), abs=1e-9), f"seed {seed}"
+
+    def test_the_insufficient_data_flag_is_not_suppressed_by_replication(self):
+        """The flag compares counts against 5, and replication is what hides a thin cell.
+
+        Two images in a category read as eighty observations at a fan-out of forty, so the
+        warning this exists to raise is exactly the one that goes quiet. Counts are
+        fractional once scaled, because what they count is images rather than detections.
+        """
+        md = self._built(0)
+        flagged = Parity(label="weather").evaluate(md).insufficient_data
+        assert flagged == Parity(label="weather").evaluate(md.at("unit")).insufficient_data
+        assert any(
+            isinstance(count, float)
+            for classes in flagged.values()
+            for counts in classes.values()
+            for count in counts.values()
+        )
+
+    def test_a_single_level_dataset_is_untouched(self):
+        """Every factor at the level being read is the case that never needed correcting."""
+        rng = np.random.default_rng(0)
+        factors = {
+            "brightness": rng.integers(0, 3, 200).astype(np.int64),
+            "weather": rng.integers(0, 3, 200).astype(np.int64),
+        }
+        md = Metadata.from_factors(factors, class_labels=rng.integers(0, 2, 200))
+        assert md.levels == ("unit",)
+        # Reaches the statistic with no entity counts at all, so it is scored as it always was.
+        assert 0.0 <= self._scored(md)[1] <= 1.0

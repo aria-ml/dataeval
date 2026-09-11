@@ -10,6 +10,7 @@ from dataeval import Metadata
 from dataeval._experimental import experimental
 from dataeval._helpers import (
     axis_record,
+    effective_entity_counts,
     factor_code_names,
     factors_excluding,
     is_metadata_like,
@@ -246,13 +247,19 @@ class Parity(Evaluator):
         # `set_metadata` stamps read through this, and so does the output's own field.
         self._axis_record = record = axis_record(self.metadata, axis)
         factor_data, factor_names, _ = factors_excluding(self.metadata, axis.excluded)
+        # How many entities each column varies over, which is not the row count for a factor
+        # read below the level it was measured at. A per-image factor on detection rows
+        # repeats once per detection, and a G-test given those detections as evidence
+        # rejects independence on the strength of the fan-out alone. None where the question
+        # does not arise, which is every single-level dataset.
+        effective_n = effective_entity_counts(self.metadata, axis, factor_names)
         class_labels = axis.values
         index2label = axis.names
 
         if not factor_names:
             raise ValueError("No factors found in provided metadata.")
 
-        output = parity(factor_data, class_labels)
+        output = parity(factor_data, class_labels, effective_n)
 
         # The factor's level is resolved the way the class label already was. This is the
         # only output that hands a user a bare code, and a bare code cannot be acted on:
