@@ -15,11 +15,11 @@ from typing import Any, Literal, TypeVar, cast, overload
 import numpy as np
 import torch
 from numpy.typing import ArrayLike, NDArray
-from typing_extensions import Self
+from typing_extensions import Self, get_protocol_members
 
 from dataeval._log import LogMessage, get_logger
 from dataeval.exceptions import ShapeMismatchError
-from dataeval.protocols import Array, Dataset, SequenceLike
+from dataeval.protocols import Array, Dataset, ObjectDetectionTarget, SegmentationTarget, SequenceLike
 
 ImageOrItem = ArrayLike | tuple[ArrayLike, Any, Any]
 
@@ -864,13 +864,13 @@ def merge_metadata(
 R = TypeVar("R")
 T = TypeVar("T")
 
+_MASKABLE_TARGET_MEMBERS = get_protocol_members(ObjectDetectionTarget) | get_protocol_members(SegmentationTarget)
+
 
 def try_mask_object(obj: T, mask: NDArray[np.bool_]) -> T:
-    """Apply a boolean per-element mask to ``obj`` if it is a maskable sequence/array.
+    """Mask ``obj`` by ``mask`` if it is a sequence/array of matching length; otherwise return it unchanged.
 
-    Returns ``obj`` unchanged when it is not a per-element collection matching the
-    mask length (e.g. a scalar or a string). Used to mask per-detection attributes
-    (boxes, scores, labels) and metadata when dropping detections.
+    Used for per-detection attributes (boxes, scores, labels) and metadata when dropping detections.
     """
     if not isinstance(obj, str | bytes | bytearray) and isinstance(obj, Sequence | Array) and len(obj) == len(mask):
         return obj[mask] if isinstance(obj, Array) else cast(T, [item for i, item in enumerate(obj) if mask[i]])
@@ -878,44 +878,46 @@ def try_mask_object(obj: T, mask: NDArray[np.bool_]) -> T:
 
 
 def materialize_target_attrs(target: Any) -> dict[str, Any]:
-    """Return a MAITE target's attributes as a plain dict for proxy ``__dict__`` materialization.
+    """Collect a MAITE target's attributes into a plain dict for ``MaskedTarget.__dict__``.
 
-    Proxy targets (e.g. the masking wrappers in ClassFilter/Relabel) delegate reads through
-    ``__getattribute__``, but ``@runtime_checkable`` protocol checks use ``getattr_static`` and
-    bypass that, inspecting the instance ``__dict__`` directly. Copying these attrs in lets the
-    proxy still satisfy ``isinstance(proxy, ObjectDetectionTarget)``. Handles both attribute-class
-    targets (have ``__dict__``) and namedtuple targets (have ``_fields`` but no ``__dict__``).
+    ``@runtime_checkable`` protocol checks use ``getattr_static``, which reads the instance
+    ``__dict__`` directly and bypasses ``MaskedTarget.__getattribute__``. Copying attrs into
+    ``__dict__`` here lets the proxy still satisfy
+    ``isinstance(proxy, ObjectDetectionTarget | SegmentationTarget)``.
+
+    Covers plain-attribute targets (via ``__dict__``), namedtuples (via ``_fields``), and
+    ``@property``-backed targets. A property's value is a class descriptor, not present in
+    the instance ``__dict__``, and is often shadowed there by a differently named private
+    attribute (e.g. ``_boxes``). Those are read explicitly through the class instead.
     """
     source = getattr(target, "__dict__", None)
-    if source:
-        return dict(source)
+    attrs = dict(source) if source else {}
     fields = getattr(target, "_fields", None)  # namedtuple (e.g. MAITE ObjectDetectionTargetTuple)
     if fields is not None:
-        return {name: getattr(target, name) for name in fields}
-    return {}
+        attrs.update((name, getattr(target, name)) for name in fields)
+    # hasattr on the class never invokes a property getter. It returns the
+    # descriptor itself so this check is safe to run before reading the instance.
+    for name in _MASKABLE_TARGET_MEMBERS:
+        if name not in attrs and hasattr(type(target), name):
+            attrs[name] = getattr(target, name)
+    return attrs
 
 
 def mask_metadata(metadata: Mapping[str, Any], mask: NDArray[np.bool_]) -> dict[str, Any]:
-    """Recursively mask per-detection arrays inside a datum metadata mapping.
-
-    Walks nested dicts, applying :func:`try_mask_object` to each leaf so per-detection
-    arrays (boxes, scores, ...) are filtered in step with a dropped-detection ``mask``.
-    """
+    """Apply :func:`try_mask_object` to every leaf of a nested metadata mapping."""
     return {k: mask_metadata(v, mask) if isinstance(v, dict) else try_mask_object(v, mask) for k, v in metadata.items()}
 
 
 class MaskedTarget:
-    """Proxy over a MAITE target that masks per-detection attributes by a boolean ``mask``.
+    """Proxy over a MAITE target that masks per-detection attributes by a boolean array.
 
-    Each per-detection attribute read (boxes, scores, labels, ...) is filtered through
-    :func:`try_mask_object`, dropping detections where ``mask`` is False. ``overrides``
-    supplies replacement values for named attributes (e.g. relabeled ``labels``) that
-    bypass masking.
+    Each attribute read is filtered through :func:`try_mask_object`, dropping detections
+    where ``mask`` is False. ``overrides`` supplies replacement values (e.g. relabeled
+    ``labels``) that bypass masking.
 
-    The target's attrs are surfaced in ``__dict__`` so ``@runtime_checkable`` protocol
-    checks (which use ``getattr_static`` and bypass ``__getattribute__``) still see this
-    proxy as the original target type; works for namedtuple targets too. Normal reads are
-    still delegated/masked via ``__getattribute__`` below.
+    ``__init__`` copies the target's protocol-relevant attributes into ``__dict__`` so a
+    ``getattr_static``-based ``isinstance`` check still recognizes the proxy as the wrapped
+    target's type. Real attribute reads go through ``__getattribute__``, not this copy.
     """
 
     def __init__(self, target: Any, mask: NDArray[np.bool_], overrides: Mapping[str, Any] | None = None) -> None:
