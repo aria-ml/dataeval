@@ -194,10 +194,11 @@ real risk.
 ### Parity
 
 {class}`.Parity` (experimental) measures statistical dependence between metadata
-factors and labels using bias-corrected Cramér's V with a G-test for
-significance. It is the most rigorous of the three bias metrics, requiring
-sufficient per-cell sample counts (minimum five per contingency cell) to produce
-valid results.
+factors and labels using bias-corrected Cramér's V, with Pearson's chi-squared
+test for significance. It is the most rigorous of the three bias metrics, and it
+checks whether its own result can be trusted: `has_insufficient_data` reports
+where the contingency table is too thin for the chi-squared approximation, judged
+by Cochran's criterion on the *expected* cell counts.
 
 The `insufficient_data` flag in the output identifies factor-label combinations
 where the sample count requirement was not met. These combinations cannot be

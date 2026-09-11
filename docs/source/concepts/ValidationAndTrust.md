@@ -465,8 +465,8 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for what these measure.
     score measures the binning as much as the data — see
     [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
 - - {class}`.Parity` ⚠️
-  - G-test with Bergsma (2013) bias correction for Cramér's V; cited in the
-    docstring.
+  - Pearson's chi-squared with Bergsma (2013) bias correction for Cramér's V, and
+    Cochran (1954) for data sufficiency; all cited in the docstring.
   - Anchored
   - `score_threshold=0.3` (Cramér's V) and `p_value_threshold=0.05` decide which
     factors are reported as associated with the label.
