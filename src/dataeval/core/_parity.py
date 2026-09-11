@@ -10,6 +10,7 @@ from scipy.stats.contingency import chi2_contingency, crosstab
 
 from dataeval._experimental import experimental
 from dataeval._log import get_logger
+from dataeval.core._effective_n import pair_n, rescaled, validate_effective_n
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
 
@@ -31,20 +32,23 @@ class ParityResult(TypedDict):
     p_values : NDArray[np.float64]
         Array of p-values calculated via the G-test (Log-Likelihood Ratio).
         Indicates the statistical significance of the calculated association.
-    insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]]
+    insufficient_data : Mapping[int, Mapping[int, Mapping[int, float]]]
         Dictionary flagging specific data subsets with low sample counts (< 5).
         Structure: {factor_index: {factor_category_value: {class_label: count}}}.
+        The count is fractional where ``effective_n`` scaled the table, since what is
+        counted there is entities rather than rows; see :func:`parity`.
     """
 
     scores: NDArray[np.float64]
     p_values: NDArray[np.float64]
-    insufficient_data: Mapping[int, Mapping[int, Mapping[int, int]]]
+    insufficient_data: Mapping[int, Mapping[int, Mapping[int, float]]]
 
 
 @experimental
 def parity(  # noqa: C901
     factor_data: Array2D[int],
     class_labels: Array1D[int],
+    effective_n: Array1D[int] | None = None,
 ) -> ParityResult:
     """
     Compute statistical parity using Bias-Corrected Cramér's V.
@@ -67,6 +71,15 @@ def parity(  # noqa: C901
         Binned metadata factor values. Shape should be (n_samples, n_factors).
     class_labels : Array1D[int]
         Observed class labels. Shape should be (n_samples,).
+    effective_n : Array1D[int] or None, default None
+        How many distinct entities stand behind each column — the class labels at index 0
+        and factor ``i`` of ``factor_data`` at index ``i+1``. None counts every row as its
+        own observation, which is right whenever the rows are one level of one dataset. It
+        is wrong where a column was replicated onto finer rows than it was measured at: a
+        per-image factor read on detection rows takes one value per image, and counting a
+        detection apiece multiplies the G-test's evidence by the fan-out. See Notes.
+
+        .. versionadded:: 1.2
 
     Returns
     -------
@@ -96,10 +109,25 @@ def parity(  # noqa: C901
 
     **Methodology:**
     1. Constructs a contingency matrix for each factor against class labels.
-    2. Identifies and flags cells with counts < 5 (insufficient data).
-    3. Removes rows with zero sums to prevent calculation errors.
-    4. Performs a G-test (Log-Likelihood Ratio) instead of Pearson's Chi-Squared.
-    5. Computes Cramér's V with Bergsma's bias correction.
+    2. Scales that matrix to ``effective_n`` where one is given.
+    3. Identifies and flags cells with counts < 5 (insufficient data).
+    4. Removes rows with zero sums to prevent calculation errors.
+    5. Performs a G-test (Log-Likelihood Ratio) instead of Pearson's Chi-Squared.
+    6. Computes Cramér's V with Bergsma's bias correction.
+
+    **Why the scaling comes second.** All three outputs read the table's counts, and a
+    replicated column inflates every one of them. The G-test statistic is linear in the
+    total, so a fan-out of forty turns a p-value of 0.3 into 1e-50 and the test rejects
+    independence on repetition alone. Cramér's V divides by ``n`` and so survives the
+    scaling, but its Bergsma correction subtracts a term in ``1/(n-1)`` and under-corrects
+    against an inflated ``n``. The insufficient-data flag compares raw counts against 5 and
+    is *suppressed* by replication, which is the reverse of what it exists for: two entities
+    seen forty times each reads as eighty observations. Scaling the table once, before any
+    of them, puts all three on the same honest footing — and leaves the association itself
+    untouched, since scaling every cell alike does not move the table's proportions.
+
+    Flagged counts are fractional once scaled, because what they count is entities rather
+    than rows.
 
     References
     ----------
@@ -115,8 +143,11 @@ def parity(  # noqa: C901
 
     chi_scores = np.zeros(factor_data_np.shape[1])
     p_values = np.zeros_like(chi_scores)
-    insufficient_ddict: defaultdict[int, defaultdict[int, dict[int, int]]] = defaultdict(lambda: defaultdict(dict))
+    insufficient_ddict: defaultdict[int, defaultdict[int, dict[int, float]]] = defaultdict(lambda: defaultdict(dict))
     unique_class_labels = np.unique(class_labels_np)
+    # One entry per factor plus one for the class labels, which is the column list the pairs
+    # below index into.
+    effective_n_np = validate_effective_n(effective_n, factor_data_np.shape[1] + 1, factor_data_np.shape[0])
 
     for i, col_data in enumerate(factor_data_np.T):
         # Builds a contingency matrix where entry at index (r,c) represents
@@ -124,6 +155,11 @@ def parity(  # noqa: C901
         # at a data point with class c.
         results = crosstab(col_data, class_labels_np)
         contingency_matrix = as_numpy(results.count)  # type: ignore
+
+        # Scaled here, ahead of all three readers below, so the sufficiency flag, the G-test
+        # and the bias correction agree about how much evidence this table holds. The pair
+        # is this factor against the class labels, and takes the larger of their two counts.
+        contingency_matrix = rescaled(contingency_matrix, pair_n(effective_n_np, 0, i + 1))
 
         # Determines if any frequencies are too low
         counts = np.nonzero(contingency_matrix < 5)
