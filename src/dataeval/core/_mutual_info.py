@@ -12,6 +12,9 @@ from sklearn.metrics.cluster import contingency_matrix, expected_mutual_informat
 
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes, get_seed
+from dataeval.core._effective_n import pair_n as _pair_n
+from dataeval.core._effective_n import rescaled
+from dataeval.core._effective_n import validate_effective_n as _validate_effective_n
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
 
@@ -64,37 +67,6 @@ def _validate_num_neighbors(num_neighbors: int) -> int:
     return num_neighbors
 
 
-def _validate_effective_n(
-    effective_n: Array1D[int] | None,
-    num_columns: int,
-    num_rows: int,
-) -> NDArray[np.intp] | None:
-    """Check a caller's entity counts against the table they describe.
-
-    A wrong length is refused rather than trimmed or padded, because it means the caller's
-    column list and this call's are not the same list, and either repair would score some
-    factor against another factor's entity count — a silent answer to a question nobody
-    asked. Counts above the row count are clamped instead: a column cannot vary over more
-    entities than there are rows carrying it, and a caller reading a filtered view can
-    arrive here with a stale total without having said anything false about the level.
-    """
-    if effective_n is None:
-        return None
-    counts = as_numpy(effective_n, dtype=np.intp, required_ndim=1)
-    if counts.shape[0] != num_columns:
-        raise ValueError(
-            f"effective_n has {counts.shape[0]} entries for {num_columns} columns. It is indexed "
-            "like `class_to_factor` — the class label at 0 and factor i of `factor_data` at i+1 — "
-            f"so it needs one entry per factor plus one, {num_columns} in all.",
-        )
-    if np.any(counts < 1):
-        raise ValueError(
-            f"effective_n holds {int(counts.min())}, and a column stands over at least one entity. "
-            "Zero usually means a level was counted on rows that cannot reach it.",
-        )
-    return np.minimum(counts, num_rows)
-
-
 def _entropy_of(values: NDArray[Any]) -> float:
     """Entropy of a discrete sample in nats, read off its observed value counts."""
     _, counts = np.unique(values, return_counts=True)
@@ -130,7 +102,7 @@ def _chance_correction(contingency: Any, n_effective: int | None) -> float:
         # so nothing could have lined up by luck, and the hypergeometric sum has no range
         # to run over.
         return 0.0
-    return float(expected_mutual_information(contingency * (n_effective / total), n_effective))
+    return float(expected_mutual_information(rescaled(contingency, n_effective), n_effective))
 
 
 def _adjusted_share(
@@ -242,23 +214,6 @@ def _adjusted_association(
     if denominator <= ceiling * 1e-6:
         return 0.0
     return float(np.clip(adjusted / denominator, 0.0, 1.0))
-
-
-def _pair_n(effective_n: NDArray[np.intp] | None, first: int, second: int) -> int | None:
-    """Entities behind a pair of columns: the larger of the two counts.
-
-    The finer factor governs. Where one nests inside the other — a per-sequence factor
-    against a per-detection one — the pair takes a distinct value per *detection*, so the
-    detections are the draws and the sequences are not a ceiling on them. Taking the
-    smaller would correct a pair that is already right, and over-correct it by about as
-    much as leaving the replicated pair uncorrected gets it wrong.
-
-    Two factors on incomparable branches — a per-frame factor against a per-track one, which
-    meet only on detection rows — have no nesting between them, and the larger of the two
-    counts understates the distinct combinations their rows carry. That direction leaves the
-    correction too large rather than too small, which is the safe way to be wrong.
-    """
-    return None if effective_n is None else int(max(effective_n[first], effective_n[second]))
 
 
 def _target_to_factor(
