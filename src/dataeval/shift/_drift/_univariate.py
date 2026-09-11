@@ -11,7 +11,7 @@ __all__ = []
 
 import math
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal, TypedDict
 
 import numpy as np
 import scipy.stats
@@ -20,8 +20,9 @@ from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
-from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput, _MannWhitneyuResult
+from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
 from dataeval.types import set_metadata
+from dataeval.utils.scipy.stats import anderson_ksamp, bws_test, cramervonmises_2samp, ks_2samp, mannwhitneyu
 from dataeval.utils.thresholds import ZScoreThreshold
 
 _ANDERSON_KSAMP_SUPPORTS_VARIANT = scipy.__version__ >= "1.17.0"
@@ -338,18 +339,18 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             Test statistic and p-value from the selected statistical test.
         """
         if self.method == "ks":
-            return scipy.stats.ks_2samp(x, y, alternative=self.alternative, method="exact")
+            result = ks_2samp(x, y, alternative=self.alternative, method="exact")
+            return np.float32(result.statistic), np.float32(result.pvalue)
 
         if self.method == "cvm":
-            result = scipy.stats.cramervonmises_2samp(x, y, method="auto")
+            result = cramervonmises_2samp(x, y, method="auto")
             return np.float32(result.statistic), np.float32(result.pvalue)
 
         if self.method == "mwu":
-            result = scipy.stats.mannwhitneyu(x, y, alternative=self.alternative)
+            result = mannwhitneyu(x, y, alternative=self.alternative)
             # scipy >=1.18 returns NaN for the two-sided test when every value is tied
             # (zero variance, e.g. a constant feature): the statistic is undefined.
             # Identical distributions imply no drift, so treat this as p-value 1.0.
-            result = cast(_MannWhitneyuResult, result)
             pvalue = result.pvalue
             if np.isnan(pvalue):
                 pvalue = np.float32(1.0)
@@ -357,11 +358,11 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
 
         if self.method == "anderson":
             anderson_ksamp_kwargs = {"variant": "midrank"} if _ANDERSON_KSAMP_SUPPORTS_VARIANT else {}
-            result = scipy.stats.anderson_ksamp([x, y], **anderson_ksamp_kwargs)  # type: ignore py3.10
-            return np.float32(result.statistic), np.float32(result.pvalue)  # type: ignore
+            result = anderson_ksamp([x, y], **anderson_ksamp_kwargs)
+            return np.float32(result.statistic), np.float32(result.pvalue)
 
         if self.method == "bws":
-            result = scipy.stats.bws_test(x, y, alternative=self.alternative)
+            result = bws_test(x, y, alternative=self.alternative)
             return np.float32(result.statistic), np.float32(result.pvalue)
 
         raise ValueError(f"Unknown method: {self.method}")

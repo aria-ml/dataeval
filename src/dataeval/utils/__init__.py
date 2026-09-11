@@ -6,7 +6,7 @@ in setting up data and architectures that are guaranteed to work with applicable
 DataEval metrics.
 """
 
-from dataeval.utils import data, losses, models, onnx, preprocessing, thresholds, training
+from dataeval.utils import data, losses, models, onnx, preprocessing, scipy, thresholds, training
 from dataeval.utils._array import as_numpy, flatten_samples, to_numpy
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "models",
     "onnx",
     "preprocessing",
+    "scipy",
     "thresholds",
     "to_numpy",
     "training",

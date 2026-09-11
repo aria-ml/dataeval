@@ -1,25 +1,18 @@
 __all__ = []
 
 from collections.abc import Sequence
-from typing import NamedTuple, TypedDict, cast
+from typing import TypedDict
 
 import numpy as np
-from scipy.stats import iqr, ks_2samp, wasserstein_distance
+from scipy.stats import iqr, wasserstein_distance
 
 from dataeval._log import get_logger
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
+from dataeval.utils.scipy.stats import ks_2samp
 
 _logger = get_logger(__name__)
-
-
-class KSType(NamedTuple):
-    """Used to typehint scipy's internal hidden ks_2samp output."""
-
-    statistic: float
-    statistic_location: float
-    pvalue: float
 
 
 class FeatureDistanceResult(TypedDict):
@@ -129,7 +122,7 @@ def feature_distance(
             results.append({"statistic": 0.0, "location": 0.0, "dist": 0.0, "p_value": 1.0})
             continue
 
-        ks_result = cast(KSType, ks_2samp(fdata1, fdata2, method="asymp"))
+        ks_result = ks_2samp(fdata1, fdata2, method="asymp")
 
         # Normalized location
         loc = float((ks_result.statistic_location - xmin) / (xmax - xmin))

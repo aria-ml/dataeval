@@ -3,18 +3,18 @@
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.stats import mannwhitneyu
 from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
-from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput, _MannWhitneyuResult
+from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
 from dataeval.shift._shared._kneighbors import KNeighborsScorer
 from dataeval.types import set_metadata
+from dataeval.utils.scipy.stats import mannwhitneyu
 from dataeval.utils.thresholds import ZScoreThreshold
 
 
@@ -252,7 +252,7 @@ class DriftKNeighbors(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftKNeigh
         # test that compares the full distributions of per-sample k-NN
         # distances without an arbitrary effective-sample-size cap.
         result = mannwhitneyu(test_scores, self._scorer.reference_scores, alternative="greater")
-        p_val = float(cast(_MannWhitneyuResult, result).pvalue)
+        p_val = result.pvalue
 
         drifted = p_val < self._p_val
 

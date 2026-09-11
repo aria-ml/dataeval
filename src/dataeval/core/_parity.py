@@ -2,17 +2,17 @@ __all__ = []
 
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import TypedDict, cast
+from typing import TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.stats.contingency import chi2_contingency, crosstab
 
 from dataeval._experimental import experimental
 from dataeval._log import get_logger
 from dataeval.core._effective_n import pair_n, rescaled, validate_effective_n
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
+from dataeval.utils.scipy.stats import chi2_contingency, crosstab
 
 _logger = get_logger(__name__)
 
@@ -176,15 +176,16 @@ def parity(  # noqa: C901
         # the frequency of current_factor_name achieving value unique_factor_values[r]
         # at a data point with class c.
         results = crosstab(col_data, class_labels_np)
-        contingency_matrix = as_numpy(results.count)  # type: ignore
+        contingency_matrix = results.count
 
         # Rescale contingency table to effective entity counts before statistical tests.
         contingency_matrix = rescaled(contingency_matrix, pair_n(effective_n_np, 0, i + 1))
 
         # Pearson's chi-square test of independence without Yates' continuity correction.
         chi_results = chi2_contingency(contingency_matrix, correction=False)
-        chi_stat, p_val = cast(tuple[np.float64, np.float64], chi_results[:2])
-        expected = as_numpy(chi_results[3])
+        chi_stat = chi_results.statistic
+        p_val = chi_results.pvalue
+        expected = chi_results.expected_freq
 
         # Flag factors breaching Cochran's sufficiency criterion.
         unique_factor_values = np.unique(col_data)
