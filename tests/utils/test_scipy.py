@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+import scipy.stats
 
 from dataeval.utils.scipy.stats import (
     AndersonKsampResult,
@@ -212,6 +213,10 @@ class TestOtherTwoSampleTests:
         assert isinstance(result.statistic, float)
         assert isinstance(result.pvalue, float)
 
+    @pytest.mark.skipif(
+        not hasattr(scipy.stats, "bws_test"),
+        reason="scipy.stats.bws_test requires scipy>=1.12.0",
+    )
     def test_bws_test(self):
         a = np.array([1.0, 2.0, 3.0])
         b = np.array([2.0, 3.0, 4.0])
@@ -219,6 +224,15 @@ class TestOtherTwoSampleTests:
         assert isinstance(result, BwsTestResult)
         assert isinstance(result.statistic, float)
         assert isinstance(result.pvalue, float)
+
+    def test_bws_test_unavailable_raises_import_error(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([2.0, 3.0, 4.0])
+        with (
+            patch("dataeval.utils.scipy.stats._scipy_bws_test", None),
+            pytest.raises(ImportError, match="requires scipy>=1.12.0"),
+        ):
+            bws_test(a, b)
 
     def test_anderson_ksamp(self):
         a = np.array([1.0, 2.0, 3.0])

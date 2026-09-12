@@ -22,14 +22,25 @@ from collections.abc import Sequence
 from typing import Any, NamedTuple
 
 import numpy as np
+import scipy
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import anderson_ksamp as _scipy_anderson_ksamp
-from scipy.stats import bws_test as _scipy_bws_test
 from scipy.stats import cramervonmises_2samp as _scipy_cramervonmises_2samp
 from scipy.stats import ks_2samp as _scipy_ks_2samp
 from scipy.stats import mannwhitneyu as _scipy_mannwhitneyu
 from scipy.stats.contingency import chi2_contingency as _scipy_chi2_contingency
 from scipy.stats.contingency import crosstab as _scipy_crosstab
+
+try:
+    from scipy.stats import bws_test as _scipy_bws_test
+except ImportError:
+    _scipy_bws_test = None
+
+# scipy.stats.ks_2samp and cramervonmises_2samp gained their `axis` parameter in scipy 1.12.0.
+_SCIPY_1_12_SUPPORTS_AXIS = scipy.__version__ >= "1.12.0"
+
+# scipy.stats.bws_test was added in scipy 1.12.0; its `axis` parameter in 1.18.0.
+_BWS_TEST_SUPPORTS_AXIS = scipy.__version__ >= "1.18.0"
 
 
 class Chi2ContingencyResult(NamedTuple):
@@ -116,7 +127,7 @@ def chi2_contingency(
     correction: bool = True,
     lambda_: float | str | None = None,
 ) -> Chi2ContingencyResult:
-    """Perform chi-square test of independence with typed result.
+    r"""Perform chi-square test of independence with typed result.
 
     Wrapper for :func:`scipy.stats.contingency.chi2_contingency`.
 
@@ -126,7 +137,7 @@ def chi2_contingency(
         Contingency table.
     correction : bool, default True
         Whether to apply Yates' correction for continuity (for 2x2 tables).
-    lambda_ : float or str or None, default None
+    lambda\_ : float or str or None, default None
         Power-divergence statistic parameter. None uses Pearson's chi-square.
 
     Returns
@@ -239,7 +250,8 @@ def ks_2samp(
     TypeError
         If any returned field does not match the expected type.
     """
-    raw = _scipy_ks_2samp(data1, data2, alternative=alternative, method=method, axis=axis)
+    kwargs: dict[str, Any] = {"axis": axis} if _SCIPY_1_12_SUPPORTS_AXIS else {}
+    raw = _scipy_ks_2samp(data1, data2, alternative=alternative, method=method, **kwargs)
 
     stat = getattr(raw, "statistic", raw[0])
     pval = getattr(raw, "pvalue", raw[1])
@@ -333,7 +345,8 @@ def cramervonmises_2samp(
 
     Wrapper for :func:`scipy.stats.cramervonmises_2samp`.
     """
-    raw = _scipy_cramervonmises_2samp(x, y, method=method, axis=axis)
+    kwargs: dict[str, Any] = {"axis": axis} if _SCIPY_1_12_SUPPORTS_AXIS else {}
+    raw = _scipy_cramervonmises_2samp(x, y, method=method, **kwargs)
 
     stat = getattr(raw, "statistic", raw[0] if isinstance(raw, tuple) else None)
     pval = getattr(raw, "pvalue", raw[1] if isinstance(raw, tuple) else None)
@@ -344,6 +357,15 @@ def cramervonmises_2samp(
         raise TypeError(f"Expected pvalue to be numeric, got {type(pval).__name__}")
 
     return CramerVonMisesResult(statistic=float(stat), pvalue=float(pval))
+
+
+def _bws_test_kwargs(method: Any, axis: int) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    if method is not None:
+        kwargs["method"] = method
+    if _BWS_TEST_SUPPORTS_AXIS:
+        kwargs["axis"] = axis
+    return kwargs
 
 
 def bws_test(
@@ -357,11 +379,16 @@ def bws_test(
     """Perform Baumgartner-Weiss-Schindler test on two samples with typed result.
 
     Wrapper for :func:`scipy.stats.bws_test`.
+
+    Raises
+    ------
+    ImportError
+        If the installed scipy version does not provide ``bws_test`` (requires scipy>=1.12.0).
     """
-    kwargs: dict[str, Any] = {}
-    if method is not None:
-        kwargs["method"] = method
-    raw = _scipy_bws_test(x, y, alternative=alternative, axis=axis, **kwargs)
+    if _scipy_bws_test is None:
+        raise ImportError("dataeval.utils.scipy.stats.bws_test requires scipy>=1.12.0.")
+
+    raw = _scipy_bws_test(x, y, alternative=alternative, **_bws_test_kwargs(method, axis))
 
     stat = getattr(raw, "statistic", None)
     pval = getattr(raw, "pvalue", None)
