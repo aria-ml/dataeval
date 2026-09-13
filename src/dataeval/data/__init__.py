@@ -5,6 +5,7 @@ __all__ = [
     "ClassBalance",
     "ClassFilter",
     "Crop",
+    "Cuts",
     "DatasetSplits",
     "DetectionCrops",
     "EvenlySpaced",
@@ -22,6 +23,7 @@ __all__ = [
     "Representative",
     "Resize",
     "Reverse",
+    "SegmentPlanner",
     "SelectChannels",
     "SequenceFrames",
     "SequenceInfo",
@@ -31,7 +33,10 @@ __all__ = [
     "Stride",
     "TorchvisionTransform",
     "TrainValSplit",
+    "VideoSegments",
+    "VideoStitch",
     "View",
+    "Window",
     "build_tracks",
     "merge_datasets",
     "split_dataset",
@@ -47,9 +52,11 @@ from dataeval.data._indices import Indices
 from dataeval.data._limit import Limit
 from dataeval.data._locate import SourceItem, SourceLocator
 from dataeval.data._merge import merge_datasets
+from dataeval.data._planners import Cuts, SegmentPlanner, Window
 from dataeval.data._relabel import Relabel
 from dataeval.data._resize import Resize
 from dataeval.data._reverse import Reverse
+from dataeval.data._segments import VideoSegments
 from dataeval.data._selectchannels import SelectChannels
 from dataeval.data._selectors import (
     AllFrames,
@@ -67,6 +74,7 @@ from dataeval.data._selectors import (
 )
 from dataeval.data._shuffle import Shuffle
 from dataeval.data._split import DatasetSplits, TrainValSplit, split_dataset
+from dataeval.data._stitch import VideoStitch
 from dataeval.data._torchvision import TorchvisionTransform
 from dataeval.data._tracks import build_tracks
 from dataeval.data._unzip import unzip_dataset
