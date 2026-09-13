@@ -16,7 +16,9 @@ from dataeval.data._selectors import (
     FrameSelector,
     FrameVerdict,
     SequenceInfo,
+    sequence_infos,
 )
+from dataeval.data._video_proxies import checked_index, inherited_metadata
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     AnnotatedDataset,
@@ -162,17 +164,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
         # Frame counts come from the targets, which cost no decode: MAITE requires one frame
         # target per frame, and the structurers already raise when a stream disagrees.
-        self._sequences: list[SequenceInfo] = []
-        for index in range(len(dataset)):
-            _, target, metadata = dataset[index]
-            self._sequences.append(
-                SequenceInfo(
-                    index=index,
-                    source_id=metadata.get("id", index),
-                    n_frames=len(target.frame_tracks),
-                    metadata=metadata,
-                )
-            )
+        self._sequences: list[SequenceInfo] = [info for info, _ in sequence_infos(dataset)]
         self.n_source_frames: int = sum(info.n_frames for info in self._sequences)
 
         # A planning selector is authoritative through `plan`, so the whole index map is known
@@ -193,12 +185,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         if self._planned is not None:
             self.n_dropped = self.n_source_frames - sum(len(positions) for positions in self._planned)
 
-        source_id = str(dataset.metadata.get("id", "dataset"))
-        index2label = dataset.metadata.get("index2label", None)
-        inherited: dict[str, Any] = {"id": f"{source_id}-frames"}
-        if index2label is not None:
-            inherited["index2label"] = {int(key): str(value) for key, value in index2label.items()}
-        self._metadata = DatasetMetadata(inherited)  # type: ignore[typeddict-item]
+        self._metadata = inherited_metadata(dataset, "frames")
 
         self._cursor_sequence: int | None = None
         self._cursor: Iterator[Any] | None = None
@@ -260,10 +247,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     def __getitem__(self, index: int) -> ObjectDetectionDatum:
         """Return one frame as an object-detection datum."""
         entries = self._entries()
-        if index < 0:
-            index += len(entries)
-        if not 0 <= index < len(entries):
-            raise IndexError(f"SequenceFrames index {index} out of range for {len(entries)} frame(s).")
+        index = checked_index(index, len(entries), "SequenceFrames", "frame(s)")
         entry = entries[index]
         frame, target = self._seek(entry["sequence"], entry["position"])
         pixels = normalize_image_shape(as_numpy(frame.pixels))

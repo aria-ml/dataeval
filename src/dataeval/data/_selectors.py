@@ -79,6 +79,27 @@ class SequenceInfo:
     metadata: DatumMetadata
 
 
+def sequence_infos(dataset: Any) -> Iterator[tuple[SequenceInfo, Any]]:
+    """Yield sequence metadata and tracking targets for each video without decoding frames.
+
+    Yields
+    ------
+    tuple[SequenceInfo, Any]
+        Sequence information and tracking target for each video.
+    """
+    for index in range(len(dataset)):
+        _, target, metadata = dataset[index]
+        yield (
+            SequenceInfo(
+                index=index,
+                source_id=metadata.get("id", index),
+                n_frames=len(target.frame_tracks),
+                metadata=metadata,
+            ),
+            target,
+        )
+
+
 @dataclass(frozen=True, eq=False)
 class FrameCandidate:
     """One frame offered to a selector for a keep-or-drop decision.
