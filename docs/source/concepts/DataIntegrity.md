@@ -257,11 +257,12 @@ accordingly.
 
 **Cluster-based detection** operates in embedding space. When a feature
 extractor is provided, images are projected into embedding space and clustered.
-For each sample, the distance to its nearest cluster center is computed and
-expressed as a number of standard deviations from that cluster's mean
-intra-cluster distance. Samples exceeding the `cluster_threshold` (default: 2.5)
-are flagged with a `cluster_distance` metric value. This path catches semantic
-anomalies — samples that look statistically normal at the pixel level but do
+For each sample, the distance to its nearest cluster center is computed.
+Samples exceeding the `cluster_threshold` (default: 2.5) are flagged with a
+`cluster_distance` metric value — the distance itself, reported beside that
+cluster's own `population_mean` and `population_std`, so the number of standard
+deviations it sits out by is `(metric_value - population_mean) /
+population_std`. This path catches semantic anomalies — samples that look statistically normal at the pixel level but do
 not belong to any established class or scene type in the dataset.
 
 Both detection paths can run simultaneously and their results are merged into

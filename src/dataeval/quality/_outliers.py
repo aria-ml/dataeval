@@ -1,7 +1,7 @@
 __all__ = []
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Generic, Literal, TypeVar, overload
+from typing import Any, Generic, Literal, NamedTuple, TypeVar, overload
 
 import numpy as np
 import polars as pl
@@ -40,7 +40,6 @@ from dataeval.types import (
     set_metadata,
 )
 from dataeval.utils._array import flatten_samples, to_numpy
-from dataeval.utils._internal import EPSILON
 from dataeval.utils.data import iter_images
 from dataeval.utils.thresholds import AdaptiveThreshold, ZScoreThreshold, resolve_threshold
 
@@ -74,10 +73,27 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
       are all an address can name, and `target_index` already tells them apart.
     - metric_name: str - Name of the metric that flagged this image/target
     - metric_value: float - Value of the metric for this image/target
+    - direction: str - ``"upper"`` or ``"lower"``: which limit the value crossed
+    - bound: float - The limit it crossed
+    - percentile: float - Where the value ranks within its reference population, as a
+      percentage. Quartiles and quintiles are readings of this column, not separate ones.
+    - population_mean, population_std: float - The reference population's own figures
 
     Rows are thresholded **within a level**: a metric's distribution is fitted separately
     over each kind of row the statistics name, so a per-frame reading is never compared
     against a spread that includes per-sequence ones.
+
+    **The reference population is the one the threshold was fitted to** -- that metric, at that
+    level, and under :meth:`classwise`, within that class -- with NaN readings left out. So the
+    context columns describe the same comparison that flagged the row rather than a second,
+    looser one, and a value that is unremarkable globally still reads as extreme beside the class
+    it was judged against.
+
+    No z-score column is reported. A z is the statistic that flagged the row only under
+    :class:`~dataeval.utils.thresholds.ZScoreThreshold`; beside an adaptive, modified-z or IQR
+    bound it is an unrelated summary of the same value, and printing one next to those invites
+    reading it as the reason. ``percentile`` means the same thing under every threshold, and
+    ``(metric_value - population_mean) / population_std`` is the z for anyone who wants it.
 
     Attributes
     ----------
@@ -701,47 +717,144 @@ MultiOutliersOutput = OutliersOutput[MultiOutliersMap]
 MultiTargetOutliersOutput = OutliersOutput[MultiTargetOutliersMap]
 
 
-def _get_outlier_mask(  # noqa: C901
-    values: NDArray[Any],
-    threshold: Threshold,
-) -> NDArray[np.bool_]:
-    """Compute outlier boolean mask using a Threshold object.
+# The frame of reference every flagged row carries, beside the value that was flagged. Declared
+# once: the schema, the empty-frame schema and the cross-dataset merge all read it from here.
+_CONTEXT_COLUMNS: dict[str, Any] = {
+    "direction": pl.Categorical("lexical"),
+    "bound": pl.Float64,
+    "percentile": pl.Float64,
+    "population_mean": pl.Float64,
+    "population_std": pl.Float64,
+}
+
+
+# The measurements, which describe a row rather than identify it. Everything else in the frame
+# is part of which row this is, and so is what the frame is ordered on.
+_UNSORTED_COLUMNS = frozenset({"metric_value", *_CONTEXT_COLUMNS})
+
+
+def _extend_context(context: dict[str, list[Any]], fit: "_Fit") -> None:
+    """Append one fit's flagged rows to the running context columns, in frame order."""
+    context["direction"].extend(np.where(fit.above[fit.mask], "upper", "lower").tolist())
+    context["bound"].extend(fit.bound[fit.mask].tolist())
+    context["percentile"].extend(fit.percentile[fit.mask].tolist())
+    context["population_mean"].extend(fit.mean[fit.mask].tolist())
+    context["population_std"].extend(fit.std[fit.mask].tolist())
+
+
+class _Fit(NamedTuple):
+    """One threshold fitted to one population, and how each value under it sits against the fit.
+
+    Every field is an array aligned with the values the fit was asked about, so a level made of
+    several class buckets assembles one of these by writing each bucket's fit into its own slots.
+
+    Attributes
+    ----------
+    mask : NDArray[np.bool_]
+        Whether each value is an outlier.
+    bound : NDArray[np.float64]
+        The limit each value crossed, NaN where it crossed none.
+    above : NDArray[np.bool_]
+        Whether the crossed limit was the upper one.
+    percentile : NDArray[np.float64]
+        Each value's rank within the population, as a percentage.
+    mean, std : NDArray[np.float64]
+        The population's own figures, repeated for every value fitted against it.
+    """
+
+    mask: NDArray[np.bool_]
+    bound: NDArray[np.float64]
+    above: NDArray[np.bool_]
+    percentile: NDArray[np.float64]
+    mean: NDArray[np.float64]
+    std: NDArray[np.float64]
+
+
+def _unfitted(count: int) -> _Fit:
+    """Return a fit that flags nothing, for a population no threshold could be derived from."""
+    return _Fit(
+        mask=np.zeros(count, dtype=bool),
+        bound=np.full(count, np.nan, dtype=np.float64),
+        above=np.zeros(count, dtype=bool),
+        percentile=np.full(count, np.nan, dtype=np.float64),
+        mean=np.full(count, np.nan, dtype=np.float64),
+        std=np.full(count, np.nan, dtype=np.float64),
+    )
+
+
+def _percentile_of(values: NDArray[Any], population: NDArray[Any]) -> NDArray[np.float64]:
+    """Rank each value within an ascending population, as a percentage, splitting ties evenly.
+
+    Reported instead of a z-score because it means the same thing under every threshold. A z is
+    only the statistic that flagged the row under :class:`~dataeval.utils.thresholds.ZScoreThreshold`;
+    beside an adaptive or IQR bound it is a second, unrelated summary of the same value. The
+    population's ``mean`` and ``std`` are reported too, so a caller who wants a z can form one.
+    """
+    left = np.searchsorted(population, values, side="left")
+    right = np.searchsorted(population, values, side="right")
+    return 100.0 * (left + right) / (2 * len(population))
+
+
+def _crossings(
+    values: NDArray[np.float64],
+    real: NDArray[np.bool_],
+    lower: float | None,
+    upper: float | None,
+) -> tuple[NDArray[np.bool_], NDArray[np.bool_], NDArray[np.float64]]:
+    """Return which values fell below, which rose above, and the limit each one crossed."""
+    below = real & (values < lower) if lower is not None else np.zeros(len(values), dtype=bool)
+    above = real & (values > upper) if upper is not None else np.zeros(len(values), dtype=bool)
+    bound = np.full(len(values), np.nan, dtype=np.float64)
+    bound[below] = lower
+    bound[above] = upper
+    return below, above, bound
+
+
+def _fit_outliers(values: NDArray[Any], threshold: Threshold) -> _Fit:
+    """Fit a threshold to one population and describe every value against it.
 
     Parameters
     ----------
     values : NDArray
-        1D array of metric values.
+        1D array of metric values making up one population.
     threshold : Threshold
         Threshold instance to compute bounds.
 
     Returns
     -------
-    NDArray[np.bool_]
-        Boolean mask where True indicates an outlier.
+    _Fit
+        The outlier mask and the frame of reference behind it.
+
+    Notes
+    -----
+    The population is the array's non-NaN values, which is exactly what the threshold is fitted
+    to. A NaN is never an outlier: it records a measurement that was not made, not an unusual
+    value, and it takes no part in the mean, the spread or the percentile ranking either.
     """
-    if len(values) == 0:
-        return np.array([], dtype=bool)
-
-    nan_mask = np.isnan(values)
-
-    if np.all(nan_mask):
-        return np.full(values.shape, False, dtype=bool)
+    count = len(values)
+    if count == 0:
+        return _unfitted(count)
 
     float_values = values.astype(np.float64)
+    real = ~np.isnan(float_values)
+    if not np.any(real):
+        return _unfitted(count)
+
     lower, upper = threshold(float_values)
-
-    # If both bounds are None, the threshold could not be computed (e.g., zero variance)
+    # Both bounds None means the threshold could not be derived (e.g. zero variance).
     if lower is None and upper is None:
-        return np.full(values.shape, False, dtype=bool)
+        return _unfitted(count)
 
-    outlier_mask = np.full(values.shape, False, dtype=bool)
-    if lower is not None:
-        outlier_mask |= float_values < lower
-    if upper is not None:
-        outlier_mask |= float_values > upper
-
-    # NaN values are never outliers
-    return outlier_mask & ~nan_mask
+    below, above, bound = _crossings(float_values, real, lower, upper)
+    population = np.sort(float_values[real])
+    return _Fit(
+        mask=below | above,
+        bound=bound,
+        above=above,
+        percentile=_percentile_of(float_values, population),
+        mean=np.full(count, float(population.mean()), dtype=np.float64),
+        std=np.full(count, float(population.std()), dtype=np.float64),
+    )
 
 
 def _build_class_ids(  # noqa: C901
@@ -834,18 +947,24 @@ def _resolve_metric_threshold(
     return DEFAULT_OUTLIERS_OUTLIER_THRESHOLD
 
 
-def _compute_outlier_mask(
+def _place(into: _Fit, where: NDArray[np.bool_], part: _Fit) -> None:
+    """Write one bucket's fit into the slots it occupies in the level-wide arrays."""
+    for whole, piece in zip(into, part, strict=True):
+        whole[where] = piece
+
+
+def _fit_level(
     level_values: NDArray[Any],
     threshold: Threshold,
     level_mask: NDArray[np.bool_],
     class_ids: NDArray[np.intp] | None,
-) -> NDArray[np.bool_]:
-    """Compute outlier mask for one level, optionally grouped by class.
+) -> _Fit:
+    """Fit one level's values, in one population or one per class.
 
     Parameters
     ----------
     level_values : NDArray
-        Metric values for entries at this level (image or target).
+        Metric values for entries at this level.
     threshold : Threshold
         Threshold instance to compute bounds.
     level_mask : NDArray[np.bool_]
@@ -855,29 +974,26 @@ def _compute_outlier_mask(
 
     Returns
     -------
-    NDArray[np.bool_]
-        Boolean mask over level_values where True indicates an outlier.
+    _Fit
+        Arrays over ``level_values``, each entry described against the population it was
+        thresholded within -- the level as a whole, or its own class.
+
+    Notes
+    -----
+    Entries with no class to look up (``class_id == -1``) form their own bucket, fitted
+    globally, which is the same population the threshold used for them.
     """
     if class_ids is None:
-        return _get_outlier_mask(level_values.astype(np.float64), threshold)
+        return _fit_outliers(level_values, threshold)
 
     level_class_ids = class_ids[level_mask]
-    outlier_mask = np.zeros(len(level_values), dtype=bool)
-
-    # Global threshold for unclassifiable entries (class_id == -1)
-    unclassifiable = level_class_ids == -1
-    if np.any(unclassifiable):
-        outlier_mask[unclassifiable] = _get_outlier_mask(level_values[unclassifiable].astype(np.float64), threshold)
-
-    # Per-class threshold for classifiable entries
-    classifiable = level_class_ids >= 0
-    if np.any(classifiable):
-        for cls in np.unique(level_class_ids[classifiable]):
-            cls_mask = level_class_ids == cls
-            cls_outliers = _get_outlier_mask(level_values[cls_mask].astype(np.float64), threshold)
-            outlier_mask[cls_mask] = cls_outliers
-
-    return outlier_mask
+    fit = _unfitted(len(level_values))
+    buckets = [level_class_ids == -1]
+    buckets.extend(level_class_ids == cls for cls in np.unique(level_class_ids[level_class_ids >= 0]))
+    for bucket in buckets:
+        if np.any(bucket):
+            _place(fit, bucket, _fit_outliers(level_values[bucket], threshold))
+    return fit
 
 
 def _masks_by_level(source_index: Sequence[SourceIndex]) -> list[NDArray[np.bool_]]:
@@ -952,6 +1068,7 @@ def _detect_outliers(  # noqa: C901
     levels: list[str | None] = []
     metric_names: list[str] = []
     metric_values: list[float] = []
+    context: dict[str, list[Any]] = {name: [] for name in _CONTEXT_COLUMNS}
 
     if len(source_index) > 0:
         # One mask per kind of row the source index names, rather than the two an
@@ -970,15 +1087,16 @@ def _detect_outliers(  # noqa: C901
 
                     level_values = values[level_mask]
                     level_indices = np.flatnonzero(level_mask)
-                    outlier_mask = _compute_outlier_mask(level_values, threshold, level_mask, class_ids)
+                    fit = _fit_level(level_values, threshold, level_mask, class_ids)
 
-                    if np.any(outlier_mask):
-                        outlier_indices = level_indices[outlier_mask]
+                    if np.any(fit.mask):
+                        outlier_indices = level_indices[fit.mask]
                         item_ids.extend(source_index[idx].item for idx in outlier_indices)
                         target_ids.extend(source_index[idx].key for idx in outlier_indices)
                         levels.extend(reported_level(source_index[idx]) for idx in outlier_indices)
                         metric_names.extend([stat] * len(outlier_indices))
                         metric_values.extend(values[outlier_indices].tolist())
+                        _extend_context(context, fit)
 
     if not item_ids:
         return pl.DataFrame(
@@ -988,6 +1106,7 @@ def _detect_outliers(  # noqa: C901
                 "level": pl.Categorical("lexical"),
                 "metric_name": pl.Categorical("lexical"),
                 "metric_value": pl.Float64,
+                **_CONTEXT_COLUMNS,
             },
         )
 
@@ -998,6 +1117,7 @@ def _detect_outliers(  # noqa: C901
             "level": pl.Series(levels, dtype=pl.Categorical("lexical")),
             "metric_name": pl.Series(metric_names, dtype=pl.Categorical("lexical")),
             "metric_value": pl.Series(metric_values, dtype=pl.Float64),
+            **{name: pl.Series(context[name], dtype=dtype) for name, dtype in _CONTEXT_COLUMNS.items()},
         },
     )
 
@@ -1316,7 +1436,7 @@ class Outliers(Evaluator):
         >>> stats = compute_stats(images, stats=ImageStats.PIXEL)
         >>> outliers = Outliers(outlier_threshold=ZScoreThreshold(2.5))
         >>> results = outliers.from_stats(stats)
-        >>> results.head(10)
+        >>> results.head(10).select("item_index", "metric_name", "metric_value")
         shape: (10, 3)
         ┌────────────┬─────────────┬──────────────┐
         │ item_index ┆ metric_name ┆ metric_value │
@@ -1440,6 +1560,7 @@ class Outliers(Evaluator):
                     "target_index": pl.Int64,
                     "metric_name": pl.Categorical("lexical"),
                     "metric_value": pl.Float64,
+                    **_CONTEXT_COLUMNS,
                 },
             )
         if len(outliers_dfs) == 1:
@@ -1460,6 +1581,10 @@ class Outliers(Evaluator):
         if has_level:
             column_order.append("level")
         column_order.extend(["metric_name", "metric_value"])
+        # Carried the same way as `level`: a frame built by hand may not have them, and the
+        # merged result should still hold the context every detector-built frame does.
+        context = [name for name in _CONTEXT_COLUMNS if any(name in df.columns for df in outliers_dfs)]
+        column_order.extend(context)
 
         normalized_dfs: list[pl.DataFrame] = []
         for df in outliers_dfs:
@@ -1467,10 +1592,12 @@ class Outliers(Evaluator):
                 df = df.with_columns(pl.lit(None, dtype=pl.Int64).alias("target_index"))
             if has_level and "level" not in df.columns:
                 df = df.with_columns(pl.lit(None, dtype=pl.Categorical("lexical")).alias("level"))
+            missing = [name for name in context if name not in df.columns]
+            df = df.with_columns(pl.lit(None, dtype=_CONTEXT_COLUMNS[name]).alias(name) for name in missing)
             normalized_dfs.append(df.select(column_order))
         # Sorted on the columns that survived, not on a fixed list: an item-level-only
         # result has no target_index to sort by, and naming it raised ColumnNotFoundError.
-        sort_columns = [name for name in column_order if name != "metric_value"]
+        sort_columns = [name for name in column_order if name not in _UNSORTED_COLUMNS]
         return pl.concat(normalized_dfs).sort(sort_columns)
 
     @staticmethod
@@ -1498,60 +1625,61 @@ class Outliers(Evaluator):
         -------
         pl.DataFrame
             DataFrame with outlier details containing columns:
+
             - item_index: int - Index of the outlier
             - metric_name: str - Always "cluster_distance"
-            - metric_value: float - Distance in std dev from cluster mean
+            - metric_value: float - Distance to the nearest cluster centre
+            - direction, bound, percentile, population_mean, population_std - the frame of
+              reference, taken from the point's own cluster
+
+        Notes
+        -----
+        ``metric_value`` is the distance itself, as every other metric reports the value that
+        was measured. The standard deviations it sits from its cluster's mean are
+        ``(metric_value - population_mean) / population_std``.
         """
-        # Get pre-calculated distances and nearest cluster indices
-        min_distances = cluster_stats["distances"]
+        distances = cluster_stats["distances"]
         nearest_cluster_idx = cluster_stats["nearest_cluster_idx"]
-        cluster_distances_mean = cluster_stats["cluster_distances_mean"]
-        cluster_distances_std = cluster_stats["cluster_distances_std"]
+        count = len(distances)
 
-        # Compute per-cluster upper bounds using the threshold
-        unique_clusters = np.unique(nearest_cluster_idx[nearest_cluster_idx >= 0])
-        is_outlier = np.full(len(min_distances), False, dtype=bool)
+        is_outlier = np.full(count, False, dtype=bool)
+        bounds = np.full(count, np.nan, dtype=np.float64)
+        percentiles = np.full(count, np.nan, dtype=np.float64)
 
-        for cluster_id in unique_clusters:
+        for cluster_id in np.unique(nearest_cluster_idx[nearest_cluster_idx >= 0]):
             mask = nearest_cluster_idx == cluster_id
-            cluster_distances = min_distances[mask]
+            cluster_distances = distances[mask]
             _, upper = threshold(cluster_distances)
+            percentiles[mask] = _percentile_of(cluster_distances, np.sort(cluster_distances))
             if upper is not None:
                 is_outlier[mask] = cluster_distances > upper
+                bounds[mask] = upper
 
-        # Build the result DataFrame with issue details
         outlier_indices = np.nonzero(is_outlier)[0]
-
+        schema: Any = {
+            "item_index": pl.Int64,
+            "metric_name": pl.Categorical("lexical"),
+            "metric_value": pl.Float64,
+            **_CONTEXT_COLUMNS,
+        }
         if len(outlier_indices) == 0:
-            return pl.DataFrame(
-                schema={
-                    "item_index": pl.Int64,
-                    "metric_name": pl.Categorical("lexical"),
-                    "metric_value": pl.Float64,
-                },
-            )
+            return pl.DataFrame(schema=schema)
 
-        item_ids: list[int] = []
-        metric_values: list[float] = []
-
-        for idx in outlier_indices:
-            cluster_idx = nearest_cluster_idx[idx]
-            distance = float(min_distances[idx])
-            mean = float(cluster_distances_mean[cluster_idx])
-            std = float(cluster_distances_std[cluster_idx])
-
-            # Calculate number of standard deviations from mean
-            std_devs = (distance - mean) / std if std > EPSILON else 0.0
-
-            item_ids.append(int(idx))
-            metric_values.append(std_devs)
-
-        # Cluster-based detection is always item-level, so we don't include target_index
+        clusters_of = nearest_cluster_idx[outlier_indices]
+        means = np.asarray(cluster_stats["cluster_distances_mean"])[clusters_of]
+        stds = np.asarray(cluster_stats["cluster_distances_std"])[clusters_of]
+        # Cluster-based detection is always item-level, so we don't include target_index, and it
+        # only ever flags points that are too far out, never too close in.
         return pl.DataFrame(
             {
-                "item_index": pl.Series(item_ids, dtype=pl.Int64),
-                "metric_name": pl.Series(["cluster_distance"] * len(item_ids), dtype=pl.Categorical("lexical")),
-                "metric_value": pl.Series(metric_values, dtype=pl.Float64),
+                "item_index": pl.Series(outlier_indices.tolist(), dtype=pl.Int64),
+                "metric_name": pl.Series(["cluster_distance"] * len(outlier_indices), dtype=pl.Categorical("lexical")),
+                "metric_value": pl.Series(distances[outlier_indices].tolist(), dtype=pl.Float64),
+                "direction": pl.Series(["upper"] * len(outlier_indices), dtype=pl.Categorical("lexical")),
+                "bound": pl.Series(bounds[outlier_indices].tolist(), dtype=pl.Float64),
+                "percentile": pl.Series(percentiles[outlier_indices].tolist(), dtype=pl.Float64),
+                "population_mean": pl.Series(means.tolist(), dtype=pl.Float64),
+                "population_std": pl.Series(stds.tolist(), dtype=pl.Float64),
             },
         ).sort(["item_index", "metric_name"], descending=[False, False])
 
@@ -1716,7 +1844,7 @@ class Outliers(Evaluator):
 
         >>> outliers = Outliers(outlier_threshold=2.5)
         >>> results = outliers.evaluate(images)
-        >>> results.head(6)
+        >>> results.head(6).select("item_index", "metric_name", "metric_value")
         shape: (6, 3)
         ┌────────────┬─────────────┬──────────────┐
         │ item_index ┆ metric_name ┆ metric_value │
@@ -1730,6 +1858,21 @@ class Outliers(Evaluator):
         │ 7          ┆ darkness    ┆ 249.900009   │
         │ 7          ┆ entropy     ┆ 0.0          │
         └────────────┴─────────────┴──────────────┘
+
+        Every row also carries the frame of reference it was judged against:
+
+        >>> results.head(4).select("metric_name", "direction", "bound", "percentile")
+        shape: (4, 4)
+        ┌─────────────┬───────────┬────────────┬────────────┐
+        │ metric_name ┆ direction ┆ bound      ┆ percentile │
+        │ ---         ┆ ---       ┆ ---        ┆ ---        │
+        │ cat         ┆ cat       ┆ f64        ┆ f64        │
+        ╞═════════════╪═══════════╪════════════╪════════════╡
+        │ zeros       ┆ upper     ┆ 0.000048   ┆ 92.0       │
+        │ zeros       ┆ upper     ┆ 0.000048   ┆ 92.0       │
+        │ brightness  ┆ upper     ┆ 114.368277 ┆ 96.0       │
+        │ contrast    ┆ lower     ┆ 0.886324   ┆ 4.0        │
+        └─────────────┴───────────┴────────────┴────────────┘
 
         Evaluate two or more datasets (cross-dataset detection):
 

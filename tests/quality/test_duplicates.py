@@ -2410,3 +2410,112 @@ class TestDefaultRadiusWarning:
         with pytest.warns(FutureWarning) as recorded:
             Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(self._images())
         assert "Pass hash_radius explicitly" in str(recorded[0].message)
+
+
+def _frame(rows: list[dict[str, Any]]) -> pl.DataFrame:
+    """Build a duplicates frame from bare group descriptions, filling the constant columns."""
+    return pl.DataFrame(
+        [
+            {
+                "group_id": index,
+                "level": row.get("level", "item"),
+                "dup_type": row.get("dup_type", "exact"),
+                "item_indices": row["item_indices"],
+                "methods": row.get("methods", ["xxhash"]),
+            }
+            for index, row in enumerate(rows)
+        ],
+        schema={
+            "group_id": pl.Int64,
+            "level": pl.Utf8,
+            "dup_type": pl.Utf8,
+            "item_indices": pl.List(pl.Int64),
+            "methods": pl.List(pl.Utf8),
+        },
+    )
+
+
+@pytest.mark.required
+class TestDeduplicate:
+    """The keep/discard plan, and the policy it is asked for."""
+
+    def test_one_member_of_each_group_survives(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}, {"item_indices": [2, 6]}]))
+        plan = result.deduplicate(n_items=8)
+        assert plan.discard == [4, 6]
+
+    def test_keep_is_every_retained_item_not_just_the_survivors(self):
+        """``Indices(plan.keep)`` has to yield the whole kept dataset, not only the deduped part."""
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}]))
+        plan = result.deduplicate(n_items=6)
+        assert plan.keep == [0, 1, 2, 3, 5]
+
+    def test_overlapping_groups_merge_before_a_survivor_is_chosen(self):
+        """Per-group choice would keep 3 for its own group while group 0 discards it."""
+        result = DuplicatesOutput(_frame([{"item_indices": [0, 3]}, {"item_indices": [3, 7]}]))
+        plan = result.deduplicate(n_items=8)
+        assert plan.discard == [3, 7]
+        assert 0 in plan.keep
+
+    def test_keep_last_survives_the_highest_index(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [0, 3]}, {"item_indices": [3, 7]}]))
+        plan = result.deduplicate(n_items=8, keep="last")
+        assert plan.discard == [0, 3]
+        assert 7 in plan.keep
+
+    def test_near_duplicates_are_left_alone_by_default(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "dup_type": "near"}]))
+        assert result.deduplicate(n_items=6).discard == []
+
+    def test_near_duplicates_are_deduped_when_asked_for(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "dup_type": "near"}]))
+        assert result.deduplicate(n_items=6, dup_types=("exact", "near")).discard == [4]
+
+    def test_an_excluded_group_contributes_nothing(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}, {"item_indices": [2, 6]}]))
+        assert result.deduplicate(n_items=8, exclude_groups=[1]).discard == [4]
+
+    def test_excluding_a_group_does_not_pin_its_members(self):
+        """Excluding group 1 means 'do not dedupe on account of it', not 'protect 3 forever'."""
+        result = DuplicatesOutput(_frame([{"item_indices": [0, 3]}, {"item_indices": [3, 7]}]))
+        plan = result.deduplicate(n_items=8, exclude_groups=[1])
+        assert plan.discard == [3]
+        assert 7 in plan.keep
+
+    def test_target_level_groups_are_skipped(self):
+        """``Indices`` addresses items; a target-level group names something else."""
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "level": "target"}]))
+        assert result.deduplicate(n_items=6).discard == []
+
+    def test_an_empty_result_discards_nothing(self):
+        result = DuplicatesOutput(_frame([]))
+        plan = result.deduplicate(n_items=4)
+        assert plan.discard == []
+        assert plan.keep == [0, 1, 2, 3]
+
+    def test_a_cross_dataset_result_is_refused(self):
+        frame = _frame([{"item_indices": [1, 4]}]).with_columns(
+            pl.Series("dataset_indices", [[0, 1]], dtype=pl.List(pl.Int64)),
+        )
+        with pytest.raises(ValueError, match="single dataset"):
+            DuplicatesOutput(frame).deduplicate(n_items=6)
+
+    def test_the_item_count_is_read_off_the_statistics(self):
+        data = np.random.random((6, 3, 16, 16))
+        result = Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0).evaluate(np.concatenate((data, data)))
+        plan = result.deduplicate()
+        assert sorted(plan.keep + plan.discard) == list(range(12))
+        assert plan.discard == [6, 7, 8, 9, 10, 11]
+
+    def test_an_unresolvable_item_count_says_what_to_pass(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}]))
+        with pytest.raises(ValueError, match="n_items"):
+            result.deduplicate()
+
+    def test_the_plan_feeds_view_directly(self):
+        from dataeval.data import Indices, View
+
+        data = np.random.random((6, 3, 16, 16))
+        result = Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0).evaluate(np.concatenate((data, data)))
+        kept = View(np.concatenate((data, data)), Indices(result.deduplicate().keep))
+        assert len(kept) == 6

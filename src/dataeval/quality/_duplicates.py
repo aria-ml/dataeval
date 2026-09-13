@@ -255,6 +255,11 @@ _EMPTY_DUPS_SCHEMA: dict[str, pl.DataType | type] = {
 _IMAGE_LEVELS = {"item": "item", "target": "target"}
 _TRACKING_LEVELS = {"item": "unit", "target": "instance", "sequence": "sequence", "track": "track"}
 
+# The only levels whose members are whole dataset items, which is what `Indices` addresses. A
+# video's item is its sequence, so `sequence` joins `item` here while `unit` -- one frame of a
+# sequence -- does not: dropping a frame is not dropping the item it came from.
+_ADDRESSES_ITEMS = frozenset({"item", "sequence"})
+
 
 def _resolve_selector(frame_sample: FrameSample) -> FrameSelector:
     """Turn the `frame_sample` policy into the mechanism that carries it out."""
@@ -2066,6 +2071,46 @@ def _pair_frame(folded: Mapping[tuple[Any, ...], dict[str, Any]], cross: bool) -
     return frame.drop(drop).sort(["level", "n_groups", "item_a", "item_b"], descending=[False, True, False, False])
 
 
+class DedupePlan(NamedTuple):
+    """What a deduplication policy keeps and what it drops.
+
+    Returned by :meth:`DuplicatesOutput.deduplicate`. Both fields are plain item indices into
+    the source dataset, sorted ascending, and either one feeds
+    :class:`~dataeval.data.Indices` directly.
+
+    Attributes
+    ----------
+    keep : list[int]
+        Every item the policy retains -- not just the survivor of each duplicate set, but
+        every index that is not in `discard`, so ``View(dataset, Indices(plan.keep))`` is the
+        whole deduplicated dataset.
+    discard : list[int]
+        The items the policy drops. Equivalent to ``Indices(plan.discard, exclude=True)``.
+    """
+
+    keep: list[int]
+    discard: list[int]
+
+
+def _discarded(groups: Sequence[Sequence[int]], keep: Literal["first", "last"]) -> list[int]:
+    """Merge every group that shares a member, then drop all but one item of each merged set.
+
+    Merging first is what keeps the answer consistent. Groups overlap -- one item routinely
+    sits in several -- and choosing a survivor per group can discard an item that another
+    group is keeping, leaving a `keep` list that still holds duplicates of each other.
+
+    Each group contributes a chain of edges rather than every pair among its members: it takes
+    the same components to build and is linear in the group's size rather than quadratic.
+    """
+    edges = [(members[i], members[i + 1]) for members in groups for i in range(len(members) - 1)]
+    if not edges:
+        return []
+    merged = _sorted_union_find(np.array(edges, dtype=np.int64))
+    # `_sorted_union_find` returns each merged set ascending, so the ends are the extreme indices.
+    position = -1 if keep == "last" else 0
+    return sorted(index for members in merged for index in members if index != members[position])
+
+
 class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDuplicatesGroup]):
     """
     Output class for :class:`.Duplicates` detector.
@@ -2092,15 +2137,20 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
          - :meth:`aggregate_by_image`
        * - Which detector found this?
          - :meth:`aggregate_by_method`
+       * - How many members are in each group?
+         - :meth:`aggregate_by_group`
        * - Just the whole-video / frame / track / detection relations
          - :attr:`sequences`, :attr:`frames`, :attr:`tracks`, :attr:`detections`
        * - The groups as plain indices, to act on
          - :attr:`exact`, :attr:`near`
+       * - Which indices to keep and which to drop, under a policy I state
+         - :meth:`deduplicate`
        * - Everything, unreshaped
          - :meth:`data`
 
-    None of these decide anything. A duplicate is evidence of redundancy, not an instruction to
-    delete: ``containment`` and ``redundant_fraction`` are reported so the cutoff stays yours.
+    None of these decide anything on their own. A duplicate is evidence of redundancy, not an
+    instruction to delete: ``containment`` and ``redundant_fraction`` are reported so the cutoff
+    stays yours, and :meth:`deduplicate` acts only on a policy you hand it.
 
     DataFrame of duplicate groups with columns:
 
@@ -2798,6 +2848,122 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             )
             .sort(["group_count", "method"], descending=[True, False])
         )
+
+    # ------------------------------------------------------------------
+    # Acting on the result
+    # ------------------------------------------------------------------
+
+    def _item_count(self, n_items: int | None) -> int:
+        """Resolve how many items the source dataset holds, which `keep` is the complement of."""
+        if n_items is not None:
+            return int(n_items)
+        if self.frame_map is not None and len(self.frame_map):
+            # A video's items are its sequences, and the frame map names the sequence each
+            # measured frame came from.
+            return int(self.frame_map[:, 0].max()) + 1
+        if self.calculation_results is not None:
+            results = self.calculation_results
+            every = [results] if isinstance(results, Mapping) else list(results)
+            return sum(int(result["image_count"]) for result in every)
+        if self.cluster_result is not None:
+            return int(len(self.cluster_result["clusters"]))
+        raise ValueError(
+            "deduplicate cannot tell how many items the dataset holds: this result carries "
+            "neither statistics nor clusters to read it off. Pass n_items=len(dataset), or use "
+            "Indices(plan.discard, exclude=True), which needs no count.",
+        )
+
+    def deduplicate(
+        self,
+        *,
+        dup_types: Sequence[str] = ("exact",),
+        keep: Literal["first", "last"] = "first",
+        exclude_groups: Sequence[int] | None = None,
+        n_items: int | None = None,
+    ) -> DedupePlan:
+        """Turn these duplicates into the indices to keep and the indices to drop.
+
+        The one method here that acts on a policy rather than only reporting. Every choice the
+        policy makes is an argument, because none of them follow from the evidence: which kinds
+        of duplicate are worth collapsing, which member of a set survives, and which groups to
+        leave alone are yours to state.
+
+        Parameters
+        ----------
+        dup_types : Sequence[str], default ``("exact",)``
+            Which ``dup_type`` values to collapse. The default touches only exact matches, where
+            the members are the same content and dropping all but one loses nothing. Add
+            ``"near"`` to collapse near duplicates, which is a judgement about how similar is too
+            similar. ``"redundant"`` relates a sequence to itself and names no items to drop;
+            see :meth:`aggregate_by_sequence` for that.
+        keep : {"first", "last"}, default "first"
+            Which member of each merged duplicate set survives -- the lowest item index, or the
+            highest.
+        exclude_groups : Sequence[int] or None, default None
+            ``group_id`` values to leave alone. An excluded group contributes nothing, so its
+            members are not collapsed *on its account*; a member that also sits in a group you
+            did not exclude can still be dropped through that one.
+        n_items : int or None, default None
+            How many items the source dataset holds. Read off the stored statistics, clusters or
+            frame map when None, which covers every result these detectors produce. Pass it when
+            the result was built by hand.
+
+        Returns
+        -------
+        DedupePlan
+            ``keep`` and ``discard``, both plain item indices.
+
+        Raises
+        ------
+        ValueError
+            If the result spans multiple datasets, where the question is leakage rather than
+            deduplication -- see :meth:`aggregate_by_pair`. Also if the item count cannot be
+            resolved and ``n_items`` was not given.
+
+        See Also
+        --------
+        :class:`~dataeval.data.Indices` : The operation that consumes either list
+        :meth:`~dataeval.quality.DuplicatesOutput.aggregate_by_pair` : Which items duplicate which
+
+        Notes
+        -----
+        **Only whole items are collapsed.** Target-, frame-, track- and detection-level groups
+        are skipped: :class:`~dataeval.data.Indices` addresses dataset items, and those rows name
+        something smaller. For a video dataset the item is the sequence, so whole-sequence groups
+        take part and per-frame ones do not.
+
+        **Overlapping groups are merged first.** An item routinely sits in several groups;
+        choosing a survivor within each group separately can discard an item that another group
+        is keeping. Groups sharing any member are merged into one set, and one member of that set
+        survives.
+
+        Examples
+        --------
+        >>> from dataeval.data import Indices, View
+
+        >>> result = Duplicates().evaluate(dataset)
+        >>> plan = result.deduplicate()
+        >>> deduplicated = View(dataset, Indices(plan.keep))
+
+        Collapse near duplicates too, but leave one group untouched:
+
+        >>> plan = result.deduplicate(dup_types=("exact", "near"), exclude_groups=[3])
+        """
+        if "dataset_indices" in self.data().columns:
+            raise ValueError(
+                "deduplicate only works with output from a single dataset. Across datasets the "
+                "question is which content is shared, not which copy to drop -- see "
+                "aggregate_by_pair().",
+            )
+        total = self._item_count(n_items)
+        rows = self.data().filter(
+            pl.col("level").is_in(list(_ADDRESSES_ITEMS))
+            & pl.col("dup_type").is_in(list(dup_types))
+            & ~pl.col("group_id").is_in(list(exclude_groups or [])),
+        )
+        discard = _discarded(rows["item_indices"].to_list(), keep)
+        dropped = set(discard)
+        return DedupePlan(keep=[index for index in range(total) if index not in dropped], discard=discard)
 
     # ------------------------------------------------------------------
     # Redetection

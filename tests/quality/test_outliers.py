@@ -11,7 +11,7 @@ from dataeval.core._label_stats import LabelStatsResult
 from dataeval.data import unzip_dataset
 from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
-from dataeval.quality._outliers import Outliers, OutliersOutput, _build_class_ids, _get_outlier_mask
+from dataeval.quality._outliers import Outliers, OutliersOutput, _build_class_ids, _fit_outliers
 from dataeval.types import SourceIndex
 from dataeval.utils.thresholds import (
     IQRThreshold,
@@ -45,7 +45,7 @@ class TestOutliers:
         assert results is not None
 
     def test_get_outlier_mask_empty(self):
-        mask = _get_outlier_mask(np.zeros([0]), ZScoreThreshold())
+        mask = _fit_outliers(np.zeros([0]), ZScoreThreshold()).mask
         assert mask is not None
         assert len(mask) == 0
 
@@ -53,15 +53,15 @@ class TestOutliers:
         "threshold",
         [ZScoreThreshold(2.5), ModifiedZScoreThreshold(2.5), IQRThreshold(2.5)],
     )
-    def test_get_outlier_mask(self, threshold):
+    def test_fit_outliers(self, threshold):
         data = np.array([0.1, 0.2, 0.1, 1.0])
-        mask = _get_outlier_mask(data, threshold)
+        mask = _fit_outliers(data, threshold).mask
         # With only 4 values, 2.5x multiplier should not flag anything
         assert mask is not None
         assert len(mask) == len(data)
 
     def test_get_outlier_mask_all_nan(self):
-        mask = _get_outlier_mask(np.array([np.nan, np.nan, np.nan]), ZScoreThreshold())
+        mask = _fit_outliers(np.array([np.nan, np.nan, np.nan]), ZScoreThreshold()).mask
         np.testing.assert_array_equal(mask, np.array([False, False, False]))
 
     def test_outliers_with_stats(self):
@@ -896,13 +896,13 @@ class TestOutliersEdgeCases:
         assert ds1["item_index"][0] == 1
 
     def test_get_outlier_mask_branches(self):
-        """Covers _get_outlier_mask specific branches (all nan, empty)."""
+        """Covers _fit_outliers specific branches (all nan, empty)."""
         t = ZScoreThreshold(3.0)
         # Empty
-        assert len(_get_outlier_mask(np.array([]), t)) == 0
+        assert len(_fit_outliers(np.array([]), t).mask) == 0
 
         # All NaNs
-        res = _get_outlier_mask(np.array([np.nan, np.nan]), t)
+        res = _fit_outliers(np.array([np.nan, np.nan]), t).mask
         assert not np.any(res)
 
     def test_evaluate_with_tuple_dataset(self, get_mock_ic_dataset):
@@ -1740,3 +1740,125 @@ class TestOutliersPerTargetKeying:
         assert set(outliers) == {0, 1}
         for per_row in outliers.values():
             assert all(isinstance(key, SourceIndex) for key in per_row)
+
+
+@pytest.mark.required
+class TestOutlierContextColumns:
+    """The frame of reference each flagged value is reported against."""
+
+    @staticmethod
+    def _detect(values, threshold, levels=None, class_ids=None):
+        from dataeval.quality._outliers import _detect_outliers
+
+        array = np.asarray(values, dtype=np.float64)
+        levels = levels if levels is not None else [None] * len(array)
+        # A stated level only separates rows when the address is keyed; an unkeyed one folds
+        # onto the task-generic kind whatever it names.
+        source_index = [SourceIndex(i, None if level is None else i, level) for i, level in enumerate(levels)]
+        return _detect_outliers({"m": array}, source_index, threshold, class_ids)
+
+    def test_an_upper_outlier_names_the_limit_it_crossed(self):
+        from dataeval.utils.thresholds import ConstantThreshold
+
+        df = self._detect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], ConstantThreshold(upper=8.5))
+        assert df["item_index"].to_list() == [9]
+        assert df["direction"].to_list() == ["upper"]
+        assert df["bound"].to_list() == [8.5]
+
+    def test_a_lower_outlier_names_the_other_limit(self):
+        from dataeval.utils.thresholds import ConstantThreshold
+
+        df = self._detect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], ConstantThreshold(lower=0.5))
+        assert df["item_index"].to_list() == [0]
+        assert df["direction"].to_list() == ["lower"]
+        assert df["bound"].to_list() == [0.5]
+
+    def test_percentile_ranks_the_value_in_its_population(self):
+        from dataeval.utils.thresholds import ConstantThreshold
+
+        df = self._detect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], ConstantThreshold(upper=8.5))
+        assert df["percentile"].to_list() == [95.0]
+
+    def test_the_population_figures_describe_what_the_threshold_was_fitted_to(self):
+        from dataeval.utils.thresholds import ConstantThreshold
+
+        df = self._detect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], ConstantThreshold(upper=8.5))
+        assert df["population_mean"].to_list() == [4.5]
+        assert df["population_std"].to_list() == pytest.approx([np.sqrt(8.25)])
+
+    def test_a_nan_is_left_out_of_the_population(self):
+        from dataeval.utils.thresholds import ConstantThreshold
+
+        df = self._detect([0, 1, 2, 3, 4, 5, 6, 7, 8, np.nan], ConstantThreshold(upper=7.5))
+        assert df["item_index"].to_list() == [8]
+        assert df["population_mean"].to_list() == [4.0]
+        assert df["percentile"].to_list() == pytest.approx([100 * 17 / 18])
+
+    def test_each_level_is_described_against_its_own_population(self):
+        from dataeval.utils.thresholds import ConstantThreshold
+
+        levels = ["unit"] * 5 + ["track"] * 5
+        df = self._detect([0, 1, 2, 3, 100, 50, 51, 52, 53, 54], ConstantThreshold(upper=40), levels=levels)
+        by_level = dict(zip(df["level"].to_list(), df["population_mean"].to_list(), strict=True))
+        assert by_level["unit"] == pytest.approx(21.2)
+        assert by_level["track"] == pytest.approx(52.0)
+
+    def test_a_class_bucket_is_described_against_its_own_population(self):
+        from dataeval.utils.thresholds import ConstantThreshold
+
+        class_ids = np.array([0] * 5 + [1] * 5, dtype=np.intp)
+        df = self._detect([0, 1, 2, 3, 100, 50, 51, 52, 53, 54], ConstantThreshold(upper=40), class_ids=class_ids)
+        assert df["item_index"].to_list() == [4, 5, 6, 7, 8, 9]
+        means = dict(zip(df["item_index"].to_list(), df["population_mean"].to_list(), strict=True))
+        assert means[4] == pytest.approx(21.2)
+        assert means[5] == pytest.approx(52.0)
+
+    def test_the_columns_survive_an_evaluate(self):
+        outliers = Outliers(flags=ImageStats.PIXEL)
+        result = outliers.evaluate(np.random.random((30, 3, 16, 16)))
+        for column in ("direction", "bound", "percentile", "population_mean", "population_std"):
+            assert column in result.data().columns
+
+    def test_the_columns_survive_a_cross_dataset_merge(self):
+        outliers = Outliers(flags=ImageStats.PIXEL)
+        result = outliers.evaluate(np.random.random((30, 3, 16, 16)), np.random.random((30, 3, 16, 16)))
+        for column in ("direction", "bound", "percentile", "population_mean", "population_std"):
+            assert column in result.data().columns
+
+    def test_the_columns_survive_redetection(self):
+        outliers = Outliers(flags=ImageStats.PIXEL)
+        result = outliers.evaluate(np.random.random((30, 3, 16, 16))).with_threshold(2.0)
+        assert "percentile" in result.data().columns
+
+
+@pytest.mark.required
+class TestClusterDistanceReportsARawValue:
+    """`metric_value` means the same thing for cluster_distance as for every other metric."""
+
+    @staticmethod
+    def _result():
+        rng = np.random.default_rng(0)
+        embeddings = np.concatenate([rng.normal(0, 0.1, (40, 4)), np.array([[9.0, 9.0, 9.0, 9.0]])])
+        clusters: ClusterResult = {
+            "clusters": np.zeros(41, dtype=np.intp),
+            "mst": np.array([], dtype=np.float32),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int64),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+        return Outliers().from_clusters(embeddings, clusters, cluster_threshold=2.0)
+
+    def test_metric_value_is_the_distance_not_its_z_score(self):
+        df = self._result().data()
+        flagged = df.filter(pl.col("metric_name") == "cluster_distance")
+        assert flagged.height > 0
+        # A z-score of a far-off point is single digits; the distance itself is much larger.
+        assert max(flagged["metric_value"].to_list()) > 10
+
+    def test_the_cluster_figures_are_reported_alongside(self):
+        df = self._result().data()
+        flagged = df.filter(pl.col("metric_name") == "cluster_distance")
+        assert flagged["population_mean"].null_count() == 0
+        assert flagged["population_std"].null_count() == 0
+        assert flagged["direction"].to_list() == ["upper"] * flagged.height
