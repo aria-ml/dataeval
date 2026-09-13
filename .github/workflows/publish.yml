@@ -50,7 +50,7 @@ jobs:
         with:
           body: ${{ steps.changelog.outputs.NOTES }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: dist/*
           generate_release_notes: true  # Adds auto-generated release notes
 
