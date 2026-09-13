@@ -122,7 +122,7 @@ create release:
   stage: release
   extends: .rules_release_only
   needs: []
-  # Serialize with 'create pre-release' - both commit and tag main, so concurrent
+  # Serialize with 'create prerelease' - both commit and tag main, so concurrent
   # runs compute the same version and the loser fails on tag creation
   resource_group: release
   # The commit and the tag are two separate API calls; an auto-cancel landing
@@ -134,9 +134,9 @@ create release:
   script:
     - uv run python .gitlab/scripts/create_release.py
 
-# This job creates a pre-release version tag (e.g., v1.0.0-rc0, v1.0.0-rc1)
-# Triggered by setting CREATE_PRE_RELEASE=true in scheduled pipeline
-create pre-release:
+# This job creates a prerelease version tag (e.g., v1.0.0-rc0, v1.0.0-rc1)
+# Triggered by setting CREATE_PRERELEASE=true in scheduled pipeline
+create prerelease:
   stage: release
   extends: .rules_prerelease_only
   needs: []

@@ -124,12 +124,12 @@ Triggered by setting `CREATE_NEW_RELEASE=true` in a scheduled pipeline:
 4. The tag push triggers **GitHub Actions** (`publish.yml`) which builds and publishes to PyPI
    and creates a GitHub Release
 
-### Pre-Release
+### Prerelease
 
-Triggered by setting `CREATE_PRE_RELEASE=true`:
+Triggered by setting `CREATE_PRERELEASE=true`:
 
-- Creates a pre-release tag like `v1.0.0-rc0` on main
-- Updates changelog and Colab links to the pre-release version
+- Creates a prerelease tag like `v1.0.0-rc0` on main
+- Updates changelog and Colab links to the prerelease version
 - An API pipeline on main creates `docs-artifacts/v1.0.0-rc0`
 
 ### Release Branch Creation
@@ -186,7 +186,7 @@ Every MR targeting `main` must have a release label:
 | Job                             | Trigger                                    | Purpose                                            |
 | ------------------------------- | ------------------------------------------ | -------------------------------------------------- |
 | `create release`                | Scheduled (`CREATE_NEW_RELEASE`)           | Creates version tag on main                        |
-| `create pre-release`            | Scheduled (`CREATE_PRE_RELEASE`)           | Creates pre-release tag on main                    |
+| `create prerelease`            | Scheduled (`CREATE_PRERELEASE`)           | Creates prerelease tag on main                    |
 | `create patch release`          | Commits to `release/v*`                    | Creates patch version tag                          |
 | `remove docs artifact branches` | Main commits                               | Cleans up artifact branches for merged MRs         |
 | `cherry-pick fixes to releases` | Main commits                               | Auto-cherry-picks fixes to active release branches |

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Creates a pre-release version tag (e.g., v1.0.0-rc0, v1.0.0-rc1).
+Creates a prerelease version tag (e.g., v1.0.0-rc0, v1.0.0-rc1).
 
-Trigger by setting CREATE_PRE_RELEASE=true in a scheduled pipeline.
+Trigger by setting CREATE_PRERELEASE=true in a scheduled pipeline.
 
 Behavior:
-- If current version is a pre-release (v1.0.0-rc0), increments to v1.0.0-rc1
+- If current version is a prerelease (v1.0.0-rc0), increments to v1.0.0-rc1
 - If current version is a standard release (v0.99.0), creates v1.0.0-rc0
   based on MR labels (MAJOR/MINOR/PATCH)
-- Updates CHANGELOG.md with the pre-release version
+- Updates CHANGELOG.md with the prerelease version
 """
 
 if __name__ == "__main__":
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # Get the version type from MR labels
     version_type = rg.get_version_type()
 
-    # Calculate next pre-release version
+    # Calculate next prerelease version
     version_tag = vt.next_prerelease(version_type)
 
     # Bail out before committing if the tag already exists (e.g. a concurrent
@@ -31,15 +31,15 @@ if __name__ == "__main__":
     if version_tag and gl.tag_exists(version_tag):
         raise SystemExit(f"Tag {version_tag} already exists - another pipeline created it. Nothing to do.")
 
-    # Generate changelog with pre-release version
+    # Generate changelog with prerelease version
     _, payload = rg.generate_prerelease(version_tag)
 
     if version_tag and payload:
-        print(f"Creating pre-release {version_tag}:")
-        commit_id = gl.commit("main", f"Pre-release {version_tag}", payload)["id"]
+        print(f"Creating prerelease {version_tag}:")
+        commit_id = gl.commit("main", f"Prerelease {version_tag}", payload)["id"]
         # Tag before triggering pipeline so push-docs-cache.sh can detect the version tag
-        gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag} (pre-release)")
-        print(f"Created pre-release tag: {version_tag}")
+        gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag} (prerelease)")
+        print(f"Created prerelease tag: {version_tag}")
         # Trigger API pipeline on main for docs build and artifact publishing
         gl.create_pipeline("main")
         print("Triggered pipeline on main")

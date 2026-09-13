@@ -15,17 +15,18 @@ HOWTO_INDEX_FILE = "docs/source/how-to/index.md"
 TUTORIAL_INDEX_FILE = "docs/source/tutorials/index.md"
 TAB = "    "
 
-# Pattern to match versions with optional pre-release suffix (e.g., v1.0.0 or v1.0.0-rc0)
+# Pattern to match versions with optional prerelease suffix (e.g., v1.0.0 or v1.0.0-rc0)
 version_pattern = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-rc([0-9]+))?")
 
 # Commit titles the release pipeline writes for its own bookkeeping. These are not
-# user-facing changes, so they never belong in the published changelog.
-RELEASE_COMMIT_PREFIXES = ("Release ", "Pre-release ")
+# user-facing changes, so they never belong in the published changelog. "Pre-release "
+# is the pre-rename spelling and is still present in history.
+RELEASE_COMMIT_PREFIXES = ("Release ", "Prerelease ", "Pre-release ")
 
-# Matches an already-recorded bookkeeping entry inside a pre-release section, e.g.
-# "- `000b2d21` - Pre-release v1.1.0-rc5". Entries written by _Commit.to_markdown
+# Matches an already-recorded bookkeeping entry inside a prerelease section, e.g.
+# "- `000b2d21` - Prerelease v1.1.0-rc5". Entries written by _Commit.to_markdown
 # are always single-line, so dropping the matched line cannot orphan a detail block.
-prerelease_entry_pattern = re.compile(r"^- `[0-9a-f]+` - Pre-release v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$")
+prerelease_entry_pattern = re.compile(r"^- `[0-9a-f]+` - Pre-?release v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$")
 
 """
 Multiline pattern that matches for the following content in MR description:
@@ -352,7 +353,7 @@ class ReleaseGen:
         self, lines: list[str], base_version: str
     ) -> tuple[dict[_Category, list[str]], list[str]]:
         """
-        Extract categorized entries from pre-release sections and return remaining non-RC lines.
+        Extract categorized entries from prerelease sections and return remaining non-RC lines.
 
         Parses all rc sections for the base version, groups their entries by category,
         and returns the grouped entries along with the non-RC changelog lines.
@@ -377,7 +378,7 @@ class ReleaseGen:
 
             # RC header - enter RC section
             if prerelease_pattern.match(stripped):
-                verbose(f"Extracting pre-release section: {stripped}")
+                verbose(f"Extracting prerelease section: {stripped}")
                 in_rc_section = True
                 current_category = None
                 continue
@@ -403,10 +404,10 @@ class ReleaseGen:
             if current_category is None:
                 continue
 
-            # Drop bookkeeping entries recorded by earlier pre-release runs so they
+            # Drop bookkeeping entries recorded by earlier prerelease runs so they
             # do not resurface in the consolidated release section
             if prerelease_entry_pattern.match(stripped):
-                verbose(f"Dropping pre-release bookkeeping entry: {stripped}")
+                verbose(f"Dropping prerelease bookkeeping entry: {stripped}")
                 continue
 
             # Collect entry lines (items, continuation lines, and blank lines between entries)
@@ -436,14 +437,14 @@ class ReleaseGen:
 
         vt = VersionTag(self.gl)
 
-        # Check if we're finalizing a pre-release
+        # Check if we're finalizing a prerelease
         is_finalizing_prerelease = vt.is_prerelease
         base_version = vt.current_base if is_finalizing_prerelease else None
 
         # Return empty dict if nothing to update
         latest, entries = self._get_entries(last_hash, current)
 
-        # When finalizing a pre-release, we may not have new entries but still need to
+        # When finalizing a prerelease, we may not have new entries but still need to
         # consolidate the changelog sections
         if not entries and not is_finalizing_prerelease:
             return "", {}
@@ -455,7 +456,7 @@ class ReleaseGen:
         remaining_lines = current[3:]
 
         if is_finalizing_prerelease and base_version:
-            verbose(f"Finalizing pre-release: consolidating {base_version}-rcX sections")
+            verbose(f"Finalizing prerelease: consolidating {base_version}-rcX sections")
 
             # Extract categorized entries from all RC sections
             rc_entries, remaining_lines = self._extract_prerelease_entries(remaining_lines, base_version)
@@ -580,9 +581,9 @@ class ReleaseGen:
 
     def generate_prerelease(self, version: str) -> tuple[str, list[dict[str, str]]]:
         """
-        Generate changelog and doc link updates for a pre-release version.
+        Generate changelog and doc link updates for a prerelease version.
         Similar to generate() but uses provided version instead of calculating it.
-        Does not update jupyter cache for pre-releases.
+        Does not update jupyter cache for prereleases.
         """
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
@@ -620,7 +621,7 @@ class ReleaseGen:
             "content": content,
         }
 
-        # Update documentation links (colab links) to point to the pre-release version
+        # Update documentation links (colab links) to point to the prerelease version
         actions = [
             self._generate_index_markdown_update_action(f, version) for f in [HOWTO_INDEX_FILE, TUTORIAL_INDEX_FILE]
         ]
