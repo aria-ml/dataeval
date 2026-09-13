@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -241,3 +242,45 @@ class TestOtherTwoSampleTests:
         assert isinstance(result, AndersonKsampResult)
         assert isinstance(result.statistic, float)
         assert isinstance(result.pvalue, float)
+
+    def test_cramervonmises_2samp_refuses_a_non_numeric_result(self):
+        with (
+            patch("dataeval.utils.scipy.stats._scipy_cramervonmises_2samp", return_value=("bad", 0.5)),
+            pytest.raises(TypeError, match="Expected statistic to be numeric"),
+        ):
+            cramervonmises_2samp([1, 2], [3, 4])
+        with (
+            patch("dataeval.utils.scipy.stats._scipy_cramervonmises_2samp", return_value=(1.0, "bad")),
+            pytest.raises(TypeError, match="Expected pvalue to be numeric"),
+        ):
+            cramervonmises_2samp([1, 2], [3, 4])
+
+    def test_bws_test_refuses_a_non_numeric_result(self):
+        with (
+            patch(
+                "dataeval.utils.scipy.stats._scipy_bws_test",
+                return_value=SimpleNamespace(statistic="bad", pvalue=0.5),
+            ),
+            pytest.raises(TypeError, match="Expected statistic to be numeric"),
+        ):
+            bws_test([1, 2], [3, 4])
+        with (
+            patch(
+                "dataeval.utils.scipy.stats._scipy_bws_test",
+                return_value=SimpleNamespace(statistic=1.0, pvalue="bad"),
+            ),
+            pytest.raises(TypeError, match="Expected pvalue to be numeric"),
+        ):
+            bws_test([1, 2], [3, 4])
+
+    def test_anderson_ksamp_refuses_a_non_numeric_result(self):
+        with (
+            patch("dataeval.utils.scipy.stats._scipy_anderson_ksamp", return_value=("bad", 0.5)),
+            pytest.raises(TypeError, match="Expected statistic to be numeric"),
+        ):
+            anderson_ksamp([[1, 2], [3, 4]])
+        with (
+            patch("dataeval.utils.scipy.stats._scipy_anderson_ksamp", return_value=(1.0, "bad")),
+            pytest.raises(TypeError, match="Expected pvalue to be numeric"),
+        ):
+            anderson_ksamp([[1, 2], [3, 4]])

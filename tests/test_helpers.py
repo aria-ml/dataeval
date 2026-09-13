@@ -105,3 +105,18 @@ class TestAxisVocabulary:
 
     def test_a_single_component_with_no_spec_is_observed(self):
         assert axis_vocabulary([None]) == "observed"
+
+
+@pytest.mark.required
+class TestEffectiveEntityCounts:
+    def test_aborts_when_a_factor_level_cannot_be_determined(self):
+        """A factor whose hierarchy level is unknown aborts the effective-n calculation."""
+        from types import SimpleNamespace
+
+        from dataeval._helpers import effective_entity_counts
+
+        metadata = SimpleNamespace(
+            _entity_counts=lambda levels: [1, 1],
+            factor_info={"w": SimpleNamespace(level=None)},
+        )
+        assert effective_entity_counts(metadata, SimpleNamespace(level="unit"), ["w"]) is None  # type: ignore[arg-type]

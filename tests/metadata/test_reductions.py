@@ -938,3 +938,24 @@ class TestAnAggregatorTakesTheOptionsItDocuments:
         following the signature got a TypeError out of the constructor."""
         assert Aggregator("mean", "instance", "unit", options=None).options == {}  # type: ignore[arg-type]
         assert Aggregator("mean", "instance", "unit").options == {}
+
+
+@pytest.mark.required
+def test_a_temporal_reduction_refuses_to_build_without_an_ordering_column():
+    """A temporal reduction reads an ordered series; with no ordering column there is no
+    answer, so it refuses rather than reading rows in an order that is not time."""
+    from dataeval._metadata._reductions import Reduction
+
+    reduction = Reduction(expr=lambda column, order: pl.col(column), domain="numeric", kind="temporal")
+    with pytest.raises(ValueError, match="no ordering"):
+        reduction.build("value", None, {})
+
+
+@pytest.mark.required
+def test_an_aggregator_requires_a_reduction_name_and_reports_resolution():
+    """A reduction name is required, and resolution is a fact about source and factors."""
+    with pytest.raises(ValueError, match="needs a reduction name"):
+        Aggregator("", "unit", "sequence")
+
+    assert Aggregator("mean", "unit", "sequence", ("w",)).is_resolved is True
+    assert Aggregator("mean", None, "sequence").is_resolved is False

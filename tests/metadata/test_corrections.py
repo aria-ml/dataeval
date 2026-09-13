@@ -530,3 +530,15 @@ class TestUnusableSamplesAColumnThatNamesItsRows:
         assert "sampled=True" in repr(sampled)
         assert sampled != Unusable(("cardinality_over_budget",), "unit", True, {}, {})
         assert len({sampled, sampled}) == 1
+
+
+@pytest.mark.required
+def test_a_correction_with_no_writer_is_refused():
+    """A correction this writer cannot render is refused, not silently dropped from the archive."""
+    from dataeval._metadata._encoding import corrections_to_list
+
+    class _Unknown:
+        pass
+
+    with pytest.raises(ValueError, match="cannot render"):
+        corrections_to_list([_Unknown()])  # type: ignore[arg-type]

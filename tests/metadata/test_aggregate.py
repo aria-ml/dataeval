@@ -13,7 +13,7 @@ import polars as pl
 import pytest
 
 from dataeval import Metadata
-from dataeval._metadata._aggregate import aggregate, validate
+from dataeval._metadata._aggregate import aggregate, successive_differences, validate
 from dataeval.types import Aggregator
 from tests.metadata.test_structurers import _mot_dataset
 
@@ -404,3 +404,26 @@ class TestARollUpIsRecordedProvenance:
         """`agg` takes arbitrary polars expressions, which have no serializable form."""
         rolled = Metadata(_mot_dataset([[2, 1], [1]])).agg("instance", "unit", pl.len().alias("n_det"))
         assert rolled._aggregations == {}
+
+
+@pytest.mark.required
+def test_successive_differences_is_empty_when_no_row_keeps_its_order_key():
+    """The tolerance is measured over the series the reduction will scan; when no row
+    recorded an ordering key that series is empty, and the difference is an empty array."""
+
+    class _Link:
+        def positions(self):
+            return np.array([0, 0, 1, 1], dtype=np.intp)
+
+    class _Store:
+        def link(self, level, ancestor, via=None):
+            return _Link()
+
+        def column(self, level, name):
+            if name == "value":
+                return pl.Series("value", [1.0, 2.0, 3.0, 4.0])
+            return pl.Series("time", [None, None, None, None], dtype=pl.Float64)
+
+    out = successive_differences(_Store(), "unit", "sequence", None, "value", "time")  # type: ignore[arg-type]
+    assert out.shape == (0,)
+    assert out.dtype == np.float64

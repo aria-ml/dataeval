@@ -1304,3 +1304,9 @@ class TestAddressingTheFrameView:
             locator.frame(locator[SourceIndex(0, None, "sequence")])
         with pytest.raises(TypeError, match="spans frames"):
             locator.frame(locator[SourceIndex(0, 0, "track")])
+
+
+@pytest.mark.required
+def test_representative_on_an_empty_sequence_yields_nothing():
+    """No frames, no sequence: the walk finds nothing to be representative of."""
+    assert list(Representative(3, batch_size=2).select(iter([]))) == []

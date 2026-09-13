@@ -1143,3 +1143,17 @@ class TestUnusableSaysWhatItWouldTakeToReadTheColumn:
         md = Metadata(_mot_dataset([[1]] * 3, [{"d": 1.0}, {"d": "N"}, {}]), partial_factors=True)
         md._structure()
         assert set(md.unusable["d"].counts) <= {"numeric", "text"}
+
+
+@pytest.mark.required
+def test_partial_factors_is_read_from_the_policy_flag():
+    """The flag a dataset passes to its structurer is surfaced wherever the walk meets a
+    partially declared value."""
+    from dataeval._metadata._structurers import DatasetStructurer
+
+    class _Passthrough(DatasetStructurer):
+        def build(self, dataset, *, progress_callback=None):  # pragma: no cover
+            raise NotImplementedError
+
+    assert _Passthrough(partial_factors=True).partial_factors is True
+    assert _Passthrough().partial_factors is False
