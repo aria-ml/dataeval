@@ -126,11 +126,29 @@ Triggered by setting `CREATE_NEW_RELEASE=true` in a scheduled pipeline:
 
 ### Prerelease
 
-Triggered by setting `CREATE_PRERELEASE=true`:
+Triggered by setting `CREATE_PRERELEASE=true`, with `PRERELEASE_TYPE` selecting the kind:
 
-- Creates a prerelease tag like `v1.0.0-rc0` on main
+| `PRERELEASE_TYPE` | Tag          | PyPI version | Purpose                                                    |
+| ----------------- | ------------ | ------------ | ---------------------------------------------------------- |
+| `a`               | `v1.0.0-a0`  | `1.0.0a0`    | Early snapshot of main for downstream projects to build on |
+| `rc` (default)    | `v1.0.0-rc0` | `1.0.0rc0`   | Candidate for the release that follows                     |
+
+- Creates a prerelease tag like `v1.0.0-a0` or `v1.0.0-rc0` on main
 - Updates changelog and Colab links to the prerelease version
-- An API pipeline on main creates `docs-artifacts/v1.0.0-rc0`
+- An API pipeline on main creates `docs-artifacts/v1.0.0-a0`
+- The tag push triggers `publish.yml`, which publishes to PyPI and creates a GitHub
+  prerelease
+
+Versions order as `1.0.0a0 < 1.0.0rc0 < 1.0.0`, so repeated `PRERELEASE_TYPE=a` runs bump
+`-a0` -> `-a1`, and a later `PRERELEASE_TYPE=rc` run promotes to `-rc0` on the same base
+version. Going the other way (an `a` after an `rc`) is refused, since it would publish a
+version that sorts before one already on PyPI.
+
+pip and uv skip prereleases unless the specifier asks for them, so a downstream pin reads:
+
+```toml
+"dataeval>=1.0.0a0",   # accepts 1.0.0a1, 1.0.0rc0 and the final 1.0.0
+```
 
 ### Release Branch Creation
 
@@ -186,7 +204,7 @@ Every MR targeting `main` must have a release label:
 | Job                             | Trigger                                    | Purpose                                            |
 | ------------------------------- | ------------------------------------------ | -------------------------------------------------- |
 | `create release`                | Scheduled (`CREATE_NEW_RELEASE`)           | Creates version tag on main                        |
-| `create prerelease`            | Scheduled (`CREATE_PRERELEASE`)           | Creates prerelease tag on main                    |
+| `create prerelease`             | Scheduled (`CREATE_PRERELEASE`)            | Creates prerelease tag on main                     |
 | `create patch release`          | Commits to `release/v*`                    | Creates patch version tag                          |
 | `remove docs artifact branches` | Main commits                               | Cleans up artifact branches for merged MRs         |
 | `cherry-pick fixes to releases` | Main commits                               | Auto-cherry-picks fixes to active release branches |

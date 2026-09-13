@@ -134,8 +134,9 @@ create release:
   script:
     - uv run python .gitlab/scripts/create_release.py
 
-# This job creates a prerelease version tag (e.g., v1.0.0-rc0, v1.0.0-rc1)
-# Triggered by setting CREATE_PRERELEASE=true in scheduled pipeline
+# This job creates a prerelease version tag (e.g., v1.0.0-a0, v1.0.0-rc0, v1.0.0-rc1).
+# Triggered by setting CREATE_PRERELEASE=true in a scheduled pipeline; PRERELEASE_TYPE
+# selects the kind ('rc' by default, 'a' for an early alpha snapshot of main).
 create prerelease:
   stage: release
   extends: .rules_prerelease_only

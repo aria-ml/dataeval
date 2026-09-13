@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from gitlab import Gitlab
 from rest import verbose
-from versiontag import VersionTag
+from versiontag import PRERELEASE_KINDS, PRERELEASE_KINDS_RE, VersionTag
 
 CHANGELOG_FILE = "CHANGELOG.md"
 # need to read this to update the doc links
@@ -15,8 +15,8 @@ HOWTO_INDEX_FILE = "docs/source/how-to/index.md"
 TUTORIAL_INDEX_FILE = "docs/source/tutorials/index.md"
 TAB = "    "
 
-# Pattern to match versions with optional prerelease suffix (e.g., v1.0.0 or v1.0.0-rc0)
-version_pattern = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-rc([0-9]+))?")
+# Pattern to match versions with optional prerelease suffix (e.g., v1.0.0, v1.0.0-a0 or v1.0.0-rc0)
+version_pattern = re.compile(rf"v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-({PRERELEASE_KINDS_RE})([0-9]+))?")
 
 # Commit titles the release pipeline writes for its own bookkeeping. These are not
 # user-facing changes, so they never belong in the published changelog. "Pre-release "
@@ -26,7 +26,9 @@ RELEASE_COMMIT_PREFIXES = ("Release ", "Prerelease ", "Pre-release ")
 # Matches an already-recorded bookkeeping entry inside a prerelease section, e.g.
 # "- `000b2d21` - Prerelease v1.1.0-rc5". Entries written by _Commit.to_markdown
 # are always single-line, so dropping the matched line cannot orphan a detail block.
-prerelease_entry_pattern = re.compile(r"^- `[0-9a-f]+` - Pre-?release v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$")
+prerelease_entry_pattern = re.compile(
+    rf"^- `[0-9a-f]+` - Pre-?release v[0-9]+\.[0-9]+\.[0-9]+-(?:{PRERELEASE_KINDS_RE})[0-9]+$"
+)
 
 """
 Multiline pattern that matches for the following content in MR description:
@@ -57,14 +59,19 @@ release_notes_pattern = re.compile(
 )
 
 
-def _get_version_tuple(version: str) -> tuple[int, int, int, int | None] | None:
-    """Parse version string into tuple. Returns (major, minor, patch, rc) where rc is None for non-prerelease."""
+def _get_version_tuple(version: str) -> tuple[int, int, int, int, int] | None:
+    """
+    Parse version string into a sortable tuple.
+
+    Returns (major, minor, patch, rank, number) where rank orders the prerelease kinds
+    ahead of the release they lead up to: v1.0.0-a0 < v1.0.0-rc0 < v1.0.0.
+    """
     result = version_pattern.match(version)
-    groups = None if result is None else result.groups()
-    if groups is None or len(groups) < 3:
+    if result is None:
         return None
-    rc = int(groups[3]) if len(groups) > 3 and groups[3] is not None else None
-    return (int(groups[0]), int(groups[1]), int(groups[2]), rc)
+    major, minor, patch, kind, number = result.groups()
+    rank = PRERELEASE_KINDS.index(kind) if kind else len(PRERELEASE_KINDS)
+    return (int(major), int(minor), int(patch), rank, int(number or 0))
 
 
 class _Category(IntEnum):
@@ -353,12 +360,12 @@ class ReleaseGen:
         self, lines: list[str], base_version: str
     ) -> tuple[dict[_Category, list[str]], list[str]]:
         """
-        Extract categorized entries from prerelease sections and return remaining non-RC lines.
+        Extract categorized entries from prerelease sections and return the remaining lines.
 
-        Parses all rc sections for the base version, groups their entries by category,
-        and returns the grouped entries along with the non-RC changelog lines.
+        Parses all prerelease sections for the base version, groups their entries by category,
+        and returns the grouped entries along with the remaining changelog lines.
         """
-        prerelease_pattern = re.compile(rf"^## {re.escape(base_version)}-rc\d+$")
+        prerelease_pattern = re.compile(rf"^## {re.escape(base_version)}-(?:{PRERELEASE_KINDS_RE})\d+$")
 
         # Build a lookup from markdown header to _Category
         header_to_category: dict[str, _Category] = {}
@@ -367,34 +374,34 @@ class ReleaseGen:
                 continue
             header_to_category[_Category.to_markdown(cat)] = cat
 
-        rc_entries: dict[_Category, list[str]] = defaultdict(list)
-        non_rc_lines: list[str] = []
+        pre_entries: dict[_Category, list[str]] = defaultdict(list)
+        remaining_lines: list[str] = []
 
-        in_rc_section = False
+        in_pre_section = False
         current_category: _Category | None = None
 
         for line in lines:
             stripped = line.strip()
 
-            # RC header - enter RC section
+            # Prerelease header - enter prerelease section
             if prerelease_pattern.match(stripped):
                 verbose(f"Extracting prerelease section: {stripped}")
-                in_rc_section = True
+                in_pre_section = True
                 current_category = None
                 continue
 
-            # Non-RC version header - exit RC section
+            # Full-release version header - exit prerelease section
             if stripped.startswith("## v"):
-                in_rc_section = False
+                in_pre_section = False
                 current_category = None
-                non_rc_lines.append(line)
+                remaining_lines.append(line)
                 continue
 
-            if not in_rc_section:
-                non_rc_lines.append(line)
+            if not in_pre_section:
+                remaining_lines.append(line)
                 continue
 
-            # In RC section - check for category header
+            # In prerelease section - check for category header
             matched = header_to_category.get(stripped)
             if matched is not None:
                 current_category = matched
@@ -411,13 +418,13 @@ class ReleaseGen:
                 continue
 
             # Collect entry lines (items, continuation lines, and blank lines between entries)
-            rc_entries[current_category].append(line)
+            pre_entries[current_category].append(line)
 
         # Clean up entries per category: strip trailing blank lines and remove
-        # stray blank lines between entry groups (from different RCs) while
+        # stray blank lines between entry groups (from different prereleases) while
         # preserving blank lines that are part of multi-line entry details
-        for cat in rc_entries:
-            raw = rc_entries[cat]
+        for cat in pre_entries:
+            raw = pre_entries[cat]
             cleaned: list[str] = []
             for i, line in enumerate(raw):
                 if line.strip() == "":
@@ -427,9 +434,9 @@ class ReleaseGen:
                         cleaned.append(line)
                 else:
                     cleaned.append(line)
-            rc_entries[cat] = cleaned
+            pre_entries[cat] = cleaned
 
-        return rc_entries, non_rc_lines
+        return pre_entries, remaining_lines
 
     def _generate_version_and_changelog_action(self) -> tuple[str, dict[str, str]]:
         current = self._read_changelog()
@@ -456,12 +463,12 @@ class ReleaseGen:
         remaining_lines = current[3:]
 
         if is_finalizing_prerelease and base_version:
-            verbose(f"Finalizing prerelease: consolidating {base_version}-rcX sections")
+            verbose(f"Finalizing prerelease: consolidating {base_version} prerelease sections")
 
-            # Extract categorized entries from all RC sections
-            rc_entries, remaining_lines = self._extract_prerelease_entries(remaining_lines, base_version)
+            # Extract categorized entries from all prerelease sections
+            pre_entries, remaining_lines = self._extract_prerelease_entries(remaining_lines, base_version)
 
-            # Merge new entries (since last RC) into the RC entries
+            # Merge new entries (since the last prerelease) into the prerelease entries
             next_category = _Category.UNKNOWN
             for category in sorted(entries):
                 if category == _Category.UNKNOWN:
@@ -469,12 +476,12 @@ class ReleaseGen:
                 for merge in entries[category]:
                     if merge.hash == last_hash:
                         break
-                    rc_entries[category].append(merge.to_markdown() + "\n")
+                    pre_entries[category].append(merge.to_markdown() + "\n")
                     verbose(f"Adding - {merge.to_markdown()}")
                     next_category = min(next_category, category)
 
-            # Include RC categories when determining version type
-            for category in rc_entries:
+            # Include prerelease categories when determining version type
+            for category in pre_entries:
                 if category != _Category.UNKNOWN:
                     next_category = min(next_category, category)
 
@@ -482,8 +489,8 @@ class ReleaseGen:
 
             # Build merged categorized content in correct category order
             lines: list[str] = []
-            for category in sorted(rc_entries):
-                cat_entries = rc_entries[category]
+            for category in sorted(pre_entries):
+                cat_entries = pre_entries[category]
                 # Strip trailing blank lines
                 while cat_entries and cat_entries[-1].strip() == "":
                     cat_entries.pop()
@@ -533,7 +540,8 @@ class ReleaseGen:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
             pattern = re.compile(
-                r"aria-ml/dataeval/blob/docs-artifacts/(?:main|v[0-9]+\.[0-9]+\.[0-9]+(?:-rc[0-9]+)?)/notebooks",
+                rf"aria-ml/dataeval/blob/docs-artifacts/"
+                rf"(?:main|v[0-9]+\.[0-9]+\.[0-9]+(?:-(?:{PRERELEASE_KINDS_RE})[0-9]+)?)/notebooks",
             )
             new_path = f"aria-ml/dataeval/blob/docs-artifacts/{pending_version}/notebooks"
 

@@ -295,7 +295,7 @@ All automation scripts are located in [`.gitlab/scripts/`](.gitlab/scripts/):
 | Script                                                                   | Purpose                        | Trigger                              |
 | ------------------------------------------------------------------------ | ------------------------------ | ------------------------------------ |
 | [`create_release.py`](.gitlab/scripts/create_release.py)                 | Create major/minor releases    | Manual: `CREATE_NEW_RELEASE=true`    |
-| [`create_prerelease.py`](.gitlab/scripts/create_prerelease.py)           | Create prerelease (rc) tags   | Manual: `CREATE_PRERELEASE=true`    |
+| [`create_prerelease.py`](.gitlab/scripts/create_prerelease.py)           | Create prerelease (a/rc) tags  | Manual: `CREATE_PRERELEASE=true`     |
 | [`create_patch_release.py`](.gitlab/scripts/create_patch_release.py)     | Create patch releases          | Auto: Commit to `release/v*`         |
 | [`validate_release_label.py`](.gitlab/scripts/validate_release_label.py) | Ensure MRs have release labels | Auto: All MRs to main                |
 | [`releasegen.py`](.gitlab/scripts/releasegen.py)                         | Core release logic & changelog | Called by release scripts            |
