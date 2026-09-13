@@ -103,7 +103,9 @@ include:
   - component: gitlab.jatic.net/jatic/devsecops/components/dsor-compliance@1.2.0
     inputs:
       full_execution_on_commit: true
-      sast_excluded_paths: tests,docs,verification,README.md
+      # Test, docs and CI-helper code only; src/ is never excluded. `.gitlab`
+      # covers scripts/test_versiontag.py, whose asserts trip bandit.B101.
+      sast_excluded_paths: tests,docs,verification,.gitlab,.github,README.md
       sast_search_max_depth: "2"
       allow_failure: true
 

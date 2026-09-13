@@ -97,6 +97,10 @@ def inv_url_for(uri: str) -> str:
 
 def fetch_with_retries(url: str, attempts: int, timeout: float) -> bytes:
     """GET *url* with retries and exponential backoff. Raises on final failure."""
+    # urllib also speaks file://, ftp:// &c. The caller already screens the
+    # configured URIs; re-check here so this helper is safe on its own.
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"refusing to fetch non-HTTP URL: {url!r}")
     last_err: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
@@ -115,7 +119,8 @@ def fetch_with_retries(url: str, attempts: int, timeout: float) -> bytes:
                 delay += random.uniform(0, 0.5)
                 _log(f"  attempt {attempt}/{attempts} failed: {err}; retrying in {delay:.1f}s")
                 time.sleep(delay)
-    assert last_err is not None
+    if last_err is None:  # attempts < 1
+        raise ValueError(f"attempts must be >= 1, got {attempts}")
     raise last_err
 
 
