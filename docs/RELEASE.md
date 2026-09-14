@@ -157,21 +157,21 @@ changelog section and the version bump. See [Commit Prefixes](../BRANCHING.md#co
 
 ### Documentation stage
 
-| Job            | Trigger                                | Purpose                                |
-| -------------- | -------------------------------------- | -------------------------------------- |
+| Job            | Trigger                                              | Purpose                                |
+| -------------- | --------------------------------------               | -------------------------------------- |
 | `docs`         | Main commits, version tags, MRs with doc/src changes | Full docs build with GPU, pushes cache |
-| `doctest`      | Main commits, MRs                      | Runs doctests                          |
-| `linkchecker`  | Main commits, MRs                      | Validates markdown links               |
-| `markdownlint` | Main commits, MRs                      | Lints markdown formatting              |
+| `doctest`      | Main commits, MRs                                    | Runs doctests                          |
+| `linkchecker`  | Main commits, MRs                                    | Validates markdown links               |
+| `markdownlint` | Main commits, MRs                                    | Lints markdown formatting              |
 
 ### Release stage
 
-| Job                             | Trigger      | Purpose                                            |
-| ------------------------------- | ------------ | -------------------------------------------------- |
+| Job                             | Trigger      | Purpose                                             |
+| ------------------------------- | ------------ | --------------------------------------------------  |
 | `validate commit prefix`        | MRs to main  | Rejects titles without a known `[type]` prefix      |
-| `publish verification`          | Version tags | Pushes test evidence and VCRM to the meta repo     |
-| `export-merged-sbom`            | Version tags | Exports the merged SBOM                            |
-| `remove docs artifact branches` | Main commits | Cleans up artifact branches for merged MRs         |
+| `publish verification`          | Version tags | Pushes test evidence and VCRM to the meta repo      |
+| `export-merged-sbom`            | Version tags | Exports the merged SBOM                             |
+| `remove docs artifact branches` | Main commits | Cleans up artifact branches for merged MRs          |
 
 ## Key Files
 

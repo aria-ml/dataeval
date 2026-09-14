@@ -105,13 +105,13 @@ arrives there, not when you push to GitLab.
 
 ### Release Types
 
-| Command                             | Run from       | Result                              |
-| ----------------------------------- | -------------- | ----------------------------------- |
-| `python scripts/release.py`          | `main`         | Minor bump (`v1.1.0` -> `v1.2.0`)   |
-| `python scripts/release.py major`    | `main`         | Major bump (`v1.1.0` -> `v2.0.0`)   |
-| `python scripts/release.py`          | `release/vX.Y` | Patch bump (`v1.1.1` -> `v1.1.2`)   |
-| `python scripts/release.py prerelease`   | `main`     | Release candidate (`v1.2.0-rc0`)    |
-| `python scripts/release.py prerelease a` | `main`     | Alpha snapshot (`v1.2.0-a0`)        |
+| Command                                  | Run from       | Result                              |
+| -----------------------------------      | -------------- | ----------------------------------- |
+| `python scripts/release.py`              | `main`         | Minor bump (`v1.1.0` -> `v1.2.0`)   |
+| `python scripts/release.py major`        | `main`         | Major bump (`v1.1.0` -> `v2.0.0`)   |
+| `python scripts/release.py`              | `release/vX.Y` | Patch bump (`v1.1.1` -> `v1.1.2`)   |
+| `python scripts/release.py prerelease`   | `main`         | Release candidate (`v1.2.0-rc0`)    |
+| `python scripts/release.py prerelease a` | `main`         | Alpha snapshot (`v1.2.0-a0`)        |
 
 A `[major]` commit is not bumped silently: an unqualified release refuses to run and tells you to confirm with
 `release.py major`. A prerelease inherits the pending bump, so candidates for a breaking release are numbered
@@ -179,14 +179,14 @@ Direct commits to `main` follow the same convention.
 
 ### Available Prefixes
 
-| Prefix                | Version Bump  | Use Case                             | Changelog Section           |
-| --------------------- | ------------- | ------------------------------------ | --------------------------- |
-| `[major]`             | MAJOR (X.0.0) | Breaking changes, major API overhaul | Major Release               |
-| `[feat]`              | MINOR (0.X.0) | New features, new capabilities       | Feature Release             |
-| `[depr]`              | MINOR (0.X.0) | Deprecating or removing functionality| Deprecations and Removals   |
-| `[impr]`, `[perf]`    | MINOR (0.X.0) | Enhancements, optimizations          | Improvements and Enhancements |
-| `[fix]`               | PATCH (0.0.X) | Bug fixes                            | Fixes                       |
-| `[docs]`, `[test]`, `[deps]`, `[type]`, `[devops]`, `[devsecops]`, `[lint]`, `[misc]` | None | Documentation, CI, refactoring, dependencies | Miscellaneous |
+| Prefix                                                                                | Version Bump  | Use Case                                     | Changelog Section             |
+| ---------------------                                                                 | ------------- | ------------------------------------         | ---------------------------   |
+| `[major]`                                                                             | MAJOR (X.0.0) | Breaking changes, major API overhaul         | Major Release                 |
+| `[feat]`                                                                              | MINOR (0.X.0) | New features, new capabilities               | Feature Release               |
+| `[depr]`                                                                              | MINOR (0.X.0) | Deprecating or removing functionality        | Deprecations and Removals     |
+| `[impr]`, `[perf]`                                                                    | MINOR (0.X.0) | Enhancements, optimizations                  | Improvements and Enhancements |
+| `[fix]`                                                                               | PATCH (0.0.X) | Bug fixes                                    | Fixes                         |
+| `[docs]`, `[test]`, `[deps]`, `[type]`, `[devops]`, `[devsecops]`, `[lint]`, `[misc]` | None          | Documentation, CI, refactoring, dependencies | Miscellaneous                 |
 
 The full accepted vocabulary lives in `TAG_CATEGORIES` in [`scripts/release.py`](scripts/release.py); the CI check
 imports it, so the two cannot drift.
@@ -292,26 +292,26 @@ flowchart TD
 
 CI validates and publishes; it does not decide when to release.
 
-| Job                             | Trigger                   | Purpose                                            |
-| ------------------------------- | ------------------------- | -------------------------------------------------- |
-| `validate commit prefix`        | MRs to main               | Rejects titles without a known `[type]` prefix      |
+| Job                             | Trigger                   | Purpose                                                 |
+| ------------------------------- | ------------------------- | --------------------------------------------------      |
+| `validate commit prefix`        | MRs to main               | Rejects titles without a known `[type]` prefix          |
 | `docs`                          | Main, MRs, version tags   | Builds docs; on a tag, publishes `docs-artifacts/<tag>` |
-| `publish verification`          | Version tags              | Pushes test evidence and VCRM to the meta repo     |
-| `export-merged-sbom`            | Version tags              | Exports the merged SBOM                            |
-| `remove docs artifact branches` | Main commits              | Cleans up artifact branches for merged MRs         |
-| `tag release candidate`         | Main commits              | Moves the `latest-known-good` marker               |
+| `publish verification`          | Version tags              | Pushes test evidence and VCRM to the meta repo          |
+| `export-merged-sbom`            | Version tags              | Exports the merged SBOM                                 |
+| `remove docs artifact branches` | Main commits              | Cleans up artifact branches for merged MRs              |
+| `tag release candidate`         | Main commits              | Moves the `latest-known-good` marker                    |
 
 The release commit itself is skipped by the workflow rules -- it only rewrites `CHANGELOG.md` and the docs index
 links, and the tag pushed alongside it already runs everything a release needs.
 
 ### Scripts
 
-| Script                                                                   | Purpose                            | Run by      |
-| ------------------------------------------------------------------------ | ---------------------------------- | ----------- |
+| Script                                                                   | Purpose                               | Run by              |
+| ------------------------------------------------------------------------ | ----------------------------------    | -----------         |
 | [`scripts/release.py`](scripts/release.py)                               | Cut a release: changelog, commit, tag | Maintainer, locally |
-| [`scripts/test_release.py`](scripts/test_release.py)                     | Self-check for the release logic   | Anyone      |
-| [`validate_commit_prefix.py`](.gitlab/scripts/validate_commit_prefix.py) | Enforce MR title prefixes          | CI          |
-| [`push_verification.py`](.gitlab/scripts/push_verification.py)           | Publish verification artifacts     | CI          |
+| [`scripts/test_release.py`](scripts/test_release.py)                     | Self-check for the release logic      | Anyone              |
+| [`validate_commit_prefix.py`](.gitlab/scripts/validate_commit_prefix.py) | Enforce MR title prefixes             | CI                  |
+| [`push_verification.py`](.gitlab/scripts/push_verification.py)           | Publish verification artifacts        | CI                  |
 
 ### Commit Message Triggers
 
