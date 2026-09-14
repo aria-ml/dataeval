@@ -6,7 +6,11 @@ if __name__ == "__main__":
     import sys
 
     from gitlab import Gitlab
-    from releasegen import CHANGELOG_FILE, HOWTO_INDEX_FILE, TUTORIAL_INDEX_FILE, ReleaseGen, _Category, _Merge
+    from releasegen import CHANGELOG_FILE, HOWTO_INDEX_FILE, TUTORIAL_INDEX_FILE, ReleaseGen, _Category
+
+    # Categories that change the public API and therefore belong on a minor or major
+    # release cut from main, never on a patch release off a release branch.
+    DISALLOWED = (_Category.MAJOR, _Category.FEATURE, _Category.DEPRECATION)
 
     # Get current branch name from CI environment
     branch_name = os.getenv("CI_COMMIT_BRANCH", "")
@@ -32,59 +36,51 @@ if __name__ == "__main__":
     current = rg._read_changelog()
     last_hash = rg._get_last_hash(current[0]) if current else ""
 
-    # Get all merges to this release branch since last release
-    merges = gl.list_merge_requests(state="merged", target_branch=branch_name)
+    # Collect everything that landed on the release branch since that hash. Hotfixes
+    # are routinely pushed straight to a release branch, so merge requests alone miss
+    # most of them; _get_entries pairs them with the branch's direct commits.
+    latest, entries = rg._get_entries(last_hash, current, branch=branch_name)
 
-    if not merges:
-        print("No merge requests found for this release branch.")
-        sys.exit(0)
+    # UNKNOWN covers merge requests with no release::* label; they are dropped from the
+    # changelog on main too, so they must not gate or shape the patch release either.
+    entries.pop(_Category.UNKNOWN, None)
 
-    # Check that all merges are fixes only and collect them
-    categorized_merges = []
-    merges_sorted = [_Merge(m) for m in merges]
-    merges_sorted.sort(reverse=True)
-
-    for merge in merges_sorted:
-        # Stop if we've reached the last hash
-        if merge.hash == last_hash:
-            break
-
-        categorized_merges.append(merge)
-
-        # Validate that only fix labels are present
-        if merge.category != _Category.FIX:
-            print(f"ERROR: Non-fix merge request found: {merge.description}")
-            print(f"       Category: {_Category(merge.category).name}")
-            print("       Only 'release::fix' labeled MRs are allowed on release branches.")
+    for category in DISALLOWED:
+        for entry in entries.get(category, []):
+            print(f"ERROR: {_Category(category).name} change found on release branch: {entry.description}")
+            print("       Release branches only carry fixes, improvements and miscellaneous changes.")
             sys.exit(1)
 
-    if not categorized_merges:
+    if latest is None or not any(entries.values()):
         print("No new changes to release since last tag.")
         sys.exit(0)
 
     # Find the latest patch version for this release branch
     tags = gl.list_tags()
-    patch_version = 0
-    version_pattern = re.compile(rf"{re.escape(base_version)}\.(\d+)")
-
-    for tag in tags:
-        match = version_pattern.match(tag["name"])
-        if match:
-            patch_num = int(match.group(1))
-            patch_version = max(patch_version, patch_num)
+    # Anchored so a pre-release tag (v1.1.2-rc0) cannot be read as a released patch
+    version_pattern = re.compile(rf"{re.escape(base_version)}\.(\d+)$")
+    patch_version = max(
+        (int(match.group(1)) for tag in tags if (match := version_pattern.match(tag["name"]))),
+        default=0,
+    )
 
     # Calculate next patch version
-    next_patch = patch_version + 1
-    next_version = f"{base_version}.{next_patch}"
+    next_version = f"{base_version}.{patch_version + 1}"
     print(f"Next patch version: {next_version}")
 
     # Build changelog content
-    lines = ["", _Category.to_markdown(_Category.FIX)]
-    for merge in categorized_merges:
-        lines.append(merge.to_markdown())
+    lines: list[str] = []
+    for category in sorted(entries):
+        if not entries[category]:
+            continue
+        lines.append("")
+        lines.append(_Category.to_markdown(category))
+        lines.append("")
+        for entry in entries[category]:
+            lines.append(entry.to_markdown())
+            print(f"Adding - {entry.to_markdown()}")
 
-    latest_merge = merges_sorted[0]
-    header = [f"[//]: # ({latest_merge.hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
+    header = [f"[//]: # ({latest.hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
     changelog_content = "\n".join(header + lines) + "\n"
 
     for oldline in current[3:]:

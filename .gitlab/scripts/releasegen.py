@@ -274,12 +274,11 @@ class ReleaseGen:
         return line[start:end]
 
     def _get_entries(
-        self, last_hash: str, existing_lines: list[str] | None = None
-    ) -> tuple[_Merge, dict[_Category, list[_Merge | _Commit]]]:
-        # get merges in to develop and main and sort
-        merges: list[_Merge] = [_Merge(m) for m in self.gl.list_merge_requests(state="merged", target_branch="main")]
+        self, last_hash: str, existing_lines: list[str] | None = None, branch: str = "main"
+    ) -> tuple[_Merge | _Commit | None, dict[_Category, list[_Merge | _Commit]]]:
+        # get merges in to the branch being released and sort
+        merges: list[_Merge] = [_Merge(m) for m in self.gl.list_merge_requests(state="merged", target_branch=branch)]
         merges.sort(reverse=True)
-        latest = merges[0]
 
         # populate the categorized merge issues
         categorized: dict[_Category, list[_Merge | _Commit]] = defaultdict(lambda: [])
@@ -295,22 +294,32 @@ class ReleaseGen:
             categorized[merge.category].append(merge)
             merge_hashes.add(merge.hash)
 
-        # capture direct (non-merge) pushes to main that bypassed the MR flow
+        # capture direct (non-merge) pushes to the branch that bypassed the MR flow
         if existing_lines is not None:
-            for commit in self._get_direct_commits(last_hash, existing_lines, merge_hashes):
+            for commit in self._get_direct_commits(last_hash, existing_lines, merge_hashes, branch):
                 categorized[commit.category].append(commit)
             # keep each category in reverse-chronological order across both sources
             for category in categorized:
                 categorized[category].sort(key=lambda entry: entry.time, reverse=True)
 
+        # the newest entry from either source becomes the next changelog boundary; None
+        # when nothing new landed, which callers read as "no release to cut"
+        latest = max(
+            (entry for entries in categorized.values() for entry in entries),
+            key=lambda entry: entry.time,
+            default=None,
+        )
+
         return latest, categorized
 
-    def _get_direct_commits(self, last_hash: str, existing_lines: list[str], merge_hashes: set[str]) -> list[_Commit]:
+    def _get_direct_commits(
+        self, last_hash: str, existing_lines: list[str], merge_hashes: set[str], ref: str = "main"
+    ) -> list[_Commit]:
         """
-        Collect direct (non-merge) commits pushed to main since the last release.
+        Collect direct (non-merge) commits pushed to ``ref`` since the last release.
 
         Direct pushes never go through a merge request, so they are invisible to
-        ``_get_entries``. This walks the first-parent history of main since the
+        ``_get_entries``. This walks the first-parent history of ``ref`` since the
         previous changelog boundary, keeps the single-parent (non-merge) commits,
         and drops any that are release commits, already recorded in the changelog,
         or correspond to a captured merge commit.
@@ -328,7 +337,7 @@ class ReleaseGen:
         existing_text = "".join(existing_lines)
 
         commits: list[_Commit] = []
-        for response in self.gl.list_commits(ref_name="main", since=since, first_parent=True):
+        for response in self.gl.list_commits(ref_name=ref, since=since, first_parent=True):
             # merge commits (2+ parents) are already captured via merge requests
             if len(response.get("parent_ids", [])) >= 2:
                 continue
@@ -449,7 +458,7 @@ class ReleaseGen:
             return "", {}
 
         # Get the latest hash - use current if no new entries (finalizing without new MRs)
-        latest_hash = latest.hash if entries else last_hash
+        latest_hash = latest.hash if latest is not None else last_hash
 
         # Get remaining changelog content (after the header lines)
         remaining_lines = current[3:]
@@ -607,7 +616,8 @@ class ReleaseGen:
                 lines.append(merge.to_markdown())
                 verbose(f"Adding - {merge.to_markdown()}")
 
-        header = [f"[//]: # ({latest.hash})", "", "# DataEval Change Log", "", f"## {version}"]
+        latest_hash = latest.hash if latest is not None else last_hash
+        header = [f"[//]: # ({latest_hash})", "", "# DataEval Change Log", "", f"## {version}"]
         content = "\n".join(header + lines) + "\n"
 
         for oldline in current[3:]:
