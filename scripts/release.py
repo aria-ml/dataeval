@@ -9,9 +9,8 @@ Cut a release from the branch you are standing on.
     python scripts/release.py --dry-run       # print what would happen, touch nothing
 
 Updates CHANGELOG.md and the notebook links in the docs indexes, commits, and tags.
-It never pushes: review the commit, then `git push --follow-tags` to publish. The tag
-push starts everything else - the GitLab tag pipeline builds the docs artifacts, and
-the tag mirrors to GitHub, where the publish workflow uploads to PyPI.
+It never pushes: review the commit, then `git push --follow-tags` to publish. Pushing
+the tag is what triggers PyPI publication and the docs build.
 
 Needs nothing but git and a Python interpreter - no credentials, no GitLab API.
 """
@@ -96,15 +95,20 @@ def fail(message: str) -> None:
     sys.exit(f"ERROR: {message}")
 
 
-def parse_version(tag: str) -> tuple[int, int, int, int, int] | None:
-    """Sort key for a version tag, or None if it is not one.
+def is_version_tag(tag: str) -> bool:
+    """True for a sortable version tag; everything else (latest-known-good, snapshots) is skipped."""
+    return VERSION_RE.match(tag) is not None
+
+
+def parse_version(tag: str) -> tuple[int, int, int, int, int]:
+    """Sort key for a version tag.
 
     A prerelease sorts before its own release, so the kind index defaults to len(kinds)
     for a full release and the sequence number is only a tiebreaker within a kind.
     """
     match = VERSION_RE.match(tag)
     if match is None:
-        return None
+        raise ValueError(f"not a version tag: {tag!r}")
     major, minor, patch, kind, number = match.groups()
     kind_rank = PRERELEASE_KINDS.index(kind) if kind else len(PRERELEASE_KINDS)
     return (int(major), int(minor), int(patch), kind_rank, int(number or 0))
@@ -112,7 +116,7 @@ def parse_version(tag: str) -> tuple[int, int, int, int, int] | None:
 
 def latest_tag(series: str | None = None) -> str | None:
     """Highest version tag reachable from HEAD, optionally limited to a `vN.N` series."""
-    tags = [t for t in git("tag", "--merged", "HEAD").splitlines() if parse_version(t)]
+    tags = [t for t in git("tag", "--merged", "HEAD").splitlines() if is_version_tag(t)]
     if series is not None:
         tags = [t for t in tags if t.startswith(f"{series}.")]
     return max(tags, key=parse_version, default=None)
@@ -166,6 +170,17 @@ def next_version(current: str | None, bump: str, kind: str | None) -> str:
     return f"{bumped}-{kind}0" if kind else bumped
 
 
+def resolve_kind(bump: str | None, kind: str | None) -> str | None:
+    """Resolve the prerelease kind for a bump, failing loudly on an impossible combo.
+
+    A kind only pairs with a `prerelease` bump; an explicit kind on `major` is a typo
+    that used to be silently dropped. A bare `prerelease` defaults to `rc`.
+    """
+    if kind is not None and bump != "prerelease":
+        fail(f"'{kind}' is a prerelease kind - pair it with `prerelease`, not `{bump}`")
+    return "rc" if bump == "prerelease" and kind is None else kind
+
+
 def render_section(version: str, entries: dict[str, list[tuple[str, str]]]) -> str:
     lines = [f"## {version}"]
     for name, heading in CATEGORIES:
@@ -208,10 +223,15 @@ def main() -> None:
         "bump", nargs="?", choices=["major", "prerelease"], help="default: minor on main, patch on a release branch"
     )
     parser.add_argument(
-        "kind", nargs="?", choices=list(PRERELEASE_KINDS), default="rc", help="prerelease kind (default: rc)"
+        "kind",
+        nargs="?",
+        choices=list(PRERELEASE_KINDS),
+        default=None,
+        help="prerelease kind (default: rc); only valid with a `prerelease` bump",
     )
     parser.add_argument("--dry-run", action="store_true", help="print the release and change nothing")
     args = parser.parse_args()
+    kind = resolve_kind(args.bump, args.kind)
 
     if git("status", "--porcelain"):
         fail("working tree is not clean - commit or stash first")
@@ -265,7 +285,7 @@ def main() -> None:
         bump = "major"
     else:
         bump = "minor"
-    version = next_version(current, bump, args.kind if args.bump == "prerelease" else None)
+    version = next_version(current, bump, kind)
     # Checked before anything is written: tagging is the last step, and discovering the
     # collision there would leave a release commit behind with no tag on it.
     if git_ok("rev-parse", "-q", "--verify", f"refs/tags/{version}") is not None:
@@ -288,12 +308,9 @@ def main() -> None:
 
     print(f"Committed and tagged {version}. Review it:\n")
     print(f"    git show {version}\n")
-    print("Then publish - pushing the tag starts the docs build, and mirrors it to GitHub")
-    print("where the publish workflow uploads to PyPI:\n")
+    print("Then publish - pushing the tag is what triggers PyPI and the docs build:\n")
     print(f"    git push --follow-tags origin {branch}\n")
-    print(f"To back out, before you push:\n\n    git tag -d {version} && git reset --hard HEAD~1\n")
-    # The mirror carries a permanent backlog of tags GitHub refuses, so its status is red
-    # whether or not this release made it across.
+    print(f"To back out:\n\n    git tag -d {version} && git reset --hard HEAD~1\n\n")
     print("Afterwards confirm the release landed on GitHub, not in the GitLab mirror status:\n")
     print("    https://github.com/aria-ml/dataeval/releases")
 
