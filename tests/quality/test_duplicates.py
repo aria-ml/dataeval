@@ -2471,6 +2471,43 @@ class TestDeduplicate:
         result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "dup_type": "near"}]))
         assert result.deduplicate(n_items=6, dup_types=("exact", "near")).discard == [4]
 
+    def test_a_near_group_bridges_two_exact_groups(self):
+        """Merging spans dup_types: the near link makes 2 and 7 one set with 0 and 3."""
+        result = DuplicatesOutput(
+            _frame([
+                {"item_indices": [0, 3]},
+                {"item_indices": [3, 7]},
+                {"item_indices": [1, 4], "dup_type": "near"},
+                {"item_indices": [2, 7], "dup_type": "near"},
+            ])
+        )
+        assert result.deduplicate(n_items=8, dup_types=("exact", "near")).discard == [2, 3, 4, 7]
+
+    def test_a_dup_type_left_out_contributes_no_edges(self):
+        """Asking for near alone must not merge through the exact group it overlaps."""
+        result = DuplicatesOutput(
+            _frame([
+                {"item_indices": [0, 3]},
+                {"item_indices": [1, 4], "dup_type": "near"},
+                {"item_indices": [4, 6], "dup_type": "near"},
+            ])
+        )
+        assert result.deduplicate(n_items=8, dup_types=["near"]).discard == [4, 6]
+
+    def test_a_redundant_run_names_no_item_to_drop(self):
+        """A redundant run repeats one sequence, so collapsing it drops nothing."""
+        result = DuplicatesOutput(
+            _frame([{"item_indices": [2, 2, 2, 2], "level": "sequence", "dup_type": "redundant"}])
+        )
+        plan = result.deduplicate(n_items=4, dup_types="redundant")
+        assert plan.discard == []
+        assert plan.keep == [0, 1, 2, 3]
+
+    def test_a_single_dup_type_may_be_given_as_a_string(self):
+        """``dup_types="near"`` is one type, not the five characters of the word."""
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "dup_type": "near"}]))
+        assert result.deduplicate(n_items=6, dup_types="near").discard == [4]
+
     def test_an_excluded_group_contributes_nothing(self):
         result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}, {"item_indices": [2, 6]}]))
         assert result.deduplicate(n_items=8, exclude_groups=[1]).discard == [4]

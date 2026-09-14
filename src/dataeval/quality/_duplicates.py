@@ -2876,7 +2876,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     def deduplicate(
         self,
         *,
-        dup_types: Sequence[str] = ("exact",),
+        dup_types: str | Sequence[str] = "exact",
         keep: Literal["first", "last"] = "first",
         exclude_groups: Sequence[int] | None = None,
         n_items: int | None = None,
@@ -2890,7 +2890,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
 
         Parameters
         ----------
-        dup_types : Sequence[str], default ``("exact",)``
+        dup_types : str or Sequence[str], default ``"exact"``
             Which ``dup_type`` values to collapse. The default touches only exact matches, where
             the members are the same content and dropping all but one loses nothing. Add
             ``"near"`` to collapse near duplicates, which is a judgement about how similar is too
@@ -2956,9 +2956,10 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
                 "aggregate_by_pair().",
             )
         total = self._item_count(n_items)
+        wanted = [dup_types] if isinstance(dup_types, str) else list(dup_types)
         rows = self.data().filter(
             pl.col("level").is_in(list(_ADDRESSES_ITEMS))
-            & pl.col("dup_type").is_in(list(dup_types))
+            & pl.col("dup_type").is_in(wanted)
             & ~pl.col("group_id").is_in(list(exclude_groups or [])),
         )
         discard = _discarded(rows["item_indices"].to_list(), keep)
