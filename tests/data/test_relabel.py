@@ -7,7 +7,7 @@ import pytest
 
 from dataeval import Metadata, Ontology
 from dataeval.core import label_alignment
-from dataeval.data import Operation, Relabel, View, merge_datasets
+from dataeval.data import Limit, Operation, Relabel, View, merge_datasets
 from dataeval.data._relabel import _label_remap
 from dataeval.exceptions import DeprecatedWarning, OntologyError
 from dataeval.protocols import ObjectDetectionTarget
@@ -157,6 +157,26 @@ class TestRelabel:
         assert np.asarray(second.boxes).shape[0] == 1  # boxes masked to surviving detection
         assert len(np.asarray(second.scores)) == 1
 
+    def test_od_drops_unlabelled_images_by_default(self, od_dataset, vehicle_target):
+        i2l = {0: "sedan", 1: "truck", 2: "spaceship"}
+        ds = od_dataset([[0], [], [2]], i2l)  # a background frame and an all-OOV frame
+        remap = label_alignment(i2l.values(), vehicle_target)["class_remap"]
+        assert len(View(ds, [Relabel(remap, vehicle_target)])) == 1
+
+    def test_od_drop_empty_false_keeps_background_images(self, od_dataset, vehicle_target):
+        i2l = {0: "sedan", 1: "truck", 2: "spaceship"}
+        ds = od_dataset([[0], [], [2]], i2l)
+        remap = label_alignment(i2l.values(), vehicle_target)["class_remap"]
+        conformed = View(ds, [Relabel(remap, vehicle_target, drop_empty=False)])
+        assert len(conformed) == 3
+        assert [len(np.asarray(conformed[i][1].labels)) for i in range(3)] == [1, 0, 0]
+
+    def test_ic_drop_empty_false_still_drops_out_of_vocabulary(self, ic_dataset, vehicle_target):
+        i2l = {0: "sedan", 1: "spaceship"}
+        ds = ic_dataset([0, 1], i2l)
+        remap = label_alignment(i2l.values(), vehicle_target)["class_remap"]
+        assert len(View(ds, [Relabel(remap, vehicle_target, drop_empty=False)])) == 1
+
     def test_on_unmatched_raise(self, ic_dataset, vehicle_target):
         i2l = {0: "sedan", 1: "spaceship"}
         ds = ic_dataset([0, 1], i2l)
@@ -179,6 +199,43 @@ class TestRelabel:
         assert 0 in relabel.mapping
         assert relabel.dropped == {1: "spaceship"}
 
+    def test_dropped_indices_reports_whole_image_drops(self, od_dataset, vehicle_target):
+        i2l = {0: "sedan", 1: "truck", 2: "spaceship"}
+        ds = od_dataset([[0], [], [2], [1]], i2l)  # background frame and all-OOV frame go
+        relabel = Relabel(label_alignment(i2l.values(), vehicle_target)["class_remap"], vehicle_target)
+        conformed = View(ds, [relabel])
+        assert relabel.dropped_indices == {1: "no detections", 2: "out of vocabulary"}
+        assert len(conformed) == 2
+        assert relabel.dropped == {2: "spaceship"}  # still the vocabulary, not the data
+
+    def test_dropped_indices_is_empty_when_nothing_is_dropped(self, od_dataset, vehicle_target):
+        i2l = {0: "sedan", 1: "truck", 2: "spaceship"}
+        ds = od_dataset([[0], [], [2]], i2l)
+        relabel = Relabel(
+            label_alignment(i2l.values(), vehicle_target)["class_remap"], vehicle_target, drop_empty=False
+        )
+        View(ds, [relabel])
+        assert relabel.dropped_indices == {}
+
+    def test_dropped_indices_counts_only_this_operations_drops(self, od_dataset, vehicle_target):
+        i2l = {0: "sedan", 1: "truck", 2: "spaceship"}
+        ds = od_dataset([[0], [2], [1]], i2l)
+        relabel = Relabel(label_alignment(i2l.values(), vehicle_target)["class_remap"], vehicle_target)
+        # Limit removes index 2 before Relabel is handed the selection
+        View(ds, [Limit(2), relabel])
+        assert relabel.dropped_indices == {1: "out of vocabulary"}
+
+    def test_ic_drop_reason_is_out_of_vocabulary(self, ic_dataset, vehicle_target):
+        i2l = {0: "sedan", 1: "spaceship"}
+        relabel = Relabel(label_alignment(i2l.values(), vehicle_target)["class_remap"], vehicle_target)
+        View(ic_dataset([0, 1], i2l), [relabel])
+        assert relabel.dropped_indices == {1: "out of vocabulary"}
+
+    def test_unapplied_relabel_dropped_indices_raises(self, vehicle_target):
+        relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)
+        with pytest.raises(OntologyError, match="View"):
+            _ = relabel.dropped_indices
+
     def test_unapplied_relabel_raises(self, vehicle_target):
         relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)
         with pytest.raises(OntologyError, match="View"):
@@ -198,7 +255,7 @@ class TestRelabel:
         relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)
         # a plain string is neither an ObjectDetectionTarget nor an Array
         with pytest.raises(TypeError, match="does not support targets of type"):
-            relabel._keep(("image", "not-a-target"))
+            relabel._drop_reason(("image", "not-a-target"))
 
     def test_remap_unsupported_target_type_raises(self, ic_dataset, vehicle_target):
         relabel = Relabel(label_alignment(["sedan"], vehicle_target)["class_remap"], vehicle_target)

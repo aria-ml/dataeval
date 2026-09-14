@@ -20,6 +20,14 @@ TargetVocabulary: TypeAlias = Ontology | Mapping[int, str] | Sequence[str]
 """A target label vocabulary: an :class:`.Ontology`, an ``index -> label`` mapping,
 or an ordered sequence of class names."""
 
+DropReason: TypeAlias = Literal["no detections", "out of vocabulary"]
+"""Why :class:`Relabel` dropped a datum whole; see :attr:`Relabel.dropped_indices`.
+
+A closed set so callers can branch on the reason. ``"no detections"`` means the datum
+has no detections at all. ``"out of vocabulary"`` means every label falls outside the
+target vocabulary.
+"""
+
 
 def _resolve_target(target: TargetVocabulary) -> tuple[dict[str, int], dict[int, str]]:  # noqa: C901
     """Normalize a target vocabulary into ``(key -> index, index -> label)``.
@@ -114,7 +122,14 @@ class Relabel(Operation):
         What to do with out-of-vocabulary source classes. ``"drop"`` removes them
         (an image-classification datum whose class is OOV is dropped; an
         object-detection detection that is OOV is dropped, and an image left with
-        no detections is dropped). ``"raise"`` raises if any source class is OOV.
+        no detections is dropped unless ``drop_empty=False``). ``"raise"`` raises if
+        any source class is OOV.
+    drop_empty : bool, default True
+        Whether to drop a *detection* datum with no in-vocabulary detections.
+        When ``False``, keep datums that have no detections, or whose detections are
+        all out of vocabulary.
+
+        .. versionadded:: 1.2
     reduce_detection_scores : bool or None, default None
         How a *detection* target's per-class scores are conformed. ``True`` — the default
         — reduces them to one confidence per detection, the score of the class the box
@@ -196,11 +211,13 @@ class Relabel(Operation):
         target: TargetVocabulary | None = None,
         *,
         on_unmatched: Literal["drop", "raise"] = "drop",
+        drop_empty: bool = True,
         reduce_detection_scores: bool | None = None,
     ) -> None:
         self._class_remap = class_remap
         self.target = target
         self.on_unmatched = on_unmatched
+        self.drop_empty = drop_empty
         self.reduce_detection_scores = reduce_detection_scores
         # Warned here rather than per datum: the caller asked for the old behavior by
         # name, so the stack points at the call that has to change, and there is no
@@ -221,6 +238,7 @@ class Relabel(Operation):
             )
         self._mapping: dict[int, int] | None = None
         self._dropped: dict[int, str] | None = None
+        self._dropped_indices: dict[int, DropReason] | None = None
         self._index2label: dict[int, str] | None = None
         self._score_width: int = 0
 
@@ -236,10 +254,38 @@ class Relabel(Operation):
 
     @property
     def dropped(self) -> Mapping[int, str]:
-        """Source classes dropped as out-of-vocabulary (source index to name)."""
+        """Source classes dropped as out-of-vocabulary (source index to name).
+
+        See Also
+        --------
+        dropped_indices : The datums dropped whole, with the reason for each.
+        """
         if self._dropped is None:
             raise OntologyError("Relabel must be applied through View(...) before use.")
         return self._dropped
+
+    @property
+    def dropped_indices(self) -> Mapping[int, DropReason]:
+        """Datums dropped whole, source index to :data:`DropReason` (computed during apply).
+
+        ``"no detections"`` means the datum has no detections at all. Widening the target
+        vocabulary cannot recover such a datum. ``"out of vocabulary"`` means the target
+        vocabulary cannot express the datum: a classification datum whose class is
+        unmatched, or a detection datum whose every detection is unmatched.
+
+        The keys index datums, not classes. This property is separate from :attr:`dropped`
+        even though both map ``int``.
+
+        Indices are the source dataset's, in order. The mapping covers only the datums
+        this operation dropped; drops made by earlier operations are not included. Like
+        :attr:`mapping` and :attr:`dropped`, the mapping reflects the most recent
+        :class:`View` the operation was applied through.
+
+        .. versionadded:: 1.2
+        """
+        if self._dropped_indices is None:
+            raise OntologyError("Relabel must be applied through View(...) before use.")
+        return self._dropped_indices
 
     @property
     def index2label(self) -> Mapping[int, str]:
@@ -265,16 +311,31 @@ class Relabel(Operation):
 
     def apply(self, view: View[Any]) -> None:
         # Drop out-of-vocabulary datums (cheap keep-check reads through preceding ops),
-        # then register the label remap applied lazily on access.
-        view.selection = [i for i in view.selection if self._keep(view.read(i))]
+        # then register the label remap applied lazily on access. Partitioned rather than
+        # filtered so the drops are reportable without reading every datum a second time.
+        kept: list[int] = []
+        self._dropped_indices = {}
+        for index in view.selection:
+            reason = self._drop_reason(view.read(index))
+            if reason is None:
+                kept.append(index)
+            else:
+                self._dropped_indices[index] = reason
+        view.selection = kept
         view.map(self._remap)
 
-    def _keep(self, datum: Any) -> bool:
+    def _drop_reason(self, datum: Any) -> DropReason | None:
+        """Why this datum cannot be conformed, or ``None`` to keep it."""
         target = datum[1]
         if isinstance(target, ObjectDetectionTarget):
-            return any(int(label) in self.mapping for label in as_numpy(target.labels))
+            if not self.drop_empty:
+                return None
+            labels = as_numpy(target.labels).reshape(-1)
+            if any(int(label) in self.mapping for label in labels):
+                return None
+            return "out of vocabulary" if labels.size else "no detections"
         if isinstance(target, Array):
-            return argmax_label(target) in self.mapping
+            return None if argmax_label(target) in self.mapping else "out of vocabulary"
         raise TypeError(f"Relabel does not support targets of type {type(target)}.")
 
     def _remap(self, datum: Any) -> Any:
