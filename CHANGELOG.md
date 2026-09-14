@@ -1,6 +1,23 @@
-[//]: # (eba1858b705a4655280012619f01fbb8fc125752)
+[//]: # (2a4c74764157f853c8226d720ba549d871793d28)
 
 # DataEval Change Log
+
+## v1.1.1
+
+👾 **Fixes**
+
+- `2a4c7476` - [fix] Read direct pushes to the release branch when cutting a patch release
+- `a36422a9` - [fix] MaskedTarget is not properly wrapping MAITE targets
+- `d0a715cc` - [fix] Read a threshold spec written as lists, as JSON and YAML deliver it
+- `1bbd3327` - [fix] Attach track_stats to Metadata without silent column splits or phantom tracks
+- `2693f1ca` - [fix] Accept integer feature matrices in the ranking core
+- `a2ceabda` - [fix] Conform detection scores to the target vocabulary in Relabel
+- `02bacb78` - [fix] Allow merge_datasets to accept packed collections of datasets
+
+📝 **Miscellaneous**
+
+- `0ff0fbf3` - [misc] Mirror MAITE protocols to enable stable isinstance checks
+- `ea90429e` - [type] Adjust ThresholdLike protocol
 
 ## v1.1.0
 
