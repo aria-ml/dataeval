@@ -86,12 +86,12 @@ pages coverage:
     paths:
       - htmlcov/
 
-validate release label:
+validate commit prefix:
   stage: release
   extends: .rules_mr_only
   needs: []
   script:
-    - .gitlab/scripts/validate_release_label.py
+    - .gitlab/scripts/validate_commit_prefix.py
 
 # This job will only run if all previous stages have succeeded,
 # and it creates a tag that signifies that all testing has passed.
@@ -115,38 +115,6 @@ remove docs artifact branches:
     - .gitlab/scripts/remove_docs_artifact_branches.py
   allow_failure: true
 
-# This job updates the changelog and tags the commit hash with a
-# new version tag, which gets picked up and published from a GitHub
-# action defined in .github/workflows/publish.yml
-create release:
-  stage: release
-  extends: .rules_release_only
-  needs: []
-  # Serialize with 'create pre-release' - both commit and tag main, so concurrent
-  # runs compute the same version and the loser fails on tag creation
-  resource_group: release
-  # The commit and the tag are two separate API calls; an auto-cancel landing
-  # between them leaves an untagged release commit on main, so opt out of the
-  # workflow-level auto_cancel that the default 'interruptible: true' enables.
-  interruptible: false
-  before_script:
-    - uv pip install requests --system
-  script:
-    - .gitlab/scripts/create_release.py
-
-# This job creates a pre-release version tag (e.g., v1.0.0-rc0, v1.0.0-rc1)
-# Triggered by setting CREATE_PRE_RELEASE=true in scheduled pipeline
-create pre-release:
-  stage: release
-  extends: .rules_prerelease_only
-  needs: []
-  resource_group: release
-  interruptible: false
-  before_script:
-    - uv pip install requests --system
-  script:
-    - .gitlab/scripts/create_prerelease.py
-
 # This job runs verification tests, generates test case markdown files and
 # VCRM, and pushes the artifacts to the DataEval meta repo (project 409).
 publish verification:
@@ -156,10 +124,7 @@ publish verification:
     - .rules_verification_only
   # Wait for the release tag when one is being cut so the artifacts are labelled
   # with it; on a standalone PUBLISH_VERIFICATION run that job is absent and the
-  # optional need is ignored.
-  needs:
-    - job: create release
-      optional: true
+  needs: []
   variables:
     GIT_DEPTH: 0
   before_script:
@@ -174,7 +139,7 @@ publish verification:
 
 export-merged-sbom:
   stage: release
-  extends: .rules_release_only
+  extends: .rules_tag_only
   image: docker:stable
   before_script:
     - apk add --update jq curl
@@ -189,26 +154,3 @@ export-merged-sbom:
   variables:
     PRIVATE_TOKEN: $DATAEVAL_BUILD_PAT
 
-# This job creates a release branch on-demand from the latest matching tag.
-# Triggered by setting CREATE_RELEASE_BRANCH=vX.Y in a web pipeline.
-create release branch:
-  stage: release
-  needs: []
-  rules:
-    - if: $CREATE_RELEASE_BRANCH
-  before_script:
-    - uv pip install requests --system
-  script:
-    - .gitlab/scripts/create_release_branch.py
-
-# This job runs automatically on commits to release/v* branches
-# and creates patch releases by updating changelog and tagging
-create patch release:
-  stage: release
-  extends: .rules_release_branch_only
-  needs: []
-  interruptible: false
-  before_script:
-    - uv pip install requests --system
-  script:
-    - .gitlab/scripts/create_patch_release.py
