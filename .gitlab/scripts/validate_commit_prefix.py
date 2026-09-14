@@ -2,7 +2,7 @@
 """
 Require a known `[tag]` prefix on the merge request title.
 
-The title becomes the commit subject on main, and `scripts/cut_release.py` reads those
+The title becomes the commit subject on main, and `scripts/release.py` reads those
 subjects to build the changelog. A missing or misspelled tag silently files the change
 under Miscellaneous - which is how `[imrp] Split internal utilities` shipped - so it is
 rejected here, where the author can still fix it.
@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
-from cut_release import TAG_CATEGORIES
+from release import TAG_CATEGORIES
 
 if __name__ == "__main__":
     # A draft is not going to be merged as-is, so do not block it on its title yet
