@@ -68,17 +68,15 @@ def test_section_renders_in_precedence_order():
 
 
 def test_changelog_splice_keeps_history():
-    original = (
-        "[//]: # (oldsha)\n\n# DataEval Change Log\n\n## v1.1.0\n\n\U0001f47e **Fixes**\n\n- `aaaaaaaa` - [fix] Old\n"
-    )
+    original = "# DataEval Change Log\n\n## v1.1.0\n\n\U0001f47e **Fixes**\n\n- `aaaaaaaa` - [fix] Old\n"
     with tempfile.TemporaryDirectory() as tmp:
         changelog = Path(tmp) / "CHANGELOG.md"
         changelog.write_text(original)
         release.CHANGELOG_FILE = changelog
-        release.update_changelog("v1.2.0", render_section("v1.2.0", {"fix": [("bbbbbbbb", "[fix] New")]}), "newsha")
+        release.update_changelog(render_section("v1.2.0", {"fix": [("bbbbbbbb", "[fix] New")]}))
         result = changelog.read_text()
 
-    assert result.startswith("[//]: # (newsha)\n\n# DataEval Change Log\n\n## v1.2.0\n"), result
+    assert result.startswith("# DataEval Change Log\n\n## v1.2.0\n"), result
     # the previous release survives intact, one blank line below the new section
     assert "- `bbbbbbbb` - [fix] New\n\n## v1.1.0\n" in result, result
     assert "- `aaaaaaaa` - [fix] Old" in result

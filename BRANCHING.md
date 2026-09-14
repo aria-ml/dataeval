@@ -1,13 +1,14 @@
 # DataEval Branching and Release Strategy
 
-DataEval follows **GitLab Flow with Release Branches**, enhanced with label-driven semantic versioning.
+DataEval follows **GitLab Flow with Release Branches**. Releases are cut from a local checkout with
+[`scripts/release.py`](scripts/release.py) and published by pushing the resulting tag.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Branch Structure](#branch-structure)
 - [Release Process](#release-process)
-- [Release Labels](#release-labels)
+- [Commit Prefixes](#commit-prefixes)
 - [Workflows](#workflows)
 - [Automation](#automation)
 - [Version Management](#version-management)
@@ -23,7 +24,8 @@ branches enable ongoing patch support for deployed versions.
 - **Single source of truth**: All features and fixes merge to `main` first
 - **Semantic versioning**: Clear version increments based on change type
 - **Manual hotfix propagation**: Maintainers cherry-pick fixes from `main` into release branches via MR
-- **Label-driven releases**: MR labels determine release type and changelog categorization
+- **Prefix-driven changelog**: The `[type]` prefix on each commit subject determines its changelog section
+- **The tag is the release**: Nothing publishes until a maintainer pushes a version tag
 
 ## Branch Structure
 
@@ -52,86 +54,69 @@ While not strictly enforced, we recommend the following patterns for clarity:
 
 ## Release Process
 
+Every release -- major, minor, patch or prerelease -- is cut the same way: run the script from the branch you want
+to release, review what it produced, then push. The branch you are on decides the bump.
+
+```bash
+git switch main && git pull          # or: git switch release/v1.1 && git pull
+python scripts/release.py --dry-run  # see the version and changelog first
+python scripts/release.py            # update CHANGELOG.md, commit, tag
+git show v1.2.0                      # review
+git push --follow-tags origin main   # publish
+```
+
+The script never pushes. Until you push the tag, nothing has been released and `git tag -d <version> && git reset
+--hard HEAD~1` backs the whole thing out.
+
+### What the script does
+
+1. Refuses to run on a dirty tree, on a branch other than `main` or `release/vX.Y`, or on a branch behind its upstream
+2. Finds the newest version tag reachable from `HEAD` (for a release branch, the newest in that `vX.Y` series)
+3. Reads the first-parent commits since that tag and groups them by their `[type]` prefix
+4. Computes the next version, refusing to reuse a tag that already exists
+5. Rewrites `CHANGELOG.md` and the Colab links in the docs indexes, commits, and creates an annotated tag
+
 ### Release Types
 
-We support three types of releases, each with different triggers and processes:
+| Command                             | Run from       | Result                              |
+| ----------------------------------- | -------------- | ----------------------------------- |
+| `python scripts/release.py`          | `main`         | Minor bump (`v1.1.0` -> `v1.2.0`)   |
+| `python scripts/release.py major`    | `main`         | Major bump (`v1.1.0` -> `v2.0.0`)   |
+| `python scripts/release.py`          | `release/vX.Y` | Patch bump (`v1.1.1` -> `v1.1.2`)   |
+| `python scripts/release.py prerelease`   | `main`     | Release candidate (`v1.2.0-rc0`)    |
+| `python scripts/release.py prerelease a` | `main`     | Alpha snapshot (`v1.2.0-a0`)        |
 
-#### 1. Major/Minor Releases (from `main`)
+A `[major]` commit is not bumped silently: an unqualified release refuses to run and tells you to confirm with
+`release.py major`. A prerelease inherits the pending bump, so candidates for a breaking release are numbered
+`v2.0.0-rcN` rather than `v1.2.0-rcN`.
 
-**Purpose**: New features, improvements, deprecations, or breaking changes
+Prereleases order as `1.2.0a0 < 1.2.0rc0 < 1.2.0`. Repeated `prerelease a` runs bump `-a0` -> `-a1`; a later
+`prerelease` run promotes to `-rc0` on the same base version. Going back down the ladder is refused, since it would
+publish a version that sorts before one already on PyPI.
 
-**Trigger**: Manual pipeline execution with `CREATE_NEW_RELEASE=true` variable
+### Patch Releases
 
-**Process**:
+Release branches carry fixes and housekeeping only. The script refuses to cut a patch when a `[feat]`, `[major]` or
+`[depr]` commit is present -- those belong on `main`.
 
-```mermaid
-graph LR
-    A[Trigger Pipeline] --> B[Scan MRs since last tag]
-    B --> C[Calculate version bump]
-    C --> D[Generate changelog]
-    D --> E[Update docs links]
-    E --> F[Create git tag vX.Y.0]
-    F --> G[Publish release]
-```
+A `release/vX.Y` branch must already have a `vX.Y.*` tag reachable from it; the branch is cut from its release tag,
+so this holds unless the branch was created by hand from the wrong commit.
 
-**Script**: [`.gitlab/scripts/create_release.py`](.gitlab/scripts/create_release.py)
+### Hotfix Cherry-Pick (from `main` to releases)
 
-> **Note**: this does **not** cut a `release/vX.Y` branch. Branching is a deliberate second step, run only when a
-> release line needs to receive backported fixes. See [Cutting a Release Branch](#cutting-a-release-branch).
+**Purpose**: Distribute critical fixes to active release branches.
 
-**Version Increment**:
-
-- `release::major` → MAJOR version bump (e.g., v0.74.0 → v1.0.0)
-- `release::feature` → MINOR version bump (e.g., v0.74.0 → v0.75.0)
-- `release::improvement` → MINOR version bump
-- `release::deprecation` → MINOR version bump
-
-#### 2. Patch Releases (from `release/vX.X`)
-
-**Purpose**: Bug fixes to existing releases
-
-**Trigger**: Automatic on any commit to `release/v*` branches
-
-**Process**:
-
-```mermaid
-graph LR
-    A[Commit to release/vX.X] --> B[Validate only release::fix MRs]
-    B --> C[Get latest patch version]
-    C --> D[Increment patch number]
-    D --> E[Generate changelog]
-    E --> F[Create git tag vX.Y.Z]
-    F --> G[Publish patch release]
-```
-
-**Script**: [`.gitlab/scripts/create_patch_release.py`](.gitlab/scripts/create_patch_release.py)
-
-**Version Increment**: Patch version only (e.g., v0.74.2 → v0.74.3)
-
-**Constraints**:
-
-- Only `release::fix` labeled MRs allowed on release branches
-- No features or breaking changes permitted
-
-#### 3. Hotfix Cherry-Pick (from `main` to releases)
-
-**Purpose**: Distribute critical fixes to active release branches
-
-**Trigger**: Manual. After a `release::fix` MR merges to `main`, a maintainer decides which release branches need the
-fix.
-
-**Process**:
+**Trigger**: Manual. After a `[fix]` MR merges to `main`, a maintainer decides which release branches need the fix.
 
 ```mermaid
 graph LR
     A[Fix merged to main] --> B[Maintainer identifies target release branches]
-    B --> C[For each target release branch]
-    C --> D[Create cherry-pick/fix-to-X-X branch from release/vX.X]
-    D --> E[git cherry-pick commit]
-    E --> F[Resolve conflicts if any]
-    F --> G[Push branch & open MR to release/vX.X]
-    G --> H[Review & merge]
-    H --> I[Automatic patch release]
+    B --> C[Create cherry-pick/fix-to-X-X branch from release/vX.X]
+    C --> D[git cherry-pick commit]
+    D --> E[Resolve conflicts if any]
+    E --> F[Push branch & open MR to release/vX.X]
+    F --> G[Review & merge]
+    G --> H[Maintainer runs release.py on the release branch]
 ```
 
 **Example commands**:
@@ -142,59 +127,65 @@ git checkout -b cherry-pick/fix-to-v0-74 origin/release/v0.74
 git cherry-pick <commit-sha>
 # resolve conflicts if needed, then:
 git push -u origin cherry-pick/fix-to-v0-74
-# open MR targeting release/v0.74 with release::fix label
+# open MR targeting release/v0.74, titled "[fix] ..."
 ```
-
-**Manual Step**: Maintainers create the cherry-pick branch, open the MR, and merge it. The resulting commit on
-`release/vX.X` triggers the automatic patch release.
 
 ### Cutting a Release Branch
 
-**Purpose**: Open a `release/vX.Y` line so that a release can receive backported fixes independently of `main`.
+**Purpose**: Open a `release/vX.Y` line so a release can receive backported fixes independently of `main`.
 
-**Automation**: Release branches are automatically cut from the release tag immediately upon major/minor release
-creation inside `.gitlab/scripts/create_release.py`.
+Not every release needs a branch. Create one by branching `release/vX.Y` from the `vX.Y.0` tag, in GitLab or locally:
 
-Not every release needs a branch; if you need to manually recreate a release branch or cut one from a historical
-tag, you can simply create a branch named `release/vX.Y` pointing to the desired tag's commit directly in GitLab.
+```bash
+git switch -c release/v1.2 v1.2.0
+git push -u origin release/v1.2
+```
 
-## Release Labels
+## Commit Prefixes
 
-Every merge request to `main` **must** have exactly one `release::*` label. This requirement is enforced by CI validation.
+Every merge request to `main` **must** have a `[type]` prefix on its title. CI enforces this with
+[`validate_commit_prefix.py`](.gitlab/scripts/validate_commit_prefix.py), because the MR title becomes the commit
+subject and the release script reads those subjects to build the changelog. An unrecognized prefix is rejected
+rather than being filed under Miscellaneous, which is how a typo like `[imrp]` used to slip through.
 
-### Available Labels
+Direct commits to `main` follow the same convention.
 
-| Label                  | Version Bump  | Use Case                             | Changelog Section |
-| ---------------------- | ------------- | ------------------------------------ | ----------------- |
-| `release::major`       | MAJOR (X.0.0) | Breaking changes, major API overhaul | Breaking Changes  |
-| `release::feature`     | MINOR (0.X.0) | New features, new capabilities       | Features          |
-| `release::improvement` | MINOR (0.X.0) | Enhancements to existing features    | Improvements      |
-| `release::deprecation` | MINOR (0.X.0) | Deprecating functionality            | Deprecations      |
-| `release::fix`         | PATCH (0.0.X) | Bug fixes, minor improvements        | Bug Fixes         |
-| `release::misc`        | None          | Documentation, CI, refactoring       | Miscellaneous     |
+### Available Prefixes
 
-### Label Selection Guide
+| Prefix                | Version Bump  | Use Case                             | Changelog Section           |
+| --------------------- | ------------- | ------------------------------------ | --------------------------- |
+| `[major]`             | MAJOR (X.0.0) | Breaking changes, major API overhaul | Major Release               |
+| `[feat]`              | MINOR (0.X.0) | New features, new capabilities       | Feature Release             |
+| `[depr]`              | MINOR (0.X.0) | Deprecating or removing functionality| Deprecations and Removals   |
+| `[impr]`, `[perf]`    | MINOR (0.X.0) | Enhancements, optimizations          | Improvements and Enhancements |
+| `[fix]`               | PATCH (0.0.X) | Bug fixes                            | Fixes                       |
+| `[docs]`, `[test]`, `[deps]`, `[type]`, `[devops]`, `[devsecops]`, `[lint]`, `[misc]` | None | Documentation, CI, refactoring, dependencies | Miscellaneous |
 
-**Choose `release::fix` when**:
+The full accepted vocabulary lives in `TAG_CATEGORIES` in [`scripts/release.py`](scripts/release.py); the CI check
+imports it, so the two cannot drift.
+
+### Prefix Selection Guide
+
+**Choose `[fix]` when**:
 
 - Fixing a bug that affects existing releases
 - Correcting incorrect behavior
 - Patching security vulnerabilities
 - The fix is a candidate for manual cherry-pick into active release branches
 
-**Choose `release::feature` when**:
+**Choose `[feat]` when**:
 
 - Adding new functionality
 - Introducing new APIs or modules
 - Adding new configuration options
 
-**Choose `release::improvement` when**:
+**Choose `[impr]` when**:
 
 - Enhancing existing features
 - Optimizing performance
 - Improving error messages or logging
 
-**Choose `release::misc` when**:
+**Choose a housekeeping prefix when**:
 
 - Updating documentation only
 - Changing CI/CD configuration
@@ -210,27 +201,22 @@ gitGraph
     commit id: "v0.74.0"
     branch "release/v0.74"
     checkout main
-    commit id: "feat: Add feature A" tag: "release::feature"
-    commit id: "fix: Critical bug" tag: "release::fix"
+    commit id: "[feat] Add feature A"
+    commit id: "[fix] Critical bug"
     branch "cherry-pick/fix-to-v0-74"
     checkout "cherry-pick/fix-to-v0-74"
-    cherry-pick id: "fix: Critical bug"
+    cherry-pick id: "[fix] Critical bug"
     checkout "release/v0.74"
     merge "cherry-pick/fix-to-v0-74" tag: "v0.74.1"
     checkout main
-    commit id: "feat: Add feature B" tag: "release::feature"
+    commit id: "[feat] Add feature B"
     commit id: "Release v0.75.0" tag: "v0.75.0"
     branch "release/v0.75"
     checkout main
-    commit id: "fix: Another bug" tag: "release::fix"
-    branch "cherry-pick/fix-to-v0-74-2"
+    commit id: "[fix] Another bug"
     branch "cherry-pick/fix-to-v0-75"
-    checkout "cherry-pick/fix-to-v0-74-2"
-    cherry-pick id: "fix: Another bug"
-    checkout "release/v0.74"
-    merge "cherry-pick/fix-to-v0-74-2" tag: "v0.74.2"
     checkout "cherry-pick/fix-to-v0-75"
-    cherry-pick id: "fix: Another bug"
+    cherry-pick id: "[fix] Another bug"
     checkout "release/v0.75"
     merge "cherry-pick/fix-to-v0-75" tag: "v0.75.1"
 ```
@@ -242,64 +228,61 @@ flowchart TD
     A[Start Work] --> B[Create feature branch from main]
     B --> C[Develop & commit changes]
     C --> D[Push branch]
-    D --> E[Create Merge Request to main]
-    E --> F[Add release::* label]
-    F --> G{Is it a fix for<br/>existing releases?}
-    G -->|Yes| H[Use release::fix label]
-    G -->|No| I[Use appropriate label<br/>feature/improvement/etc.]
-    H --> J[CI validates label]
-    I --> J
-    J --> K[Review & approval]
-    K --> L[Merge to main]
-    L --> M{Has release::fix<br/>label?}
-    M -->|Yes| N[Maintainer manually creates<br/>cherry-pick MR per target release branch]
-    M -->|No| O[Done]
-    N --> P[Review cherry-pick MRs]
-    P --> Q[Merge cherry-picks into release/vX.X]
-    Q --> R[Automatic patch releases]
-    R --> O
+    D --> E["Open MR to main, titled '[type] Summary'"]
+    E --> F[CI validates the title prefix]
+    F --> G[Review & approval]
+    G --> H[Merge to main]
+    H --> I{Is it a fix for<br/>existing releases?}
+    I -->|Yes| J[Maintainer opens a cherry-pick MR<br/>per target release branch]
+    I -->|No| K[Done]
+    J --> K
 ```
 
 ### Maintainer Workflow: Creating a Release
 
 ```mermaid
 flowchart TD
-    A[Ready to Release] --> B{Release Type?}
-    B -->|Major/Minor| C[Go to GitLab CI/CD Pipeline]
-    B -->|Patch| D[Merge fix MR to release branch]
-    C --> E["Expand '🚀 Build' flyout"]
-    E --> F[Click 'Pipeline schedules']
-    F --> G[Run 'Manual release' pipeline]
-    G --> H[Script scans merged MRs]
-    H --> I[Calculates version from labels]
-    I --> J[Generates changelog]
-    J --> K[Creates git tag vX.Y.0]
-    K --> M[Publishes release]
-    M --> N[Done]
-    D --> O[CI detects commit on release branch]
-    O --> P[Validates only release::fix MRs]
-    P --> Q[Increments patch version]
-    Q --> R[Creates git tag vX.Y.Z]
-    R --> S[Publishes patch release]
-    S --> N
+    A[Ready to Release] --> B[git switch main or release/vX.Y]
+    B --> C[git pull]
+    C --> D[python scripts/release.py --dry-run]
+    D --> E{Changelog and<br/>version correct?}
+    E -->|No| F[Fix commit subjects or cherry-picks, retry]
+    F --> D
+    E -->|Yes| G[python scripts/release.py]
+    G --> H[git show the release commit and tag]
+    H --> I{Happy?}
+    I -->|No| J["git tag -d vX.Y.Z && git reset --hard HEAD~1"]
+    I -->|Yes| K[git push --follow-tags]
+    K --> L[Tag pipeline builds docs artifacts,<br/>verification evidence and SBOM]
+    K --> M[GitHub Actions publishes to PyPI<br/>and creates the GitHub Release]
 ```
 
 ## Automation
 
-Our release process is highly automated through GitLab CI/CD pipelines.
+### What CI does
 
-### Automated Scripts
+CI validates and publishes; it does not decide when to release.
 
-All automation scripts are located in [`.gitlab/scripts/`](.gitlab/scripts/):
+| Job                             | Trigger                   | Purpose                                            |
+| ------------------------------- | ------------------------- | -------------------------------------------------- |
+| `validate commit prefix`        | MRs to main               | Rejects titles without a known `[type]` prefix      |
+| `docs`                          | Main, MRs, version tags   | Builds docs; on a tag, publishes `docs-artifacts/<tag>` |
+| `publish verification`          | Version tags              | Pushes test evidence and VCRM to the meta repo     |
+| `export-merged-sbom`            | Version tags              | Exports the merged SBOM                            |
+| `remove docs artifact branches` | Main commits              | Cleans up artifact branches for merged MRs         |
+| `tag release candidate`         | Main commits              | Moves the `latest-known-good` marker               |
 
-| Script                                                                   | Purpose                        | Trigger                              |
-| ------------------------------------------------------------------------ | ------------------------------ | ------------------------------------ |
-| [`create_release.py`](.gitlab/scripts/create_release.py)                 | Create major/minor releases    | Manual: `CREATE_NEW_RELEASE=true`    |
-| [`create_prerelease.py`](.gitlab/scripts/create_prerelease.py)           | Create prerelease (a/rc) tags  | Manual: `CREATE_PRERELEASE=true`     |
-| [`create_patch_release.py`](.gitlab/scripts/create_patch_release.py)     | Create patch releases          | Auto: Commit to `release/v*`         |
-| [`validate_release_label.py`](.gitlab/scripts/validate_release_label.py) | Ensure MRs have release labels | Auto: All MRs to main                |
-| [`releasegen.py`](.gitlab/scripts/releasegen.py)                         | Core release logic & changelog | Called by release scripts            |
-| [`versiontag.py`](.gitlab/scripts/versiontag.py)                         | Version parsing & increment    | Called by release scripts            |
+The release commit itself is skipped by the workflow rules -- it only rewrites `CHANGELOG.md` and the docs index
+links, and the tag pushed alongside it already runs everything a release needs.
+
+### Scripts
+
+| Script                                                                   | Purpose                            | Run by      |
+| ------------------------------------------------------------------------ | ---------------------------------- | ----------- |
+| [`scripts/release.py`](scripts/release.py)                               | Cut a release: changelog, commit, tag | Maintainer, locally |
+| [`scripts/test_release.py`](scripts/test_release.py)                     | Self-check for the release logic   | Anyone      |
+| [`validate_commit_prefix.py`](.gitlab/scripts/validate_commit_prefix.py) | Enforce MR title prefixes          | CI          |
+| [`push_verification.py`](.gitlab/scripts/push_verification.py)           | Publish verification artifacts     | CI          |
 
 ### Commit Message Triggers
 
@@ -317,39 +300,12 @@ marker has to appear in the *merge commit* message, which GitLab composes from t
 so putting `+skipdocsclean` in either one works. Scheduled pipelines ignore the marker, so the nightly cache
 refresh still rebuilds from scratch.
 
-### CI/CD Pipeline
+### What Requires Manual Action
 
-The release pipeline consists of these key jobs:
-
-```mermaid
-graph TD
-    A[Pipeline Start] --> B[Test Stage]
-    B --> C[Validate Release Label]
-    C --> D{Branch Type?}
-    D -->|main + CREATE_NEW_RELEASE| E[Create Release Job]
-    D -->|release/v*| F[Create Patch Release Job]
-    E --> H[Tag Release]
-    F --> I[Tag Patch]
-    H --> K[Build & Publish]
-    I --> K
-    M[Maintainer opens manual<br/>cherry-pick MR to release/vX.X] --> F
-```
-
-### What Gets Automated
-
-**Fully Automated** (no human intervention):
-
-- Release label validation on MRs
-- Version number calculation
-- Changelog generation from MR labels
-- Git tag creation
-- Patch release creation when fixes are merged to `release/v*`
-
-**Requires Manual Action**:
-
-- Triggering major/minor releases (set `CREATE_NEW_RELEASE=true`)
+- Deciding when to release, and running `scripts/release.py`
+- Reviewing the release commit before pushing the tag
 - Creating cherry-pick branches and MRs to backport fixes into release branches
-- Reviewing and merging cherry-pick MRs
+- Cutting a `release/vX.Y` branch when a release line needs to receive backports
 - Approving MRs to main
 
 ## Version Management
@@ -362,37 +318,32 @@ We follow [Semantic Versioning 2.0.0](https://semver.org/):
 vMAJOR.MINOR.PATCH
 ```
 
-- **MAJOR**: Incompatible API changes (`release::major`)
-- **MINOR**: New features, backward compatible (`release::feature`, `release::improvement`, `release::deprecation`)
-- **PATCH**: Backward compatible bug fixes (`release::fix`)
+- **MAJOR**: Incompatible API changes (`[major]`)
+- **MINOR**: New features, backward compatible (`[feat]`, `[impr]`, `[depr]`)
+- **PATCH**: Backward compatible bug fixes (`[fix]`)
 
 ### Version Calculation Logic
 
-The version bump is determined by the **highest priority** label among all MRs since the last release:
-
-**Priority Order** (highest to lowest):
-
-1. `release::major` → Bump MAJOR version
-2. `release::feature`, `release::improvement`, `release::deprecation` → Bump MINOR version
-3. `release::fix` → Bump PATCH version (for major/minor releases from main)
-4. `release::misc` → No version bump (must have other changes)
+A release from `main` is a minor bump unless a `[major]` commit is pending or `major` is passed explicitly. A release
+from `release/vX.Y` is always a patch bump. Housekeeping commits are recorded in the changelog but never drive the
+bump on their own.
 
 **Examples**:
 
-- Current: `v0.74.5`, Changes: 3× `release::feature`, 2× `release::fix` → Next: `v0.75.0`
-- Current: `v0.74.5`, Changes: 1× `release::major`, 5× `release::feature` → Next: `v1.0.0`
-- Current: `v0.74.5`, Changes on `release/v0.74`: 1× `release::fix` → Next: `v0.74.6`
+- Current `v0.74.5` on main, changes: 3x `[feat]`, 2x `[fix]` -> next `v0.75.0`
+- Current `v0.74.5` on main, changes include 1x `[major]` -> `release.py` requires `release.py major` -> next `v1.0.0`
+- Current `v0.74.5` on `release/v0.74`, changes: 1x `[fix]` -> next `v0.74.6`
 
 ### Version Tag Format
 
 - All version tags start with `v` prefix (e.g., `v0.74.0`, `v1.0.0`)
-- Tags are annotated git tags with release notes
+- Tags are annotated git tags
 - Tags are immutable once published
-- Tags trigger additional CI/CD processes (Docker image builds, documentation publishing)
+- Pushing a tag is what triggers publication: PyPI, the GitHub Release, docs artifacts, verification and the SBOM
 
 ### Release Branch Lifecycle
 
-**Creation**: Release branches are cut on demand by a maintainer, not automatically -- see
+**Creation**: Release branches are cut on demand by a maintainer -- see
 [Cutting a Release Branch](#cutting-a-release-branch)
 
 **Naming**: `release/vX.Y` (major.minor only, no patch number)
@@ -417,18 +368,18 @@ git push origin --delete release/v0.70
 
 ### For Developers
 
-1. **Always add a `release::*` label** to your MR before requesting review
-2. **Flag fixes that may need backport** - `release::fix` MRs are candidates for manual cherry-pick into releases
+1. **Title every MR `[type] Summary`** -- the title becomes the commit subject and the changelog entry
+2. **Flag fixes that may need backport** - `[fix]` MRs are candidates for manual cherry-pick into releases
 3. **Keep changes focused** - One MR should have one primary purpose
-4. **Write clear MR descriptions** - They become part of the changelog
+4. **Write clear MR titles** - They are what users read in the changelog
 5. **Test thoroughly** - Fixes cherry-picked to release branches land in production patch releases
 
 ### For Maintainers
 
-1. **Cherry-pick fixes promptly** - When a `release::fix` lands on `main`, decide quickly whether it needs backport
-2. **Monitor release branch health** - Ensure patches are being applied successfully
-3. **Coordinate major/minor releases** - Communicate with team before triggering
-4. **Verify changelog accuracy** - Auto-generated but should be reviewed
+1. **Always `--dry-run` first** - It costs nothing and shows the exact changelog and version
+2. **Review before pushing** - The tag is the point of no return; the commit before it is free to discard
+3. **Pull before releasing** - The script refuses to run on a stale branch, but start fresh anyway
+4. **Cherry-pick fixes promptly** - When a `[fix]` lands on `main`, decide quickly whether it needs backport
 5. **Define EOL policy** - Decide which release branches to actively maintain
 
 ### For the Team
@@ -436,8 +387,7 @@ git push origin --delete release/v0.70
 1. **Document breaking changes** - Use MR descriptions to explain impact
 2. **Coordinate deprecations** - Give users advance notice
 3. **Test on release branches** - Don't just test on `main`
-4. **Monitor automation** - Check CI/CD pipeline results
-5. **Keep this document updated** - Process improvements should be reflected here
+4. **Keep this document updated** - Process improvements should be reflected here
 
 ## Comparison to Other Strategies
 
@@ -448,43 +398,62 @@ Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 | Main development branch     | `main`                | ✓           | `develop`      | `main`      |
 | Long-lived release branches | `release/vX.X`        | ✓           | `release/vX.X` | ✗           |
 | Cherry-pick into releases   | Manual                | Manual      | ✗              | ✗           |
-| Label-driven versioning     | ✓                     | ✗           | ✗              | ✗           |
+| Prefix-driven changelog     | ✓                     | ✗           | ✗              | ✗           |
 | Hotfix branches             | Manual cherry-pick MR | Manual      | `hotfix/`      | ✗           |
 | CI/CD integrated            | ✓                     | ✓           | Optional       | ✓           |
 
 **What makes our strategy unique**:
 
-- Label-driven semantic versioning
-- Validation enforced at merge time
-- Full changelog automation
-- Automatic patch releases once a cherry-pick is merged into a release branch
+- Prefix-driven semantic versioning, validated at merge time
+- Full changelog automation from commit subjects, with no credentials required to generate it
+- A human review step between generating a release and publishing it
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Issue**: MR blocked because missing `release::*` label
+**Issue**: MR blocked because the title has no `[type]` prefix, or an unknown one
 
-- **Solution**: Add the appropriate label based on the change type
+- **Solution**: Retitle the MR. The error message lists every valid prefix.
+
+**Issue**: `release.py` says the working tree is not clean
+
+- **Solution**: Commit or stash your changes. The release commit must contain only what the script generates.
+
+**Issue**: `release.py` says the branch is behind its upstream
+
+- **Solution**: `git pull`. Releasing from a stale branch computes a version that may already be published.
+
+**Issue**: `release.py` says the tag already exists
+
+- **Solution**: Someone has already released that version. Fetch and check what is on the remote before retrying.
+
+**Issue**: `release.py` refuses because a `[major]` change is pending
+
+- **Solution**: Run `python scripts/release.py major` to confirm the breaking bump, or move the change off the branch.
+
+**Issue**: A patch release is refused because of a `[feat]` commit on the release branch
+
+- **Solution**: Features belong on `main`. Revert it from the release branch and release it from `main` instead.
+
+**Issue**: The changelog entry for a merge commit reads "Merge branch ..."
+
+- **Solution**: The MR title was empty or the merge was made by hand. Amend the commit subject before releasing.
+
+**Issue**: A release was tagged but should not have been
+
+- **Solution**: If it has not been pushed, `git tag -d <version> && git reset --hard HEAD~1`. Once pushed, the tag is
+  published -- cut a new version rather than deleting it.
 
 **Issue**: Cherry-pick has conflicts
 
 - **Solution**: Resolve conflicts locally on the `cherry-pick/fix-to-X-X` branch before pushing, or skip the cherry-pick
   and open a new fix MR directly against the release branch
 
-**Issue**: Wrong version number generated
-
-- **Solution**: Check that MRs have correct labels; re-run release with corrections if needed
-
 **Issue**: Fix on `main` didn't reach a release branch
 
 - **Solution**: Cherry-picks are manual. Open a cherry-pick MR targeting `release/vX.X` yourself — nothing will do it
   automatically.
-
-**Issue**: Patch release fails validation
-
-- **Solution**: Ensure only `release::fix` labeled MRs are merged to release branches; other change types must go to
-  `main` first
 
 ## References
 
@@ -492,7 +461,7 @@ Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 - [Semantic Versioning 2.0.0](https://semver.org/)
 - [Git Branching Model Comparison](https://www.gitkraken.com/learn/git/best-practices/git-branch-strategy)
 - Project CI/CD Configuration: [`.gitlab-ci.yml`](.gitlab-ci.yml)
-- Release Scripts: [`.gitlab/scripts/`](.gitlab/scripts/)
+- Release script: [`scripts/release.py`](scripts/release.py)
 
 ## Questions or Feedback
 

@@ -100,7 +100,7 @@ In the checked-in documentation, Colab links point to `docs-artifacts/main`:
 https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/<file>.ipynb
 ```
 
-During a release, `releasegen.py` rewrites these to the versioned artifact branch:
+During a release, [`scripts/release.py`](../scripts/release.py) rewrites these to the versioned artifact branch:
 
 ```text
 https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v0.96.0/notebooks/<file>.ipynb
@@ -108,41 +108,36 @@ https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v0
 
 ## Release Process
 
-Releases are managed via GitLab CI scheduled pipelines and mirrored to GitHub.
+Releases are cut locally with [`scripts/release.py`](../scripts/release.py) and published by pushing the tag.
+See [BRANCHING.md](../BRANCHING.md) for the full strategy; this section covers what happens to the docs.
 
-### Full Release
+```bash
+git switch main && git pull
+python scripts/release.py --dry-run   # review version and changelog
+python scripts/release.py             # changelog, commit, annotated tag
+git push --follow-tags origin main    # publish
+```
 
-Triggered by setting `CREATE_NEW_RELEASE=true` in a scheduled pipeline:
+The branch decides the bump: `main` gives a minor release, `release/vX.Y` a patch. `release.py major` forces a
+major bump, and `release.py prerelease [a|rc]` cuts a prerelease. Nothing is published until the tag is pushed.
 
-1. **`create_release.py`** analyzes merged MRs since the last tag, determines the version
-   bump (major/minor), updates `CHANGELOG.md`, rewrites Colab links to the new version, and
-   commits to `main`
-2. The commit is **tagged** `vX.Y.Z`
-3. An **API pipeline** is triggered on `main` which builds docs, then
-   `push-docs-cache.sh` detects the version tag on HEAD and pushes artifacts to both
-   `docs-artifacts/main` and `docs-artifacts/vX.Y.Z`
-4. The tag push triggers **GitHub Actions** (`publish.yml`) which builds and publishes to PyPI
-   and creates a GitHub Release
+### What the tag triggers
 
-### Prerelease
+1. **GitLab tag pipeline** runs the `docs` job, and `push-docs-cache.sh` pushes the notebooks and Jupyter cache to
+   `docs-artifacts/vX.Y.Z` -- the branch the Colab links now point at
+2. **GitLab tag pipeline** also runs `publish verification` and `export-merged-sbom`
+3. **GitHub Actions** (`publish.yml`) builds the package, publishes to PyPI and creates the GitHub Release
 
-Triggered by setting `CREATE_PRERELEASE=true`, with `PRERELEASE_TYPE` selecting the kind:
+### Prereleases
 
-| `PRERELEASE_TYPE` | Tag          | PyPI version | Purpose                                                    |
-| ----------------- | ------------ | ------------ | ---------------------------------------------------------- |
-| `a`               | `v1.0.0-a0`  | `1.0.0a0`    | Early snapshot of main for downstream projects to build on |
-| `rc` (default)    | `v1.0.0-rc0` | `1.0.0rc0`   | Candidate for the release that follows                     |
+| Command                       | Tag          | PyPI version | Purpose                                                    |
+| ----------------------------- | ------------ | ------------ | ---------------------------------------------------------- |
+| `release.py prerelease a`     | `v1.0.0-a0`  | `1.0.0a0`    | Early snapshot of main for downstream projects to build on |
+| `release.py prerelease`       | `v1.0.0-rc0` | `1.0.0rc0`   | Candidate for the release that follows                     |
 
-- Creates a prerelease tag like `v1.0.0-a0` or `v1.0.0-rc0` on main
-- Updates changelog and Colab links to the prerelease version
-- An API pipeline on main creates `docs-artifacts/v1.0.0-a0`
-- The tag push triggers `publish.yml`, which publishes to PyPI and creates a GitHub
-  prerelease
-
-Versions order as `1.0.0a0 < 1.0.0rc0 < 1.0.0`, so repeated `PRERELEASE_TYPE=a` runs bump
-`-a0` -> `-a1`, and a later `PRERELEASE_TYPE=rc` run promotes to `-rc0` on the same base
-version. Going the other way (an `a` after an `rc`) is refused, since it would publish a
-version that sorts before one already on PyPI.
+Versions order as `1.0.0a0 < 1.0.0rc0 < 1.0.0`, so repeated `prerelease a` runs bump `-a0` -> `-a1`, and a later
+`prerelease` run promotes to `-rc0` on the same base version. Going the other way (an `a` after an `rc`) is refused,
+since it would publish a version that sorts before one already on PyPI.
 
 pip and uv skip prereleases unless the specifier asks for them, so a downstream pin reads:
 
@@ -150,43 +145,10 @@ pip and uv skip prereleases unless the specifier asks for them, so a downstream 
 "dataeval>=1.0.0a0",   # accepts 1.0.0a1, 1.0.0rc0 and the final 1.0.0
 ```
 
-### Release Branch Creation
+### MR Title Prefixes
 
-Release branches are automatically created when a major/minor release is published from `main`.
-
-If a release branch needs to be created manually (e.g., for older historical versions, or if a
-branch was accidentally deleted), it can be created directly via Git or the GitLab UI:
-
-1. Create a new branch named `release/vX.Y` (e.g., `release/v1.2`) pointing to the desired tag's
-   commit (e.g., `v1.2.0`).
-2. Push the branch to GitLab.
-
-Once the branch exists:
-
-- Cherry-pick fixes or create MRs targeting `release/vX.Y`
-- Future `release::fix` merges to main will auto-cherry-pick to this branch
-- When fixes merge, `create_patch_release.py` auto-tags the next patch version
-
-### Patch Release
-
-Triggered automatically on commits to `release/v*` branches:
-
-- Only accepts `release::fix` labeled MRs
-- Calculates next patch version (e.g., `v1.2.0` to `v1.2.1`)
-- Updates changelog and tags the release branch
-
-### MR Labels
-
-Every MR targeting `main` must have a release label:
-
-| Label                  | Version bump                  | Description               |
-| ---------------------- | ----------------------------- | ------------------------- |
-| `release::major`       | Major                         | Breaking changes          |
-| `release::feature`     | Minor                         | New functionality         |
-| `release::improvement` | Minor                         | Enhancements              |
-| `release::deprecation` | Minor                         | Deprecations and removals |
-| `release::fix`         | Patch (release branches only) | Bug fixes                 |
-| `release::misc`        | Minor                         | Other changes             |
+Every MR targeting `main` must have a `[type]` prefix on its title; CI rejects the rest. The prefix decides the
+changelog section and the version bump. See [Commit Prefixes](../BRANCHING.md#commit-prefixes) for the full table.
 
 ## CI Jobs
 
@@ -194,25 +156,25 @@ Every MR targeting `main` must have a release label:
 
 | Job            | Trigger                                | Purpose                                |
 | -------------- | -------------------------------------- | -------------------------------------- |
-| `docs`         | Main commits, MRs with doc/src changes | Full docs build with GPU, pushes cache |
+| `docs`         | Main commits, version tags, MRs with doc/src changes | Full docs build with GPU, pushes cache |
 | `doctest`      | Main commits, MRs                      | Runs doctests                          |
 | `linkchecker`  | Main commits, MRs                      | Validates markdown links               |
 | `markdownlint` | Main commits, MRs                      | Lints markdown formatting              |
 
 ### Release stage
 
-| Job                             | Trigger                                    | Purpose                                            |
-| ------------------------------- | ------------------------------------------ | -------------------------------------------------- |
-| `create release`                | Scheduled (`CREATE_NEW_RELEASE`)           | Creates version tag on main                        |
-| `create prerelease`             | Scheduled (`CREATE_PRERELEASE`)            | Creates prerelease tag on main                     |
-| `create patch release`          | Commits to `release/v*`                    | Creates patch version tag                          |
-| `remove docs artifact branches` | Main commits                               | Cleans up artifact branches for merged MRs         |
-| `cherry-pick fixes to releases` | Main commits                               | Auto-cherry-picks fixes to active release branches |
+| Job                             | Trigger      | Purpose                                            |
+| ------------------------------- | ------------ | -------------------------------------------------- |
+| `validate commit prefix`        | MRs to main  | Rejects titles without a known `[type]` prefix      |
+| `publish verification`          | Version tags | Pushes test evidence and VCRM to the meta repo     |
+| `export-merged-sbom`            | Version tags | Exports the merged SBOM                            |
+| `remove docs artifact branches` | Main commits | Cleans up artifact branches for merged MRs         |
 
 ## Key Files
 
 | File                                               | Purpose                                                                |
 | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| `scripts/release.py`                               | Cuts releases: changelog, Colab links, commit, tag                     |
 | `noxfile.py`                                       | Build orchestration (`docs`, `docsync`, `doctest` sessions)            |
 | `docs/source/notebooks/jupytext.toml`              | Configures py/ipynb pairing                                            |
 | `docs/push-docs-cache.sh`                          | Pushes cache + notebooks to artifact branches                          |
@@ -221,6 +183,4 @@ Every MR targeting `main` must have a release label:
 | `docs/source/conf.py`                              | Sphinx configuration (MyST-NB, cache settings)                         |
 | `.gitlab/ci/docs.yml`                              | Documentation CI jobs                                                  |
 | `.gitlab/ci/release.yml`                           | Release CI jobs                                                        |
-| `.gitlab/scripts/releasegen.py`                    | Generates changelog and updates Colab links                            |
-| `.gitlab/scripts/create_release.py`                | Orchestrates full releases                                             |
 | `.gitlab/scripts/remove_docs_artifact_branches.py` | Cleans up stale artifact branches                                      |

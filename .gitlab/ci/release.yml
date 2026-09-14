@@ -115,39 +115,6 @@ remove docs artifact branches:
     - uv run python .gitlab/scripts/remove_docs_artifact_branches.py
   allow_failure: true
 
-# This job updates the changelog and tags the commit hash with a
-# new version tag, which gets picked up and published from a GitHub
-# action defined in .github/workflows/publish.yml
-create release:
-  stage: release
-  extends: .rules_release_only
-  needs: []
-  # Serialize with 'create prerelease' - both commit and tag main, so concurrent
-  # runs compute the same version and the loser fails on tag creation
-  resource_group: release
-  # The commit and the tag are two separate API calls; an auto-cancel landing
-  # between them leaves an untagged release commit on main, so opt out of the
-  # workflow-level auto_cancel that the default 'interruptible: true' enables.
-  interruptible: false
-  before_script:
-    - uv pip install requests --system
-  script:
-    - uv run python .gitlab/scripts/create_release.py
-
-# This job creates a prerelease version tag (e.g., v1.0.0-a0, v1.0.0-rc0, v1.0.0-rc1).
-# Triggered by setting CREATE_PRERELEASE=true in a scheduled pipeline; PRERELEASE_TYPE
-# selects the kind ('rc' by default, 'a' for an early alpha snapshot of main).
-create prerelease:
-  stage: release
-  extends: .rules_prerelease_only
-  needs: []
-  resource_group: release
-  interruptible: false
-  before_script:
-    - uv pip install requests --system
-  script:
-    - uv run python .gitlab/scripts/create_prerelease.py
-
 # This job runs verification tests, generates test case markdown files and
 # VCRM, and pushes the artifacts to the DataEval meta repo (project 409).
 publish verification:
@@ -155,12 +122,9 @@ publish verification:
   extends:
     - .nox
     - .rules_verification_only
-  # Wait for the release tag when one is being cut so the artifacts are labelled
-  # with it; on a standalone PUBLISH_VERIFICATION run that job is absent and the
-  # optional need is ignored.
-  needs:
-    - job: create release
-      optional: true
+  # A tag pipeline already carries the tag in CI_COMMIT_TAG, so the artifacts label
+  # themselves; nothing has to run first.
+  needs: []
   variables:
     GIT_DEPTH: 0
   before_script:
@@ -175,7 +139,7 @@ publish verification:
 
 export-merged-sbom:
   stage: release
-  extends: .rules_release_only
+  extends: .rules_tag_only
   image: docker:stable
   before_script:
     - apk add --update jq curl
@@ -189,15 +153,3 @@ export-merged-sbom:
       - "gl-sbom-merged-*.cdx.json"
   variables:
     PRIVATE_TOKEN: $DATAEVAL_BUILD_PAT
-
-# This job runs automatically on commits to release/v* branches
-# and creates patch releases by updating changelog and tagging
-create patch release:
-  stage: release
-  extends: .rules_release_branch_only
-  needs: []
-  interruptible: false
-  before_script:
-    - uv pip install requests --system
-  script:
-    - uv run python .gitlab/scripts/create_patch_release.py

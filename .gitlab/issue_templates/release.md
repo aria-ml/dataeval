@@ -11,6 +11,6 @@ It is crucial that all code has been tested and all documentation is complete
 - [ ] Unit Tests <!-- (Do all unit tests pass?) -->
 - [ ] Docstrings <!-- (Does every public method have a NumPy style docstring?) -->
 - [ ] API Documentation <!-- (Does autosummary in the reference guide correctly link all public methods?) -->
-- [ ] Set Merge Request Release Label <!-- The merge request MUST be labeled under release:: -->
+- [ ] Merge Request Title <!-- The title MUST start with a [type] prefix; see BRANCHING.md#commit-prefixes -->
 
 /label ~ARiA ~issue::dev

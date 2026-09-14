@@ -174,5 +174,5 @@ if [ -n "$VERSION_TAG" ]; then
 elif [[ "$BRANCH_NAME" =~ ^release/v ]]; then
     echo ""
     echo "⚠ Release branch has no version tag on HEAD — no artifact branch pushed"
-    echo "  Artifacts will be pushed when create_patch_release.py tags this commit"
+    echo "  Artifacts are pushed by the tag pipeline once scripts/release.py tags this commit"
 fi

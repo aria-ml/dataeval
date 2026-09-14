@@ -175,17 +175,14 @@ def render_section(version: str, entries: dict[str, list[tuple[str, str]]]) -> s
     return "\n".join(lines)
 
 
-def update_changelog(version: str, section: str, head: str) -> None:
+def update_changelog(section: str) -> None:
     text = CHANGELOG_FILE.read_text()
     # Splice in front of the newest version heading rather than at a fixed line number, so
     # a change to the file's preamble cannot silently shear off the top of the changelog.
     index = text.find("\n## v")
     if index < 0:
         fail(f"{CHANGELOG_FILE.name} has no '## v...' heading to insert before")
-    # ponytail: the `[//]: # (sha)` marker is only read by the GitLab CI release scripts.
-    # Drop the marker, and this line, once those are deleted.
-    header = f"[//]: # ({head})\n\n# DataEval Change Log\n"
-    CHANGELOG_FILE.write_text(f"{header}\n{section}\n\n{text[index + 1 :]}")
+    CHANGELOG_FILE.write_text(f"# DataEval Change Log\n\n{section}\n\n{text[index + 1 :]}")
 
 
 def update_doc_indexes(version: str) -> list[Path]:
@@ -280,7 +277,7 @@ def main() -> None:
         print("--dry-run: nothing written.")
         return
 
-    update_changelog(version, section, git("rev-parse", "HEAD"))
+    update_changelog(section)
     changed = update_doc_indexes(version)
 
     label = "Prerelease" if args.bump == "prerelease" else "Release"

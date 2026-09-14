@@ -26,28 +26,26 @@ workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
-    # Variable-triggered automation workflows, runnable from a pipeline schedule,
-    # the web 'Run pipeline' form or the API. These have to be matched ahead of the
+    # Release and automation workflows. These have to be matched ahead of the
     # CHANGELOG.md filters below: GitLab evaluates `changes` as true whenever a
     # pipeline has no git push event behind it, so those filters would otherwise
     # reject every one of these triggers before its job rules are ever consulted.
+    # Release Workflow - a version tag pushed by scripts/release.py. The tag, not a
+    # pipeline variable, is what publishes: it rebuilds the docs artifacts, pushes the
+    # verification evidence and exports the SBOM, and on GitHub it publishes to PyPI.
+    - if: $CI_COMMIT_TAG
     # Publish Verification Workflow
     - if: $PUBLISH_VERIFICATION
-    # Release Workflow
-    - if: $CREATE_NEW_RELEASE
-    # Prerelease Workflow
-    - if: $CREATE_PRERELEASE
     # Nightly Docs Cache Update Workflow
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
     # Merge Request Workflow
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    # API-triggered pipelines on release branches or main (from release scripts for docs builds)
-    - if: $CI_PIPELINE_SOURCE == 'api' && ($CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN || $CI_COMMIT_BRANCH == 'main')
-    # Skip CHANGELOG.md updates
+    # Skip the release commit itself, on main and on release branches: it only rewrites
+    # CHANGELOG.md and the docs index links, and the tag pushed alongside it already runs
+    # everything the release needs.
     - if: $CI_COMMIT_BRANCH == 'main'
       changes: ['CHANGELOG.md']
       when: never
-    # Skip CHANGELOG.md updates on release branches (prevents cyclic loop from create_patch_release.py)
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
       changes: ['CHANGELOG.md']
       when: never
@@ -123,14 +121,14 @@ stages:
 
 .rules_main_mr:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRERELEASE || $PUBLISH_VERIFICATION
+    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 .rules_main_mr_code:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRERELEASE || $PUBLISH_VERIFICATION
+    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -142,7 +140,7 @@ stages:
 
 .rules_main_mr_deps:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRERELEASE || $PUBLISH_VERIFICATION
+    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -153,8 +151,11 @@ stages:
 
 .rules_main_mr_docs:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRERELEASE || $PUBLISH_VERIFICATION
+    - if: $PUBLISH_VERIFICATION
       when: never
+    # A version tag republishes the notebooks to docs-artifacts/<tag>, which is where the
+    # colab links rewritten by scripts/release.py point.
+    - if: $CI_COMMIT_TAG
     # Build off the cache instead of re-executing every notebook. Scheduled
     # pipelines (the nightly cache refresh) ignore the marker so the cache still
     # gets rebuilt from scratch on its usual cadence.
@@ -175,37 +176,29 @@ stages:
 # assembled from whichever of the docs and coverage jobs actually ran.
 .rules_mr_preview:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRERELEASE || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 .rules_mr_only:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRERELEASE || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 .rules_main_only:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRERELEASE || $PUBLISH_VERIFICATION
+    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
 
-.rules_release_only:
+.rules_tag_only:
   rules:
-    - if: $CREATE_NEW_RELEASE
-
-.rules_prerelease_only:
-  rules:
-    - if: $CREATE_PRERELEASE
-
-.rules_release_branch_only:
-  rules:
-    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+    - if: $CI_COMMIT_TAG
 
 .rules_verification_only:
   rules:
-    - if: $CREATE_NEW_RELEASE || $PUBLISH_VERIFICATION
+    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
 
 ###############################################################################
 # Stage -- Trigger the DevSecOps components
@@ -220,7 +213,7 @@ stages:
 trigger_compliance:
   extends: .trigger_compliance
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRERELEASE || $PUBLISH_VERIFICATION
+    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
       when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
   variables:

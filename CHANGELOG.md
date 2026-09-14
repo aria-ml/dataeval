@@ -1,5 +1,3 @@
-[//]: # (eba1858b705a4655280012619f01fbb8fc125752)
-
 # DataEval Change Log
 
 ## v1.1.0
