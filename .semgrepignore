@@ -1,5 +1,4 @@
-# This duplicates `sast_excluded_paths` on the dsor-compliance component in
-# .gitlab/ci/compliance.yml, because that input is not reaching the analyzer.
+# This duplicates `sast_excluded_paths` on the dsor-compliance component in .gitlab/ci/compliance.yml
 
 tests/
 verification/

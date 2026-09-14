@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import release
-from release import TAG_CATEGORIES, next_version, parse_version, render_section
+from release import TAG_CATEGORIES, is_version_tag, next_version, parse_version, render_section
 
 
 def test_version_ladder():
@@ -40,8 +40,14 @@ def test_prerelease_sorts_before_its_release():
     order = ["v1.1.0", "v1.2.0-a0", "v1.2.0-a1", "v1.2.0-rc0", "v1.2.0", "v1.2.1"]
     keys = [parse_version(tag) for tag in order]
     assert keys == sorted(keys), f"tags sort out of order: {order}"
-    assert parse_version("not-a-tag") is None
-    assert parse_version("v1.2.0-beta0") is None  # unknown kinds are not version tags
+    assert is_version_tag("not-a-tag") is False
+    assert is_version_tag("v1.2.0-beta0") is False  # unknown kinds are not version tags
+    try:
+        parse_version("not-a-tag")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("parse_version should raise on a non-version tag")
 
 
 def test_tag_vocabulary():
@@ -80,6 +86,23 @@ def test_changelog_splice_keeps_history():
     # the previous release survives intact, one blank line below the new section
     assert "- `bbbbbbbb` - [fix] New\n\n## v1.1.0\n" in result, result
     assert "- `aaaaaaaa` - [fix] Old" in result
+
+
+def test_kind_pairs_only_with_prerelease():
+    # a bare prerelease defaults to rc; an explicit kind is kept
+    assert release.resolve_kind("prerelease", None) == "rc"
+    assert release.resolve_kind("prerelease", "a") == "a"
+    # a kind with a non-prerelease bump used to be silently dropped; now it fails loudly
+    for kind in ("a", "rc"):
+        try:
+            release.resolve_kind("major", kind)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError(f"major + {kind} should fail loudly")
+    # a non-prerelease bump without a kind is left alone
+    assert release.resolve_kind("major", None) is None
+    assert release.resolve_kind(None, None) is None
 
 
 if __name__ == "__main__":
