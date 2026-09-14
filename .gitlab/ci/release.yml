@@ -86,12 +86,12 @@ pages coverage:
     paths:
       - htmlcov/
 
-validate release label:
+validate commit prefix:
   stage: release
   extends: .rules_mr_only
   needs: []
   script:
-    - uv run python .gitlab/scripts/validate_release_label.py
+    - uv run python .gitlab/scripts/validate_commit_prefix.py
 
 # This job will only run if all previous stages have succeeded,
 # and it creates a tag that signifies that all testing has passed.

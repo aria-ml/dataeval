@@ -44,8 +44,11 @@ CATEGORIES = (
 )
 CATEGORY_ORDER = [name for name, _ in CATEGORIES]
 
-# Commit message `[tag]` prefix -> changelog category. Anything unrecognized (including a
-# missing prefix) falls through to misc so a commit is never silently dropped.
+# Commit message `[tag]` prefix -> changelog category. This is the whole accepted
+# vocabulary: `.gitlab/scripts/validate_commit_prefix.py` rejects a merge request whose
+# title uses anything else, which is what stops a typo like `[imrp]` reaching main.
+# Reading history is more forgiving - an unrecognized prefix on an old commit falls
+# through to misc rather than being dropped.
 TAG_CATEGORIES = {
     "major": "major",
     "feat": "feature",
@@ -59,6 +62,15 @@ TAG_CATEGORIES = {
     "perf": "improvement",
     "fix": "fix",
     "bugfix": "fix",
+    # Housekeeping - real changes, but not ones that move the public API
+    "deps": "misc",
+    "devops": "misc",
+    "devsecops": "misc",
+    "docs": "misc",
+    "lint": "misc",
+    "misc": "misc",
+    "test": "misc",
+    "type": "misc",
 }
 
 # Categories that change the public API, so they may not ship in a patch off a release branch.
