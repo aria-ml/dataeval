@@ -114,7 +114,7 @@ def latest_tag(series: str | None = None) -> str | None:
     tags = [t for t in git("tag", "--merged", "HEAD").splitlines() if parse_version(t)]
     if series is not None:
         tags = [t for t in tags if t.startswith(f"{series}.")]
-    return max(tags, key=lambda t: parse_version(t), default=None) if tags else None
+    return max(tags, key=parse_version, default=None)
 
 
 def collect_entries(since: str | None) -> dict[str, list[tuple[str, str]]]:
@@ -126,7 +126,7 @@ def collect_entries(since: str | None) -> dict[str, list[tuple[str, str]]]:
     entries: dict[str, list[tuple[str, str]]] = {name: [] for name in CATEGORY_ORDER}
     for record in filter(None, (r.strip("\n") for r in raw.split("\x1e"))):
         shorthash, parents, body = record.strip().split("\x1f", 2)
-        lines = body.strip().splitlines()
+        lines = body.strip().splitlines() or [""]
 
         # A GitLab merge commit reads "Merge branch 'x' into 'main'" with the merge request
         # title on the third line; that title is the change, the merge subject is noise.
@@ -176,11 +176,16 @@ def render_section(version: str, entries: dict[str, list[tuple[str, str]]]) -> s
 
 
 def update_changelog(version: str, section: str, head: str) -> None:
-    lines = CHANGELOG_FILE.read_text().splitlines(keepends=True)
+    text = CHANGELOG_FILE.read_text()
+    # Splice in front of the newest version heading rather than at a fixed line number, so
+    # a change to the file's preamble cannot silently shear off the top of the changelog.
+    index = text.find("\n## v")
+    if index < 0:
+        fail(f"{CHANGELOG_FILE.name} has no '## v...' heading to insert before")
     # ponytail: the `[//]: # (sha)` marker is only read by the GitLab CI release scripts.
     # Drop the marker, and this line, once those are deleted.
     header = f"[//]: # ({head})\n\n# DataEval Change Log\n"
-    CHANGELOG_FILE.write_text(header + f"\n{section}\n" + "".join(lines[3:]))
+    CHANGELOG_FILE.write_text(f"{header}\n{section}\n\n{text[index + 1 :]}")
 
 
 def update_doc_indexes(version: str) -> list[Path]:
@@ -213,6 +218,11 @@ def main() -> None:
     if git("status", "--porcelain"):
         fail("working tree is not clean - commit or stash first")
 
+    # Both guards below compare against refs on disk, so they are only as good as the last
+    # fetch. Tolerate failure so an offline maintainer is warned rather than blocked.
+    if git_ok("fetch", "--tags", "--quiet") is None:
+        print("warning: could not reach the remote - checking against local refs only")
+
     branch = git("rev-parse", "--abbrev-ref", "HEAD")
     release_series = re.match(r"^release/(v\d+\.\d+)$", branch)
     if branch != "main" and not release_series:
@@ -229,6 +239,8 @@ def main() -> None:
 
     series = release_series[1] if release_series else None
     current = latest_tag(series)
+    if release_series and current is None:
+        fail(f"no {series}.x tag is reachable from {branch} - was this branch cut from its release tag?")
     if current and git("rev-list", "-n", "1", current) == git("rev-parse", "HEAD"):
         fail(f"HEAD is already tagged {current}")
 
@@ -242,12 +254,19 @@ def main() -> None:
         if blocked:
             fail("release branches carry fixes only; these belong on main:\n  " + "\n  ".join(blocked))
 
-    # An unqualified release off main follows its entries: a [major] commit forces the
-    # caller to say so out loud rather than shipping a breaking change as a minor.
-    if args.bump != "prerelease" and "major" in entries and args.bump != "major":
+    # A [major] commit forces the caller to say so out loud rather than shipping a breaking
+    # change as a minor. A prerelease is explicit enough already: it just inherits the bump,
+    # so v2.0.0's candidates are numbered v2.0.0-rcN rather than v1.2.0-rcN.
+    pending_major = "major" in entries
+    if pending_major and args.bump is None:
         fail("a [major] change is pending - run `release.py major` to confirm the bump")
 
-    bump = "patch" if release_series else ("major" if args.bump == "major" else "minor")
+    if release_series:
+        bump = "patch"
+    elif args.bump == "major" or pending_major:
+        bump = "major"
+    else:
+        bump = "minor"
     version = next_version(current, bump, args.kind if args.bump == "prerelease" else None)
     # Checked before anything is written: tagging is the last step, and discovering the
     # collision there would leave a release commit behind with no tag on it.

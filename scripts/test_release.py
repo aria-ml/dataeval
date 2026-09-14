@@ -7,10 +7,12 @@ pyproject restricts testpaths to `tests`, and this needs to run anywhere git doe
 """
 
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import release
 from release import TAG_CATEGORIES, next_version, parse_version, render_section
 
 
@@ -27,6 +29,7 @@ def test_version_ladder():
         ("v1.2.0-a3", "minor", "rc"): "v1.2.0-rc0",  # promotion restarts the sequence
         ("v1.2.0-rc2", "minor", None): "v1.2.0",  # finalizing drops the suffix
         ("v1.2.0-rc2", "patch", None): "v1.2.0",  # ...and does not also bump
+        ("v1.1.0", "major", "rc"): "v2.0.0-rc0",  # a prerelease carries the major bump with it
     }
     for (current, bump, kind), expected in cases.items():
         actual = next_version(current, bump, kind)
@@ -62,6 +65,23 @@ def test_section_renders_in_precedence_order():
     assert "- `bbbbbbbb` - [fix] Repair" in section
     # a category with no entries contributes no heading
     assert "🌟" not in section
+
+
+def test_changelog_splice_keeps_history():
+    original = (
+        "[//]: # (oldsha)\n\n# DataEval Change Log\n\n## v1.1.0\n\n\U0001f47e **Fixes**\n\n- `aaaaaaaa` - [fix] Old\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        changelog = Path(tmp) / "CHANGELOG.md"
+        changelog.write_text(original)
+        release.CHANGELOG_FILE = changelog
+        release.update_changelog("v1.2.0", render_section("v1.2.0", {"fix": [("bbbbbbbb", "[fix] New")]}), "newsha")
+        result = changelog.read_text()
+
+    assert result.startswith("[//]: # (newsha)\n\n# DataEval Change Log\n\n## v1.2.0\n"), result
+    # the previous release survives intact, one blank line below the new section
+    assert "- `bbbbbbbb` - [fix] New\n\n## v1.1.0\n" in result, result
+    assert "- `aaaaaaaa` - [fix] Old" in result
 
 
 if __name__ == "__main__":
