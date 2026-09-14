@@ -103,8 +103,10 @@ include:
   - component: gitlab.jatic.net/jatic/devsecops/components/dsor-compliance@1.2.0
     inputs:
       full_execution_on_commit: true
-      # Test, docs and CI-helper code only; src/ is never excluded. `.gitlab`
-      # covers scripts/test_versiontag.py, whose asserts trip bandit.B101.
+      # Not currently honored: the job logs the GitLab SAST template default
+      # (`spec, test, tests, tmp`) regardless of this value, unlike
+      # sast_search_max_depth below. `.semgrepignore` at the repo root carries
+      # the real exclusions; keep both in sync until the component is fixed.
       sast_excluded_paths: tests,docs,verification,.gitlab,.github,README.md
       sast_search_max_depth: "2"
       allow_failure: true
