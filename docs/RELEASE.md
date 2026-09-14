@@ -126,7 +126,10 @@ major bump, and `release.py prerelease [a|rc]` cuts a prerelease. Nothing is pub
 1. **GitLab tag pipeline** runs the `docs` job, and `push-docs-cache.sh` pushes the notebooks and Jupyter cache to
    `docs-artifacts/vX.Y.Z` -- the branch the Colab links now point at
 2. **GitLab tag pipeline** also runs `publish verification` and `export-merged-sbom`
-3. **GitHub Actions** (`publish.yml`) builds the package, publishes to PyPI and creates the GitHub Release
+3. **The GitLab push mirror** copies the tag to `github.com/aria-ml/dataeval`, where **GitHub Actions**
+   (`publish.yml`) builds the package, publishes to PyPI and creates the GitHub Release. Publishing happens on
+   GitHub, not GitLab, and the mirror hop is asynchronous. The mirror's status is permanently red from a backlog of
+   historical tags GitHub refuses, so confirm a release on the GitHub releases page rather than from GitLab.
 
 ### Prereleases
 

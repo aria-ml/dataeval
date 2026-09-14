@@ -9,8 +9,9 @@ Cut a release from the branch you are standing on.
     python scripts/release.py --dry-run       # print what would happen, touch nothing
 
 Updates CHANGELOG.md and the notebook links in the docs indexes, commits, and tags.
-It never pushes: review the commit, then `git push --follow-tags` to publish. Pushing
-the tag is what triggers PyPI publication and the docs build.
+It never pushes: review the commit, then `git push --follow-tags` to publish. The tag
+push starts everything else - the GitLab tag pipeline builds the docs artifacts, and
+the tag mirrors to GitHub, where the publish workflow uploads to PyPI.
 
 Needs nothing but git and a Python interpreter - no credentials, no GitLab API.
 """
@@ -287,9 +288,14 @@ def main() -> None:
 
     print(f"Committed and tagged {version}. Review it:\n")
     print(f"    git show {version}\n")
-    print("Then publish - pushing the tag is what triggers PyPI and the docs build:\n")
+    print("Then publish - pushing the tag starts the docs build, and mirrors it to GitHub")
+    print("where the publish workflow uploads to PyPI:\n")
     print(f"    git push --follow-tags origin {branch}\n")
-    print(f"To back out:\n\n    git tag -d {version} && git reset --hard HEAD~1")
+    print(f"To back out, before you push:\n\n    git tag -d {version} && git reset --hard HEAD~1\n")
+    # The mirror carries a permanent backlog of tags GitHub refuses, so its status is red
+    # whether or not this release made it across.
+    print("Afterwards confirm the release landed on GitHub, not in the GitLab mirror status:\n")
+    print("    https://github.com/aria-ml/dataeval/releases")
 
 
 if __name__ == "__main__":

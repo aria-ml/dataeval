@@ -26,6 +26,7 @@ branches enable ongoing patch support for deployed versions.
 - **Manual hotfix propagation**: Maintainers cherry-pick fixes from `main` into release branches via MR
 - **Prefix-driven changelog**: The `[type]` prefix on each commit subject determines its changelog section
 - **The tag is the release**: Nothing publishes until a maintainer pushes a version tag
+- **GitHub does the publishing**: GitLab mirrors the tag to GitHub, whose workflow uploads to PyPI
 
 ## Branch Structure
 
@@ -67,6 +68,32 @@ git push --follow-tags origin main   # publish
 
 The script never pushes. Until you push the tag, nothing has been released and `git tag -d <version> && git reset
 --hard HEAD~1` backs the whole thing out.
+
+### Where publishing actually happens
+
+The package is **not** published from GitLab. The tag takes two independent paths:
+
+```mermaid
+graph LR
+    A[git push --follow-tags] --> B[GitLab tag pipeline]
+    B --> C[docs-artifacts/vX.Y.Z]
+    B --> D[verification evidence + SBOM]
+    A --> E[GitLab push mirror]
+    E --> F[github.com/aria-ml/dataeval]
+    F --> G[".github/workflows/publish.yml"]
+    G --> H[PyPI]
+    G --> I[GitHub Release]
+```
+
+The mirror is a GitLab *push mirror*, so the hop is asynchronous -- the GitHub workflow starts once the tag
+arrives there, not when you push to GitLab.
+
+> **The mirror's status is not a release signal.** Roughly ten historical tags (`v0.94.0` through `v1.0.6` and the
+> `v1.0.0-rc*` / `v1.1.0-rc*` series) exist on GitLab but not on GitHub, and GitHub's ruleset refuses to create
+> them. The mirror retries them on every run and reports the whole push as failed, so GitLab shows a red mirror and
+> an empty "last successful update" permanently. New tags still go across -- a push is not atomic, so the refs that
+> pass the ruleset are created while the rejected ones are reported. Confirm a release at
+> [github.com/aria-ml/dataeval/releases](https://github.com/aria-ml/dataeval/releases), never from the mirror status.
 
 ### What the script does
 
@@ -253,8 +280,10 @@ flowchart TD
     H --> I{Happy?}
     I -->|No| J["git tag -d vX.Y.Z && git reset --hard HEAD~1"]
     I -->|Yes| K[git push --follow-tags]
-    K --> L[Tag pipeline builds docs artifacts,<br/>verification evidence and SBOM]
-    K --> M[GitHub Actions publishes to PyPI<br/>and creates the GitHub Release]
+    K --> L[GitLab tag pipeline builds docs artifacts,<br/>verification evidence and SBOM]
+    K --> M[GitLab push mirror copies the tag to GitHub]
+    M --> N[GitHub Actions publishes to PyPI<br/>and creates the GitHub Release]
+    N --> O[Confirm at github.com/aria-ml/dataeval/releases]
 ```
 
 ## Automation
@@ -339,7 +368,8 @@ bump on their own.
 - All version tags start with `v` prefix (e.g., `v0.74.0`, `v1.0.0`)
 - Tags are annotated git tags
 - Tags are immutable once published
-- Pushing a tag is what triggers publication: PyPI, the GitHub Release, docs artifacts, verification and the SBOM
+- Pushing a tag triggers everything: the GitLab tag pipeline (docs artifacts, verification, SBOM) and, via the
+  push mirror, the GitHub workflow that uploads to PyPI and creates the GitHub Release
 
 ### Release Branch Lifecycle
 
@@ -439,6 +469,12 @@ Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 **Issue**: The changelog entry for a merge commit reads "Merge branch ..."
 
 - **Solution**: The MR title was empty or the merge was made by hand. Amend the commit subject before releasing.
+
+**Issue**: The tag is on GitLab but no GitHub Release or PyPI upload appeared
+
+- **Solution**: Check [the GitHub releases page](https://github.com/aria-ml/dataeval/releases) and the Actions tab
+  there. The GitLab mirror status is permanently red because of an unpushable backlog of historical tags, so it
+  cannot tell you whether this tag made it. If the tag is genuinely missing on GitHub, push it there directly.
 
 **Issue**: A release was tagged but should not have been
 
