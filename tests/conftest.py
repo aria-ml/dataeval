@@ -48,6 +48,7 @@ pytest_plugins = [
     "tests.fixtures.models",
     "tests.fixtures.numba_cache",
     "tests.fixtures.sufficiency",
+    "tests.fixtures.videos",
 ]
 
 set_seed(0, all_generators=True)
