@@ -1,14 +1,24 @@
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
-from .video_generation_scripts.build_dataset import build_synthetic_dataset
-
 
 @pytest.fixture(scope="session")
 def video_dataset_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Builds synthetic videos once per test session in a temporary folder."""
+    """Builds synthetic videos once per test session in a temporary folder.
+
+    OpenCV renders the raw frames and ffmpeg/ffprobe transcode and probe them. Neither
+    is a dataeval dependency, so the video tests skip rather than error if not available.
+    """
+    pytest.importorskip("cv2", reason="synthetic video fixtures need opencv")
+    for tool in ("ffmpeg", "ffprobe"):
+        if shutil.which(tool) is None:
+            pytest.skip(f"synthetic video fixtures need {tool} on PATH")
+
+    from .video_generation_scripts.build_dataset import build_synthetic_dataset
+
     target_dir = tmp_path_factory.mktemp("synthetic_videos")
     return build_synthetic_dataset(target_dir)
 

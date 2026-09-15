@@ -1,3 +1,8 @@
+import pytest
+
+pytestmark = pytest.mark.ffmpeg
+
+
 class TestVideos:
     """Making sure videos can be analyzed."""
 

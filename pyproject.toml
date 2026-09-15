@@ -279,6 +279,7 @@ markers = [
   "required: marks tests for required features",
   "optional: marks tests for optional features",
   "cuda: marks tests that require cuda",
+  "ffmpeg: marks integration tests that run against ffmpeg-generated video fixtures",
 ]
 
 [tool.coverage.run]

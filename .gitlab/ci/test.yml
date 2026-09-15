@@ -27,6 +27,11 @@ test:
   extends:
     - .nox_all
     - .rules_main_mr
+  before_script:
+    # The comprehensive lane runs the ffmpeg-marked tests, which build their synthetic
+    # clips with ffmpeg/ffprobe (see tests/fixtures/videos.py).
+    - apt-get update && apt-get install -y --no-install-recommends ffmpeg
+    - uv tool install nox --with nox-uv
   script:
     - uvx nox -e test
   cache:
@@ -53,7 +58,8 @@ conda:
     - .conda_all
     - .rules_main_mr_code
   script:
-    - pytest -m 'not optional'
+    # No opencv or ffmpeg in this environment; see the `deps` session in noxfile.py.
+    - pytest -m 'not (optional or ffmpeg)'
 
 verify:
   extends:

@@ -40,6 +40,21 @@ Activate the result and you are ready to work:
 source .venv/bin/activate
 ```
 
+#### Optional: ffmpeg
+
+Part of the test suite runs against synthetic video clips that are rendered with
+OpenCV and transcoded with `ffmpeg`. `ffmpeg` is a system package rather than a
+Python dependency, so `uv` cannot fetch it:
+
+```bash
+sudo apt-get install ffmpeg      # Debian/Ubuntu
+brew install ffmpeg              # macOS
+conda install -c conda-forge ffmpeg
+```
+
+It is optional. Without `ffmpeg` and `ffprobe` on `PATH` those tests skip rather
+than fail.
+
 :warning: **Bootstrap with `uvx`, not `uv run`.** `uv run nox -s dev` would run nox
 out of the very environment the session is about to delete and rebuild; the session
 detects this and refuses to start. `uvx` fetches a throwaway nox instead, so there
@@ -57,6 +72,19 @@ uv run nox -s type      # pyright and type-completeness
 uv run nox -s doctest   # docstring examples
 uv run nox -s docs      # build the documentation
 ```
+
+`test` is the comprehensive lane: it runs everything, including the `ffmpeg`-marked
+integration tests that work against generated video content. `deps` is the opposite
+end — the minimum supported Python with the lowest declared dependencies and no
+optional extras — and it is what guarantees the unit tests carry coverage on their
+own. Anything that needs `ffmpeg`-generated content belongs behind the marker so it
+stays out of that lane:
+
+```python
+pytestmark = pytest.mark.ffmpeg
+```
+
+Run or skip that set directly with `pytest -m ffmpeg` and `pytest -m 'not ffmpeg'`.
 
 Once `.venv` exists, `uv run nox ...` is the convenient form for everything except
 `dev` itself; `uvx --with nox-uv nox ...` works from anywhere and needs no project
