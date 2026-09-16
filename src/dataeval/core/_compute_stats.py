@@ -1589,7 +1589,7 @@ def _reject_unaddressable(result: FactorResult, position: int | None = None) -> 
     where = "" if position is None else f" (result {position} of the sequence)"
     raise TypeError(
         f"Cannot combine a StatsResult{where} that carries no 'source_index': it places its "
-        "values by level and key rather than by address, as track_stats does, so "
+        "values by level and key rather than by address, as ego_stats and track_stats do, so "
         "there is no address to offset or concatenate here. Attach it directly with "
         "Metadata.add_factors(result, level=..., key=...) instead of combining it.",
     )

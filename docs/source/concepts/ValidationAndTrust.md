@@ -838,6 +838,25 @@ statistical and computational.
   - Anchored
   - Assumes track identity is already resolved: detections carrying no track id
     take no part, and nothing here re-associates them.
+- - {func}`.ego_stats`
+  - Per-frame camera ego-motion, from a robust affine fit to cheap optical flow,
+    with declared roll-ups to the sequence level. See
+    [Camera motion as a per-frame factor](MetadataLevels.md#camera-motion-as-a-per-frame-factor).
+  - Ground-truth checked (kinematics recovered from analytically constructed
+    flow fields)
+  - Measures **apparent** motion, so it cannot distinguish a moving camera from
+    a scene moving coherently against a still one. Pairs where the two are
+    genuinely ambiguous are refused rather than guessed; the per-frame
+    `ego_trusted` flag reports which, and a sequence roll-up answers null rather
+    than from too little evidence once fewer than a quarter of its frames were
+    trusted. The affine model is first-order and carries no depth, so a camera
+    translating through a scene with strong parallax is fitted only
+    approximately. `pan_speed` and `mover_speed` are in each sequence's own
+    pixels and are not comparable across resolutions without normalizing; the
+    rates are. The temporal trust gate assumes a roughly steady camera state
+    across the sequence. A reading is attributed to the *later* frame of the
+    pair it was measured from, so the leading `gap` frames of every sequence
+    carry no reading.
 - - {func}`.phash`, {func}`.phash_d4`, {func}`.dhash`, {func}`.dhash_d4`,
     {func}`.xxhash`
   - Perceptual hashing ([Zauner, 2010](DataIntegrity.md#references)); xxHash

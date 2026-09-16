@@ -7,6 +7,7 @@ __all__ = [
     "CompletenessResult",
     "CoverageResult",
     "DivergenceResult",
+    "EgoStatsResult",
     "FactorResult",
     "FeatureDistanceResult",
     "HashGroupResult",
@@ -46,6 +47,7 @@ __all__ = [
     "dhash_d4",
     "divergence_fnn",
     "divergence_mst",
+    "ego_stats",
     "feature_distance",
     "factor_deviation",
     "factor_predictors",
@@ -97,6 +99,7 @@ from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._compute_stats import FactorResult, StatsResult, combine_stats_results, compute_stats
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
+from dataeval.core._ego_stats import EgoStatsResult, ego_stats
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
 from dataeval.core._hash import dhash, dhash_d4, hamming_distance, phash, phash_d4, xxhash
 from dataeval.core._hash_index import (
