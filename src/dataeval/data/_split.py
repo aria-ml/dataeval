@@ -400,7 +400,7 @@ def _get_groups(metadata: MetadataLike, split_on: Sequence[str] | None) -> NDArr
         When a named factor is not among the metadata's factors. Refused rather than
         skipped: ``split_on`` exists to keep rows that belong together on one side of a
         split, so silently grouping by a *subset* of what was asked for hands back folds
-        that do not honour the request, and nothing downstream can tell. A factor
+        that do not honor the request, and nothing downstream can tell. A factor
         :class:`~dataeval.Metadata` dropped as an identifier is the common way to arrive
         here — and a per-entity id is exactly what a caller reaches for first.
     """
@@ -417,7 +417,7 @@ def _get_groups(metadata: MetadataLike, split_on: Sequence[str] | None) -> NDArr
         raise ValueError(
             f"`split_on` names {missing}, which {'is' if len(missing) == 1 else 'are'} not among this "
             f"metadata's factors {names}.{detail} Grouping by the rest would return folds that do not "
-            "honour the request, so it is refused. Name only factors the metadata carries.",
+            "honor the request, so it is refused. Name only factors the metadata carries.",
         )
     indices = [i for i, name in enumerate(names) if name in split_set]
     binned_features = metadata.factor_data[:, indices]

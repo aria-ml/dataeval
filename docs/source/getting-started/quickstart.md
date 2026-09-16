@@ -8,7 +8,7 @@ suite of tools.
 
 :::{note}
 DataEval imposes no restrictions on image type. It accepts any image modality
-(RGB, IR, EO, multispectral, greyscale, and others) at any bit depth (8-bit, 16-bit, 32-bit, etc.)
+(RGB, IR, EO, multispectral, grayscale, and others) at any bit depth (8-bit, 16-bit, 32-bit, etc.)
 and channel count (1+).
 :::
 

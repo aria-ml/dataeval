@@ -299,7 +299,7 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
             extractor=extractor,
         )
 
-        # Initialise base + mixins
+        # Initialize base + mixins
         BaseDrift.__init__(self)
         self._init_adaptive(extractor=extractor, update_strategy=update_strategy)
 

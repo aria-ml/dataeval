@@ -66,7 +66,7 @@ def tracking(request):
 
 @pytest.mark.required
 class TestAggMatchesAKeyedGroupBy:
-    """The four acceptance cases from the spec, plus their generalisation."""
+    """The four acceptance cases from the spec, plus their generalization."""
 
     @pytest.mark.parametrize(
         ("from_level", "to_level", "unique_by"),

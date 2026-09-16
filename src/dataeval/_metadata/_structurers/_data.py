@@ -66,7 +66,7 @@ class StructuredData:
         and never looks at the rest. Both would answer confidently and wrongly.
 
         The assumption holds in every structurer today — each emits its levels once — so
-        this states it rather than changes it. It is checked here because the levelled
+        this states it rather than changes it. It is checked here because the leveled
         frames that :meth:`to_frame` builds are keyed by level outright, which turns a
         silent wrong answer into a missing block.
         """
@@ -74,7 +74,7 @@ class StructuredData:
         if repeated := sorted(level for level, count in counts.items() if count > 1):
             raise ValueError(
                 f"Level(s) {repeated} have more than one row block. A level's rows are one block, "
-                "because the layout and the levelled frames are both keyed by level — a second "
+                "because the layout and the leveled frames are both keyed by level — a second "
                 "block does not extend the first, it hides it. Concatenate the rows into one "
                 "block per level before building the bundle.",
             )

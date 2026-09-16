@@ -860,7 +860,7 @@ class TestEquivalence:
             ])
 
     def test_canonical_election_prefers_a_real_label_over_an_id(self):
-        # from_rdflib falls back to `label = str(subject)` for an unlabelled
+        # from_rdflib falls back to `label = str(subject)` for an unlabeled
         # class; electing that as canonical would demote the human label to a
         # synonym and surface a raw IRI everywhere concept.label is displayed
         onto = Ontology([
@@ -878,7 +878,7 @@ class TestEquivalence:
         ])
         assert onto.ids == ("ex:Auto",)
 
-    def test_canonical_election_falls_back_when_no_member_is_labelled(self):
+    def test_canonical_election_falls_back_when_no_member_is_labeled(self):
         onto = Ontology([
             OntologyConcept(id="ex:B", label="ex:B", equivalent_to=("ex:A",)),
             OntologyConcept(id="ex:A", label="ex:A"),

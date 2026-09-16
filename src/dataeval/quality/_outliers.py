@@ -1628,7 +1628,7 @@ class Outliers(Evaluator):
 
             - item_index: int - Index of the outlier
             - metric_name: str - Always "cluster_distance"
-            - metric_value: float - Distance to the nearest cluster centre
+            - metric_value: float - Distance to the nearest cluster center
             - direction, bound, percentile, population_mean, population_std - the frame of
               reference, taken from the point's own cluster
 

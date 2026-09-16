@@ -211,7 +211,7 @@ class ExtractorMixin:
     Overrides :meth:`_preprocess` to apply the extractor before the
     standard conversion to float32 ndarray. Subclasses that further
     override ``_preprocess`` (e.g. to add flattening) should call
-    ``super()._preprocess(x)`` to preserve this behaviour.
+    ``super()._preprocess(x)`` to preserve this behavior.
     """
 
     _extractor: FeatureExtractor | None

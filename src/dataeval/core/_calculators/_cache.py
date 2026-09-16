@@ -234,7 +234,7 @@ class CalculatorCache:
     def is_fully_measured(self) -> bool:
         """Whether every pixel of the view holds a measurement, known without scanning for one.
 
-        A licence to take the plain reductions instead of the NaN-aware ones, which each
+        A license to take the plain reductions instead of the NaN-aware ones, which each
         scan the whole view to discover the same thing. False wherever it cannot be
         answered outright — including views that do happen to hold no NaN, since this
         makes no claim about the ones it declines.
@@ -281,7 +281,7 @@ class CalculatorCache:
         if window is None or window.ndim != 3:
             return None
         bands = window.shape[0]
-        # Totalled in uint16 rather than accumulated in float64 wherever the brightest
+        # Totaled in uint16 rather than accumulated in float64 wherever the brightest
         # possible band stack still fits it. The total is a small whole number either way
         # and dividing it reaches the same float64 the wider accumulator would have, for
         # most of a pass over the window less; a stack deep enough to overflow falls back.
@@ -376,7 +376,7 @@ class CalculatorCache:
     def nan_like(self, shape: tuple[int, ...] | None = None) -> NDArray[np.float64]:
         """Return an all-NaN float64 array standing in for a view that could not be measured.
 
-        Absence is reported as float64 NaN rather than raised or sentinelled, and the dtype
+        Absence is reported as float64 NaN rather than raised or sentineled, and the dtype
         is load-bearing: `np.nanpercentile`, `np.histogram` and `edge_filter` all behave
         differently on a float32 or object array. Kept in one place so the policy can change
         in one place.

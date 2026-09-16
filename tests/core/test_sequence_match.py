@@ -116,7 +116,7 @@ class TestMatchSegments:
         assert segments["mean_distance"].tolist() == pytest.approx([3.0])
 
     def test_offset_tolerance_joins_a_drifting_diagonal(self):
-        """A slight frame-rate difference spreads one shared stretch across neighbouring offsets."""
+        """A slight frame-rate difference spreads one shared stretch across neighboring offsets."""
         pairs = np.concatenate([diagonal(0, 10, 8), diagonal(8, 11, 8), diagonal(16, 12, 8)])
         strict = match_segments(pairs, zeros(pairs), min_length=6)
         joined = match_segments(pairs, zeros(pairs), min_length=6, offset_tolerance=1)

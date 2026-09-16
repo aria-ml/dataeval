@@ -286,7 +286,7 @@ for warning in caught:
 # ## 7. Choose what the evaluator reads
 #
 # Recording the cut lets {class}`.Balance` do something it could not before:
-# honour it. Its `factor_source` decides, **per factor**, whether to score the
+# honor it. Its `factor_source` decides, **per factor**, whether to score the
 # codes or the values they were cut from.
 #
 # The default, `"auto"`, reads the codes wherever somebody made a claim - `edges`,
@@ -325,7 +325,7 @@ for source in ("auto", "coded", "values"):
 # The three answers are all correct; they answer different questions. `coded`
 # asks how much a three-way temperature band shares with a binned haze index,
 # `values` asks it of the measurements and ignores your cutoff, and `auto`
-# honours the cutoff on `temp_c` while reading `haze` as measured.
+# honors the cutoff on `temp_c` while reading `haze` as measured.
 #
 # The selector is named for the two representations, not for binning: `factor_data`
 # holds *codes*, and bin indices are only one kind of code - `site` is coded and was
@@ -366,7 +366,7 @@ print(f"digest: {restored.encoding_digest == winter.encoding_digest}")
 # - {attr}`.Metadata.encoding_digest` says whether two results are comparable, and
 #   travels on the result itself
 # - A locked cut reports when it stops fitting rather than quietly re-fitting
-# - {attr}`~dataeval.bias.Balance.factor_source` honours a declared cut and reads
+# - {attr}`~dataeval.bias.Balance.factor_source` honors a declared cut and reads
 #   unbinned values where nobody declared one; `scored_as` says which happened
 
 # %% [markdown]

@@ -63,7 +63,7 @@ class TestLabelDefaultsToClassLabels:
 
 @pytest.mark.required
 class TestLabelReachesEveryLevel:
-    """Naming a factor is what makes a coarser view analysable at all."""
+    """Naming a factor is what makes a coarser view analyzable at all."""
 
     @pytest.mark.parametrize("evaluator", EVALUATORS)
     @pytest.mark.parametrize("level", ["unit", "instance"])

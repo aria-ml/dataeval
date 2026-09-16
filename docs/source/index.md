@@ -217,11 +217,11 @@ complexities:
 
 ::::-->
 
-## Acknowledgement
+## Acknowledgment
 
 :::{include} ../../README.md
-:start-after: <!-- start acknowledgement -->
-:end-before: <!-- end acknowledgement -->
+:start-after: <!-- start acknowledgment -->
+:end-before: <!-- end acknowledgment -->
 :::
 
 <!-- markdownlint-disable MD033 -->

@@ -55,7 +55,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         A value of 1.4 means operational distances more than 40% larger than
         the train/validation baseline are flagged as drift.
     n_features : int or None, default None
-        Number of features to analyse. When None, automatically inferred from
+        Number of features to analyze. When None, automatically inferred from
         the flattened shape of the first data sample.
     extractor : FeatureExtractor or None, default None
         Optional feature extraction function to convert input data to arrays.
@@ -138,7 +138,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         ratio_threshold : float, default 1.4
             Distance ratio above which drift is declared, per feature.
         n_features : int or None, default None
-            Number of features to analyse.
+            Number of features to analyze.
         update_strategy : UpdateStrategy or None, default None
             Strategy for updating reference data over time.
         extractor : FeatureExtractor or None, default None
@@ -170,7 +170,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
             extractor=extractor,
         )
 
-        # Initialise base + mixins
+        # Initialize base + mixins
         BaseDrift.__init__(self)
         self._init_adaptive(
             extractor=extractor,
@@ -365,7 +365,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         Rather than comparing chunks against each other (as in the univariate
         case), each chunk is compared against the training reference, mirroring
-        the predict-time behaviour. This means the chunked baseline reflects the
+        the predict-time behavior. This means the chunked baseline reflects the
         expected ratio distribution for in-distribution data.
 
         Parameters
@@ -395,7 +395,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         Parameters
         ----------
         data : Any
-            Test dataset to analyse for drift. When an ``extractor`` is configured,
+            Test dataset to analyze for drift. When an ``extractor`` is configured,
             this may be any input the extractor accepts (e.g. a full MAITE dataset or
             raw images); otherwise it must be array-like or an :class:`~dataeval.Embeddings`.
 

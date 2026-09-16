@@ -259,7 +259,7 @@ def _is_coded(column: NDArray[Any]) -> bool:
     tabulating it would give most rows a cell of their own.
 
     Read from the values rather than taken from the caller, because it is a fact about
-    the array in hand and not a judgement about the variable behind it. Non-finite entries
+    the array in hand and not a judgment about the variable behind it. Non-finite entries
     are ignored: a NaN is neither integral nor measured, and would otherwise make every
     column carrying one look measured.
     """

@@ -201,7 +201,7 @@ class ConstantThreshold(_Threshold, threshold_type="constant"):
         Returns
         -------
         tuple[float | None, float | None]
-            ``(lower, upper)`` as set during initialisation.
+            ``(lower, upper)`` as set during initialization.
         """
         return self.lower, self.upper
 
@@ -801,7 +801,7 @@ def resolve_threshold(value: ThresholdLike | None = None) -> Threshold:  # noqa:
     if isinstance(value, str):
         return _resolve_cls(value)()
     # Read as the tuples it was written as. Every branch below asks `isinstance(..., tuple)`,
-    # and neither JSON nor YAML has a tuple -- so a spec that travelled through a config file
+    # and neither JSON nor YAML has a tuple -- so a spec that traveled through a config file
     # arrived as nested lists, fell past all of them, and resolved to the default. That is
     # the worst failure this function can have: the right shape, quietly the wrong threshold,
     # and an error later about a bound nobody wrote.

@@ -238,7 +238,7 @@ class VideoTorchExtractor:
         """Forward hook to capture layer input or output."""
         captured = _tensor_of(output) if self._use_output else inputs[0]
         if captured is None:
-            # Unrecognised output kept as it came, rather than discarded: the layer was
+            # Unrecognized output kept as it came, rather than discarded: the layer was
             # named by the caller, who knows what it produces better than this does.
             self._captured_output = output
         else:

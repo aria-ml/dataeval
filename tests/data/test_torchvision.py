@@ -19,7 +19,7 @@ class _LazyV2:
     """Resolve ``torchvision.transforms.v2`` on first attribute access, not at import.
 
     A module-level ``importorskip`` would skip the whole file -- including TestLazyImport
-    and TestInvalidates, which are precisely the tests about behaviour when torchvision is
+    and TestInvalidates, which are precisely the tests about behavior when torchvision is
     *absent*, and which need nothing from it. Deferring means each test that reaches for a
     real transform skips on its own, and the rest run in a torchvision-free environment.
     """

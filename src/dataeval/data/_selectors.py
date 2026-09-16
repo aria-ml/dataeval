@@ -306,7 +306,7 @@ class _Binned(FrameSelector, ABC):
 
     The two rules for sizing those bins -- a fixed bin *size* (:class:`Stride`) and a fixed bin
     *count* (:class:`EvenlySpaced`) -- are the only difference between the subclasses, so the
-    jitter, seeding and replay behaviour they share lives here.
+    jitter, seeding and replay behavior they share lives here.
 
     Because bins are contiguous and each kept frame stands for its own bin, the default
     :attr:`FrameVerdict.weight` -- the gap to the next kept frame -- is already right, and no
@@ -372,7 +372,7 @@ class Stride(_Binned):
 
     Left unjittered this keeps positions ``0, step, 2 * step, ...``, which is a frame rate
     reduction: what survives is still perfectly periodic, so a frame remains predictable from its
-    neighbours. ``jitter=True`` keeps a *random* frame from each block of ``step`` instead, which
+    neighbors. ``jitter=True`` keeps a *random* frame from each block of ``step`` instead, which
     breaks that periodicity while leaving the spacing about the same -- the difference between
     thinning a video and sampling one.
 
@@ -517,7 +517,7 @@ class EvenlySpaced(_Binned):
         """``count`` bins of near-equal width, capped at one bin per frame for a short sequence."""
         n_bins = min(self.count, n_frames)
         edges = np.linspace(0, n_frames, n_bins + 1).round().astype(np.intp)
-        # Rounding cannot collapse neighbouring edges once n_bins <= n_frames, but a collapsed bin
+        # Rounding cannot collapse neighboring edges once n_bins <= n_frames, but a collapsed bin
         # would be an empty draw range rather than a wrong answer, so it is ruled out rather than
         # reasoned about.
         return np.unique(edges)
@@ -687,7 +687,7 @@ class FrameRate(FrameSelector):
     -----
     :meth:`plan` returns None on purpose. Nothing in the multi-object-tracking protocol declares a
     frame rate -- a video's :obj:`~dataeval.protocols.DatumMetadata` carries ``height``, ``width``,
-    ``time_base`` and ``size``, not a duration or an fps -- so a target rate can only be honoured
+    ``time_base`` and ``size``, not a duration or an fps -- so a target rate can only be honored
     against each frame's own ``time_s``, which requires the walk. Guessing a rate would make every
     derived timing quietly wrong.
 
@@ -727,7 +727,7 @@ class FrameRate(FrameSelector):
         if untimed and sequence is not None:
             _logger.info(
                 "FrameRate: %d of %d frame(s) in sequence %d declare no time_s and were kept in "
-                "full; a target rate cannot be honoured without timestamps.",
+                "full; a target rate cannot be honored without timestamps.",
                 untimed,
                 sequence.n_frames,
                 sequence.index,
@@ -876,7 +876,7 @@ class Representative(FrameSelector):
     Only descriptors are held between the passes, never pixels.
 
     Prefer a bandwidth left at ``None``. A kernel much wider than the median pairwise distance
-    cannot tell neighbouring frames apart, and herding then picks *adjacent* frames at a
+    cannot tell neighboring frames apart, and herding then picks *adjacent* frames at a
     sequence's extremes -- the opposite of what a representative subset is for.
 
     What is matched is the *distribution*, so budget follows mass rather than variety: a stretch

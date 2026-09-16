@@ -240,11 +240,11 @@ class FactorsStructurer(PropagationMixin, Structurer):
         :class:`~dataeval.quality.Outliers` — so a zero there would misreport a
         per-item result as a per-target one.
         """
-        labelled = len(rows.label_positions) > 0
-        positions = rows.label_positions if labelled else rows.item_positions
-        item_indices = rows.label_items if labelled else rows.item_ids
+        labeled = len(rows.label_positions) > 0
+        positions = rows.label_positions if labeled else rows.item_positions
+        item_indices = rows.label_items if labeled else rows.item_ids
         keyed: dict[str, Any] = (
-            {"target_index": rows.label_targets, "instance_index": rows.label_targets} if labelled else {}
+            {"target_index": rows.label_targets, "instance_index": rows.label_targets} if labeled else {}
         )
 
         labels = self._checked_labels(class_labels, len(positions), self.label_level)
@@ -286,13 +286,13 @@ class FactorsStructurer(PropagationMixin, Structurer):
             },
         )
         reject_mixed_values(factors)
-        levelled: dict[FactorLevel, Mapping[str, Any]] = {
+        leveled: dict[FactorLevel, Mapping[str, Any]] = {
             "unit": {safe_column_name(f"unit_{name}"): values[rows.item_positions] for name, values in factors.items()},
             "instance": {
                 safe_column_name(f"instance_{name}"): values[rows.label_positions] for name, values in factors.items()
             },
         }
-        return StructuredData([unit_block, instance_block], levelled, {}, [], labels, rows.label_items)
+        return StructuredData([unit_block, instance_block], leveled, {}, [], labels, rows.label_items)
 
     @staticmethod
     def _checked_labels(class_labels: NDArray[np.intp] | None, size: int, level: FactorLevel) -> NDArray[np.intp]:

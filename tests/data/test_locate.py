@@ -454,7 +454,7 @@ class TestAStreamThatNumbersItsOwnFrames:
         assert found.pixels[1][0][0] == 12
 
     def test_a_subscriptable_stream_is_addressed_by_number_too(self):
-        """Being indexable is no licence to treat the key as a position."""
+        """Being indexable is no license to treat the key as a position."""
         found = SourceLocator(_mot_dataset(subscriptable=True, offset=10))[SourceIndex(0, 14, "unit")]
         assert found.frame.frame_index == 14
 

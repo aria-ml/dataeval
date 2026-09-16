@@ -85,7 +85,7 @@ name has one job:
   `image`; [Level names](#level-names) explains why it is not.
 - **`track`** — one identity a tracker assigns, of which each observation is one
   detection.
-- **`instance`** — one labelled thing. A detection for object detection and
+- **`instance`** — one labeled thing. A detection for object detection and
   tracking; the image itself for whole-image {term}`classification <Classification>`.
   Every supervised task has this level.
 
@@ -197,7 +197,7 @@ linked — conventionally `track_id == -1` — sits in a frame but belongs to no
 track. Per-track factors are null on it, and that null is not a missing
 measurement: it is the statement that this row has no such ancestor. A factor
 that cannot describe every row of a view is left out of factor analysis at that
-view rather than analysed against rows it says nothing about. Read at its own
+view rather than analyzed against rows it says nothing about. Read at its own
 level, via `md.at("track")`, it is complete and usable — and it can be rolled up
 into `sequence` (below) whatever the current view happens to be, because that is
 a question about the data rather than about the view.
@@ -265,7 +265,7 @@ one dataset at once.
 
 ### Choosing which factors to analyze: `inherited`
 
-The view chooses *which rows* are projected. `inherited` chooses *which factors* are analysed on them.
+The view chooses *which rows* are projected. `inherited` chooses *which factors* are analyzed on them.
 
 With `inherited=True`, the default, a view analyzes every factor it can read —
 its own, plus everything propagated down from more granular levels. With `inherited=False` it
@@ -311,7 +311,7 @@ rolled.at("unit").factor_names
 
 `n_detections` is now a per-image fact stored once per image, and every level
 rule applies to it unchanged — it bins at `unit`, propagates down to detections,
-and is analysed at `unit` with one vote per image.
+and is analyzed at `unit` with one vote per image.
 
 Two rules govern what `agg` will accept.
 
@@ -853,7 +853,7 @@ confounded by it — `motion` is categorical, so it bins directly.
 
 ```{warning}
 Read `ego_trusted` first. Where it is `False`, that frame's camera fields
-(`pan_x` and its neighbours) are NaN. At the sequence level there is no single
+(`pan_x` and its neighbors) are NaN. At the sequence level there is no single
 flag to check instead: each roll-up above answers only when at least a quarter
 of its sequence's frames were trusted (`min_coverage=0.25`), and is null
 otherwise, so a summary is never built from too little evidence. There is
@@ -922,7 +922,7 @@ piece of the vocabulary chosen for what it enables rather than for what it
 describes today.
 
 Every level name in the graph describes a *structural role*: `sequence` is "an
-ordered run" of `units`, `instance` is "one labelled thing", and `track` is "one identity across
+ordered run" of `units`, `instance` is "one labeled thing", and `track` is "one identity across
 time", or "an ordered run" of `instances`.
 
 Each medium will have a familiar/colloquial term for the thing at each level.

@@ -232,7 +232,7 @@ def align_subsequence(
         ``O(N * band)`` and rejects alignments that warp further than that -- usually the point,
         since an unconstrained warp will align nearly anything to nearly anything.
     offset : int, default 0
-        Diagonal the band is centred on: query frame ``i`` sits opposite candidate frame
+        Diagonal the band is centered on: query frame ``i`` sits opposite candidate frame
         ``i + offset``. :func:`~dataeval.core.match_segments` reports exactly this quantity, so a
         segment it found is verified by passing its ``offset`` through. Ignored when ``band`` is
         None.

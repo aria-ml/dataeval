@@ -272,7 +272,7 @@ class Representation(Evaluator):
                 return {str(key): int(count) for key, count in data.items()}
             i2l = {int(k): str(v) for k, v in (index2label or {}).items()}
             return {i2l.get(int(key), str(int(key))): int(count) for key, count in data.items()}
-        # Dataset / Metadata / any labelled container: all reduce to a label array plus a
+        # Dataset / Metadata / any labeled container: all reduce to a label array plus a
         # naming. A Metadata already carries labels, so only AnnotatedDataset needs
         # converting first. Labels are the whole of what is read here, so that is the whole
         # of what is asked for -- a container built for this evaluator should not have to

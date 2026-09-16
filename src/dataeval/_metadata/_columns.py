@@ -138,7 +138,7 @@ def split_by_dimensionality(
     it. That is what a dataframe column or a ``reshape(-1, 1)`` pipeline produces, so
     rejecting it would drop real data over a shape carrying no extra information. Only
     an array that is genuinely several values per row — a histogram, a percentile
-    vector, a centre coordinate — has nowhere to go.
+    vector, a center coordinate — has nowhere to go.
 
     A *leading* singleton axis is left alone rather than flattened, and a 1-D array is
     passed through untouched however short it is. Both guard the same edge: on a

@@ -47,7 +47,7 @@ def _duplicate_stats():
     return compute_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
 
 
-def _relevelled(stats: StatsResult, address) -> StatsResult:
+def _releveled(stats: StatsResult, address) -> StatsResult:
     """Return the same statistics, readdressed by `address(position)`."""
     return {**stats, "source_index": [address(i) for i in range(len(stats.get("source_index", [])))]}
 
@@ -63,7 +63,7 @@ class TestOutliersReportAtTheLevelDetected:
 
     @pytest.mark.parametrize("level", ["unit", "track"])
     def test_a_level_between_the_ends_survives_the_round_trip(self, level):
-        result = Outliers().from_stats(_relevelled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, level)))
+        result = Outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, level)))
 
         assert list(result.outliers) == [SourceIndex(0, 3, level)]
 
@@ -73,7 +73,7 @@ class TestOutliersReportAtTheLevelDetected:
         The address comes back in its canonical spelling rather than the one it went in as,
         which is what makes two runs over differently-spelled statistics compare equal.
         """
-        stats = _relevelled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "instance"))
+        stats = _releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "instance"))
         result = Outliers().from_stats(stats, per_target=True)
 
         assert list(result.outliers) == [SourceIndex(0, 3)]
@@ -86,19 +86,19 @@ class TestOutliersReportAtTheLevelDetected:
         a spelling that is not equal to the `3` the same finding has always been reported
         as, and that `Duplicates` still reports it as.
         """
-        result = Outliers().from_stats(_relevelled(_outlier_stats(), lambda i: SourceIndex(i, None, "sequence")))
+        result = Outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i, None, "sequence")))
 
         assert list(result.outliers) == [3]
         assert "level" not in result.data().columns
 
     def test_the_level_is_a_column_of_the_frame(self):
-        result = Outliers().from_stats(_relevelled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "unit")))
+        result = Outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "unit")))
 
         assert result.data()["level"].to_list() == ["unit", "unit"]
 
     def test_a_level_between_the_ends_is_included_whatever_the_flags_say(self):
         """`per_image`/`per_target` name the two ends; a frame is neither, so neither gates it."""
-        stats = _relevelled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "unit"))
+        stats = _releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "unit"))
 
         assert Outliers().from_stats(stats, per_target=False).outliers
         assert Outliers().from_stats(stats, per_image=False).outliers
@@ -132,13 +132,13 @@ class TestDuplicatesReportAtTheLevelDetected:
 
     @pytest.mark.parametrize("level", ["unit", "track"])
     def test_a_level_between_the_ends_survives_the_round_trip(self, level):
-        result = Duplicates().from_stats(_relevelled(_duplicate_stats(), lambda i: SourceIndex(0, i, level)))
+        result = Duplicates().from_stats(_releveled(_duplicate_stats(), lambda i: SourceIndex(0, i, level)))
 
         assert result.exact == [[SourceIndex(0, 0, level), SourceIndex(0, 1, level), SourceIndex(0, 3, level)]]
 
     def test_the_label_end_is_reported_canonically(self):
         """As `Outliers` does: a key already says the row is one of its item's labels."""
-        stats = _relevelled(_duplicate_stats(), lambda i: SourceIndex(0, i, "instance"))
+        stats = _releveled(_duplicate_stats(), lambda i: SourceIndex(0, i, "instance"))
         result = Duplicates().from_stats(stats, per_target=True)
 
         assert result.exact == [[SourceIndex(0, 0), SourceIndex(0, 1), SourceIndex(0, 3)]]
@@ -146,13 +146,13 @@ class TestDuplicatesReportAtTheLevelDetected:
 
     def test_an_unkeyed_address_reports_as_its_item(self):
         """As `Outliers` does, on the same input: an item's own row is named by its item."""
-        result = Duplicates().from_stats(_relevelled(_duplicate_stats(), lambda i: SourceIndex(i, None, "sequence")))
+        result = Duplicates().from_stats(_releveled(_duplicate_stats(), lambda i: SourceIndex(i, None, "sequence")))
 
         assert result.exact == [[0, 1, 3]]
         assert "address_levels" not in result.data().columns
 
     def test_a_level_between_the_ends_is_included_whatever_per_target_says(self):
-        stats = _relevelled(_duplicate_stats(), lambda i: SourceIndex(0, i, "unit"))
+        stats = _releveled(_duplicate_stats(), lambda i: SourceIndex(0, i, "unit"))
 
         assert Duplicates().from_stats(stats, per_target=False).exact
 
@@ -165,7 +165,7 @@ class TestDuplicatesReportAtTheLevelDetected:
         """
         addresses = [SourceIndex(0, 0, "unit"), SourceIndex(0, 0, "instance")]
         addresses += [SourceIndex(0, 1, "unit"), SourceIndex(0, 1, "instance")]
-        result = Duplicates().from_stats(_relevelled(_duplicate_stats(), addresses.__getitem__), per_target=True)
+        result = Duplicates().from_stats(_releveled(_duplicate_stats(), addresses.__getitem__), per_target=True)
 
         assert result.exact == [[SourceIndex(0, 0), SourceIndex(0, 1)]]
 
@@ -250,8 +250,8 @@ class TestTheTwoSpellingsBehaveIdentically:
 
     @pytest.mark.parametrize(("per_image", "per_target"), [(True, False), (False, True), (True, True)])
     def test_outliers_gate_both_spellings_alike(self, per_image, per_target):
-        minimal = _relevelled(_outlier_stats(), lambda i: SourceIndex(0, i))
-        explicit = _relevelled(_outlier_stats(), lambda i: SourceIndex(0, i, "instance"))
+        minimal = _releveled(_outlier_stats(), lambda i: SourceIndex(0, i))
+        explicit = _releveled(_outlier_stats(), lambda i: SourceIndex(0, i, "instance"))
 
         assert len(Outliers().from_stats(minimal, per_image=per_image, per_target=per_target).outliers) == len(
             Outliers().from_stats(explicit, per_image=per_image, per_target=per_target).outliers
@@ -259,8 +259,8 @@ class TestTheTwoSpellingsBehaveIdentically:
 
     @pytest.mark.parametrize(("per_image", "per_target"), [(True, False), (False, True), (True, True)])
     def test_duplicates_gate_both_spellings_alike(self, per_image, per_target):
-        minimal = _relevelled(_duplicate_stats(), lambda i: SourceIndex(0, i))
-        explicit = _relevelled(_duplicate_stats(), lambda i: SourceIndex(0, i, "instance"))
+        minimal = _releveled(_duplicate_stats(), lambda i: SourceIndex(0, i))
+        explicit = _releveled(_duplicate_stats(), lambda i: SourceIndex(0, i, "instance"))
 
         assert len(Duplicates().from_stats(minimal, per_image=per_image, per_target=per_target).exact) == len(
             Duplicates().from_stats(explicit, per_image=per_image, per_target=per_target).exact
@@ -273,15 +273,15 @@ class TestTheTwoSpellingsBehaveIdentically:
         genuine duplicates spelled differently were never hashed against each other.
         """
         addresses = [SourceIndex(0, 0, "instance"), SourceIndex(0, 1), SourceIndex(0, 2, "instance"), SourceIndex(0, 3)]
-        result = Duplicates().from_stats(_relevelled(_duplicate_stats(), addresses.__getitem__), per_target=True)
+        result = Duplicates().from_stats(_releveled(_duplicate_stats(), addresses.__getitem__), per_target=True)
 
         assert result.exact == [[SourceIndex(0, 0), SourceIndex(0, 1), SourceIndex(0, 3)]]
 
     def test_both_spellings_produce_the_same_frame(self):
         """Not just the same groups — the same table, column for column."""
-        minimal = Duplicates().from_stats(_relevelled(_duplicate_stats(), lambda i: SourceIndex(0, i)), per_target=True)
+        minimal = Duplicates().from_stats(_releveled(_duplicate_stats(), lambda i: SourceIndex(0, i)), per_target=True)
         explicit = Duplicates().from_stats(
-            _relevelled(_duplicate_stats(), lambda i: SourceIndex(0, i, "instance")), per_target=True
+            _releveled(_duplicate_stats(), lambda i: SourceIndex(0, i, "instance")), per_target=True
         )
 
         assert minimal.data().equals(explicit.data())
@@ -289,7 +289,7 @@ class TestTheTwoSpellingsBehaveIdentically:
     def test_an_unkeyed_address_is_one_kind_whatever_level_it_states(self):
         """An item has exactly one own-row, so `sequence`, `unit` and unstated all name it."""
         addresses = [SourceIndex(0, None, "sequence"), SourceIndex(1), SourceIndex(2, None, "unit"), SourceIndex(3)]
-        result = Duplicates().from_stats(_relevelled(_duplicate_stats(), addresses.__getitem__))
+        result = Duplicates().from_stats(_releveled(_duplicate_stats(), addresses.__getitem__))
 
         assert result.exact == [[0, 1, 3]]
 

@@ -162,7 +162,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
             update_strategy=update_strategy,
         )
 
-        # Initialise base + mixins
+        # Initialize base + mixins
         BaseDrift.__init__(self)
         self._init_adaptive(extractor=extractor, update_strategy=update_strategy)
 

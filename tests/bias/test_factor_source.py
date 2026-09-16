@@ -46,7 +46,7 @@ def _score(result, a="humid", b="temp_c") -> float:
 @pytest.mark.required
 class TestTheDefaultReadsWhatNobodyClaimed:
     def test_an_underived_pair_is_read_as_measured(self):
-        """Nobody cut these on purpose, so there is no claim to honour."""
+        """Nobody cut these on purpose, so there is no claim to honor."""
         assert _regimes(Balance().evaluate(_md())) == {"estimator"}
 
     def test_a_declared_cut_keeps_its_codes(self):

@@ -24,7 +24,7 @@ _logger = get_logger(__name__)
 
 class RedundantRunResult(TypedDict):
     """
-    Stretches of an ordered hash sequence whose neighbours carry no new information.
+    Stretches of an ordered hash sequence whose neighbors carry no new information.
 
     Attributes
     ----------
@@ -89,7 +89,7 @@ def redundant_runs(
     min_length: int = 2,
 ) -> RedundantRunResult:
     """
-    Find stretches of an ordered hash sequence whose neighbours are within a Hamming radius.
+    Find stretches of an ordered hash sequence whose neighbors are within a Hamming radius.
 
     Parameters
     ----------

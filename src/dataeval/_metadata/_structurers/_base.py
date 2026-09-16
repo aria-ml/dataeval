@@ -39,7 +39,7 @@ class Structurer:
     label_level : str
         Level whose rows carry ``class_label``.
     multi_target : bool
-        Whether one dataset item can yield more than one labelled row.
+        Whether one dataset item can yield more than one labeled row.
     unit_type : str
         What one row at the unit level holds, e.g. ``"image"`` or ``"frame"``.
         Descriptive only; it never affects structuring.

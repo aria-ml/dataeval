@@ -172,7 +172,7 @@ class TestComputeStepSpeeds:
         np.testing.assert_allclose(step_speeds, [10.0, 10.0])
         np.testing.assert_allclose(delta_pos, [[10.0, 0.0], [10.0, 0.0]])
 
-    def test_normalised_by_inter_frame_delta(self):
+    def test_normalized_by_inter_frame_delta(self):
         # Gaps must not inflate the speed estimate: displacement / frame-delta.
         boxes = np.array([[0, 0, 2, 2], [10, 0, 12, 2], [40, 0, 42, 2]], dtype=np.float64)
         _, step_speeds = _compute_step_speeds(_centers(boxes), np.array([0, 2, 5]), 3)
@@ -352,7 +352,7 @@ class TestTrackStats:
             stats["stats"]["total_gap_length"][0]
             == stats["stats"]["track_duration"][0] - stats["stats"]["n_appearances"][0]
         )
-        # Speeds normalised by inter-frame delta: [10/2, 30/3] = [5, 10].
+        # Speeds normalized by inter-frame delta: [10/2, 30/3] = [5, 10].
         assert stats["stats"]["mean_speed"][0] == pytest.approx(7.5)
         assert stats["stats"]["speed_variance"][0] == pytest.approx(6.25)
         assert stats["stats"]["net_displacement"][0] == pytest.approx(40.0)
@@ -551,7 +551,7 @@ class TestNestedShape:
 
 @pytest.mark.required
 class TestTrackStatsOverDataset:
-    """The dataset form: every sequence measured, each result labelled with its item."""
+    """The dataset form: every sequence measured, each result labeled with its item."""
 
     @staticmethod
     def _dataset(shapes):
@@ -559,7 +559,7 @@ class TestTrackStatsOverDataset:
 
         return _mot_dataset(shapes)
 
-    def test_every_sequence_is_measured_and_labelled(self):
+    def test_every_sequence_is_measured_and_labeled(self):
         """``item_index`` and ``track_ids`` together name one track; ids restart per item."""
         stats = track_stats(self._dataset([[[5, 9], [5]], [[7], [3, 7]]]))
         items = stats["stats"].get("item_index", [])

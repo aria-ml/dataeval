@@ -475,7 +475,7 @@ class TestTheSameRowsAddressedInsteadOfKeyed:
 
 
 @pytest.mark.required
-class TestAddressesThisMetadataCannotHonour:
+class TestAddressesThisMetadataCannotHonor:
     """What a level-addressed source index is refused for, and how it says so."""
 
     def test_a_key_no_row_carries_is_rejected(self):

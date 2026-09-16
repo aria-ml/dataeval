@@ -364,8 +364,10 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.typos.default]
+locale = "en-us"
 extend-ignore-re = [
-  "`[0-9a-fA-F]{7,40}`"
+  "`[0-9a-fA-F]{7,40}`",
+  "get_cluster_labelling_at_cut",  # vendored fast_hdbscan API name
 ]
 
 [tool.typos.default.extend-words]
@@ -376,6 +378,7 @@ fpr = "fpr"
 Pont = "Pont"
 setp = "setp"
 writeable = "writeable"
+aeroplane = "aeroplane"  # Pascal VOC class label
 
 [tool.typos.files]
 extend-exclude = [
@@ -385,7 +388,8 @@ extend-exclude = [
 
 [tool.codespell]
 skip = 'pyproject.toml,./*env*,./specs,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.*.txt,*.html,*.lock,*.ipynb,./graphify-out'
-ignore-words-list = ["Hart","FPR", "MOT", "mot", "reencode"]
+builtin = "clear,rare,en-GB_to_en-US"
+ignore-words-list = ["Hart","FPR", "MOT", "mot", "reencode", "writeable"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

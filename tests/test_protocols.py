@@ -103,7 +103,7 @@ class TestTheMetadataProtocolPair:
 
         # `issubclass` is unavailable for a protocol with data members, so the base-class
         # usage is confirmed the way a caller would actually feel it: it subclasses, and
-        # what it produces is recognised.
+        # what it produces is recognized.
         assert isinstance(Mine(), protocols.CodedMetadataLike)
 
     def test_the_concrete_metadata_carries_both_channels(self):

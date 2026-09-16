@@ -1040,7 +1040,7 @@ class TestHashRadius:
         assert Duplicates(hash_radius=2, config=Duplicates.Config(hash_radius=9)).hash_radius == 2
 
     def test_radius_zero_reproduces_digest_equality(self):
-        """The compatibility contract: the default path is the behaviour that shipped."""
+        """The compatibility contract: the default path is the behavior that shipped."""
         images = _near_variants()
         assert Duplicates(hash_radius=0).evaluate(images).near == []
 
@@ -1068,7 +1068,7 @@ class TestHashRadius:
         with pytest.raises(ValueError, match="non-negative"):
             Duplicates(hash_radius=-1).evaluate(_near_variants())
 
-    def test_from_stats_honours_the_radius(self):
+    def test_from_stats_honors_the_radius(self):
         images = _near_variants()
         stats = compute_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
         assert Duplicates(hash_radius=0).from_stats(stats).near == []
@@ -1779,7 +1779,7 @@ def make_tracked_dataset(sequences, shape=(3, 24, 32), timed=True) -> Any:
     Each sequence is a list of frames; each frame is a list of ``(track_id, fill)``. Detection *j*
     of a frame owns vertical strip *j* of the image and its strip is painted with that detection's
     fill, so a track's crops hash its own fills over time and two tracks in one frame are told
-    apart -- which flat frames, whose every crop is the same colour, cannot do.
+    apart -- which flat frames, whose every crop is the same color, cannot do.
     """
     from dataclasses import dataclass
 
@@ -1984,7 +1984,7 @@ def _segments(*spans: tuple[int, int, int, int, int, float]) -> Any:
 
 @pytest.mark.required
 class TestDominantSegments:
-    """One stretch, reported once -- not once per neighbouring diagonal."""
+    """One stretch, reported once -- not once per neighboring diagonal."""
 
     def test_parallel_diagonals_collapse_to_the_best_one(self):
         """Periodic content matches its copy at several offsets; only one is the relation."""

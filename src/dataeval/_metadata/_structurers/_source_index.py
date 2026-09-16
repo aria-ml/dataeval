@@ -86,7 +86,7 @@ class SourceIndexRows:
         The level one dataset item sits at, which an unkeyed address with no stated level
         resolves to.
     label_level : FactorLevel
-        The level one labelled thing sits at, which a keyed address with no stated level
+        The level one labeled thing sits at, which a keyed address with no stated level
         resolves to.
     by_level : Mapping[FactorLevel, LevelRows]
         The rows at each level the source index names, coarsest level first. Levels the
@@ -181,8 +181,8 @@ class SourceIndexRows:
         removes.
 
         Every level leaves :meth:`parse` sorted, so a repeat is adjacent and the common
-        case is settled by one vectorised comparison per level. The keys themselves are
-        materialised only to name the offenders in the message, where a second pass costs
+        case is settled by one vectorized comparison per level. The keys themselves are
+        materialized only to name the offenders in the message, where a second pass costs
         nothing.
 
         A level whose rows carry no key compares on the item alone, which falls out of the
@@ -206,7 +206,7 @@ class SourceIndexRows:
     def reject_levels_beyond_two(self) -> None:
         """Reject addresses this source index cannot be *built* from, only placed by.
 
-        Placing values into rows that already exist can honour any level: the rows carry
+        Placing values into rows that already exist can honor any level: the rows carry
         their own parentage and the address only has to name one of them. **Building** the
         rows from addresses alone cannot. An address deliberately says nothing about
         parentage — that is what lets one tuple name a row at any level of a graph that
@@ -310,7 +310,7 @@ class SourceIndexRows:
             missing = sorted(set(self.label_items[orphaned].tolist()))
             raise ValueError(
                 f"source_index has per-label entries for item(s) {missing} but no per-item entry "
-                "for them, so those labels have no item row to hang from. Give every labelled "
+                "for them, so those labels have no item row to hang from. Give every labeled "
                 "item a key=None entry, or drop the per-item entries entirely.",
             )
         return positions.astype(np.intp)

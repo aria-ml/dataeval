@@ -578,7 +578,7 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     # The second repairable drop, derived the same way: a name dropped for naming its rows
     # can only be a factor again if a reading gave it a vocabulary. Without this the
     # restored instance reports the same column in `factor_names` and in `dropped_factors`
-    # at once, and `unusable` describes a factor that is being analysed.
+    # at once, and `unusable` describes a factor that is being analyzed.
     md._repaired |= {
         name for name, reasons in md._dropped_factors.items() if "cardinality_over_budget" in reasons
     } & md._factors

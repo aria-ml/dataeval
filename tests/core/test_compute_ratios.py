@@ -699,7 +699,7 @@ class TestBandColumnsUseTheOverrideMap:
 
         The band range is anchored on the whole datum, so image and box report the same
         depth. Falling through to plain division returns 1.0 under a name that reads like a
-        measurement rather than like the arithmetic artefact it is.
+        measurement rather than like the arithmetic artifact it is.
         """
         cube = (np.random.default_rng(0).random((4, 16, 16)) * 4095).astype(np.uint16)
 
@@ -757,7 +757,7 @@ class TestLevelsThatContradictTheKeyAreRejected:
             normalize_pixel_values=False,
         )
 
-    def _relevelled(self, item_level, label_level):
+    def _releveled(self, item_level, label_level):
         stats = self._stats()
         stats["source_index"] = [
             SourceIndex(si.item, si.key, label_level if si.key is not None else item_level)
@@ -768,7 +768,7 @@ class TestLevelsThatContradictTheKeyAreRejected:
     @pytest.mark.parametrize("item_level", ["sequence", "unit"])
     def test_a_level_that_agrees_with_the_key_is_accepted(self, item_level):
         """The fully explicit spelling the SourceIndex docstring documents."""
-        assert "mean" in compute_ratios(self._relevelled(item_level, "instance"))["stats"]
+        assert "mean" in compute_ratios(self._releveled(item_level, "instance"))["stats"]
 
     def test_an_unstated_level_is_still_accepted(self):
         """The minimal spelling is what producers emit, and it goes through unchanged."""
@@ -777,24 +777,24 @@ class TestLevelsThatContradictTheKeyAreRejected:
     @pytest.mark.parametrize("label_level", ["sequence", "unit", "track"])
     def test_a_keyed_address_at_a_non_label_level_is_rejected(self, label_level):
         with pytest.raises(ValueError, match="a ratio is only defined between an item and its targets"):
-            compute_ratios(self._relevelled("unit", label_level))
+            compute_ratios(self._releveled("unit", label_level))
 
     @pytest.mark.parametrize("item_level", ["track", "instance"])
     def test_an_unkeyed_address_at_a_non_item_level_is_rejected(self, item_level):
         with pytest.raises(ValueError, match="a ratio is only defined between an item and its targets"):
-            compute_ratios(self._relevelled(item_level, "instance"))
+            compute_ratios(self._releveled(item_level, "instance"))
 
     def test_the_rejection_says_which_level_and_whether_it_was_keyed(self):
         with pytest.raises(ValueError, match=r"'track' with a key"):
-            compute_ratios(self._relevelled("unit", "track"))
+            compute_ratios(self._releveled("unit", "track"))
 
     def test_the_rejection_names_the_spellings_that_would_work(self):
         with pytest.raises(ValueError, match=r"unkeyed at 'sequence' or 'unit'.*by a key at 'instance'"):
-            compute_ratios(self._relevelled("unit", "track"))
+            compute_ratios(self._releveled("unit", "track"))
 
     def test_the_rejection_names_the_argument(self):
         with pytest.raises(ValueError, match="stats_output contains addresses"):
-            compute_ratios(self._relevelled("unit", "unit"))
+            compute_ratios(self._releveled("unit", "unit"))
 
     def test_separate_inputs_are_checked_on_both_sides(self):
         image_only = compute_stats(

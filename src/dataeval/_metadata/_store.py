@@ -241,7 +241,7 @@ class LevelStore:
 
         True only for the in-between case: ``level`` does reach ``at``, but not from every
         row. A detection no tracker linked is the instance of it — it has a frame and no
-        track, so a per-track factor is null there while being present on its neighbours.
+        track, so a per-track factor is null there while being present on its neighbors.
         Callers that need a total column have to exclude such a factor, which is a
         property of the links rather than of the values, so it is answered here.
 

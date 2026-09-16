@@ -157,7 +157,7 @@ class TestRelabel:
         assert np.asarray(second.boxes).shape[0] == 1  # boxes masked to surviving detection
         assert len(np.asarray(second.scores)) == 1
 
-    def test_od_drops_unlabelled_images_by_default(self, od_dataset, vehicle_target):
+    def test_od_drops_unlabeled_images_by_default(self, od_dataset, vehicle_target):
         i2l = {0: "sedan", 1: "truck", 2: "spaceship"}
         ds = od_dataset([[0], [], [2]], i2l)  # a background frame and an all-OOV frame
         remap = label_alignment(i2l.values(), vehicle_target)["class_remap"]
@@ -330,7 +330,7 @@ class TestRelabelScores:
         target = conformed[0][1]
         assert list(np.asarray(target.labels)) == [1, 0]
         # one confidence per detection, carrying no vocabulary for the new labels to
-        # disagree with — and each detection kept its own number, not its neighbour's
+        # disagree with — and each detection kept its own number, not its neighbor's
         np.testing.assert_allclose(np.asarray(target.scores), [0.75, 0.75])
         for index, label in enumerate(np.asarray(target.labels)):
             assert detection_score(target, index, int(label)) == pytest.approx(0.75)

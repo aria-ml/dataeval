@@ -292,7 +292,7 @@ class TestParseDateTimeReadsTextAsATime:
             ("hour_of_day", "12"),
         ],
     )
-    def test_each_period_is_labelled(self, every, expected):
+    def test_each_period_is_labeled(self, every, expected):
         """27 August 2020 was a Thursday, in ISO week 35."""
         assert apply(["2020-08-27T12:52:58"], [ParseDateTime("d", every=every)]) == [expected]
 

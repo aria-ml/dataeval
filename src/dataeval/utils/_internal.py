@@ -81,7 +81,7 @@ def simplify_type(data: list[str] | str) -> list[int] | list[float] | list[str] 
 def value_kind(value: Any) -> str:
     """Whether a value reads as a number or as text.
 
-    The split every judgement about a mixed column turns on, in one place, so that the rule
+    The split every judgment about a mixed column turns on, in one place, so that the rule
     that sets a column aside and the report that describes it cannot disagree about which
     values are the problem. Read through :func:`simplify_type`, so a numeral is numeric
     whichever way it is spelled -- metadata that has been through JSON is all text.

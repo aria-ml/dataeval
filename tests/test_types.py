@@ -910,7 +910,7 @@ class TestOwnClassScores:
 
     def test_per_class_scores_read_the_own_class_column(self):
         # deliberately not the row's maximum: the question a score answers is "how
-        # confident in what this box is labelled", which class_label already names
+        # confident in what this box is labeled", which class_label already names
         read = own_class_scores(np.array([[0.2, 0.7], [0.9, 0.1]], dtype=np.float32), np.array([0, 1]))
         np.testing.assert_allclose(read, [0.2, 0.1])
 

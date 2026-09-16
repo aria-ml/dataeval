@@ -156,7 +156,7 @@ class TestMetadataStructureWithBiasFunctions:
         # One block per level: 5 image rows followed by 5 label rows.
         assert len(md.dataframe) == 10
 
-        # Every image here is labelled, so the two levels have the same height.
+        # Every image here is labeled, so the two levels have the same height.
         assert len(md.rows_at("instance")) == 5
         assert len(md.rows_at("unit")) == 5
         assert len(md.rows_at(md.label_level)) == 5

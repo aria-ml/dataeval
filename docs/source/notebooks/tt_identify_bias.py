@@ -640,7 +640,7 @@ class AdjustedMetadata(CodedMetadataLike):
 # One row per detection, which is the level `object_size` is recorded at.
 rows = metadata.rows_at("instance")
 
-# A derived factor: apparent size per metre of altitude, cut into 5 groups. Rows with no altitude
+# A derived factor: apparent size per meter of altitude, cut into 5 groups. Rows with no altitude
 # reading (-1) take a bin of their own rather than a ratio that would not mean anything.
 ratio = np.where(rows["altitude"].to_numpy() > 0, rows["object_size"].to_numpy() / rows["altitude"].to_numpy(), -1.0)
 edges = np.quantile(ratio[ratio > 0], np.linspace(0, 1, 5))
@@ -650,7 +650,7 @@ custom_metadata = AdjustedMetadata(
     factors=np.column_stack([derived, rows["object_size\u2195"].to_numpy()]),
     labels=rows["class_label"].to_numpy().squeeze(),
     index2label=ds.index2label,
-    names=["size_per_metre", "object_size"],
+    names=["size_per_meter", "object_size"],
     binned=[True, True],
 )
 

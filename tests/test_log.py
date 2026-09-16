@@ -170,7 +170,7 @@ class TestSetMetadataNamespace:
 
     The execution trace belongs to the subsystem that ran, not to ``dataeval.types``
     where the decorator lives, so the module path is resolved per call. Curating it
-    keeps that behaviour while dropping the private path from the logger name.
+    keeps that behavior while dropping the private path from the logger name.
     """
 
     @staticmethod

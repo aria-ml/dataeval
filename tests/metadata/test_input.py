@@ -11,11 +11,11 @@ from dataeval.types import Aggregator, SourceIndex
 
 @pytest.mark.required
 class TestIsStatsResult:
-    def test_recognises_a_result_without_a_source_index(self):
+    def test_recognizes_a_result_without_a_source_index(self):
         # Keyed producers place by level and key, so they carry no addresses.
         assert _is_stats_result({"stats": {"pan_speed": [1.0]}})
 
-    def test_recognises_a_result_with_a_source_index(self):
+    def test_recognizes_a_result_with_a_source_index(self):
         result = {"stats": {"brightness": [1.0]}, "source_index": [SourceIndex(0, None, None)]}
         assert _is_stats_result(result)
 

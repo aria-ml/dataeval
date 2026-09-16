@@ -566,7 +566,7 @@ class TestODSplitDataset:
 class TestSplitOnNamesAFactorTheMetadataDoesNotCarry:
     """``split_on`` exists to keep rows that belong together on one side of a split.
 
-    Grouping by a *subset* of what was asked for hands back folds that do not honour the
+    Grouping by a *subset* of what was asked for hands back folds that do not honor the
     request, and nothing downstream can tell — so an unresolvable name is refused rather
     than skipped.
     """

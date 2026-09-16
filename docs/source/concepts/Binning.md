@@ -1014,7 +1014,7 @@ on a range already 0.24 wide.
 That is why `factor_source="auto"` reads native values only where nobody declared
 anything. A declared cutoff is a claim, and the under-reporting is that claim
 being honored — you asked about *freezing*, not about temperature. Where no one
-claimed anything, there is nothing to honour, and the calibrated read is the
+claimed anything, there is nothing to honor, and the calibrated read is the
 better one.
 
 ## What the choice determines

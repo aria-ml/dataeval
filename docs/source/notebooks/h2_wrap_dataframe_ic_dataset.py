@@ -19,7 +19,7 @@
 # %% [markdown]
 # ## Problem statement
 #
-# Many datasets are catalogued as tabular data: a CSV, parquet file, or database
+# Many datasets are cataloged as tabular data: a CSV, parquet file, or database
 # query that lists one row per image with columns for the image location, its
 # label, and any associated metadata (weather, sensor, altitude, capture time,
 # etc.). A natural way to hold this in memory is a

@@ -1,7 +1,7 @@
 """Which task a dataset is, and what that task says about the levels its rows sit at.
 
 More than one reader needs this and none of them is the other's caller.
-:class:`~dataeval.Metadata` structures a dataset into levelled rows; anything that follows
+:class:`~dataeval.Metadata` structures a dataset into leveled rows; anything that follows
 a :class:`~dataeval.types.SourceIndex` back to the datum it names walks the same graph in
 the other direction. All of them have to agree on which task a dataset is, which levels it
 therefore has, and which of those one item and one label sit at. Declared once here so they
@@ -47,7 +47,7 @@ class TaskProfile:
         The level of one dataset item — what the dataset yields. ``unit`` for an
         image-based task, ``sequence`` for tracking.
     label_level : FactorLevel
-        The level of one labelled thing. ``instance`` for every task, which is why an
+        The level of one labeled thing. ``instance`` for every task, which is why an
         address with a key means the same thing whatever it was measured over.
     unit_type : str
         What one row at the ``unit`` level holds, in the dataset's own vocabulary.

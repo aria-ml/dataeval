@@ -65,7 +65,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     """Present a multi-object-tracking dataset as an object-detection dataset of frames.
 
     One frame becomes one datum. :class:`~dataeval.data.DetectionCrops` does the same job one
-    level down -- object detection presented as image classification -- and this is its analogue
+    level down -- object detection presented as image classification -- and this is its analog
     one level up, so every per-image tool reaches video frames unchanged:
     :func:`~dataeval.core.compute_stats` and everything built on it,
     :class:`~dataeval.Embeddings`, :class:`~dataeval.data.View`.

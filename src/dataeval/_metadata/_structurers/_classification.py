@@ -43,7 +43,7 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
         """One datum's class scores, flattened.
 
         A 0-d target is a class index rather than a vector, and is refused: reshaped to
-        ``(1,)`` its argmax is 0, so every datum would be labelled class 0 with its class
+        ``(1,)`` its argmax is 0, so every datum would be labeled class 0 with its class
         index recorded as the confidence.
         """
         values = as_numpy(target)

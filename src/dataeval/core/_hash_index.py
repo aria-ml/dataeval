@@ -1,7 +1,7 @@
 """Hamming-radius search over packed perceptual hashes.
 
 Perceptual hashes answer *how similar* two images are, in bits: a re-encode, a resize or a
-mild colour shift moves a handful of bits, an unrelated image moves about half of them. Using
+mild color shift moves a handful of bits, an unrelated image moves about half of them. Using
 them therefore means asking for every pair within some radius — a question a dictionary keyed
 on the digest cannot answer at all, since it can only find pairs at radius zero.
 
@@ -11,7 +11,7 @@ split each code into ``radius + 1`` disjoint substrings, and observe that two co
 at most ``radius`` bits must agree *exactly* on at least one of them, because ``radius`` differing
 bits cannot fall into ``radius + 1`` disjoint parts without leaving one untouched. Grouping on
 each substring in turn therefore produces a candidate set that provably contains every true
-neighbour, and a popcount over those candidates alone decides the rest.
+neighbor, and a popcount over those candidates alone decides the rest.
 
 Recall is exact — this is a blocking scheme, not a sketch, and it discards no true pair.
 
@@ -116,7 +116,7 @@ class HashGroupResult(TypedDict):
         members. Groups are ordered by their smallest member.
     labels : NDArray[np.intp]
         Shape ``(N,)``. The index into ``groups`` of each input position, or ``-1`` for a
-        position in no group -- one with no neighbour, or one excluded as invalid.
+        position in no group -- one with no neighbor, or one excluded as invalid.
     """
 
     groups: Sequence[NDArray[np.intp]]
@@ -124,7 +124,7 @@ class HashGroupResult(TypedDict):
 
 
 def _empty_result() -> HashNeighborResult:
-    """Return the well-typed empty answer, so callers never special-case a no-neighbour input."""
+    """Return the well-typed empty answer, so callers never special-case a no-neighbor input."""
     return HashNeighborResult(
         pairs=np.empty((0, 2), dtype=np.intp),
         distances=np.empty(0, dtype=np.intp),
@@ -457,7 +457,7 @@ def _prefer_scan(count: int, width: int, radius: int) -> bool:
 
     Three things send the search to the scan:
 
-    - a radius at or above the digest width, where every pair is a neighbour and no blocking
+    - a radius at or above the digest width, where every pair is a neighbor and no blocking
       scheme can narrow anything, and which is also the only radius the pigeonhole argument
       cannot supply enough bands for;
     - a corpus small enough that the index's grouping costs more than the whole comparison;
@@ -505,7 +505,7 @@ def _search(
 
 
 def _merge_components(labels: NDArray[np.intp], left: NDArray[np.intp], right: NDArray[np.intp]) -> NDArray[np.intp]:
-    """Fold a buffer of edges into a component labelling and return the composed labelling.
+    """Fold a buffer of edges into a component labeling and return the composed labeling.
 
     Composing after every flush is what keeps connectivity linear in space: the edges seen so far
     collapse to at most one label per node and are then discarded, so an input with quadratically
@@ -885,7 +885,7 @@ def hash_neighbors(
     too fine to exclude anything. Multi-index hashing narrows as the radius grows -- bands shrink,
     so more of the corpus shares each one -- and at a radius approaching half the digest width it
     degenerates into the scan it replaced, which is not a defect but a statement about the
-    question: at that radius most pairs *are* neighbours.
+    question: at that radius most pairs *are* neighbors.
 
     **The answer can be quadratic even when the search is not.** *k* copies of one image are
     ``k * (k - 1) / 2`` pairs however cheaply they are found, so a few thousand duplicates --
@@ -893,7 +893,7 @@ def hash_neighbors(
     gigabytes of memory. ``max_pairs`` is counted exactly rather than estimated, and counted
     *before the pairs are expanded*, which is the allocation that would dominate; the search
     itself still runs, and its own working set is bounded but not free. Exceeding the budget
-    raises rather than truncating: a silently shortened neighbour list reads as a complete one.
+    raises rather than truncating: a silently shortened neighbor list reads as a complete one.
     When the question is which hashes belong together rather than which pairs link them,
     :func:`~dataeval.core.hash_groups` answers it in space bounded by ``N``.
 

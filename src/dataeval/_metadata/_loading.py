@@ -1,7 +1,7 @@
 """Populating a :class:`~dataeval.Metadata` from raw factor arrays, with no dataset.
 
 The machinery behind :meth:`~dataeval.Metadata.from_factors`. Two ways in — arrays that
-all describe one level, and arrays labelled by a :class:`~dataeval.types.SourceIndex` —
+all describe one level, and arrays labeled by a :class:`~dataeval.types.SourceIndex` —
 which differ only in how the rows are keyed and then converge on the same
 ``StructuredData`` bundle the dataset path produces, so the
 reserved columns have exactly one producer.
@@ -147,7 +147,7 @@ def _load_factors_by_source_index(
     item_indices: Array1D[Any] | None,
     source_index: Sequence[SourceIndex],
 ) -> None:
-    """Populate structured state from factor arrays labelled by a source index.
+    """Populate structured state from factor arrays labeled by a source index.
 
     The source index supplies what `level` and `item_indices` supply on the other
     path — which level each value belongs to and which item it came from — so all

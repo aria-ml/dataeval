@@ -160,7 +160,7 @@ class Balance(Evaluator):
           the caller did not ask. A cut nobody chose carries no claim, so the measured
           values are read instead. A category is always read as codes — there is no
           measurement behind it to prefer.
-        - ``"coded"`` reads ``factor_data`` throughout. The behaviour of every release
+        - ``"coded"`` reads ``factor_data`` throughout. The behavior of every release
           before 1.1, and what to pass to reproduce a number from one.
         - ``"values"`` reads ``factor_values`` throughout, ignoring every declared cut.
           An error on a container that provides only codes.
@@ -409,7 +409,7 @@ class Balance(Evaluator):
 
         # The axis is whatever is being conditioned on: the class labels by default, or
         # the named factor(s). A factor serving as the axis is dropped from the factors
-        # analysed against it, since it would otherwise report perfect correlation with
+        # analyzed against it, since it would otherwise report perfect correlation with
         # itself.
         axis = resolve_label_axis(self.metadata, self.label)
         # Recorded before anything is computed from it: the three scalar members

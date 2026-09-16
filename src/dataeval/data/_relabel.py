@@ -133,7 +133,7 @@ class Relabel(Operation):
     reduce_detection_scores : bool or None, default None
         How a *detection* target's per-class scores are conformed. ``True`` — the default
         — reduces them to one confidence per detection, the score of the class the box
-        was labelled with. ``False`` folds them into the target vocabulary instead,
+        was labeled with. ``False`` folds them into the target vocabulary instead,
         keeping a column per target class.
 
         This is about the conformed *target*: what ``dataset[i][1].scores`` hands back.
@@ -175,7 +175,7 @@ class Relabel(Operation):
     cannot be conformed without them. What that takes differs by task:
 
     - **Object detection.** Each detection's score is read down to one confidence — the
-      score of the class it was labelled with, taken against its *source* label, which is
+      score of the class it was labeled with, taken against its *source* label, which is
       the last moment the columns still mean what the labels say. A confidence is a
       property of the detection, so the result carries no vocabulary, needs no width, and
       stacks with any other dataset's — including one that scored every box rather than
@@ -227,7 +227,7 @@ class Relabel(Operation):
                 "Relabel(reduce_detection_scores=False) folds a detection target's "
                 "per-class scores into the target vocabulary. It will be removed in "
                 "v1.3, after which a detection's score is always reduced to one "
-                "confidence — the score of the class the box was labelled with — which "
+                "confidence — the score of the class the box was labeled with — which "
                 "carries no vocabulary and lets datasets that scored differently be "
                 "merged. The fold is not v1.1's layout either: v1.1 left the array "
                 "source-indexed, and the fold spells an unreadable score 0.0 where the "

@@ -582,7 +582,7 @@ class TestRepresentativeSelector:
         with pytest.raises(ValueError, match="bandwidth must be positive"):
             Representative(4, bandwidth=-1.0)
 
-    def test_an_explicit_bandwidth_is_honoured(self):
+    def test_an_explicit_bandwidth_is_honored(self):
         dataset, _ = make_dataset((16,))
         wide = SequenceFrames(dataset, Representative(5, bandwidth=1e6, batch_size=8)).frame_map
         narrow = SequenceFrames(dataset, Representative(5, bandwidth=1e-2, batch_size=8)).frame_map
@@ -1142,7 +1142,7 @@ class TestProvenanceThroughAViewAboveTheFrameView:
     def test_track_map_reports_the_source_detections_not_the_ones_a_transform_left(self):
         """`track_map` is read off the source targets, so a transform above it is invisible.
 
-        This pins a real limit rather than a desired behaviour: a caller that crops at the
+        This pins a real limit rather than a desired behavior: a caller that crops at the
         view level and then links per-detection statistics through `frames.track_map` gets
         a map with more rows than the view has detections. Linking has to be done against
         the targets the view actually yields.

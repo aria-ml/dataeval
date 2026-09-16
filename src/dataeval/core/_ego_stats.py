@@ -10,7 +10,7 @@ estimator gives an upper bound on what a model could pick up for free.
 
 Model
 -----
-For one frame pair, with ``x`` the pixel offset from the image centre and ``v = (u, w)``
+For one frame pair, with ``x`` the pixel offset from the image center and ``v = (u, w)``
 the flow in pixels, the camera contributes an affine field::
 
     v(x) = A x + b,    A = [[a00, a01], [a10, a11]]
@@ -20,14 +20,14 @@ whose parts name the physical motions::
     div   = a00 + a11                 looming; zoom or dolly, signed in/out
     curl  = a10 - a01                 roll; a pure roll of phi gives curl = 2 phi
     shear = (a00 - a11, a01 + a10)    off-axis or oblique motion
-    t0    = b                         flow at the centre; the pan/tilt rate
+    t0    = b                         flow at the center; the pan/tilt rate
     FOE   = -A^-1 b                   zero of the field, where the camera is heading
 
 ``A`` is a ratio of pixels to pixels, so it is resolution-free. ``div``, ``curl`` and
 ``shear`` are per-frame rates that do not change when the frames are downscaled. ``t0`` and
 ``FOE`` are lengths, reported in the sequence's own full-resolution pixels.
 
-The fit excludes independent movers instead of modelling them. Rejection happens inside
+The fit excludes independent movers instead of modeling them. Rejection happens inside
 the robust fit itself, which is IRLS with Tukey biweight weights. That fit is deterministic
 and does none of the random sampling RANSAC would. No mask leaves the fit. What survives
 is reported on three separate axes, so an audit can condition on each independently:
@@ -99,9 +99,9 @@ class _AffineFit(NamedTuple):
     au, aw : NDArray[np.float64]
         The two decoupled 3-parameter solutions, ``[d/dx, d/dy, constant]`` for the ``u``
         and ``w`` flow components respectively. The constant is the flow at `centroid`,
-        because the coordinates are centred there.
+        because the coordinates are centered there.
     centroid : NDArray[np.float64]
-        Mean sample position the fit was centred on.
+        Mean sample position the fit was centered on.
     weights : NDArray[np.float64]
         Final biweight weight per sample, in ``[0, 1]``.
     condition : float
@@ -233,9 +233,9 @@ class _PairReading(NamedTuple):
     div, curl, shear : float
         Camera rates per frame, resolution-free.
     t0x, t0y, t0_mag : float
-        Pan/tilt at the image centre, full-resolution pixels per frame.
+        Pan/tilt at the image center, full-resolution pixels per frame.
     foe_x, foe_y : float
-        Focus of expansion relative to the image centre, full-resolution pixels. NaN when
+        Focus of expansion relative to the image center, full-resolution pixels. NaN when
         the field has no in-frame zero, which includes every pure pan.
     motion : str
         Which single motion dominates, or ``"complex"`` when none does.
@@ -317,12 +317,12 @@ def _explained(fit: _AffineFit, pts: NDArray[np.float64], flow: NDArray[np.float
 
 def _focus_of_expansion(
     fit: _AffineFit,
-    img_centre: NDArray[np.float64],
+    img_center: NDArray[np.float64],
     scale: float,
     half_diagonal: float,
     limit_mult: float,
 ) -> tuple[float, float]:
-    """Locate the zero of the flow field relative to the image centre, or NaN if there is none.
+    """Locate the zero of the flow field relative to the image center, or NaN if there is none.
 
     Only the divergent part of the field has a focus. A pure roll is a rotation about a
     point, and its field does have a zero, but that point is where the camera pivots, and
@@ -339,7 +339,7 @@ def _focus_of_expansion(
         zero = np.linalg.solve(matrix, -fit.offset) + fit.centroid
     except np.linalg.LinAlgError:
         return np.nan, np.nan
-    offset = (zero - img_centre) * scale
+    offset = (zero - img_center) * scale
     # A focus far outside the frame only means the pan had a slight divergence in it, so
     # it is no use as a heading.
     if np.max(np.abs(offset)) >= limit_mult * half_diagonal:
@@ -401,7 +401,7 @@ def _pair_ego(
     proc_w, proc_h = proc_wh
     full_w, full_h = full_wh
     scale = 0.5 * (full_w / proc_w + full_h / proc_h)
-    img_centre = np.array([proc_w / 2.0, proc_h / 2.0])
+    img_center = np.array([proc_w / 2.0, proc_h / 2.0])
     half_diagonal = 0.5 * float(np.hypot(full_w, full_h))
 
     fit = _fit_irls(pts, flow)
@@ -413,9 +413,9 @@ def _pair_ego(
     div = (matrix[0, 0] + matrix[1, 1]) / gap
     curl = (matrix[1, 0] - matrix[0, 1]) / gap
     shear = float(np.hypot((matrix[0, 0] - matrix[1, 1]) / gap, (matrix[0, 1] + matrix[1, 0]) / gap))
-    t0 = (matrix @ (img_centre - fit.centroid) + fit.offset) * scale / gap
+    t0 = (matrix @ (img_center - fit.centroid) + fit.offset) * scale / gap
     t0_mag = float(np.hypot(t0[0], t0[1]))
-    foe_x, foe_y = _focus_of_expansion(fit, img_centre, scale, half_diagonal, foe_limit_mult)
+    foe_x, foe_y = _focus_of_expansion(fit, img_center, scale, half_diagonal, foe_limit_mult)
 
     resid = fit.residuals(pts, flow)
     speed = np.hypot(resid[:, 0], resid[:, 1]) * scale / gap
@@ -533,21 +533,21 @@ def _pair_egos(
         yield _pair_ego(pts, vectors, (width, height), full_wh, gap) if len(pts) >= _MIN_SAMPLES else None
 
 
-def _trimmed_centre(state: NDArray[np.float64]) -> NDArray[np.float64]:
-    """Find the centre of the dominant cluster, unmoved by a burst of any width.
+def _trimmed_center(state: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Find the center of the dominant cluster, unmoved by a burst of any width.
 
     The median is global and iteratively trimmed. A short rolling window would track a
     wide burst and stop seeing it as a departure, while trimming against the whole sequence
     holds the baseline wherever the quiet pairs are still a plurality.
     """
-    centre = np.median(state, axis=0)
+    center = np.median(state, axis=0)
     for _ in range(3):
-        distance = np.linalg.norm(state - centre, axis=1)
+        distance = np.linalg.norm(state - center, axis=1)
         keep = distance < 4.0 * (_MAD_TO_SIGMA * np.median(distance) + 1e-6)
         if keep.sum() < 4:
             break
-        centre = np.median(state[keep], axis=0)
-    return centre
+        center = np.median(state[keep], axis=0)
+    return center
 
 
 def _temporal_outliers(
@@ -574,7 +574,7 @@ def _temporal_outliers(
     if measured.sum() < 8:
         return flags
 
-    distance = np.linalg.norm(state - _trimmed_centre(state[measured]), axis=1)
+    distance = np.linalg.norm(state - _trimmed_center(state[measured]), axis=1)
     # Floored at two pixels per frame. Below that the camera is effectively still and the
     # spread is estimator noise, which would otherwise make every pair an outlier.
     sigma = max(_MAD_TO_SIGMA * float(np.median(distance[measured])), 2.0)
@@ -608,7 +608,7 @@ class EgoFactors(TypedDict):
     unit_index : Sequence[int]
         Frame's position within its own sequence, zero-based.
     pan_x, pan_y : Sequence[float]
-        Signed pan/tilt at the image centre, full-resolution pixels per frame.
+        Signed pan/tilt at the image center, full-resolution pixels per frame.
     pan_speed : Sequence[float]
         Magnitude of the above.
     zoom_rate : Sequence[float]
@@ -618,7 +618,7 @@ class EgoFactors(TypedDict):
     shear_rate : Sequence[float]
         Magnitude of the traceless symmetric part, per frame. Resolution-free.
     foe_x, foe_y : Sequence[float]
-        Focus of expansion relative to the image centre, full-resolution pixels. NaN where
+        Focus of expansion relative to the image center, full-resolution pixels. NaN where
         the field has no in-frame zero, which includes every pure pan and every pure roll.
     motion : Sequence[str]
         Dominant motion for this frame: ``"static"``, ``"pan_tilt"``, ``"zoom_dolly"``,
@@ -805,7 +805,7 @@ def ego_stats(
 
     Motion is estimated from cheap optical flow fitted to an affine field by iteratively
     reweighted least squares. The robust weighting rejects independent movers instead of
-    modelling them. Pairs where the camera cannot be told apart from a mover are refused
+    modeling them. Pairs where the camera cannot be told apart from a mover are refused
     outright. See `ego_trusted`.
 
     Parameters

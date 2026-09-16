@@ -422,11 +422,11 @@ page allows you to jump around between the different areas of the documentation 
 
 If you have any questions, feel free to reach out to [us](mailto:dataeval@ariacoustics.com)!
 
-## Acknowledgement
+## Acknowledgment
 
-### CDAO Funding Acknowledgement
+### CDAO Funding Acknowledgment
 
-<!-- start acknowledgement -->
+<!-- start acknowledgment -->
 
 This material is based upon work supported by the Chief Digital and Artificial
 Intelligence Office under Contract No. W519TC-23-9-2033. The views and
@@ -434,4 +434,4 @@ conclusions contained herein are those of the author(s) and should not be
 interpreted as necessarily representing the official policies or endorsements,
 either expressed or implied, of the U.S. Government.
 
-<!-- end acknowledgement -->
+<!-- end acknowledgment -->

@@ -75,7 +75,7 @@ def own_class_scores(scores: Any, labels: NDArray[np.intp]) -> NDArray[np.float3
     is read as scoreless rather than as scoring a class it never named.
 
     A detection's own class is read rather than its highest, so the number answers "how
-    confident, in what this box is labelled" — the question a row of the metadata frame is
+    confident, in what this box is labeled" — the question a row of the metadata frame is
     about — and not "what did the model most believe", which is a different one and is
     already answered by ``class_label``.
 
@@ -170,7 +170,7 @@ def detection_score(target: Any, index: int, label: int) -> float | None:
         The confidence, or ``None`` where the target carries none this detection can be
         read from. A ground-truth target scores ``1.0``. Where scores are ``(N, CLASSES)``
         this is the score of the box's **own** class rather than its highest, so a
-        detection's score is about the class it was labelled with.
+        detection's score is about the class it was labeled with.
 
     Notes
     -----

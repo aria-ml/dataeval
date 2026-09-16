@@ -221,7 +221,7 @@ class SourceIndex(_SourceIndexBase):
             The level of one dataset item, as :attr:`dataeval.Metadata.item_level` reports
             it — ``unit`` for image-based tasks, ``sequence`` for tracking.
         label_level : FactorLevel
-            The level of one labelled thing, as :attr:`dataeval.Metadata.label_level`
+            The level of one labeled thing, as :attr:`dataeval.Metadata.label_level`
             reports it. ``instance`` for every dataset task.
 
         Returns

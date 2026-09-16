@@ -194,7 +194,7 @@ def sequence_fingerprint(
 def _merge_close(segments: SegmentMatchResult, offset_tolerance: int, max_gap: int) -> SegmentMatchResult:
     """Join segments on near-enough diagonals whose query spans run into one another.
 
-    A small frame-rate difference makes one shared stretch drift across neighbouring offsets
+    A small frame-rate difference makes one shared stretch drift across neighboring offsets
     rather than sitting on a single one, so it arrives here as several short segments. Joining
     them reports the stretch that is actually shared.
 

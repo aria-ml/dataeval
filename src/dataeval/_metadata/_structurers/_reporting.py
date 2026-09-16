@@ -1,6 +1,6 @@
 """What structuring did not carry into the rows, said out loud.
 
-Both cases here are legitimate shapes rather than errors — a partially labelled dataset,
+Both cases here are legitimate shapes rather than errors — a partially labeled dataset,
 and a metadata key spelling the same name as a factor the structurer derives itself — and
 both change what a caller sees without changing what they asked for. They are logged at
 info level rather than warned about, and collected in one module so that the two reads
@@ -23,7 +23,7 @@ def log_items_without_targets(without: Sequence[int], level: FactorLevel, items:
 
     These items keep their item-level row and every factor on it; they contribute no
     row at ``level``, so label-aware analysis covers fewer items than the dataset has.
-    Informational rather than a warning: a partially labelled dataset is a legitimate
+    Informational rather than a warning: a partially labeled dataset is a legitimate
     shape, and it costs no data now that the item level is separate from the target
     level.
     """

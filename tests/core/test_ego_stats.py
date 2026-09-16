@@ -62,13 +62,13 @@ def affine_flow(
     The matrix is assembled so that ``a00 + a11 == div`` and ``a10 - a01 == curl``, which
     is the decomposition the module claims to invert.
     """
-    centred = pts - np.array([WIDTH / 2.0, HEIGHT / 2.0])
+    centered = pts - np.array([WIDTH / 2.0, HEIGHT / 2.0])
     matrix = np.array([[div / 2.0, -curl / 2.0], [curl / 2.0, div / 2.0]])
-    return (matrix @ centred.T).T + np.array(t0, float)
+    return (matrix @ centered.T).T + np.array(t0, float)
 
 
 def radial_flow(pts: NDArray[np.float64], focus: tuple[float, float], rate: float) -> NDArray[np.float64]:
-    """Pure expansion away from a point offset from the image centre."""
+    """Pure expansion away from a point offset from the image center."""
     return rate * (pts - (np.array([WIDTH / 2.0, HEIGHT / 2.0]) + np.array(focus, float)))
 
 
@@ -159,8 +159,8 @@ class TestKinematicRecovery:
         # A traceless symmetric field: both div and curl are zero by construction, so a
         # non-zero reading here is the only evidence the motion happened at all.
         pts = lattice()
-        centred = pts - np.array([WIDTH / 2.0, HEIGHT / 2.0])
-        pair = measure((np.array([[0.01, 0.0], [0.0, -0.01]]) @ centred.T).T, pts)
+        centered = pts - np.array([WIDTH / 2.0, HEIGHT / 2.0])
+        pair = measure((np.array([[0.01, 0.0], [0.0, -0.01]]) @ centered.T).T, pts)
         assert pair.div == pytest.approx(0.0, abs=1e-9)
         assert pair.curl == pytest.approx(0.0, abs=1e-9)
         assert pair.shear == pytest.approx(0.02, abs=1e-9)
@@ -187,7 +187,7 @@ class TestKinematicRecovery:
         assert np.isnan(pair.foe_x)
         assert np.isnan(pair.foe_y)
 
-    def test_a_dolly_toward_frame_centre_still_has_one(self):
+    def test_a_dolly_toward_frame_center_still_has_one(self):
         # The counterpart to the roll case: divergence present, so the focus is real.
         assert measure(affine_flow(lattice(), div=0.02)).foe_in_frame
 
@@ -518,7 +518,7 @@ class TestParameterValidation:
             ego_stats(cast("VideoStream", panning_stream()), **kwargs)
 
     def test_unknown_flow_estimator_is_rejected(self):
-        """Regression test for an unrecognised estimator falling back to Lucas-Kanade.
+        """Regression test for an unrecognized estimator falling back to Lucas-Kanade.
 
         Silently substituting an estimator makes the reported ``flow`` a lie and the
         measurement irreproducible.
@@ -557,7 +557,7 @@ class TestStreamPairs:
     def test_at_most_gap_plus_one_frames_are_held_at_once(self, gap: int):
         """A metadata pass runs over whole datasets of video.
 
-        Materialising a sequence is the difference between a measurement that runs and one
+        Materializing a sequence is the difference between a measurement that runs and one
         that exhausts memory, so the window has to stay bounded by `gap` however long the
         sequence is.
         """

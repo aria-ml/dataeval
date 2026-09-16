@@ -260,7 +260,7 @@ class TestHashGroups:
             assert group.tolist() == sorted(group.tolist())
         assert [int(g[0]) for g in groups] == sorted(int(g[0]) for g in groups)
 
-    def test_invalid_positions_are_labelled_out(self):
+    def test_invalid_positions_are_labeled_out(self):
         codes, valid = pack_hashes(["ff00ff00ff00ff00", "", "ff00ff00ff00ff00"])
         result = hash_groups(codes, radius=6, valid=valid)
         assert [g.tolist() for g in result["groups"]] == [[0, 2]]

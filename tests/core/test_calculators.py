@@ -2674,7 +2674,7 @@ class TestPerGroupStatsValidation:
             )
 
     def test_only_the_barren_group_is_dropped(self):
-        """One group asking for geometry alone must not take its neighbour down with it."""
+        """One group asking for geometry alone must not take its neighbor down with it."""
         with pytest.warns(UserWarning, match="none of the requested statistics vary") as caught:
             result = compute_stats(
                 self._IMAGE,
@@ -3340,7 +3340,7 @@ class TestCountedPercentiles:
             np.percentile(values, q=QUARTILES).astype(np.float64),
         )
 
-    def test_interpolates_between_neighbours_like_numpy(self):
+    def test_interpolates_between_neighbors_like_numpy(self):
         """The quartiles of four values all land off a whole index, so nothing is read directly."""
         values = np.array([10, 20, 30, 41], dtype=np.uint8)
 

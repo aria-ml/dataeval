@@ -20,7 +20,7 @@ _logger = get_logger(__name__)
 
 
 class DatasetStructurer(Structurer, ABC):
-    """Strategy for turning a dataset into levelled metadata rows.
+    """Strategy for turning a dataset into leveled metadata rows.
 
     Parameters
     ----------

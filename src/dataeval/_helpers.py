@@ -195,7 +195,7 @@ def _recorded_encodings(metadata: MetadataLike, names: Sequence[str]) -> dict[st
 
 
 # The window where fixed notation is the readable choice. ``%g`` switches to an exponent at
-# 1e6, which is exactly where it starts hiding the difference between neighbouring edges;
+# 1e6, which is exactly where it starts hiding the difference between neighboring edges;
 # above 1e16 a float64 has no digits left below the exponent, so the value really is
 # scientific and writing it out in full would be sixteen true digits and a tail of noise.
 _FIXED_FLOOR, _FIXED_CEIL = 1e6, 1e16
@@ -221,7 +221,7 @@ def _edge_format(edges: Sequence[float]) -> str:
       Raising precision only as far as distinctness needs it avoids the opposite failure,
       where ``0.1`` renders as ``0.10000000000000001``.
 
-    One format for the whole cut rather than one per edge, so that neighbouring bounds are
+    One format for the whole cut rather than one per edge, so that neighboring bounds are
     written to the same precision and an interval reads as an interval. :func:`_distinguish`
     still guards the result: two edges can round to the same text under any precision this
     is willing to reach.
@@ -298,7 +298,7 @@ def _names_from_bin_spec(spec: BinSpec, uniques: NDArray[Any]) -> dict[int, str]
     if not spec.edges or any(later < earlier for earlier, later in zip(spec.edges, spec.edges[1:], strict=False)):
         return {int(code): str(int(code)) for code in uniques}
     # One format for the whole cut, chosen from all of its edges: a per-edge choice would
-    # render neighbouring bounds to different precisions and print `[1.787e+15, 1787011240000000)`.
+    # render neighboring bounds to different precisions and print `[1.787e+15, 1787011240000000)`.
     fmt = _edge_format(spec.edges)
     return {int(code): _bin_name(spec, int(code), fmt) for code in uniques}
 
@@ -316,7 +316,7 @@ def _level_name(spec: LevelSpec, code: int) -> str:
     """Name one code from the vocabulary that produced it."""
     if code == spec.missing_code:
         # The same word the bin path uses for the same thing. Left to the fallback below,
-        # a partly recorded factor labelled its unrecorded rows with a bare number sitting
+        # a partly recorded factor labeled its unrecorded rows with a bare number sitting
         # among real category names, reading as a category the data contains.
         return "missing"
     return str(spec.levels[code]) if code < len(spec.levels) else str(code)
@@ -934,7 +934,7 @@ def kept_factors(metadata: Any, excluded: Sequence[int]) -> tuple[list[str], lis
         raise ValueError(
             f"The label axis names every factor this metadata has ({names}), leaving nothing to "
             "measure against it — a factor serving as the axis is dropped from the factors "
-            "analysed, since it correlates perfectly with itself. Name fewer factors in `label`, "
+            "analyzed, since it correlates perfectly with itself. Name fewer factors in `label`, "
             "or pass None to use the class labels.",
         )
     return [names[index] for index in kept], kept

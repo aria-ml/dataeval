@@ -42,7 +42,7 @@ question about the data and has two, because there are two sets of values.
 
 The reference is not the image's brightest pixel. Reading it off the data would
 mean every image is normalized against its own maximum, so a photograph of a night
-sky and one of a beach would both report mid-grey — the opposite of comparable.
+sky and one of a beach would both report mid-gray — the opposite of comparable.
 
 Instead it is **decoded** where the data carries an encoding, because integer image
 formats genuinely are power-of-two:
@@ -61,7 +61,7 @@ pipeline produces the first, a resize or any interpolation produces the second.
 
 ## When there is no reference
 
-Some data has none. Elevation below sea level, mean-centred reflectance, temperature
+Some data has none. Elevation below sea level, mean-centered reflectance, temperature
 in Celsius, a 16-bit band holding physical units — the dynamic range of these is a
 property of the *sensor*, not of a file format, and nothing about the array reveals
 it. There is no encoding to decode.

@@ -820,7 +820,7 @@ class TestAFittedToleranceIsReplayedRatherThanRefitted:
         assert rolled.at("sequence").rows_at("sequence")["b_longest_run"].to_list() == [4]
 
     def test_resolving_a_fit_again_leaves_it_a_fit(self):
-        """Relabelling it ``declared`` claimed a caller wrote what a resolution measured."""
+        """Relabeling it ``declared`` claimed a caller wrote what a resolution measured."""
         fitted = self._fitted()
         metadata = self._sequence([0.10, 0.50, 0.90, 1.30])
         (again,) = TestResolution._resolve(fitted, metadata)

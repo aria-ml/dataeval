@@ -1,4 +1,4 @@
-"""Pluggable structuring strategies that turn a dataset into levelled metadata rows.
+"""Pluggable structuring strategies that turn a dataset into leveled metadata rows.
 
 The core :class:`~dataeval.Metadata` engine is task agnostic: it consumes a
 :class:`StructuredData` bundle and never inspects the dataset itself. Everything

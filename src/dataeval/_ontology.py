@@ -113,12 +113,12 @@ class Ontology:
             # all-undefined group cannot form.
             defined = sorted(member for member in group if member in collected)
             # Among those, prefer a member carrying a real label. `from_rdflib`
-            # falls back to `label = str(subject)` for an unlabelled class, and
+            # falls back to `label = str(subject)` for an unlabeled class, and
             # electing that would demote the group's human label to a synonym and
             # surface a raw IRI wherever `concept.label` is displayed. Smallest
             # id still breaks the tie, so the choice stays order-independent.
-            labelled = [member for member in defined if collected[member].label != member]
-            canonical_id = (labelled or defined)[0]
+            labeled = [member for member in defined if collected[member].label != member]
+            canonical_id = (labeled or defined)[0]
             alias_ids = sorted(member for member in group if member != canonical_id)
             aliases_of[canonical_id] = alias_ids
             for alias in alias_ids:

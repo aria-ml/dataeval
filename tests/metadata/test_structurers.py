@@ -395,7 +395,7 @@ class TestOneNameOneLevel:
 
 @pytest.mark.required
 class TestToFrame:
-    """The levelled build must produce exactly the frame the flat builder did."""
+    """The leveled build must produce exactly the frame the flat builder did."""
 
     @staticmethod
     def _bundles():
@@ -668,7 +668,7 @@ class TestTrackLevel:
         # Excluded from analysis, still present in the dataframe.
         assert "track_length" in md.dataframe.columns
 
-    def test_track_factors_are_analysable_when_everything_is_tracked(self):
+    def test_track_factors_are_analyzable_when_everything_is_tracked(self):
         md = Metadata(_mot_dataset([[[7, 12], [7], [12]]]))
         assert "track_length" in md.factor_names
         assert md.factor_data.shape[0] == md.level_counts["instance"]
@@ -1029,7 +1029,7 @@ class TestScoreColumn:
         assert md.rows_at("unit")["score"].is_null().all()
 
     def test_a_scalar_classification_target_is_refused(self):
-        """Reshaped to (1,) it would argmax to 0, labelling every item class 0."""
+        """Reshaped to (1,) it would argmax to 0, labeling every item class 0."""
         md = Metadata(MockDataset([np.zeros((3, 4, 4))] * 2, [np.asarray(3.0), np.asarray(1.0)]))
         with pytest.raises(TypeError, match="0-dimensional"):
             _ = md.dataframe
@@ -1050,7 +1050,7 @@ class TestScoreColumn:
 @pytest.mark.required
 class TestSourceIndexRowsRefusal:
     def test_a_label_level_row_without_a_key_cannot_be_built_from_addresses(self):
-        """A labelled row that states no key contradicts the two-level reading the build relies on."""
+        """A labeled row that states no key contradicts the two-level reading the build relies on."""
         rows = SourceIndexRows.parse([SourceIndex(0, None, "instance")])
         with pytest.raises(ValueError, match="with no key"):
             rows.reject_levels_beyond_two()

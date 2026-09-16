@@ -600,7 +600,7 @@ def get_value_range(values: NDArray[Any], *, declared: tuple[float, float] | Non
     matters — testing ``[0, 1]`` first means a binary mask reads as normalized rather
     than as a degenerate 8-bit image.
 
-    Case 6 is the honest answer for elevation below sea level, mean-centred reflectance,
+    Case 6 is the honest answer for elevation below sea level, mean-centered reflectance,
     temperature in Celsius, or any band whose dynamic range is a property of the sensor
     rather than of a file format. Declare the interval for these; the alternative is a
     number derived from an arbitrary maximum, which looks like a measurement and is not.
@@ -691,7 +691,7 @@ class ChannelGroup:
         stacking them into a single array leaves the dtype describing none of them
         individually. So a group whose values carry no encoding to decode — a reflectance,
         elevation or temperature band — declares its interval here, independently of its
-        neighbours. Leave as None for bands that are ordinary image data; see
+        neighbors. Leave as None for bands that are ordinary image data; see
         :func:`get_value_range`.
 
     Raises

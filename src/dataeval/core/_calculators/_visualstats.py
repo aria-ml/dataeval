@@ -30,7 +30,7 @@ def _percentiles_by_count(counts: NDArray[np.intp], quantiles: tuple[int, ...]) 
     """
     cumulative = np.cumsum(counts)
     # NumPy places quantile q at index q/100 * (n - 1) of the sorted values, and reads
-    # between its neighbours when that lands off a whole index.
+    # between its neighbors when that lands off a whole index.
     virtual = np.asarray(quantiles, dtype=np.float64) / 100.0 * (cumulative[-1] - 1)
     below = np.floor(virtual)
     # The k-th smallest value is the first level whose running total has passed k.

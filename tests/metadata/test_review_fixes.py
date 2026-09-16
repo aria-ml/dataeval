@@ -231,7 +231,7 @@ class TestUnlabeledClassificationItems:
         assert md.rows_at("unit")["weather"].to_list() == ["sun", "fog", "rain"]
         assert md.rows_at("unit")["brightness"].to_list() == [0.1, 0.9, 0.5]
 
-    def test_label_aware_views_cover_only_labelled_items(self):
+    def test_label_aware_views_cover_only_labeled_items(self):
         md = Metadata(self._partially_labeled())
 
         assert md.rows_at(md.label_level).height == 2

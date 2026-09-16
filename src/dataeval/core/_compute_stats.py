@@ -1100,7 +1100,7 @@ def compute_stats(  # noqa: C901
         ``uint8``, ``uint16`` and ``ToTensor``-style data all need nothing here.
 
         Declare it for data whose dynamic range is a property of the sensor rather than
-        of a file format: elevation below sea level, mean-centred reflectance,
+        of a file format: elevation below sea level, mean-centered reflectance,
         temperature in Celsius, a 16-bit band holding physical units. Such data carries
         no encoding to decode, so :attr:`~dataeval.flags.ImageStats.DIMENSION_DEPTH`
         reports NaN for it, as does any statistic that needs an interval —

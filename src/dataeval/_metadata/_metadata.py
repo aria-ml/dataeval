@@ -290,7 +290,7 @@ def _unused_bins(spec: BinSpec, codes: NDArray[np.int64]) -> tuple[NDArray[np.in
     """
     # Missing rows are not a bin the cut placed. Counting their reserved code as occupancy
     # inflated every tally by one and, where exactly one bin short of the count was empty,
-    # cancelled the shortfall out and said nothing at all.
+    # canceled the shortfall out and said nothing at all.
     present = codes[codes != spec.missing_code]
     declared = _declared_bins(spec)
     # Asked of the declared intervals alone — codes 1 through `declared` — since an empty
@@ -462,7 +462,7 @@ def _caller_stacklevel() -> int:
     is supposed to mean.
 
     Falls back to 2 -- the caller's caller -- when the stack cannot be walked, which is the
-    behaviour this replaces.
+    behavior this replaces.
     """
     frame = inspect.currentframe()
     frame = frame.f_back if frame is not None else None
@@ -500,7 +500,7 @@ class Metadata(Array, FeatureExtractor):
     ``MOT`` multi-object tracking (video)   sequence    instance        sequence, unit, track, instance   frame
     ======================================  ==========  ==============  ================================  =========
 
-    An *instance* is one labelled thing inside an item: a detection for object detection
+    An *instance* is one labeled thing inside an item: a detection for object detection
     or multi-object tracking, the image itself for classification. The label level is
     always distinct from the item level, so an item carrying no label — an unlabeled
     image, or one with no detections — still has an item row and keeps every factor on
@@ -1026,7 +1026,7 @@ class Metadata(Array, FeatureExtractor):
         view : str or None, default None
             Level to read from. Defaults to the level carrying class labels.
         inherited : bool, default True
-            Whether factors defined above the view are analysed at it.
+            Whether factors defined above the view are analyzed at it.
 
         Returns
         -------
@@ -1599,7 +1599,7 @@ class Metadata(Array, FeatureExtractor):
             _logger.info(
                 "Factors %s are read from this data but were not factors of the fitted "
                 "reference, so they carry no encoding and are left out of the extracted "
-                "columns. Repair them on the reference to have them analysed.",
+                "columns. Repair them on the reference to have them analyzed.",
                 sorted(dropped),
             )
         data = derived.factor_data
@@ -1933,7 +1933,7 @@ class Metadata(Array, FeatureExtractor):
         A metadata built with ``inherited=False`` does not see factors defined above its
         view at all, so a coarse-level axis is refused there rather than replicated —
         ``inherited`` is the existing declaration that ancestor values should not be spread
-        onto these rows, and honouring it is why this method needs no gate of its own.
+        onto these rows, and honoring it is why this method needs no gate of its own.
 
         The pivot survives :meth:`at`, :meth:`where`, :meth:`having` and :meth:`agg`, and is
         deliberately **not** written by :meth:`save`: like ``view``, ``include`` and
@@ -1983,7 +1983,7 @@ class Metadata(Array, FeatureExtractor):
                 f"classed_by names every factor this metadata has ({available}), and the class "
                 "labels could not be promoted to take their place, so there is nothing left to "
                 "measure against the axis — a factor serving as the axis is dropped from the "
-                "factors analysed, since it correlates perfectly with itself.",
+                "factors analyzed, since it correlates perfectly with itself.",
             )
         return view
 
@@ -2046,7 +2046,7 @@ class Metadata(Array, FeatureExtractor):
         """Read the class axis's code columns off the view's rows, with their encodings.
 
         Read from ``_factor_cache`` rather than through :attr:`factor_names`, which no longer
-        lists them: a factor serving as the axis is dropped from the factors analysed, and
+        lists them: a factor serving as the axis is dropped from the factors analyzed, and
         the axis still has to be able to read itself.
         """
         columns: list[NDArray[Any]] = []
@@ -2301,7 +2301,7 @@ class Metadata(Array, FeatureExtractor):
         For tracking that has a consequence worth stating plainly: a detection whose frame
         holds a match but whose *track* does not is dropped, because its track did not
         survive. ``md.having(pl.col("class_label") == person, level="instance")`` therefore
-        keeps the tracks that contain a person and drops the car travelling through the
+        keeps the tracks that contain a person and drops the car traveling through the
         same frames.
 
         Parameters
@@ -3180,7 +3180,7 @@ class Metadata(Array, FeatureExtractor):
         -------
         bool
             True (default) if a factor from an ancestor level is replicated onto the
-            view's rows and analysed there, False if only factors native to the view
+            view's rows and analyzed there, False if only factors native to the view
             survive.
 
         Notes
@@ -3225,7 +3225,7 @@ class Metadata(Array, FeatureExtractor):
             level each row belongs to, that level's own key columns, and all
             processed metadata factors.
 
-            ``score`` is one confidence per labelled row — the row's confidence in
+            ``score`` is one confidence per labeled row — the row's confidence in
             its **own** class, whichever layout the dataset's targets carried, and
             null where they carried none to read. A per-class layout is as wide as
             the vocabulary that produced it, so keeping it whole would make the
@@ -4094,7 +4094,7 @@ class Metadata(Array, FeatureExtractor):
         NDArray[np.intp]
             Array of class indices corresponding to dataset labels, one per
             label-level row: one per detection for object detection, one per
-            labelled image for image classification.
+            labeled image for image classification.
 
         Raises
         ------
@@ -4162,7 +4162,7 @@ class Metadata(Array, FeatureExtractor):
         NDArray[np.intp]
             One index per row at :attr:`view`, mapping that row back to its source
             item in the original dataset. At the default view this is one entry per
-            detection for object detection and one per labelled image for image
+            detection for object detection and one per labeled image for image
             classification; at :attr:`item_level` it is one entry per item.
 
         Notes
@@ -4565,7 +4565,7 @@ class Metadata(Array, FeatureExtractor):
         # Assigned before anything is announced. A warning filter turned into an error
         # otherwise raises out of `_structure`, which has already set `_is_structured`, and
         # leaves the instance permanently claiming it has no factors at all.
-        # A factor serving as the class axis is dropped from the factors analysed: left in
+        # A factor serving as the class axis is dropped from the factors analyzed: left in
         # place it correlates perfectly with itself and reports 1.0 against the axis. This
         # is what `label=` achieves per evaluator through `LabelAxis.excluded`; on a pivoted
         # instance the factor genuinely is not one, so every reader sees the same set.
@@ -4721,7 +4721,7 @@ class Metadata(Array, FeatureExtractor):
         # `factor_type` is a fact about the variable, not about the map: an integer count is
         # discrete however its codes were produced. Read from the values, which is cheap and
         # deterministic, while the placement -- the expensive and unstable half -- comes from
-        # the record. Assuming a kind here instead relabelled every restored discrete factor
+        # the record. Assuming a kind here instead relabeled every restored discrete factor
         # as categorical.
         numeric = bool(np.issubdtype(data.dtype, np.number))
         if isinstance(spec, BinSpec):
@@ -5247,7 +5247,7 @@ class Metadata(Array, FeatureExtractor):
         """Record a non-numeric factor dropped for carrying more levels than the sample supports.
 
         Reason-only, like its two siblings: :meth:`_build_factors` decides which names are
-        in the analysed set and simply does not admit this one. Writing back into
+        in the analyzed set and simply does not admit this one. Writing back into
         ``_factors_by_level`` from a later pass would edit the registry structuring owns,
         which made the same object serialize differently depending on what had been read
         from it first.

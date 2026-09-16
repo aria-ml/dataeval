@@ -283,7 +283,7 @@ class TestAcceptingADerivedEncoding:
         assert md.encoding("temp_c").provenance == "accepted"
         assert md.encoding("weather").provenance == "derived"
 
-    def test_a_declared_cut_is_not_relabelled(self):
+    def test_a_declared_cut_is_not_relabeled(self):
         """Accepting ratifies a derived placement; a declared one was never in question."""
         md = _md(_winter(), continuous_factor_bins={"temp_c": [-np.inf, 0.0, np.inf]})
         md.accept()
@@ -493,7 +493,7 @@ class TestValuesThatDoNotBehaveLikeKeys:
         codes = md.factor_data[:, 0]
 
         # The declared vocabulary is used as given: four levels, no fifth appended for a
-        # NaN that failed to recognise itself, and every missing row on the one code.
+        # NaN that failed to recognize itself, and every missing row on the one code.
         assert len(md.encoding("grade").levels) == 4
         assert list(np.unique(codes)) == [0, 1, 2, 3]
         assert codes[3] == 3
@@ -656,7 +656,7 @@ class TestDerivedInstancesOwnTheirRecords:
 class TestFitnessCountsTheBinsTheCutReaches:
     def test_missing_rows_are_not_an_occupied_bin(self):
         """The reserved missing code is not a bin the cut placed. Counting it inflated
-        every tally by one, and where exactly one bin was empty it cancelled the shortfall
+        every tally by one, and where exactly one bin was empty it canceled the shortfall
         out and said nothing at all."""
         rng = np.random.default_rng(4)
         values = rng.normal(30.0, 3.0, 200)

@@ -72,7 +72,7 @@ _SHOWN_VALUES = 8
 # frame or window of that run, which is why it is named for its role rather than
 # for any medium. ``Structurer.unit_type`` carries the medium's own word for it.
 #
-# ``instance`` is one labelled thing inside an item: a detection for object detection
+# ``instance`` is one labeled thing inside an item: a detection for object detection
 # or multi-object tracking, the image itself for whole-image classification. Every task
 # shares it, so the same object keeps one level name whichever view produced it — a
 # detection in an object detection dataset, the same detection seen through
@@ -791,8 +791,8 @@ class Rescale:
     """Apply ``value * multiply + add`` to the values in a range.
 
     The correction for a column that is readable but in the wrong units: a run of altitudes
-    in feet among metres, a sensor whose readings carry a constant offset, a depth field
-    that switched to millimetres partway through a collection.
+    in feet among meters, a sensor whose readings carry a constant offset, a depth field
+    that switched to millimeters partway through a collection.
 
     One affine form rather than four operations, because ``multiply`` covers multiply and
     divide, ``add`` covers add and subtract, and multiplying before adding is the order
@@ -1111,7 +1111,7 @@ class ParseDateTime:
         which is what a timestamp that has been through JSON almost always is. Read only
         for values that are text.
     every : str or None, default None
-        Period each row is labelled by, from the two families above. ``None`` keeps the
+        Period each row is labeled by, from the two families above. ``None`` keeps the
         instant. Weeks and weekdays are ISO, so a week belongs to the year holding its
         Thursday --- ``"2020-W35"`` --- and Monday is ``1`` through Sunday ``7``.
     epoch : {"s", "ms", "us", "ns"}, default "s"

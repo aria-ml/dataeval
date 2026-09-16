@@ -615,7 +615,7 @@ def _at(aggregator: Aggregator, source: FactorLevel, factors: tuple[str, ...], o
 
     A fit stays a fit. An aggregator that already arrived ``derived`` carries something read
     off a dataset — a resolved level, a selected factor set, a fitted tolerance — and
-    re-labelling it ``declared`` because it now names both would claim a caller wrote what a
+    re-labeling it ``declared`` because it now names both would claim a caller wrote what a
     previous resolution measured, and hand it back to the checks a declaration answers to.
     """
     inferred = aggregator.provenance == "derived" or aggregator.source is None or not aggregator.factors

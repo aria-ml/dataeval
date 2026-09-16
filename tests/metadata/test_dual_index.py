@@ -468,7 +468,7 @@ class TestDualKeyIndexing:
         width_tgt = tgt_stats["stats"]["width"]
         mean_tgt = tgt_stats["stats"]["mean"]
 
-        # 3. Both levels at once -> one array spanning image and target rows, labelled
+        # 3. Both levels at once -> one array spanning image and target rows, labeled
         #    by the accompanying source index
         both_stats = compute_stats(
             od_dataset_varied_pixels,
@@ -677,7 +677,7 @@ class TestAddFactorsRobustness:
         assert md.rows_at(md.label_level)["instance_cs"].to_list() == [1.0, 2.0, 4.0, 6.0, 7.0, 8.0]
         assert md.factor_data.shape == (6, len(md.factor_names))
 
-    def test_relevelling_a_factor_clears_stale_membership(self, od_dataset_with_metadata):
+    def test_releveling_a_factor_clears_stale_membership(self, od_dataset_with_metadata):
         """Re-adding a factor at a different level must not leave it registered at both."""
         md = Metadata(od_dataset_with_metadata)
 

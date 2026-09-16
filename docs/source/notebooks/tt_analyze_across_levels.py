@@ -435,7 +435,7 @@ print(f"largest gap on any single image: {units.select(gap.max()).item():.1f}")
 
 # %% [markdown]
 # The difference is negligible. Across all 200 images, the two brightness readings never diverge by more than
-# 2 grey levels.
+# 2 gray levels.
 #
 # This occurs because brightness is an average over pixels. Masking out 0.5% of them leaves the mean virtually
 # unchanged, because the objects are a rounding error in the pixel count. Sharpness is not an average in that sense —

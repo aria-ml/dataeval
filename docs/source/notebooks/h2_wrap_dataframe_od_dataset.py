@@ -19,11 +19,11 @@
 # %% [markdown]
 # ## Problem statement
 #
-# Object detection catalogues are commonly stored as tabular data, but unlike
+# Object detection catalogs are commonly stored as tabular data, but unlike
 # image classification an image holds *many* bounding boxes. The natural way to
 # express this in a table is the *long* (tidy) format: **one row per box**, where
 # rows that share an image identifier belong to the same image. This is what most
-# annotation-tool CSV exports and flattened COCO/Pascal-VOC catalogues look like.
+# annotation-tool CSV exports and flattened COCO/Pascal-VOC catalogs look like.
 #
 # DataEval does not require any particular dataset class. Its evaluators consume
 # any object that satisfies the {class}`.AnnotatedDataset` protocol - a minimal

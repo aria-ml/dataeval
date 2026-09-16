@@ -1,6 +1,6 @@
 """Factors are binned at their own level, not at the target level.
 
-The behaviour these pin down: a factor's bin edges, its bin count and its
+The behavior these pin down: a factor's bin edges, its bin count and its
 continuous/discrete verdict are read off the level where it holds one value per
 entity. Binning at the target level instead reads each factor's distribution
 through however many descendants an entity happens to have.
@@ -102,10 +102,10 @@ class TestNativeLevelBinning:
 
 @pytest.mark.required
 class TestImageClassificationUnaffected:
-    """IC factors sit at image level over a fully labelled dataset, so nothing moves."""
+    """IC factors sit at image level over a fully labeled dataset, so nothing moves."""
 
     def _ic(self, labels, factors) -> Metadata:
-        """``labels`` is a sequence of one-hot rows; an empty row means unlabelled."""
+        """``labels`` is a sequence of one-hot rows; an empty row means unlabeled."""
         return Metadata(
             MockDataset(
                 np.zeros((len(labels), 3, 16, 16)),
@@ -121,7 +121,7 @@ class TestImageClassificationUnaffected:
         assert len(md.class_labels) == 4
 
     def test_unlabeled_image_keeps_its_factor_binned(self):
-        """An unlabelled image has an image row but no instance row.
+        """An unlabeled image has an image row but no instance row.
 
         Its factor value was previously invisible to the binner, which read only
         target rows; it now has a bin like every other image.
@@ -240,7 +240,7 @@ class TestIdentifierColumnsAreDropped:
         assert "text" not in md.factor_names
         assert "cardinality_over_budget" in md.dropped_factors["text"]
 
-    def test_the_surviving_factors_are_still_analysable(self):
+    def test_the_surviving_factors_are_still_analyzable(self):
         """Dropping one factor must not disturb the others' codes or their records."""
         names = [f"img_{i:04d}.png" for i in range(60)]
         md = _od([1] * 60, {"filename": names, "weather": ["sun", "rain"] * 30})

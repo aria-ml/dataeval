@@ -241,7 +241,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             extractor=extractor,
         )
 
-        # Initialise base + mixins
+        # Initialize base + mixins
         BaseDrift.__init__(self)
         self._init_adaptive(
             extractor=extractor,

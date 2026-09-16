@@ -882,7 +882,7 @@ class NamedFeatureExtractor(FeatureExtractor, Protocol):
     """
     Protocol for a feature extractor that can name the columns it produces.
 
-    A plain :class:`FeatureExtractor` returns an unlabelled ``(n_samples, n_features)``
+    A plain :class:`FeatureExtractor` returns an unlabeled ``(n_samples, n_features)``
     array, so anything a detector reports per feature -- a p-value, an importance -- is
     positional, and the caller has to reconstruct what column ``i`` was. Extractors whose
     columns *have* names, such as :class:`~dataeval.Metadata`, implement this so a drift

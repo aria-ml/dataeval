@@ -1163,18 +1163,18 @@ def _crossing_pairs(
     """
     joined = np.concatenate((left, right))
     try:
-        neighbours = hash_neighbors(frames.codes[joined], radius, valid=frames.valid[joined], bits=frames.bits)
+        neighbors = hash_neighbors(frames.codes[joined], radius, valid=frames.valid[joined], bits=frames.bits)
     except ValueError as err:
         _logger.info(
             "Duplicates: no segments for a %d and %d frame sequence pair; matching them exceeded "
-            "the neighbour budget (%s). Their frames repeat themselves heavily enough that the "
+            "the neighbor budget (%s). Their frames repeat themselves heavily enough that the "
             "within-sequence matches alone are quadratic -- redundant_runs reports those.",
             len(left),
             len(right),
             err,
         )
         return np.empty((0, 2), dtype=np.intp), np.empty(0, dtype=np.intp)
-    pairs = neighbours["pairs"]
+    pairs = neighbors["pairs"]
     if not len(pairs):
         return np.empty((0, 2), dtype=np.intp), np.empty(0, dtype=np.intp)
     first = pairs[:, 0] < len(left)
@@ -1183,7 +1183,7 @@ def _crossing_pairs(
     # Re-expressed as (position in left, position in right), whichever way each pair fell.
     query = np.where(first, pairs[:, 0], pairs[:, 1])
     candidate = np.where(first, pairs[:, 1], pairs[:, 0]) - len(left)
-    return np.stack((query, candidate), axis=1).astype(np.intp), neighbours["distances"][crosses]
+    return np.stack((query, candidate), axis=1).astype(np.intp), neighbors["distances"][crosses]
 
 
 def _checked_segment_policy(policy: _SegmentPolicy) -> None:
@@ -1270,7 +1270,7 @@ def _overlap(first: tuple[int, int], second: tuple[int, int]) -> float:
 
 
 def _dominant(segments: SegmentMatchResult) -> SegmentMatchResult:
-    """Keep one segment per stretch, dropping the neighbouring diagonals that restate it.
+    """Keep one segment per stretch, dropping the neighboring diagonals that restate it.
 
     Consecutive video frames resemble each other, so frame *i* of one sequence matches not only
     frame *i + k* of the other but *i + k ± 1* as well. Each of those near-misses forms its own
@@ -2349,7 +2349,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         A sequence names a video and a frame names ``(sequence, frame)``, so a list holding both
         cannot be walked without asking each element what it is. Image results are left alone: an
         item and a target are both a :class:`~dataeval.types.SourceIndex` there, so mixing them
-        stays navigable -- and that behaviour shipped.
+        stays navigable -- and that behavior shipped.
 
         The narrowed views reach the rest: :attr:`sequences`, :attr:`tracks` and
         :attr:`detections` each hold one level already, so ``.sequences.exact`` is how a
@@ -2444,7 +2444,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         redundancy; one whose members span two is the same content on both sides of a split, which
         is what makes a held-out score stop measuring what it claims to.
 
-        Structural, not a judgement: this says *which relations cross*, and leaves how much overlap
+        Structural, not a judgment: this says *which relations cross*, and leaves how much overlap
         matters to the reader. Pair it with
         :meth:`~dataeval.quality.DuplicatesOutput.aggregate_by_pair` to read how much of each side
         the other accounts for::
@@ -2716,7 +2716,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
 
         ``duplicate_frames`` counts distinct frames, so a frame in several groups is counted once.
         It counts only frames shared with a *different* sequence: a frame that merely resembles its
-        own neighbour is this sequence repeating itself, which ``redundant_frames`` already
+        own neighbor is this sequence repeating itself, which ``redundant_frames`` already
         reports. Counting both would make a corpus of unrelated videos read as wholly duplicated,
         since consecutive frames of any video resemble one another at a useful ``hash_radius``.
 
@@ -2793,7 +2793,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             )
         )
         # Only groups reaching *another* sequence count as duplication. A frame that merely
-        # resembles its own neighbour is this sequence repeating itself, which `redundant_frames`
+        # resembles its own neighbor is this sequence repeating itself, which `redundant_frames`
         # already reports -- counting it here too makes an unrelated corpus read as wholly
         # duplicated, which is the opposite of what the column is for.
         shared = exploded.filter(pl.col("dup_type") != "redundant")
@@ -2916,7 +2916,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         dup_types : str or Sequence[str], default ``"exact"``
             Which ``dup_type`` values to collapse. The default touches only exact matches, where
             the members are the same content and dropping all but one loses nothing. Add
-            ``"near"`` to collapse near duplicates, which is a judgement about how similar is too
+            ``"near"`` to collapse near duplicates, which is a judgment about how similar is too
             similar. ``"redundant"`` relates a sequence to itself and names no items to drop;
             see :meth:`aggregate_by_sequence` for that.
         keep : {"first", "last"}, default "first"
@@ -3466,7 +3466,7 @@ class Duplicates(Evaluator):
             "The default value of hash_radius will change from 0 in a future major release, so "
             "that Duplicates finds the perceptual near-duplicates it documents rather than only "
             "bit-identical ones (5 of 64 bits is the expected value). Pass hash_radius explicitly "
-            "to pin the current behaviour and silence this warning.",
+            "to pin the current behavior and silence this warning.",
             FutureWarning,
             stacklevel=3,
         )
@@ -3777,7 +3777,7 @@ class Duplicates(Evaluator):
             A level not asked for is not searched for: ``levels="sequence"`` over a video corpus
             reports which videos duplicate which and pays for no frame-level grouping at all.
 
-            None keeps the behaviour of whichever of ``per_image``/``per_target`` was given, and
+            None keeps the behavior of whichever of ``per_image``/``per_target`` was given, and
             of their defaults when neither was.
 
             .. versionadded:: 1.2

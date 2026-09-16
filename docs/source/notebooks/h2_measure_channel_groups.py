@@ -334,7 +334,7 @@ print(sorted(composed))
 
 # %%
 physical = np.stack([
-    rng.normal(0.0, 500.0, (32, 32)),  # elevation, metres relative to sea level
+    rng.normal(0.0, 500.0, (32, 32)),  # elevation, meters relative to sea level
     rng.normal(0.0, 50.0, (32, 32)),  # a tighter instrument on the same scene
 ])
 

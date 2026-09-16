@@ -66,7 +66,7 @@ def unpack_stats_result(
     ------
     ValueError
         When a level is named as well as a source index carried by the result. The result
-        already says what each value describes, so the two cannot both be honoured. A result
+        already says what each value describes, so the two cannot both be honored. A result
         with no source index places nothing by address, so a level for it is allowed.
     """
     if not _is_stats_result(factors):
@@ -170,7 +170,7 @@ def _apply_how(declared: tuple[Aggregator, ...], how: Mapping[str, str]) -> tupl
 def _swapped(aggregator: Aggregator, how: Mapping[str, str]) -> tuple[Aggregator, ...]:
     """One declaration, split around an override that names some of its factors.
 
-    A declaration covering several factors is split, not just relabelled. The factors the
+    A declaration covering several factors is split, not just relabeled. The factors the
     override names move to their own declaration under the new reduction. Any factor it does
     not name stays on the original one, unchanged. Naming none of the declaration's factors
     returns it unchanged, in a one-tuple.

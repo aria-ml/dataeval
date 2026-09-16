@@ -75,7 +75,7 @@ class TrackFactors(TypedDict):
         ``track_duration - n_appearances``.
     mean_speed : Sequence[float]
         Mean per-frame displacement of the bounding-box center in pixels,
-        computed over consecutive observed frame pairs and normalised by
+        computed over consecutive observed frame pairs and normalized by
         the inter-frame delta so gaps do not inflate the estimate.
     speed_variance : Sequence[float]
         Variance of per-frame center displacement across consecutive
@@ -499,7 +499,7 @@ def _dataset_stats(
     jitter_min_frames: int,
     jitter_fc: float,
 ) -> TrackStatsResult:
-    """Measure every sequence in a dataset, labelling each result with the item it came from.
+    """Measure every sequence in a dataset, labeling each result with the item it came from.
 
     Items are walked by position, so ``item_index`` is the same index
     :class:`~dataeval.Metadata` keys its rows by. Reading them off
@@ -573,7 +573,7 @@ def track_stats(
         result["stats"]["mean_speed"][i]  # mean speed for that track
 
     Given a dataset, every sequence is measured and the results are concatenated,
-    each labelled with the item it came from in ``item_index``. That pair —
+    each labeled with the item it came from in ``item_index``. That pair —
     ``item_index`` and ``track_ids`` — is what names a row, so the whole result can
     be handed straight to :meth:`~dataeval.Metadata.add_factors`::
 
