@@ -70,8 +70,8 @@ class TestCheckedComputeStats:
             [Images(3), Images(4)], stats=ImageStats.DIMENSION_WIDTH, caller="Outliers", per_target=False
         )
         assert len(results) == 2
-        assert len(results[0]["source_index"]) == 3
-        assert len(results[1]["source_index"]) == 4
+        assert len(results[0].get("source_index", [])) == 3
+        assert len(results[1].get("source_index", [])) == 4
 
     def test_plain_dataset_does_not_warn(self):
         assert not caught(

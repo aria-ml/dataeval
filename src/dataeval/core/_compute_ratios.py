@@ -255,6 +255,21 @@ def _calculate_ratio_for_stat(  # noqa: C901
         return box_value
 
 
+def _paired_image_counts(stats_output: StatsResult, target_stats_output: StatsResult) -> tuple[int, int]:
+    """Read both sides' 'image_count', raising KeyError if either carries none.
+
+    A KeyError, matching the other missing-key checks in this module. Both keys must be
+    present before :func:`_validate_separate_inputs` can ask whether the counts agree. Split
+    out from that mismatch check, which reports a count that differs, not one that is
+    missing.
+    """
+    if "image_count" not in stats_output or "image_count" not in target_stats_output:
+        raise KeyError(
+            "stats_output and target_stats_output must each contain an 'image_count' key from compute_stats() output",
+        )
+    return stats_output["image_count"], target_stats_output["image_count"]
+
+
 def _validate_separate_inputs(
     stats_output: StatsResult,
     target_stats_output: StatsResult,
@@ -267,16 +282,17 @@ def _validate_separate_inputs(
     tuple[Sequence[SourceIndex], Sequence[SourceIndex]]
         Image source indices and box source indices
     """
-    # Validate compatibility
-    if stats_output["image_count"] != target_stats_output["image_count"]:
+    img_count, tgt_count = _paired_image_counts(stats_output, target_stats_output)
+    if img_count != tgt_count:
         raise ValueError(
-            f"Image count mismatch: stats_output has {stats_output['image_count']} images, "
-            f"but target_stats_output has {target_stats_output['image_count']} images.",
+            f"Image count mismatch: stats_output has {img_count} images, "
+            f"but target_stats_output has {tgt_count} images.",
         )
 
-    # Validate that stats_output has only image entries
-    img_source_indices: Sequence[SourceIndex] = stats_output[SOURCE_INDEX_KEY]
-    box_source_indices: Sequence[SourceIndex] = target_stats_output[SOURCE_INDEX_KEY]
+    # An absent SOURCE_INDEX_KEY defaults to empty. The only caller, compute_ratios, has
+    # already rejected a missing key on both inputs before reaching here.
+    img_source_indices: Sequence[SourceIndex] = stats_output.get(SOURCE_INDEX_KEY, [])
+    box_source_indices: Sequence[SourceIndex] = target_stats_output.get(SOURCE_INDEX_KEY, [])
     _reject_disagreeing_levels(img_source_indices, "stats_output")
     _reject_disagreeing_levels(box_source_indices, "target_stats_output")
 
@@ -533,6 +549,16 @@ def compute_ratios(  # noqa: C901
         source_indices_for_boxes = source_indices
         img_calc_result = stats_output
         box_calc_result = stats_output
+
+    if (
+        "object_count" not in box_calc_result
+        or "invalid_box_count" not in box_calc_result
+        or "image_count" not in box_calc_result
+    ):
+        raise KeyError(
+            "stats_output must contain 'object_count', 'invalid_box_count' and 'image_count' "
+            "keys from compute_stats() output",
+        )
 
     ratio_map = dict(_default_ratio_map())
     ratio_map.update(override_map or {})

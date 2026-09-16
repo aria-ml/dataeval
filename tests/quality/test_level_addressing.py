@@ -49,7 +49,7 @@ def _duplicate_stats():
 
 def _relevelled(stats: StatsResult, address) -> StatsResult:
     """Return the same statistics, readdressed by `address(position)`."""
-    return {**stats, "source_index": [address(i) for i in range(len(stats["source_index"]))]}
+    return {**stats, "source_index": [address(i) for i in range(len(stats.get("source_index", [])))]}
 
 
 @pytest.mark.required

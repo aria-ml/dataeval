@@ -961,7 +961,7 @@ def _prepare_hash_inputs(
     """
     if isinstance(calculation_results, dict):
         stats = calculation_results["stats"]
-        return stats, list(calculation_results["source_index"]), set(stats.keys()), None
+        return stats, list(calculation_results.get("source_index", [])), set(stats.keys()), None
 
     combined_stats, combined_source_index, dataset_steps = combine_stats_results(calculation_results)
     return combined_stats, combined_source_index, set(combined_stats.keys()), dataset_steps
@@ -2111,6 +2111,31 @@ def _discarded(groups: Sequence[Sequence[int]], keep: Literal["first", "last"]) 
     return sorted(index for members in merged for index in members if index != members[position])
 
 
+def _sum_image_counts(results: StatsResult | Sequence[StatsResult]) -> int:
+    """Total 'image_count' across one or more calculation results.
+
+    `image_count` is `NotRequired` so `track_stats` results, which place their values by
+    level and key and never counted images, can share `StatsResult`. A result that lacks it
+    is not the same as one that is zero, so this raises instead of reading the absence as
+    zero.
+    """
+    every = [results] if isinstance(results, Mapping) else list(results)
+    counts: list[int] = []
+    unaddressable: list[int] = []
+    for i, result in enumerate(every):
+        if "image_count" in result:
+            counts.append(int(result["image_count"]))
+        else:
+            unaddressable.append(i)
+    if unaddressable:
+        raise ValueError(
+            f"Cannot resolve item count from calculation_results: result(s) at index "
+            f"{unaddressable} carry no 'image_count', as track_stats "
+            "results do not. Pass n_items=len(dataset) instead.",
+        )
+    return sum(counts)
+
+
 class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDuplicatesGroup]):
     """
     Output class for :class:`.Duplicates` detector.
@@ -2862,9 +2887,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             # measured frame came from.
             return int(self.frame_map[:, 0].max()) + 1
         if self.calculation_results is not None:
-            results = self.calculation_results
-            every = [results] if isinstance(results, Mapping) else list(results)
-            return sum(int(result["image_count"]) for result in every)
+            return _sum_image_counts(self.calculation_results)
         if self.cluster_result is not None:
             return int(len(self.cluster_result["clusters"]))
         raise ValueError(
@@ -3848,9 +3871,10 @@ class Duplicates(Evaluator):
                 per_target=plan.per_target,
                 normalize_pixel_values=False,
             )[0]
+            source_index = self.stats["source_index"]
             found = _find_relations(
                 self.stats["stats"],
-                self.stats["source_index"],
+                source_index,
                 frame_map,
                 track_map,
                 self._detection_policy(plan),

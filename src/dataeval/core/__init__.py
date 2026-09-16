@@ -7,6 +7,7 @@ __all__ = [
     "CompletenessResult",
     "CoverageResult",
     "DivergenceResult",
+    "FactorResult",
     "FeatureDistanceResult",
     "HashGroupResult",
     "HashNeighborResult",
@@ -93,7 +94,7 @@ from dataeval.core._bin import is_continuous
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
 from dataeval.core._completeness import CompletenessResult, completeness
 from dataeval.core._compute_ratios import compute_ratios
-from dataeval.core._compute_stats import StatsResult, combine_stats_results, compute_stats
+from dataeval.core._compute_stats import FactorResult, StatsResult, combine_stats_results, compute_stats
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance

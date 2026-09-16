@@ -81,7 +81,7 @@ class TestTheRegistry:
     """A reduction's name is a contract, so every name has to state one."""
 
     def test_an_unknown_reduction_lists_the_known_ones(self):
-        with pytest.raises(ValueError, match=r"'meen' is not a reduction. The reductions are \['all'"):
+        with pytest.raises(ValueError, match=r"'meen' is not a reduction. The reductions are \['abs_sum'"):
             lookup("meen")
 
     @pytest.mark.parametrize("how", sorted(REDUCTIONS))
@@ -959,3 +959,37 @@ def test_an_aggregator_requires_a_reduction_name_and_reports_resolution():
 
     assert Aggregator("mean", "unit", "sequence", ("w",)).is_resolved is True
     assert Aggregator("mean", None, "sequence").is_resolved is False
+
+
+@pytest.mark.required
+class TestAbsSum:
+    """Total absolute magnitude, as distinct from the signed sum."""
+
+    def test_is_registered(self):
+        assert "abs_sum" in REDUCTIONS
+
+    def test_sums_magnitudes_not_signs(self):
+        frame = pl.DataFrame({"g": [0, 0, 0], "v": [3.0, -4.0, 5.0]})
+        got = frame.group_by("g").agg(REDUCTIONS["abs_sum"].expr("v"))
+        assert got["v"].to_list() == [12.0]
+
+    def test_differs_from_sum_on_alternating_signs(self):
+        frame = pl.DataFrame({"g": [0, 0], "v": [7.0, -7.0]})
+        signed = frame.group_by("g").agg(REDUCTIONS["sum"].expr("v"))["v"].to_list()
+        absolute = frame.group_by("g").agg(REDUCTIONS["abs_sum"].expr("v"))["v"].to_list()
+        assert signed == [0.0]
+        assert absolute == [14.0]
+
+    def test_empty_group_answers_zero(self):
+        assert REDUCTIONS["abs_sum"].identity == 0
+
+    def test_applies_only_to_numeric(self):
+        assert REDUCTIONS["abs_sum"].domain == "numeric"
+
+    def test_is_positional(self):
+        # No ordering column is needed: magnitude does not depend on row order.
+        assert REDUCTIONS["abs_sum"].kind == "positional"
+
+    def test_is_coverage_sensitive(self):
+        # Missing values beneath a destination distort a total, unlike count or n_unique.
+        assert REDUCTIONS["abs_sum"].coverage_sensitive is True

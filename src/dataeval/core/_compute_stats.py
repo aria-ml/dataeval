@@ -7,10 +7,11 @@ from enum import Flag
 from functools import partial, reduce
 from itertools import zip_longest
 from operator import or_
-from typing import Any, TypedDict, cast, get_args
+from typing import Any, Generic, cast, get_args
 
 import numpy as np
 from numpy.typing import NDArray
+from typing_extensions import NotRequired, TypedDict, TypeVar
 
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
@@ -22,7 +23,7 @@ from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.data import unzip_dataset
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback, _is_protocol_instance
-from dataeval.types import FactorLevel, SourceIndex, StatsMap
+from dataeval.types import Aggregator, FactorLevel, SourceIndex, StatsMap
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import (
     _UNKNOWN_RANGE,
@@ -144,32 +145,62 @@ def _absent_band(count: int, hw: tuple[int, ...]) -> NDArray[np.float64]:
     return np.full((count, *hw), np.nan, dtype=np.float64)
 
 
-class StatsResult(TypedDict):
+TFactors = TypeVar("TFactors", bound=Mapping[str, Any], default=StatsMap)
+
+
+class FactorResult(TypedDict, Generic[TFactors]):
     """
-    Type definition for calculation output.
+    The shape every statistics producer returns.
+
+    One shape rather than one per producer. A consumer accepts any result without knowing
+    which function made it, and a producer can carry the recipes for rolling its factors up
+    alongside the values. Producers that address every value to a row return the richer
+    :class:`StatsResult`.
+
+    Attributes
+    ----------
+    stats : Mapping[str, Any]
+        The measurements, as a mapping of factor name to one value per row. Parameterized
+        per producer: ``FactorResult[TrackFactors]`` narrows this to the factors
+        ``track_stats`` measures, so ``result["stats"]["mean_speed"]`` is checked rather
+        than ``Any``. Bare, it defaults to :data:`~dataeval.types.StatsMap`
+        (``Mapping[str, NDArray[Any]]``). ``compute_stats`` and ``compute_ratios`` return
+        one NumPy array per statistic, object dtype for string-valued ones such as hashes.
+    aggregations : tuple[Aggregator, ...], optional
+        How these factors roll up to a coarser level, declared by the producer.
+        :meth:`~dataeval.Metadata.add_factors` applies them unless told not to. Absent where
+        a producer declares nothing.
+    """
+
+    stats: TFactors
+    aggregations: NotRequired[tuple[Aggregator, ...]]
+
+
+class StatsResult(FactorResult[TFactors]):
+    """
+    A :class:`FactorResult` that also carries an address for every value.
+
+    What ``compute_stats`` and ``compute_ratios`` return, and what combining or offsetting
+    results needs. Producers that place their values by level and key instead
+    (``track_stats``) return a bare :class:`FactorResult`, with no address to offset or
+    concatenate against.
 
     Attributes
     ----------
     source_index : Sequence[SourceIndex]
-        Sequence of SourceIndex objects with image/box info.
+        An address per value, saying which row of which level it belongs to.
     object_count : Sequence[int]
-        Sequence of object counts per image.
+        Objects per image. Bookkeeping about the run, not a factor.
     invalid_box_count : Sequence[int]
-        Sequence of invalid box counts per image.
+        Invalid boxes per image. Bookkeeping about the run, not a factor.
     image_count : int
-        Total number of images processed.
-    stats : Mapping[str, NDArray[Any]]
-        Mapping of statistic names to NumPy arrays of computed values.
-        Keys are the names of statistics requested (e.g., 'mean', 'std', 'brightness').
-        Values are NumPy arrays where each element corresponds to a source_index entry.
-        String values (e.g., hashes) are stored as object dtype arrays.
+        Total images processed. Bookkeeping about the run, not a factor.
     """
 
     source_index: Sequence[SourceIndex]
     object_count: Sequence[int]
     invalid_box_count: Sequence[int]
     image_count: int
-    stats: Mapping[str, NDArray[Any]]
 
 
 @dataclass
@@ -1545,6 +1576,25 @@ def require_same_stat_names(
     raise ValueError(f"{summary} ({detail}). {remedy}")
 
 
+def _reject_unaddressable(result: FactorResult, position: int | None = None) -> None:
+    """Refuse a result that carries no `source_index` at all.
+
+    `NotRequired` made this key optional so producers like `track_stats`, which place their
+    values by level and key rather than by address, can share `StatsResult`. That fits
+    `Metadata.add_factors`, which reads placement either way. It does not fit here: without
+    an address per value there is nothing to offset or concatenate against.
+    """
+    if "source_index" in result:
+        return
+    where = "" if position is None else f" (result {position} of the sequence)"
+    raise TypeError(
+        f"Cannot combine a StatsResult{where} that carries no 'source_index': it places its "
+        "values by level and key rather than by address, as track_stats does, so "
+        "there is no address to offset or concatenate here. Attach it directly with "
+        "Metadata.add_factors(result, level=..., key=...) instead of combining it.",
+    )
+
+
 def _reject_stat_name_mismatch(combined: StatsMap, stats: StatsMap, position: int) -> None:
     """Refuse to combine results computed over different statistics."""
     require_same_stat_names(
@@ -1589,16 +1639,19 @@ def combine_stats_results(  # noqa: C901
     Raises
     ------
     TypeError
-        If an empty sequence is provided.
+        If an empty sequence is provided, or if a result carries no `source_index`, as a
+        `track_stats` result does, placed by level and key instead.
     """
     if isinstance(results, dict):
-        return results["stats"], list(results["source_index"]), []
+        _reject_unaddressable(results)
+        return results["stats"], list(results.get("source_index", [])), []
 
     if len(results) == 0:
         raise TypeError("Cannot combine empty sequence of stats.")
 
     if len(results) == 1:
-        return results[0]["stats"], list(results[0]["source_index"]), []
+        _reject_unaddressable(results[0])
+        return results[0]["stats"], list(results[0].get("source_index", [])), []
 
     combined_stats: StatsMap | None = None
     combined_source_index: list[SourceIndex] = []
@@ -1606,8 +1659,10 @@ def combine_stats_results(  # noqa: C901
     offset = 0
 
     for position, r in enumerate(results):
+        _reject_unaddressable(r, position)
         stats = r["stats"]
-        if not r["source_index"]:
+        source_index = r.get("source_index", [])
+        if not source_index:
             # A result with no rows has no values to concatenate and no name set worth
             # comparing. An empty split — a filter or a selection that matched nothing —
             # must not read as "computed with different flags", which is what comparing its
@@ -1631,8 +1686,8 @@ def combine_stats_results(  # noqa: C901
 
         # `_replace` rather than a field-by-field rebuild: only `item` moves, and naming the
         # two that do not is what makes a future field silently dropped here.
-        combined_source_index.extend(s._replace(item=s.item + offset) for s in r["source_index"])
-        offset += len(r["source_index"])
+        combined_source_index.extend(s._replace(item=s.item + offset) for s in source_index)
+        offset += len(source_index)
         dataset_steps.append(offset)
 
     # `None` only where every result was empty, which is an empty result rather than an

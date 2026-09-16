@@ -491,7 +491,7 @@ class TestDualKeyIndexing:
         md.add_factors({"target_mean_ratio": mean_ratio}, level="instance")
         # The two-level array is placed by its source index, splitting into one factor
         # per level rather than sharing a column.
-        md.add_factors({"mean": mean_both}, source_index=both_stats["source_index"])
+        md.add_factors({"mean": mean_both}, source_index=both_stats.get("source_index", []))
 
         info = md.factor_info
         assert info["unit_mean"].level == "unit"
@@ -655,7 +655,7 @@ class TestAddFactorsRobustness:
             normalize_pixel_values=False,
         )
 
-        md.add_factors(results["stats"], source_index=results["source_index"])
+        md.add_factors(results["stats"], source_index=results.get("source_index", []))
 
         # The stats span both levels, so each scalar one arrives as an image- and a
         # instance-level factor rather than a single column shared between them.

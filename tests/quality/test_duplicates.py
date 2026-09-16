@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -307,7 +307,7 @@ class TestDuplicates:
         dataset = get_mock_od_dataset(images, labels, bboxes)
         result = compute_stats(dataset, stats=ImageStats.HASH, per_image=True, per_target=True)
 
-        assert len(result["source_index"]) == 3
+        assert len(result.get("source_index", [])) == 3
 
         full_image_xxhash = result["stats"]["xxhash"][0]
         box0_xxhash = result["stats"]["xxhash"][1]
@@ -2547,6 +2547,18 @@ class TestDeduplicate:
     def test_an_unresolvable_item_count_says_what_to_pass(self):
         result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}]))
         with pytest.raises(ValueError, match="n_items"):
+            result.deduplicate()
+
+    def test_a_calculation_result_with_no_image_count_says_so(self):
+        # track_stats results place values by level and key and never counted
+        # images, so `image_count` is absent rather than zero: `.get(..., 0)` used to read
+        # that as "zero images" and summed it in silently.
+        by_level_and_key = {"stats": {"pan_speed": np.array([1.0, 2.0])}}
+        result = DuplicatesOutput(
+            _frame([{"item_indices": [1, 4]}]),
+            calculation_results=cast("Any", by_level_and_key),
+        )
+        with pytest.raises(ValueError, match="image_count"):
             result.deduplicate()
 
     def test_the_plan_feeds_view_directly(self):

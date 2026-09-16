@@ -903,6 +903,7 @@ EPOCH_SECONDS: Mapping[str, float] = MappingProxyType({"s": 1.0, "ms": 1e-3, "us
 # needs to *enumerate* is this one. `_reductions` asserts the registry matches at import, so
 # they cannot drift.
 ReductionName: TypeAlias = Literal[
+    "abs_sum",
     "all",
     "any",
     "changes",

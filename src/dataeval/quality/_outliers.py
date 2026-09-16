@@ -1940,12 +1940,13 @@ class Outliers(Evaluator):
                 normalize_pixel_values=True,
             )[0]
             stats_result = self.stats
+            source_index = self.stats["source_index"]
 
             class_ids: NDArray[np.intp] | None = None
             if per_class and metadata is not None:
-                class_ids = _build_class_ids(self.stats["source_index"], metadata)
+                class_ids = _build_class_ids(source_index, metadata)
 
-            outliers_dfs.append(self._get_outliers(self.stats["stats"], self.stats["source_index"], class_ids))
+            outliers_dfs.append(self._get_outliers(self.stats["stats"], source_index, class_ids))
 
         if self.extractor is not None:
             cluster_df, stored_cluster_stats = self._get_cluster_outliers(data)

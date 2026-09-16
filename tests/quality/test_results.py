@@ -1,7 +1,9 @@
+from typing import Any, cast
+
 import numpy as np
 import pytest
 
-from dataeval.core._compute_stats import StatsResult, combine_stats_results
+from dataeval.core._compute_stats import FactorResult, StatsResult, combine_stats_results
 from dataeval.quality._shared import get_dataset_step_from_idx
 from dataeval.types import SourceIndex
 
@@ -57,6 +59,25 @@ class TestResultsEdgeCases:
         assert [s.item for s in source_index] == [0, 1]
         assert dataset_steps == []
         np.testing.assert_array_equal(stats["x"], [1.0, 2.0])
+
+    def test_combine_rejects_a_result_with_no_source_index(self):
+        """track_stats places values by level and key, not by address, so it returns a
+        bare FactorResult with no source_index to offset. Passed here anyway, this must
+        say why it cannot be combined rather than silently producing an empty result.
+        """
+        by_level_and_key: FactorResult = {"stats": {"pan_speed": np.array([1.0, 2.0])}}
+        # `combine_stats_results` asks for a StatsResult, so this is a type error too --
+        # cast past it to prove the runtime says so as well, for callers who are untyped.
+        unaddressed = cast("Any", by_level_and_key)
+
+        with pytest.raises(TypeError, match="source_index"):
+            combine_stats_results(unaddressed)
+
+        with pytest.raises(TypeError, match="source_index"):
+            combine_stats_results([unaddressed])
+
+        with pytest.raises(TypeError, match="source_index"):
+            combine_stats_results([unaddressed, unaddressed])
 
 
 @pytest.mark.required

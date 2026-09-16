@@ -2,7 +2,7 @@
 
 A caller can construct an :class:`~dataeval.types.Aggregator` but, until these were
 exported, could not ask what ``how`` accepts — so a config layer wanting to reject a
-misspelled reduction at declaration time had to hardcode the eighteen names and reach into
+misspelled reduction at declaration time had to hardcode the nineteen names and reach into
 a private module to check them. The same held for ``every`` and ``epoch``.
 
 These pin the export, and that each name is one the thing it configures actually takes.
@@ -22,7 +22,7 @@ from dataeval.types import (
 @pytest.mark.required
 class TestTheVocabulariesAreReachable:
     def test_reduction_names_are_exported(self):
-        assert len(REDUCTION_NAMES) == 18
+        assert len(REDUCTION_NAMES) == 19
 
     def test_datetime_granularities_are_exported(self):
         assert len(DATETIME_GRANULARITIES) == 9
