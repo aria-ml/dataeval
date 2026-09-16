@@ -92,7 +92,7 @@ class TestAddFactorsFromComputeStats:
         assert _distinct(result["stats"]["mean"])
 
         md = Metadata(od_dataset)
-        md.add_factors(dict(result["stats"]), source_index=result["source_index"])
+        md.add_factors(dict(result["stats"]), source_index=result.get("source_index", []))
 
         # A two-level array splits into one factor per level; a single-level one keeps its name.
         columns = [c for c in md.dataframe.columns if c.endswith("mean")]
@@ -106,6 +106,7 @@ class TestAddFactorsFromComputeStats:
     def test_ic_stats_land_on_image_rows(self, ic_dataset):
         """Classification stats are one per image and must not be split."""
         result = _stats(ic_dataset)
+        assert "source_index" in result
         assert all(entry.key is None for entry in result["source_index"])
 
         md = Metadata(ic_dataset)
@@ -129,7 +130,7 @@ class TestAddFactorsFromComputeStats:
         empty = OD_LABELS.index([])
 
         md = Metadata(od_dataset)
-        md.add_factors(dict(result["stats"]), source_index=result["source_index"])
+        md.add_factors(dict(result["stats"]), source_index=result.get("source_index", []))
 
         stored = _actual_by_label(md, "unit_mean")
         assert SourceIndex(empty, None) in stored
@@ -141,7 +142,7 @@ class TestAddFactorsFromComputeStats:
         result = compute_stats(od_dataset, normalize_pixel_values=False)
 
         md = Metadata(od_dataset)
-        md.add_factors(dict(result["stats"]), source_index=result["source_index"])
+        md.add_factors(dict(result["stats"]), source_index=result.get("source_index", []))
 
         assert "histogram" in md.dropped_factors
         assert "unit_mean" in md.factor_names
@@ -152,7 +153,7 @@ class TestFromFactorsFromComputeStats:
 
     def test_od_two_level_stats_round_trip(self, od_dataset):
         result = _stats(od_dataset)
-        md = Metadata.from_factors(dict(result["stats"]), source_index=result["source_index"])
+        md = Metadata.from_factors(dict(result["stats"]), source_index=result.get("source_index", []))
 
         assert md.levels == ("unit", "instance")
         assert dict(md.level_counts) == {"unit": len(OD_LABELS), "instance": sum(len(x) for x in OD_LABELS)}
@@ -166,7 +167,7 @@ class TestFromFactorsFromComputeStats:
         result = _stats(od_dataset)
         flat = np.concatenate([np.asarray(labels, dtype=int) for labels in OD_LABELS])
 
-        md = Metadata.from_factors(dict(result["stats"]), flat, source_index=result["source_index"])
+        md = Metadata.from_factors(dict(result["stats"]), flat, source_index=result.get("source_index", []))
 
         assert md.class_labels.tolist() == flat.tolist()
 
@@ -174,7 +175,7 @@ class TestFromFactorsFromComputeStats:
         result = _stats(od_dataset, per_image=False)
         flat = np.concatenate([np.asarray(labels, dtype=int) for labels in OD_LABELS])
 
-        md = Metadata.from_factors(dict(result["stats"]), flat, source_index=result["source_index"])
+        md = Metadata.from_factors(dict(result["stats"]), flat, source_index=result.get("source_index", []))
 
         # One kind of entry, so one level, and the factor keeps its bare name.
         assert md.levels == ("instance",)
@@ -182,12 +183,12 @@ class TestFromFactorsFromComputeStats:
 
         # Rows follow the source index, which carries the (item, target) of each value.
         rows = md.dataframe.select("item_index", "target_index", "mean")
-        assert [SourceIndex(item, target) for item, target, _ in rows.rows()] == list(result["source_index"])
+        assert [SourceIndex(item, target) for item, target, _ in rows.rows()] == list(result.get("source_index", []))
         assert rows["mean"].to_numpy() == pytest.approx(result["stats"]["mean"])
 
     def test_ic_stats_round_trip(self, ic_dataset):
         result = _stats(ic_dataset)
-        md = Metadata.from_factors(dict(result["stats"]), IC_LABELS, source_index=result["source_index"])
+        md = Metadata.from_factors(dict(result["stats"]), IC_LABELS, source_index=result.get("source_index", []))
 
         assert "mean" in md.factor_names
         assert md.rows_at(md.levels[0])["mean"].to_numpy() == pytest.approx(result["stats"]["mean"])
@@ -196,7 +197,7 @@ class TestFromFactorsFromComputeStats:
         """Without a filter these flatten to a wrong length and abort the whole call."""
         result = compute_stats(od_dataset, normalize_pixel_values=False)
 
-        md = Metadata.from_factors(dict(result["stats"]), source_index=result["source_index"])
+        md = Metadata.from_factors(dict(result["stats"]), source_index=result.get("source_index", []))
 
         assert "histogram" in md.dropped_factors
         assert "unit_mean" in md.factor_names
@@ -206,14 +207,14 @@ class TestFromFactorsFromComputeStats:
         with pytest.raises(ValueError, match="mutually exclusive"):
             Metadata.from_factors(
                 dict(result["stats"]),
-                item_indices=np.zeros(len(result["source_index"]), dtype=int),
-                source_index=result["source_index"],
+                item_indices=np.zeros(len(result.get("source_index", [])), dtype=int),
+                source_index=result.get("source_index", []),
             )
 
     def test_level_and_source_index_are_exclusive(self, od_dataset):
         result = _stats(od_dataset, per_image=False)
         with pytest.raises(ValueError, match="mutually exclusive"):
-            Metadata.from_factors(dict(result["stats"]), level="unit", source_index=result["source_index"])
+            Metadata.from_factors(dict(result["stats"]), level="unit", source_index=result.get("source_index", []))
 
     def test_repeated_item_indices_get_distinct_target_indices(self):
         """Several rows sharing an item are targets 0, 1, ... of it, not all target 0.
@@ -311,7 +312,7 @@ class TestFromFactorsFromComputeStats:
         assert np.asarray(result["stats"]["mean"]).shape == (1,)
         assert np.asarray(result["stats"]["histogram"]).shape == (1, 256)
 
-        md = Metadata.from_factors(dict(result["stats"]), source_index=result["source_index"])
+        md = Metadata.from_factors(dict(result["stats"]), source_index=result.get("source_index", []))
 
         assert "mean" in md.factor_names
         assert "histogram" in md.dropped_factors
@@ -341,7 +342,7 @@ class TestStatsResultIsAccepted:
         result = _stats(od_dataset, **kwargs)
 
         unpacked = Metadata(od_dataset)
-        unpacked.add_factors(dict(result["stats"]), source_index=result["source_index"])
+        unpacked.add_factors(dict(result["stats"]), source_index=result.get("source_index", []))
 
         direct = Metadata(od_dataset)
         direct.add_factors(result)
@@ -353,7 +354,7 @@ class TestStatsResultIsAccepted:
     def test_from_factors_unpacks_a_stats_result(self, od_dataset):
         result = _stats(od_dataset)
 
-        unpacked = Metadata.from_factors(dict(result["stats"]), source_index=result["source_index"])
+        unpacked = Metadata.from_factors(dict(result["stats"]), source_index=result.get("source_index", []))
         direct = Metadata.from_factors(result)
 
         assert sorted(direct.factor_names) == sorted(unpacked.factor_names)
@@ -373,7 +374,7 @@ class TestStatsResultIsAccepted:
     def test_an_explicit_source_index_overrides_the_embedded_one(self, od_dataset):
         """The escape hatch for a corrected index must actually take effect."""
         result = _stats(od_dataset, per_image=False)
-        reversed_index = list(reversed(result["source_index"]))
+        reversed_index = list(reversed(result.get("source_index", [])))
 
         md = Metadata(od_dataset)
         md.add_factors(result, source_index=reversed_index)
@@ -405,7 +406,7 @@ class TestStatsResultIsAccepted:
         ("candidate", "expected"),
         [
             ({"stats": {"mean": [1.0]}, "source_index": [SourceIndex(0)]}, True),
-            ({"stats": {"mean": [1.0]}}, False),
+            ({"stats": {"mean": [1.0]}}, True),  # keyed producers carry no source_index at all
             ({"source_index": [SourceIndex(0)]}, False),
             ({"stats": [1.0], "source_index": [SourceIndex(0)]}, False),
             ({"stats": {"mean": [1.0]}, "source_index": [(0, None, None)]}, False),
@@ -413,7 +414,7 @@ class TestStatsResultIsAccepted:
             ({}, False),
         ],
     )
-    def test_detection_requires_both_keys_and_both_value_types(self, candidate, expected):
+    def test_detection_by_key_and_value_types(self, candidate, expected):
         assert _is_stats_result(candidate) is expected
 
 
@@ -444,7 +445,7 @@ class TestBackgroundStatsImport:
         )
         expected = {
             source: value
-            for source, value in zip(result["source_index"], result["stats"]["background_mean"], strict=True)
+            for source, value in zip(result.get("source_index", []), result["stats"]["background_mean"], strict=True)
             if source.key is None
         }
         assert _distinct(list(expected.values()))
@@ -527,8 +528,8 @@ class TestVacuousSplitsAreReported:
 
         md = Metadata(dataset)
         md.add_factors(
-            {"all_null": np.full(len(result["source_index"]), np.nan)},
-            source_index=result["source_index"],
+            {"all_null": np.full(len(result.get("source_index", [])), np.nan)},
+            source_index=result.get("source_index", []),
         )
 
         assert {"unit_all_null", "instance_all_null"} <= set(md.factor_names)

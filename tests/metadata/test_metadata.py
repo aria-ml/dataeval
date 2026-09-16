@@ -116,9 +116,9 @@ class TestMetadata:
             per_target=True,
         )
         ratiostats = compute_ratios(imgstats, target_stats_output=boxstats)
-        assert len(imgstats["source_index"]) == 10
-        assert len(boxstats["source_index"]) == 16
-        assert len(ratiostats["source_index"]) == 16
+        assert len(imgstats.get("source_index", [])) == 10
+        assert len(boxstats.get("source_index", [])) == 16
+        assert len(ratiostats.get("source_index", [])) == 16
 
     def test_add_factors_preserves_existing_factor_info(self):
         """Regression: add_factors after factor_info should not drop existing factors."""

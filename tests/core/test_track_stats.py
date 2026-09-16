@@ -9,8 +9,9 @@ from typing import Any, cast
 import numpy as np
 import pytest
 
-from dataeval.core import TrackStatsResult, track_stats
+from dataeval.core import track_stats
 from dataeval.core._track_stats import (
+    TrackFactors,
     _at_edge,
     _centers,
     _compute_appearances_and_duration,
@@ -319,20 +320,20 @@ class TestTrackStats:
         )
         stats = track_stats({1: track})
 
-        assert stats["track_ids"] == [1]
-        assert stats["n_appearances"] == [3]
-        assert stats["track_duration"] == [3]
-        assert stats["n_gaps"] == [0]
-        assert stats["total_gap_length"] == [0]
-        assert stats["mean_speed"][0] == pytest.approx(10.0)
-        assert stats["speed_variance"][0] == pytest.approx(0.0)
-        assert stats["net_displacement"][0] == pytest.approx(20.0)
-        assert stats["straightness_index"][0] == pytest.approx(1.0)
+        assert stats["stats"]["track_ids"] == [1]
+        assert stats["stats"]["n_appearances"] == [3]
+        assert stats["stats"]["track_duration"] == [3]
+        assert stats["stats"]["n_gaps"] == [0]
+        assert stats["stats"]["total_gap_length"] == [0]
+        assert stats["stats"]["mean_speed"][0] == pytest.approx(10.0)
+        assert stats["stats"]["speed_variance"][0] == pytest.approx(0.0)
+        assert stats["stats"]["net_displacement"][0] == pytest.approx(20.0)
+        assert stats["stats"]["straightness_index"][0] == pytest.approx(1.0)
         # Short track (< jitter_min_frames) -> jitter_rate is NaN, no _jitter_sparc call.
-        assert np.isnan(stats["jitter_rate"][0])
+        assert np.isnan(stats["stats"]["jitter_rate"][0])
         # No frame dimensions were given, so where the border sits is unknown.
-        assert stats["entry_at_edge"] == [None]
-        assert stats["exit_at_edge"] == [None]
+        assert stats["stats"]["entry_at_edge"] == [None]
+        assert stats["stats"]["exit_at_edge"] == [None]
 
     def test_track_with_gaps(self):
         # frames [0, 2, 5]: two gap runs, total 3 missing frames.
@@ -342,47 +343,50 @@ class TestTrackStats:
         )
         stats = track_stats({1: track})
 
-        assert stats["n_appearances"] == [3]
-        assert stats["track_duration"] == [6]
-        assert stats["n_gaps"] == [2]
-        assert stats["total_gap_length"] == [3]
+        assert stats["stats"]["n_appearances"] == [3]
+        assert stats["stats"]["track_duration"] == [6]
+        assert stats["stats"]["n_gaps"] == [2]
+        assert stats["stats"]["total_gap_length"] == [3]
         # total_gap_length == track_duration - n_appearances
-        assert stats["total_gap_length"][0] == stats["track_duration"][0] - stats["n_appearances"][0]
+        assert (
+            stats["stats"]["total_gap_length"][0]
+            == stats["stats"]["track_duration"][0] - stats["stats"]["n_appearances"][0]
+        )
         # Speeds normalised by inter-frame delta: [10/2, 30/3] = [5, 10].
-        assert stats["mean_speed"][0] == pytest.approx(7.5)
-        assert stats["speed_variance"][0] == pytest.approx(6.25)
-        assert stats["net_displacement"][0] == pytest.approx(40.0)
-        assert stats["straightness_index"][0] == pytest.approx(1.0)
+        assert stats["stats"]["mean_speed"][0] == pytest.approx(7.5)
+        assert stats["stats"]["speed_variance"][0] == pytest.approx(6.25)
+        assert stats["stats"]["net_displacement"][0] == pytest.approx(40.0)
+        assert stats["stats"]["straightness_index"][0] == pytest.approx(1.0)
 
     def test_single_appearance_track(self):
         # Edge case: a track of length 1.
         track = make_track([[0, 0, 10, 10]], [3])
         stats = track_stats({1: track})
 
-        assert stats["n_appearances"] == [1]
-        assert stats["track_duration"] == [1]
-        assert stats["n_gaps"] == [0]
-        assert stats["total_gap_length"] == [0]
-        assert stats["mean_speed"][0] == pytest.approx(0.0)
-        assert stats["speed_variance"][0] == pytest.approx(0.0)
-        assert stats["net_displacement"][0] == pytest.approx(0.0)
-        assert np.isnan(stats["straightness_index"][0])
-        assert np.isnan(stats["jitter_rate"][0])
+        assert stats["stats"]["n_appearances"] == [1]
+        assert stats["stats"]["track_duration"] == [1]
+        assert stats["stats"]["n_gaps"] == [0]
+        assert stats["stats"]["total_gap_length"] == [0]
+        assert stats["stats"]["mean_speed"][0] == pytest.approx(0.0)
+        assert stats["stats"]["speed_variance"][0] == pytest.approx(0.0)
+        assert stats["stats"]["net_displacement"][0] == pytest.approx(0.0)
+        assert np.isnan(stats["stats"]["straightness_index"][0])
+        assert np.isnan(stats["stats"]["jitter_rate"][0])
 
     def test_stationary_track_straightness_is_nan(self):
         # Multi-frame but never moves: zero path length -> straightness NaN.
         track = make_track([[0, 0, 10, 10]] * 3, [0, 1, 2])
         stats = track_stats({1: track})
 
-        assert stats["mean_speed"][0] == pytest.approx(0.0)
-        assert stats["net_displacement"][0] == pytest.approx(0.0)
-        assert np.isnan(stats["straightness_index"][0])
+        assert stats["stats"]["mean_speed"][0] == pytest.approx(0.0)
+        assert stats["stats"]["net_displacement"][0] == pytest.approx(0.0)
+        assert np.isnan(stats["stats"]["straightness_index"][0])
 
     def test_diagonal_net_displacement(self):
         # Centers (0,0) -> (3,4): Euclidean distance 5.
         track = make_track([[0, 0, 0, 0], [3, 4, 3, 4]], [0, 1])
         stats = track_stats({1: track})
-        assert stats["net_displacement"][0] == pytest.approx(5.0)
+        assert stats["stats"]["net_displacement"][0] == pytest.approx(5.0)
 
     def test_multiple_tracks_sorted_by_id(self):
         a = make_track([[0, 0, 10, 10], [10, 0, 20, 10], [20, 0, 30, 10]], [0, 1, 2])
@@ -390,59 +394,59 @@ class TestTrackStats:
         stats = track_stats({5: a, 2: b})
 
         # Output is indexed by position in *sorted* track-ID order.
-        assert stats["track_ids"] == [2, 5]
-        assert stats["n_appearances"] == [3, 3]
-        assert stats["n_gaps"] == [2, 0]  # track 2 has gaps, track 5 does not
+        assert stats["stats"]["track_ids"] == [2, 5]
+        assert stats["stats"]["n_appearances"] == [3, 3]
+        assert stats["stats"]["n_gaps"] == [2, 0]  # track 2 has gaps, track 5 does not
 
     def test_label_is_majority_per_frame_label(self):
         # Track is mostly class 3 with one dissenting class-1 frame.
         track = make_track([[0, 0, 10, 10]] * 4, [0, 1, 2, 3], labels=[3, 3, 1, 3])
         stats = track_stats({1: track})
-        assert stats["labels"] == [3]
+        assert stats["stats"]["labels"] == [3]
 
     def test_label_confidence_is_one_for_single_class_track(self):
         track = make_track([[0, 0, 10, 10]] * 3, [0, 1, 2], labels=[2, 2, 2])
         stats = track_stats({1: track})
-        assert stats["label_confidence"][0] == pytest.approx(1.0)
+        assert stats["stats"]["label_confidence"][0] == pytest.approx(1.0)
 
     def test_label_confidence_is_frame_purity_for_uniform_scores(self):
         # 3 of 4 frames agree with the majority label; scores are uniform (1.0).
         track = make_track([[0, 0, 10, 10]] * 4, [0, 1, 2, 3], labels=[3, 3, 1, 3])
         stats = track_stats({1: track})
-        assert stats["label_confidence"][0] == pytest.approx(0.75)
+        assert stats["stats"]["label_confidence"][0] == pytest.approx(0.75)
 
     def test_label_confidence_is_score_weighted(self):
         # Majority label 0 (2 frames) carries little score; label 1 dominates score.
         track = make_track([[0, 0, 10, 10]] * 3, [0, 1, 2], labels=[0, 0, 1], scores=[0.1, 0.1, 0.8])
         stats = track_stats({1: track})
-        assert stats["labels"] == [0]  # majority by frame count
+        assert stats["stats"]["labels"] == [0]  # majority by frame count
         # confidence in label 0 = (0.1 + 0.1) / 1.0
-        assert stats["label_confidence"][0] == pytest.approx(0.2)
+        assert stats["stats"]["label_confidence"][0] == pytest.approx(0.2)
 
     def test_mean_score(self):
         track = make_track([[0, 0, 10, 10]] * 3, [0, 1, 2], scores=[0.2, 0.4, 0.9])
         stats = track_stats({1: track})
-        assert stats["mean_score"][0] == pytest.approx(0.5)
+        assert stats["stats"]["mean_score"][0] == pytest.approx(0.5)
 
     def test_labels_aligned_with_sorted_track_ids(self):
         a = make_track([[0, 0, 10, 10], [10, 0, 20, 10]], [0, 1], labels=[7, 7])
         b = make_track([[0, 0, 2, 2], [10, 0, 12, 2]], [0, 1], labels=[4, 4])
         stats = track_stats({5: a, 2: b})
         # labels follow the same sorted-ID order as every other field.
-        assert stats["track_ids"] == [2, 5]
-        assert stats["labels"] == [4, 7]
+        assert stats["stats"]["track_ids"] == [2, 5]
+        assert stats["stats"]["labels"] == [4, 7]
 
     def test_all_fields_present_and_aligned(self):
         track = make_track([[0, 0, 10, 10], [10, 0, 20, 10]], [0, 1])
         stats = track_stats({1: track})
         for fieldname in ALL_FIELDS:
-            assert fieldname in stats, f"missing field {fieldname}"
-            assert len(stats[fieldname]) == 1
+            assert fieldname in stats["stats"], f"missing field {fieldname}"
+            assert len(stats["stats"][fieldname]) == 1
 
     def test_empty_tracks_mapping(self):
         stats = track_stats({})
         for fieldname in ALL_FIELDS:
-            assert stats[fieldname] == []
+            assert stats["stats"][fieldname] == []
 
     # --- edge flags -------------------------------------------------------
 
@@ -450,22 +454,22 @@ class TestTrackStats:
         # First box top-left corner, last box bottom-right corner.
         track = make_track([[0, 0, 10, 10], [90, 90, 100, 100]], [0, 1])
         stats = track_stats({1: track}, frame_width=100, frame_height=100, edge_threshold=5)
-        assert stats["entry_at_edge"] == [True]
-        assert stats["exit_at_edge"] == [True]
+        assert stats["stats"]["entry_at_edge"] == [True]
+        assert stats["stats"]["exit_at_edge"] == [True]
 
     def test_interior_track_no_edge_flags(self):
         track = make_track([[40, 40, 50, 50], [45, 45, 55, 55]], [0, 1])
         stats = track_stats({1: track}, frame_width=100, frame_height=100, edge_threshold=5)
-        assert stats["entry_at_edge"] == [False]
-        assert stats["exit_at_edge"] == [False]
+        assert stats["stats"]["entry_at_edge"] == [False]
+        assert stats["stats"]["exit_at_edge"] == [False]
 
     def test_missing_frame_dims_warns_and_flags_null(self, caplog):
         track = make_track([[0, 0, 10, 10], [90, 90, 100, 100]], [0, 1])
         with caplog.at_level(logging.WARNING):
             stats = track_stats({1: track})  # no frame_width/frame_height
         assert any("entry_at_edge and exit_at_edge will be null" in r.message for r in caplog.records)
-        assert stats["entry_at_edge"] == [None]
-        assert stats["exit_at_edge"] == [None]
+        assert stats["stats"]["entry_at_edge"] == [None]
+        assert stats["stats"]["exit_at_edge"] == [None]
 
     def test_large_edge_threshold_warns(self, caplog):
         track = make_track([[40, 40, 50, 50], [45, 45, 55, 55]], [0, 1])
@@ -494,8 +498,8 @@ class TestTrackStats:
         boxes = [[i * 1.0, 0, i * 1.0 + 5, 5] for i in range(12)]
         track = make_track(boxes, frames)
         stats = track_stats({1: track})
-        assert np.isfinite(stats["jitter_rate"][0])
-        assert stats["jitter_rate"][0] >= 0.0
+        assert np.isfinite(stats["stats"]["jitter_rate"][0])
+        assert stats["stats"]["jitter_rate"][0] >= 0.0
 
     def test_jitter_min_frames_override(self):
         # A 5-frame track is gated out under the default jitter_min_frames (10);
@@ -505,22 +509,44 @@ class TestTrackStats:
         track = make_track(boxes, frames)
 
         gated = track_stats({1: track})
-        assert np.isnan(gated["jitter_rate"][0])
+        assert np.isnan(gated["stats"]["jitter_rate"][0])
 
         computed = track_stats({1: track}, jitter_min_frames=3)
-        assert np.isfinite(computed["jitter_rate"][0])
+        assert np.isfinite(computed["stats"]["jitter_rate"][0])
 
 
 class TestTrackStatsResult:
-    """Tests for the ``TrackStatsResult`` typed dict."""
+    """Tests for the ``TrackFactors`` typed dict."""
 
     def test_declares_all_fields(self):
-        assert set(TrackStatsResult.__annotations__) == set(DATASET_FIELDS)
+        assert set(TrackFactors.__annotations__) == set(DATASET_FIELDS)
 
     def test_track_stats_returns_mapping_with_those_keys(self):
         track = make_track([[0, 0, 10, 10], [10, 0, 20, 10]], [0, 1])
         stats = track_stats({1: track})
-        assert set(stats.keys()) == set(ALL_FIELDS)
+        assert set(stats["stats"].keys()) == set(ALL_FIELDS)
+
+
+@pytest.mark.required
+class TestNestedShape:
+    """``track_stats`` returns the shared nested ``StatsResult`` shape."""
+
+    def test_values_live_under_stats(self):
+        track = make_track([[0, 0, 10, 10], [10, 0, 20, 10]], [0, 1])
+        result = track_stats({1: track})
+        assert set(result) == {"stats"}
+        assert "track_ids" in result["stats"]
+
+    def test_the_whole_result_still_attaches(self):
+        from dataeval import Metadata
+        from tests.metadata.test_structurers import _mot_dataset
+
+        dataset = _mot_dataset([[[5, 9], [5]], [[7], [3, 7]]])
+        metadata = Metadata(dataset)
+        metadata._structure()
+
+        metadata.add_factors(track_stats(dataset), level="track", key="track_id")
+        assert "mean_speed" in metadata.factor_names
 
 
 @pytest.mark.required
@@ -536,12 +562,12 @@ class TestTrackStatsOverDataset:
     def test_every_sequence_is_measured_and_labelled(self):
         """``item_index`` and ``track_ids`` together name one track; ids restart per item."""
         stats = track_stats(self._dataset([[[5, 9], [5]], [[7], [3, 7]]]))
-        items = stats.get("item_index", [])
-        assert list(zip(items, stats["track_ids"], strict=True)) == [(0, 5), (0, 9), (1, 3), (1, 7)]
-        assert stats["n_appearances"] == [2, 1, 1, 2]
+        items = stats["stats"].get("item_index", [])
+        assert list(zip(items, stats["stats"]["track_ids"], strict=True)) == [(0, 5), (0, 9), (1, 3), (1, 7)]
+        assert stats["stats"]["n_appearances"] == [2, 1, 1, 2]
 
     def test_the_result_declares_every_field(self):
-        stats = track_stats(self._dataset([[[5, 9], [5]]]))
+        stats = track_stats(self._dataset([[[5, 9], [5]]]))["stats"]
         assert set(stats.keys()) == set(DATASET_FIELDS)
 
     def test_frame_dimensions_are_read_from_the_stream(self):
@@ -551,31 +577,33 @@ class TestTrackStatsOverDataset:
         border can fire, which is the half of the answer that needs the frame's width.
         """
         stats = track_stats(self._dataset([[[5]]]), edge_threshold=0.5)
-        assert stats["entry_at_edge"] == [False]
-        assert stats["exit_at_edge"] == [False]
+        assert stats["stats"]["entry_at_edge"] == [False]
+        assert stats["stats"]["exit_at_edge"] == [False]
 
     def test_stated_dimensions_win_over_the_stream(self):
         """The mock streams 4x4 frames; stating 2x2 moves the far border past the box."""
         dataset = self._dataset([[[5]]])
-        assert track_stats(dataset, edge_threshold=0.5)["exit_at_edge"] == [False]
-        assert track_stats(dataset, frame_width=2, frame_height=2, edge_threshold=0.5)["exit_at_edge"] == [True]
+        assert track_stats(dataset, edge_threshold=0.5)["stats"]["exit_at_edge"] == [False]
+        assert track_stats(dataset, frame_width=2, frame_height=2, edge_threshold=0.5)["stats"]["exit_at_edge"] == [
+            True
+        ]
 
     def test_untracked_detections_take_no_part(self):
         """A negative id belongs to no track, so it contributes to none of these."""
         stats = track_stats(self._dataset([[[5, -1], [-1]]]))
-        assert stats["track_ids"] == [5]
-        assert stats["n_appearances"] == [1]
+        assert stats["stats"]["track_ids"] == [5]
+        assert stats["stats"]["n_appearances"] == [1]
 
     def test_an_empty_dataset_still_answers_with_every_field(self):
-        stats = track_stats(self._dataset([]))
+        stats = track_stats(self._dataset([]))["stats"]
         assert set(stats.keys()) == set(DATASET_FIELDS)
         # Read as a plain mapping: the assertion is about every field, whichever it is.
         assert all(len(values) == 0 for values in cast("Mapping[str, Sequence[Any]]", stats).values())
 
     def test_a_sequence_without_tracks_contributes_nothing(self):
         stats = track_stats(self._dataset([[[-1]], [[7]]]))
-        items = stats.get("item_index", [])
-        assert list(zip(items, stats["track_ids"], strict=True)) == [(1, 7)]
+        items = stats["stats"].get("item_index", [])
+        assert list(zip(items, stats["stats"]["track_ids"], strict=True)) == [(1, 7)]
 
     def test_a_non_dataset_non_mapping_source_is_refused(self):
         with pytest.raises(TypeError, match="'source' must be"):
@@ -616,7 +644,7 @@ class TestAttachingToMetadata:
         """Both drop untracked detections, so neither names a track the other lacks."""
         md, dataset = self._metadata([[[5, -1], [5]]])
         stats = track_stats(dataset)
-        assert set(stats["track_ids"]) == set(md._store.frame("track")["track_id"].to_list())
+        assert set(stats["stats"]["track_ids"]) == set(md._store.frame("track")["track_id"].to_list())
 
     def test_unknown_edge_flags_land_as_null_not_false(self):
         """A null column reads as 'not determined'; an all-False one reads as a measurement."""

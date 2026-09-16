@@ -42,6 +42,7 @@ from dataeval._metadata._filters import evaluate, report_orphaned_rows
 from dataeval._metadata._input import (
     build_index2label,
     reject_length_mismatch,
+    resolve_aggregations,
     unpack_stats_result,
 )
 from dataeval._metadata._keyed import resolve_keyed
@@ -79,8 +80,7 @@ from dataeval.core._bin import (
     is_continuous,
     level_budget,
 )
-from dataeval.core._compute_stats import StatsResult
-from dataeval.core._track_stats import TrackStatsResult
+from dataeval.core._compute_stats import FactorResult, StatsResult
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import (
     AnnotatedDataset,
@@ -935,7 +935,8 @@ class Metadata(Array, FeatureExtractor):
         >>> sorted(md.factor_names)
         ['instance_mean', 'unit_mean']
         """
-        factors, source_index = unpack_stats_result(factors, source_index, level=level)
+        factors, source_index, declared = unpack_stats_result(factors, source_index, level=level)
+        aggregations = (*declared, *(aggregations or ()))
         inst = cls(
             None,
             continuous_factor_bins=continuous_factor_bins,
@@ -2567,30 +2568,49 @@ class Metadata(Array, FeatureExtractor):
         source = None if from_level is None else self._resolve_level(from_level)
         return self._write_rolled(self._rolled_batches(self._declarations(factors, target, how, source)))
 
-    def _replay_aggregations(self) -> None:
+    def _replay_aggregations(self, changed: frozenset[str] = frozenset()) -> None:
         """Re-run the roll-ups this metadata carries, onto the walk that has just finished.
 
-        In the order they were declared, because a roll-up onto a level can read a column
-        an earlier one wrote there — two levels of aggregation are two entries, and the
-        second is only answerable once the first has run. Written onto this instance rather
-        than onto a copy: nothing is being asked here, the walk is simply finishing.
+        They run in the order they were declared. A roll-up onto a level can read a column
+        an earlier one wrote there, and a two-level roll-up is two such entries, so the
+        second is answerable only once the first has run. Each writes onto this instance
+        rather than a copy, since the walk is simply finishing and nothing is being asked.
 
-        Each declaration is resolved again rather than trusted. It carries what it fitted
-        to the dataset it came from, and resolving checks that against *this* one: the
-        factor still exists, and the reduction still applies to what it holds.
+        Each declaration is resolved again, not trusted. It was fitted to the dataset it
+        came from, so resolving re-checks it against this one: the factor still exists, and
+        the reduction still applies to what it holds.
+
+        A carried roll-up whose output column is already in the store is not recomputed,
+        unless one of its source factors is named in `changed`. A changed source makes the
+        roll-up stale, so its column must be rebuilt. That is what a second replay on an
+        already-structured instance sees: :meth:`add_factors` registering a further
+        declaration, or overwriting a factor an earlier declaration already rolled up.
+        A roll-up whose source did not move is skipped, so it does not find its own name
+        taken and rename itself into a duplicate column. On a fresh walk replaying what
+        `new()` carried in, no such column exists yet and every roll-up runs.
         """
-        carried = list(dict.fromkeys(self._aggregations.values()))
+        present = set(self._store.columns)
+        stale_names = [
+            name
+            for name, aggregator in self._aggregations.items()
+            if name not in present or set(aggregator.factors) & changed
+        ]
+        stale = list(dict.fromkeys(self._aggregations[name] for name in stale_names))
+        tracked = list(dict.fromkeys(self._aggregations.values()))
         # Declared last: a roll-up the caller asked for may read a column one carried in
         # from `new()` has just written.
-        declared = [*carried, *(a for a in self._declared_aggregations if a not in carried)]
+        declared = [*stale, *(a for a in self._declared_aggregations if a not in tracked)]
         # Consumed rather than kept: `_aggregations` carries them from here on, and leaving
         # these would run them a second time on any later re-adopt.
         self._declared_aggregations = ()
         if not declared:
             return
-        # Cleared first so the replay records them afresh under the names this dataset
-        # gives them, which a collision could make differ from the names it came with.
-        self._aggregations = {}
+        # Only the stale entries are dropped, from the record and the store alike, so a
+        # changed source frees its old output name. The recompute then does not find the
+        # name taken and rename into a duplicate `_agg` column. An entry untouched by
+        # `changed` stays recorded as it is.
+        self._aggregations = {name: agg for name, agg in self._aggregations.items() if name not in stale_names}
+        self._store = self._store.without_columns(stale_names)
         for aggregator in declared:
             try:
                 batches = self._rolled_batches([aggregator])
@@ -5336,12 +5356,15 @@ class Metadata(Array, FeatureExtractor):
 
     def add_factors(
         self,
-        factors: Mapping[str, Array1D[Any]] | StatsResult | TrackStatsResult,
+        factors: Mapping[str, Array1D[Any]] | FactorResult[Any],
         level: FactorLevel | None = None,
         overwrite: bool = False,
         append_string: str = "_added",
         source_index: Sequence[SourceIndex] | None = None,
         key: str | None = None,
+        aggregate: bool = True,
+        how: Mapping[str, str] | None = None,
+        aggregations: Sequence[Aggregator] | None = None,
     ) -> None:
         """Add additional factors to metadata collection.
 
@@ -5357,12 +5380,14 @@ class Metadata(Array, FeatureExtractor):
             the row count of the specified level (see :attr:`level_counts`), or the
             length of `source_index` when one is given.
 
-            A whole :class:`~dataeval.core.StatsResult` — the return of
-            :func:`~dataeval.core.compute_stats` or
-            :func:`~dataeval.core.compute_ratios` — may be passed here directly, in
-            which case its ``stats`` become the factors and its ``source_index`` the
-            placement. Its bookkeeping keys (``object_count``, ``invalid_box_count``,
-            ``image_count``) describe the run rather than the images and are ignored.
+            A whole :class:`~dataeval.core.FactorResult` — the return of
+            :func:`~dataeval.core.compute_stats`, :func:`~dataeval.core.compute_ratios`,
+            or :func:`~dataeval.core.track_stats` — may be passed here directly, in
+            which case its ``stats`` become the factors and its ``source_index``, when
+            it carries one, the placement (see `key` below for the alternative
+            ``track_stats`` uses). Its bookkeeping keys (``object_count``,
+            ``invalid_box_count``, ``image_count``) describe the run rather than the
+            images and are ignored.
         level : str or None, default None
             Level at which to store the factors — one of :attr:`levels`. Required
             unless `source_index` is given: those are the two supported ways to say
@@ -5423,6 +5448,21 @@ class Metadata(Array, FeatureExtractor):
             that already holds a value is named again, and `overwrite` then decides it as
             it does anywhere else — replacing just the named rows rather than the whole
             column.
+        aggregate : bool, default True
+            Whether to apply the roll-up recipes the result declares. A producer knows how
+            its factors summarize and how much of a group must be present for a summary to
+            hold, so it declares that beside the measurement, and callers do not re-derive
+            it. False stores the values only. A plain factor mapping declares nothing, so
+            this is ignored rather than an error.
+        how : Mapping[str, str] or None, default None
+            Replace the reduction for the named factors, keeping every other field of the
+            declaration: its levels, its coverage threshold and its ordering. Naming a
+            factor the result does not declare is an error rather than a silent no-op.
+            Mutually exclusive with `aggregations`.
+        aggregations : Sequence[Aggregator] or None, default None
+            Replace the result's declarations entirely. Mutually exclusive with `how`. For
+            a roll-up no named reduction expresses, use :meth:`agg`, which takes an
+            expression.
 
         Raises
         ------
@@ -5485,6 +5525,10 @@ class Metadata(Array, FeatureExtractor):
         Either every factor in `factors` is added or none is — a validation failure on any
         factor leaves the metadata unchanged.
 
+        .. versionadded:: 1.2
+            `aggregate`, `how` and `aggregations`, letting a caller suppress, swap or
+            replace the roll-up recipes a stats result declares alongside its values.
+
         Examples
         --------
         >>> metadata = Metadata(dataset)
@@ -5510,9 +5554,13 @@ class Metadata(Array, FeatureExtractor):
         ['instance_mean', 'unit_mean']
         """
         self._structure()
-        factors, source_index = unpack_stats_result(factors, source_index, level=level)
+        factors, source_index, declared = unpack_stats_result(factors, source_index, level=level)
+        rollups = resolve_aggregations(declared, aggregate, how, aggregations)
 
         if not factors:
+            # No new values, but a declaration naming an already-stored factor is still
+            # work to do, not a no-op to discard.
+            self._register_rollups(rollups)
             return
 
         _reject_unusable_key(key, level, source_index)
@@ -5549,6 +5597,25 @@ class Metadata(Array, FeatureExtractor):
         self._record_multidimensional(skipped)
         self._record_vacuous(vacuous)
         self._commit_factors(resolved)
+        self._register_rollups(rollups, changed=frozenset(factor.name for factor in resolved))
+
+    def _register_rollups(self, rollups: tuple[Aggregator, ...], changed: frozenset[str] = frozenset()) -> None:
+        """Run newly-resolved roll-ups, and re-run any carried one a just-landed factor feeds.
+
+        Replayed here rather than left to `_structure`, which has already run by the time
+        `add_factors` is called: it returns early once structured, so a declaration
+        registered now would never execute otherwise. Writing in place matches
+        `add_factors` returning None rather than a copy.
+
+        `changed` names the factors this call just committed, new or overwritten. A roll-up
+        already on file replays when one of its sources moved, even though this call declares
+        no roll-up of its own.
+        """
+        if not rollups and not changed:
+            return
+        if rollups:
+            self._declared_aggregations = (*self._declared_aggregations, *rollups)
+        self._replay_aggregations(changed)
 
     def _commit_factors(self, resolved: Sequence[_ResolvedFactor]) -> None:
         """Write resolved columns to the dataframe and register their levels.

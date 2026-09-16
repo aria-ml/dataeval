@@ -214,6 +214,7 @@ REDUCTIONS: Mapping[str, Reduction] = {
     "count": Reduction(lambda c: pl.col(c).count(), "any", identity=0, coverage_sensitive=False),
     "n_unique": Reduction(lambda c: pl.col(c).drop_nulls().n_unique(), "any", identity=0, coverage_sensitive=False),
     "sum": Reduction(lambda c: pl.col(c).sum(), "numeric", identity=0),
+    "abs_sum": Reduction(lambda c: pl.col(c).abs().sum(), "numeric", identity=0),
     "mean": Reduction(lambda c: pl.col(c).mean(), "numeric"),
     "median": Reduction(lambda c: pl.col(c).median(), "numeric"),
     "std": Reduction(lambda c: pl.col(c).std(), "numeric"),

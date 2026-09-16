@@ -35,6 +35,7 @@ class TestCalculateRatios:
         ratios = compute_ratios(stats)
 
         # Verify we only have box entries (no image entries)
+        assert SOURCE_INDEX in ratios
         assert all(si.key is not None for si in ratios[SOURCE_INDEX])
 
         # Verify we have 4 box entries (2 boxes per image, 2 images)
@@ -254,9 +255,9 @@ class TestCalculateRatios:
         assert "image_count" in ratios
 
         # Verify values match original
-        assert ratios["object_count"] == stats["object_count"]
-        assert ratios["invalid_box_count"] == stats["invalid_box_count"]
-        assert ratios["image_count"] == stats["image_count"]
+        assert ratios["object_count"] == stats.get("object_count", [])
+        assert ratios["invalid_box_count"] == stats.get("invalid_box_count", [])
+        assert ratios["image_count"] == stats.get("image_count", 0)
 
     def test_multiple_images_multiple_boxes(self):
         """Test with multiple images and varying box counts."""
@@ -282,14 +283,14 @@ class TestCalculateRatios:
         ratios = compute_ratios(stats)
 
         # Should have 1 + 2 + 3 = 6 box entries
-        assert len(ratios[SOURCE_INDEX]) == 6
+        assert len(ratios.get(SOURCE_INDEX, [])) == 6
 
         # Verify image indices are correct
-        image_indices = [si.item for si in ratios[SOURCE_INDEX]]
+        image_indices = [si.item for si in ratios.get(SOURCE_INDEX, [])]
         assert image_indices == [0, 1, 1, 2, 2, 2]
 
         # Verify box indices are correct
-        box_indices = [si.key for si in ratios[SOURCE_INDEX]]
+        box_indices = [si.key for si in ratios.get(SOURCE_INDEX, [])]
         assert box_indices == [0, 0, 1, 0, 1, 2]
 
     def test_divide_by_zero_handling(self):
@@ -339,6 +340,7 @@ class TestCalculateRatios:
         ratios = compute_ratios(stats)
 
         # Check SourceIndex structure
+        assert SOURCE_INDEX in ratios
         for si in ratios[SOURCE_INDEX]:
             assert isinstance(si, SourceIndex)
             assert isinstance(si.item, int)
@@ -404,7 +406,7 @@ class TestCalculateRatios:
         # offset_x should now use default division instead of custom calculation
         # This is different from the default override behavior
         assert "offset_x" in ratios["stats"]
-        assert len(ratios[SOURCE_INDEX]) == 1
+        assert len(ratios.get(SOURCE_INDEX, [])) == 1
 
 
 class TestCalculateRatiosSeparateInputs:
@@ -440,7 +442,7 @@ class TestCalculateRatiosSeparateInputs:
         ratios = compute_ratios(img_stats, target_stats_output=tgt_stats)
 
         # Should have 1 box entry
-        assert len(ratios[SOURCE_INDEX]) == 1
+        assert len(ratios.get(SOURCE_INDEX, [])) == 1
 
         # Check width ratio: 40 / 200 = 0.2
         assert ratios["stats"]["width"][0] == pytest.approx(40.0 / 200.0, abs=1e-3)
@@ -462,7 +464,7 @@ class TestCalculateRatiosSeparateInputs:
         ratios = compute_ratios(img_stats, target_stats_output=tgt_stats)
 
         # Should have 3 box entries total
-        assert len(ratios[SOURCE_INDEX]) == 3
+        assert len(ratios.get(SOURCE_INDEX, [])) == 3
 
     def test_separate_inputs_image_count_mismatch(self):
         """Test that error is raised when image counts don't match."""
@@ -481,6 +483,25 @@ class TestCalculateRatiosSeparateInputs:
 
         with pytest.raises(ValueError, match="Image count mismatch"):
             compute_ratios(img_stats, target_stats_output=tgt_stats)
+
+    def test_separate_inputs_missing_image_count_raises_key_error(self):
+        """A missing 'image_count' is a KeyError on both compute_ratios paths.
+
+        The unified path (one stats_output) has always raised KeyError for this; the
+        separate-inputs path used to fold a missing key into the same branch as a real
+        mismatch and raise ValueError instead, so the two paths disagreed on what kind of
+        problem a missing key is. Picking KeyError uniformly.
+        """
+        images = [np.random.random((3, 50, 50))]
+        boxes = [[[10, 10, 30, 30]]]
+        img_stats = compute_stats(images, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
+        tgt_stats = dict(
+            compute_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True),
+        )
+        del tgt_stats["image_count"]
+
+        with pytest.raises(KeyError, match="image_count"):
+            compute_ratios(img_stats, target_stats_output=tgt_stats)  # type: ignore[arg-type]
 
     def test_separate_inputs_mismatched_channel_groups(self):
         """Two different `channels=` mappings must raise rather than ratio the overlap.
@@ -593,7 +614,7 @@ class TestCalculateRatiosEdgeCases:
 
         ratios = compute_ratios(stats)
 
-        assert len(ratios[SOURCE_INDEX]) == 1
+        assert len(ratios.get(SOURCE_INDEX, [])) == 1
         assert ratios["stats"]["width"][0] == pytest.approx(1.0 / 50.0, abs=1e-3)
         assert ratios["stats"]["height"][0] == pytest.approx(1.0 / 50.0, abs=1e-3)
 
@@ -664,7 +685,7 @@ class TestBackgroundStatsAreNotRatioed:
         being present and returned a table of NaN instead of saying what was missing.
         """
         stats = self._stats(per_image=False, per_target=True, per_background=True)
-        assert any(si.key is None for si in stats["source_index"])
+        assert any(si.key is None for si in stats.get("source_index", []))
 
         with pytest.raises(ValueError, match="carry background values only"):
             compute_ratios(stats)
@@ -740,7 +761,7 @@ class TestLevelsThatContradictTheKeyAreRejected:
         stats = self._stats()
         stats["source_index"] = [
             SourceIndex(si.item, si.key, label_level if si.key is not None else item_level)
-            for si in stats["source_index"]
+            for si in stats.get("source_index", [])
         ]
         return stats
 
@@ -790,7 +811,7 @@ class TestLevelsThatContradictTheKeyAreRejected:
             per_image=False,
             normalize_pixel_values=False,
         )
-        box_only["source_index"] = [SourceIndex(si.item, si.key, "track") for si in box_only["source_index"]]
+        box_only["source_index"] = [SourceIndex(si.item, si.key, "track") for si in box_only.get("source_index", [])]
 
         with pytest.raises(ValueError, match="target_stats_output contains addresses"):
             compute_ratios(image_only, target_stats_output=box_only)

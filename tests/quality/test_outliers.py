@@ -41,7 +41,7 @@ class TestOutliers:
         outliers = Outliers()
         results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
         assert len(outliers.stats["stats"]) > 0
-        assert len(outliers.stats["source_index"]) == 100
+        assert len(outliers.stats.get("source_index", [])) == 100
         assert results is not None
 
     def test_get_outlier_mask_empty(self):
@@ -164,7 +164,7 @@ class TestOutliers:
         outliers1 = Outliers(flags=ImageStats.DIMENSION)
         outliers1.evaluate(dataset, per_image=True, per_target=True)
         # Should have both image-level and target-level stats
-        source_indices1 = outliers1.stats["source_index"]
+        source_indices1 = outliers1.stats.get("source_index", [])
         has_image_level = any(idx.key is None for idx in source_indices1)
         has_target_level = any(idx.key is not None for idx in source_indices1)
         assert has_image_level
@@ -174,6 +174,7 @@ class TestOutliers:
         outliers2 = Outliers(flags=ImageStats.DIMENSION)
         outliers2.evaluate(dataset, per_image=True, per_target=False)
         # Should have only image-level stats
+        assert "source_index" in outliers2.stats
         source_indices2 = outliers2.stats["source_index"]
         assert all(idx.key is None for idx in source_indices2)
 
@@ -181,6 +182,7 @@ class TestOutliers:
         outliers3 = Outliers(flags=ImageStats.DIMENSION)
         outliers3.evaluate(dataset, per_image=False, per_target=True)
         # Should have only target-level stats
+        assert "source_index" in outliers3.stats
         source_indices3 = outliers3.stats["source_index"]
         assert all(idx.key is not None for idx in source_indices3)
 
@@ -732,9 +734,9 @@ class TestOutliersCoverageImprovements:
         assert result is not None
 
         # Should have image-level stats only
-        assert len(outliers.stats["source_index"]) > 0
+        assert len(outliers.stats.get("source_index", [])) > 0
         # All source indices should have target=None (no boxes in input)
-        assert all(idx.key is None for idx in outliers.stats["source_index"])
+        assert all(idx.key is None for idx in outliers.stats.get("source_index", []))
 
     def test_outliers_from_stats_with_empty_result(self):
         """Test from_stats when no outliers are found."""

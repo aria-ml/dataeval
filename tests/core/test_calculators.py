@@ -494,9 +494,9 @@ class TestPerImagePerBox:
 
         # Should have 1 result (full image)
         assert len(result["stats"]["mean"]) == 1
-        assert len(result["source_index"]) == 1
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].key is None
+        assert len(result.get("source_index", [])) == 1
+        assert result.get("source_index", [])[0].item == 0
+        assert result.get("source_index", [])[0].key is None
 
     def test_per_image_and_per_target_with_boxes(self):
         """Test per_image=True and per_target=True with boxes provided."""
@@ -518,17 +518,17 @@ class TestPerImagePerBox:
 
         # Should have 3 results: full image + 2 boxes
         assert len(result["stats"]["mean"]) == 3
-        assert len(result["source_index"]) == 3
+        assert len(result.get("source_index", [])) == 3
 
         # First should be full image
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].key is None
+        assert result.get("source_index", [])[0].item == 0
+        assert result.get("source_index", [])[0].key is None
 
         # Next two should be boxes
-        assert result["source_index"][1].item == 0
-        assert result["source_index"][1].key == 0
-        assert result["source_index"][2].item == 0
-        assert result["source_index"][2].key == 1
+        assert result.get("source_index", [])[1].item == 0
+        assert result.get("source_index", [])[1].key == 0
+        assert result.get("source_index", [])[2].item == 0
+        assert result.get("source_index", [])[2].key == 1
 
     def test_per_target_only_with_boxes(self):
         """Test per_image=False and per_target=True with boxes provided."""
@@ -550,13 +550,13 @@ class TestPerImagePerBox:
 
         # Should have 2 results: only boxes
         assert len(result["stats"]["mean"]) == 2
-        assert len(result["source_index"]) == 2
+        assert len(result.get("source_index", [])) == 2
 
         # Both should be boxes (no full image)
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].key == 0
-        assert result["source_index"][1].item == 0
-        assert result["source_index"][1].key == 1
+        assert result.get("source_index", [])[0].item == 0
+        assert result.get("source_index", [])[0].key == 0
+        assert result.get("source_index", [])[1].item == 0
+        assert result.get("source_index", [])[1].key == 1
 
     def test_per_image_only_with_boxes_ignored(self):
         """Test per_image=True and per_target=False with boxes provided (boxes ignored)."""
@@ -578,11 +578,11 @@ class TestPerImagePerBox:
 
         # Should have 1 result: only full image (boxes ignored)
         assert len(result["stats"]["mean"]) == 1
-        assert len(result["source_index"]) == 1
+        assert len(result.get("source_index", [])) == 1
 
         # Should be full image
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].key is None
+        assert result.get("source_index", [])[0].item == 0
+        assert result.get("source_index", [])[0].key is None
 
     def test_multiple_images_per_image_and_per_target(self):
         """Test multiple images with per_image=True and per_target=True."""
@@ -605,27 +605,27 @@ class TestPerImagePerBox:
 
         # Should have 5 results: image0 (1 full + 1 box) + image1 (1 full + 2 boxes)
         assert len(result["stats"]["mean"]) == 5
-        assert len(result["source_index"]) == 5
+        assert len(result.get("source_index", [])) == 5
 
         # Image 0: full image
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].key is None
+        assert result.get("source_index", [])[0].item == 0
+        assert result.get("source_index", [])[0].key is None
 
         # Image 0: box 0
-        assert result["source_index"][1].item == 0
-        assert result["source_index"][1].key == 0
+        assert result.get("source_index", [])[1].item == 0
+        assert result.get("source_index", [])[1].key == 0
 
         # Image 1: full image
-        assert result["source_index"][2].item == 1
-        assert result["source_index"][2].key is None
+        assert result.get("source_index", [])[2].item == 1
+        assert result.get("source_index", [])[2].key is None
 
         # Image 1: box 0
-        assert result["source_index"][3].item == 1
-        assert result["source_index"][3].key == 0
+        assert result.get("source_index", [])[3].item == 1
+        assert result.get("source_index", [])[3].key == 0
 
         # Image 1: box 1
-        assert result["source_index"][4].item == 1
-        assert result["source_index"][4].key == 1
+        assert result.get("source_index", [])[4].item == 1
+        assert result.get("source_index", [])[4].key == 1
 
     def test_invalid_both_false_raises_error(self):
         """Test that per_image=False and per_target=False raises ValueError."""
@@ -653,8 +653,8 @@ class TestPerImagePerBox:
         )
 
         # Object count should be 2 (number of boxes)
-        assert result["object_count"][0] == 2
-        assert result["image_count"] == 1
+        assert result.get("object_count", [])[0] == 2
+        assert result.get("image_count", 0) == 1
 
 
 class TestLowerDimensionalPixelStats:
@@ -968,13 +968,13 @@ class TestImageClassificationDataset:
 
         # Should process 3 images without boxes
         assert len(result["stats"]["mean"]) == 3
-        assert len(result["source_index"]) == 3
-        assert result["image_count"] == 3
+        assert len(result.get("source_index", [])) == 3
+        assert result.get("image_count", 0) == 3
 
         # All should be full images (box=None)
         for i in range(3):
-            assert result["source_index"][i].item == i
-            assert result["source_index"][i].key is None
+            assert result.get("source_index", [])[i].item == i
+            assert result.get("source_index", [])[i].key is None
 
     def test_ic_dataset_with_explicit_boxes_param(self, get_mock_ic_dataset):
         """Test ImageClassificationDataset with explicit boxes parameter (should be ignored)."""
@@ -998,8 +998,8 @@ class TestImageClassificationDataset:
 
         # Should process boxes since they are explicitly provided
         assert len(result["stats"]["mean"]) == 4  # 2 images + 2 boxes
-        assert len(result["source_index"]) == 4
-        assert result["image_count"] == 2
+        assert len(result.get("source_index", [])) == 4
+        assert result.get("image_count", 0) == 2
 
     def test_ic_dataset_multiple_stats(self, get_mock_ic_dataset):
         """Test ImageClassificationDataset with multiple statistics."""
@@ -1022,7 +1022,7 @@ class TestImageClassificationDataset:
         assert "sharpness" in stats
 
         assert len(stats["mean"]) == 2
-        assert result["image_count"] == 2
+        assert result.get("image_count", 0) == 2
 
 
 class TestObjectDetectionDataset:
@@ -1043,32 +1043,32 @@ class TestObjectDetectionDataset:
 
         # Should have: image0 (1 full + 2 boxes) + image1 (1 full + 1 box) = 5 results
         assert len(result["stats"]["mean"]) == 5
-        assert len(result["source_index"]) == 5
-        assert result["image_count"] == 2
+        assert len(result.get("source_index", [])) == 5
+        assert result.get("image_count", 0) == 2
 
         # Check object counts
-        assert result["object_count"][0] == 2
-        assert result["object_count"][1] == 1
+        assert result.get("object_count", [])[0] == 2
+        assert result.get("object_count", [])[1] == 1
 
         # Image 0: full image
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].key is None
+        assert result.get("source_index", [])[0].item == 0
+        assert result.get("source_index", [])[0].key is None
 
         # Image 0: box 0
-        assert result["source_index"][1].item == 0
-        assert result["source_index"][1].key == 0
+        assert result.get("source_index", [])[1].item == 0
+        assert result.get("source_index", [])[1].key == 0
 
         # Image 0: box 1
-        assert result["source_index"][2].item == 0
-        assert result["source_index"][2].key == 1
+        assert result.get("source_index", [])[2].item == 0
+        assert result.get("source_index", [])[2].key == 1
 
         # Image 1: full image
-        assert result["source_index"][3].item == 1
-        assert result["source_index"][3].key is None
+        assert result.get("source_index", [])[3].item == 1
+        assert result.get("source_index", [])[3].key is None
 
         # Image 1: box 0
-        assert result["source_index"][4].item == 1
-        assert result["source_index"][4].key == 0
+        assert result.get("source_index", [])[4].item == 1
+        assert result.get("source_index", [])[4].key == 0
 
     def test_od_dataset_per_target_only(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset with per_image=False, per_target=True."""
@@ -1085,17 +1085,17 @@ class TestObjectDetectionDataset:
 
         # Should have only boxes: 1 + 2 = 3 results (no full images)
         assert len(result["stats"]["mean"]) == 3
-        assert len(result["source_index"]) == 3
+        assert len(result.get("source_index", [])) == 3
 
         # All should be boxes (no full images)
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].key == 0
+        assert result.get("source_index", [])[0].item == 0
+        assert result.get("source_index", [])[0].key == 0
 
-        assert result["source_index"][1].item == 1
-        assert result["source_index"][1].key == 0
+        assert result.get("source_index", [])[1].item == 1
+        assert result.get("source_index", [])[1].key == 0
 
-        assert result["source_index"][2].item == 1
-        assert result["source_index"][2].key == 1
+        assert result.get("source_index", [])[2].item == 1
+        assert result.get("source_index", [])[2].key == 1
 
     def test_od_dataset_per_image_only(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset with per_image=True, per_target=False."""
@@ -1112,14 +1112,14 @@ class TestObjectDetectionDataset:
 
         # Should have only full images: 2 results (no boxes)
         assert len(result["stats"]["mean"]) == 2
-        assert len(result["source_index"]) == 2
+        assert len(result.get("source_index", [])) == 2
 
         # All should be full images
-        assert result["source_index"][0].item == 0
-        assert result["source_index"][0].key is None
+        assert result.get("source_index", [])[0].item == 0
+        assert result.get("source_index", [])[0].key is None
 
-        assert result["source_index"][1].item == 1
-        assert result["source_index"][1].key is None
+        assert result.get("source_index", [])[1].item == 1
+        assert result.get("source_index", [])[1].key is None
 
     def test_od_dataset_with_dimension_stats(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset with dimension statistics for boxes."""
@@ -1132,7 +1132,7 @@ class TestObjectDetectionDataset:
         result = compute_stats(dataset, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
 
         # Should have 1 result (just the box)
-        assert len(result["source_index"]) == 1
+        assert len(result.get("source_index", [])) == 1
 
         # Check box dimensions
         assert result["stats"]["offset_x"][0] == 10
@@ -1165,7 +1165,7 @@ class TestObjectDetectionDataset:
         )
 
         # Should use override boxes
-        assert len(result["source_index"]) == 2
+        assert len(result.get("source_index", [])) == 2
 
         # Check first box dimensions from override
         assert result["stats"]["offset_x"][0] == 5
@@ -1185,11 +1185,11 @@ class TestObjectDetectionDataset:
 
         # Should have: image0 (1 full + 0 boxes) + image1 (1 full + 1 box) = 3 results
         assert len(result["stats"]["mean"]) == 3
-        assert len(result["source_index"]) == 3
+        assert len(result.get("source_index", [])) == 3
 
         # Check object counts
-        assert result["object_count"][0] == 0
-        assert result["object_count"][1] == 1
+        assert result.get("object_count", [])[0] == 0
+        assert result.get("object_count", [])[1] == 1
 
     def test_od_dataset_multiple_stats(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset with multiple statistics."""
@@ -1239,7 +1239,7 @@ class TestProgressCallback:
 
         # Callback should have been called for each image
         assert len(callback_calls) == 5
-        assert result["image_count"] == 5
+        assert result.get("image_count", 0) == 5
 
         # Verify callbacks have correct step values
         for i, call in enumerate(callback_calls):
@@ -1253,7 +1253,7 @@ class TestProgressCallback:
         result = compute_stats(images, stats=ImageStats.PIXEL, progress_callback=None)
 
         # Should work without error
-        assert result["image_count"] == 3
+        assert result.get("image_count", 0) == 3
 
     def test_progress_callback_with_boxes(self):
         """Test that progress_callback works with bounding boxes."""
@@ -1268,7 +1268,7 @@ class TestProgressCallback:
 
         # Callback should be called for each image (not each box)
         assert len(callback_calls) == 3
-        assert result["image_count"] == 3
+        assert result.get("image_count", 0) == 3
 
         # Verify step counts
         for i, call in enumerate(callback_calls):
@@ -1291,7 +1291,7 @@ class TestProgressCallback:
 
         # Callback should be called for each image
         assert len(callback_calls) == 4
-        assert result["image_count"] == 4
+        assert result.get("image_count", 0) == 4
 
         # Verify total is provided for Dataset (which is Sized)
         for call in callback_calls:
@@ -1315,9 +1315,13 @@ class TestProgressCallback:
         images = []
         result = compute_stats(images, stats=ImageStats.PIXEL)
 
+        assert "image_count" in result
         assert result["image_count"] == 0
+        assert "source_index" in result
         assert len(result["source_index"]) == 0
+        assert "object_count" in result
         assert len(result["object_count"]) == 0
+        assert "invalid_box_count" in result
         assert len(result["invalid_box_count"]) == 0
 
     def test_channels_true_is_refused_by_name(self):
@@ -1478,9 +1482,9 @@ class TestPerBackground:
         )
 
         # One row for the image, one for its box - the background added no row.
-        assert len(result["source_index"]) == 2
-        assert result["source_index"][0] == SourceIndex(0, None)
-        assert result["source_index"][1] == SourceIndex(0, 0)
+        assert len(result.get("source_index", [])) == 2
+        assert result.get("source_index", [])[0] == SourceIndex(0, None)
+        assert result.get("source_index", [])[1] == SourceIndex(0, 0)
         assert set(result["stats"]) == {"mean", "background_mean", "background_fraction"}
 
     def test_background_excludes_the_boxed_pixels(self):
@@ -1534,7 +1538,7 @@ class TestPerBackground:
             normalize_pixel_values=False,
         )
 
-        image_rows = [i for i, s in enumerate(result["source_index"]) if s.key is None]
+        image_rows = [i for i, s in enumerate(result.get("source_index", [])) if s.key is None]
         empty = image_rows[1]
         assert result["stats"]["background_fraction"][empty] == pytest.approx(1.0)
         assert result["stats"]["background_mean"][empty] == pytest.approx(result["stats"]["mean"][empty], abs=1e-3)
@@ -1572,6 +1576,7 @@ class TestPerBackground:
         )
 
         # Every stat array stays one-to-one with the source index.
+        assert "source_index" in result
         assert all(len(values) == len(result["source_index"]) for values in result["stats"].values())
         for i, source in enumerate(result["source_index"]):
             if source.key is not None:
@@ -1615,8 +1620,8 @@ class TestPerBackground:
         )
 
         assert set(result["stats"]) == {"background_mean", "background_fraction"}
-        assert len(result["source_index"]) == 1
-        assert result["source_index"][0] == SourceIndex(0, None)
+        assert len(result.get("source_index", [])) == 1
+        assert result.get("source_index", [])[0] == SourceIndex(0, None)
 
     def test_hash_and_dimension_stats_are_skipped_for_background(self):
         """Statistics that cannot describe a masked region are not computed for it."""
@@ -2278,7 +2283,7 @@ class TestUnsatisfiableChannelGroups:
             channels={"nir": 3, "rgb": [0, 1, 2]},
         )
 
-        rows = len(result["source_index"])
+        rows = len(result.get("source_index", []))
         for name, values in result["stats"].items():
             assert len(values) == rows, f"{name} is {len(values)} long against {rows} rows"
 
@@ -2469,7 +2474,7 @@ class TestPerGroupStats:
             normalize_pixel_values=False,
         )
 
-        assert [(s.item, s.key) for s in result["source_index"]] == [(0, None), (0, 0)]
+        assert [(s.item, s.key) for s in result.get("source_index", [])] == [(0, None), (0, 0)]
         assert len(result["stats"]["rgb_mean"]) == 2
 
     def test_a_mapping_restating_one_flag_set_matches_it(self):
@@ -2727,7 +2732,7 @@ class TestEmptyStatsRequest:
             result = compute_stats(self._IMAGE, stats=stats, normalize_pixel_values=False)
 
         assert result["stats"] == {}
-        assert len(result["source_index"]) == 1, "the rows still exist; only the columns are gone"
+        assert len(result.get("source_index", [])) == 1, "the rows still exist; only the columns are gone"
 
     def test_a_group_asked_for_nothing_stays_quiet(self):
         """`ImageStats.NONE` is the only way to define a group without measuring it.

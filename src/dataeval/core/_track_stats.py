@@ -5,12 +5,13 @@ from __future__ import annotations
 __all__ = ["TrackStatsResult", "track_stats"]
 
 from collections.abc import Mapping, Sequence
-from typing import Any, TypedDict, cast, overload
+from typing import Any, TypeAlias, TypedDict, cast, overload
 
 import numpy as np
 from typing_extensions import NotRequired
 
 from dataeval._log import get_logger
+from dataeval.core._compute_stats import FactorResult
 from dataeval.data import build_tracks
 from dataeval.protocols import Dataset, MultiobjectTrackingDataset
 from dataeval.types import Track
@@ -20,7 +21,7 @@ from dataeval.utils._internal import EPSILON
 _logger = get_logger(__name__)
 
 
-class TrackStatsResult(TypedDict):
+class TrackFactors(TypedDict):
     """
     Compute per-track statistics for one video sequence.
 
@@ -140,6 +141,13 @@ class TrackStatsResult(TypedDict):
     jitter_rate: Sequence[float]
     entry_at_edge: Sequence[bool | None]
     exit_at_edge: Sequence[bool | None]
+
+
+TrackStatsResult: TypeAlias = FactorResult[TrackFactors]
+"""Per-track statistics for one video sequence or a whole dataset.
+
+The values are under ``stats``; see :class:`TrackFactors` for what each one means.
+"""
 
 
 def _centers(boxes: np.ndarray) -> np.ndarray:
@@ -463,21 +471,23 @@ def _sequence_stats(
     _logger.info("Track stats complete.")
 
     return TrackStatsResult(
-        track_ids=track_ids,
-        labels=labels,
-        label_confidence=label_confidence,
-        mean_score=mean_score,
-        n_appearances=n_appearances,
-        track_duration=track_duration,
-        n_gaps=n_gaps,
-        total_gap_length=total_gap_length,
-        mean_speed=mean_speed,
-        speed_variance=speed_variance,
-        net_displacement=net_displacement,
-        straightness_index=straightness_index,
-        jitter_rate=jitter_rate,
-        entry_at_edge=entry_at_edge,
-        exit_at_edge=exit_at_edge,
+        stats=TrackFactors(
+            track_ids=track_ids,
+            labels=labels,
+            label_confidence=label_confidence,
+            mean_score=mean_score,
+            n_appearances=n_appearances,
+            track_duration=track_duration,
+            n_gaps=n_gaps,
+            total_gap_length=total_gap_length,
+            mean_speed=mean_speed,
+            speed_variance=speed_variance,
+            net_displacement=net_displacement,
+            straightness_index=straightness_index,
+            jitter_rate=jitter_rate,
+            entry_at_edge=entry_at_edge,
+            exit_at_edge=exit_at_edge,
+        ),
     )
 
 
@@ -510,7 +520,7 @@ def _dataset_stats(
         video_stream, target, _ = dataset[item]
         tracks = build_tracks(target)
         width, height = (frame_width, frame_height) if stated else frame_size(next(iter(video_stream), None))
-        stats = _sequence_stats(tracks, width, height, edge_threshold, jitter_min_frames, jitter_fc)
+        stats = _sequence_stats(tracks, width, height, edge_threshold, jitter_min_frames, jitter_fc)["stats"]
         # Read as a plain mapping: a TypedDict types its values field by field, and this
         # walks them uniformly without caring which field it is holding.
         for name, values in cast("Mapping[str, Sequence[Any]]", stats).items():
@@ -520,7 +530,9 @@ def _dataset_stats(
     _logger.info("Track stats complete for %d item(s).", count)
     # An empty dataset still has to answer with every field, so the keys come from the
     # result type rather than from whatever the walk happened to produce.
-    return cast("TrackStatsResult", {name: merged.get(name, []) for name in TrackStatsResult.__annotations__})
+    return TrackStatsResult(
+        stats=cast("TrackFactors", {name: merged.get(name, []) for name in TrackFactors.__annotations__}),
+    )
 
 
 @overload
@@ -553,12 +565,12 @@ def track_stats(
 ) -> TrackStatsResult:
     """Compute per-track statistics for one video sequence or a whole dataset.
 
-    Results are returned as lists indexed by **position in sorted track ID
-    order**.  The ``track_ids`` field maps each position back to its original
-    track ID::
+    Results are returned as lists under ``stats``, indexed by **position in
+    sorted track ID order**. The ``track_ids`` field maps each position back
+    to its original track ID::
 
-        stats["track_ids"][i]  # the track ID at position i
-        stats["mean_speed"][i]  # mean speed for that track
+        result["stats"]["track_ids"][i]  # the track ID at position i
+        result["stats"]["mean_speed"][i]  # mean speed for that track
 
     Given a dataset, every sequence is measured and the results are concatenated,
     each labelled with the item it came from in ``item_index``. That pair —
@@ -595,10 +607,11 @@ def track_stats(
     Returns
     -------
     TrackStatsResult
-        A :class:`TrackStatsResult` dict where every stat field is a Sequence
-        indexed by position in sorted track ID order.  Use ``track_ids[i]``
-        to recover the original track ID for position *i*, and ``item_index[i]``
-        the sequence it belongs to when a dataset was measured.
+        A :class:`TrackStatsResult` whose ``stats`` holds every stat field, as a
+        Sequence indexed by position in sorted track ID order. Use
+        ``result["stats"]["track_ids"][i]`` to recover the original track ID for
+        position *i*, and ``result["stats"]["item_index"][i]`` the sequence it
+        belongs to when a dataset was measured.
 
     Raises
     ------
