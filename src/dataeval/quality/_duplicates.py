@@ -2130,7 +2130,7 @@ def _sum_image_counts(results: StatsResult | Sequence[StatsResult]) -> int:
     if unaddressable:
         raise ValueError(
             f"Cannot resolve item count from calculation_results: result(s) at index "
-            f"{unaddressable} carry no 'image_count', as track_stats "
+            f"{unaddressable} carry no 'image_count', as ego_stats and track_stats "
             "results do not. Pass n_items=len(dataset) instead.",
         )
     return sum(counts)

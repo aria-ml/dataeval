@@ -680,7 +680,7 @@ and the summaries available.
 
 | Measured Entity | Level | Which column names a row |
 | --- | --- | --- |
-| Property of the whole video (e.g., codec, resolution, platform) | `sequence` | — the item names it |
+| Property of the whole video (e.g., codec, resolution, camera motion) | `sequence` | — the item names it |
 | Property of one frame (e.g., brightness, blur, scene cuts) | `unit` | `unit_index` |
 | Property of one track (e.g., mean speed, total displacement) | `track` | `track_id` |
 | Property of one detection (e.g., box area, confidence, IoU) | `instance` | `target_index` |
@@ -805,6 +805,68 @@ in frames 0 and 2 has `track_length == 2` and `frame_span == 3`).
 Because DataEval computes these automatically, you do not need to recalculate
 them via {func}`.track_stats` or manual aggregation (such as running `pl.len()`
 at the `instance` level).
+
+### Camera motion as a per-frame factor
+
+How the camera moved is a property of each frame, so {func}`.ego_stats` measures
+it there. It returns one row per frame of every sequence, concatenated in
+dataset-item order, which is what the `unit` level expects — attach it with the
+frame index as the key:
+
+```python
+from dataeval.core import ego_stats
+
+metadata.add_factors(ego_stats(dataset), level="unit", key="unit_index")
+```
+
+`ego_stats` also ships the recipe for rolling these per-frame readings up to a
+sequence summary — a rate accumulates by median, a label by mode, and so on (see
+[Declaring a roll-up apart from running it](#declaring-a-roll-up-apart-from-running-it)).
+`add_factors` runs that recipe automatically, so the one call above also adds one
+row per sequence. The sequence-level name is the per-frame name with the
+reduction appended:
+
+| Per-frame (`unit`) | Sequence roll-up (`sequence`) |
+| --- | --- |
+| `pan_x`, `pan_y` | `pan_x_variability`, `pan_y_variability` |
+| `pan_speed` | `pan_speed_median` |
+| `zoom_rate` | `zoom_rate_median`, `zoom_rate_excursion` |
+| `roll_rate` | `roll_rate_median`, `roll_rate_excursion` |
+| `shear_rate` | `shear_rate_median` |
+| `motion` | `motion_mode` |
+| `mover_frac` | `mover_frac_median` |
+| `mover_speed` | `mover_speed_median` |
+
+The per-frame factors themselves sit on three axes, kept apart so you can condition
+on each independently:
+
+| Axis | Factors | What it tells you |
+| --- | --- | --- |
+| Camera | `pan_x`, `pan_y`, `pan_speed`, `zoom_rate`, `roll_rate`, `shear_rate`, `foe_x`, `foe_y`, `motion` | What the camera did |
+| Contamination | `mover_frac`, `mover_speed` | How much independent motion was in frame |
+| Trust | `ego_trusted` | Whether to believe this frame's camera fields |
+
+Camera motion is a shortcut hazard: a detector can learn "the camera was panning"
+in place of the object whenever the two correlate. Storing these as factors is
+what lets a bias or balance analysis condition on the camera rather than be
+confounded by it — `motion` is categorical, so it bins directly.
+
+```{warning}
+Read `ego_trusted` first. Where it is `False`, that frame's camera fields
+(`pan_x` and its neighbours) are NaN. At the sequence level there is no single
+flag to check instead: each roll-up above answers only when at least a quarter
+of its sequence's frames were trusted (`min_coverage=0.25`), and is null
+otherwise, so a summary is never built from too little evidence. There is
+deliberately no `ego_trusted` roll-up of its own — the named-reduction registry's
+`mean` takes numeric columns only, and `ego_trusted` is Boolean. Read it directly
+at `unit`, or aggregate it explicitly with {meth}`.Metadata.agg`; see the escape
+hatch in {func}`.ego_stats`'s docstring.
+```
+
+Because the roll-ups land at `sequence`, they propagate **down** to every frame,
+track and detection row beneath them — so a per-detection analysis can already
+see the sequence's camera summary without running any aggregation itself. See
+[Propagation](#propagation-values-move-down-never-up).
 
 ## Saving and reading Metadata
 
