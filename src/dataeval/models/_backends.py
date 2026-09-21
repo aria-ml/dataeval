@@ -2,6 +2,7 @@
 
 __all__ = ["RuntimeBackend", "OnnxBackend", "LiteRtBackend", "make_backend"]
 
+from importlib import import_module
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -93,25 +94,34 @@ class OnnxBackend:
         return {name: np.asarray(arr) for name, arr in zip(self.output_names, outputs, strict=True)}
 
 
+#: Interpreter providers tried in order. `ai_edge_litert` is what `dataeval[litert]`
+#: installs and is the supported successor to the standalone `tflite_runtime` wheel;
+#: the other two stay as fallbacks for environments that already carry them.
+_LITERT_MODULES = ("ai_edge_litert.interpreter", "tflite_runtime.interpreter", "tensorflow.lite")
+
+
 def _litert_interpreter(model_path: str | Path) -> Any:
-    try:
-        from tflite_runtime.interpreter import Interpreter
-    except ImportError:
+    for module_name in _LITERT_MODULES:
         try:
-            from tensorflow.lite import Interpreter  # type: ignore[no-redef]
-        except ImportError as e:
-            raise ImportError("LiteRtBackend requires tflite-runtime or tensorflow. Install dataeval[tflite].") from e
-    return Interpreter(model_path=str(model_path))
+            interpreter = import_module(module_name).Interpreter
+        except ImportError:
+            continue
+        return interpreter(model_path=str(model_path))
+    raise ImportError(
+        "LiteRtBackend requires a LiteRT interpreter, which is not installed. "
+        "Install it with: pip install 'dataeval[litert]' (or provide tflite-runtime or tensorflow)."
+    )
 
 
 class LiteRtBackend:
     """
     LiteRT (TensorFlow Lite) backend with NCHW input.
 
-    Loads a ``.tflite`` model via a LiteRT interpreter (``tflite-runtime`` if
-    available, else ``tensorflow.lite``). Accepts NCHW input and transposes to the
-    NHWC layout LiteRT expects internally, resizing the interpreter's input tensor
-    per batch. Implements :class:`RuntimeBackend`. Requires ``dataeval[tflite]``.
+    Loads a ``.tflite`` model via a LiteRT interpreter (``ai-edge-litert`` if
+    available, else ``tflite-runtime`` or ``tensorflow.lite``). Accepts NCHW input
+    and transposes to the NHWC layout LiteRT expects internally, resizing the
+    interpreter's input tensor per batch. Implements :class:`RuntimeBackend`.
+    Requires ``dataeval[litert]``.
 
     Parameters
     ----------
@@ -121,7 +131,7 @@ class LiteRtBackend:
     Raises
     ------
     ImportError
-        If neither ``tflite-runtime`` nor ``tensorflow`` is installed.
+        If no LiteRT interpreter is available.
     FileNotFoundError
         If ``model_path`` does not exist.
     """
