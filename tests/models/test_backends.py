@@ -105,26 +105,50 @@ def test_litert_backend_init_and_run_transposes_to_nhwc(tmp_path, monkeypatch):
     assert interp.resized_shape == (1, 8, 8, 3)
 
 
+def _hide_litert_runtimes(monkeypatch) -> None:
+    """Make every interpreter provider unimportable."""
+    for module_name in backends._LITERT_MODULES:
+        monkeypatch.setitem(sys.modules, module_name, None)
+        monkeypatch.setitem(sys.modules, module_name.partition(".")[0], None)
+
+
+def _install_fake_interpreter(monkeypatch, module_name: str) -> None:
+    """Register a fake interpreter provider under `module_name`."""
+    interpreter_module = types.ModuleType(module_name)
+    interpreter_module.Interpreter = _FakeInterpreter  # type: ignore
+    parent_name, _, attr = module_name.rpartition(".")
+    parent = types.ModuleType(parent_name)
+    setattr(parent, attr, interpreter_module)
+    monkeypatch.setitem(sys.modules, parent_name, parent)
+    monkeypatch.setitem(sys.modules, module_name, interpreter_module)
+
+
 def test_litert_interpreter_raises_without_runtime(monkeypatch):
-    # neither tflite_runtime nor tensorflow importable -> a helpful ImportError
-    monkeypatch.setitem(sys.modules, "tflite_runtime", None)
-    monkeypatch.setitem(sys.modules, "tensorflow", None)
-    with pytest.raises(ImportError, match="tflite-runtime or tensorflow"):
+    # no interpreter provider importable -> an ImportError naming the `litert` extra,
+    # which is the extra that actually supplies one (ai-edge-litert).
+    _hide_litert_runtimes(monkeypatch)
+    with pytest.raises(ImportError, match=r"pip install 'dataeval\[litert\]'"):
         backends._litert_interpreter("model.tflite")
 
 
-def test_litert_interpreter_uses_tflite_runtime(monkeypatch):
-    # a present tflite_runtime is used to build the interpreter
-    module = types.ModuleType("tflite_runtime")
-    interpreter_module = types.ModuleType("tflite_runtime.interpreter")
-    interpreter_module.Interpreter = _FakeInterpreter  # type: ignore
-    module.interpreter = interpreter_module  # type: ignore
-    monkeypatch.setitem(sys.modules, "tflite_runtime", module)
-    monkeypatch.setitem(sys.modules, "tflite_runtime.interpreter", interpreter_module)
+@pytest.mark.parametrize("module_name", backends._LITERT_MODULES)
+def test_litert_interpreter_uses_each_provider(monkeypatch, module_name):
+    # each provider in the fallback chain is enough on its own to build the interpreter
+    _hide_litert_runtimes(monkeypatch)
+    _install_fake_interpreter(monkeypatch, module_name)
 
     interp = backends._litert_interpreter("model.tflite")
     assert isinstance(interp, _FakeInterpreter)
     assert interp.model_path == "model.tflite"
+
+
+def test_litert_interpreter_prefers_ai_edge_litert(monkeypatch):
+    # ai_edge_litert is what dataeval[litert] installs, so it wins over the fallbacks
+    _hide_litert_runtimes(monkeypatch)
+    assert backends._LITERT_MODULES[0] == "ai_edge_litert.interpreter"
+    _install_fake_interpreter(monkeypatch, "ai_edge_litert.interpreter")
+
+    assert isinstance(backends._litert_interpreter("model.tflite"), _FakeInterpreter)
 
 
 def test_onnx_backend_init_and_run_with_stubbed_runtime(stub_model_file, fake_onnxruntime):

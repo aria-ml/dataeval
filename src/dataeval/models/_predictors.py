@@ -184,7 +184,7 @@ class LiteRtImageClassifier(_BaseImageClassifier):
     of CHW images to per-image class scores. Calling the instance preprocesses each
     image to the model's input contract (color layout, size, ``[0, 1]``
     normalization), runs inference, and returns one ``(nClasses,)`` float32 score
-    array per image. Requires ``dataeval[tflite]``.
+    array per image. Requires ``dataeval[litert]``.
 
     Parameters
     ----------
@@ -205,7 +205,7 @@ class LiteRtImageClassifier(_BaseImageClassifier):
     ValueError
         If the metadata declares a task other than ``IMAGE_CLASSIFICATION``.
     ImportError
-        If neither ``tflite-runtime`` nor ``tensorflow`` is installed.
+        If no LiteRT interpreter is available.
     FileNotFoundError
         If ``model_path`` does not exist.
 
@@ -413,7 +413,7 @@ class LiteRtObjectDetector(_BaseObjectDetector):
     to per-image detection targets. Calling the instance preprocesses each image to
     the model's input contract (color layout, size, ``[0, 1]`` normalization), runs
     inference, and returns one detection target per image. Requires
-    ``dataeval[tflite]``.
+    ``dataeval[litert]``.
 
     Parameters
     ----------
@@ -436,7 +436,7 @@ class LiteRtObjectDetector(_BaseObjectDetector):
     ValueError
         If the metadata declares a task other than ``IMAGE_OBJECT_DETECTION``.
     ImportError
-        If neither ``tflite-runtime`` nor ``tensorflow`` is installed.
+        If no LiteRT interpreter is available.
     FileNotFoundError
         If ``model_path`` does not exist.
 
