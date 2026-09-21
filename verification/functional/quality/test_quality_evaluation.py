@@ -35,6 +35,24 @@ class TestQualityEvaluation:
         exact_items = df.filter((df["level"] == "item") & (df["dup_type"] == "exact"))
         assert exact_items.shape[0] > 0
 
+    def test_duplicates_detects_near_duplicates(self):
+        """Verify Duplicates detects near duplicates using perceptual hashing."""
+        import polars as pl
+
+        from dataeval.quality import Duplicates
+
+        rng = np.random.default_rng(0)
+        data = rng.random((20, 3, 16, 16)).astype(np.float32)
+        # Adding 0.001 creates non-byte-identical values detected as near duplicates via phash/dhash
+        images_with_near_dupes = np.concatenate([data, data[:2] + 0.001])
+        result = Duplicates().evaluate(images_with_near_dupes)
+        df = result.data()
+        assert isinstance(df, pl.DataFrame)
+        near_items = df.filter((df["level"] == "item") & (df["dup_type"] == "near"))
+        assert near_items.shape[0] > 0
+        assert hasattr(result, "near")
+        assert len(result.near) > 0
+
     def test_outliers_returns_issues_dataframe(self):
         import polars as pl
 

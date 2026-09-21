@@ -27,7 +27,7 @@ class TestWheelContents:
             "dataeval.core",
             "dataeval.quality",
             "dataeval.scope",
-            "dataeval.selection",
+            "dataeval.data",
             "dataeval.shift",
             "dataeval.extractors",
             "dataeval.utils",

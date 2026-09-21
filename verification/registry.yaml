@@ -93,7 +93,7 @@ requirements:
     test_cases: ["11-2"]
 
   FR-12:
-    name: Utility Components
+    name: Evaluation Support & Data Preparation Utilities
     origin: DR-1.5
     origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
     file: FR-12-utility-components.md
@@ -143,11 +143,15 @@ test_cases:
     test_type: Core Functionality
     business_case: >-
       Verify that DataEval installs and functions correctly across all
-      supported Python versions (3.10 through 3.14) to ensure broad
+      supported Python versions (3.10 through 3.14), and that optional
+      dependencies degrade gracefully when they are absent, to ensure broad
       compatibility and reliable operation across different environments.
     initial_conditions:
-      - Clean Python environment for the target version
-      - Network access for pip/uv package installation
+      - Clean Python environment for the target version (3.10 through 3.14)
+      - Network access or a local package cache for installation
+      - >-
+        The graceful-degradation steps simulate a missing optional dependency by
+        making it unimportable, so they run regardless of which extras are installed
     expected_results:
       - Package imports without errors on the current Python version
       - Version string is set and valid (not "unknown")
@@ -155,6 +159,9 @@ test_cases:
       - Key user-facing classes (Embeddings, Metadata, Balance, etc.) exist
       - Protocol types are exported from dataeval.protocols
       - Package metadata (name, requires-python, license, project URLs) is correctly set
+      - >-
+        Optional capabilities raise an ImportError naming the missing package and
+        its install command when their optional dependency is absent
 
   "1-2":
     name: Dependency Resolution
@@ -186,9 +193,12 @@ test_cases:
     expected_results:
       - Package imports and basic computation completes without error
       - py.typed marker is present (PEP 561)
-      - All documented subpackages (bias, core, quality, selection, shift, extractors, utils) are installed
+      - All documented subpackages (bias, core, quality, scope, data, shift, extractors, utils) are installed
       - No test files are included in the distributed package
       - Optional extras install and expose expected functionality
+      - >-
+        Optional capabilities raise an ImportError naming the missing package and
+        its install command when their optional dependency is absent
 
   "2-1":
     name: Bias Analysis Suite
@@ -215,14 +225,16 @@ test_cases:
     test_type: Core Functionality
     business_case: >-
       Verify that Duplicates and Outliers evaluators correctly identify data
-      quality issues, support multiple detection methods, and produce properly
-      structured output objects.
+      quality issues -- exact duplicate images, near-duplicate images via
+      perceptual hashing, and statistical outliers -- support multiple detection
+      methods, and produce properly structured output objects.
     initial_conditions:
       - DataEval installed with core dependencies (polars)
       - Numpy image arrays for evaluation
     expected_results:
       - Duplicates detects exact copies and returns items and targets attributes
       - Duplicates items has exact field for exact duplicate detection
+      - Duplicates detects near duplicates via perceptual hashing
       - Outliers returns issues as a polars DataFrame
       - Outliers supports zscore detection method
       - Outliers supports iqr detection method
@@ -267,19 +279,19 @@ test_cases:
     name: Dataset Selection & Filtering
     test_type: Core Functionality
     business_case: >-
-      Verify that Select and its composable selection operators (Limit, Indices,
+      Verify that View and its composable operation steps (Limit, Indices,
       Shuffle, Reverse) correctly transform datasets and support chaining
       multiple operations.
     initial_conditions:
       - DataEval installed
       - Dataset object implementing __getitem__ and __len__
     expected_results:
-      - Select with Limit restricts dataset length correctly
-      - Select with Indices selects specified indices
-      - Select with Shuffle preserves dataset length while reordering
-      - Select with Reverse reverses item order
-      - Select composes multiple operations (e.g., Limit + Shuffle)
-      - Select result is iterable
+      - View with Limit restricts dataset length correctly
+      - View with Indices selects specified indices
+      - View with Shuffle preserves dataset length while reordering
+      - View with Reverse reverses item order
+      - View composes multiple operations (e.g., Limit + Shuffle)
+      - View result is iterable
 
   "7-1":
     name: Feature Extraction
@@ -362,18 +374,26 @@ test_cases:
       - Prioritize supports stratified selection policy
 
   "12-1":
-    name: Utility Components
+    name: Evaluation Support & Data Preparation Utilities
     test_type: Core Functionality
     business_case: >-
-      Verify that DataEval utilities for data loading, model management,
-      and thresholding are available and functional.
+      Verify that the public utilities DataEval exposes under dataeval.utils --
+      statistical thresholding, image and bounding-box preparation, dataset
+      validation, ONNX graph handling, and the PyTorch model/loss/training
+      helpers -- are available and functional.
     initial_conditions:
-      - DataEval installed
+      - DataEval installed with core dependencies
     expected_results:
-      - utils.data provides working dataset wrappers
-      - utils.thresholds provides ZScore and IQR threshold calculators
-      - utils.preprocessing provides image tensor conversion
-      - utils.onnx is available for model management
+      - utils.thresholds provides callable ZScore and IQR threshold calculators
+      - >-
+        utils.preprocessing provides bounding-box integer conversion, canonical
+        grayscale conversion, and dynamic range rescaling
+      - >-
+        utils.data validates MAITE dataset shape and rejects a dataset that does
+        not match the expected kind
+      - utils.onnx provides ONNX graph utilities for embedding extraction
+      - utils.models, utils.losses, and utils.training provide the PyTorch helpers
+        used by the model-based evaluators
 
   "10-1":
     name: Type Safety Infrastructure
@@ -411,16 +431,25 @@ test_cases:
     name: Dataset & Model Metadata Export
     test_type: Core Functionality
     business_case: >-
-      Verify that DataEval produces a validated metadata.json sidecar for
-      datasets and models, supporting cross-tool interoperability per
-      IR-3-S-12.
+      Verify that DataEval provides a validated, portable metadata.json schema for
+      dataset, model, and feature-extractor artifacts, supporting cross-tool
+      interoperability per IR-3-S-12.
     initial_conditions:
-      - DataEval installed
-      - Writable temporary directory available
+      - DataEval installed with core dependencies (pydantic)
     expected_results:
-      - DatasetInfo round-trips through write/read with all fields preserved
-      - ModelInfo round-trips through write/read with framework and IO specs preserved
-      - A single metadata.json may carry both dataset and model blocks
-      - The written file is indented, valid JSON containing schema_version and a provenance block
-      - The provenance block reuses ExecutionMetadata directly so an Output.meta() record can be passed straight to write_metadata_json
-      - The producer raises a clear error when neither dataset nor model is provided
+      - DatasetInfo round-trips through serialize/validate with all fields preserved
+      - ModelInfo round-trips through serialize/validate with framework and IO specs preserved
+      - A single MetadataJson document may carry both dataset and model blocks
+      - DatasetInfo and ModelInfo are independently serializable for consumers that need only one
+      - >-
+        The emitted JSON is indented, valid JSON carrying schema_version and a
+        provenance block
+      - >-
+        The provenance block is an ExecutionMetadata record, so an Output.meta()
+        record can be passed straight to MetadataJson
+      - >-
+        Dataset selections and an extractor with its own model and transforms
+        round-trip within one document
+      - >-
+        The schema rejects a document carrying none of dataset, model, or extractor
+        with a clear error
