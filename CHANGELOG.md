@@ -1,5 +1,20 @@
 # DataEval Change Log
 
+## v1.1.2
+
+👾 **Fixes**
+
+- `897db8b6` - [fix] Update docstrings for litert extras
+- `5f04dfc4` - [fix] Fail loudly on incorrect params and typing improvements
+
+📝 **Miscellaneous**
+
+- `690bc1a7` - [misc] Update verification tests
+- `f45bfae8` - [docs] Align markdown table columns to satisfy MD060
+- `4da241f1` - [docs] Port BRANCHING.md release-doc fixes to release/v1.1
+- `09c0dc80` - [devsecops] Workaround SAST path ignore list
+- `22c818de` - [devops] Publish releases from version tags instead of pipeline variables
+
 ## v1.1.1
 
 👾 **Fixes**
