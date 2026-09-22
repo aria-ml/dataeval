@@ -53,8 +53,16 @@ COPY src/ ./src/
 # Install production dependencies and project into a self-contained venv.
 # Non-editable install avoids copying /app/src to prod. Installing the project
 # also registers maite entry points required by IR-1-H-3.
+#
+# `--refresh-package dataeval` is required for correctness, not speed. The uv
+# cache mount below persists built wheels across builds, and uv's cache key for
+# the project does not include SETUPTOOLS_SCM_PRETEND_VERSION. Without the
+# refresh, a rebuild reuses the wheel from the *first* build and silently
+# installs that build's version -- the image would carry the right OCI label and
+# the wrong dataeval.__version__. Only the project is refreshed, so dependency
+# wheels still come from cache.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-editable {{ extras_flags }}
+    uv sync --frozen --no-dev --no-editable --refresh-package dataeval {{ extras_flags }}
 
 # =============================================================================
 # Stage 2: Test (exercise built venv before publishing)
