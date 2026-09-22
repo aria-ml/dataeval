@@ -4,3 +4,4 @@ include:
   - local: '.gitlab/ci/docs.yml'
   - local: '.gitlab/ci/release.yml'
   - local: '.gitlab/ci/security.yml'
+  - local: '.gitlab/ci/container.yml'

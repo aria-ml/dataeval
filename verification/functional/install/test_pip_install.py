@@ -85,7 +85,7 @@ class TestPipInstall:
         from dataeval.utils import onnx
 
         with pytest.raises(ImportError, match=r"onnx is required for ONNX model utilities"):
-            onnx.to_encoding_model(b"dummy")
+            onnx.to_encoding_model(b"dummy")  # type: ignore
 
     def test_optional_dependencies_graceful_degradation_litert(self, monkeypatch, tmp_path):
         """LiteRtBackend degrades gracefully with an ImportError naming the `litert` extra."""

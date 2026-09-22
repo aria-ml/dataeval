@@ -1,0 +1,56 @@
+# Docker variant definitions for DataEval
+# Used by `nox -s docker_gen` to render Dockerfile.<variant> from Dockerfile.j2
+#
+# To add a new CUDA variant:
+#   1. Add the variant key below with its base_image and extras
+#   2. Ensure pyproject.toml has the matching torch extra, the matching
+#      onnx-<variant> extra, and the pytorch index
+#   3. Add the variant to DEVICE_VARIANTS in noxfile.py
+#   4. Run `nox -s docker_gen` to generate the Dockerfile
+#
+# The `extras` list per variant must stay in sync with what
+# `_export_dependency_files` in noxfile.py writes to requirements.<variant>.txt:
+# the image and the exported requirements file describe the same environment,
+# and the dependency scanner reads the latter.
+#
+# Every variant builds and ships on plain Ubuntu, including the CUDA ones.
+# The NVIDIA `cudnn-devel` images are not used, for two reasons that were
+# checked against the lockfile rather than assumed:
+#
+#   1. Nothing is compiled. All packages in uv.lock resolve to prebuilt wheels,
+#      so `uv sync --frozen` never invokes a compiler and the devel toolchain
+#      (gcc, nvcc, CUDA headers) is dead weight in the build stage.
+#   2. cuDNN and the CUDA runtime arrive as wheels. The cu126 resolution pulls
+#      nvidia-cudnn-cu12 and friends from PyPI; cu130 pulls nvidia-cudnn-cu13.
+#      Nothing links against a system cuDNN, so the base image never needs one.
+#
+# What that buys: a much smaller image, and a far smaller CVE surface to triage
+# under CS-2-H-2 -- the devel images carry a full compiler toolchain whose
+# findings would gate DataEval releases for no runtime benefit.
+
+# Pinned tool versions (shared across all variants)
+uv_version: "0.10.12"
+
+# The interpreter shipped in the image. DataEval supports 3.10 through 3.14;
+# this pins the one users get by default, and is deliberately conservative
+# rather than tracking PYTHON_LATEST_SUPPORTED_VERSION in .gitlab/ci/base.yml.
+python_version: "3.12"
+
+variants:
+  cpu:
+    base_image: "ubuntu:24.04"
+    extras: ["cpu", "onnx", "opencv"]
+    label_title: "DataEval (CPU)"
+    label_description: "DataEval base execution environment - CPU variant"
+
+  cu126:
+    base_image: "ubuntu:24.04"
+    extras: ["cu126", "onnx-cu126", "opencv"]
+    label_title: "DataEval (CUDA 12.6)"
+    label_description: "DataEval base execution environment - CUDA 12.6 variant"
+
+  cu130:
+    base_image: "ubuntu:24.04"
+    extras: ["cu130", "onnx-cu130", "opencv"]
+    label_title: "DataEval (CUDA 13.0)"
+    label_description: "DataEval base execution environment - CUDA 13.0 variant"

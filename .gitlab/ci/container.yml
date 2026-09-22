@@ -1,0 +1,318 @@
+### CONTAINER PUBLISH JOBS ###
+#
+# Builds, signs, scans and promotes the DataEval base execution environment to
+# Harbor at aria/dataeval. This image is a library runtime, not an application:
+# it declares no ENTRYPOINT and no CMD. See docker/Dockerfile.j2 for why that is
+# deliberate and which requirements it keeps out of scope.
+#
+# Requirement coverage:
+#   CS-1-H-1..3   OCI image via buildx, Dockerfile in-repo, --platform amd64
+#   CS-2-H-1      non-root USER in the prod stage
+#   CS-2-H-2/H-3  container_scanning (Trivy via the GitLab template)
+#   CS-2-H-4      Syft CycloneDX SBOM, attested to the registry by digest
+#   CS-3-H-1      cosign signature over the image digest
+#   CS-4-H-1      semver image tags, resolved by docker/resolve-version.sh
+#   DSOR-3-H-1    promotion gating scan runs in this pipeline
+#
+# Setup this pipeline depends on:
+#   COSIGN_PRIVATE_KEY_B64  Group-level CI/CD variable on jatic/aria (masked,
+#                           protected), inherited by this project and shared
+#                           between DataEval and DataEval-Flow images.
+#   HARBOR_TOKEN            Group-level CI/CD variable on jatic/aria (masked,
+#                           protected), providing access for the common
+#                           robot$aria+aria-bot account.
+
+
+include:
+  - template: Security/Container-Scanning.gitlab-ci.yml
+
+variables:
+  HARBOR_URL: harbor.jatic.net
+  CI_APPLICATION_REPOSITORY: ${HARBOR_URL}/aria/dataeval
+  CI_CACHE_REPOSITORY: ${HARBOR_URL}/aria/cache
+  HARBOR_ROBOT: 'robot$aria+aria-bot'
+
+.variants: &variants
+  - VARIANT: [cpu, cu126, cu130]
+
+### SHARED RULE TEMPLATE ###
+
+# Containers build on main, on release branches, and on version tags.
+#
+# Release branches build so an image can be scanned before its tag is pushed;
+# promote-tags.sh withholds every floating pointer from those builds, so the
+# validation cannot move a tag users pull. Merge requests are excluded -- three
+# CUDA images per MR is not a cost this pipeline should carry.
+.rules_container:
+  rules:
+    - if: $PUBLISH_VERIFICATION
+      when: never
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
+      when: never
+    # Only version tags. The `latest-known-good` tag that `tag release
+    # candidate` repoints on every green main pipeline must not build images.
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+
+### SHARED JOB TEMPLATES ###
+
+.container_setup:
+  extends: .rules_container
+  stage: publish
+  image: docker:25.0.5-git
+  variables:
+    COSIGN_PASSWORD: ''
+  before_script:
+    # docker:25.0.5-git is Alpine and ships ash, not bash.
+    # docker/resolve-version.sh uses `[[ =~ ]]` and BASH_REMATCH.
+    - apk add --no-cache bash
+    - echo "${HARBOR_TOKEN}" | docker login "${HARBOR_URL}" --username "${HARBOR_ROBOT}" --password-stdin
+  after_script:
+    - docker logout "${HARBOR_URL}" || true
+
+.push_setup:
+  extends: .container_setup
+  before_script:
+    - !reference [.container_setup, before_script]
+    # jq is consumed downstream by release:sbom to unwrap the CycloneDX
+    # predicate from the cosign attestation envelope.
+    - apk add --no-cache cosign jq
+    # The docker-container driver is required for type=registry build cache.
+    - docker buildx create --use --name ci-builder || true
+
+### JOBS ###
+
+# Resolve the PEP 440 and OCI-safe versions ONCE for the whole pipeline. Both
+# are derived from git tags (the hatch-vcs source of truth) and are identical
+# across variants -- only the `-${VARIANT}` tag suffix differs -- so every
+# downstream job consumes this dotenv rather than re-running the script 15x
+# across the matrix.
+resolve:version:
+  extends: .rules_container
+  stage: publish
+  image: alpine:latest
+  needs: []
+  variables:
+    GIT_STRATEGY: fetch
+    GIT_DEPTH: '0'  # full history so `git describe` resolves a real version
+  before_script:
+    - apk add --no-cache bash git
+  script:
+    - git fetch --tags
+    - eval "$(./docker/resolve-version.sh)"
+    - echo "DATAEVAL_VERSION=${DATAEVAL_VERSION}" > version.env
+    - echo "DATAEVAL_IMAGE_TAG=${DATAEVAL_IMAGE_TAG}" >> version.env
+    - cat version.env
+  artifacts:
+    reports:
+      dotenv: version.env
+
+push:docker:
+  extends: .push_setup
+  needs:
+    - job: resolve:version
+      artifacts: true
+  parallel:
+    matrix: *variants
+  script:
+    # DATAEVAL_VERSION / DATAEVAL_IMAGE_TAG are inherited from resolve:version.
+    - IMMUTABLE_TAG="${DATAEVAL_IMAGE_TAG}-${VARIANT}"
+    - echo "Building dataeval ${DATAEVAL_VERSION} → ${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}"
+
+    # Build the test stage first. It runs docker/smoke.py against the frozen,
+    # variant-specific venv; a failure here fails the job and nothing is pushed.
+    - >-
+      docker buildx build --target test
+      --platform linux/amd64
+      --build-arg DATAEVAL_VERSION="${DATAEVAL_VERSION}"
+      --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT}
+      --cache-to type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT},mode=max,image-manifest=true
+      -f docker/Dockerfile.${VARIANT} .
+
+    # Build and push the immutable, version-stamped tag only. Floating tags
+    # (:edge-${VARIANT} on main, :${VARIANT} and :${MAJOR}.${MINOR}-${VARIANT}
+    # on a release) are gated on the scan and applied later by promote:floating.
+    - >-
+      docker buildx build --target prod
+      --platform linux/amd64
+      --build-arg DATAEVAL_VERSION="${DATAEVAL_VERSION}"
+      --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT}
+      -f docker/Dockerfile.${VARIANT}
+      -t ${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}
+      --push .
+
+    # Sign the digest [CS-3-H-1]. `imagetools inspect` reads the digest back
+    # from the registry because buildx --push never loads the image locally.
+    - printf '%s' "$COSIGN_PRIVATE_KEY_B64" | base64 -d > cosign.key
+    - chmod 600 cosign.key
+    - DIGEST=$(docker buildx imagetools inspect "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" --raw | sha256sum | awk '{print "sha256:"$1}')
+    - cosign sign --key cosign.key --yes "${CI_APPLICATION_REPOSITORY}@${DIGEST}"
+
+    # Per-image SBOM [CS-2-H-4]: generated from the pushed image by digest and
+    # attached to the registry as a CycloneDX cosign attestation. The same file
+    # is kept as a CI artifact, and release:sbom republishes it on tags with
+    # permanent retention.
+    - apk add --no-cache curl
+    - curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+    - unset DOCKER_AUTH_CONFIG
+    - syft "${CI_APPLICATION_REPOSITORY}@${DIGEST}" -o cyclonedx-json=sbom-${VARIANT}.json
+    - cosign attest --key cosign.key --type cyclonedx --predicate sbom-${VARIANT}.json --yes "${CI_APPLICATION_REPOSITORY}@${DIGEST}"
+    - rm -f cosign.key
+  artifacts:
+    paths:
+      - sbom-*.json
+    expire_in: 30 days
+
+# Verify the signature and SBOM attestation on the pushed image, then confirm
+# the artifact actually runs.
+verify:docker:
+  extends: .container_setup
+  needs:
+    - job: push:docker
+    - job: resolve:version
+      artifacts: true
+  parallel:
+    matrix: *variants
+  before_script:
+    - !reference [.container_setup, before_script]
+    - apk add --no-cache cosign
+    - export IMMUTABLE_TAG="${DATAEVAL_IMAGE_TAG}-${VARIANT}"
+  script:
+    - docker pull "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}"
+    - cosign verify --key docker/cosign.pub "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}"
+    - cosign verify-attestation --key docker/cosign.pub --type cyclonedx "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" > /dev/null
+
+    # Smoke test the published artifact. There is no --help to call: the image
+    # declares no entrypoint, so the command comes from the caller, which is
+    # exactly how users are documented to run it.
+    - |
+      RUNTIME_VERSION=$(docker run --rm "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" \
+        python -c "import dataeval; print(dataeval.__version__)")
+      echo "Image reports dataeval ${RUNTIME_VERSION}, expected ${DATAEVAL_VERSION}"
+      if [ "${RUNTIME_VERSION}" != "${DATAEVAL_VERSION}" ]; then
+        echo "Version baked into the image does not match the tag it was published under."
+        exit 1
+      fi
+
+    # Confirm the image runs as a non-root user [CS-2-H-1]. The Dockerfile's
+    # USER instruction is verified statically by the scanner; this catches a
+    # base image that resolves the name to uid 0.
+    - |
+      UID_IN_IMAGE=$(docker run --rm "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" id -u)
+      echo "Image default uid: ${UID_IN_IMAGE}"
+      if [ "${UID_IN_IMAGE}" = "0" ]; then
+        echo "Image runs as root; CS-2-H-1 requires a non-root default user."
+        exit 1
+      fi
+
+# Container vulnerability scan [DSOR-3-H-1, CS-2-H-2, CS-2-H-3].
+#
+# Uses the GitLab-managed Container-Scanning template rather than a hand-rolled
+# Trivy job, so findings land in the GitLab Vulnerability Report and dismissals
+# carry a CVE, justification and re-evaluation date.
+#
+# CS_SEVERITY_THRESHOLD is HIGH, matching CS-2-H-2 ("no critical or high") and
+# DataEval-Flow's setting. Note that DSOR-3-H-2 is written more strictly than
+# CS-2-H-2 -- it also bars MEDIUM findings. Gating a PyTorch-bearing image at
+# MEDIUM would block essentially every release on upstream CVE churn, so the
+# threshold is a deliberate choice to match the containerization standard and
+# the sibling product. Revisit if the program resolves the two requirements.
+container_scanning:
+  stage: publish
+  needs:
+    - job: push:docker
+    - job: resolve:version
+      artifacts: true
+  # The template hard-sets `dependencies: []`, which blocks ALL artifact
+  # downloads -- including resolve:version's dotenv -- regardless of
+  # `needs: artifacts: true`. Without this override DATAEVAL_IMAGE_TAG resolves
+  # empty and the scan aborts with image-not-found.
+  dependencies: ['resolve:version']
+  parallel:
+    matrix: *variants
+  variables:
+    # Pin the analyzer to the floating v8 major so Trivy and its advisory DB
+    # track the latest release rather than whatever the instance default lags at.
+    CS_ANALYZER_IMAGE: "$CI_TEMPLATE_REGISTRY_HOST/security-products/container-scanning:8"
+    CS_SEVERITY_THRESHOLD: HIGH
+    CS_REGISTRY_USER: 'robot$aria+aria-bot'
+    CS_REGISTRY_PASSWORD: $HARBOR_TOKEN
+    # Check out the repo (the template default is no clone) and point
+    # auto-remediation at the per-variant Dockerfile.
+    GIT_STRATEGY: fetch
+    CS_DOCKERFILE_PATH: "docker/Dockerfile.${VARIANT}"
+  before_script:
+    # dotenv vars are injected into the job environment at runtime but are NOT
+    # expanded inside the `variables:` keyword -- declaring CS_IMAGE there
+    # yields an empty tag. Assemble it here, where the dotenv var is present.
+    - export CS_IMAGE="${CI_APPLICATION_REPOSITORY}:${DATAEVAL_IMAGE_TAG}-${VARIANT}"
+    - echo "Scanning ${CS_IMAGE}"
+  # Promote the scan from the template's advisory default to a gate.
+  allow_failure: false
+  rules:
+    - if: $PUBLISH_VERIFICATION
+      when: never
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
+      when: never
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+
+# Promote a scan-cleared immutable tag to its floating pointers:
+#   main pipeline    → :edge-${VARIANT}
+#   release pipeline → :${MAJOR}.${MINOR}-${VARIANT}, and :${VARIANT} if highest
+# Server-side retag via `imagetools create` -- no pull, no rebuild. The digest
+# is already cosign-signed by push:docker, so the signature covers every tag
+# that points at it.
+promote:floating:
+  extends: .push_setup
+  stage: promote
+  needs: [push:docker, verify:docker, container_scanning, 'resolve:version']
+  parallel:
+    matrix: *variants
+  variables:
+    # Full tag history: promote-tags.sh ranks this release against every other
+    # one to decide whether it may hold the bare `:${VARIANT}` pointer.
+    GIT_DEPTH: '0'
+  script:
+    - IMMUTABLE_TAG="${DATAEVAL_IMAGE_TAG}-${VARIANT}"
+    - git fetch --tags --quiet
+    - FLOATING_TAGS=$(git tag -l 'v*' | ./docker/promote-tags.sh "${VARIANT}")
+    - |
+      if [ -z "$FLOATING_TAGS" ]; then
+        echo "No floating pointer for ${IMMUTABLE_TAG} — immutable tag only."
+      fi
+    - |
+      for FLOATING_TAG in $FLOATING_TAGS; do
+        echo "Promoting ${IMMUTABLE_TAG} → ${FLOATING_TAG}"
+        docker buildx imagetools create \
+          -t ${CI_APPLICATION_REPOSITORY}:${FLOATING_TAG} \
+          ${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}
+      done
+
+# Per-version SBOM release artifact [CS-2-H-4].
+# Downloads the CycloneDX attestation written by push:docker (digest-addressed,
+# so it follows the immutable tag through promotion) and republishes it as a
+# versioned artifact with permanent retention. Tag-only: main pipelines already
+# retain the 30-day artifact from push:docker.
+release:sbom:
+  extends: .push_setup
+  stage: promote
+  needs: [push:docker, verify:docker, container_scanning, 'resolve:version']
+  parallel:
+    matrix: *variants
+  rules:
+    - if: $PUBLISH_VERIFICATION
+      when: never
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+  script:
+    - IMMUTABLE_TAG="${DATAEVAL_IMAGE_TAG}-${VARIANT}"
+    - DIGEST=$(docker buildx imagetools inspect "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" --raw | sha256sum | awk '{print "sha256:"$1}')
+    - >-
+      cosign download attestation --predicate-type https://cyclonedx.org/bom "${CI_APPLICATION_REPOSITORY}@${DIGEST}"
+      | jq -r '.payload' | base64 -d | jq '.predicate' > sbom-${DATAEVAL_VERSION}-${VARIANT}.json
+  artifacts:
+    paths:
+      - sbom-*.json
+    expire_in: never

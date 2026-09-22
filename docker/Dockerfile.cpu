@@ -1,0 +1,126 @@
+# AUTO-GENERATED from docker/Dockerfile.j2. Do not edit directly.
+# Regenerate with: nox -s docker_gen
+# Variant: cpu
+#
+# Base execution environment containing Python, DataEval, and runtime
+# dependencies. Declares no ENTRYPOINT or CMD; users supply the command.
+
+# Dynamic version matching git tags from hatch-vcs. CI passes the resolved
+# version via --build-arg DATAEVAL_VERSION=... Local docker build uses the
+# default below, set to the latest tag by docker/generate.py.
+ARG DATAEVAL_VERSION="1.1.0"
+
+# =============================================================================
+# Stage 1: Build (install production dependencies and project into venv)
+# =============================================================================
+FROM ubuntu:24.04 AS build
+
+# Security updates (cached and reused in prod stage)
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends --only-upgrade libc6 libc-bin libsqlite3-0 zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pinned uv binary from official image
+COPY --from=ghcr.io/astral-sh/uv:0.10.12 /uv /uvx /bin/
+
+# Install Python 3.12 to /opt/python (accessible by all users)
+ENV UV_PYTHON_INSTALL_DIR=/opt/python
+ENV UV_LINK_MODE=copy
+RUN uv python install 3.12
+
+# Drop the pip bundled with the standalone interpreter. uv builds the venv
+# directly and never invokes pip, so nothing in the image can reach it -- but
+# the scanner still reports its CVEs against the published artifact. ensurepip
+# and the console scripts go with it: removing only site-packages/pip would
+# clear the finding while leaving an older, still-vulnerable pip wheel on disk,
+# which the scanner does not look inside.
+RUN rm -rf /opt/python/*/lib/python3.12/site-packages/pip \
+           /opt/python/*/lib/python3.12/site-packages/pip-*.dist-info \
+           /opt/python/*/lib/python3.12/ensurepip \
+           /opt/python/*/bin/pip*
+
+WORKDIR /app
+
+# Build context lacks .git (see .dockerignore). Setting pretend version keeps
+# the build hermetic and matches dataeval.__version__ to the image tag.
+ARG DATAEVAL_VERSION
+ENV SETUPTOOLS_SCM_PRETEND_VERSION="${DATAEVAL_VERSION}"
+
+COPY pyproject.toml uv.lock README.md ./
+COPY src/ ./src/
+
+# Install production dependencies and project into a self-contained venv.
+# Non-editable install avoids copying /app/src to prod. Installing the project
+# also registers maite entry points required by IR-1-H-3.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-editable --extra cpu --extra onnx --extra opencv
+
+# =============================================================================
+# Stage 2: Test (exercise built venv before publishing)
+# =============================================================================
+FROM build AS test
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+COPY docker/smoke.py ./docker/smoke.py
+
+# Set expected PyTorch variant for smoke testing. Scoped to this stage so
+# the production image sets no environment variables (IR-2.1-H-1).
+ENV DATAEVAL_SMOKE_VARIANT=cpu
+
+# Container smoke test: verify package imports, variant dependencies,
+# and entry points against the built venv.
+RUN python docker/smoke.py
+
+# =============================================================================
+# Stage 3: Production (runtime environment)
+# =============================================================================
+# Reuses patched base from build stage. CUDA variants use plain Ubuntu because
+# runtime libraries are provided by pinned Python wheels (see variants.yaml).
+FROM ubuntu:24.04 AS prod
+
+# Patch OS-level vulnerabilities from the base image
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends --only-upgrade libc6 libc-bin libsqlite3-0 zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user (CS-2-H-1). Create standard mount points for datasets, models,
+# and results (IR-2.5).
+RUN useradd --create-home --shell /bin/bash dataeval \
+    && mkdir -p /input/data /input/models /output/data /output/models /output/results \
+    && touch /input/.not_mounted /output/.not_mounted \
+    && chown -R dataeval:dataeval /input /output
+
+WORKDIR /app
+
+# Copy pre-built runtime artifacts from build stage
+COPY --from=build /opt/python /opt/python
+COPY --from=build --chown=dataeval:dataeval /app/.venv /app/.venv
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Container labels
+ARG DATAEVAL_VERSION
+LABEL org.opencontainers.image.title="DataEval (CPU)" \
+      org.opencontainers.image.description="DataEval base execution environment - CPU variant" \
+      org.opencontainers.image.version="${DATAEVAL_VERSION}" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="ARiA" \
+      org.opencontainers.image.url="https://dataeval.ai/" \
+      org.opencontainers.image.source="https://gitlab.jatic.net/jatic/aria/dataeval"
+
+USER dataeval
+
+# No ENTRYPOINT or CMD. DataEval is a library with no CLI or service interface;
+# requirements in IR-2.3 and IR-2.4 do not apply. Users specify commands
+# directly, for example:
+#
+#   docker run --rm -v ./data:/input/data <image> python -c "import dataeval"
+#
+# `CMD []` is required to make that true. ubuntu:24.04 sets CMD ["/bin/bash"],
+# and an image that does not clear it inherits that shell -- `docker image
+# inspect` then reports a Cmd this project never chose, at exactly the point a
+# reviewer looks to confirm the claim above.
+CMD []

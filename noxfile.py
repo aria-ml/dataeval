@@ -528,3 +528,31 @@ def check(session: nox.Session) -> None:
     session.run("uv", "lock", "--check")
     _export_dependency_files(session)
     session.run("git", "diff", "--exit-code", "--", *EXPORTED_DEPENDENCY_FILES, external=True)
+
+
+@session(python=PYTHON_VERSIONS[0], uv_only_groups=["docker"], uv_no_install_project=True)
+def docker_gen(session: nox.Session) -> None:
+    """Generate `docker/Dockerfile.<variant>` files from `docker/Dockerfile.j2`."""
+    session.run("python", "docker/generate.py")
+
+
+@session(python=PYTHON_VERSIONS[0], uv_only_groups=["docker"], uv_no_install_project=True)
+def docker_check(session: nox.Session) -> None:
+    """Validate the generated Dockerfiles match the template and variants.yaml."""
+    session.run("python", "docker/generate.py")
+    session.run(
+        "git",
+        "diff",
+        "--exit-code",
+        "--",
+        *(f"docker/Dockerfile.{variant}" for variant in DEVICE_VARIANTS),
+        external=True,
+    )
+
+
+@session(uv_extras=with_onnx([*UV_EXTRAS, "opencv"]))
+def docker_smoke(session: nox.Session) -> None:
+    """Run the container smoke test against a locally built environment."""
+    # Mirrors the ENV the Dockerfile's test stage sets, so the torch-build
+    # assertion stays live locally instead of degrading to a bare report.
+    session.run("python", "docker/smoke.py", env={"DATAEVAL_SMOKE_VARIANT": UV_EXTRAS[0]})

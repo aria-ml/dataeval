@@ -73,6 +73,8 @@ stages:
   - docs
   - release
   - security
+  - publish
+  - promote
   - compliance
 
 
