@@ -68,6 +68,8 @@ stages:
   - docs
   - release
   - security
+  - publish
+  - promote
   - compliance
 
 ### SHARED JOB TEMPLATES ###

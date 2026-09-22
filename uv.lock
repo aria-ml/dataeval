@@ -1314,6 +1314,10 @@ dev = [
     { name = "ultralytics" },
     { name = "uv" },
 ]
+docker = [
+    { name = "jinja2" },
+    { name = "pyyaml" },
+]
 docs = [
     { name = "certifi" },
     { name = "dataeval-plots", extra = ["plotly"] },
@@ -1473,6 +1477,10 @@ dev = [
     { name = "typos", specifier = ">=1.0" },
     { name = "ultralytics", specifier = ">=8.0.0" },
     { name = "uv", specifier = ">=0.8.0" },
+]
+docker = [
+    { name = "jinja2", specifier = ">=3.1" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 docs = [
     { name = "certifi", specifier = ">=2024.7.4" },
