@@ -171,3 +171,34 @@ class TestGeneratedFilesAreCurrent:
         assert (DOCKER_DIR / "Dockerfile.j2").is_file()
         assert VARIANTS_FILE.is_file()
         assert (DOCKER_DIR / "generate.py").is_file()
+
+    def test_generation_does_not_depend_on_git(self):
+        """Rendering must be a pure function of the template and variants.yaml.
+
+        An earlier version derived the ARG default from ``git describe``. CI
+        clones shallow and without tags, so it rendered "unknown" -- which is
+        not valid PEP 440 and would fail SETUPTOOLS_SCM_PRETEND_VERSION -- and
+        ``docker_check`` failed on every pipeline. It also made the output
+        differ per branch, so cherry-picks carried a spurious diff.
+        """
+        source = (DOCKER_DIR / "generate.py").read_text()
+        assert "subprocess" not in source, "generate.py shells out again; rendering must not depend on repository state"
+
+    @pytest.mark.parametrize("variant", VARIANT_NAMES)
+    def test_arg_default_is_a_valid_placeholder_version(self, variant: str):
+        """The build-arg default must parse as PEP 440.
+
+        It is fed to SETUPTOOLS_SCM_PRETEND_VERSION by the build stage, so a
+        local ``docker build`` without ``--build-arg`` fails outright if this is
+        not a version string.
+        """
+        from packaging.version import InvalidVersion, Version
+
+        text = (DOCKER_DIR / f"Dockerfile.{variant}").read_text()
+        match = re.search(r'^ARG DATAEVAL_VERSION="([^"]*)"', text, re.MULTILINE)
+        assert match, "Dockerfile declares no DATAEVAL_VERSION default"
+        default = match.group(1)
+        try:
+            Version(default)
+        except InvalidVersion:
+            pytest.fail(f"ARG DATAEVAL_VERSION default {default!r} is not valid PEP 440")

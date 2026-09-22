@@ -1,7 +1,5 @@
 """Generate Dockerfile.<variant> files from docker/Dockerfile.j2 template."""
 
-import re
-import subprocess
 from pathlib import Path
 
 import yaml
@@ -10,38 +8,28 @@ from jinja2 import Environment, FileSystemLoader
 root = Path(__file__).resolve().parent.parent
 config = yaml.safe_load((root / "docker" / "variants.yaml").read_text())
 
-
-def _default_version() -> str:
-    """Resolve the last published tag for the `DATAEVAL_VERSION` build-arg default.
-
-    `--abbrev=0` returns the most recent tag *without* the `-N-g<sha>[-dirty]`
-    suffix that `git describe` normally appends. Using the bare tag keeps the
-    committed Dockerfile.<variant> defaults stable across regenerations — the
-    rendered ARG only churns when an actual release tag lands, not when a
-    contributor regenerates from a dirty working tree.
-
-    This default is only consumed by local `docker build` invocations that omit
-    `--build-arg`; CI builds always pass an explicit version resolved by
-    docker/resolve-version.sh, which becomes the source of truth in the
-    published image.
-    """
-    try:
-        tag = (
-            subprocess
-            .check_output(
-                ["git", "describe", "--tags", "--abbrev=0", "--match", "v*"],
-                cwd=root,
-                stderr=subprocess.DEVNULL,
-            )
-            .decode()
-            .strip()
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return "unknown"
-    return re.sub(r"^v", "", tag)
-
-
-version = _default_version()
+# Fallback for the `DATAEVAL_VERSION` build arg, used only by a local
+# `docker build` that omits `--build-arg`. CI always passes an explicit version
+# from docker/resolve-version.sh, and that is what a published image carries.
+#
+# This is a fixed string rather than the last git tag, so that rendering is a
+# pure function of Dockerfile.j2 and variants.yaml. Deriving it from
+# `git describe` made the output depend on the repository state around it, which
+# broke in three separate ways:
+#
+#   - CI clones shallow and without tags, so `git describe` found nothing and
+#     rendered "unknown" -- which is not valid PEP 440, so the Dockerfile it
+#     produced could not even build locally (SETUPTOOLS_SCM_PRETEND_VERSION
+#     rejects it). `nox -s docker_check` failed on every pipeline.
+#   - The value differed per branch (1.1.0 on main, 1.1.2 on release/v1.1), so
+#     cherry-picking container changes between branches always needed a
+#     regeneration step to avoid a spurious diff.
+#   - Every release tag dirtied all three generated files, so the check would
+#     fail until somebody regenerated and committed the churn.
+#
+# A constant has none of those failure modes, and the value it replaces was
+# never load-bearing.
+PLACEHOLDER_VERSION = "0.0.0.dev0"
 
 # autoescape is off: the output is a Dockerfile, not markup. Leaving Jinja's
 # HTML escaping on would silently mangle any label or patch command containing
@@ -76,7 +64,7 @@ for name, variant in config["variants"].items():
         extras_flags=extras_flags,
         label_title=variant["label_title"],
         label_description=variant["label_description"],
-        version=version,
+        version=PLACEHOLDER_VERSION,
         security_patches=variant.get("security_patches", []),
     )
 
