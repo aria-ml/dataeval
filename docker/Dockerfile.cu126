@@ -5,10 +5,10 @@
 # Base execution environment containing Python, DataEval, and runtime
 # dependencies. Declares no ENTRYPOINT or CMD; users supply the command.
 
-# Dynamic version matching git tags from hatch-vcs. CI passes the resolved
-# version via --build-arg DATAEVAL_VERSION=... Local docker build uses the
-# default below, set to the latest tag by docker/generate.py.
-ARG DATAEVAL_VERSION="1.1.1"
+# Version stamped into the image and fed to hatch-vcs. CI passes the resolved
+# value via --build-arg DATAEVAL_VERSION=..., derived from git tags by
+# docker/resolve-version.sh; that is what a published image carries.
+ARG DATAEVAL_VERSION="0.0.0.dev0"
 
 # =============================================================================
 # Stage 1: Build (install production dependencies and project into venv)
