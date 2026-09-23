@@ -33,63 +33,44 @@ Compliance Checklist, version 1.2.
 :widths: 35 65
 :header-rows: 0
 
-* - Maturity level
+* - Product maturity level
   - Maturity Level I
 * - Approved
   - 2026-04-14, following a program assessment of `v1.0.6`
-* - Supported mature release
-  - `v1.1.3`, maintained on the `release/v1.1` branch
-* - Next level under assessment
-  - Maturity Level II. Not yet granted.
+* - Mature release
+  - `v1.0.6`
 ```
 
 ## Maturity by Release
 
-Releases at Maturity Level I or higher carry the maturity label in the exact form
-`JATIC Maturity I`. Releases below Maturity Level I carry no label.
+A release carries the maturity label `JATIC Maturity I` only if it was assessed
+and approved by the Program Direction Group as a mature release. Other releases
+carry no label, including releases made after DataEval reached Maturity Level I.
 
 ```{list-table}
-:widths: 30 20 20 30
+:widths: 30 25 45
 :header-rows: 1
 
 * - Releases
-  - Maturity level
   - Label
   - Basis
-* - `v1.1.3`
-  - Level I
-  - `JATIC Maturity I`
-  - Stable release after approval
-* - `v1.1.2`
-  - Level I
-  - `JATIC Maturity I`
-  - Stable release after approval
-* - `v1.1.1`
-  - Level I
-  - `JATIC Maturity I`
-  - Stable release after approval
-* - `v1.1.0`
-  - Level I
-  - `JATIC Maturity I`
-  - Stable release after approval
+* - `v1.1.0` through `v1.1.3`
+  - None
+  - Not submitted for mature-release approval
 * - `v1.0.6`
-  - Level I
   - `JATIC Maturity I`
-  - Assessed release, approved 2026-04-14
+  - Assessed and approved as a mature release, 2026-04-14
 * - `v1.0.5` and earlier
-  - Below Level I
   - None
-  - Released before approval
+  - Released before DataEval reached Maturity Level I
 * - Pre-releases (`-rcN`, `-aN`)
-  - Not graded
   - None
-  - Not maturity-verified releases
+  - Not mature releases
 ```
 
-The program requires only the newest mature release to be supported. A mature
-release receives CI and critical hotfixes for at least six months, or until a
-newer mature release is published. Removing a release from this table withdraws
-that support.
+A mature release is supported with CI and hotfixes for at least six months, or
+until a newer mature release is issued, and for as long as the product
+documentation lists it as a mature release.
 
 ## Requirements by Level
 
