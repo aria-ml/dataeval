@@ -69,7 +69,7 @@ is not the one you get tomorrow.
 Release candidates publish under their exact version (e.g. `1.2.0-rc1-cpu`) and
 never touch `latest-cpu`, which only ever follows `main`.
 
-Images are signed with [cosign](https://docs.sigstore.dev/cosign/overview/) and
+Images are signed with [cosign](https://docs.sigstore.dev/cosign/) and
 include a CycloneDX SBOM attestation. The public key is in the repository at
 `docker/cosign.pub` (the same key used by DataEval-Flow).
 
