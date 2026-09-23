@@ -58,6 +58,7 @@ def config() -> dict:
     return _variants()
 
 
+@pytest.mark.test_case("14-1")
 @pytest.mark.parametrize("variant", VARIANT_NAMES)
 class TestDockerfiles:
     """Each declared variant has a Dockerfile that meets the container standards."""
@@ -106,6 +107,7 @@ class TestDockerfiles:
         assert cmds == ["[]"], f"expected exactly one `CMD []`, found {cmds!r}"
 
 
+@pytest.mark.test_case("14-1")
 class TestVariantConsistency:
     """The variant definitions agree with the rest of the project."""
 
@@ -159,6 +161,7 @@ class TestVariantConsistency:
         assert not missing, f"variants.yaml references undeclared extras: {sorted(missing)}"
 
 
+@pytest.mark.test_case("14-1")
 class TestGeneratedFilesAreCurrent:
     """The committed Dockerfiles are what the template currently renders."""
 
@@ -206,6 +209,7 @@ class TestGeneratedFilesAreCurrent:
             pytest.fail(f"ARG DATAEVAL_VERSION default {default!r} is not valid PEP 440")
 
 
+@pytest.mark.test_case("14-1")
 class TestScanReport:
     """CS-2-H-3: the published image carries its own vulnerability scan report.
 
