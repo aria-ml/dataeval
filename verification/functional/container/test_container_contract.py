@@ -10,6 +10,7 @@ would catch if a Dockerfile were edited by hand:
   - the image runs as a non-root user                        [CS-2-H-1]
   - the base image comes from a trusted registry             [CS-1-S-2]
   - no ENTRYPOINT, and CMD explicitly cleared                [IR-2.3, IR-2.4]
+  - the published stage carries a vulnerability scan report  [CS-2-H-3]
   - variants.yaml extras agree with the exported requirements
 
 The runtime behavior of a built image is covered separately by
@@ -202,3 +203,81 @@ class TestGeneratedFilesAreCurrent:
             Version(default)
         except InvalidVersion:
             pytest.fail(f"ARG DATAEVAL_VERSION default {default!r} is not valid PEP 440")
+
+
+class TestScanReport:
+    """CS-2-H-3: the published image carries its own vulnerability scan report.
+
+    The report cannot be produced inside a single build -- it describes the
+    finished filesystem -- so CI builds ``prod``, scans it, writes the report
+    into ``docker/security/`` and builds ``scanned``, which is ``prod`` plus
+    that one layer. These checks pin the parts of that arrangement which live
+    in source; ``verify:docker`` checks the report in the published artifact.
+    """
+
+    @pytest.mark.parametrize("variant", VARIANT_NAMES)
+    def test_scanned_stage_extends_prod(self, variant: str):
+        """The published stage must add to ``prod`` rather than rebuild it.
+
+        Rebuilding would scan one image and publish another.
+        """
+        text = (DOCKER_DIR / f"Dockerfile.{variant}").read_text()
+        assert re.search(r"^FROM prod AS scanned\b", text, re.MULTILINE), (
+            "Dockerfile has no `FROM prod AS scanned` stage; the scanned image "
+            "must be the scanned filesystem plus the report, not a second build"
+        )
+
+    @pytest.mark.parametrize("variant", VARIANT_NAMES)
+    def test_scanned_stage_copies_the_report(self, variant: str):
+        text = (DOCKER_DIR / f"Dockerfile.{variant}").read_text()
+        scanned = text.split("FROM prod AS scanned", 1)[-1]
+        assert re.search(r"^COPY .*docker/security/", scanned, re.MULTILINE), (
+            "the scanned stage does not copy docker/security/ into the image"
+        )
+
+    @pytest.mark.parametrize("variant", VARIANT_NAMES)
+    def test_prod_stage_does_not_need_the_report(self, variant: str):
+        """``--target prod`` must build without a scan having run.
+
+        The report only exists once ``prod`` has been built and scanned, so a
+        reference to it from ``prod`` itself would be a build-order cycle, and
+        would break a plain local ``docker build``.
+        """
+        text = (DOCKER_DIR / f"Dockerfile.{variant}").read_text()
+        prod = text.split("AS prod", 1)[-1].split("FROM prod AS scanned", 1)[0]
+        # Comments explaining the scanned stage sit above its FROM and so fall
+        # inside this slice; only instructions constrain the build.
+        prod = "\n".join(ln for ln in prod.splitlines() if not ln.lstrip().startswith("#"))
+        assert "docker/security" not in prod, (
+            "the prod stage references docker/security; it must not, or `--target prod` "
+            "cannot build before the scan that produces it"
+        )
+
+    def test_build_context_admits_the_report(self):
+        """``.dockerignore`` excludes ``docker/``; the report must be re-included."""
+        ignore = (PROJECT_ROOT / ".dockerignore").read_text()
+        assert re.search(r"^!docker/security\b", ignore, re.MULTILINE), (
+            ".dockerignore excludes docker/ without re-including docker/security, "
+            "so the COPY in the scanned stage would fail"
+        )
+
+    def test_scanner_is_pinned_at_or_above_the_required_version(self):
+        """CS-2-H-2 names Trivy v0.62.0 as the floor for an approved scanner."""
+        from packaging.version import Version
+
+        ci = (PROJECT_ROOT / ".gitlab" / "ci" / "container.yml").read_text()
+        match = re.search(r'^\s*TRIVY_VERSION:\s*"([^"]+)"', ci, re.MULTILINE)
+        assert match, "container.yml does not pin TRIVY_VERSION"
+        assert Version(match.group(1)) >= Version("0.62.0"), (
+            f"Trivy {match.group(1)} is below the v0.62.0 floor named by CS-2-H-2"
+        )
+
+    def test_scan_gates_the_push(self):
+        """A HIGH or CRITICAL finding must fail the job before anything is pushed."""
+        ci = (PROJECT_ROOT / ".gitlab" / "ci" / "container.yml").read_text()
+        push = ci.split("push:docker:", 1)[-1].split("\nvalidate:docker:", 1)[0]
+        gate = re.search(r"trivy image[^\n]*--severity HIGH,CRITICAL[^\n]*--exit-code 1", push)
+        assert gate, "push:docker has no blocking HIGH/CRITICAL trivy gate"
+        assert push.index(gate.group(0)) < push.index("--push"), (
+            "the trivy gate runs after the push; a failing scan would not withhold the image"
+        )

@@ -9,6 +9,7 @@
 #   CS-1-H-1..3   OCI image via buildx, Dockerfile in-repo, --platform amd64
 #   CS-2-H-1      non-root USER in the prod stage
 #   CS-2-H-2/H-3  container_scanning (Trivy via the GitLab template)
+#   CS-2-H-3      Trivy report copied into the image by the `scanned` stage
 #   CS-2-H-4      Syft CycloneDX SBOM, attested to the registry by digest
 #   CS-3-H-1      cosign signature over the image digest
 #   CS-4-H-1      semver image tags, resolved by docker/resolve-version.sh
@@ -28,6 +29,10 @@ include:
 
 variables:
   HARBOR_URL: harbor.jatic.net
+  # CS-2-H-2 names Trivy v0.62.0+ as an approved scanner. Pinned rather than
+  # floating so a published image's report names a scanner version that was
+  # chosen, not whatever happened to be current the day it built.
+  TRIVY_VERSION: "0.74.0"
   CI_APPLICATION_REPOSITORY: ${HARBOR_URL}/aria/dataeval
   CI_CACHE_REPOSITORY: ${HARBOR_URL}/aria/cache
 #
@@ -105,6 +110,13 @@ variables:
     # jq is consumed downstream by release:sbom to unwrap the CycloneDX
     # predicate from the cosign attestation envelope.
     - apk add --no-cache cosign jq
+    # Trivy is installed from its release tarball rather than apk: Alpine's
+    # package lags, and CS-2-H-2 sets a version floor the image's own report
+    # has to be able to name.
+    - >-
+      wget -qO- "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+      | tar -xz -C /usr/local/bin trivy
+    - trivy --version
     # The docker-container driver is required for type=registry build cache.
     - docker buildx create --use --name ci-builder || true
 
@@ -180,10 +192,50 @@ push:docker:
       --cache-to type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT},mode=max,image-manifest=true
       -f docker/Dockerfile.${VARIANT} .
 
-    # Build and push. On main this overwrites :latest-${VARIANT} in place; on a
-    # tag it writes :${VERSION}-${VARIANT}, which is never rewritten.
+    # Build `prod` to a local tarball rather than pushing it. The image has to
+    # exist before it can be scanned, and it must not exist *in the registry*
+    # before the scan has passed -- once the published tag is written there is
+    # no taking it back. `type=docker,dest=` avoids importing multiple GiB into
+    # the daemon just to hand it to trivy. The image is tagged even though it is
+    # not pushed: the tag rides along inside the tarball, so the report records
+    # `Metadata.RepoTags` naming the image it describes instead of describing an
+    # anonymous tarball nobody can trace back to a release.
     - >-
       docker buildx build --target prod
+      --platform linux/amd64
+      --build-arg DATAEVAL_VERSION="${DATAEVAL_VERSION}"
+      --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT}
+      --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-flow-${VARIANT}
+      -f docker/Dockerfile.${VARIANT}
+      -t ${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}
+      --output type=docker,dest=prod-${VARIANT}.tar .
+
+    # Vulnerability scan report, written into the build context so the
+    # `scanned` stage can copy it into the published image [CS-2-H-3]. JSON is
+    # the machine-readable record; the table is what a human opens.
+    - mkdir -p docker/security
+    - >-
+      trivy image --input prod-${VARIANT}.tar --scanners vuln
+      --format json --output docker/security/vulnerability-scan.json
+    - >-
+      trivy image --input prod-${VARIANT}.tar --scanners vuln
+      --format table --output docker/security/vulnerability-scan.txt
+    - chmod 0644 docker/security/vulnerability-scan.*
+
+    # The publishing gate [CS-2-H-2]: exit 1 on any HIGH or CRITICAL finding,
+    # before the image reaches the registry. container_scanning re-scans the
+    # pushed image afterwards so findings land in GitLab's Vulnerability Report
+    # with its dismissal workflow, but that runs too late to stop a push -- this
+    # is what actually withholds a dirty image.
+    - trivy image --input prod-${VARIANT}.tar --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --quiet
+    - rm -f prod-${VARIANT}.tar
+
+    # Publish `scanned` -- `prod` plus the report layer. Rebuilt from the local
+    # cache the previous build just populated, so this adds one layer, not one
+    # build. On main this overwrites :latest-${VARIANT} in place; on a tag it
+    # writes :${VERSION}-${VARIANT}, which is never rewritten.
+    - >-
+      docker buildx build --target scanned
       --platform linux/amd64
       --build-arg DATAEVAL_VERSION="${DATAEVAL_VERSION}"
       --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT}
@@ -271,6 +323,19 @@ verify:docker:
         exit 1
       fi
 
+    # The published image must carry its own scan report [CS-2-H-3]. Checked
+    # against the running artifact rather than the Dockerfile, because a COPY
+    # that silently produced an empty directory still looks correct in source.
+    - |
+      docker run --rm "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}" python -c "
+      import json
+      d = json.load(open('/usr/share/dataeval/security/vulnerability-scan.json'))
+      tags = (d.get('Metadata') or {}).get('RepoTags') or []
+      print('scan report: trivy', d['Trivy']['Version'], '| repoTags', tags)
+      assert d.get('SchemaVersion'), 'report has no SchemaVersion'
+      assert tags, 'report does not name the image it describes'
+      "
+
     # Confirm the image runs as a non-root user [CS-2-H-1]. The Dockerfile's
     # USER instruction is verified statically by the scanner; this catches a
     # base image that resolves the name to uid 0.
@@ -282,7 +347,7 @@ verify:docker:
         exit 1
       fi
 
-# Container vulnerability scan [DSOR-3-H-1, CS-2-H-2, CS-2-H-3].
+# Container vulnerability scan [DSOR-3-H-1].
 #
 # Uses the GitLab-managed Container-Scanning template rather than a hand-rolled
 # Trivy job, so findings land in the GitLab Vulnerability Report and dismissals
