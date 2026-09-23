@@ -7,6 +7,26 @@ program requires at each level.
 Levels, labels, and requirements on this page follow the JATIC Product Standards
 Compliance Checklist, version 1.2.
 
+## Maturity Levels
+
+```{list-table}
+:widths: 15 85
+:header-rows: 1
+
+* - Level
+  - Description
+* - 0
+  - A new product to JATIC.
+* - S
+  - The mid development phase of the product.
+* - I
+  - Completion of technical requirements for a final product.
+* - II
+  - Product is validated by users.
+* - III
+  - Product is mature. Validated and adopted by many users.
+```
+
 ## Current Status
 
 ```{list-table}
