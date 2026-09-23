@@ -4,8 +4,31 @@ The JATIC program grades each product on a maturity scale. This page records the
 maturity level DataEval holds, the releases that level applies to, and what the
 program requires at each level.
 
-Levels, labels, and requirements on this page follow the JATIC Product Standards
-Compliance Checklist, version 1.2.
+Requirements on this page follow draft version 1.3 of the JATIC product
+standards: the Software Development Plan (SDP) Requirements v1.3 draft for
+software, and the program's draft release, validation, and deployment standards.
+Version 1.3 has not been released. A release's maturity is governed by the
+standards in force when that release was assessed, not by this draft.
+
+## Maturity Levels
+
+```{list-table}
+:widths: 15 85
+:header-rows: 1
+
+* - Level
+  - Description
+* - 0
+  - A new product to JATIC.
+* - S
+  - The mid development phase of the product.
+* - I
+  - Completion of technical requirements for a final product.
+* - II
+  - Product is validated.
+* - III
+  - Product is mature. Validated and adopted by many users.
+```
 
 ## Current Status
 
@@ -73,25 +96,76 @@ that support.
 
 ## Requirements by Level
 
-Each level adds requirement areas to the level below it. The table lists which
-areas of the Program Standards a product must meet at each level.
+The SDP Requirements v1.3 draft maps each software requirement area to the
+maturity levels at which it applies. At Maturity S, the program requires only
+the interoperability standards.
+
+```{list-table}
+:widths: 25 15 15 15 15 15
+:header-rows: 1
+
+* - Software area
+  - 0
+  - S
+  - I
+  - II
+  - III
+* - General software (SR)
+  - Not required
+  - Partial
+  - Required
+  - Required
+  - Required
+* - Python coding (CR)
+  - Not required
+  - Partial
+  - Required
+  - Required
+  - Required
+* - Interoperability (IR)
+  - Not required
+  - Required (IR-1, IR-2)
+  - Required
+  - Required
+  - Required
+* - Containerization (CS)
+  - Not required
+  - Partial
+  - Required
+  - Required
+  - Required
+* - Testing (TR)
+  - Not required
+  - Partial
+  - Required
+  - Required
+  - Required
+* - DevSecOps (DSOR)
+  - Not required
+  - Partial
+  - Required
+  - Required
+  - Required
+* - GitLab and branching (GR)
+  - Not required
+  - Partial
+  - Required
+  - Required
+  - Required
+```
+
+The remaining product standards apply as follows:
 
 ```{list-table}
 :widths: 30 14 14 14 14 14
 :header-rows: 1
 
-* - Requirement area
+* - Standard
   - 0
-  - S (Sandbox)
+  - S
   - I
   - II
   - III
-* - Software (SR, CR, GR, CS, TR, DSOR, IR)
-  - Not required
-  - Interoperability only
-  - Required
-  - Required
-  - Required
 * - Documentation (DR)
   - Not required
   - Governance (DR-1) only
@@ -107,7 +181,7 @@ areas of the Program Standards a product must meet at each level.
 * - Validation (VS)
   - Not required
   - Not required
-  - Internal validation (VS-1) only
+  - Internal qualitative validation (VS-1) only
   - Required
   - Required
 * - Deployment (DS)
@@ -134,26 +208,35 @@ Several requirements set a different threshold at each level:
   - Level I
   - Level II
   - Level III
-* - Reference implementation coverage of T&E functions (TR-5-H-1)
+* - Public T&E capabilities integrated into CheckMAITE (TR-5-H-1)
   - At least 50%
   - At least 90%
   - At least 90%
-* - Minimum score on every qualitative rubric question, graded 1.0 to 7.0 (VS-1-H-1)
+* - Minimum score on every qualitative rubric question, scored out of 5.0 (VS-1-H-1)
+  - 3.0
+  - 3.5
   - 4.0
-  - 4.4
-  - 5.0
 * - External usage (VS-2-H-1)
   - None
   - At least 2 DoD programs
-  - At least 5 DoD programs or 5 academic or industry organizations, and publications by at least 2 external groups
-* - Deploy updates to user enclaves after a mature release (DS-1-H-1)
+  - At least 5 DoD programs or 5 academic or industry organizations, and academic
+    publications by at least 2 groups outside the developer's organization
+* - Demonstrated use on CDAO data holdings in a meaningful scenario (VS-3)
+  - Not required
+  - Required
+  - Required
+* - Documented validation of product features (VS-4)
+  - Not required
+  - Required
+  - Required
+* - Start deploying updates after a mature release (DS-1-H-1)
   - Within 30 business days
   - Within 10 business days
   - Within 10 business days
 * - Required deployment environments (DS-2-H-1)
-  - Advana
-  - Advana, Iron Bank, Linchpin, SUNet
-  - Advana, Iron Bank, Linchpin, SUNet
+  - WDP (formerly Advana)
+  - WDP, COSMOS, SUNet
+  - WDP, COSMOS, SUNet, Iron Bank, Linchpin
 ```
 
 A mature release is approved by the Program Direction Group after an assessment
