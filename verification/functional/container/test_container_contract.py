@@ -298,7 +298,10 @@ class TestScanReport:
 
         def promote(tag: str, tags: str) -> str:
             return subprocess.run(
-                [str(script)], input=tags, capture_output=True, text=True,
+                [str(script)],
+                input=tags,
+                capture_output=True,
+                text=True,
                 env={"PATH": os.environ["PATH"], "CI_COMMIT_TAG": tag},
             ).stdout.strip()
 
