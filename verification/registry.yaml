@@ -134,6 +134,13 @@ requirements:
     file: NFR-4-configuration-reproducibility.md
     test_cases: ["11-1"]
 
+  NFR-5:
+    name: Container Packaging & Distribution
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    file: NFR-5-container-packaging.md
+    test_cases: ["14-1"]
+
 # ---------------------------------------------------------------------------
 # Test Cases — columns in the VCRM, individual markdown files
 # ---------------------------------------------------------------------------
@@ -453,3 +460,23 @@ test_cases:
       - >-
         The schema rejects a document carrying none of dataset, model, or extractor
         with a clear error
+
+  "14-1":
+    name: Container Packaging & Distribution
+    test_type: Non-Functional
+    business_case: >-
+      Verify that the published container images hold to the contract they claim:
+      one Dockerfile per declared variant, generated from the tracked template,
+      built on a trusted base image, running as a non-root user, declaring no
+      entrypoint, and carrying their own vulnerability scan report and SBOM with
+      the scan gating publication.
+    initial_conditions:
+      - Repo checkout with docker/ and .gitlab/ci/ present
+    expected_results:
+      - Every variant declared in docker/variants.yaml has a committed Dockerfile
+      - Each Dockerfile declares a non-root USER and clears the inherited CMD
+      - Base images come from a trusted registry per CS-1-S-2
+      - Committed Dockerfiles match what the template currently renders
+      - The scanned stage extends prod and copies the scan report and SBOM into the image
+      - The vulnerability scan runs before any registry write and gates the push
+      - latest-<variant> is a retag of the newest release rather than a rebuild
