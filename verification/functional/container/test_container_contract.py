@@ -19,6 +19,7 @@ The runtime behavior of a built image is covered separately by
 
 from __future__ import annotations
 
+import os
 import re
 from importlib.metadata import metadata
 from pathlib import Path
@@ -271,6 +272,41 @@ class TestScanReport:
         assert Version(match.group(1)) >= Version("0.62.0"), (
             f"Trivy {match.group(1)} is below the v0.62.0 floor named by CS-2-H-2"
         )
+
+    def test_latest_is_a_retag_not_a_build(self):
+        """`latest` must point at a published release, never be built separately.
+
+        A second build could differ from the release it claims to be, and would
+        not be covered by that release's signature or scan.
+        """
+        ci = (PROJECT_ROOT / ".gitlab" / "ci" / "container.yml").read_text()
+        promote = ci.split("promote:latest:", 1)[-1].split("\nrelease:sbom:", 1)[0]
+        assert "imagetools create" in promote, "promote:latest does not retag; it must not rebuild"
+        assert "buildx build" not in promote, "promote:latest builds an image; latest must be a retag"
+
+    def test_latest_is_gated_on_the_scan(self):
+        """A release that failed its scan must not take the default pointer."""
+        ci = (PROJECT_ROOT / ".gitlab" / "ci" / "container.yml").read_text()
+        promote = ci.split("promote:latest:", 1)[-1].split("\nrelease:sbom:", 1)[0]
+        assert "container_scanning" in promote, "promote:latest does not depend on container_scanning"
+
+    def test_only_the_highest_release_takes_latest(self):
+        """A patch on an older line must not drag `latest` backwards."""
+        script = DOCKER_DIR / "promote-latest.sh"
+        assert script.is_file(), "docker/promote-latest.sh is missing"
+        import subprocess
+
+        def promote(tag: str, tags: str) -> str:
+            return subprocess.run(
+                [str(script)], input=tags, capture_output=True, text=True,
+                env={"PATH": os.environ["PATH"], "CI_COMMIT_TAG": tag},
+            ).stdout.strip()
+
+        assert promote("v1.1.3", "v1.1.0\nv1.1.2\nv1.1.3") == "latest"
+        assert promote("v1.1.4", "v1.1.0\nv1.2.0\nv1.1.4") == "", "a patch outranked by a newer line took latest"
+        assert promote("v1.10.0", "v1.2.0\nv1.9.0\nv1.10.0") == "latest", "version ordering is lexical, not numeric"
+        assert promote("v1.2.0-rc1", "v1.1.0\nv1.2.0-rc1") == "", "a prerelease took latest"
+        assert promote("", "v1.1.0") == "", "a branch build took latest"
 
     def test_sbom_is_built_before_the_push(self):
         """CS-2-H-4: the SBOM must describe the image, and ship with it.
