@@ -9,7 +9,7 @@ The image declares no entrypoint or command. Provide the command when running
 the container:
 
 ```bash
-docker run --rm harbor.jatic.net/aria/dataeval:cpu \
+docker run --rm harbor.jatic.net/aria/dataeval:latest-cpu \
   python -c "import dataeval; print(dataeval.__version__)"
 ```
 
@@ -54,17 +54,20 @@ flags such as `--gpus all`.
 * - Tag
   - Points at
 * - `1.2.0-cpu`
-  - Exact release. Immutable.
-* - `1.2-cpu`
-  - Latest patch release on the 1.2 release line.
-* - `cpu`
-  - Latest stable release across all versions.
-* - `edge-cpu`
-  - Latest build from the `main` branch. Unstable.
+  - Exact release. Immutable, and never rewritten.
+* - `latest-cpu`
+  - Newest build of the `main` branch. Moves on every merge. Unstable.
 ```
 
-Replace `cpu` with `cu126` or `cu130` for CUDA variants. Release candidates use
-exact version tags (e.g. `1.2.0-rc1-cpu`) and do not update floating tags.
+Those two are the only tags published. Replace `cpu` with `cu126` or `cu130`
+for CUDA variants.
+
+Pin a version tag for anything reproducible. `latest-cpu` is a moving target:
+the digest behind it changes without notice, so an image pulled under it today
+is not the one you get tomorrow.
+
+Release candidates publish under their exact version (e.g. `1.2.0-rc1-cpu`) and
+never touch `latest-cpu`, which only ever follows `main`.
 
 Images are signed with [cosign](https://docs.sigstore.dev/cosign/overview/) and
 include a CycloneDX SBOM attestation. The public key is in the repository at
@@ -132,7 +135,7 @@ All mount directories are owned by the non-root `dataeval` user.
 docker run --rm \
   -v "$(pwd)/data:/input/data:ro" \
   -v "$(pwd)/results:/output/results" \
-  harbor.jatic.net/aria/dataeval:cpu \
+  harbor.jatic.net/aria/dataeval:latest-cpu \
   python /input/data/analyze.py
 ```
 
