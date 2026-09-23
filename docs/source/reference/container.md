@@ -92,10 +92,10 @@ cosign download attestation --predicate-type https://cyclonedx.org/bom \
   | jq -r '.payload' | base64 -d | jq '.predicate'
 ```
 
-## Vulnerability Scan Report
+## Security Artifacts
 
-Every published image carries the vulnerability scan that gated its release,
-at `/usr/share/dataeval/security/`:
+Every published image carries the vulnerability scan that gated its release and
+the SBOM describing its contents, at `/usr/share/dataeval/security/`:
 
 ```bash
 docker run --rm harbor.jatic.net/aria/dataeval:latest-cpu \
@@ -106,10 +106,20 @@ docker run --rm harbor.jatic.net/aria/dataeval:latest-cpu \
 the scanner version, the scan timestamp, and the image tag the report was
 produced for under `Metadata.RepoTags`.
 
+`sbom.cdx.json` is the CycloneDX SBOM for the image. The same SBOM is attached
+to the registry as a cosign attestation, so it can be read either from inside
+the image or from the registry without pulling:
+
+```bash
+cosign download attestation --predicate-type https://cyclonedx.org/bom \
+  harbor.jatic.net/aria/dataeval:latest-cpu \
+  | jq -r '.payload' | base64 -d | jq '.predicate'
+```
+
 The scan runs before the image is published, and a finding of HIGH or CRITICAL
-severity fails the build, so no image reaches the registry carrying one. The
-report describes the image minus the layer holding the report itself, which
-contains no executable content.
+severity fails the build, so no image reaches the registry carrying one. Both
+files describe the image minus the layer that holds them, which installs
+nothing and so changes neither the scan nor the package list.
 
 ## Configuration
 
