@@ -56,18 +56,26 @@ flags such as `--gpus all`.
 * - `1.2.0-cpu`
   - Exact release. Immutable, and never rewritten.
 * - `latest-cpu`
+  - Newest stable release. Moves when a higher version is released.
+* - `main-cpu`
   - Newest build of the `main` branch. Moves on every merge. Unstable.
 ```
 
-Those two are the only tags published. Replace `cpu` with `cu126` or `cu130`
-for CUDA variants.
+Replace `cpu` with `cu126` or `cu130` for CUDA variants.
 
-Pin a version tag for anything reproducible. `latest-cpu` is a moving target:
-the digest behind it changes without notice, so an image pulled under it today
-is not the one you get tomorrow.
+Pin a version tag for anything reproducible. Both `latest-cpu` and `main-cpu`
+are moving targets: the digest behind them changes without notice, so an image
+pulled under either today is not the one you get tomorrow.
+
+`latest-cpu` is a retag of a release rather than a separate build, so it carries
+the same signature, scan report and SBOM as the version tag it points at.
+
+A patch released on an older line does not take `latest-cpu`. If v1.2.0 has
+shipped, a later v1.1.4 publishes `1.1.4-cpu` and leaves `latest-cpu` on the
+1.2 line, so pulling it never downgrades you.
 
 Release candidates publish under their exact version (e.g. `1.2.0-rc1-cpu`) and
-never touch `latest-cpu`, which only ever follows `main`.
+never take `latest-cpu`.
 
 Images are signed with [cosign](https://docs.sigstore.dev/cosign/) and
 include a CycloneDX SBOM attestation. The public key is in the repository at

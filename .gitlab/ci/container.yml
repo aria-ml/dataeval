@@ -50,10 +50,19 @@ variables:
 
 ### SHARED RULE TEMPLATES ###
 
-# Exactly two kinds of image are ever published:
+# Two images are ever built, and a third tag points at one of them:
 #
-#   :latest-<variant>    the newest build of main
+#   :main-<variant>      the newest build of the default branch
 #   :<version>-<variant> a tagged release, immutable
+#   :latest-<variant>    a retag of the highest stable release
+#
+# `latest` is a pointer, not a build -- `imagetools create` repoints it at a
+# digest that is already published, scanned and signed, so it costs no storage
+# and inherits every guarantee the release carries. It follows releases rather
+# than the branch because that is what users assume it means; a `latest` built
+# from the default branch advertises a version *older* than the newest release
+# whenever releases are cut from a release branch, which is exactly the shape
+# of this repository.
 #
 # Nothing else reaches the registry. An earlier design also pushed a
 # version-stamped tag from every main and release-branch commit
@@ -151,12 +160,14 @@ resolve:version:
     # version verbatim and never overwrites it; every other pipeline that
     # publishes at all is main, which overwrites :latest in place.
     # DATAEVAL_VERSION is unaffected -- it is what gets baked into the wheel
-    # and the OCI label, so a :latest image still reports its true version.
+    # and the OCI label, so a branch image still reports its true version.
+    # The branch build is named after the branch it came from, so the tag and
+    # its source stay 1:1 without anyone maintaining a second copy of the name.
     - |
       if [ -n "${CI_COMMIT_TAG:-}" ]; then
         DATAEVAL_PUBLISH_TAG="${DATAEVAL_IMAGE_TAG}"
       else
-        DATAEVAL_PUBLISH_TAG="latest"
+        DATAEVAL_PUBLISH_TAG="${CI_DEFAULT_BRANCH}"
       fi
     - echo "DATAEVAL_VERSION=${DATAEVAL_VERSION}" > version.env
     - echo "DATAEVAL_IMAGE_TAG=${DATAEVAL_IMAGE_TAG}" >> version.env
@@ -415,6 +426,42 @@ container_scanning:
   allow_failure: false
   rules:
     - !reference [.rules_container_publish, rules]
+
+# Point :latest-${VARIANT} at this release, if it is the newest one.
+#
+# A server-side retag via `imagetools create` -- no pull, no rebuild, no new
+# storage. The digest is already cosign-signed and carries its own scan report
+# and SBOM attestation, so every guarantee follows the pointer.
+#
+# Gated on the scan: `needs` includes container_scanning, so a release that
+# fails its scan can never take the pointer users pull by default.
+promote:latest:
+  extends: .push_setup
+  stage: attest
+  needs: [push:docker, verify:docker, container_scanning, 'resolve:version']
+  parallel:
+    matrix: *variants
+  variables:
+    # Full tag history: promote-latest.sh ranks this release against every
+    # other one to decide whether it may hold the pointer.
+    GIT_DEPTH: '0'
+  rules:
+    - if: $PUBLISH_VERIFICATION
+      when: never
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+  script:
+    - git fetch --tags --quiet
+    - PROMOTE=$(git tag -l 'v*' | ./docker/promote-latest.sh)
+    - |
+      if [ -z "$PROMOTE" ]; then
+        echo "${CI_COMMIT_TAG} is not the highest stable release; :latest-${VARIANT} left where it is."
+        exit 0
+      fi
+    - echo "Promoting ${DATAEVAL_PUBLISH_TAG}-${VARIANT} → latest-${VARIANT}"
+    - >-
+      docker buildx imagetools create
+      -t ${CI_APPLICATION_REPOSITORY}:latest-${VARIANT}
+      ${CI_APPLICATION_REPOSITORY}:${DATAEVAL_PUBLISH_TAG}-${VARIANT}
 
 # Per-version SBOM release artifact [CS-2-H-4].
 # Downloads the CycloneDX attestation written by push:docker (digest-addressed,
