@@ -10,7 +10,7 @@ would catch if a Dockerfile were edited by hand:
   - the image runs as a non-root user                        [CS-2-H-1]
   - the base image comes from a trusted registry             [CS-1-S-2]
   - no ENTRYPOINT, and CMD explicitly cleared                [IR-2.3, IR-2.4]
-  - the published stage carries a vulnerability scan report  [CS-2-H-3]
+  - the published stage carries a scan report and an SBOM    [CS-2-H-3, CS-2-H-4]
   - variants.yaml extras agree with the exported requirements
 
 The runtime behavior of a built image is covered separately by
@@ -270,6 +270,27 @@ class TestScanReport:
         assert match, "container.yml does not pin TRIVY_VERSION"
         assert Version(match.group(1)) >= Version("0.62.0"), (
             f"Trivy {match.group(1)} is below the v0.62.0 floor named by CS-2-H-2"
+        )
+
+    def test_sbom_is_built_before_the_push(self):
+        """CS-2-H-4: the SBOM must describe the image, and ship with it.
+
+        It is generated from the same tarball trivy scanned, so it has to be
+        produced before the push rather than from the pushed reference.
+        """
+        ci = (PROJECT_ROOT / ".gitlab" / "ci" / "container.yml").read_text()
+        push = ci.split("push:docker:", 1)[-1].split("\nvalidate:docker:", 1)[0]
+        sbom = re.search(r"syft scan docker-archive:[^\n]*docker/security/sbom\.cdx\.json", push)
+        assert sbom, "push:docker does not generate the SBOM into docker/security/"
+        assert push.index(sbom.group(0)) < push.index("--push"), (
+            "the SBOM is generated after the push, so it cannot be copied into the image"
+        )
+
+    def test_sbom_is_attested_to_the_registry(self):
+        """CS-2-H-4 requires the SBOM stored alongside the image in the registry."""
+        ci = (PROJECT_ROOT / ".gitlab" / "ci" / "container.yml").read_text()
+        assert re.search(r"cosign attest .*--type cyclonedx", ci), (
+            "no cosign CycloneDX attestation; an in-image copy alone does not satisfy CS-2-H-4"
         )
 
     def test_scan_gates_the_push(self):

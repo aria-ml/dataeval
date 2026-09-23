@@ -117,6 +117,11 @@ variables:
       wget -qO- "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
       | tar -xz -C /usr/local/bin trivy
     - trivy --version
+    # syft generates the CycloneDX SBOM. Installed here rather than mid-job so a
+    # missing tool fails before anything is built.
+    - apk add --no-cache curl
+    - curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+    - syft --version
     # The docker-container driver is required for type=registry build cache.
     - docker buildx create --use --name ci-builder || true
 
@@ -228,6 +233,17 @@ push:docker:
     # with its dismissal workflow, but that runs too late to stop a push -- this
     # is what actually withholds a dirty image.
     - trivy image --input prod-${VARIANT}.tar --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --quiet
+
+    # SBOM, generated from the same tarball that was scanned and copied into the
+    # image beside the report [CS-2-H-4]. Generating it here rather than from the
+    # pushed image means one syft run instead of two, and the package list is
+    # identical either way: the only thing `scanned` adds to `prod` is the report
+    # layer, which installs nothing. It is also attested to the registry below,
+    # which is what CS-2-H-4 actually requires -- shipping a copy inside the
+    # image as well means an auditor with only the image still has it.
+    - syft scan docker-archive:prod-${VARIANT}.tar -o cyclonedx-json=docker/security/sbom.cdx.json
+    - cp docker/security/sbom.cdx.json sbom-${VARIANT}.json
+    - chmod 0644 docker/security/sbom.cdx.json
     - rm -f prod-${VARIANT}.tar
 
     # Publish `scanned` -- `prod` plus the report layer. Rebuilt from the local
@@ -251,14 +267,9 @@ push:docker:
     - DIGEST=$(docker buildx imagetools inspect "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}" --raw | sha256sum | awk '{print "sha256:"$1}')
     - cosign sign --key cosign.key --yes "${CI_APPLICATION_REPOSITORY}@${DIGEST}"
 
-    # Per-image SBOM [CS-2-H-4]: generated from the pushed image by digest and
-    # attached to the registry as a CycloneDX cosign attestation. The same file
-    # is kept as a CI artifact, and release:sbom republishes it on tags with
-    # permanent retention.
-    - apk add --no-cache curl
-    - curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-    - unset DOCKER_AUTH_CONFIG
-    - syft "${CI_APPLICATION_REPOSITORY}@${DIGEST}" -o cyclonedx-json=sbom-${VARIANT}.json
+    # Attach the SBOM built above to the registry as a CycloneDX cosign
+    # attestation [CS-2-H-4]. The same file is kept as a CI artifact, and
+    # release:sbom republishes it on tags with permanent retention.
     - cosign attest --key cosign.key --type cyclonedx --predicate sbom-${VARIANT}.json --yes "${CI_APPLICATION_REPOSITORY}@${DIGEST}"
     - rm -f cosign.key
   artifacts:
@@ -323,17 +334,24 @@ verify:docker:
         exit 1
       fi
 
-    # The published image must carry its own scan report [CS-2-H-3]. Checked
-    # against the running artifact rather than the Dockerfile, because a COPY
-    # that silently produced an empty directory still looks correct in source.
+    # The published image must carry its own scan report [CS-2-H-3] and SBOM.
+    # Checked against the running artifact rather than the Dockerfile, because
+    # a COPY that silently produced an empty directory still looks correct in
+    # source, and an empty JSON file still parses.
     - |
       docker run --rm "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}" python -c "
       import json
-      d = json.load(open('/usr/share/dataeval/security/vulnerability-scan.json'))
-      tags = (d.get('Metadata') or {}).get('RepoTags') or []
-      print('scan report: trivy', d['Trivy']['Version'], '| repoTags', tags)
-      assert d.get('SchemaVersion'), 'report has no SchemaVersion'
-      assert tags, 'report does not name the image it describes'
+      base = '/usr/share/dataeval/security/'
+      scan = json.load(open(base + 'vulnerability-scan.json'))
+      tags = (scan.get('Metadata') or {}).get('RepoTags') or []
+      print('scan report: trivy', scan['Trivy']['Version'], '| repoTags', tags)
+      assert scan.get('SchemaVersion'), 'scan report has no SchemaVersion'
+      assert tags, 'scan report does not name the image it describes'
+      sbom = json.load(open(base + 'sbom.cdx.json'))
+      comps = sbom.get('components') or []
+      print('sbom:', sbom.get('bomFormat'), sbom.get('specVersion'), '|', len(comps), 'components')
+      assert sbom.get('bomFormat') == 'CycloneDX', 'in-image SBOM is not CycloneDX'
+      assert len(comps) > 50, f'in-image SBOM lists only {len(comps)} components'
       "
 
     # Confirm the image runs as a non-root user [CS-2-H-1]. The Dockerfile's
