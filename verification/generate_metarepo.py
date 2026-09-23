@@ -6,6 +6,7 @@ Reads the static registry (registry.yaml) and the dynamic verification report
 
   - test-cases/test-case-{id}.md  — one per test case, with Test Results filled
   - vcrm.md                       — VCRM with Verification row filled from results
+  - test-results.log              — per-test-case run log for the dated assessment folder
 
 Output directory: verification/reports/metarepo/
 """
@@ -13,8 +14,11 @@ Output directory: verification/reports/metarepo/
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 from datetime import UTC, datetime
+from importlib import metadata
 from pathlib import Path
 
 import yaml
@@ -24,6 +28,8 @@ PROJECT_ROOT = VERIFICATION_DIR.parent
 REGISTRY_PATH = VERIFICATION_DIR / "registry.yaml"
 REPORT_PATH = PROJECT_ROOT / "output" / "verification_report.json"
 OUTPUT_DIR = PROJECT_ROOT / "output" / "metarepo"
+PRODUCT = "DataEval"
+DISTRIBUTION = "dataeval"
 
 
 def load_registry() -> dict:
@@ -264,6 +270,172 @@ def generate_vcrm(registry: dict, report: dict | None) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Test Results Log Generation
+# ---------------------------------------------------------------------------
+
+LOG_WIDTH = 100
+_LOG_STATUS = {"passed": "PASS", "failed": "FAIL", "error": "ERROR", "skipped": "SKIP", "xfailed": "XFAIL"}
+
+
+def _git(*args: str) -> str | None:
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(PROJECT_ROOT), *args],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return out.stdout.strip()
+
+
+def _source_line() -> str:
+    """Describe the verified source: project URL, ref, commit, and whether it had local changes."""
+    url = os.environ.get("CI_PROJECT_URL")
+    if not url:
+        url = _git("remote", "get-url", "origin") or "unknown"
+        if url.startswith("git@"):
+            url = "https://" + url.removeprefix("git@").replace(":", "/", 1)
+        url = re.sub(r"//[^/@]+@", "//", url).removesuffix(".git")
+    ref = (
+        os.environ.get("CI_COMMIT_TAG")
+        or _git("describe", "--tags", "--exact-match", "HEAD")
+        or os.environ.get("CI_COMMIT_REF_NAME")
+        or _git("rev-parse", "--abbrev-ref", "HEAD")
+        or "unknown"
+    )
+    commit = (os.environ.get("CI_COMMIT_SHA") or _git("rev-parse", "HEAD") or "unknown")[:8]
+    dirty = " [uncommitted changes]" if _git("status", "--porcelain", "--untracked-files=no") else ""
+    return f"{url} @ {ref} ({commit}){dirty}"
+
+
+def _product_version() -> str:
+    try:
+        return metadata.version(DISTRIBUTION)
+    except metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def _log_label(status: str) -> str:
+    return _LOG_STATUS.get(status, status.upper())
+
+
+def _log_counts(statuses: list[str]) -> str:
+    found = {s: statuses.count(s) for s in _LOG_STATUS if statuses.count(s)}
+    return ", ".join(f"{n} {s}" for s, n in found.items()) or "none"
+
+
+def _log_requirement_status(tcs: list[str], tc_status: dict[str, str]) -> str:
+    statuses = [tc_status.get(t) for t in tcs]
+    if not tcs:
+        return "UNMAPPED"
+    if all(s == "passed" for s in statuses):
+        return "VERIFIED"
+    if any(s == "failed" for s in statuses):
+        return "FAILED"
+    return "PARTIAL"
+
+
+def _log_test_case_rows(registry: dict, cases: dict, tc_status: dict[str, str]) -> list[str]:
+    tc_to_reqs: dict[str, list[str]] = {}
+    for req_id, req_data in registry["requirements"].items():
+        for tc_id in req_data.get("test_cases", []):
+            tc_to_reqs.setdefault(tc_id, []).append(req_id)
+
+    rows = [f"{'TEST CASE':<10}{'STATUS':<8}{'PASSED/TESTS':<18}{'REQUIREMENTS':<16}NAME"]
+    for tc_id in sorted(set(registry["test_cases"]) | set(tc_status), key=_tc_sort_key):
+        tests = cases.get(f"test-case-{tc_id}", {}).get("tests", [])
+        n_pass = sum(t["status"] == "passed" for t in tests)
+        n_other = len(tests) - n_pass - sum(t["status"] in ("failed", "error") for t in tests)
+        tally = f"{n_pass}/{len(tests)}" + (f" ({n_other} not run)" if n_other else "")
+        status = _log_label(tc_status[tc_id]) if tc_id in tc_status else "NOT RUN"
+        name = registry["test_cases"].get(tc_id, {}).get("name", "(not in registry)")
+        rows.append(f"{tc_id:<10}{status:<8}{tally:<18}{', '.join(tc_to_reqs.get(tc_id, ['-'])):<16}{name}")
+    return rows
+
+
+def _log_detail_rows(cases: dict, all_tests: dict) -> list[str]:
+    def test_line(nodeid: str, status: str) -> list[str]:
+        message = all_tests.get(nodeid, {}).get("message")
+        return [f"  {_log_label(status):<6}{nodeid}"] + ([f"        -> {message}"] if message else [])
+
+    rows: list[str] = []
+    for tc_key, case in sorted(cases.items(), key=lambda kv: _tc_sort_key(kv[0].removeprefix("test-case-"))):
+        rows.append(f"[{tc_key}] {_log_label(case['status'])}")
+        for test in case["tests"]:
+            rows += test_line(test["test"], test["status"])
+        rows.append("")
+
+    mapped = {t["test"] for case in cases.values() for t in case["tests"]}
+    unmapped = sorted(nodeid for nodeid in all_tests if nodeid not in mapped)
+    rows += ["-" * LOG_WIDTH, "TESTS NOT MAPPED TO A TEST CASE", "-" * LOG_WIDTH]
+    for nodeid in unmapped:
+        rows += test_line(nodeid, all_tests[nodeid]["status"])
+    if not unmapped:
+        rows.append("  (none)")
+    return rows
+
+
+def generate_test_results_log(registry: dict, report: dict) -> str:
+    """Generate the metarepo ``test-results.log`` (DR-1.1-H-4, DR-1.3-H-1) from a verification run."""
+    run = report.get("run", {})
+    all_tests = report.get("tests", {})
+    cases = report["test_cases"]
+    requirements = registry["requirements"]
+    tc_status = {tc_key.removeprefix("test-case-"): c["status"] for tc_key, c in cases.items()}
+    req_status = {r: _log_requirement_status(d.get("test_cases", []), tc_status) for r, d in requirements.items()}
+    verified = list(req_status.values()).count("VERIFIED")
+    rule, thin = "=" * LOG_WIDTH, "-" * LOG_WIDTH
+
+    lines = [
+        rule,
+        f"{PRODUCT} - Verification Test Results",
+        rule,
+        f"Product version    : {_product_version()}",
+        f"Source             : {_source_line()}",
+        f"Runner             : {os.environ.get('CI_JOB_URL') or 'local run (not CI)'}",
+        f"Command            : {run.get('command', 'unknown')}",
+        f"Python             : {run.get('python', 'unknown')} ({run.get('platform', 'unknown')})",
+        f"Started (UTC)      : {run.get('started', 'unknown')}",
+        f"Finished (UTC)     : {run.get('finished', 'unknown')}",
+        f"pytest exit status : {run.get('exit_status', 'unknown')}",
+        "Standard           : DR-1.1-H-4, DR-1.3-H-1 (JATIC internal-docs v1.2.0)",
+        "",
+        thin,
+        "SUMMARY",
+        thin,
+        f"Test cases         : {len(cases)} total, {_log_counts(list(tc_status.values()))}",
+        f"Tests              : {len(all_tests)} total, {_log_counts([t['status'] for t in all_tests.values()])}",
+        f"Requirements       : {len(requirements)} total, {verified} verified (every mapped test case passed)",
+        "",
+        thin,
+        "TEST CASE RESULTS",
+        thin,
+        *_log_test_case_rows(registry, cases, tc_status),
+        "",
+        thin,
+        "REQUIREMENT COVERAGE",
+        thin,
+        f"{'REQUIREMENT':<13}{'STATUS':<10}{'TEST CASES':<20}NAME",
+        *(
+            f"{r:<13}{req_status[r]:<10}{', '.join(d.get('test_cases', [])) or '-':<20}{d['name']}"
+            for r, d in requirements.items()
+        ),
+        "",
+        thin,
+        "TEST DETAIL",
+        thin,
+        *_log_detail_rows(cases, all_tests),
+        "",
+        rule,
+        "END OF REPORT",
+        rule,
+    ]
+    return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -296,6 +468,11 @@ def main() -> None:
     vcrm_path = OUTPUT_DIR / "vcrm.md"
     vcrm_path.write_text(vcrm_content)
     print("  Generated vcrm.md")
+
+    # Generate test results log
+    if report:
+        (OUTPUT_DIR / "test-results.log").write_text(generate_test_results_log(registry, report))
+        print("  Generated test-results.log")
 
     print(f"\nAll artifacts written to {OUTPUT_DIR}")
 

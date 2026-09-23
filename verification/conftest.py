@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import platform
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -35,7 +35,7 @@ if _PROJECT_ROOT not in sys.path:
 
 
 def pytest_sessionstart(session):
-    session.config._verification_started = datetime.now(timezone.utc)
+    session.config._verification_started = datetime.now(UTC)
 
 
 def pytest_configure(config):
@@ -171,7 +171,7 @@ def pytest_sessionfinish(session, exitstatus):
         },
         "run": {
             "started": _utc(session.config._verification_started),
-            "finished": _utc(datetime.now(timezone.utc)),
+            "finished": _utc(datetime.now(UTC)),
             "exit_status": int(exitstatus),
             "command": " ".join(["pytest", *session.config.invocation_params.args]),
             "python": platform.python_version(),
