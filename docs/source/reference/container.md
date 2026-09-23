@@ -92,6 +92,25 @@ cosign download attestation --predicate-type https://cyclonedx.org/bom \
   | jq -r '.payload' | base64 -d | jq '.predicate'
 ```
 
+## Vulnerability Scan Report
+
+Every published image carries the vulnerability scan that gated its release,
+at `/usr/share/dataeval/security/`:
+
+```bash
+docker run --rm harbor.jatic.net/aria/dataeval:latest-cpu \
+  cat /usr/share/dataeval/security/vulnerability-scan.txt
+```
+
+`vulnerability-scan.json` holds the same scan in Trivy's JSON schema, including
+the scanner version, the scan timestamp, and the image tag the report was
+produced for under `Metadata.RepoTags`.
+
+The scan runs before the image is published, and a finding of HIGH or CRITICAL
+severity fails the build, so no image reaches the registry carrying one. The
+report describes the image minus the layer holding the report itself, which
+contains no executable content.
+
 ## Configuration
 
 DataEval is configured through its Python API rather than through environment

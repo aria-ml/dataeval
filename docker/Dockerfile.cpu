@@ -132,3 +132,28 @@ USER dataeval
 # inspect` then reports a Cmd this project never chose, at exactly the point a
 # reviewer looks to confirm the claim above.
 CMD []
+
+
+# =============================================================================
+# Stage: scanned -- the image that actually gets published
+# =============================================================================
+# CS-2-H-3 requires a vulnerability scan report to ship *inside* the final
+# image. That cannot be done in one pass: the report describes the finished
+# filesystem, so it exists only after `prod` is built. CI therefore builds
+# `prod`, scans it, writes the report into docker/security/, and builds this
+# stage -- `prod` plus a single layer carrying the report.
+#
+# The scan is also the publishing gate [CS-2-H-2]: a HIGH or CRITICAL finding
+# fails the job before this stage is ever built, so nothing reaches the
+# registry. That gate used to live in a separate promote step which moved
+# floating tags only after a clean scan; now that the published tag is written
+# directly, the gate has to sit in front of the push instead.
+#
+# The published image is one layer larger than what was scanned -- that layer
+# being the report itself, which contains no executable content.
+#
+# `--target prod` does not reference docker/security/, so a plain local build
+# still works without running a scan first.
+FROM prod AS scanned
+
+COPY --chown=root:root docker/security/ /usr/share/dataeval/security/
