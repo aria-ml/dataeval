@@ -1,5 +1,27 @@
 # DataEval Change Log
 
+## v1.1.3
+
+🛠️ **Improvements and Enhancements**
+
+- `9712b8a2` - [impr] Publish main-<variant> from the branch and point latest at the newest release
+- `7a76618d` - [impr] Publish only :latest from main and version tags from releases
+
+👾 **Fixes**
+
+- `635b4186` - [fix] Spell the Harbor robot name inline so GitLab cannot expand it
+- `3a5cbd97` - [fix] Rebuild the dataeval wheel so images carry the resolved version
+- `03d7eb17` - [fix] Generate Dockerfiles without depending on git tag history
+- `f386f763` - [fix] Restore publish verification rules and keep main from overwriting them
+
+📝 **Miscellaneous**
+
+- `343999ab` - [devsecops] Ship the SBOM inside the image alongside the scan report
+- `86d768de` - [devsecops] Ship the vulnerability scan report inside the published image
+- `1fc925e5` - [docs] Point the cosign link at a URL sigstore still serves
+- `18ed12c9` - [docs] Document the two container tags that are actually published
+- `abc82f28` - [devsecops] Add containerization infrastructure
+
 ## v1.1.2
 
 👾 **Fixes**
