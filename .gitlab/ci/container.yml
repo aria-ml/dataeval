@@ -1,6 +1,6 @@
 ### CONTAINER PUBLISH JOBS ###
 #
-# Builds, signs, scans and promotes the DataEval base execution environment to
+# Builds, signs, scans and publishes the DataEval base execution environment to
 # Harbor at aria/dataeval. This image is a library runtime, not an application:
 # it declares no ENTRYPOINT and no CMD. See docker/Dockerfile.j2 for why that is
 # deliberate and which requirements it keeps out of scope.
@@ -43,15 +43,20 @@ variables:
 .variants: &variants
   - VARIANT: [cpu, cu126, cu130]
 
-### SHARED RULE TEMPLATE ###
+### SHARED RULE TEMPLATES ###
 
-# Containers build on main, on release branches, and on version tags.
+# Exactly two kinds of image are ever published:
 #
-# Release branches build so an image can be scanned before its tag is pushed;
-# promote-tags.sh withholds every floating pointer from those builds, so the
-# validation cannot move a tag users pull. Merge requests are excluded -- three
-# CUDA images per MR is not a cost this pipeline should carry.
-.rules_container:
+#   :latest-<variant>    the newest build of main
+#   :<version>-<variant> a tagged release, immutable
+#
+# Nothing else reaches the registry. An earlier design also pushed a
+# version-stamped tag from every main and release-branch commit
+# (:1.1.1.dev110-g8b978998-cpu and so on). Those accumulate without bound --
+# 145 of them, 357 GiB, filled the Harbor project's 500 GiB quota and began
+# failing pushes outright. A floating :latest that is overwritten in place
+# costs one tag per variant no matter how long main runs.
+.rules_container_publish:
   rules:
     - if: $PUBLISH_VERIFICATION
       when: never
@@ -61,12 +66,25 @@ variables:
     # candidate` repoints on every green main pipeline must not build images.
     - if: $CI_COMMIT_TAG =~ /^v\d+/
     - if: $CI_COMMIT_BRANCH == 'main'
+
+# Release branches build but never publish. Their Dockerfiles can diverge from
+# main's -- release/v1.1 is a different tree -- so the build still has to be
+# exercised before a tag is cut, but the artifact it produces is thrown away
+# rather than parked in the registry under a name nobody pulls.
+.rules_container_validate:
+  rules:
+    - if: $PUBLISH_VERIFICATION
+      when: never
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
 
 ### SHARED JOB TEMPLATES ###
 
 .container_setup:
-  extends: .rules_container
+  extends: .rules_container_publish
   stage: publish
   image: docker:25.0.5-git
   variables:
@@ -98,7 +116,9 @@ variables:
 # downstream job consumes this dotenv rather than re-running the script 15x
 # across the matrix.
 resolve:version:
-  extends: .rules_container
+  rules:
+    - !reference [.rules_container_publish, rules]
+    - !reference [.rules_container_validate, rules]
   stage: publish
   image: alpine:latest
   needs: []
@@ -110,8 +130,20 @@ resolve:version:
   script:
     - git fetch --tags
     - eval "$(./docker/resolve-version.sh)"
+    # The tag the image is published under. A release pipeline publishes the
+    # version verbatim and never overwrites it; every other pipeline that
+    # publishes at all is main, which overwrites :latest in place.
+    # DATAEVAL_VERSION is unaffected -- it is what gets baked into the wheel
+    # and the OCI label, so a :latest image still reports its true version.
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        DATAEVAL_PUBLISH_TAG="${DATAEVAL_IMAGE_TAG}"
+      else
+        DATAEVAL_PUBLISH_TAG="latest"
+      fi
     - echo "DATAEVAL_VERSION=${DATAEVAL_VERSION}" > version.env
     - echo "DATAEVAL_IMAGE_TAG=${DATAEVAL_IMAGE_TAG}" >> version.env
+    - echo "DATAEVAL_PUBLISH_TAG=${DATAEVAL_PUBLISH_TAG}" >> version.env
     - cat version.env
   artifacts:
     reports:
@@ -125,37 +157,46 @@ push:docker:
   parallel:
     matrix: *variants
   script:
-    # DATAEVAL_VERSION / DATAEVAL_IMAGE_TAG are inherited from resolve:version.
-    - IMMUTABLE_TAG="${DATAEVAL_IMAGE_TAG}-${VARIANT}"
-    - echo "Building dataeval ${DATAEVAL_VERSION} → ${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}"
+    # DATAEVAL_VERSION / DATAEVAL_PUBLISH_TAG are inherited from resolve:version.
+    - PUBLISH_TAG="${DATAEVAL_PUBLISH_TAG}-${VARIANT}"
+    - echo "Building dataeval ${DATAEVAL_VERSION} → ${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}"
 
     # Build the test stage first. It runs docker/smoke.py against the frozen,
     # variant-specific venv; a failure here fails the job and nothing is pushed.
+    #
+    # Two --cache-from refs, one per product. DataEval and DataEval-Flow build
+    # the same base (ubuntu:24.04, the same Python and uv pins) and diverge
+    # only once their own dependencies are installed. BuildKit keys cache
+    # entries on the content of each step, so the shared prefix hits whichever
+    # product warmed it first and the product-specific tail only ever hits its
+    # own ref. --cache-to writes this product's ref alone, so neither can
+    # clobber the other's.
     - >-
       docker buildx build --target test
       --platform linux/amd64
       --build-arg DATAEVAL_VERSION="${DATAEVAL_VERSION}"
       --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT}
+      --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-flow-${VARIANT}
       --cache-to type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT},mode=max,image-manifest=true
       -f docker/Dockerfile.${VARIANT} .
 
-    # Build and push the immutable, version-stamped tag only. Floating tags
-    # (:edge-${VARIANT} on main, :${VARIANT} and :${MAJOR}.${MINOR}-${VARIANT}
-    # on a release) are gated on the scan and applied later by promote:floating.
+    # Build and push. On main this overwrites :latest-${VARIANT} in place; on a
+    # tag it writes :${VERSION}-${VARIANT}, which is never rewritten.
     - >-
       docker buildx build --target prod
       --platform linux/amd64
       --build-arg DATAEVAL_VERSION="${DATAEVAL_VERSION}"
       --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT}
+      --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-flow-${VARIANT}
       -f docker/Dockerfile.${VARIANT}
-      -t ${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}
+      -t ${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}
       --push .
 
     # Sign the digest [CS-3-H-1]. `imagetools inspect` reads the digest back
     # from the registry because buildx --push never loads the image locally.
     - printf '%s' "$COSIGN_PRIVATE_KEY_B64" | base64 -d > cosign.key
     - chmod 600 cosign.key
-    - DIGEST=$(docker buildx imagetools inspect "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" --raw | sha256sum | awk '{print "sha256:"$1}')
+    - DIGEST=$(docker buildx imagetools inspect "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}" --raw | sha256sum | awk '{print "sha256:"$1}')
     - cosign sign --key cosign.key --yes "${CI_APPLICATION_REPOSITORY}@${DIGEST}"
 
     # Per-image SBOM [CS-2-H-4]: generated from the pushed image by digest and
@@ -173,6 +214,32 @@ push:docker:
       - sbom-*.json
     expire_in: 30 days
 
+# Release-branch build check. Builds through the `test` target -- which runs
+# docker/smoke.py inside the image -- and stops there. Nothing is tagged and
+# nothing is pushed, so a release branch costs zero registry storage while
+# still proving its own Dockerfiles build and import cleanly before a tag is
+# cut from it. It reads both cache refs but writes neither: a build that is
+# never published should not be able to poison the cache a published one uses.
+validate:docker:
+  extends: .push_setup
+  rules:
+    - !reference [.rules_container_validate, rules]
+  needs:
+    - job: resolve:version
+      artifacts: true
+  parallel:
+    matrix: *variants
+  script:
+    - echo "Validating dataeval ${DATAEVAL_VERSION} (${VARIANT}) -- no publish"
+    - >-
+      docker buildx build --target test
+      --platform linux/amd64
+      --build-arg DATAEVAL_VERSION="${DATAEVAL_VERSION}"
+      --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-${VARIANT}
+      --cache-from type=registry,ref=${CI_CACHE_REPOSITORY}:dataeval-flow-${VARIANT}
+      -f docker/Dockerfile.${VARIANT} .
+
+
 # Verify the signature and SBOM attestation on the pushed image, then confirm
 # the artifact actually runs.
 verify:docker:
@@ -186,17 +253,17 @@ verify:docker:
   before_script:
     - !reference [.container_setup, before_script]
     - apk add --no-cache cosign
-    - export IMMUTABLE_TAG="${DATAEVAL_IMAGE_TAG}-${VARIANT}"
+    - export PUBLISH_TAG="${DATAEVAL_PUBLISH_TAG}-${VARIANT}"
   script:
-    - docker pull "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}"
-    - cosign verify --key docker/cosign.pub "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}"
-    - cosign verify-attestation --key docker/cosign.pub --type cyclonedx "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" > /dev/null
+    - docker pull "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}"
+    - cosign verify --key docker/cosign.pub "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}"
+    - cosign verify-attestation --key docker/cosign.pub --type cyclonedx "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}" > /dev/null
 
     # Smoke test the published artifact. There is no --help to call: the image
     # declares no entrypoint, so the command comes from the caller, which is
     # exactly how users are documented to run it.
     - |
-      RUNTIME_VERSION=$(docker run --rm "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" \
+      RUNTIME_VERSION=$(docker run --rm "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}" \
         python -c "import dataeval; print(dataeval.__version__)")
       echo "Image reports dataeval ${RUNTIME_VERSION}, expected ${DATAEVAL_VERSION}"
       if [ "${RUNTIME_VERSION}" != "${DATAEVAL_VERSION}" ]; then
@@ -208,7 +275,7 @@ verify:docker:
     # USER instruction is verified statically by the scanner; this catches a
     # base image that resolves the name to uid 0.
     - |
-      UID_IN_IMAGE=$(docker run --rm "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" id -u)
+      UID_IN_IMAGE=$(docker run --rm "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}" id -u)
       echo "Image default uid: ${UID_IN_IMAGE}"
       if [ "${UID_IN_IMAGE}" = "0" ]; then
         echo "Image runs as root; CS-2-H-1 requires a non-root default user."
@@ -254,7 +321,7 @@ container_scanning:
     # dotenv vars are injected into the job environment at runtime but are NOT
     # expanded inside the `variables:` keyword -- declaring CS_IMAGE there
     # yields an empty tag. Assemble it here, where the dotenv var is present.
-    - export CS_IMAGE="${CI_APPLICATION_REPOSITORY}:${DATAEVAL_IMAGE_TAG}-${VARIANT}"
+    - export CS_IMAGE="${CI_APPLICATION_REPOSITORY}:${DATAEVAL_PUBLISH_TAG}-${VARIANT}"
     # Exported here rather than declared under `variables:` for the same reason
     # the docker login spells it inline: GitLab would expand the `$aria` in
     # `robot$aria+aria-bot` to nothing and the analyzer would authenticate as
@@ -264,54 +331,16 @@ container_scanning:
   # Promote the scan from the template's advisory default to a gate.
   allow_failure: false
   rules:
-    - if: $PUBLISH_VERIFICATION
-      when: never
-    - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
-      when: never
-    - if: $CI_COMMIT_TAG =~ /^v\d+/
-    - if: $CI_COMMIT_BRANCH == 'main'
-    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
-
-# Promote a scan-cleared immutable tag to its floating pointers:
-#   main pipeline    → :edge-${VARIANT}
-#   release pipeline → :${MAJOR}.${MINOR}-${VARIANT}, and :${VARIANT} if highest
-# Server-side retag via `imagetools create` -- no pull, no rebuild. The digest
-# is already cosign-signed by push:docker, so the signature covers every tag
-# that points at it.
-promote:floating:
-  extends: .push_setup
-  stage: promote
-  needs: [push:docker, verify:docker, container_scanning, 'resolve:version']
-  parallel:
-    matrix: *variants
-  variables:
-    # Full tag history: promote-tags.sh ranks this release against every other
-    # one to decide whether it may hold the bare `:${VARIANT}` pointer.
-    GIT_DEPTH: '0'
-  script:
-    - IMMUTABLE_TAG="${DATAEVAL_IMAGE_TAG}-${VARIANT}"
-    - git fetch --tags --quiet
-    - FLOATING_TAGS=$(git tag -l 'v*' | ./docker/promote-tags.sh "${VARIANT}")
-    - |
-      if [ -z "$FLOATING_TAGS" ]; then
-        echo "No floating pointer for ${IMMUTABLE_TAG} — immutable tag only."
-      fi
-    - |
-      for FLOATING_TAG in $FLOATING_TAGS; do
-        echo "Promoting ${IMMUTABLE_TAG} → ${FLOATING_TAG}"
-        docker buildx imagetools create \
-          -t ${CI_APPLICATION_REPOSITORY}:${FLOATING_TAG} \
-          ${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}
-      done
+    - !reference [.rules_container_publish, rules]
 
 # Per-version SBOM release artifact [CS-2-H-4].
 # Downloads the CycloneDX attestation written by push:docker (digest-addressed,
-# so it follows the immutable tag through promotion) and republishes it as a
+# so it is found by digest rather than by tag) and republishes it as a
 # versioned artifact with permanent retention. Tag-only: main pipelines already
 # retain the 30-day artifact from push:docker.
 release:sbom:
   extends: .push_setup
-  stage: promote
+  stage: attest
   needs: [push:docker, verify:docker, container_scanning, 'resolve:version']
   parallel:
     matrix: *variants
@@ -320,8 +349,8 @@ release:sbom:
       when: never
     - if: $CI_COMMIT_TAG =~ /^v\d+/
   script:
-    - IMMUTABLE_TAG="${DATAEVAL_IMAGE_TAG}-${VARIANT}"
-    - DIGEST=$(docker buildx imagetools inspect "${CI_APPLICATION_REPOSITORY}:${IMMUTABLE_TAG}" --raw | sha256sum | awk '{print "sha256:"$1}')
+    - PUBLISH_TAG="${DATAEVAL_PUBLISH_TAG}-${VARIANT}"
+    - DIGEST=$(docker buildx imagetools inspect "${CI_APPLICATION_REPOSITORY}:${PUBLISH_TAG}" --raw | sha256sum | awk '{print "sha256:"$1}')
     - >-
       cosign download attestation --predicate-type https://cyclonedx.org/bom "${CI_APPLICATION_REPOSITORY}@${DIGEST}"
       | jq -r '.payload' | base64 -d | jq '.predicate' > sbom-${DATAEVAL_VERSION}-${VARIANT}.json
