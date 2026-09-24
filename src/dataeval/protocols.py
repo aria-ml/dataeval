@@ -247,6 +247,64 @@ def _is_protocol_instance(obj: Any, protocol: type[_TProtocol]) -> TypeIs[_TProt
     return all(inspect.getattr_static(obj, name, _MISSING) is not _MISSING for name in _protocol_members(protocol))
 
 
+def _optional_attr(obj: Any, name: str) -> Any:
+    """Read ``name`` off ``obj`` if it is genuinely there, else None. Never fabricated.
+
+    For an attribute outside the protocol a target is dispatched on -- ``track_ids`` on an
+    :obj:`ObjectDetectionTarget`, say -- where absence is a legitimate answer rather than a
+    malformed target.
+
+    Presence is answered by :func:`inspect.getattr_static`, the same probe
+    :func:`_is_protocol_instance` applies to protocol membership, and for the same reason: it
+    does not call ``__getattr__``, so an attribute-fabricating stand-in reports missing rather
+    than answering every probe. Once presence is confirmed the value itself is read the ordinary
+    way, through ``getattr``, so a real property is evaluated rather than handed back as its own
+    descriptor.
+
+    Parameters
+    ----------
+    obj : Any
+        Object to read from.
+    name : str
+        Attribute name.
+
+    Returns
+    -------
+    Any
+        The attribute's value, or None when ``obj`` does not present it.
+
+    Examples
+    --------
+    >>> class Detection:
+    ...     boxes = np.zeros((2, 4))
+    ...     track_ids = np.arange(2)
+    >>> _optional_attr(Detection(), "track_ids").tolist()
+    [0, 1]
+
+    An absent attribute reads as None rather than raising:
+
+    >>> _optional_attr(Detection(), "scores") is None
+    True
+
+    A stand-in that fabricates attributes on demand does not invent one:
+
+    >>> from unittest.mock import Mock
+    >>> _optional_attr(Mock(), "track_ids") is None
+    True
+
+    A property is evaluated rather than returned as its descriptor:
+
+    >>> class Computed:
+    ...     @property
+    ...     def track_ids(self):
+    ...         return np.arange(3)
+    >>> _optional_attr(Computed(), "track_ids").tolist()
+    [0, 1, 2]
+    """
+    value = inspect.getattr_static(obj, name, _MISSING)
+    return None if value is _MISSING else getattr(obj, name)
+
+
 DatumMetadata: TypeAlias = maite.protocols.DatumMetadata
 """
 Metadata associated with a single datum (item-level).

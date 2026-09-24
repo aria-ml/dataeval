@@ -38,11 +38,38 @@ embedding-based clustering as a third detection mode alongside its hash methods.
 
 ### Redundancy and duplication
 
-A {term}`duplicate <Duplicates>` is any sample that is identical or
-near-identical to another sample already in the dataset. Near-duplicates
-include images with minor lighting shifts, JPEG re-compression artifacts,
-slight crops of the same underlying scene, or rotated and flipped versions
-of the same image.
+A {term}`duplicate <Duplicates>` is not simply "a sample identical or
+near-identical to another" — that description only covers pixels, and pixels
+are one of three projections a duplicate can be found in. A duplicate is a
+**collision in some projection of the datum**: reduce a sample through pixels,
+through its annotation, or through its coded metadata factors, and two
+samples whose reduction agrees are duplicates in that projection, whether or
+not they agree in any other.
+
+| Projection | What it reduces to |
+| --- | --- |
+| Pixels | phash / dhash / xxhash over decoded frames |
+| Annotation | a digest over boxes, labels, and track ids |
+| Metadata factors | the coded {class}`.Metadata` factor row |
+
+**Pixels** are the common case and the one most tooling assumes. Near-duplicates
+here include images with minor lighting shifts, JPEG re-compression artifacts,
+slight crops of the same underlying scene, or rotated and flipped versions of
+the same image.
+
+**Annotation** duplicates share a box/label/track-id digest even when their
+pixels differ or were never compared. **Factor** duplicates share a named
+{class}`.Metadata` factor row — a capture timestamp, GPS fix, or source
+filename — even before either image is decoded.
+
+Which projections agree, and which disagree, is itself the finding: two
+samples agreeing on pixels but disagreeing on annotation is one collect
+carrying two conflicting label passes; agreeing on annotation while
+disagreeing on pixels is a synthetically augmented copy; agreeing on both is a
+plain re-ingest under a new name. {class}`.Duplicates` reports which
+projections it checked and which of those agreed on every group — see
+[Duplicates and near-duplicates](ActingOnResults.md#duplicates-and-near-duplicates)
+for how to read that against a specific result.
 
 The training impact of redundancy is well established. When a sample appears
 multiple times, the model receives repeated gradient updates from information
@@ -164,8 +191,9 @@ landscape without the practitioner realizing it.
 
 ### Duplicate detection: hashing and clustering
 
-{class}`.Duplicates` uses three complementary detection approaches, each
-suited to a different kind of redundancy.
+{class}`.Duplicates` computes the pixel projection through three complementary
+approaches, each suited to a different kind of redundancy. Two further
+projections — annotation and metadata factors — are covered afterward.
 
 **Exact duplicate detection** uses xxHash, a fast non-cryptographic hash of
 the raw image bytes. Two images with identical xxHash values are guaranteed to
@@ -210,6 +238,40 @@ exact duplicates, even when their embedding distance is zero. This mode catches
 **semantic duplicates** — distinct photographs of the same object or scene that
 are not similar at the pixel level but occupy the same region of embedding
 space.
+
+**Annotation detection** is on by default whenever a dataset carries targets
+(object detection boxes and labels). Each item's annotation — its boxes,
+labels, and, for tracking data, track ids — is reduced to a digest; items
+whose digest agrees are grouped as an annotation duplicate, whether or not
+their pixels do. Because it runs alongside pixel detection rather than
+instead of it, the same pair of items can be checked on both projections at
+once: a pair agreeing on pixels but not on annotation surfaces as an exact
+pixel match whose annotation disagreed (one collect carrying two conflicting
+label passes); a pair agreeing on annotation but not on pixels surfaces as an
+annotation duplicate whose pixels disagreed (a synthetically augmented copy).
+No feature extractor or threshold is needed — it is an exact, transitive
+comparison, like xxHash for pixels.
+
+**Factor detection** is the only projection that is opt-in. Passing
+`duplicate_factors` to {meth}`.Duplicates.evaluate` names one or more
+{class}`.Metadata` factors whose exact agreement makes two items duplicates,
+such as a capture timestamp, a GPS fix, or a source filename.
+
+The factor names form a **conjunction**. Two items are duplicates only when
+every named factor agrees. Agreeing on some factors while differing on another
+does not produce a duplicate. Because matching applies to the entire row,
+adding a factor can only split groups. Use additional factors to narrow an
+identifier that is not unique on its own (for example,
+`duplicate_factors=["capture_date", "camera_id"]` requires agreement on both).
+Items with unstated factors (null, or NaN in numeric columns) are excluded from
+grouping.
+
+Factor detection is disabled unless factors are explicitly named. There is no
+default set or selection heuristic. The signal is valid only when the named
+factors identify an individual item rather than a shared condition. For
+example, items sharing `weather=rain` reflect shared conditions that belong in
+{class}`.Balance` and {class}`.Coverage`. Grouping on low-cardinality factors
+produces large groups that obscure actual duplicates.
 
 ### Outlier detection: image statistics and embeddings
 

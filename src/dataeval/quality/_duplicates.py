@@ -3,8 +3,8 @@
 __all__ = []
 
 import warnings
-from collections.abc import Mapping, Sequence, Sized
-from itertools import combinations
+from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
+from itertools import combinations, groupby
 from typing import Any, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar, cast, overload
 
 import numpy as np
@@ -14,10 +14,13 @@ from numpy.typing import NDArray
 from dataeval import Embeddings
 from dataeval._log import get_logger
 from dataeval.core import (
+    AnnotationDivergence,
     ClusterResult,
     SegmentMatchResult,
     StatsResult,
     align_subsequence,
+    annotation_divergence,
+    annotation_fingerprint,
     cluster,
     combine_stats_results,
     hash_groups,
@@ -34,9 +37,12 @@ from dataeval.protocols import (
     ArrayLike,
     Dataset,
     FeatureExtractor,
+    MetadataLike,
     MultiobjectTrackingDataset,
     MultiobjectTrackingTarget,
+    ObjectDetectionTarget,
     _is_protocol_instance,
+    _optional_attr,
 )
 from dataeval.quality._shared import (
     LABEL_KIND,
@@ -100,6 +106,19 @@ RedundantGroup: TypeAlias = tuple[Sequence[Any], str, float]
 # beside the track ids themselves, since a track index is not a frame index and cannot be derived
 # from one.
 TrackGroup: TypeAlias = tuple[Sequence[Any], str, list[int]]
+
+# One datum's annotation as the annotation axis reads it.
+# Frames in temporal order, plus the image size their coordinates are normalized by.
+# image_hw is None for a sequence (frames are never decoded to read it) and for anything
+# else whose shape could not be read.
+_AnnotationSource: TypeAlias = tuple[list[tuple[Any, Any, Any]], tuple[int, int] | None]
+
+# How `_fold_row` names one pair: its level, then each side's `(dataset, item, track)`.
+_PairKey: TypeAlias = tuple[Any, ...]
+
+# One datum's annotation axis reading. `_aligned_digests` re-keys a digest and its source
+# annotation with one function, not two.
+_T = TypeVar("_T")
 
 
 class SegmentMatch(NamedTuple):
@@ -245,6 +264,8 @@ _EMPTY_DUPS_SCHEMA: dict[str, pl.DataType | type] = {
     "span_start": pl.List(pl.Int64),
     "span_end": pl.List(pl.Int64),
     "containment": pl.List(pl.Float64),
+    "differs_on": pl.List(pl.Utf8),
+    "annotation_divergence": pl.Float64,
     "mean_distance": pl.Float64,
 }
 
@@ -258,6 +279,22 @@ _TRACKING_LEVELS = {"item": "unit", "target": "instance", "sequence": "sequence"
 # video's item is its sequence, so `sequence` joins `item` here while `unit` -- one frame of a
 # sequence -- does not: dropping a frame is not dropping the item it came from.
 _ADDRESSES_ITEMS = frozenset({"item", "sequence"})
+
+# The levels an annotation digest speaks about: a whole item, or a whole sequence. A run that
+# asks for neither has nothing to compare annotation against, and so does not read any.
+_ANNOTATION_LEVELS = frozenset({"item", "sequence"})
+
+
+def _describes_whole_data(levels: frozenset[str]) -> bool:
+    """Whether a run reporting these levels reports one the annotation and factor axes speak at.
+
+    Both axes name a whole datum: an item, or a sequence. Neither is gated by the level branches
+    in :func:`_find_relations`. So without this check, a view narrowed to targets, frames, tracks
+    or detections would grow ``level="item"`` rows on a re-detection. Those rows sit at a level the
+    view does not hold and that it was narrowed away from. This rule is written once and read at
+    both emission points, so the two axes apply the same test.
+    """
+    return bool(levels & _ANNOTATION_LEVELS)
 
 
 def _resolve_selector(frame_sample: FrameSample) -> FrameSelector:
@@ -578,6 +615,8 @@ def _make_row(
     frame_map: NDArray[np.intp] | None = None,
     spans: tuple[list[int], list[int]] | None = None,
     containment: list[float] | None = None,
+    differs_on: list[str] | None = None,
+    annotation_divergence: float | None = None,
     mean_distance: float | None = None,
     track_ids: list[int] | None = None,
 ) -> dict[str, Any]:
@@ -611,8 +650,188 @@ def _make_row(
     row["orientation"] = orientation
     row["span_start"], row["span_end"] = spans if spans is not None else (None, None)
     row["containment"] = containment
+    row["differs_on"] = differs_on
+    row["annotation_divergence"] = annotation_divergence
     row["mean_distance"] = mean_distance
     return row
+
+
+def _datum_keys(
+    indices: Iterable[Any],
+    frame_map: NDArray[np.intp] | None,
+    dataset_steps: Sequence[int] | None,
+) -> list[Any]:
+    """Name the datum each index addresses: its sequence for a frame view, the item itself otherwise.
+
+    This is what lets the annotation axis line up with the content axis. The two key a sequence on
+    different frames: :func:`_annotation_digests` on its first *annotated* frame, and
+    :func:`_find_sequence_duplicates` on its first *measured* one. Those differ the moment a
+    sequence's leading frames carry no boxes. Comparing the sequences the keys name, rather than
+    the keys themselves, avoids that. Sequence numbering restarts at every dataset boundary, so
+    for a several-dataset call the name also carries the dataset.
+    """
+    items = [index.item if isinstance(index, SourceIndex) else int(index) for index in indices]
+    if frame_map is None:
+        return items
+    return [
+        (get_dataset_step_from_idx(item, dataset_steps)[0] if dataset_steps is not None else 0, int(frame_map[item, 0]))
+        for item in items
+    ]
+
+
+def _annotation_agreement(keys: Sequence[Any], annotated: Mapping[Any, str]) -> list[str] | None:
+    """Whether everything in a content-exact group was annotated alike, or None if it cannot be said.
+
+    ``["annotation"]`` is one collect annotated twice: the same content under two different
+    annotations. ``None`` when any member carries no annotation at all. The axis is self-disabling
+    then: a dataset that was never annotated must read as unexamined, not as disagreeing.
+    """
+    digests = [annotated[key] for key in keys if key in annotated]
+    if not digests or len(digests) != len(keys):
+        return None
+    return [] if len(set(digests)) == 1 else ["annotation"]
+
+
+def _content_agreement(keys: Sequence[Any], content_groups: Sequence[set[Any]] | None) -> list[str] | None:
+    """Whether an annotation group's members are also identical in content.
+
+    ``["content"]`` is an augmented copy: one annotation over two different images. ``[]`` is a
+    plain re-ingest. ``None`` is neither: the content was never checked, as on a cluster-only or
+    perceptual-hash-only run, where no exact content digest was taken. Nothing was compared, so
+    nothing is claimed.
+    """
+    if content_groups is None:
+        return None
+    members = set(keys)
+    return [] if any(members <= group for group in content_groups) else ["content"]
+
+
+class _DivergenceCache(NamedTuple):
+    """What the annotation axis needs to say by how much two flagged annotations differ.
+
+    Two caches, one under the other, because they answer different questions. ``readings`` is
+    keyed by *pair* and is the output. It is what
+    :meth:`~dataeval.quality.DuplicatesOutput.aggregate_by_pair` reads back, and what a
+    re-detection carries forward in place of annotations it no longer holds. ``shapes`` is keyed
+    by the two *annotations* and only stops the same comparison being computed again.
+
+    Attributes
+    ----------
+    sources : Mapping[Any, _AnnotationSource]
+        The annotations to compare, keyed by datum. Empty on a re-detection, which holds no
+        annotations and can only reuse ``readings``.
+    digests : Mapping[Any, str]
+        Each datum's annotation digest, keyed the same way. This says two members carry the
+        same annotation without comparing their boxes.
+    readings : dict[_PairKey, AnnotationDivergence]
+        One reading per flagged pair, keyed as :func:`_fold_row` keys a pair.
+    shapes : dict[tuple[str, str], AnnotationDivergence]
+        One reading per ordered pair of *distinct annotations*. A pixel-exact group of a thousand
+        blank frames under two label passes implies half a million pairs but holds two
+        annotations, so it costs three comparisons rather than 499,500. Ordered, not symmetric:
+        ``tracks_split`` is directional, so ``(a, b)`` is not ``(b, a)``.
+    """
+
+    sources: Mapping[Any, _AnnotationSource]
+    digests: Mapping[Any, str]
+    readings: dict[_PairKey, AnnotationDivergence]
+    shapes: dict[tuple[str, str], AnnotationDivergence]
+
+
+def _measure_divergence(
+    row: Mapping[str, Any],
+    keys: Sequence[Any],
+    cache: _DivergenceCache,
+    cross: bool,
+) -> float | None:
+    """Measure how far one flagged group's annotations disagree, per pair.
+
+    Called only for a group whose ``differs_on`` already says ``"annotation"``. The reading is
+    bounded by those candidates, not by the corpus. Matching boxes across every pair of a large
+    collection would be unaffordable. The correspondence is not re-derived either. The pixel
+    group that produced the candidate already says which data are the same footage, and its
+    members, in order, are the two annotations to compare.
+
+    Fills ``cache.readings`` with one reading per pair, keyed exactly as :func:`_fold_row` keys a
+    pair. :meth:`~dataeval.quality.DuplicatesOutput.aggregate_by_pair` then reads them straight
+    back. A pair already present is left alone. That is what lets a re-detection, which no longer
+    holds the annotations, carry the evaluation's readings forward.
+
+    The group size is still quadratic in pairs, but not in *comparisons*. Pairs whose two members
+    carry the same two annotations share one reading, via ``cache.shapes``. A group is flagged
+    precisely because its members do not all agree, and in practice they disagree in a handful of
+    ways, not a member's worth.
+
+    Parameters
+    ----------
+    row : Mapping[str, Any]
+        The group's row, as :func:`_make_row` built it.
+    keys : Sequence[Any]
+        The datum each member addresses, positionally aligned with the row's members, as
+        :func:`_datum_keys` names them.
+    cache : _DivergenceCache
+        The annotations, their digests, and the readings taken so far. Added to in place.
+    cross : bool
+        Whether the row carries ``dataset_indices``, i.e. whether this is a several-dataset call.
+
+    Returns
+    -------
+    float or None
+        The share of compared frames that differ, pooled over the group's pairs. None when no
+        pair could be measured, which is not the same claim as a divergence of zero. Every
+        annotation reaching here carries at least one frame, because
+        :func:`_annotation_sources` dropped the data that carry none. So a measured pair always
+        compared at least one frame.
+    """
+    members = _pair_members(row, cross)
+    compared = differing = 0
+    measured = False
+    for left, right in combinations(range(len(members)), 2):
+        flip = members[right] < members[left]
+        sides = (right, left) if flip else (left, right)
+        a, b = members[sides[0]], members[sides[1]]
+        if a == b:
+            continue
+        reading = _pair_divergence((row["level"], *a, *b), keys[sides[0]], keys[sides[1]], cache)
+        if reading is None:
+            continue
+        compared += reading["frames_compared"]
+        differing += reading["frames_differing"]
+        measured = True
+    return differing / compared if measured else None
+
+
+def _pair_divergence(pair: _PairKey, key_a: Any, key_b: Any, cache: _DivergenceCache) -> AnnotationDivergence | None:
+    """Read one pair's divergence, comparing boxes only when this pair of annotations is new.
+
+    Three routes are tried in cost order: the pair's own reading, then a reading of the same two
+    annotations taken for some other pair, then an actual comparison. The middle route keeps a
+    large flagged group affordable. The digest is the statement "these two carry the same
+    annotation". So a group of *n* copies carrying *k* distinct annotations costs one comparison
+    per ordered pair of those *k*, not one per pair of the *n*.
+
+    Reusing a reading across pairs is sound because the digest determines everything the reading
+    reads: the normalized boxes, the labels, and the track numbering, all canonicalized.
+    Coordinates are held to the digest's rounding (6 decimals). So a reused ``mean_iou`` can
+    differ in its last decimals from one computed for that pair alone. The counts cannot.
+
+    None when no route is open. The pair has no reading and this run does not hold the
+    annotations to take one, which is a re-detection. Null columns then say the measurement was
+    not made, rather than claiming a divergence of zero.
+    """
+    if pair in cache.readings:
+        return cache.readings[pair]
+    if key_a not in cache.sources or key_b not in cache.sources:
+        return None
+    shape = (cache.digests[key_a], cache.digests[key_b])
+    reading = cache.shapes.get(shape)
+    if reading is None:
+        frames_a, image_hw_a = cache.sources[key_a]
+        frames_b, image_hw_b = cache.sources[key_b]
+        reading = annotation_divergence(frames_a, frames_b, image_hw_a=image_hw_a, image_hw_b=image_hw_b)
+        cache.shapes[shape] = reading
+    cache.readings[pair] = reading
+    return reading
 
 
 def _build_duplicates_dataframe(  # noqa: C901
@@ -629,7 +848,12 @@ def _build_duplicates_dataframe(  # noqa: C901
     segment_matches: Sequence[SegmentMatch] | None = None,
     alignment_matches: Sequence[AlignmentMatch] | None = None,
     track_exact: Sequence[TrackGroup] | None = None,
-) -> pl.DataFrame:
+    annotation_groups: MethodGroups | None = None,
+    annotation_digests: Mapping[int, str] | None = None,
+    factor_groups: MethodGroups | None = None,
+    annotation_sources: Mapping[int, _AnnotationSource] | None = None,
+    annotation_divergences: Mapping[_PairKey, AnnotationDivergence] | None = None,
+) -> tuple[pl.DataFrame, dict[_PairKey, AnnotationDivergence]]:
     """Build a unified DataFrame of duplicate groups from raw detection data.
 
     Handles near-group merging internally via ``_merge_near_groups``.
@@ -638,14 +862,84 @@ def _build_duplicates_dataframe(  # noqa: C901
     ``frame_map`` marks the results as coming from a frame view of a tracking dataset: it splits
     each flattened frame position back into ``(sequence, frame)`` and renames the levels to the
     ones :class:`~dataeval.Metadata` gives a tracking dataset.
+
+    ``annotation_digests`` is what the two axes are compared through. It fills ``differs_on`` on
+    both the annotation groups and the pixel-exact ones. Its absence leaves that column null,
+    which is what an unannotated dataset reports.
+
+    ``factor_groups`` already address items, or sequences for a frame view. So they are laid out
+    without ``frame_map``, unlike every other group here. Those other groups have members that
+    are positions in the flattened walk of frames.
+
+    ``annotation_sources`` is what turns a flagged group into a figure. These are the boxes
+    themselves, read once off the targets, so a group whose ``differs_on`` says ``"annotation"``
+    can also say by how much. Only those groups are measured. The reading is bounded by the
+    flagged candidates, never by the corpus. ``annotation_divergences`` carries readings already
+    taken, so a re-detection, which no longer has the annotations to hand, keeps the figures the
+    evaluation found.
+
+    Returns
+    -------
+    tuple[pl.DataFrame, dict[_PairKey, AnnotationDivergence]]
+        The groups, and one divergence reading per flagged *pair*, keyed as :func:`_fold_row` keys
+        a pair so :meth:`~dataeval.quality.DuplicatesOutput.aggregate_by_pair` reads them back
+        without re-deriving which data correspond.
     """
     rows: list[dict[str, Any]] = []
     group_id = 0
     names = _IMAGE_LEVELS if frame_map is None else _TRACKING_LEVELS
 
+    annotated: dict[Any, str] = {}
+    sources: dict[Any, _AnnotationSource] = {}
+    divergences: dict[_PairKey, AnnotationDivergence] = dict(annotation_divergences or {})
+    # Filled in place below, never rebound: the cache holds these very dicts, and reassigning a
+    # name here would leave it pointing at the empty ones.
+    cache = _DivergenceCache(sources, annotated, divergences, {})
+    cross = dataset_steps is not None
+    content_groups: list[set[Any]] | None = None
+    if annotation_digests:
+        annotated.update(
+            zip(_datum_keys(annotation_digests, frame_map, dataset_steps), annotation_digests.values(), strict=True)
+        )
+        if annotation_sources:
+            sources.update(
+                zip(_datum_keys(annotation_sources, frame_map, dataset_steps), annotation_sources.values(), strict=True)
+            )
+        # A verdict on content needs the digest that would give it. The image view's exact groups
+        # are read from xxhash alone. A frame view's are read from the first of `_REDUNDANCY_METHODS`
+        # present. So a run holding neither compared nothing. "Nothing was compared" has to stay
+        # distinguishable from "compared, and they differ". Otherwise a phash-only run reports
+        # every re-ingest as an augmented copy.
+        measured_content = (
+            any(method in available_stats for method in _REDUNDANCY_METHODS)
+            if frame_map is not None
+            else "xxhash" in available_stats
+        )
+        if measured_content:
+            # The content axis an annotation digest is comparable to: a sequence digest covers the
+            # same span a sequence's annotation digest does, and a frame digest does not.
+            exact = [group for group, _ in sequence_exact or []] if frame_map is not None else list(item_exact or [])
+            content_groups = [set(_datum_keys(group, frame_map, dataset_steps)) for group in exact]
+
     for indices, method in sequence_exact or []:
-        rows.append(_make_row(indices, group_id, names["sequence"], "exact", [method], None, dataset_steps, frame_map))
+        keys = _datum_keys(indices, frame_map, dataset_steps)
+        differs = _annotation_agreement(keys, annotated)
+        rows.append(
+            _make_row(
+                indices,
+                group_id,
+                names["sequence"],
+                "exact",
+                [method],
+                None,
+                dataset_steps,
+                frame_map,
+                differs_on=differs,
+            )
+        )
         rows[-1]["unit_indices"] = None
+        if "annotation" in (differs or []):
+            rows[-1]["annotation_divergence"] = _measure_divergence(rows[-1], keys, cache, cross)
         group_id += 1
 
     for indices, method, track_ids in track_exact or []:
@@ -739,22 +1033,92 @@ def _build_duplicates_dataframe(  # noqa: C901
         ("item", item_exact, item_near_method_groups),
         ("target", target_exact, target_near_method_groups),
     ):
+        # Only whole items are held against an annotation digest. A target is a region of one.
+        # A frame of a tracking dataset is a slice of a sequence-wide digest. So neither addresses
+        # the thing the digest describes. This holds for exact and near alike. How far apart two
+        # data are in pixels says nothing about whether they were annotated the same way. A JPEG
+        # re-encode is matched by phash and not by xxhash. That is exactly how one collect,
+        # labeled twice, tends to arrive.
+        comparable = level == "item" and frame_map is None
         if exact_groups:
             ordered = [sorted(g, key=_address_order) for g in exact_groups]
             for group in sorted(ordered, key=lambda g: _address_order(g[0])):
+                keys = _datum_keys(group, frame_map, dataset_steps) if comparable else []
+                differs = _annotation_agreement(keys, annotated) if comparable else None
                 rows.append(
-                    _make_row(group, group_id, names[level], "exact", ["xxhash"], None, dataset_steps, frame_map)
+                    _make_row(
+                        group,
+                        group_id,
+                        names[level],
+                        "exact",
+                        ["xxhash"],
+                        None,
+                        dataset_steps,
+                        frame_map,
+                        differs_on=differs,
+                    )
                 )
+                if "annotation" in (differs or []):
+                    rows[-1]["annotation_divergence"] = _measure_divergence(rows[-1], keys, cache, cross)
                 group_id += 1
 
         if near_method_groups:
             for indices, methods, orientation in _merge_near_groups(near_method_groups, available_stats, merge):
+                keys = _datum_keys(indices, frame_map, dataset_steps) if comparable else []
+                differs = _annotation_agreement(keys, annotated) if comparable else None
                 rows.append(
                     _make_row(
-                        indices, group_id, names[level], "near", sorted(methods), orientation, dataset_steps, frame_map
+                        indices,
+                        group_id,
+                        names[level],
+                        "near",
+                        sorted(methods),
+                        orientation,
+                        dataset_steps,
+                        frame_map,
+                        differs_on=differs,
                     )
                 )
+                if "annotation" in (differs or []):
+                    rows[-1]["annotation_divergence"] = _measure_divergence(rows[-1], keys, cache, cross)
                 group_id += 1
+
+    # Last, so that adding the annotation axis leaves every other relation's group_id where it was.
+    for indices, method in annotation_groups or []:
+        rows.append(
+            _make_row(
+                indices,
+                group_id,
+                names["sequence"] if frame_map is not None else names["item"],
+                "annotation",
+                [method],
+                None,
+                dataset_steps,
+                frame_map,
+                differs_on=_content_agreement(_datum_keys(indices, frame_map, dataset_steps), content_groups),
+            )
+        )
+        if frame_map is not None:
+            rows[-1]["unit_indices"] = None
+        group_id += 1
+
+    # Last again, for the same reason. The factor axis is opt-in. A caller who turns it on
+    # should not find every other relation's group id has moved.
+    for indices, method in factor_groups or []:
+        rows.append(
+            _make_row(
+                indices,
+                group_id,
+                names["sequence"] if frame_map is not None else names["item"],
+                "factors",
+                [method],
+                None,
+                dataset_steps,
+                # `differs_on` is left null on purpose. A factor collision checks neither content
+                # nor annotation, and `[]` here would claim both were checked and agreed.
+            )
+        )
+        group_id += 1
 
     # Orientation is only meaningful when both basic and D4 hashes were computed
     has_basic_stats = bool(available_stats & _BASIC_HASH_METHODS)
@@ -774,22 +1138,25 @@ def _build_duplicates_dataframe(  # noqa: C901
         schema[key] = dtype
 
     if not rows:
-        return pl.DataFrame(schema=schema)
+        return pl.DataFrame(schema=schema), divergences
 
     df = pl.DataFrame(rows, schema=schema)
 
-    return drop_null_index_columns(
-        df,
-        [
-            "target_indices",
-            "address_levels",
-            "unit_indices",
-            "track_indices",
-            "span_start",
-            "span_end",
-            "containment",
-            "mean_distance",
-        ],
+    return (
+        drop_null_index_columns(
+            df,
+            [
+                "target_indices",
+                "address_levels",
+                "unit_indices",
+                "track_indices",
+                "span_start",
+                "span_end",
+                "containment",
+                "mean_distance",
+            ],
+        ),
+        divergences,
     )
 
 
@@ -1091,6 +1458,128 @@ def _find_redundant_runs(
             members = [int(gathered.items[where[position]]) for position in range(start, end + 1)]
             groups.append((members, gathered.method, float(distance)))
     return groups
+
+
+def _find_annotation_duplicates(annotation_digests: Mapping[int, str]) -> MethodGroups:
+    """Group data carrying the same annotation, whatever their pixels say.
+
+    Exact by construction. An augmented copy or a re-ingest preserves the annotation bit for bit.
+    So there is no near match to search for and no radius to tune. What the group means is left
+    to ``differs_on``. Alone it says only that one annotation describes several data.
+
+    Parameters
+    ----------
+    annotation_digests : Mapping[int, str]
+        Item index to annotation digest, as :func:`_annotation_digests` reports it. One entry
+        per annotated item, or per sequence keyed on its first annotated frame.
+
+    Returns
+    -------
+    MethodGroups
+        One ``(members, "annotation")`` group per digest that more than one datum carries.
+    """
+    groups: dict[str, list[int]] = {}
+    for item_index, digest in annotation_digests.items():
+        groups.setdefault(digest, []).append(item_index)
+    return [(sorted(members), "annotation") for members in groups.values() if len(members) > 1]
+
+
+def _is_stated(name: str, dtype: pl.DataType) -> pl.Expr:
+    """Check whether a column value is present.
+
+    Considers null values and floating-point NaN values as missing.
+    """
+    column = pl.col(name)
+    return column.is_not_null() & column.is_not_nan() if dtype.is_float() else column.is_not_null()
+
+
+def _checked_factor_request(metadata: Any, cross: bool, factors: Sequence[str] | None) -> None:
+    """Validate factor grouping arguments.
+
+    Raises
+    ------
+    ValueError
+        If factors are specified without metadata, or with multiple datasets.
+    """
+    if not factors:
+        return
+    if metadata is None:
+        raise ValueError("Duplicates.evaluate: `duplicate_factors` requires `metadata` to be specified.")
+    if cross:
+        raise ValueError("Duplicates.evaluate: `duplicate_factors` supports only one dataset.")
+
+
+def _checked_sole_metadata(data: Any, metadata: Any) -> Any:
+    """Validate that only one metadata container is specified.
+
+    Raises
+    ------
+    ValueError
+        If `metadata` is a different container than `data`.
+    """
+    if metadata is not None and metadata is not data:
+        raise ValueError(
+            "Duplicates.evaluate: `data` and `metadata` specify two different metadata "
+            "containers. Pass a single metadata container."
+        )
+    return data
+
+
+def _find_factor_duplicates(metadata: Any, factors: Sequence[str]) -> tuple[MethodGroups, dict[str, int]]:
+    """Group items whose metadata factor rows match exactly.
+
+    Two items are duplicates only when every factor in ``factors`` matches.
+    Factor names function as a conjunction rather than alternatives.
+
+    Rows are read at the metadata item level. Items with unstated factors
+    (null or NaN) are excluded from grouping.
+
+    Parameters
+    ----------
+    metadata : Metadata
+        The metadata containing factor rows.
+    factors : Sequence[str]
+        Factor names that must all match for items to be considered duplicates.
+
+    Returns
+    -------
+    tuple[MethodGroups, dict[str, int]]
+        A list of ``(members, "factors")`` groups with multiple matching items,
+        and a mapping of each named factor to its count of distinct stated values.
+
+    Raises
+    ------
+    KeyError
+        If a named factor is not one this metadata carries at its item level.
+    TypeError
+        If the container has no level schema to read one row per item from.
+    """
+    item_level = getattr(metadata, "item_level", None)
+    if item_level is None or not hasattr(metadata, "rows_at"):
+        raise TypeError(
+            "Duplicates.evaluate: `duplicate_factors` requires a dataeval.Metadata instance with an item-level schema."
+        )
+    # Checked against the container's own names rather than left to the dataframe's column
+    # lookup. A factor name is caller input. Polars' ColumnNotFoundError neither says what
+    # was on offer nor is something this module's contract should be pinned to.
+    available = list(metadata.at(item_level).factor_names)
+    unknown = [name for name in factors if name not in available]
+    if unknown:
+        raise KeyError(
+            f"Duplicates.evaluate: {unknown} {'is' if len(unknown) == 1 else 'are'} not a factor "
+            f"of this metadata at the {item_level!r} level; it carries {available}."
+        )
+
+    wanted = list(dict.fromkeys(factors))
+    # Exclude rows where any requested factor is unstated (null or NaN).
+    # Missing values do not indicate agreement.
+    frame = metadata.rows_at(item_level).select(["item_index", *wanted])
+    frame = frame.filter(pl.all_horizontal([_is_stated(name, frame.schema[name]) for name in wanted]))
+    grouped = frame.group_by(wanted).agg(pl.col("item_index").alias("members"))
+    # Sorted, because `group_by` does not promise an order and two runs of one evaluation should
+    # not hand back the same findings under different group ids.
+    members = sorted(sorted(group) for group in grouped["members"].to_list() if len(group) > 1)
+    return [(group, "factors") for group in members], {name: frame[name].n_unique() for name in wanted}
 
 
 def _find_sequence_duplicates(
@@ -1591,6 +2080,54 @@ class _FrameView(NamedTuple):
     track_map: NDArray[np.intp] | None
 
 
+def _aligned_digests(source_index: Sequence[SourceIndex], digests: Mapping[int, _T], total: int) -> dict[int, _T]:
+    """Re-key a per-item annotation reading onto the combined item numbering, for a several-dataset call.
+
+    The same reconciliation :func:`_aligned_frame_map` performs, for the same reason and against
+    the same numbering. :func:`_multi_annotation_sources` offsets each dataset's keys by the item
+    count of the datasets before it. ``combine_stats_results`` offsets item indices by the
+    number of *stats rows*. For a per-target run that counts the detections too. Left
+    unreconciled, one dataset's digests name another dataset's items. Being digests, nothing
+    about the resulting groups looks wrong.
+
+    A single-dataset call has no offsets to reconcile and comes back unchanged. So does a run
+    whose item indices already number the items directly, and a cluster-only one, which measured
+    no rows to reconcile against at all. A run whose measured items do not account for ``total``
+    of them comes back **empty** instead. The mapping is positional, so there is no correspondence
+    to be had. Handing the digests back unchanged would name the wrong items just as confidently
+    as a re-key would, only at a different offset. Nothing is claimed rather than the wrong thing.
+    This is the same total-count guard :func:`_aligned_frame_map` takes, for the same reason.
+
+    Parameters
+    ----------
+    source_index : Sequence[SourceIndex]
+        The measured rows, whose whole-item entries carry the combined item numbering.
+    digests : Mapping[int, _T]
+        Whatever the annotation axis read per datum. A digest, or the annotation itself. Keyed
+        by flattened item index, as :func:`_multi_annotation_sources` reports it. The re-keying
+        is the same either way, so one function serves both.
+    total : int
+        How many flattened data those keys number. The item counts of every dataset summed.
+
+    Returns
+    -------
+    dict[int, _T]
+        The readings keyed by combined item index, or an empty mapping when the measured items
+        cannot name them.
+    """
+    if not source_index:
+        # Nothing was measured, so there is no stats-row numbering to reconcile against. The keys
+        # stand as :func:`_multi_annotation_sources` made them. That is the flattened item
+        # numbering a cluster-only run walks the datasets in anyway.
+        return dict(digests)
+    items = np.unique(np.array([index.item for index in source_index if index.key is None], dtype=np.intp))
+    if len(items) != total:
+        return {}
+    if not digests or int(items[-1]) == len(items) - 1:
+        return dict(digests)
+    return {int(items[key]): digest for key, digest in digests.items()}
+
+
 def _aligned_track_map(
     source_index: Sequence[SourceIndex],
     track_map: NDArray[np.intp] | None,
@@ -1644,13 +2181,14 @@ class _Relations(NamedTuple):
     target_near: MethodGroups
     redundant: list[RedundantGroup]
     sequence_exact: MethodGroups
+    annotation: MethodGroups
     stretches: _SharedStretches
     tracks: _TrackRelations
 
     @classmethod
     def empty(cls) -> "_Relations":
         """Return the nothing-found result, which is what a cluster-only run reports."""
-        return cls([], [], [], [], [], [], _SharedStretches([], []), _TrackRelations([], []))
+        return cls([], [], [], [], [], [], [], _SharedStretches([], []), _TrackRelations([], []))
 
 
 class _LevelPlan(NamedTuple):
@@ -1728,6 +2266,7 @@ def _find_relations(
     track_map: NDArray[np.intp] | None,
     policy: _DetectionPolicy,
     dataset_steps: Sequence[int] | None = None,
+    annotation_digests: Mapping[int, str] | None = None,
 ) -> _Relations:
     """Find every relation the policy asks for, and none it does not.
 
@@ -1767,7 +2306,14 @@ def _find_relations(
         found = found._replace(
             tracks=_find_track_relations(stats, source_index, frame_map, track_map, policy.track, dataset_steps)
         )
-    return found
+    # An annotation digest describes a whole item, or a whole sequence. A pass answering at
+    # neither level is handed none to group. `evaluate` does not even read them. Doing so costs
+    # a walk of the targets this function never sees. The gate is repeated here rather than left
+    # to that. A re-detection is handed the digests a *wider* pass stored. So a view narrowed to
+    # targets reaches this with digests in hand and a `levels` that excludes them.
+    return found._replace(
+        annotation=_find_annotation_duplicates(annotation_digests or {}) if _describes_whole_data(levels) else []
+    )
 
 
 def _relations_frame(
@@ -1776,7 +2322,11 @@ def _relations_frame(
     merge: bool,
     frame_map: NDArray[np.intp] | None,
     dataset_steps: Sequence[int] | None = None,
-) -> pl.DataFrame:
+    annotation_digests: Mapping[int, str] | None = None,
+    factor_groups: MethodGroups | None = None,
+    annotation_sources: Mapping[int, _AnnotationSource] | None = None,
+    annotation_divergences: Mapping[_PairKey, AnnotationDivergence] | None = None,
+) -> tuple[pl.DataFrame, dict[_PairKey, AnnotationDivergence]]:
     """Lay one pass of detection out as rows. Shared, so a new relation reaches every path at once."""
     return _build_duplicates_dataframe(
         found.item_exact or None,
@@ -1792,7 +2342,29 @@ def _relations_frame(
         segment_matches=[*found.stretches.segments, *found.tracks.segments],
         alignment_matches=found.stretches.alignments,
         track_exact=found.tracks.exact,
+        annotation_groups=found.annotation,
+        annotation_digests=annotation_digests,
+        factor_groups=factor_groups,
+        annotation_sources=annotation_sources,
+        annotation_divergences=annotation_divergences,
     )
+
+
+def _is_metadata(data: Any) -> bool:
+    """Determine whether `data` implements the MetadataLike protocol.
+
+    Checks the protocol before dataset decoding because :class:`~dataeval.Metadata`
+    structurally implements :class:`~dataeval.protocols.Dataset`.
+    """
+    return _is_protocol_instance(data, MetadataLike)
+
+
+def _metadata_item_count(metadata: Any) -> int | None:
+    """Return the number of items described by metadata, or None if unavailable."""
+    item_level = getattr(metadata, "item_level", None)
+    if item_level is None or not hasattr(metadata, "rows_at"):
+        return None
+    return int(metadata.rows_at(item_level).height)
 
 
 def _is_tracking(data: Any) -> bool:
@@ -1928,6 +2500,208 @@ def _as_frames_multi(
     )
 
 
+def _frame_targets_of(measured: SequenceFrames) -> Iterator[tuple[int, int, Any]]:
+    """Yield each flattened frame's position, sequence, and target, reading the sequence level only.
+
+    ``source`` and ``frame_map`` are both derived from targets. For a selector that plans (the
+    default :class:`~dataeval.data.AllFrames`, :class:`~dataeval.data.Stride`, ...), walking them
+    never calls ``__getitem__``, which decodes a frame to answer. This is the same route
+    :attr:`~dataeval.data.SequenceFrames.track_map` takes to read track ids decode-free. A
+    selector that cannot plan (:class:`~dataeval.data.Redundancy`,
+    :class:`~dataeval.data.Representative`) needs pixels to decide what to keep. So
+    :func:`_as_frames` already walked and decoded every sequence once to answer
+    ``frame_map`` in the first place. By the time this runs, that walk is cached. So nothing here
+    adds a further decode. Either way, this function itself never calls ``__getitem__``.
+    """
+    # Grouped rather than cached behind a "has the sequence changed" flag. The map is walked in
+    # order, so a sequence's frames arrive in one run. Grouping says that outright. One read of
+    # a sequence's targets per run of its frames, with no target list outliving its run.
+    # The sequence is yielded alongside the target because the groupby key already is it. Asking
+    # `measured.frame_map` a second time to recover it would rebuild the whole map.
+    for sequence, run in groupby(enumerate(measured.frame_map), key=lambda entry: int(entry[1][0])):
+        tracks = measured.source[sequence][1].frame_tracks
+        for position, (_, frame) in run:
+            yield position, sequence, tracks[int(frame)]
+
+
+def _targets_of(measured: Any) -> Iterator[tuple[int, Any, Any]]:
+    """Yield each item's index, image, and target, reading targets and never a video frame.
+
+    Only for a per-item dataset. An object-detection dataset, an image dataset, or a bare array
+    of images. A :class:`~dataeval.data.SequenceFrames` is handled separately, by
+    :func:`_sequence_sources`. An item that does not come back as a ``(data, target, metadata)``
+    triple carries no target at all. It is skipped rather than raised on. That is what lets a
+    plain image dataset pass through here silently. So does anything that cannot be read by index
+    at all. :class:`~dataeval.protocols.Dataset` is the smallest shape this can walk. What does
+    not present it carries nothing to walk.
+
+    The image comes back alongside the target rather than being fetched again for its shape.
+    ``__getitem__`` is a decode for a disk-backed dataset. The annotation axis runs on every
+    annotated evaluation. So asking twice would double that cost for nothing.
+    """
+    if not _is_protocol_instance(measured, Dataset):
+        return
+    for index in range(len(measured)):
+        datum = measured[index]
+        if isinstance(datum, tuple) and len(datum) == 3:
+            yield index, datum[0], datum[1]
+
+
+def _annotated_frames(target: Any) -> list[tuple[Any, Any, Any]]:
+    """Reduce one frame's target to a single ``(boxes, labels, track_ids)`` row.
+
+    Only ever describes one frame. A flat object-detection target, or the single frame a
+    :class:`~dataeval.data.SequenceFrames` view already picked out of a tracking target's
+    ``frame_tracks``. A whole sequence's frames are folded together by :func:`_sequence_sources`.
+    That is instead of composing them from calls to this function one frame at a time. Composing
+    them would canonicalize each frame's track ids in isolation. That throws away the track
+    continuity across frames. That is exactly what a track-aware digest needs to preserve.
+    Anything without ``boxes``/``labels`` carries no annotation. The empty list this returns for
+    it is what tells its caller to skip it.
+
+    ``track_ids`` is read through :func:`_optional_attr` rather than plain ``getattr``.
+    ``track_ids`` is not part of :class:`~dataeval.protocols.ObjectDetectionTarget`. So an
+    attribute-fabricating stand-in would otherwise answer the probe with a fabricated value
+    instead of raising. That turns a legitimate "no track ids" into something that is not actually
+    track ids.
+    """
+    if _is_protocol_instance(target, ObjectDetectionTarget):
+        return [(target.boxes, target.labels, _optional_attr(target, "track_ids"))]
+    return []
+
+
+def _image_hw_of(image: Any) -> tuple[int, int]:
+    """Return the ``(height, width)`` behind one item's pixels.
+
+    Only called for a per-item dataset. An object-detection or image dataset. A
+    :class:`~dataeval.data.SequenceFrames` never reaches here. :func:`_sequence_sources` passes
+    ``image_hw=None`` directly rather than asking. Reading a frame's shape would decode it.
+
+    Raises
+    ------
+    ValueError
+        If the array carries fewer than two dimensions, so no height and width can be read off
+        it. Refused rather than answered with ``None``. ``None`` is already
+        ``_annotation_match._normalized``'s "these coordinates are normalized already". So
+        handing it back here would hash this datum in absolute coordinates alongside normalized
+        siblings. That is a false negative that looks like a clean answer.
+    """
+    array = to_numpy(image, copy=False)
+    if array.ndim < 2:
+        raise ValueError(f"cannot read an image height and width from an array of shape {array.shape}")
+    return int(array.shape[-2]), int(array.shape[-1])
+
+
+def _sequence_sources(measured: SequenceFrames) -> dict[int, _AnnotationSource]:
+    """Gather each sequence's whole annotation once, keyed by its first frame's item index.
+
+    Composing per-frame digests cannot stand in for this. :func:`~dataeval.core.annotation_fingerprint`
+    canonicalizes track ids sequence-wide, on the assumption that it sees a whole sequence's
+    frames together. Calling it once per frame instead canonicalizes each frame in isolation. So
+    two sequences with identical boxes and labels but different track continuity would collapse
+    to the same digest. That continuity is exactly what a tracking dataset can distinguish that an
+    object-detection one cannot. So a sequence's annotated frames are gathered here, in temporal
+    order, and folded through one :func:`~dataeval.core.annotation_fingerprint` call.
+
+    Keyed by the flattened item index of the sequence's first annotated frame. This matches the
+    "representative frame" convention :func:`_find_sequence_duplicates` already reports
+    sequence-level groups under. So a caller names a video's digest the same way it names every
+    other sequence-level result.
+
+    ``image_hw`` is None throughout. Reading a frame's shape would decode it, and this whole path
+    exists to stay on the target side.
+
+    A sequence none of whose frames carry annotation takes no part. This is the same rule
+    :func:`_annotation_sources` applies at the item level.
+    """
+    rows: dict[int, list[tuple[Any, Any, Any]]] = {}
+    representative: dict[int, int] = {}
+    for position, sequence, target in _frame_targets_of(measured):
+        frames = _annotated_frames(target)
+        if not frames:
+            continue
+        rows.setdefault(sequence, []).extend(frames)
+        representative.setdefault(sequence, position)
+    return {representative[sequence]: (seq_rows, None) for sequence, seq_rows in rows.items()}
+
+
+def _multi_annotation_sources(datasets: Sequence[Any]) -> dict[int, _AnnotationSource]:
+    """Combine each dataset's annotations under one flattened, cross-dataset item numbering.
+
+    The numbering :func:`_as_frames_multi` itself uses for ``frame_map`` and ``track_map``. Each
+    dataset's own item indices are shifted by the flattened item count of every dataset before
+    it. ``_as_frames_multi``'s ``data`` is exactly the ``list`` this is called with.
+    """
+    sources: dict[int, _AnnotationSource] = {}
+    offset = 0
+    for dataset in datasets:
+        for index, source in _annotation_sources(dataset).items():
+            sources[index + offset] = source
+        offset += len(dataset)
+    return sources
+
+
+def _annotation_sources(measured: Any) -> dict[int, _AnnotationSource]:
+    """Read each datum's annotation off its target, never off a pixel.
+
+    Returns an empty mapping when the dataset carries no annotation. That is what makes the
+    annotation axis self-disabling rather than an error for a plain image dataset.
+
+    Kept whole rather than reduced to a digest on the spot. Two callers want two different things
+    from one walk. :func:`_annotation_digests` wants the fingerprint that groups identical
+    annotations. :func:`_measure_divergence` wants the boxes themselves, to say by how much
+    two disagreeing ones differ.
+
+    Parameters
+    ----------
+    measured : Any
+        The dataset duplicate detection is about to measure. The same value ``_as_frames``
+        returns as its ``data``: a :class:`~dataeval.data.SequenceFrames` for tracking input, the
+        original dataset unchanged for anything else, or a ``list`` of either. The ``list`` is
+        what ``_as_frames_multi`` returns for a multi-dataset call, handled by
+        :func:`_multi_annotation_sources`.
+
+    Returns
+    -------
+    dict[int, _AnnotationSource]
+        Item index to ``(frames, image_hw)``, for the items (or, for a tracking sequence, the
+        sequence's first frame) that carry an annotation.
+    """
+    if isinstance(measured, list):
+        return _multi_annotation_sources(measured)
+    if isinstance(measured, SequenceFrames):
+        return _sequence_sources(measured)
+    sources: dict[int, _AnnotationSource] = {}
+    for item_index, image, target in _targets_of(measured):
+        frames = _annotated_frames(target)
+        if not frames:
+            continue
+        sources[item_index] = (frames, _image_hw_of(image))
+    return sources
+
+
+def _annotation_digests(measured: Any) -> dict[int, str]:
+    """Digest each datum's annotation, reading targets only.
+
+    Parameters
+    ----------
+    measured : Any
+        As :func:`_annotation_sources` takes it.
+
+    Returns
+    -------
+    dict[int, str]
+        Item index to annotation digest, for the items (or, for a tracking sequence, the
+        sequence's first frame) that carry one.
+    """
+    return _digests_of(_annotation_sources(measured))
+
+
+def _digests_of(sources: Mapping[int, _AnnotationSource]) -> dict[int, str]:
+    """Fingerprint annotations already read, so one walk of the targets serves both axes."""
+    return {index: annotation_fingerprint(frames, image_hw=image_hw) for index, (frames, image_hw) in sources.items()}
+
+
 _PAIR_SCHEMA: dict[str, pl.DataType | type] = {
     "level": pl.Utf8,
     "dataset_a": pl.Int64,
@@ -1941,7 +2715,22 @@ _PAIR_SCHEMA: dict[str, pl.DataType | type] = {
     "containment_a": pl.Float64,
     "containment_b": pl.Float64,
     "mean_distance": pl.Float64,
+    # How far the two annotations of one collect disagree. Null on every pair the annotation axis
+    # did not flag. `mean_iou` is nullable in its own right and stays so. Null means no box pair
+    # matched. That is a different claim from an IoU of 0.0. That one is compared and not
+    # overlapping.
+    "frames_compared": pl.Int64,
+    "frames_differing": pl.Int64,
+    "mean_iou": pl.Float64,
+    "boxes_added": pl.Int64,
+    "boxes_removed": pl.Int64,
+    "labels_changed": pl.Int64,
+    "tracks_split": pl.Int64,
 }
+
+#: The divergence fields a flagged pair carries, read off the TypedDict itself so the pair rows
+#: cannot drift from what :func:`~dataeval.core.annotation_divergence` actually reports.
+_DIVERGENCE_FIELDS = tuple(AnnotationDivergence.__annotations__)
 
 #: Pairs one ``aggregate_by_pair`` call may expand to. A group of n members implies n(n-1)/2, so a
 #: single cluster of near-identical frames reaches this long before the row count does.
@@ -1975,7 +2764,11 @@ def _pair_members(row: Mapping[str, Any], cross: bool) -> list[tuple[int, int, i
     return [(int(dataset), int(item), int(track)) for dataset, item, track in zip(datasets, items, tracks, strict=True)]
 
 
-def _pair_rows(rows: pl.DataFrame, cross: bool) -> pl.DataFrame:
+def _pair_rows(
+    rows: pl.DataFrame,
+    cross: bool,
+    divergences: Mapping[_PairKey, AnnotationDivergence] | None = None,
+) -> pl.DataFrame:
     """Expand each group into the pairs it implies, then fold them onto one row per pair."""
     if rows.is_empty():
         return pl.DataFrame(schema=_PAIR_SCHEMA)
@@ -1990,7 +2783,7 @@ def _pair_rows(rows: pl.DataFrame, cross: bool) -> pl.DataFrame:
 
     folded: dict[tuple[Any, ...], dict[str, Any]] = {}
     for row in rows.iter_rows(named=True):
-        _fold_row(folded, row, _pair_members(row, cross))
+        _fold_row(folded, row, _pair_members(row, cross), divergences or {})
     return _pair_frame(folded, cross)
 
 
@@ -2009,6 +2802,7 @@ def _blank(level: str, a: tuple[int, int, int], b: tuple[int, int, int]) -> dict
         "containment_a": None,
         "containment_b": None,
         "mean_distance": None,
+        **dict.fromkeys(_DIVERGENCE_FIELDS),
     }
 
 
@@ -2016,8 +2810,13 @@ def _fold_row(
     folded: dict[tuple[Any, ...], dict[str, Any]],
     row: Mapping[str, Any],
     members: Sequence[tuple[int, int, int]],
+    divergences: Mapping[_PairKey, AnnotationDivergence],
 ) -> None:
-    """Fold every pair one group implies onto the running per-pair rows."""
+    """Fold every pair one group implies onto the running per-pair rows.
+
+    ``divergences`` holds a reading only for the pairs the annotation axis flagged. Those are
+    taken once during detection. Every other pair keeps the nulls :func:`_blank` gave it.
+    """
     for left, right in combinations(range(len(members)), 2):
         first, second = members[left], members[right]
         if first == second:
@@ -2032,6 +2831,9 @@ def _fold_row(
         entry["relations"].add(row["dup_type"])
         entry["n_groups"] += 1
         _carry(entry, row.get("containment"), left, right, flip, row.get("mean_distance"))
+        reading = divergences.get((row["level"], *a, *b))
+        if reading is not None:
+            entry.update(reading)
 
 
 def _carry(
@@ -2163,6 +2965,12 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
          - :meth:`aggregate_by_method`
        * - How many members are in each group?
          - :meth:`aggregate_by_group`
+       * - One collect, two conflicting annotations?
+         - :meth:`divergent`
+       * - One annotation, a synthetic copy in pixels?
+         - :meth:`augmented`
+       * - Two collects stamped with one timestamp, GPS fix or source file?
+         - ``duplicate_factors=`` on ``evaluate``, then :attr:`factor_cardinality`
        * - Just the whole-video / frame / track / detection relations
          - :attr:`sequences`, :attr:`frames`, :attr:`tracks`, :attr:`detections`
        * - The groups as plain indices, to act on
@@ -2180,7 +2988,8 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
 
     - group_id: int - Auto-incrementing ID for each duplicate group
     - level: str - ``"item"`` or ``"target"``
-    - dup_type: str - ``"exact"`` or ``"near"``
+    - dup_type: str - ``"exact"``, ``"segment"``, ``"aligned"``, ``"redundant"``, ``"near"``,
+      ``"annotation"``, or ``"factors"``. Which projection collided, not how much.
     - item_indices: list[int] - Item indices of members in the group
     - target_indices: list[int] - Target indices within items (only when target-level
       groups exist, positionally aligned with item_indices)
@@ -2225,6 +3034,27 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     track_map : NDArray[np.intp] or None
         For results from a video dataset, the ``(frame, track id)`` behind each measured
         detection. None for image datasets, and for a run that measured no detections.
+    annotation_digests : Mapping[int, str] or None
+        Each annotated datum's annotation digest, read off the targets during evaluation. Kept
+        for the same reason the policy is: a re-detection is rebuilt from what was stored, and
+        the dataset is not stored, so without these the annotation relations would be lost.
+    annotation_divergences : Mapping[tuple[Any, ...], AnnotationDivergence] or None
+        One reading per pair the annotation axis flagged. Each says how far the two annotations
+        of one collect disagree. Taken during evaluation and kept for the same reason the digests
+        are. The annotations themselves are not stored, so a re-detection would otherwise lose
+        the figures. :meth:`aggregate_by_pair` reads them back onto the pair rows.
+
+        .. versionadded:: 1.2
+    factor_groups : list[tuple[Sequence[Any], str]] or None
+        The groups the factor axis found. Kept so a re-detection does not lose them. None when
+        the axis did not run, which is the default. See ``duplicate_factors``.
+    factor_cardinality : Mapping[str, int] or None
+        How many distinct values each factor named in ``duplicate_factors`` took. None where the
+        axis did not run. A diagnostic and not a decision. A factor with a handful of values
+        groups items by *condition* rather than by identity. This makes that visible at a glance.
+        It stops a caller wondering why one group holds the corpus.
+
+        .. versionadded:: 1.2
     """
 
     def __init__(
@@ -2246,6 +3076,11 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         levels: frozenset[str] | None = None,
         frame_map: NDArray[np.intp] | None = None,
         track_map: NDArray[np.intp] | None = None,
+        annotation_digests: Mapping[int, str] | None = None,
+        annotation_divergences: Mapping[_PairKey, AnnotationDivergence] | None = None,
+        factor_groups: MethodGroups | None = None,
+        factor_cardinality: Mapping[str, int] | None = None,
+        item_count: int | None = None,
     ) -> None:
         super().__init__(data)
         self.calculation_results = calculation_results
@@ -2264,6 +3099,11 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         self.levels: frozenset[str] = frozenset(default) if levels is None else levels
         self.frame_map = frame_map
         self.track_map = track_map
+        self.annotation_digests = annotation_digests
+        self.annotation_divergences = annotation_divergences
+        self.factor_groups = factor_groups
+        self.factor_cardinality = factor_cardinality
+        self.item_count = item_count
 
     def _segment_policy(self, hash_radius: int | None = None) -> _SegmentPolicy:
         """Rebuild the shared-stretch policy these results were found under."""
@@ -2376,8 +3216,11 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     def _with(self, frame: pl.DataFrame, levels: frozenset[str] | None = None) -> Self:
         """Return these results over a narrowed frame, carrying every setting forward.
 
-        The settings travel because a narrowed view is still re-detectable and still has to know
-        what it was measured under.
+        The settings travel because a narrowed view is still re-detectable. It still has to know
+        what it was measured under. That includes what the annotation and factor axes were run
+        against. A view is narrower than the result it came from, but it was computed by the same
+        pass. A diagnostic that reads "this axis never ran" on a view whose frame still holds that
+        axis's rows would be wrong.
         """
         return type(self)(  # type: ignore[return-value]
             frame,
@@ -2396,6 +3239,11 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             levels=self.levels if levels is None else levels,
             frame_map=self.frame_map,
             track_map=self.track_map,
+            annotation_digests=self.annotation_digests,
+            annotation_divergences=self.annotation_divergences,
+            factor_groups=self.factor_groups,
+            factor_cardinality=self.factor_cardinality,
+            item_count=self.item_count,
         )
 
     @property
@@ -2478,6 +3326,36 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         The tracking-facing spelling of :attr:`targets`, empty for an image dataset.
         """
         return self._filtered_by_level("instance")
+
+    def divergent(self) -> Self:
+        """Return groups whose members were checked and found to disagree on annotation.
+
+        One collect carrying two conflicting label passes. A null ``differs_on`` is excluded along
+        with genuine agreement. The axis was never checked there, so it is read as neither.
+
+        ``annotation_divergence`` on each returned row says how far they disagree. This is the
+        share of compared frames the two annotations differ about. Zero there is a real reading,
+        not an absent one. A frame counts as differing only on an added box, a removed one, or a
+        relabel. So two annotations can disagree without any frame counting. That happens on track
+        continuity alone, or on box geometry that moved but stayed within the matching IoU
+        threshold. ``mean_iou`` below ``1.0`` carries the second case.
+        :meth:`aggregate_by_pair` breaks the figure out per pair, into what the disagreement
+        actually consists of.
+        """
+        return self._with(self.data().filter(pl.col("differs_on").list.contains("annotation")))
+
+    def augmented(self) -> Self:
+        """Return groups sharing one annotation over different content. This is a synthetic copy's signature.
+
+        Requires both an annotation match (``methods`` contains ``"annotation"``) and a content
+        mismatch (``differs_on`` contains ``"content"``). A run that never checked content reports
+        a null ``differs_on`` there and is excluded, not assumed augmented.
+        """
+        return self._with(
+            self.data().filter(
+                pl.col("methods").list.contains("annotation") & pl.col("differs_on").list.contains("content")
+            )
+        )
 
     @property
     def exact(self) -> TExactDuplicatesGroup:
@@ -2580,7 +3458,8 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
 
             - group_id: int - Group identifier
             - level: str - ``"item"`` or ``"target"``
-            - dup_type: str - ``"exact"`` or ``"near"``
+            - dup_type: str - ``"exact"``, ``"segment"``, ``"aligned"``, ``"redundant"``, ``"near"``,
+              ``"annotation"``, or ``"factors"``. Which projection collided, not how much
             - member_count: int - Number of members in the group
             - methods: list[str] - Detection methods
             - orientation: str | None - Only present when both basic and D4
@@ -2641,6 +3520,17 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             - containment_a, containment_b: float - How much of each side the other accounts for,
               where a directed relation reports it
             - mean_distance: float - The closest evidence linking the two
+            - frames_compared, frames_differing: int - Frames held against one another, and how
+              many of them the two annotations disagree about
+            - mean_iou: float - Mean IoU over matched box pairs. Null means nothing matched,
+              which is not the same claim as an IoU of 0.0
+            - boxes_added, boxes_removed, labels_changed: int - What the disagreement consists
+              of, counted from *a* to *b*
+            - tracks_split: int - Tracks in *a* whose boxes land on more than one track in *b*.
+              Directional: swapping the two sides gives a different number, not the same one
+              seen from the other side
+
+            The last seven are null on every pair the annotation axis did not flag. See Notes.
 
         Raises
         ------
@@ -2666,6 +3556,12 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         ``redundant`` rows take no part: a run of repeated frames relates a sequence to itself, and
         so names no pair. Pairs of one item with itself are dropped for the same reason.
 
+        **The divergence columns are diagnostics, never verdicts.** They are filled only for
+        pairs whose group ``differs_on`` says ``"annotation"``. That is one collect carrying two
+        conflicting label passes. They are null everywhere else, including where the axis never
+        ran. Every one is a count or a ratio. They say how far the two annotations disagree.
+        They never say which of them is right. That is not knowable from the data.
+
         Examples
         --------
         >>> Duplicates().evaluate(train, test).aggregate_by_pair("sequence")  # doctest: +SKIP
@@ -2675,7 +3571,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             return pl.DataFrame(schema=_PAIR_SCHEMA)
         wanted = _checked_levels(levels, frame)
         rows = frame.filter(pl.col("dup_type") != "redundant").filter(pl.col("level").is_in(wanted))
-        return _pair_rows(rows, cross="dataset_indices" in frame.columns)
+        return _pair_rows(rows, "dataset_indices" in frame.columns, self.annotation_divergences)
 
     def aggregate_by_sequence(self) -> pl.DataFrame:
         """Summarize each video sequence: how much of it repeats itself, and how much is copied.
@@ -2769,10 +3665,17 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         # A whole-sequence row names videos rather than frames: it has no unit index to explode
         # against, and its members are already sequences. It still touches the sequences it names,
         # so it counts toward `group_count` -- but a frame count cannot be drawn from it.
-        touched = self.data().explode("item_indices").rename({"item_indices": "sequence"})
+        # `drop_null_index_columns` takes `unit_indices` away entirely when no row carries one.
+        # That is what a result holding only whole-sequence relations looks like. Two videos
+        # annotated alike but sharing no frames, for example. There is then nothing to explode
+        # against. But the sequences those rows name are still touched. So the column is restored
+        # empty, rather than the summary refusing to be built.
+        frame = self.data()
+        if "unit_indices" not in frame.columns:
+            frame = frame.with_columns(pl.lit(None, pl.List(pl.Int64)).alias("unit_indices"))
+        touched = frame.explode("item_indices").rename({"item_indices": "sequence"})
         exploded = (
-            self
-            .data()
+            frame
             .filter(pl.col("unit_indices").is_not_null())
             .explode(["item_indices", "unit_indices"])
             .rename({"item_indices": "sequence"})
@@ -2877,10 +3780,8 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     # Acting on the result
     # ------------------------------------------------------------------
 
-    def _item_count(self, n_items: int | None) -> int:
-        """Resolve how many items the source dataset holds, which `keep` is the complement of."""
-        if n_items is not None:
-            return int(n_items)
+    def _counted_items(self) -> int | None:
+        """Return the number of items recorded in this result, or None if unavailable."""
         if self.frame_map is not None and len(self.frame_map):
             # A video's items are its sequences, and the frame map names the sequence each
             # measured frame came from.
@@ -2889,11 +3790,20 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             return _sum_image_counts(self.calculation_results)
         if self.cluster_result is not None:
             return int(len(self.cluster_result["clusters"]))
-        raise ValueError(
-            "deduplicate cannot tell how many items the dataset holds: this result carries "
-            "neither statistics nor clusters to read it off. Pass n_items=len(dataset), or use "
-            "Indices(plan.discard, exclude=True), which needs no count.",
-        )
+        return self.item_count
+
+    def _item_count(self, n_items: int | None) -> int:
+        """Resolve how many items the source dataset holds, which `keep` is the complement of."""
+        if n_items is not None:
+            return int(n_items)
+        counted = self._counted_items()
+        if counted is None:
+            raise ValueError(
+                "deduplicate cannot tell how many items the dataset holds: this result carries "
+                "neither statistics nor clusters to read it off. Pass n_items=len(dataset), or use "
+                "Indices(plan.discard, exclude=True), which needs no count.",
+            )
+        return counted
 
     def deduplicate(
         self,
@@ -3086,6 +3996,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
                 self.track_map,
                 self._detection_policy(hash_radius),
                 dataset_steps,
+                annotation_digests=self.annotation_digests,
             )
 
         # Recompute cluster results with new distance factor
@@ -3097,7 +4008,16 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             )
             found = found._replace(item_near=found.item_near + [(group, "cluster") for group in cluster_dupes])
 
-        df = _relations_frame(found, available_stats, self.merge_near_duplicates, self.frame_map, dataset_steps)
+        df, divergences = _relations_frame(
+            found,
+            available_stats,
+            self.merge_near_duplicates,
+            self.frame_map,
+            dataset_steps,
+            self.annotation_digests,
+            self.factor_groups if _describes_whole_data(self.levels) else None,
+            annotation_divergences=self.annotation_divergences,
+        )
 
         return DuplicatesOutput(  # type: ignore[return-value]
             df,
@@ -3116,6 +4036,11 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             levels=self.levels,
             frame_map=self.frame_map,
             track_map=self.track_map,
+            annotation_digests=self.annotation_digests,
+            annotation_divergences=divergences,
+            factor_groups=self.factor_groups,
+            factor_cardinality=self.factor_cardinality,
+            item_count=self.item_count,
         )
 
 
@@ -3579,7 +4504,7 @@ class Duplicates(Evaluator):
             hash_stats, source_index, self.hash_radius
         )
 
-        df = _build_duplicates_dataframe(
+        df, _ = _build_duplicates_dataframe(
             (item_exact or None) if per_image else None,
             item_near if per_image else [],
             _selected_targets(target_exact, per_target) or None,
@@ -3647,7 +4572,7 @@ class Duplicates(Evaluator):
 
         cluster_method_groups: MethodGroups = [(group, "cluster") for group in cluster_dupes]
 
-        df = _build_duplicates_dataframe(
+        df, _ = _build_duplicates_dataframe(
             item_exact=None,
             item_near_method_groups=cluster_method_groups,
             target_exact=None,
@@ -3684,6 +4609,8 @@ class Duplicates(Evaluator):
         levels: str | Sequence[str] | None = ...,
         per_image: bool | None = ...,
         per_target: Literal[False] | None = ...,
+        metadata: MetadataLike | None = ...,
+        duplicate_factors: Sequence[str] | None = ...,
     ) -> SingleDuplicatesOutput: ...
 
     @overload
@@ -3694,6 +4621,8 @@ class Duplicates(Evaluator):
         levels: str | Sequence[str] | None = ...,
         per_image: bool | None = ...,
         per_target: Literal[True],
+        metadata: MetadataLike | None = ...,
+        duplicate_factors: Sequence[str] | None = ...,
     ) -> SingleTargetDuplicatesOutput: ...
 
     @overload
@@ -3704,6 +4633,8 @@ class Duplicates(Evaluator):
         levels: str | Sequence[str] | None = ...,
         per_image: bool | None = ...,
         per_target: Literal[False] | None = ...,
+        metadata: MetadataLike | None = ...,
+        duplicate_factors: Sequence[str] | None = ...,
     ) -> MultiDuplicatesOutput: ...
 
     @overload
@@ -3714,6 +4645,8 @@ class Duplicates(Evaluator):
         levels: str | Sequence[str] | None = ...,
         per_image: bool | None = ...,
         per_target: Literal[True],
+        metadata: MetadataLike | None = ...,
+        duplicate_factors: Sequence[str] | None = ...,
     ) -> MultiTargetDuplicatesOutput: ...
 
     @set_metadata(
@@ -3730,6 +4663,7 @@ class Duplicates(Evaluator):
             "verify_alignment",
             "min_track_frames",
             "frame_sample",
+            "encoding_digest",
         ]
     )
     def evaluate(
@@ -3739,6 +4673,8 @@ class Duplicates(Evaluator):
         levels: str | Sequence[str] | None = None,
         per_image: bool | None = None,
         per_target: bool | None = None,
+        metadata: MetadataLike | None = None,
+        duplicate_factors: Sequence[str] | None = None,
     ) -> SingleDuplicatesOutput | SingleTargetDuplicatesOutput | MultiDuplicatesOutput | MultiTargetDuplicatesOutput:
         """Find duplicates by computing hashes and/or analyzing embeddings.
 
@@ -3758,6 +4694,13 @@ class Duplicates(Evaluator):
 
             A plain array or list of image arrays also structurally satisfies
             :class:`~dataeval.protocols.Dataset` and is accepted directly.
+
+            A :class:`~dataeval.Metadata` instance is also accepted directly without a
+            dataset. In that case, ``duplicate_factors`` is required. Results are reported
+            at ``level="item"``, and :meth:`~dataeval.quality.DuplicatesOutput.deduplicate`
+            reads its item count directly from the metadata.
+
+            .. versionadded:: 1.2
         *other : Dataset
             Zero or more additional datasets for cross-dataset duplicate
             detection, each accepting the same forms as ``data``. When provided,
@@ -3787,6 +4730,41 @@ class Duplicates(Evaluator):
             When True, accessor properties return :class:`SourceIndex` indices;
             when False, they return plain ``int`` item indices. For a tracking dataset this is
             also what asks for track-level relations; ``levels`` says so directly.
+        metadata : MetadataLike or None, default None
+            Metadata for the items in ``data``. Supplies the factors specified in
+            ``duplicate_factors`` and provides the :attr:`~dataeval.Metadata.encoding_digest`
+            recorded on the result.
+
+            Pass alongside a dataset, or pass metadata directly as ``data`` to evaluate
+            metadata alone. Specifying different metadata containers for ``data`` and
+            ``metadata`` raises ValueError.
+
+            .. versionadded:: 1.2
+        duplicate_factors : Sequence[str] or None, default None
+            Names of the metadata factors that must all agree for items to be considered
+            duplicates. None disables factor grouping, unless ``data`` is a metadata
+            instance, which requires this argument.
+
+            Specified factors operate as a conjunction. Items are grouped only when every
+            named factor matches; matching some factors while differing on another does not
+            produce a duplicate. Adding factors narrows matches. For example,
+            ``["capture_date", "camera_id"]`` matches items only when both factors agree.
+
+            Items with unstated factors (null or NaN) are excluded from grouping.
+
+            Factor grouping should only use identifying attributes, such as timestamps,
+            GPS fixes, or source filenames. Grouping on low-cardinality attributes such as
+            ``weather=rain`` identifies shared conditions rather than duplicates.
+            :attr:`~dataeval.quality.DuplicatesOutput.factor_cardinality` reports the number
+            of distinct stated values for each factor.
+
+            Factor groups carry ``methods=["factors"]`` and ``dup_type="factors"`` with
+            a null ``differs_on``.
+
+            Requires a single dataset and metadata containing the specified factors at
+            the item level.
+
+            .. versionadded:: 1.2
 
         Returns
         -------
@@ -3797,7 +4775,15 @@ class Duplicates(Evaluator):
         Raises
         ------
         ValueError
-            If flags is NONE and no extractor is provided.
+            If flags is NONE and no extractor is provided; if ``duplicate_factors`` is specified
+            without metadata or with multiple datasets; or if ``data`` is a metadata instance and
+            ``duplicate_factors`` is omitted, multiple datasets are passed, ``metadata`` specifies
+            a different container, or a level other than ``"item"`` is requested.
+        KeyError
+            If ``duplicate_factors`` contains a factor missing from the metadata item level.
+        TypeError
+            If ``duplicate_factors`` receives a metadata instance lacking an item-level schema,
+            such as a bare :class:`~dataeval.protocols.MetadataLike`.
 
         Examples
         --------
@@ -3805,32 +4791,53 @@ class Duplicates(Evaluator):
 
         >>> detector = Duplicates()
         >>> detector.evaluate(images)
-        shape: (3, 5)
-        ┌──────────┬───────┬──────────┬───────────────┬────────────┐
-        │ group_id ┆ level ┆ dup_type ┆ item_indices  ┆ methods    │
-        │ ---      ┆ ---   ┆ ---      ┆ ---           ┆ ---        │
-        │ i64      ┆ str   ┆ str      ┆ list[i64]     ┆ list[str]  │
-        ╞══════════╪═══════╪══════════╪═══════════════╪════════════╡
-        │ 0        ┆ item  ┆ exact    ┆ [3, 20]       ┆ ["xxhash"] │
-        │ 1        ┆ item  ┆ exact    ┆ [7, 11, … 25] ┆ ["xxhash"] │
-        │ 2        ┆ item  ┆ exact    ┆ [16, 37]      ┆ ["xxhash"] │
-        └──────────┴───────┴──────────┴───────────────┴────────────┘
+        shape: (3, 7)
+        ┌──────────┬───────┬──────────┬───────────────┬────────────┬────────────┬───────────────────────┐
+        │ group_id ┆ level ┆ dup_type ┆ item_indices  ┆ methods    ┆ differs_on ┆ annotation_divergence │
+        │ ---      ┆ ---   ┆ ---      ┆ ---           ┆ ---        ┆ ---        ┆ ---                   │
+        │ i64      ┆ str   ┆ str      ┆ list[i64]     ┆ list[str]  ┆ list[str]  ┆ f64                   │
+        ╞══════════╪═══════╪══════════╪═══════════════╪════════════╪════════════╪═══════════════════════╡
+        │ 0        ┆ item  ┆ exact    ┆ [3, 20]       ┆ ["xxhash"] ┆ null       ┆ null                  │
+        │ 1        ┆ item  ┆ exact    ┆ [7, 11, … 25] ┆ ["xxhash"] ┆ null       ┆ null                  │
+        │ 2        ┆ item  ┆ exact    ┆ [16, 37]      ┆ ["xxhash"] ┆ null       ┆ null                  │
+        └──────────┴───────┴──────────┴───────────────┴────────────┴────────────┴───────────────────────┘
+
+        ``images`` carries no annotations. So the annotation axis never ran. Its two columns
+        read ``null``. Not checked, rather than checked and agreed.
 
         Cross-dataset detection:
 
         >>> detector = Duplicates()
         >>> detector.evaluate(train_ds, test_ds)
-        shape: (3, 6)
-        ┌──────────┬───────┬──────────┬───────────────┬─────────────────┬────────────┐
-        │ group_id ┆ level ┆ dup_type ┆ item_indices  ┆ dataset_indices ┆ methods    │
-        │ ---      ┆ ---   ┆ ---      ┆ ---           ┆ ---             ┆ ---        │
-        │ i64      ┆ str   ┆ str      ┆ list[i64]     ┆ list[i64]       ┆ list[str]  │
-        ╞══════════╪═══════╪══════════╪═══════════════╪═════════════════╪════════════╡
-        │ 0        ┆ item  ┆ exact    ┆ [3, 20]       ┆ [0, 0]          ┆ ["xxhash"] │
-        │ 1        ┆ item  ┆ exact    ┆ [7, 11, … 25] ┆ [0, 0, … 0]     ┆ ["xxhash"] │
-        │ 2        ┆ item  ┆ exact    ┆ [16, 37]      ┆ [0, 0]          ┆ ["xxhash"] │
-        └──────────┴───────┴──────────┴───────────────┴─────────────────┴────────────┘
+        shape: (3, 8)
+        ┌──────────┬───────┬──────────┬──────────────┬─────────────┬────────────┬────────────┬─────────────┐
+        │ group_id ┆ level ┆ dup_type ┆ item_indices ┆ dataset_ind ┆ methods    ┆ differs_on ┆ annotation_ │
+        │ ---      ┆ ---   ┆ ---      ┆ ---          ┆ ices        ┆ ---        ┆ ---        ┆ divergence  │
+        │ i64      ┆ str   ┆ str      ┆ list[i64]    ┆ ---         ┆ list[str]  ┆ list[str]  ┆ ---         │
+        │          ┆       ┆          ┆              ┆ list[i64]   ┆            ┆            ┆ f64         │
+        ╞══════════╪═══════╪══════════╪══════════════╪═════════════╪════════════╪════════════╪═════════════╡
+        │ 0        ┆ item  ┆ exact    ┆ [3, 20]      ┆ [0, 0]      ┆ ["xxhash"] ┆ null       ┆ null        │
+        │ 1        ┆ item  ┆ exact    ┆ [7, 11, …    ┆ [0, 0, … 0] ┆ ["xxhash"] ┆ null       ┆ null        │
+        │          ┆       ┆          ┆ 25]          ┆             ┆            ┆            ┆             │
+        │ 2        ┆ item  ┆ exact    ┆ [16, 37]     ┆ [0, 0]      ┆ ["xxhash"] ┆ null       ┆ null        │
+        └──────────┴───────┴──────────┴──────────────┴─────────────┴────────────┴────────────┴─────────────┘
         """
+        # Resolve metadata when passed in the data argument. Metadata satisfies Dataset
+        # structurally, so this check precedes image decoding paths.
+        alone = _is_metadata(data)
+        metadata = _checked_sole_metadata(data, metadata) if alone else metadata
+
+        # Recorded before detection runs. `set_metadata` reads `encoding_digest` through this
+        # *after* the call. Assigned unconditionally. A second pass on the same detector,
+        # handed no metadata, has to report no digest rather than the previous pass's.
+        self.metadata = metadata
+        if alone:
+            return self._evaluate_metadata(metadata, other, levels, per_image, per_target, duplicate_factors)
+        _checked_factor_request(metadata, bool(other), duplicate_factors)
+        factor_groups, factor_cardinality = (
+            _find_factor_duplicates(metadata, duplicate_factors) if duplicate_factors else (None, None)
+        )
+
         tracking = _yields_frames(data) or any(_yields_frames(dataset) for dataset in other)
         self._warn_default_radius(tracking)
         plan = _resolve_levels(levels, per_image, per_target, tracking)
@@ -3838,9 +4845,62 @@ class Duplicates(Evaluator):
         if other:
             return self._evaluate_multi([data, *other], plan)
 
-        return self._evaluate_single(data, plan)
+        return self._evaluate_single(data, plan, factor_groups, factor_cardinality)
 
-    def _evaluate_single(self, data: _DatasetInput, plan: _LevelPlan) -> SingleDuplicatesOutput:
+    def _evaluate_metadata(
+        self,
+        metadata: Any,
+        other: Sequence[Any],
+        levels: str | Sequence[str] | None,
+        per_image: bool | None,
+        per_target: bool | None,
+        duplicate_factors: Sequence[str] | None,
+    ) -> SingleDuplicatesOutput:
+        """Evaluate metadata directly for factor duplicates without image data."""
+        if other:
+            raise ValueError("Duplicates.evaluate: metadata evaluation supports only one dataset.")
+        if not duplicate_factors:
+            raise ValueError("Duplicates.evaluate: metadata evaluation requires `duplicate_factors`.")
+        plan = _resolve_levels(levels, per_image, per_target, tracking=False)
+        if plan.levels != frozenset({"item"}):
+            raise ValueError(
+                f"Duplicates.evaluate: metadata evaluation supports only the 'item' level, got {sorted(plan.levels)}."
+            )
+
+        factor_groups, factor_cardinality = _find_factor_duplicates(metadata, duplicate_factors)
+        df, divergences = _relations_frame(
+            _Relations.empty(),
+            set(),
+            self.merge_near_duplicates,
+            None,
+            factor_groups=factor_groups,
+        )
+        return DuplicatesOutput(
+            df,
+            merge_near_duplicates=self.merge_near_duplicates,
+            flags=self.flags,
+            hash_radius=self.hash_radius,
+            redundancy_radius=self.redundancy_radius,
+            min_segment_frames=self.min_segment_frames,
+            max_segment_gap=self.max_segment_gap,
+            segment_offset_tolerance=self.segment_offset_tolerance,
+            verify_alignment=self.verify_alignment,
+            min_track_frames=self.min_track_frames,
+            levels=plan.levels,
+            frame_map=None,
+            annotation_divergences=divergences,
+            factor_groups=factor_groups,
+            factor_cardinality=factor_cardinality,
+            item_count=_metadata_item_count(metadata),
+        )
+
+    def _evaluate_single(
+        self,
+        data: _DatasetInput,
+        plan: _LevelPlan,
+        factor_groups: MethodGroups | None = None,
+        factor_cardinality: Mapping[str, int] | None = None,
+    ) -> SingleDuplicatesOutput:
         """Single-dataset evaluate implementation."""
         # Validate parameters - need either hash-based or cluster-based detection
         # Cluster-based detection requires both extractor AND cluster_sensitivity
@@ -3860,6 +4920,21 @@ class Duplicates(Evaluator):
         # view, which is image-shaped, and rebinding the parameter would keep its declared type.
         measured, frame_map, track_map = _as_frames(data, self.frame_sample, type(self).__name__, self.hash_radius)
 
+        # Read off the targets before any hashing, and whether or not there is any. The annotation
+        # axis costs no decode. So a cluster-only run has the same claim on it as a hashing one.
+        # Nested under the hash flag it would silently vanish from exactly the run that has the
+        # least other evidence to offer.
+        annotation_sources: Mapping[int, _AnnotationSource] = (
+            _annotation_sources(measured) if plan.levels & _ANNOTATION_LEVELS else {}
+        )
+        annotation_digests: Mapping[int, str] = _digests_of(annotation_sources)
+        # The grouping is a dict of digests, so it needs no pixels either. A cluster-only run
+        # reports annotation groups as well as `differs_on`. A hashing run rebinds `found`
+        # wholesale below. There, `_find_relations` derives the same groups alongside the rest.
+        found = found._replace(
+            annotation=_find_annotation_duplicates(annotation_digests) if _describes_whole_data(plan.levels) else []
+        )
+
         # Hash-based duplicate detection
         if self.flags & ImageStats.HASH:
             self.stats = checked_compute_stats(
@@ -3877,6 +4952,7 @@ class Duplicates(Evaluator):
                 frame_map,
                 track_map,
                 self._detection_policy(plan),
+                annotation_digests=annotation_digests,
             )
 
         # Cluster-based duplicate detection (requires both extractor and cluster_sensitivity)
@@ -3898,7 +4974,15 @@ class Duplicates(Evaluator):
             found = found._replace(item_near=found.item_near + [(group, "cluster") for group in cluster_dupes])
 
         available_stats = set(self.stats["stats"].keys()) if self.flags & ImageStats.HASH else set()
-        df = _relations_frame(found, available_stats, self.merge_near_duplicates, frame_map)
+        df, divergences = _relations_frame(
+            found,
+            available_stats,
+            self.merge_near_duplicates,
+            frame_map,
+            annotation_digests=annotation_digests,
+            factor_groups=factor_groups if _describes_whole_data(plan.levels) else None,
+            annotation_sources=annotation_sources,
+        )
         return DuplicatesOutput(  # type: ignore[return-value]
             df,
             calculation_results=self.stats if has_hash_detection else None,
@@ -3916,6 +5000,10 @@ class Duplicates(Evaluator):
             levels=plan.levels,
             frame_map=frame_map,
             track_map=track_map,
+            annotation_digests=annotation_digests,
+            annotation_divergences=divergences,
+            factor_groups=factor_groups,
+            factor_cardinality=factor_cardinality,
         )
 
     def _evaluate_multi(self, datasets: Sequence[_DatasetInput], plan: _LevelPlan) -> MultiDuplicatesOutput:
@@ -3955,9 +5043,28 @@ class Duplicates(Evaluator):
 
         stored_cluster_result: ClusterResult | None = None
         found = _Relations.empty()
+        # Ungated, for the reason `_evaluate_single` gives.
+        annotation_sources: Mapping[int, _AnnotationSource] = (
+            _aligned_digests(source_index, _annotation_sources(measured), sum(len(dataset) for dataset in measured))
+            if plan.levels & _ANNOTATION_LEVELS
+            else {}
+        )
+        annotation_digests: Mapping[int, str] = _digests_of(annotation_sources)
+        # The grouping is a dict of digests, so it needs no pixels either. A cluster-only run
+        # reports annotation groups as well as `differs_on`. A hashing run rebinds `found`
+        # wholesale below. There, `_find_relations` derives the same groups alongside the rest.
+        found = found._replace(
+            annotation=_find_annotation_duplicates(annotation_digests) if _describes_whole_data(plan.levels) else []
+        )
         if calc_results:
             found = _find_relations(
-                hash_stats, source_index, frame_map, track_map, self._detection_policy(plan), dataset_steps
+                hash_stats,
+                source_index,
+                frame_map,
+                track_map,
+                self._detection_policy(plan),
+                dataset_steps,
+                annotation_digests=annotation_digests,
             )
 
         # Cluster-based: combine all images, extract, cluster together
@@ -3980,7 +5087,15 @@ class Duplicates(Evaluator):
             )
             found = found._replace(item_near=found.item_near + [(group, "cluster") for group in cluster_dupes])
 
-        df = _relations_frame(found, available_stats, self.merge_near_duplicates, frame_map, dataset_steps)
+        df, divergences = _relations_frame(
+            found,
+            available_stats,
+            self.merge_near_duplicates,
+            frame_map,
+            dataset_steps,
+            annotation_digests,
+            annotation_sources=annotation_sources,
+        )
         return DuplicatesOutput(  # type: ignore[return-value]
             df,
             calculation_results=calc_results if calc_results else None,
@@ -3998,4 +5113,6 @@ class Duplicates(Evaluator):
             levels=plan.levels,
             frame_map=frame_map,
             track_map=track_map,
+            annotation_digests=annotation_digests,
+            annotation_divergences=divergences,
         )
