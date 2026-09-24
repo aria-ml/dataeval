@@ -44,7 +44,7 @@ class TestIsMetadataLike:
     """Dispatch must recognize Metadata without touching its properties.
 
     ``MetadataLike`` is a runtime_checkable protocol. Python 3.12+ resolves protocol
-    members with ``inspect.getattr_static``, but 3.10 and 3.11 use ``hasattr``, which
+    members with ``inspect.getattr_static``, but 3.11 uses ``hasattr``, which
     calls property getters — so a bare ``isinstance`` against the protocol structures
     and bins the whole dataset inside a type check, and raises rather than returning
     False at a view where ``class_labels`` is undefined. Both versions are supported,
@@ -61,7 +61,7 @@ class TestIsMetadataLike:
         assert not metadata._is_binned
 
     def test_view_above_label_level_does_not_raise(self, get_od_dataset):
-        # class_labels raises above label_level by design; on 3.10/3.11 hasattr only
+        # class_labels raises above label_level by design; on 3.11 hasattr only
         # swallows AttributeError, so that ValueError used to escape isinstance itself.
         from dataeval import Metadata
         from dataeval._helpers import is_metadata_like

@@ -45,19 +45,15 @@ class TestLabelIndependenceUnit:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            with pytest.raises(ValueError, match="unique classes"):
-                label_parity(labels_expected, labels_observed)
+        with warnings.catch_warnings(action="ignore"), pytest.raises(ValueError, match="unique classes"):
+            label_parity(labels_expected, labels_observed)
 
     def test_fails_with_unaccounted_for_zero(self):
         labels_expected = np.array([], dtype=np.intp)
         labels_observed = np.array([0, 1], dtype=np.intp)
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            with pytest.raises(ValueError, match="is all zeros"):
-                label_parity(labels_expected, labels_observed, num_classes=2)
+        with warnings.catch_warnings(action="ignore"), pytest.raises(ValueError, match="is all zeros"):
+            label_parity(labels_expected, labels_observed, num_classes=2)
 
     def test_warns_with_not_enough_frequency(self, caplog):
         f_exp = [1, 1]
@@ -88,8 +84,7 @@ class TestLabelIndependenceUnit:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
+        with warnings.catch_warnings(action="error"):
             label_parity(labels_expected, labels_observed)
 
     def test_passes_with_ncls(self):
@@ -99,8 +94,7 @@ class TestLabelIndependenceUnit:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             label_parity(labels_expected, labels_observed, num_classes=2)
 
     def test_fails_with_empty_exp_dataset(self):
@@ -110,10 +104,8 @@ class TestLabelIndependenceUnit:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            with pytest.raises(ValueError, match="is all zeros"):
-                label_parity(labels_expected, labels_observed)
+        with warnings.catch_warnings(action="ignore"), pytest.raises(ValueError, match="is all zeros"):
+            label_parity(labels_expected, labels_observed)
 
     def test_fails_with_empty_obs_dataset(self):
         f_exp = [0, 1]
@@ -122,10 +114,8 @@ class TestLabelIndependenceUnit:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            with pytest.raises(ValueError, match="No labels found"):
-                label_parity(labels_expected, labels_observed)
+        with warnings.catch_warnings(action="ignore"), pytest.raises(ValueError, match="No labels found"):
+            label_parity(labels_expected, labels_observed)
 
 
 @pytest.mark.optional

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -23,7 +23,7 @@ from dataeval.types import (
 def _sample_execution_metadata() -> ExecutionMetadata:
     return ExecutionMetadata(
         name="dataeval.bias.Balance.evaluate",
-        execution_time=datetime(2026, 5, 25, tzinfo=timezone.utc),
+        execution_time=datetime(2026, 5, 25, tzinfo=UTC),
         execution_duration=1.234,
         arguments={"metadata": "Metadata: len=100"},
         state={"factors": "list: len=3"},

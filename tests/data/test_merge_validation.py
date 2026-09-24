@@ -62,8 +62,7 @@ class TestMergeValidation:
     def test_valid_merge_no_warning(self):
         """Existing valid merges (shared vocabulary) still succeed with no warning."""
         i2l = {0: "cat", 1: "dog"}
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")  # any warning becomes an error
+        with warnings.catch_warnings(action="error"):  # any warning becomes an error
             merged = merge_datasets(
                 _LabeledDataset("a", 2, i2l),
                 _LabeledDataset("b", 3, i2l),

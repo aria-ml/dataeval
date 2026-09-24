@@ -3,11 +3,10 @@
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, Self, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy

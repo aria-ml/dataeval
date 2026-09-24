@@ -5,10 +5,9 @@ from __future__ import annotations
 __all__ = ["TrackStatsResult", "track_stats"]
 
 from collections.abc import Mapping, Sequence
-from typing import Any, TypeAlias, TypedDict, cast, overload
+from typing import Any, NotRequired, TypeAlias, TypedDict, cast, overload
 
 import numpy as np
-from typing_extensions import NotRequired
 
 from dataeval._log import get_logger
 from dataeval.core._compute_stats import FactorResult

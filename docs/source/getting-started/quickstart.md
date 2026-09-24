@@ -23,7 +23,7 @@ for details.
 
 ## Step 1: Install DataEval
 
-DataEval requires Python 3.10 or higher. It has been tested on Ubuntu and Windows.
+DataEval requires Python 3.11 or higher. It has been tested on Ubuntu and Windows.
 macOS users may encounter platform-specific issues; report these via the issue
 tracker.
 

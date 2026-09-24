@@ -5,10 +5,9 @@ __all__ = [
 ]
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Self
 
 from pydantic.dataclasses import dataclass
-from typing_extensions import Self
 
 try:
     from dataeval._version import __version__

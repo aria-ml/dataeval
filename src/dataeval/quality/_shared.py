@@ -27,16 +27,11 @@ def _stat_names(stats: ImageStats) -> str:
     is the calculator's output name (``DIMENSION_ASPECT_RATIO`` -> ``aspect_ratio``), so
     the mapping is derived rather than duplicated from ``dataeval.core._calculators``.
 
-    Walks the class's members rather than iterating ``stats`` itself: iterating a ``Flag``
-    *value* to yield its constituent members only exists on Python 3.11+, and this package
-    supports 3.10. Composite members (``PIXEL``, ``DIMENSION``, ...) are skipped by the
-    power-of-two test so only individual stat columns are named.
+    Iterating a ``Flag`` value yields only the single-bit members it holds, so composite
+    members (``PIXEL``, ``DIMENSION``, ...) never appear and only individual stat columns
+    are named. The ``name`` test only narrows ``Flag.name``, which is typed optional.
     """
-    return ", ".join(
-        name.split("_", 1)[1].lower()
-        for name, member in ImageStats.__members__.items()
-        if name == member.name and member.value and not member.value & (member.value - 1) and member & stats
-    )
+    return ", ".join(member.name.split("_", 1)[1].lower() for member in stats if member.name)
 
 
 def checked_compute_stats(

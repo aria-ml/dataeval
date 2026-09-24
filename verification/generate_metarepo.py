@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -64,7 +64,7 @@ def _result_char(status: str) -> str:
 def generate_test_case_md(tc_id: str, tc_meta: dict, report: dict | None) -> str:
     """Generate a single test case markdown file."""
     tc_key = f"test-case-{tc_id}"
-    today = datetime.now(tz=timezone.utc).strftime("%m/%d/%Y")
+    today = datetime.now(tz=UTC).strftime("%m/%d/%Y")
 
     # Look up dynamic results
     tc_report = None
@@ -166,7 +166,7 @@ def generate_vcrm(registry: dict, report: dict | None) -> str:
     """Generate the full VCRM markdown."""
     requirements = registry["requirements"]
     test_cases = registry["test_cases"]
-    today = datetime.now(tz=timezone.utc).strftime("%m/%d/%Y")
+    today = datetime.now(tz=UTC).strftime("%m/%d/%Y")
 
     # Sorted test case IDs
     all_tc_ids = sorted(test_cases.keys(), key=_tc_sort_key)

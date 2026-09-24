@@ -139,8 +139,7 @@ class TestGeometry:
     def test_image_classification_datum_is_transformed_without_boxes(self):
         op = TorchvisionTransform(v2.Resize((4, 4)))
         view = View(_NoIdDataset(), [op])
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             image, target, _ = view[0]
         assert np.asarray(image).shape == (3, 4, 4)
         assert np.asarray(target).tolist() == [1.0, 0.0]
@@ -243,15 +242,13 @@ class TestMissingDatumId:
 
     def test_missing_id_falls_back_to_a_content_hash_and_round_trips(self):
         view = View(_NoIdDataset(n=3), [_jitter()])
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             first, second = _images_of(view), _images_of(view)
         assert all(np.array_equal(a, b) for a, b in zip(first, second, strict=True))
 
     def test_content_hash_gives_different_datums_different_augmentations(self):
         view = View(_NoIdDataset(n=3), [_jitter()])
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             images = _images_of(view)
         assert not np.array_equal(images[0], images[1])
 

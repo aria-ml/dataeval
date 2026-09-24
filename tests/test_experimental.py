@@ -74,8 +74,7 @@ class TestExperimentalDecorator:
 
         assert MyClass.__name__ == "MyClass"
         assert "__experimental__" in MyClass.__dict__
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ExperimentalWarning)
+        with warnings.catch_warnings(action="ignore", category=ExperimentalWarning):
             obj = MyClass()
         assert isinstance(obj, MyClass)
 
@@ -182,8 +181,7 @@ class TestDeprecatedDecorator:
 
         assert OldClass.__name__ == "OldClass"
         assert hasattr(OldClass, "__deprecated__")
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecatedWarning)
+        with warnings.catch_warnings(action="ignore", category=DeprecatedWarning):
             obj = OldClass()
         assert isinstance(obj, OldClass)
 
@@ -247,8 +245,7 @@ class TestLazyImportWithWarning:
 
     def test_lazy_import_returns_correct_object(self):
         """The helper returns the actual attribute from the target module."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ExperimentalWarning)
+        with warnings.catch_warnings(action="ignore", category=ExperimentalWarning):
             result = _lazy_import_with_warning("os.path", "join", "fake.os.path.join", "experimental")
         from os.path import join
 

@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval.protocols import FeatureExtractor
 from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODScoreOutput

@@ -17,9 +17,7 @@ __all__ = ["Ontology"]
 
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, Self
 
 from dataeval._log import get_logger
 from dataeval.exceptions import OntologyCycleError, OntologyError

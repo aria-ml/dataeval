@@ -21,7 +21,7 @@ arithmetic out of them is what lets one be reviewed in a pull request without ru
 __all__ = []
 
 from collections.abc import Callable, Mapping, Sequence
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from types import MappingProxyType
 from typing import Any
 
@@ -124,7 +124,7 @@ def _read_as_time(value: Any, reading: ParseDateTime) -> Any:
         # Naive timestamps are read as UTC rather than through the local zone, so the same
         # declaration gives the same number wherever it is replayed.
         if moment.tzinfo is None:
-            moment = moment.replace(tzinfo=timezone.utc)
+            moment = moment.replace(tzinfo=UTC)
         return moment.timestamp()
     return _period_label(moment, reading.every)
 
@@ -164,7 +164,7 @@ def _from_epoch(count: float, unit: str) -> datetime | None:
     staying mixed.
     """
     try:
-        return datetime.fromtimestamp(count * EPOCH_SECONDS[unit], tz=timezone.utc)
+        return datetime.fromtimestamp(count * EPOCH_SECONDS[unit], tz=UTC)
     except (OverflowError, OSError, ValueError):
         return None
 
@@ -174,8 +174,8 @@ def _as_datetime(value: str, pattern: str | None) -> datetime | None:
     try:
         if pattern is not None:
             return datetime.strptime(value, pattern)
-        # ``fromisoformat`` learned to read a trailing 'Z' in 3.11; on the 3.10 floor it
-        # raises, and a timestamp that has been through JSON is very often spelled that way.
+        # ``fromisoformat`` reads a trailing 'Z' after a time, but not after a bare date, which
+        # XML Schema spells as ``2020-08-27Z``; spelled as an offset, both read as UTC.
         return datetime.fromisoformat(value[:-1] + "+00:00" if value.endswith("Z") else value)
     except ValueError:
         return None

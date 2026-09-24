@@ -255,7 +255,7 @@ class TestProtocolInstanceIsVersionIndependent:
     ``isinstance`` against a ``@runtime_checkable`` protocol does not: below 3.12 it probes
     members with ``hasattr``, from 3.12 on with :func:`inspect.getattr_static`. Task
     dispatch is decided by that answer, so a divergence there means a dataset is read as a
-    different task on 3.11 than on 3.12. These assert the 3.12 answer, so on 3.10 and 3.11
+    different task on 3.11 than on 3.12. These assert the 3.12 answer, so on 3.11
     they fail if dispatch ever falls back to ``isinstance``.
     """
 

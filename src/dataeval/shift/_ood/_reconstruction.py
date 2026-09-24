@@ -12,12 +12,11 @@ __all__ = []
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Self
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval.protocols import ArrayLike, DeviceLike, FeatureExtractor
 from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODScoreOutput

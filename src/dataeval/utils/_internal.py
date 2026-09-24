@@ -9,9 +9,7 @@ from collections.abc import Callable, Iterable, Iterator
 from importlib import import_module
 from os import cpu_count
 from types import ModuleType
-from typing import Any, Literal, TypeVar, overload
-
-from typing_extensions import Self
+from typing import Any, Literal, Self, TypeVar, overload
 
 from dataeval._log import get_logger
 

@@ -25,7 +25,7 @@ class TestVersionMetadata:
     def test_requires_python(self):
         meta = metadata("dataeval")
         assert meta["Requires-Python"] is not None
-        assert "3.10" in meta["Requires-Python"]
+        assert "3.11" in meta["Requires-Python"]
 
     def test_license_set(self):
         meta = metadata("dataeval")

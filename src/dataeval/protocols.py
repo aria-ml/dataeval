@@ -58,6 +58,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Protocol,
+    Self,
     TypeAlias,
     TypeVar,
     overload,
@@ -69,7 +70,7 @@ import maite.protocols.multiobject_tracking
 import numpy as np
 import torch
 from numpy.typing import NDArray
-from typing_extensions import Self, TypeIs, get_protocol_members
+from typing_extensions import TypeIs, get_protocol_members
 
 if TYPE_CHECKING:
     from dataeval.types import Correspondence, OntologyConcept
@@ -183,7 +184,7 @@ def _is_protocol_instance(obj: Any, protocol: type[_TProtocol]) -> TypeIs[_TProt
 
     - ``hasattr`` *calls* property getters, so a member that raises anything but
       :class:`AttributeError` escapes the type test rather than making it answer False --
-      a raising ``boxes`` turns ``isinstance`` into a ``ValueError`` on 3.10 and 3.11 --
+      a raising ``boxes`` turns ``isinstance`` into a ``ValueError`` on 3.11 --
       and a getter that does real work (as the masking proxies behind
       :class:`~dataeval.data.ClassFilter` do, filtering detections on every read) does it
       again for the type test.

@@ -59,7 +59,7 @@ using MAITE-compliant datasets and models.
 
 ## Getting Started
 
-**Python versions:** 3.10 - 3.14
+**Python versions:** 3.11 - 3.14
 
 Choose your preferred method of installation below or follow our
 [installation guide](docs/source/getting-started/installation.md).

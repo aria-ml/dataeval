@@ -5,9 +5,7 @@ __all__ = [
 ]
 
 import warnings
-from typing import Any, NamedTuple, cast, get_args
-
-from typing_extensions import Self
+from typing import Any, NamedTuple, Self, cast, get_args
 
 from dataeval.types._factors import FactorLevel
 

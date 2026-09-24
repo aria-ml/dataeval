@@ -41,7 +41,7 @@ def is_metadata_like(candidate: Any) -> TypeIs[MetadataLike]:
     keeps the common case both cheap and safe. ``MetadataLike`` is a
     :func:`~typing.runtime_checkable` protocol, and ``isinstance`` against one consults
     every member the protocol names. Python 3.12+ resolves those with
-    :func:`inspect.getattr_static` and touches nothing, but 3.10 and 3.11 use a plain
+    :func:`inspect.getattr_static` and touches nothing, but 3.11 uses a plain
     ``hasattr``, which *calls* each property getter — so for a
     :class:`~dataeval.Metadata` the check structures and bins the entire dataset from
     inside a type test. Worse, at a view above :attr:`~dataeval.Metadata.label_level`
@@ -101,7 +101,7 @@ def is_labels_like(candidate: Any) -> TypeIs[LabelsLike]:
     for :class:`~dataeval.scope.Representation` had to declare factors it has none of.
 
     The concrete class is answered first for the same reason as in
-    :func:`is_metadata_like`: on Python 3.10 and 3.11 an ``isinstance`` against a
+    :func:`is_metadata_like`: on Python 3.11 an ``isinstance`` against a
     :func:`~typing.runtime_checkable` protocol *calls* the property, and
     :attr:`~dataeval.Metadata.class_labels` deliberately raises above the label level --
     a :class:`ValueError`, which ``hasattr`` does not swallow.

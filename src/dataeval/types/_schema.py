@@ -17,11 +17,10 @@ __all__ = [
     "TransformInfo",
 ]
 
-from datetime import datetime, timezone
-from typing import Any, ClassVar
+from datetime import UTC, datetime
+from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing_extensions import Self
 
 from dataeval.types._execution import ExecutionMetadata, __version__
 
@@ -197,7 +196,7 @@ class ExtractorInfo(BaseModel):
 def _default_provenance() -> ExecutionMetadata:
     return ExecutionMetadata(
         name="dataeval.types.MetadataJson",
-        execution_time=datetime.now(timezone.utc),
+        execution_time=datetime.now(UTC),
         execution_duration=0.0,
         arguments={},
         state={},

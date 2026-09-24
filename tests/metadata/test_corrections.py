@@ -306,8 +306,12 @@ class TestParseDateTimeReadsTextAsATime:
         assert naive == aware == [0.0]
 
     def test_a_trailing_z_is_read_as_utc(self):
-        """Which the 3.10 floor's fromisoformat does not accept unaided."""
+        """A timestamp that has been through JSON is very often spelled this way."""
         assert apply(["1970-01-01T00:00:00Z"], [ParseDateTime("d")]) == [0.0]
+
+    def test_a_trailing_z_on_a_bare_date_is_read_as_utc(self):
+        """XML Schema's zoned date, which ``fromisoformat`` does not accept unaided."""
+        assert apply(["1970-01-02Z"], [ParseDateTime("d")]) == [86400.0]
 
     def test_a_declared_format_reads_a_column_no_standard_describes(self):
         assert apply(["27/08/2020 12:52"], [ParseDateTime("d", format="%d/%m/%Y %H:%M", every="day")]) == ["2020-08-27"]

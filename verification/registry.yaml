@@ -150,11 +150,11 @@ test_cases:
     test_type: Core Functionality
     business_case: >-
       Verify that DataEval installs and functions correctly across all
-      supported Python versions (3.10 through 3.14), and that optional
+      supported Python versions (3.11 through 3.14), and that optional
       dependencies degrade gracefully when they are absent, to ensure broad
       compatibility and reliable operation across different environments.
     initial_conditions:
-      - Clean Python environment for the target version (3.10 through 3.14)
+      - Clean Python environment for the target version (3.11 through 3.14)
       - Network access or a local package cache for installation
       - >-
         The graceful-degradation steps simulate a missing optional dependency by

@@ -10,7 +10,7 @@ concern (Pydantic's built-in ``model_dump_json`` / ``model_validate_json``).
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -85,7 +85,7 @@ class TestMetadataJsonSchema:
     def test_execution_metadata_serializes_as_provenance(self):
         meta = ExecutionMetadata(
             name="dataeval.bias.Balance.evaluate",
-            execution_time=datetime(2026, 5, 25, tzinfo=timezone.utc),
+            execution_time=datetime(2026, 5, 25, tzinfo=UTC),
             execution_duration=0.42,
             arguments={"metadata": "Metadata: len=100"},
             state={"factors": "list: len=3"},

@@ -5,13 +5,12 @@ __all__ = ["Embeddings"]
 import os
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import numpy as np
 import psutil
 import xxhash as xxh
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval._log import get_logger
 from dataeval.config import resolve_batch_size

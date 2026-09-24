@@ -11,12 +11,11 @@ __all__ = []
 
 import math
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, Self, TypedDict
 
 import numpy as np
 import scipy.stats
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy

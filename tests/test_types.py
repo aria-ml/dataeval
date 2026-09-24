@@ -123,8 +123,7 @@ class TestSourceIndexIsAnAddress:
 
     def test_an_explicit_null_target_does_not_warn(self):
         """Indistinguishable from not passing it, so warning would be noise."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", DeprecationWarning)
+        with warnings.catch_warnings(action="error", category=DeprecationWarning):
             assert SourceIndex(item=3, target=None) == SourceIndex(3)
 
     def test_both_spellings_together_are_rejected(self):
@@ -466,8 +465,7 @@ class TestEvaluatorRepr:
             def __init__(self, alpha=None, beta=None, config=None):
                 super().__init__(locals())
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")  # pydantic model_fields instance-access deprecation
+        with warnings.catch_warnings(action="ignore"):  # pydantic model_fields instance-access deprecation
             assert repr(MyEval(alpha=0.9)) == "MyEval(alpha=0.9, beta=3)"
 
     def test_repr_with_dataclass_config(self):

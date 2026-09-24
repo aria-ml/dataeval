@@ -375,7 +375,7 @@ class TestDriftOutputFeatureNames:
     def test_unfitted_named_extractor_does_not_raise(self):
         """Resolving names must answer empty, not propagate NotFittedError.
 
-        On Python 3.10/3.11 a runtime-checkable protocol's instance check calls
+        On Python 3.11 a runtime-checkable protocol's instance check calls
         ``hasattr``, which would invoke the property and raise. The lookup is duck-typed
         to avoid that.
         """

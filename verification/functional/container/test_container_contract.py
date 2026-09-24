@@ -123,8 +123,7 @@ class TestVariantConsistency:
         """The interpreter shipped in the image is one the project supports.
 
         Read from installed distribution metadata rather than pyproject.toml:
-        the verification lane runs on 3.10, where ``tomllib`` is not in the
-        standard library, and the built metadata is the more faithful source.
+        the built metadata is the more faithful source.
         """
         classifiers = metadata("dataeval").get_all("Classifier") or []
         supported = {
