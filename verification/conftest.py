@@ -2,7 +2,8 @@
 
 Provides:
 - ``test_case(*ids)`` marker linking tests to ``test-case-<id>.md`` in the meta repo
-- JSON report generation mapping test case numbers to pass/fail results
+- JSON report generation mapping test case numbers to pass/fail results, plus
+  run metadata and every test's status for the metarepo test-results log
 - Terminal summary of verification results
 
 A single test may map to multiple test cases (and therefore multiple FRs/NFRs
@@ -16,7 +17,9 @@ via the VCRM in the meta repo) by stacking markers::
 from __future__ import annotations
 
 import json
+import platform
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -29,6 +32,10 @@ OUTPUT_DIR = VERIFICATION_DIR.parent / "output"
 _PROJECT_ROOT = str(VERIFICATION_DIR.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
+
+
+def pytest_sessionstart(session):
+    session.config._verification_started = datetime.now(UTC)
 
 
 def pytest_configure(config):
@@ -76,6 +83,29 @@ def _get_test_status(item):
     return "error"
 
 
+def _get_test_message(item) -> str | None:
+    """Return the first line of an item's skip, xfail, or failure reason, if any."""
+    reports = getattr(item, "_verification_reports", {})
+    for phase in ("setup", "call", "teardown"):
+        r = reports.get(phase)
+        if r is None:
+            continue
+        if r.skipped:
+            reason = getattr(r, "wasxfail", None)
+            if reason is None and isinstance(r.longrepr, tuple):
+                reason = r.longrepr[2].removeprefix("Skipped: ")
+            return reason.splitlines()[0][:200] if reason else None
+        if r.failed:
+            crash = getattr(r.longrepr, "reprcrash", None)
+            message = crash.message if crash is not None else str(r.longrepr)
+            return message.splitlines()[0][:200] if message else None
+    return None
+
+
+def _utc(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 # ---------------------------------------------------------------------------
 # Report generation
 # ---------------------------------------------------------------------------
@@ -99,9 +129,12 @@ def _tc_status(tests: list[dict]) -> str:
 def pytest_sessionfinish(session, exitstatus):
     """Write ``output/reports/verification_report.json``."""
     results: dict[str, list[dict]] = {}
+    all_tests: dict[str, dict] = {}
 
     for item in session.items:
         status = _get_test_status(item)
+        message = _get_test_message(item)
+        all_tests[item.nodeid] = {"status": status, **({"message": message} if message else {})}
         for marker in item.iter_markers("test_case"):
             for tc_num in marker.args:
                 tc_id = f"test-case-{tc_num}"
@@ -136,6 +169,15 @@ def pytest_sessionfinish(session, exitstatus):
             }
             for tc_id, tests in sorted(results.items())
         },
+        "run": {
+            "started": _utc(session.config._verification_started),
+            "finished": _utc(datetime.now(UTC)),
+            "exit_status": int(exitstatus),
+            "command": " ".join(["pytest", *session.config.invocation_params.args]),
+            "python": platform.python_version(),
+            "platform": f"{platform.system().lower()} {platform.machine()}",
+        },
+        "tests": all_tests,
     }
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
