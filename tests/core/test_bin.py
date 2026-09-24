@@ -155,8 +155,7 @@ class TestMissingValueBinning:
         lumpy = np.concatenate([rng.normal(100.0 * k, 0.1, 40) for k in range(5)])
         assert is_continuous(lumpy) is False
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", RuntimeWarning)
+        with warnings.catch_warnings(action="error", category=RuntimeWarning):
             assert is_continuous(np.append(lumpy, sentinel)) is False
 
     def test_is_continuous_matches_finite_only_verdict(self):

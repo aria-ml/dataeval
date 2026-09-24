@@ -69,7 +69,7 @@ def session(**kwargs):
 
 
 PYTHON_VERSION = f"{sys.version_info[0]}.{sys.version_info[1]}"
-PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
+PYTHON_VERSIONS = ["3.11", "3.12", "3.13", "3.14"]
 PYTHON_DEFAULT = "3.11"
 PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
 DEVICE_VARIANTS = ["cpu", "cu126", "cu130"]

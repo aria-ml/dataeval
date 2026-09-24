@@ -76,7 +76,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -88,7 +88,7 @@ jobs:
         run: uv tool install nox --with nox-uv
 
       - name: Run minimum install test
-        run: uvx nox -e deps -P 3.10
+        run: uvx nox -e deps -P 3.11
 
   typecheck:
     name: Type Check (Python ${{ matrix.python-version }})
@@ -96,7 +96,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
 
@@ -123,7 +123,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
 
@@ -169,7 +169,7 @@ jobs:
   #   strategy:
   #     fail-fast: false
   #     matrix:
-  #       python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+  #       python-version: ['3.11', '3.12', '3.13', '3.14']
   #   steps:
   #     - uses: actions/checkout@v4
 

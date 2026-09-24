@@ -8,7 +8,7 @@ primary backends.
 
 ## Supported Python Versions
 
-We currently support Python `3.10` through `3.14`.
+We currently support Python `3.11` through `3.14`.
 
 ## PyTorch Dependency
 

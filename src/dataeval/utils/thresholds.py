@@ -18,11 +18,10 @@ __all__ = [
 ]
 
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval.protocols import Threshold, ThresholdBounds, ThresholdLike, ThresholdLimits
 from dataeval.utils._internal import EPSILON

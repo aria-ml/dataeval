@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-SUPPORTED_VERSIONS = [(3, 10), (3, 11), (3, 12), (3, 13), (3, 14)]
+SUPPORTED_VERSIONS = [(3, 11), (3, 12), (3, 13), (3, 14)]
 
 
 @pytest.mark.test_case("1-1")

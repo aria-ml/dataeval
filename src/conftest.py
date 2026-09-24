@@ -18,14 +18,13 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Self, cast
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 import torch
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval import Metadata
 from dataeval.config import _config, set_batch_size, set_device, set_seed
@@ -430,8 +429,7 @@ def _export_tiny_onnx(model: torch.nn.Module, path: Path, output_names: list[str
 
     dummy = torch.zeros(1, 3, 8, 8)
     dynamic_axes = {"image": {0: "batch"}} | {name: {0: "batch"} for name in output_names}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+    with warnings.catch_warnings(action="ignore"):
         torch.onnx.export(
             model.eval(),
             (dummy,),

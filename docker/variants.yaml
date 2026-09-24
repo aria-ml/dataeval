@@ -31,7 +31,7 @@
 # Pinned tool versions (shared across all variants)
 uv_version: "0.10.12"
 
-# The interpreter shipped in the image. DataEval supports 3.10 through 3.14;
+# The interpreter shipped in the image. DataEval supports 3.11 through 3.14;
 # this pins the one users get by default, and is deliberately conservative
 # rather than tracking PYTHON_LATEST_SUPPORTED_VERSION in .gitlab/ci/base.yml.
 python_version: "3.12"

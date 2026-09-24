@@ -13,7 +13,7 @@ __all__ = [
 import inspect
 import logging
 from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import partial, wraps
 from typing import Any, Generic, ParamSpec, TypeVar, overload
 
@@ -263,14 +263,14 @@ def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | N
         # above keeps the instance's class and the full module path, so curating the
         # logger costs no provenance.
         _logger = get_logger(fn.__module__)
-        time = datetime.now(timezone.utc)
+        time = datetime.now(UTC)
         _logger.log(logging.INFO, f">>> Executing '{name}': args={arguments} state={state} <<<")
 
         # EXECUTE FUNCTION #####
         result = fn(*args, **kwargs)
         ############################
 
-        duration = (datetime.now(timezone.utc) - time).total_seconds()
+        duration = (datetime.now(UTC) - time).total_seconds()
         _logger.log(logging.INFO, f">>> Completed '{name}': args={arguments} state={state} duration={duration} <<<")
 
         # Read after the call, not before. Every name in ``state`` is configuration that the

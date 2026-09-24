@@ -26,9 +26,8 @@ from typing import Any, Literal, TypeAlias, get_args
 #
 # A :obj:`~typing.Literal` rather than an enum because the string *is* the value:
 # it lands directly in the dataframe's ``level`` column and is compared there. An
-# enum-typed parameter would also reject the plain ``rows_at("unit")`` spelling
-# that :class:`~dataeval.Metadata` is designed around, and ``enum.StrEnum`` is
-# unavailable on the supported 3.10 floor.
+# enum-typed parameter, ``enum.StrEnum`` included, would also reject the plain
+# ``rows_at("unit")`` spelling that :class:`~dataeval.Metadata` is designed around.
 FactorLevel: TypeAlias = Literal["sequence", "unit", "track", "instance"]
 
 # Distinct values an ``Unusable`` repr shows per kind before abbreviating. The attribute

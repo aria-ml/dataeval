@@ -463,8 +463,7 @@ def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int, unit_interval:
         except RuntimeWarning:
             return np.nan
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings("error", category=RuntimeWarning)
+    with warnings.catch_warnings(action="error", category=RuntimeWarning):
         res = basinhopping(
             f,
             x0=linear_initialization(p_i, n_i, bounds),

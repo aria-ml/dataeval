@@ -27,7 +27,7 @@ uvx --with nox-uv nox -s dev -- --python 3.12 --device cu130
 
 | Flag | Values | Default |
 | ---- | ------ | ------- |
-| `-p`, `--python` | `3.10` – `3.14` | `3.11` |
+| `-p`, `--python` | `3.11` – `3.14` | `3.11` |
 | `-d`, `--device` | `cpu`, `cu126`, `cu130` | `cu130` |
 | `-n`, `--name` | any directory | `.venv` |
 

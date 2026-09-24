@@ -4,13 +4,12 @@ __all__ = []
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import Literal, Self, TypedDict
 
 import numpy as np
 import torch
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import norm
-from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import DeviceLike, FeatureExtractor, Threshold

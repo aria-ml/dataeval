@@ -5,12 +5,11 @@ __all__ = []
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
@@ -214,7 +213,7 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         Notes
         -----
         Deliberately duck-typed rather than an ``isinstance`` check against
-        :class:`~dataeval.protocols.NamedFeatureExtractor`. On Python 3.10 and 3.11 a
+        :class:`~dataeval.protocols.NamedFeatureExtractor`. On Python 3.11 a
         runtime-checkable protocol's instance check calls ``hasattr``, which invokes the
         property -- so testing an extractor that has not been fitted would raise
         :class:`~dataeval.exceptions.NotFittedError` out of an ``isinstance`` call rather

@@ -1,11 +1,10 @@
 __all__ = []
 
 from collections.abc import Callable, Sequence
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import NotRequired
 
 from dataeval._log import get_logger
 from dataeval.protocols import ArrayLike

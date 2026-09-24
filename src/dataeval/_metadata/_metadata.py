@@ -9,12 +9,11 @@ import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Literal, NamedTuple, cast
+from typing import Any, Literal, NamedTuple, Self, cast
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval._log import get_logger
 from dataeval._metadata import _corrections as corrections

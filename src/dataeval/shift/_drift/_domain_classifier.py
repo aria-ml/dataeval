@@ -11,11 +11,10 @@ Licensed under Apache Software License (Apache 2.0)
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any, Self, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval._log import get_logger
 from dataeval.exceptions import NotFittedError, ShapeMismatchError

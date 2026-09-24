@@ -7,11 +7,11 @@ from enum import Flag
 from functools import partial, reduce
 from itertools import zip_longest
 from operator import or_
-from typing import Any, Generic, cast, get_args
+from typing import Any, Generic, NotRequired, cast, get_args
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import NotRequired, TypedDict, TypeVar
+from typing_extensions import TypedDict, TypeVar
 
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
@@ -69,11 +69,11 @@ not. Only reads happen here, so accepting the narrower key type is sound.
 def _flag_list(flags: Flag) -> list[str]:
     """List the single-bit members of `flags`, leaving out the composite aliases.
 
-    Iterating a Flag class yields the composites declared in its body as well — on Python
-    3.10 in particular — so a group like ``VISUAL`` would list itself beside each of the
-    statistics it stands for.
+    Iterating a Flag value yields only the single-bit members it holds, so a group like
+    ``VISUAL`` never lists itself beside the statistics it stands for. The ``name`` test
+    only narrows ``Flag.name``, which is typed optional.
     """
-    return [f.name for f in type(flags) if f in flags and f.name and f.value and (f.value & (f.value - 1)) == 0]
+    return [f.name for f in flags if f.name]
 
 
 def _flag_names(flags: Flag) -> str:
@@ -1353,10 +1353,6 @@ def compute_stats(  # noqa: C901
     # survives, and this is the one that names the column that went missing and the entry
     # that brings it back. Barren's remedy changes what the group measures instead, which
     # answers a question the caller did not ask.
-    # `~whole_flags` is folded into each term rather than applied to the total — the same
-    # set, and it keeps both operands of every `|` a `Flag`, which Python 3.10 needs: its
-    # `enum` has no reflected `__ror__`, so an accumulator typed `ImageStats` cannot take a
-    # `Flag` on the right.
     stranded = reduce(
         or_,
         (flags & ~band_flags[name] & ~whole_flags for name, flags in group_flags.items()),

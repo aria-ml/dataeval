@@ -493,8 +493,7 @@ class TestReduceDetectionScoresShim:
 
     @pytest.mark.parametrize("choice", [None, True])
     def test_taking_the_default_is_silent(self, choice):
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
+        with warnings.catch_warnings(action="error"):
             Relabel({"car": "vehicle"}, ["vehicle"], reduce_detection_scores=choice)
 
     def test_opting_out_leaves_per_box_scores_alone(self, od_dataset):

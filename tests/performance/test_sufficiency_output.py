@@ -337,8 +337,7 @@ class TestSufficiencyInverseProject:
         desired_accuracies = {"Accuracy": np.array([0.00000001, 0.93689])}
 
         # ensure there are no warnings for valid input
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
+        with warnings.catch_warnings(action="error"):
             result = data.inv_project(desired_accuracies)
             needed_data = result["Accuracy"].to_numpy()
 

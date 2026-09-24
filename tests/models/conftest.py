@@ -136,8 +136,7 @@ def onnx_classifier(tmp_path: Path) -> Path:
     path = tmp_path / "classifier.onnx"
     model = _TinyClassifier(n_classes=4).eval()
     dummy = torch.zeros(1, 3, 8, 8)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+    with warnings.catch_warnings(action="ignore"):
         torch.onnx.export(
             model,
             dummy,
@@ -156,8 +155,7 @@ def onnx_detector(tmp_path: Path) -> Path:
     path = tmp_path / "detector.onnx"
     model = _TinyDetector(n_boxes=5, n_classes=4).eval()
     dummy = torch.zeros(1, 3, 8, 8)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+    with warnings.catch_warnings(action="ignore"):
         torch.onnx.export(
             model,
             dummy,

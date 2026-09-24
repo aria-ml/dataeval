@@ -5,12 +5,11 @@ __all__ = []
 import warnings
 from collections.abc import Mapping, Sequence, Sized
 from itertools import combinations
-from typing import Any, Generic, Literal, NamedTuple, TypeAlias, TypeVar, cast, overload
+from typing import Any, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar, cast, overload
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval import Embeddings
 from dataeval._log import get_logger

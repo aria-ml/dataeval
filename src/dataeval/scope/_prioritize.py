@@ -8,11 +8,10 @@ that handle dataset loading and embedding computation.
 __all__ = []
 
 from collections.abc import Iterator
-from typing import Any, Literal, cast
+from typing import Any, Literal, Self, cast
 
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval import Metadata
 from dataeval._embeddings import Embeddings

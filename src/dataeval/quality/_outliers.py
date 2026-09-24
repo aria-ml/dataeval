@@ -1,12 +1,11 @@
 __all__ = []
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Generic, Literal, NamedTuple, TypeVar, overload
+from typing import Any, Generic, Literal, NamedTuple, Self, TypeVar, overload
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from typing_extensions import Self
 
 from dataeval import Embeddings
 from dataeval._helpers import _get_index2label, _get_item_indices, reject_filtered_metadata

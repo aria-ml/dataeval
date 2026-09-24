@@ -321,8 +321,7 @@ class TestStructuringAnnouncesItself:
     def test_the_repr_reports_the_silent_default(self):
         """Visible on inspection too, for a caller who filtered the warning."""
         md = _od([1] * 80, self._factors())
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
+        with warnings.catch_warnings(action="ignore", category=UserWarning):
             _ = md.factor_data
         assert "auto_encoded=3" in repr(md)
 
@@ -461,10 +460,8 @@ class TestTheIdentifierVerdictIsDecidedOnce:
         factors = {"filename": [f"img_{i:04d}.png" for i in range(60)], "weather": ["a", "b"] * 30}
         md = _od([1] * 60, factors)
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            with pytest.raises(UserWarning):
-                _ = md.factor_names
+        with warnings.catch_warnings(action="error"), pytest.raises(UserWarning):
+            _ = md.factor_names
 
         assert md.factor_names == ["weather"]
 

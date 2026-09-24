@@ -1420,8 +1420,7 @@ class TestNormalizePixelValues:
         """Explicit normalize_pixel_values should not warn."""
         import warnings
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", FutureWarning)
+        with warnings.catch_warnings(action="error", category=FutureWarning):
             compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=True)
             compute_stats(uint8_images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
 
@@ -2073,8 +2072,7 @@ class TestBackgroundEdgeCases:
 
     def test_empty_datum_reports_no_fraction_and_stays_quiet(self):
         """A datum with no pixels has no background to report, and nothing to warn about."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
+        with warnings.catch_warnings(action="error"):
             result = compute_stats(
                 [np.zeros((3, 0, 0))],
                 boxes=[[(0, 0, 1, 1)]],
@@ -2652,20 +2650,20 @@ class TestPerGroupStatsValidation:
 
     def test_the_remedy_that_returns_the_column_survives_strict_filters(self):
         """Barren's remedy changes what the group measures; this one brings `width` back."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", UserWarning)
-            with pytest.raises(UserWarning, match="nothing computes them"):
-                compute_stats(
-                    self._IMAGE,
-                    stats={"rgb": ImageStats.DIMENSION_WIDTH},
-                    channels={"rgb": [0, 1, 2]},
-                    normalize_pixel_values=False,
-                )
+        with (
+            warnings.catch_warnings(action="error", category=UserWarning),
+            pytest.raises(UserWarning, match="nothing computes them"),
+        ):
+            compute_stats(
+                self._IMAGE,
+                stats={"rgb": ImageStats.DIMENSION_WIDTH},
+                channels={"rgb": [0, 1, 2]},
+                normalize_pixel_values=False,
+            )
 
     def test_no_warning_when_the_whole_image_entry_asks_for_it(self):
         """A caller who arranged to get `width` has already answered the question."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", UserWarning)
+        with warnings.catch_warnings(action="error", category=UserWarning):
             compute_stats(
                 self._IMAGE,
                 stats={None: ImageStats.DIMENSION_WIDTH, "rgb": ImageStats.PIXEL_MEAN | ImageStats.DIMENSION_WIDTH},
@@ -2741,8 +2739,7 @@ class TestEmptyStatsRequest:
         which makes an empty entry a deliberate statement rather than an oversight, and
         telling it to request PIXEL, VISUAL or HASH would answer a question it did not ask.
         """
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", UserWarning)
+        with warnings.catch_warnings(action="error", category=UserWarning):
             result = compute_stats(
                 self._IMAGE,
                 stats={None: ImageStats.DIMENSION_WIDTH, "ir": ImageStats.NONE},
@@ -2992,8 +2989,7 @@ class TestPresenceStatisticsReadTheRawView:
         """Data with no readable range is still present, so nothing is missing."""
         images = np.random.default_rng(0).random((2, 3, 8, 8)) * 1000.0  # float beyond [0, 255]
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             aggregate = compute_stats(images, stats=ImageStats.PIXEL_MISSING, normalize_pixel_values=True)["stats"]
 
         assert np.all(np.asarray(aggregate["missing"]) == 0.0), "an unreadable range is not missing data"
@@ -3002,8 +2998,7 @@ class TestPresenceStatisticsReadTheRawView:
         """A declared range starting below zero must not move which pixels count as zero."""
         images = np.zeros((1, 3, 4, 4))
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             aggregate = compute_stats(
                 images,
                 stats=ImageStats.PIXEL_ZEROS,
@@ -3050,8 +3045,7 @@ class TestRegressionsAgainstV1_0:
         """
         image = np.linspace(-50.0, 50.0, 64).reshape(8, 8)  # 2-D, negative, so no readable range
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings(action="ignore"):
             pixel = compute_stats([image], stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=True)["stats"]
             visual = compute_stats([image], stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=False)["stats"]
 

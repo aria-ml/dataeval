@@ -18,7 +18,7 @@ variables:
   DOCS_SKIP_CLEAN_PATTERN: '/\+skipdocsclean/'
 
 .python_versions: &python_versions
-  - PYTHON_VERSION: ['3.10', '3.11', '3.12', '3.13', '3.14']
+  - PYTHON_VERSION: ['3.11', '3.12', '3.13', '3.14']
 
 workflow:
   # Allows jobs in this workflow to be interrupted:
