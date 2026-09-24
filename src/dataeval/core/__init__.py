@@ -1,6 +1,7 @@
 """Core stateless functions for performing dataset, metadata and model evaluation."""
 
 __all__ = [
+    "AnnotationDivergence",
     "BERResult",
     "ClusterResult",
     "ClusterStats",
@@ -32,6 +33,8 @@ __all__ = [
     "SubsequenceAlignment",
     "TrackStatsResult",
     "align_subsequence",
+    "annotation_divergence",
+    "annotation_fingerprint",
     "ber_knn",
     "ber_mst",
     "cluster",
@@ -51,6 +54,7 @@ __all__ = [
     "feature_distance",
     "factor_deviation",
     "factor_predictors",
+    "frame_annotation_hash",
     "hamming_distance",
     "hash_groups",
     "hash_neighbors",
@@ -91,6 +95,12 @@ __all__ = [
 ]
 
 from dataeval.core._alignment import SubsequenceAlignment, align_subsequence
+from dataeval.core._annotation_match import (
+    AnnotationDivergence,
+    annotation_divergence,
+    annotation_fingerprint,
+    frame_annotation_hash,
+)
 from dataeval.core._ber import BERResult, ber_knn, ber_mst
 from dataeval.core._bin import is_continuous
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats

@@ -28,7 +28,10 @@
 # %% [markdown]
 # ### When to use
 #
-# The Duplicates class should be used if you need to find duplicate images in your dataset.
+# The Duplicates class should be used if you need to find duplicate images in your dataset. It also looks past pixels:
+# when your dataset carries object detection targets, it checks whether two items share one annotation (a synthetic
+# copy) or share pixels but disagree on annotation (one collect labeled twice) - see the annotation duplicates
+# section below.
 
 # %% [markdown]
 # ### What you will need
@@ -54,6 +57,8 @@ except Exception:
     pass
 
 # %%
+from dataclasses import dataclass
+
 import numpy as np
 from IPython.display import display
 from maite_datasets.image_classification import MNIST
@@ -61,6 +66,7 @@ from maite_datasets.image_classification import MNIST
 from dataeval import Metadata
 from dataeval.config import set_max_processes
 from dataeval.data import Indices, View
+from dataeval.protocols import DatasetMetadata, DatumMetadata
 from dataeval.quality import Duplicates
 
 set_max_processes(4)
@@ -127,6 +133,84 @@ assert results.exact
 assert len(results.exact) == len(duplicates)
 for k, v in duplicates.items():
     assert [v, k] in results.exact
+
+
+# %% [markdown]
+# ## Beyond pixels: annotation duplicates
+#
+# MNIST has no object detection targets, so everything above compared pixels only. When a dataset does carry targets
+# (boxes and labels), `Duplicates` also digests the annotation itself - on by default, no argument needed - and two
+# accessors narrow the result to the annotation-driven relations:
+#
+# - `divergent()` - items whose annotation was checked and found to disagree: one collect labeled two different ways.
+# - `augmented()` - items sharing one annotation over different pixels: the signature of a synthetic copy.
+#
+# Build a tiny object detection dataset with one pair of each to see both.
+
+
+# %%
+@dataclass
+class BoxTarget:
+    """A minimal object detection target: boxes, labels, and scores."""
+
+    boxes: np.ndarray
+    labels: np.ndarray
+    scores: np.ndarray
+
+
+class TinyObjectDetectionDataset:
+    """Four items as two duplicate pairs: one relabeled, one augmented."""
+
+    def __init__(self, images: list[np.ndarray], boxes: list[list[list[float]]], labels: list[list[int]]) -> None:
+        self._images = images
+        self._boxes = boxes
+        self._labels = labels
+        self.metadata: DatasetMetadata = DatasetMetadata(id="tiny-od", index2label={0: "object"})
+
+    def __len__(self) -> int:
+        return len(self._images)
+
+    def __getitem__(self, index: int) -> tuple[np.ndarray, BoxTarget, DatumMetadata]:
+        item_labels = np.asarray(self._labels[index], dtype=np.intp)
+        target = BoxTarget(
+            boxes=np.asarray(self._boxes[index], dtype=np.float32),
+            labels=item_labels,
+            scores=np.ones(len(item_labels), dtype=np.float32),
+        )
+        return self._images[index], target, DatumMetadata(id=index)
+
+
+rng = np.random.default_rng(0)
+same_image = rng.random((3, 16, 16))
+
+# Items 0, 1: identical pixels, two different boxes drawn for the same collect - a divergent pair.
+# Items 2, 3: identical annotation, two independently sampled images - an augmented pair.
+annotation_images = [same_image, same_image.copy(), rng.random((3, 16, 16)), rng.random((3, 16, 16))]
+annotation_boxes = [[[1.0, 1.0, 6.0, 6.0]], [[9.0, 9.0, 14.0, 14.0]], [[0.0, 0.0, 5.0, 5.0]], [[0.0, 0.0, 5.0, 5.0]]]
+annotation_labels = [[0], [0], [0], [0]]
+
+annotation_ds = TinyObjectDetectionDataset(annotation_images, annotation_boxes, annotation_labels)
+annotation_results = Duplicates(hash_radius=0).evaluate(annotation_ds)
+
+# %% [markdown]
+# `divergent()` finds the pair whose pixels matched but whose annotation did not - a label-quality issue, not a
+# redundancy one.
+
+# %%
+display(annotation_results.divergent())
+
+# %% [markdown]
+# `augmented()` finds the pair whose annotation matched but whose pixels did not - a synthetic copy's signature.
+
+# %%
+display(annotation_results.augmented())
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+assert len(annotation_results.divergent()) == 1
+assert annotation_results.divergent().data()["item_indices"].item().to_list() == [0, 1]
+assert len(annotation_results.augmented()) == 1
+assert annotation_results.augmented().data()["item_indices"].item().to_list() == [2, 3]
 
 # %% [markdown]
 # ## Next steps

@@ -1,10 +1,12 @@
 import logging
+import warnings
 from typing import Any, cast
 
 import numpy as np
 import polars as pl
 import pytest
 
+from dataeval import Metadata
 from dataeval.core import align_subsequence, pack_hashes
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._compute_stats import compute_stats
@@ -14,7 +16,12 @@ from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, DuplicatesOutput, _duplicates
 from dataeval.quality._duplicates import (
     SourceIndex,
+    _aligned_digests,
+    _annotation_digests,
+    _as_frames,
+    _as_frames_multi,
     _build_duplicates_dataframe,
+    _datum_keys,
     _dominant,
     _find_hash_groups,
     _merge_near_groups,
@@ -93,6 +100,15 @@ class TestDuplicates:
         near_targets = _get_near_groups(results, "target")
         assert exact_targets.shape[0] == 0
         assert near_targets.shape[0] == 0
+
+    def test_new_axis_columns_present_and_null_for_pixel_only(self):
+        """Plumbing only: the axis-agreement columns exist and stay null until something populates them."""
+        data = np.random.random((20, 3, 16, 16))
+        results = Duplicates().evaluate(np.concatenate((data, data)))
+        frame = results.data()
+        assert "differs_on" in frame.columns
+        assert "annotation_divergence" in frame.columns
+        assert frame["annotation_divergence"].is_null().all()
 
     def test_duplicates_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
@@ -602,7 +618,7 @@ class TestDuplicatesEdgeCases:
         trigger a polars schema-inference ComputeError."""
         item_exact = [[2 * i, 2 * i + 1] for i in range(101)]
         item_near = [((1000, 1001), "phash")]
-        df = _build_duplicates_dataframe(
+        df, _ = _build_duplicates_dataframe(
             item_exact=item_exact,
             item_near_method_groups=item_near,
             target_exact=None,
@@ -969,7 +985,7 @@ class TestDuplicatesLevelViews:
 @pytest.mark.required
 def test_aggregate_by_group_carries_orientation_for_d4_hashes():
     """D4 hashing records which rotation/flip matched, and the summary keeps that column."""
-    df = _build_duplicates_dataframe(
+    df, _ = _build_duplicates_dataframe(
         item_exact=[[0, 1], [2, 3]],
         item_near_method_groups=[((4, 5), "phash_d4")],
         target_exact=None,
@@ -988,7 +1004,7 @@ def test_aggregate_by_group_carries_orientation_for_d4_hashes():
 @pytest.mark.required
 def test_aggregate_by_group_of_an_empty_d4_result_keeps_the_orientation_column():
     """The empty frame is built from the same schema, so readers see the same columns."""
-    df = _build_duplicates_dataframe(
+    df, _ = _build_duplicates_dataframe(
         item_exact=[[0, 1]],
         item_near_method_groups=[((2, 3), "phash_d4")],
         target_exact=None,
@@ -1145,8 +1161,16 @@ class _ReplayStream:
             yield _ReplayFrame(index, pixels, self._timed)
 
 
-def make_tracking_dataset(sequences, shape=(3, 24, 32), timed=True) -> Any:
-    """A MAITE-shaped tracking dataset whose frames replay the given fill values."""
+def make_tracking_dataset(sequences, shape=(3, 24, 32), timed=True, annotate=None) -> Any:
+    """A MAITE-shaped tracking dataset whose frames replay the given fill values.
+
+    ``annotate`` gives the per-frame values each sequence's annotation is derived from, and
+    defaults to the sequence's own frames: boxes follow the content, so two videos are annotated
+    alike exactly when they hold the same frames. An annotation identical in every video would
+    make every video an annotation duplicate of every other video of the same length. Pass it to
+    annotate one video as though it held another's frames -- the augmented copy, whose annotation
+    matches and whose pixels do not.
+    """
     from dataclasses import dataclass
     from typing import Any as _Any
 
@@ -1172,19 +1196,21 @@ def make_tracking_dataset(sequences, shape=(3, 24, 32), timed=True) -> Any:
         def __getitem__(self, index):
             return self._data[index]
 
-    def target():
+    def target(value):
+        shift = int(np.mean(value)) % 11
         return _FrameTarget(
             track_ids=np.zeros(1, dtype=np.int64),
-            boxes=np.array([[1.0, 2.0, 9.0, 10.0]], dtype=np.float32),
+            boxes=np.array([[1.0 + shift, 2.0 + shift, 9.0 + shift, 10.0 + shift]], dtype=np.float32),
             scores=np.ones(1, dtype=np.float32),
             labels=np.zeros(1, dtype=np.int64),
         )
 
     data: list[_Any] = []
-    for index, values in enumerate(sequences):
+    annotate = sequences if annotate is None else annotate
+    for index, (values, annotation) in enumerate(zip(sequences, annotate, strict=True)):
         data.append((
             _ReplayStream(values, shape, timed),
-            _VideoTarget(frame_tracks=[target() for _ in values]),
+            _VideoTarget(frame_tracks=[target(value) for value in annotation]),
             {"id": f"v{index}"},
         ))
     return _Dataset(data)
@@ -2195,7 +2221,8 @@ class TestAggregateByPair:
         assert pairs.shape[0] == 1
         row = pairs.row(0, named=True)
         assert (row["item_a"], row["item_b"]) == (0, 1)
-        assert row["relations"] == ["exact"]
+        # One row, both relations: the copy holds the same frames and carries the same annotation.
+        assert row["relations"] == ["annotation", "exact"]
 
     def test_frame_level_pairs_count_the_frames_they_share(self):
         pairs = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(self._copies()).aggregate_by_pair("unit")
@@ -2568,3 +2595,904 @@ class TestDeduplicate:
         result = Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0).evaluate(np.concatenate((data, data)))
         kept = View(np.concatenate((data, data)), Indices(result.deduplicate().keep))
         assert len(kept) == 6
+
+
+@pytest.mark.required
+class TestAnnotationDigests:
+    """`_annotation_digests` reads boxes and labels off targets, never off pixels or frames."""
+
+    def test_agrees_for_identical_annotation_and_differs_for_different(self, get_mock_od_dataset):
+        images = [np.zeros((3, 16, 16)) for _ in range(3)]
+        labels = [[0], [0], [1]]
+        bboxes = [[[0, 0, 5, 5]], [[0, 0, 5, 5]], [[1, 1, 6, 6]]]
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+
+        measured, _, _ = _as_frames(dataset, None, "test")
+        digests = _annotation_digests(measured)
+
+        assert len(digests) == len(dataset)
+        assert all(isinstance(d, str) and len(d) == 16 for d in digests.values())
+        assert digests[0] == digests[1]
+        assert digests[0] != digests[2]
+
+    def test_empty_for_a_dataset_with_no_annotation(self):
+        """A plain image dataset makes the annotation axis self-disable rather than error."""
+        dataset = MockDataset()
+        measured, _, _ = _as_frames(dataset, None, "test")
+        assert _annotation_digests(measured) == {}
+
+    def test_multi_dataset_digests_use_one_flattened_numbering(self, get_mock_od_dataset):
+        """Cross-dataset annotation collision is the single most useful relation here.
+
+        `_as_frames_multi` returns a plain `list` of prepared datasets rather than one dataset,
+        so this must not silently come back empty the way it would if a list were treated as an
+        item that carries no target.
+        """
+        first = get_mock_od_dataset(
+            [np.zeros((3, 16, 16)), np.zeros((3, 16, 16))],
+            [[0], [0]],
+            [[[0, 0, 5, 5]], [[1, 1, 6, 6]]],
+        )
+        second = get_mock_od_dataset([np.zeros((3, 16, 16))], [[0]], [[[0, 0, 5, 5]]])
+
+        measured, _, _ = _as_frames_multi([first, second], None, "test")
+        digests = _annotation_digests(measured)
+
+        assert len(digests) == 3
+        assert digests[0] == digests[2]  # first dataset's item 0 and second dataset's only item
+        assert digests[0] != digests[1]
+
+    def _undecodable_tracking_dataset(self, sequences: list[list[int]]):
+        """A tracking dataset whose every stream raises if anything so much as measures it.
+
+        `sequences` is one per-frame list of track ids per sequence, e.g. `[[0, 0], [0, 1]]` for
+        a two-frame sequence whose track continues, next to one whose track ends after frame 0
+        and a new one starts in frame 1. Boxes and labels are identical in every frame regardless
+        of `sequences`, so any digest difference below is attributable to track continuity alone.
+
+        `_UndecodableStream` raises from `__len__` and `__getitem__` as well as `__iter__`: a
+        stream is genuinely never touched by an annotation digest, decode-free or not, so nothing
+        should probe it any of these ways.
+        """
+        from dataclasses import dataclass
+
+        @dataclass
+        class _FrameTarget:
+            boxes: np.ndarray
+            labels: np.ndarray
+            scores: np.ndarray
+            track_ids: np.ndarray
+
+        @dataclass
+        class _VideoTarget:
+            frame_tracks: list
+
+        class _UndecodableStream:
+            def __len__(self):
+                raise AssertionError("a video stream's length was read")
+
+            def __getitem__(self, index):
+                raise AssertionError("a video stream was indexed")
+
+            def __iter__(self):
+                raise AssertionError("a video frame was decoded")
+
+        class _Dataset:
+            def __init__(self, data):
+                self._data = data
+                self.metadata = {"id": "videos"}
+
+            def __len__(self):
+                return len(self._data)
+
+            def __getitem__(self, index):
+                return self._data[index]
+
+        def frame(track_id: int) -> "_FrameTarget":
+            return _FrameTarget(
+                boxes=np.array([[1.0, 2.0, 9.0, 10.0]], dtype=np.float32),
+                labels=np.zeros(1, dtype=np.int64),
+                scores=np.ones(1, dtype=np.float32),
+                track_ids=np.array([track_id], dtype=np.int64),
+            )
+
+        data = [
+            (_UndecodableStream(), _VideoTarget(frame_tracks=[frame(t) for t in track_ids]), {"id": f"v{i}"})
+            for i, track_ids in enumerate(sequences)
+        ]
+        return _Dataset(data)
+
+    def test_reads_a_frame_view_without_decoding_any_frame(self):
+        """The strongest proof available: the sequence's stream raises if anything reads it.
+
+        Constructing `SequenceFrames` already costs no decode -- `data/_frames.py` reads frame
+        counts from the targets for exactly that reason -- so the only way this passes is if
+        `_annotation_digests` also stays on the target side, through `source` and `frame_map`,
+        the same route `SequenceFrames.track_map` takes. One digest per sequence, not per frame.
+        """
+        measured, _, _ = _as_frames(self._undecodable_tracking_dataset([[0, 0]]), None, "test")
+        digests = _annotation_digests(measured)
+
+        assert len(digests) == 1
+        assert len(digests[0]) == 16
+
+    def test_track_continuity_changes_the_sequence_digest(self):
+        """Same boxes and labels every frame; one track continues, the other restarts.
+
+        Composing per-frame digests would canonicalize track ids per frame in isolation, so both
+        sequences' single id would canonicalize to 0 in every frame and the two would read alike.
+        Folding a whole sequence through one `annotation_fingerprint` call instead lets the second
+        frame's canonical id depend on the first, so a restarted track reads differently from a
+        continuing one -- which is the entire reason a tracking dataset can be told apart from
+        one that just repeats the same detection every frame.
+        """
+        dataset = self._undecodable_tracking_dataset([[0, 0], [0, 1]])
+        measured, _, _ = _as_frames(dataset, None, "test")
+        digests = _annotation_digests(measured)
+
+        assert set(digests) == {0, 2}  # one representative frame per sequence
+        assert digests[0] != digests[2]
+
+
+@pytest.fixture
+def augmented_pair(get_mock_od_dataset):
+    """One annotation over two different images -- the signature of a synthetic copy."""
+    rng = np.random.default_rng(0)
+    images = [rng.random((3, 16, 16)), rng.random((3, 16, 16))]
+    return get_mock_od_dataset(images, [[0], [0]], [[[0, 0, 5, 5]], [[0, 0, 5, 5]]])
+
+
+@pytest.fixture
+def exact_reingest_pair(get_mock_od_dataset):
+    """The same datum twice over, agreeing on both axes -- a plain re-ingest under a new name."""
+    image = np.random.default_rng(1).random((3, 16, 16))
+    return get_mock_od_dataset([image, image.copy()], [[0], [0]], [[[0, 0, 5, 5]], [[0, 0, 5, 5]]])
+
+
+@pytest.fixture
+def relabeled_pair(get_mock_od_dataset):
+    """One collect annotated twice: identical pixels, one box moved."""
+    image = np.random.default_rng(2).random((3, 16, 16))
+    return get_mock_od_dataset([image, image.copy()], [[0], [0]], [[[0, 0, 5, 5]], [[2, 2, 7, 7]]])
+
+
+@pytest.fixture
+def near_relabeled_pair(get_mock_od_dataset):
+    """The same collect labeled twice, the two copies a re-encode apart.
+
+    One pixel moved, which is enough for xxhash to miss the pair and not enough for phash to:
+    the near group is the only place this V12 pair can be reported at all.
+    """
+    image = np.random.default_rng(5).random((3, 16, 16))
+    re_encoded = image.copy()
+    re_encoded[0, 0, 0] *= 0.5
+    return get_mock_od_dataset([image, re_encoded], [[0], [0]], [[[0, 0, 5, 5]], [[2, 2, 7, 7]]])
+
+
+@pytest.fixture
+def duplicate_images():
+    """Pixels and nothing else, which is what the annotation axis has to stay out of."""
+    data = np.random.default_rng(3).random((6, 3, 16, 16))
+    return np.concatenate((data, data))
+
+
+@pytest.mark.required
+class TestAnnotationRelations:
+    """Grouping on the annotation digest, and what the two axes say about each other."""
+
+    def test_v13_augmented_copy_same_annotation_different_pixels(self, augmented_pair):
+        frame = Duplicates().evaluate(augmented_pair).data()
+        rows = frame.filter(pl.col("methods").list.contains("annotation"))
+        assert len(rows) == 1
+        assert rows["item_indices"].item().to_list() == [0, 1]
+        assert rows["differs_on"].item().to_list() == ["content"]
+
+    def test_v14_identity_only_both_axes_agree(self, exact_reingest_pair):
+        frame = Duplicates().evaluate(exact_reingest_pair).data()
+        rows = frame.filter(pl.col("methods").list.contains("annotation"))
+        assert rows["differs_on"].item().to_list() == []
+
+    def test_v12_detected_as_annotation_disagreement(self, relabeled_pair):
+        frame = Duplicates().evaluate(relabeled_pair).data()
+        rows = frame.filter(pl.col("differs_on").list.contains("annotation"))
+        assert len(rows) == 1
+        assert rows["dup_type"].item() == "exact"
+        assert rows["item_indices"].item().to_list() == [0, 1]
+
+    def test_a_near_group_carries_the_annotation_verdict_too(self, near_relabeled_pair):
+        """Pixel proximity says nothing about annotation, so the verdict belongs on `near` rows
+        as much as on `exact` ones. Left null, a pair a JPEG re-encode apart -- the ordinary way
+        one collect labeled twice arrives -- drops out of `divergent()` with nothing about the
+        row looking wrong."""
+        result = Duplicates().evaluate(near_relabeled_pair)
+        rows = result.data().filter(pl.col("dup_type") == "near")
+        assert rows["item_indices"].item().to_list() == [0, 1]
+        assert rows["differs_on"].item().to_list() == ["annotation"]
+        assert rows["annotation_divergence"].item() == 1.0
+        assert len(result.divergent()) == 1
+
+    def test_a_near_group_that_agrees_reads_as_agreement(self, get_mock_od_dataset):
+        """The other half of the same contract: an empty list, not a null and not a flag."""
+        image = np.random.default_rng(5).random((3, 16, 16))
+        re_encoded = image.copy()
+        re_encoded[0, 0, 0] *= 0.5
+        data = get_mock_od_dataset([image, re_encoded], [[0], [0]], [[[0, 0, 5, 5]], [[0, 0, 5, 5]]])
+        rows = Duplicates().evaluate(data).data().filter(pl.col("dup_type") == "near")
+        assert rows["differs_on"].item().to_list() == []
+
+    def test_a_relabeled_pair_is_not_an_annotation_group(self, relabeled_pair):
+        """Different annotation, so there is nothing for the annotation axis to group."""
+        frame = Duplicates().evaluate(relabeled_pair).data()
+        assert frame.filter(pl.col("methods").list.contains("annotation")).is_empty()
+
+    def test_plain_image_dataset_is_unchanged(self, duplicate_images):
+        frame = Duplicates().evaluate(duplicate_images).data()
+        assert frame.filter(pl.col("methods").list.contains("annotation")).is_empty()
+        assert frame["differs_on"].is_null().all()
+
+    def test_the_annotation_axis_crosses_datasets(self, augmented_pair, get_mock_od_dataset):
+        """Train/test leakage by annotation is the relation worth crossing datasets for."""
+        other = get_mock_od_dataset([np.random.default_rng(4).random((3, 16, 16))], [[0]], [[[0, 0, 5, 5]]])
+        frame = Duplicates().evaluate(augmented_pair, other).data()
+        rows = frame.filter(pl.col("methods").list.contains("annotation"))
+        assert len(rows) == 1
+        assert rows["item_indices"].item().to_list() == [0, 1, 0]
+        assert rows["dataset_indices"].item().to_list() == [0, 0, 1]
+
+    def test_crossing_datasets_survives_a_per_target_run(self, augmented_pair, get_mock_od_dataset):
+        """Item indices are offset by stats rows, which count the detections once targets are
+        measured, and the digests are offset by item counts. Unreconciled, the second dataset's
+        digests name the first dataset's items."""
+        other = get_mock_od_dataset([np.random.default_rng(4).random((3, 16, 16))], [[0]], [[[0, 0, 5, 5]]])
+        frame = Duplicates().evaluate(augmented_pair, other, per_image=True, per_target=True).data()
+        rows = frame.filter(pl.col("methods").list.contains("annotation"))
+        assert rows["item_indices"].item().to_list() == [0, 1, 0]
+        assert rows["dataset_indices"].item().to_list() == [0, 0, 1]
+
+    def test_no_pixel_verdict_without_a_pixel_digest(self, exact_reingest_pair):
+        """A perceptual hash never says two images are identical, so a run holding only one has no
+        evidence either way -- and null must stay distinguishable from an empty list, which is the
+        checked-and-agreed answer."""
+        rows = (
+            Duplicates(flags=ImageStats.HASH_PHASH)
+            .evaluate(exact_reingest_pair)
+            .data()
+            .filter(pl.col("methods").list.contains("annotation"))
+        )
+        assert len(rows) == 1
+        assert rows["differs_on"].item() is None
+        exact = Duplicates().evaluate(exact_reingest_pair).data()
+        assert exact.filter(pl.col("methods").list.contains("annotation"))["differs_on"].item().to_list() == []
+
+    def test_digests_are_dropped_when_the_items_do_not_account_for_them(self):
+        """The re-keying is positional, so a run that measured fewer items than the digests were
+        keyed against cannot name any of them. Handing them back unchanged is not the cautious
+        answer -- it names the wrong items just as confidently, only at a different offset."""
+        source_index = [SourceIndex(0, None, None), SourceIndex(5, None, None)]
+        assert _aligned_digests(source_index, {0: "a", 1: "b", 2: "c"}, 3) == {}
+        assert _aligned_digests(source_index, {0: "a", 1: "b"}, 2) == {0: "a", 5: "b"}
+
+    def test_digests_stand_when_nothing_was_measured(self):
+        """A cluster-only run measures no rows, so there is no stats numbering to reconcile
+        against and the flattened item keys are already the ones its walk uses."""
+        assert _aligned_digests([], {0: "a", 1: "b"}, 2) == {0: "a", 1: "b"}
+
+    def test_a_re_detection_keeps_the_annotation_relations(self, augmented_pair):
+        """The dataset is not stored, so a re-detection that did not keep the digests would quietly
+        report fewer relations than the evaluation it came from."""
+        original = Duplicates().evaluate(augmented_pair)
+        for frame in (original.data(), original.with_radius(2).data()):
+            rows = frame.filter(pl.col("methods").list.contains("annotation"))
+            assert len(rows) == 1
+            assert rows["differs_on"].item().to_list() == ["content"]
+
+    def test_the_axis_runs_without_any_hashing(self, get_mock_od_dataset):
+        """Reading a target costs no decode, so hashing is not what the axis depends on -- and a
+        cluster-only run is exactly the pass with the least other evidence to offer. The sibling
+        factor axis is ungated for the same reason."""
+        rng = np.random.default_rng(7)
+        image = rng.random((3, 16, 16))
+        data = get_mock_od_dataset(
+            [image, image.copy(), rng.random((3, 16, 16)), rng.random((3, 16, 16))],
+            [[0]] * 4,
+            [[[0, 0, 5, 5]], [[2, 2, 7, 7]], [[1, 1, 6, 6]], [[3, 3, 8, 8]]],
+        )
+        result = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0).evaluate(data)
+        assert result.annotation_digests
+        assert len(result.annotation_digests) == 4
+        rows = result.data().filter(pl.col("dup_type") == "near")
+        assert rows["item_indices"].item().to_list() == [0, 1]
+        assert rows["differs_on"].item().to_list() == ["annotation"]
+        assert len(result.divergent()) == 1
+
+    def test_the_axis_groups_without_any_hashing(self, augmented_pair):
+        """Grouping on the digest is a dict lookup, so it is not hashing's to gate either. Pixels
+        went unchecked, which `differs_on` has to report as null rather than as agreement."""
+        result = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0).evaluate(
+            augmented_pair
+        )
+        rows = result.data().filter(pl.col("methods").list.contains("annotation"))
+        assert rows["item_indices"].item().to_list() == [0, 1]
+        assert rows["differs_on"].item() is None
+
+    def test_a_target_only_run_reads_no_annotation(self, augmented_pair):
+        """An annotation digest describes a whole item, so a run reporting neither items nor
+        sequences has nowhere to put one."""
+        frame = Duplicates().evaluate(augmented_pair, levels="target").data()
+        assert frame.filter(pl.col("methods").list.contains("annotation")).is_empty()
+
+    def test_views_narrow_to_their_relation(self, relabeled_pair, augmented_pair):
+        assert len(Duplicates().evaluate(relabeled_pair).divergent()) == 1
+        assert len(Duplicates().evaluate(augmented_pair).augmented()) == 1
+        assert len(Duplicates().evaluate(relabeled_pair).augmented()) == 0
+
+    def test_augmented_excludes_a_run_that_never_checked_content(self, exact_reingest_pair):
+        """A phash-only run takes no content digest, so `differs_on` is null rather than
+        `["content"]` -- and `augmented()` must not read a null row as a match."""
+        result = Duplicates(flags=ImageStats.HASH_PHASH).evaluate(exact_reingest_pair)
+        assert len(result.augmented()) == 0
+
+
+@pytest.fixture
+def relabeled_box_pair(get_mock_od_dataset):
+    """One collect annotated twice: identical pixels and box, one label changed."""
+    image = np.random.default_rng(5).random((3, 16, 16))
+    return get_mock_od_dataset([image, image.copy()], [[0], [1]], [[[0, 0, 5, 5]], [[0, 0, 5, 5]]])
+
+
+#: The columns `aggregate_by_pair` grew for the annotation axis, and nothing else may move.
+DIVERGENCE_COLUMNS = [
+    "frames_compared",
+    "frames_differing",
+    "mean_iou",
+    "boxes_added",
+    "boxes_removed",
+    "labels_changed",
+    "tracks_split",
+]
+
+
+@pytest.mark.required
+class TestAnnotationDivergence:
+    """How far two annotations of one collect disagree, per pair and per group."""
+
+    def test_pair_rows_quantify_annotation_divergence(self, relabeled_pair):
+        """A moved box past the IoU threshold is one box removed and one added, not a relabel."""
+        pairs = Duplicates().evaluate(relabeled_pair).aggregate_by_pair()
+        row = pairs.filter(pl.col("frames_differing") > 0)
+        assert len(row) == 1
+        assert row["frames_compared"].item() == 1
+        assert row["frames_differing"].item() == 1
+        assert row["boxes_added"].item() == 1
+        assert row["boxes_removed"].item() == 1
+        assert row["labels_changed"].item() == 0
+        assert row["tracks_split"].item() == 0
+
+    def test_a_relabeled_box_is_a_matched_pair_with_a_changed_label(self, relabeled_box_pair):
+        """The box is the same box, so it matches -- and the disagreement is the label alone."""
+        pairs = Duplicates().evaluate(relabeled_box_pair).aggregate_by_pair()
+        row = pairs.filter(pl.col("labels_changed") > 0)
+        assert len(row) == 1
+        assert row["labels_changed"].item() == 1
+        assert row["boxes_added"].item() == 0
+        assert row["boxes_removed"].item() == 0
+        assert row["mean_iou"].item() == pytest.approx(1.0)
+
+    def test_a_null_mean_iou_is_not_an_iou_of_zero(self, relabeled_pair):
+        """Nothing matched, so there was nothing to average -- a different claim from "compared,
+        and they do not overlap", which is what 0.0 would say."""
+        pairs = Duplicates().evaluate(relabeled_pair).aggregate_by_pair()
+        assert pairs.filter(pl.col("frames_differing") > 0)["mean_iou"].item() is None
+
+    def test_the_group_row_carries_the_share_of_frames_that_differ(self, relabeled_pair):
+        frame = Duplicates().evaluate(relabeled_pair).data()
+        rows = frame.filter(pl.col("differs_on").list.contains("annotation"))
+        assert rows["annotation_divergence"].item() == pytest.approx(1.0)
+
+    def test_an_agreeing_pair_is_not_measured(self, exact_reingest_pair):
+        """Divergence is taken only where the axis flagged a disagreement. A re-ingest agrees, so
+        its pair rows stay null rather than reporting a measured zero."""
+        result = Duplicates().evaluate(exact_reingest_pair)
+        assert result.data()["annotation_divergence"].is_null().all()
+        pairs = result.aggregate_by_pair()
+        assert not pairs.is_empty()
+        for column in DIVERGENCE_COLUMNS:
+            assert pairs[column].is_null().all()
+
+    def test_a_run_with_no_annotation_axis_only_grows_null_columns(self, duplicate_images):
+        """The regression guard: a plain image run must be what it was, plus nulls."""
+        pairs = Duplicates().evaluate(duplicate_images).aggregate_by_pair()
+        assert not pairs.is_empty()
+        assert pairs.columns[-len(DIVERGENCE_COLUMNS) :] == DIVERGENCE_COLUMNS
+        for column in DIVERGENCE_COLUMNS:
+            assert pairs[column].is_null().all()
+
+    def test_a_re_detection_keeps_the_divergence(self, relabeled_pair):
+        """The annotations are not stored, so a re-detection that did not keep the readings would
+        quietly report fewer figures than the evaluation it came from."""
+        original = Duplicates().evaluate(relabeled_pair)
+        again = original.with_radius(2)
+        assert again.data().filter(pl.col("differs_on").list.contains("annotation"))[
+            "annotation_divergence"
+        ].item() == pytest.approx(1.0)
+        assert again.aggregate_by_pair().filter(pl.col("frames_differing") > 0)["boxes_added"].item() == 1
+
+    def test_two_videos_disagreeing_only_on_track_continuity(self):
+        """Identical pixels and boxes, one track restarted -- the disagreement a tracking dataset
+        can have that an object-detection one cannot. Nothing about a *frame* differs, so the
+        group's ratio is a genuine zero while `tracks_split` carries the finding."""
+        frames = [[(0, 10)], [(0, 20)], [(0, 30)], [(0, 40)], [(0, 50)]]
+        restarted = [[(0, 10)], [(1, 20)], [(1, 30)], [(1, 40)], [(1, 50)]]
+        result = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(
+            make_tracked_dataset([frames, restarted]), per_target=False
+        )
+        groups = result.data().filter(pl.col("differs_on").list.contains("annotation"))
+        assert len(groups) == 1
+        assert groups["annotation_divergence"].item() == 0.0
+        pairs = result.aggregate_by_pair("sequence")
+        row = pairs.filter(pl.col("tracks_split") > 0)
+        assert len(row) == 1
+        assert row["frames_compared"].item() == 5
+        assert row["frames_differing"].item() == 0
+        assert row["tracks_split"].item() == 1
+        assert row["mean_iou"].item() == pytest.approx(1.0)
+
+    def test_pairs_sharing_an_annotation_share_one_comparison(self, monkeypatch, get_mock_od_dataset):
+        """A flagged group is quadratic in pairs but not in comparisons.
+
+        Eight copies of one collect under two label passes imply 28 pairs and hold two
+        annotations, so three ordered annotation pairs are compared -- not 28. Without this the
+        cost is n^2 box matching inside `evaluate`, and a group of a thousand blank frames is a
+        quarter of a minute before `aggregate_by_pair` even gets the chance to refuse it.
+        """
+        image = np.random.default_rng(7).random((3, 16, 16))
+        dataset = get_mock_od_dataset([image.copy() for _ in range(8)], [[0]] * 4 + [[1]] * 4, [[[0, 0, 5, 5]]] * 8)
+
+        compared = []
+        measure = _duplicates.annotation_divergence
+
+        def counted(*args, **kwargs):
+            compared.append(1)
+            return measure(*args, **kwargs)
+
+        monkeypatch.setattr(_duplicates, "annotation_divergence", counted)
+        pairs = Duplicates().evaluate(dataset).aggregate_by_pair()
+
+        assert len(compared) == 3
+        read = pairs.filter(pl.col("frames_compared").is_not_null())
+        assert len(read) == 28
+        assert read.filter(pl.col("labels_changed") > 0).height == 16
+
+    def test_the_axis_crosses_datasets(self, get_mock_od_dataset):
+        """Two splits holding one collect under two annotations is the leakage worth measuring."""
+        image = np.random.default_rng(6).random((3, 16, 16))
+        train = get_mock_od_dataset([image], [[0]], [[[0, 0, 5, 5]]])
+        test = get_mock_od_dataset([image.copy()], [[1]], [[[0, 0, 5, 5]]])
+        pairs = Duplicates().evaluate(train, test).aggregate_by_pair()
+        row = pairs.filter(pl.col("labels_changed") > 0)
+        assert len(row) == 1
+        assert (row["dataset_a"].item(), row["dataset_b"].item()) == (0, 1)
+
+
+@pytest.mark.required
+class TestNarrowedRedetection:
+    """A re-detection off a narrowed view stays at the level the view was taken at.
+
+    The annotation and factor axes both describe a whole datum, and neither is gated by the level
+    branches in ``_find_relations``, so a view narrowed to targets could otherwise grow
+    ``level="item"`` rows it does not itself hold -- contradicting ``_filtered_by_level``'s own
+    promise, which is the contract a reader goes by.
+    """
+
+    @pytest.fixture
+    def annotated_and_labeled(self, get_mock_od_dataset):
+        """Two re-ingests of one datum, with an identifying factor and detections to narrow to.
+
+        Boxes are pinned rather than random so the two items duplicate at the target level as well
+        as the item level -- a target view with no rows of its own would make the pin vacuous.
+        """
+        rng = np.random.default_rng(13)
+        image = rng.random((3, 16, 16))
+        images = [image, image.copy(), rng.random((3, 16, 16))]
+        boxes = [[[0, 0, 8, 8]]] * 3
+        dataset = get_mock_od_dataset(
+            images, [[0], [0], [0]], boxes, [{"timestamp": stamp} for stamp in ("a", "a", "b")]
+        )
+        return dataset, Metadata(dataset, exclude=["id"])
+
+    def test_a_target_view_re_detects_only_targets(self, annotated_and_labeled):
+        data, _ = annotated_and_labeled
+        result = Duplicates().evaluate(data, per_target=True)
+        # There is something to leak, and something to keep: the full result holds both levels.
+        assert set(result.data()["level"].unique().to_list()) == {"item", "target"}
+        assert result.targets.with_radius(4).data()["level"].unique().to_list() == ["target"]
+
+    def test_a_target_view_re_detects_no_factor_rows(self, annotated_and_labeled):
+        data, md = annotated_and_labeled
+        result = Duplicates().evaluate(data, per_target=True, metadata=md, duplicate_factors=["timestamp"])
+        assert not result.data().filter(pl.col("methods").list.contains("factors")).is_empty()
+        assert result.targets.with_radius(4).data()["level"].unique().to_list() == ["target"]
+
+    def test_an_item_view_keeps_the_factor_row_it_holds(self, annotated_and_labeled):
+        """The other half of the same rule: `.items` is at the level the factor row sits at, so
+        the row was never filtered out and a re-detection must still return it."""
+        data, md = annotated_and_labeled
+        result = Duplicates().evaluate(data, per_target=True, metadata=md, duplicate_factors=["timestamp"])
+        rows = result.items.with_radius(4).data().filter(pl.col("methods").list.contains("factors"))
+        assert rows["item_indices"].item().to_list() == [0, 1]
+
+
+@pytest.mark.required
+class TestAnnotationRelationsForVideo:
+    """The same two axes for whole videos, where each keys its sequences on its own frame."""
+
+    def test_two_videos_annotated_alike_differ_only_on_pixels(self):
+        source = _fills(10, 8)
+        dataset = make_tracking_dataset([source, _fills(100, 8)], annotate=[source, source])
+        result = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(dataset)
+        rows = result.data().filter(pl.col("methods").list.contains("annotation"))
+        assert len(rows) == 1
+        assert rows["level"].item() == "sequence"
+        assert rows["item_indices"].item().to_list() == [0, 1]
+        assert rows["differs_on"].item().to_list() == ["content"]
+        # Sequence-level rows carry no frame index, so this result has no `unit_indices` column at
+        # all. The natural next call must survive that rather than raise on the missing column.
+        summary = result.aggregate_by_sequence()
+        assert summary["sequence"].to_list() == [0, 1]
+        assert summary["duplicate_frames"].to_list() == [0, 0]
+        assert summary["shared_with"].to_list() == [1, 1]
+        assert summary["group_count"].to_list() == [1, 1]
+
+    def test_a_re_encoded_video_agrees_on_both_axes(self):
+        source = _fills(10, 8)
+        dataset = make_tracking_dataset([source, list(source)])
+        frame = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(dataset).data()
+        annotation = frame.filter(pl.col("methods").list.contains("annotation"))
+        sequence = frame.filter((pl.col("level") == "sequence") & (pl.col("dup_type") == "exact"))
+        assert annotation["differs_on"].item().to_list() == []
+        assert sequence["differs_on"].item().to_list() == []
+
+    def test_a_sequence_is_named_by_its_sequence_not_by_whichever_frame_keyed_it(self):
+        """The two axes key a sequence on different frames -- the first *annotated* one and the
+        first *measured* one -- so they are compared by the sequence they name instead."""
+        frame_map = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]], dtype=np.intp)
+        assert _datum_keys([0], frame_map, None) == _datum_keys([2], frame_map, None)
+        assert _datum_keys([0], frame_map, None) != _datum_keys([3], frame_map, None)
+
+    def test_one_sequence_number_in_two_datasets_is_two_sequences(self):
+        """Frame maps are laid end to end and their sequence numbering restarts at the boundary."""
+        frame_map = np.array([[0, 0], [0, 1], [0, 0], [0, 1]], dtype=np.intp)
+        assert _datum_keys([0], frame_map, [2, 4]) != _datum_keys([2], frame_map, [2, 4])
+
+
+@pytest.fixture
+def dataset_with_metadata(get_ic_dataset):
+    """Four images, no two alike in pixels, whose factors collide on one identifying pair.
+
+    ``timestamp`` is near-unique -- the kind of factor a collision on actually means something.
+    ``weather`` is the counter-example the axis is opt-in for: everything shares a value.
+    """
+    rng = np.random.default_rng(11)
+    images = [rng.random((3, 16, 16)) for _ in range(4)]
+    dataset = get_ic_dataset(
+        images,
+        metadata=[
+            {"timestamp": "2024-01-01T00:00:00", "weather": "rain"},
+            {"timestamp": "2024-01-01T00:00:00", "weather": "rain"},
+            {"timestamp": "2024-01-02T00:00:00", "weather": "rain"},
+            {"timestamp": "2024-01-03T00:00:00", "weather": "rain"},
+        ],
+    )
+    return dataset, Metadata(dataset, exclude=["id"])
+
+
+@pytest.mark.required
+class TestFactorAxis:
+    """Grouping on the metadata factor row -- the axis that is off until the caller names factors."""
+
+    def test_axis_is_off_unless_factors_are_named(self, dataset_with_metadata):
+        data, md = dataset_with_metadata
+        frame = Duplicates().evaluate(data, metadata=md).data()
+        assert frame.filter(pl.col("methods").list.contains("factors")).is_empty()
+
+    def test_identical_factor_rows_group(self, dataset_with_metadata):
+        data, md = dataset_with_metadata
+        frame = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"]).data()
+        rows = frame.filter(pl.col("methods").list.contains("factors"))
+        assert len(rows) == 1
+        assert rows["item_indices"].item().to_list() == [0, 1]
+        assert rows["level"].item() == "item"
+        assert rows["dup_type"].item() == "factors"
+
+    def test_result_is_attributed_to_the_encoding(self, dataset_with_metadata):
+        data, md = dataset_with_metadata
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"])
+        assert result.meta().state["encoding_digest"] == md.encoding_digest
+
+    def test_unknown_factor_is_refused(self, dataset_with_metadata):
+        data, md = dataset_with_metadata
+        with pytest.raises(KeyError) as excinfo:
+            Duplicates().evaluate(data, metadata=md, duplicate_factors=["not_a_factor"])
+        # The available names come back with the refusal: a factor name is user input, and an
+        # error that does not say what was on offer leaves a typo indistinguishable from a
+        # factor the container never carried.
+        assert "not_a_factor" in str(excinfo.value)
+        assert "timestamp" in str(excinfo.value)
+
+    def test_a_factor_below_the_item_level_is_refused(self, get_mock_od_dataset):
+        """A per-detection factor is null on the item rows, so reading it there would call every
+        item a duplicate of every other. It is refused with the item-level names instead."""
+        rng = np.random.default_rng(12)
+        images = [rng.random((3, 16, 16)) for _ in range(2)]
+        dataset = get_mock_od_dataset(
+            images, [[0, 1], [0]], [[[0, 0, 4, 4], [1, 1, 5, 5]], [[0, 0, 4, 4]]], [{"ts": "a"}, {"ts": "a"}]
+        )
+        md = Metadata(dataset, exclude=["id"])
+        md.add_factors({"detector_score": [0.1, 0.2, 0.3]}, level="instance")
+        assert "detector_score" in md.factor_names
+        with pytest.raises(KeyError, match="detector_score"):
+            Duplicates().evaluate(dataset, metadata=md, duplicate_factors=["detector_score"])
+        # The item-level factor beside it still works, so this is about the level and not the name.
+        result = Duplicates().evaluate(dataset, metadata=md, duplicate_factors=["ts"])
+        assert result.factor_cardinality == {"ts": 1}
+
+    def test_a_useless_factor_says_so_through_its_cardinality(self, dataset_with_metadata):
+        """One value across the corpus groups everything -- the result reports the count that
+        explains why, and refuses to guess a threshold on the caller's behalf."""
+        data, md = dataset_with_metadata
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["weather"])
+        assert result.factor_cardinality == {"weather": 1}
+        rows = result.data().filter(pl.col("methods").list.contains("factors"))
+        assert rows["item_indices"].item().to_list() == [0, 1, 2, 3]
+
+    def test_cardinality_is_reported_for_every_named_factor(self, dataset_with_metadata):
+        data, md = dataset_with_metadata
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp", "weather"])
+        assert result.factor_cardinality == {"timestamp": 3, "weather": 1}
+        # Both factors have to agree, so the collision survives the second column.
+        rows = result.data().filter(pl.col("methods").list.contains("factors"))
+        assert rows["item_indices"].item().to_list() == [0, 1]
+
+    def test_cardinality_is_null_when_the_axis_did_not_run(self, dataset_with_metadata):
+        data, md = dataset_with_metadata
+        assert Duplicates().evaluate(data, metadata=md).factor_cardinality is None
+
+    def test_a_factor_group_makes_no_claim_about_pixels_or_annotation(self, dataset_with_metadata):
+        """`differs_on` is three-state, and a factor collision checks neither other axis."""
+        data, md = dataset_with_metadata
+        frame = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"]).data()
+        rows = frame.filter(pl.col("methods").list.contains("factors"))
+        assert rows["differs_on"].item() is None
+
+    def test_naming_factors_without_metadata_is_refused(self, dataset_with_metadata):
+        data, _ = dataset_with_metadata
+        with pytest.raises(ValueError, match="metadata"):
+            Duplicates().evaluate(data, duplicate_factors=["timestamp"])
+
+    def test_the_axis_refuses_a_cross_dataset_call(self, dataset_with_metadata):
+        """One metadata's item indices address one dataset; read as positions in the
+        concatenation they would name the wrong items."""
+        data, md = dataset_with_metadata
+        with pytest.raises(ValueError, match="one dataset"):
+            Duplicates().evaluate(data, data, metadata=md, duplicate_factors=["timestamp"])
+
+    def test_factor_rows_survive_a_re_detection(self, dataset_with_metadata):
+        data, md = dataset_with_metadata
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"])
+        rows = result.with_radius(4).data().filter(pl.col("methods").list.contains("factors"))
+        assert rows["item_indices"].item().to_list() == [0, 1]
+
+    def test_a_narrowed_view_still_says_the_axis_ran(self, dataset_with_metadata):
+        """`factor_cardinality` is None for "the axis did not run", so a view whose frame still
+        holds the axis's rows must not report None -- that describes a pass that never happened."""
+        data, md = dataset_with_metadata
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"])
+        for view in (result.items, result.crossing, result.divergent()):
+            assert view.factor_cardinality == {"timestamp": 3}
+            assert view.factor_groups == [([0, 1], "factors")]
+        # `items` keeps the factor rows, so the two agree about that view rather than one of them
+        # claiming an axis the other's rows deny.
+        assert not result.items.data().filter(pl.col("methods").list.contains("factors")).is_empty()
+
+    def test_a_narrowed_view_still_says_the_annotation_axis_ran(self, exact_reingest_pair):
+        """The sibling axis has the same contract, and `_with` promises every setting travels."""
+        result = Duplicates().evaluate(exact_reingest_pair)
+        assert result.annotation_digests
+        assert result.items.annotation_digests == result.annotation_digests
+
+    def test_the_axis_runs_without_any_hashing(self, dataset_with_metadata):
+        """Factor collision reads no pixels, so it is available to a run that hashes nothing."""
+        data, md = dataset_with_metadata
+        result = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0).evaluate(
+            data, metadata=md, duplicate_factors=["timestamp"]
+        )
+        rows = result.data().filter(pl.col("methods").list.contains("factors"))
+        assert rows["item_indices"].item().to_list() == [0, 1]
+
+    def test_a_pass_without_metadata_records_no_digest(self, dataset_with_metadata):
+        """A pass handed no metadata records no digest -- and does not carry over the one an
+        earlier pass on the same detector was handed.
+
+        ``"NoneType"`` is how the execution record already renders every null it is given, as
+        ``verify_alignment`` does on the same rows; what matters here is that it is not a digest.
+        """
+        data, md = dataset_with_metadata
+        detector = Duplicates()
+        assert detector.evaluate(data).meta().state["encoding_digest"] == "NoneType"
+        detector.evaluate(data, metadata=md)
+        assert detector.evaluate(data).meta().state["encoding_digest"] == "NoneType"
+
+    def test_every_named_factor_has_to_agree(self, metadata_agreeing_on_one_factor):
+        """Items are duplicates only when all specified factors match."""
+        data, md = metadata_agreeing_on_one_factor
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["site", "day"])
+        assert result.factor_groups == []
+        assert result.data().filter(pl.col("methods").list.contains("factors")).is_empty()
+        # Evaluating 'site' alone yields duplicates, confirming 'day' narrowed the group.
+        alone = Duplicates().evaluate(data, metadata=md, duplicate_factors=["site"])
+        assert alone.factor_groups == [([0, 1], "factors")]
+
+    def test_a_missing_factor_is_not_agreement(self, metadata_with_a_missing_factor):
+        """Items sharing null factor values are not grouped as duplicates."""
+        data, md = metadata_with_a_missing_factor
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["serial"])
+        assert result.factor_groups == []
+
+    def test_a_null_does_not_carry_a_row_that_agrees_elsewhere(self, metadata_with_a_missing_factor):
+        """Items are not grouped when any specified factor is unstated."""
+        data, md = metadata_with_a_missing_factor
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["serial", "day"])
+        assert result.factor_groups == []
+        # Evaluating 'day' alone matches all items, confirming the null factor caused exclusion.
+        assert Duplicates().evaluate(data, metadata=md, duplicate_factors=["day"]).factor_groups == [
+            ([0, 1, 2], "factors")
+        ]
+
+    def test_cardinality_counts_the_rows_that_were_grouped(self, metadata_with_a_missing_factor):
+        """Factor cardinality counts stated values only."""
+        data, md = metadata_with_a_missing_factor
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["serial"])
+        assert result.factor_cardinality == {"serial": 1}
+
+    def test_a_nan_reading_is_not_agreement(self, metadata_with_a_nan_factor):
+        """Items sharing NaN factor values are not grouped as duplicates."""
+        data, md = metadata_with_a_nan_factor
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["reading"])
+        assert result.factor_groups == []
+        assert result.factor_cardinality == {"reading": 1}
+
+
+@pytest.fixture
+def metadata_agreeing_on_one_factor(get_ic_dataset):
+    """Dataset where pairs share at most one factor value."""
+    rng = np.random.default_rng(13)
+    dataset = get_ic_dataset(
+        [rng.random((3, 16, 16)) for _ in range(3)],
+        metadata=[
+            {"site": "north", "day": "mon"},
+            {"site": "north", "day": "tue"},
+            {"site": "south", "day": "mon"},
+        ],
+    )
+    return dataset, Metadata(dataset, exclude=["id"])
+
+
+@pytest.fixture
+def metadata_with_a_missing_factor(get_ic_dataset):
+    """Dataset with null factor values added via add_factors."""
+    rng = np.random.default_rng(14)
+    dataset = get_ic_dataset(
+        [rng.random((3, 16, 16)) for _ in range(3)],
+        metadata=[{"day": "mon"}, {"day": "mon"}, {"day": "mon"}],
+    )
+    metadata = Metadata(dataset, exclude=["id"])
+    metadata.add_factors({"serial": [None, None, "abc"]}, level=metadata.item_level)
+    return dataset, metadata
+
+
+@pytest.fixture
+def metadata_with_a_nan_factor(get_ic_dataset):
+    """Dataset with NaN factor values in a float column."""
+    rng = np.random.default_rng(15)
+    dataset = get_ic_dataset(
+        [rng.random((3, 16, 16)) for _ in range(3)],
+        metadata=[{"day": "mon"}, {"day": "mon"}, {"day": "mon"}],
+    )
+    metadata = Metadata(dataset, exclude=["id"])
+    metadata.add_factors({"reading": [np.nan, np.nan, 3.0]}, level=metadata.item_level)
+    return dataset, metadata
+
+
+@pytest.mark.required
+class TestMetadataOnly:
+    """Tests for evaluating factor duplicates from metadata alone."""
+
+    def test_metadata_alone_finds_factor_groups(self, dataset_with_metadata):
+        _, md = dataset_with_metadata
+        result = Duplicates().evaluate(md, duplicate_factors=["timestamp"])
+        assert result.factor_groups == [([0, 1], "factors")]
+        assert result.factor_cardinality == {"timestamp": 3}
+
+    def test_metadata_alone_makes_no_pixel_claim(self, dataset_with_metadata):
+        """Verifies that evaluating metadata alone reports only factor methods."""
+        _, md = dataset_with_metadata
+        frame = Duplicates().evaluate(md, duplicate_factors=["timestamp"]).data()
+        assert frame["methods"].explode().unique().to_list() == ["factors"]
+        assert frame["dup_type"].unique().to_list() == ["factors"]
+
+    def test_the_result_records_no_statistics(self, dataset_with_metadata):
+        """Verifies that no calculation or cluster results are recorded."""
+        _, md = dataset_with_metadata
+        result = Duplicates().evaluate(md, duplicate_factors=["timestamp"])
+        assert result.calculation_results is None
+        assert result.cluster_result is None
+
+    def test_the_result_is_attributed_to_the_encoding(self, dataset_with_metadata):
+        """Verifies that the result records the metadata encoding digest."""
+        _, md = dataset_with_metadata
+        result = Duplicates().evaluate(md, duplicate_factors=["timestamp"])
+        assert result.meta().state["encoding_digest"] == md.encoding_digest
+
+    def test_naming_no_factors_is_refused(self, dataset_with_metadata):
+        """Verifies that evaluating metadata without duplicate_factors raises ValueError."""
+        _, md = dataset_with_metadata
+        with pytest.raises(ValueError, match="duplicate_factors"):
+            Duplicates().evaluate(md)
+
+    def test_a_second_input_is_refused(self, dataset_with_metadata):
+        _, md = dataset_with_metadata
+        with pytest.raises(ValueError, match="one dataset"):
+            Duplicates().evaluate(md, md, duplicate_factors=["timestamp"])
+
+    def test_a_conflicting_metadata_is_refused(self, dataset_with_metadata, metadata_agreeing_on_one_factor):
+        """Verifies that passing different metadata objects to data and metadata raises ValueError."""
+        _, md = dataset_with_metadata
+        _, other = metadata_agreeing_on_one_factor
+        with pytest.raises(ValueError, match="two different"):
+            Duplicates().evaluate(md, metadata=other, duplicate_factors=["timestamp"])
+
+    def test_passing_the_same_metadata_twice_is_allowed(self, dataset_with_metadata):
+        """Verifies that passing the same metadata instance to data and metadata is accepted."""
+        _, md = dataset_with_metadata
+        result = Duplicates().evaluate(md, metadata=md, duplicate_factors=["timestamp"])
+        assert result.factor_groups == [([0, 1], "factors")]
+
+    def test_a_target_level_is_refused(self, dataset_with_metadata):
+        """Verifies that requesting non-item levels for metadata evaluation raises ValueError."""
+        _, md = dataset_with_metadata
+        with pytest.raises(ValueError, match="item"):
+            Duplicates().evaluate(md, per_target=True, duplicate_factors=["timestamp"])
+        with pytest.raises(ValueError, match="item"):
+            Duplicates().evaluate(md, levels="target", duplicate_factors=["timestamp"])
+
+    def test_the_item_level_may_be_asked_for(self, dataset_with_metadata):
+        _, md = dataset_with_metadata
+        result = Duplicates().evaluate(md, levels="item", duplicate_factors=["timestamp"])
+        assert result.factor_groups == [([0, 1], "factors")]
+
+    def test_deduplicate_needs_no_item_count(self, dataset_with_metadata):
+        """Verifies that deduplicate infers item count directly from metadata."""
+        _, md = dataset_with_metadata
+        plan = Duplicates().evaluate(md, duplicate_factors=["timestamp"]).deduplicate(dup_types="factors")
+        assert plan.discard == [1]
+        assert plan.keep == [0, 2, 3]
+
+    def test_no_hash_radius_warning_is_raised(self, dataset_with_metadata):
+        """Verifies that metadata evaluation raises no hash radius deprecation warning."""
+        _, md = dataset_with_metadata
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", FutureWarning)
+            Duplicates().evaluate(md, duplicate_factors=["timestamp"])
+
+    def test_a_metadata_without_a_level_schema_is_refused(self, dataset_with_metadata):
+        """Verifies that metadata lacking an item-level schema raises TypeError."""
+        _, md = dataset_with_metadata
+
+        class BareMetadata:
+            factor_names = ["timestamp"]
+            factor_data = np.zeros((4, 1), dtype=np.intp)
+            class_labels = np.zeros(4, dtype=np.intp)
+            is_binned = [False]
+
+        with pytest.raises(TypeError, match="dataeval.Metadata"):
+            Duplicates().evaluate(cast(Any, BareMetadata()), duplicate_factors=["timestamp"])

@@ -24,10 +24,16 @@ not a verdict.
 
 ### Duplicates and near-duplicates
 
-{class}`.Duplicates` returns three groups of indices: exact matches (by xxHash),
-near-matches (by perceptual hash with D4 variants for rotation/flip invariance),
-and semantic clusters (by cluster-based grouping). The available actions differ
-by group.
+{class}`.Duplicates` finds collisions in up to three projections of a datum —
+pixels, annotation, and (when asked) metadata factors — and reports which
+projections agreed on each group. The available action differs by *which*
+projection fired and, for a group found one way, by what the *other*
+projections said once checked.
+
+**Pixel relations** come back as one of five `dup_type` values: `exact`
+(byte-identical, by xxHash), `near` (visually similar, by perceptual hash with
+D4 variants for rotation/flip invariance, or by cluster-based grouping in
+embedding space), and, for video, `segment`, `aligned`, and `redundant`.
 
 **Exact duplicates** are unambiguous. An image appearing twice contributes
 nothing new to either training or evaluation. In training data, exact duplicates
@@ -35,7 +41,10 @@ artificially inflate the effective weight of those samples during gradient
 updates. In test data, they introduce data leakage if the duplicate also appears
 in training. Remove all but one instance per exact-match group. The exception is
 when exact duplicates appear with *different labels* — that is a label error,
-not a redundancy issue, and requires human review before any removal.
+not a redundancy issue, and requires human review before any removal. If the
+dataset carries targets, `Duplicates` now surfaces this case directly: an
+exact-match group whose `differs_on` contains `"annotation"` is exactly that
+label-error case, found without any manual cross-check.
 
 **Near-duplicates** require judgment. A perceptual hash match means two images
 are visually similar but not pixel-identical — typically the same image with
@@ -47,17 +56,31 @@ evaluation datasets, near-duplicates between train and test are the primary
 concern — they degrade the validity of held-out metrics, while a near-duplicate
 group sitting entirely within one split does not. However, near-duplicates only
 informs that a duplicate group exists; it does not specify which split each data
-point comes from unless each split is passed in as a separate dataset.
-
-**Semantic clusters** (from cluster-based detection) identify images that are
-different in appearance but close in embedding space — similar scene
+point comes from unless each split is passed in as a separate dataset. Because
+embeddings are approximate, cluster-based matches always report as `near`, even
+at zero embedding distance — these are the **semantic clusters**: images
+different in appearance but close in embedding space (similar scene
 composition, same background type, or same target in very similar
-configurations. These represent redundancy at a higher level of abstraction.
-High semantic redundancy in a region of the feature space means training
-examples are concentrated there at the expense of underrepresented regions. This
-is where {class}`.Prioritize` becomes relevant: rather than deciding which
+configuration). They represent redundancy at a higher level of abstraction, and
+a region of the feature space with heavy semantic redundancy means training
+examples are concentrated there at the expense of underrepresented regions.
+This is where {class}`.Prioritize` becomes relevant: rather than deciding which
 images to delete, use prioritization to select a subset that preserves coverage
 while reducing redundancy.
+
+**Video relations** (`segment`, `aligned`, `redundant`) extend the same
+exact/near judgment to sequences. A `segment` group is a stretch of frames two
+videos share verbatim — treat it like an exact or near match at the frame
+level, and check `dataset_a`/`dataset_b` in `aggregate_by_pair()` for leakage
+the same way. An `aligned` group is the same, but matched under a detected
+warp (reordering, a speed change) — the two videos are not simple
+concatenations of one another, but the shared content is just as real and just
+as worth removing from one side. A `redundant` group is a video repeating
+itself internally — a dwell, a loop — and is reported per sequence by
+`aggregate_by_sequence()`'s `redundant_fraction`, which is a compression
+opportunity rather than a leakage signal: it says how much of a sequence you
+could drop without losing information, not that a split has been
+contaminated.
 
 For large datasets with known high redundancy — full motion video, overhead
 imagery with abundant background, repeated collection passes over the same area
@@ -65,6 +88,70 @@ imagery with abundant background, repeated collection passes over the same area
 reduces the size of the problem that all subsequent evaluators have to process
 and removes the noise that redundant samples introduce into coverage and bias
 metrics. It also helps prevent leakage between dataset splits.
+
+**Annotation collisions** are on by default whenever the dataset carries
+targets — no configuration needed. Each item's boxes, labels, and (for
+tracking data) track ids are reduced to a digest, and items whose digest
+agrees are grouped as `dup_type="annotation"`, whether or not their pixels
+do. Two accessors narrow straight to the cases worth acting on differently:
+
+- **`divergent()`** — groups whose annotation was checked and found to
+  disagree: one collect carrying two conflicting label passes. This is a
+  *label-quality* finding, not a redundancy one. Do not delete either side;
+  route it to human review, using `aggregate_by_pair()`'s divergence columns
+  (below) to see what the disagreement actually consists of before anyone
+  looks at the images.
+- **`augmented()`** — groups sharing one annotation over different pixels: a
+  synthetic copy's signature. Act on it the way you would a near-duplicate for
+  leakage purposes (the two are different pixels, but not independent
+  evidence) and the way you would an exact duplicate for training redundancy
+  (the annotation truly repeats).
+
+**Factor collisions** are the only opt-in projection. Pass
+`duplicate_factors=[...]` naming {class}`.Metadata` factors to `evaluate()`.
+Items are grouped as `dup_type="factors"` only when every named factor agrees.
+Factor names form a conjunction, not alternatives. A pair agreeing on
+`capture_date` but differing on `camera_id` is not grouped. Adding a factor
+narrows existing groups. Items with unstated factors (null or NaN) are excluded
+from grouping. Use this option only with identifying factors, such as capture
+timestamps, GPS fixes, or source filenames. Avoid low-cardinality factors
+describing shared conditions like `weather=rain`, which belong in
+{class}`.Balance` and {class}`.Coverage`. When applicable, factor collision is
+the most efficient detection signal: items sharing identifying attributes
+often represent duplicate decodes of the same capture.
+
+**Reading `differs_on` and the divergence columns.** `methods` says which
+projection(s) found a group; `differs_on` says, for every group, what the
+*other* checked projections concluded. `differs_on` carries three distinct
+states, and treating any two of them alike will misread the result:
+
+- `null` — the axis was **not checked**: that run had no evidence to say
+  either way (no targets, no `duplicate_factors`, or no content digest
+  computed). A row like this drops out of `pl.col("differs_on").list.contains(...)`,
+  which is what `divergent()` and `augmented()` rely on to exclude it.
+- `[]` — **checked, and the members agreed.** An empty list is a positive
+  reading of agreement, not a missing one.
+- `["content"]`, `["annotation"]`, or both — **checked, and they disagreed**
+  on the named axis or axes.
+
+Confusing `null` with `[]` either direction changes what a filter over this
+column means: reading `null` as agreement overstates how clean the dataset
+is, and reading `[]` as "not checked" throws away a real finding.
+
+`annotation_divergence`, populated wherever `differs_on` flags `"annotation"`,
+is the share of compared frames the two annotations disagree about — `0.0` is
+a genuine reading (the two can disagree on track continuity alone, changing no
+single frame), not an absent one. `aggregate_by_pair()` breaks the same
+disagreement down further, into `boxes_added`, `boxes_removed`,
+`labels_changed`, and `tracks_split` per pair, alongside `mean_iou`. On a pair
+row, `mean_iou` is `float | None`, and the two mean different things:
+**`None`** means no box pair matched between the two sides, so there is
+nothing to average — **`0.0`** means pairs matched and do not overlap at all.
+Reading a `None` as `0.0` manufactures a claim of total mismatch out of a
+comparison that never had anything to compare. Through {class}`.Duplicates`
+the `0.0` end is unreachable: matching runs at the default IoU threshold of
+`0.5` and anything below it is counted as an added and a removed box rather
+than as a match, so every averaged `mean_iou` on a pair row is at least `0.5`.
 
 ### Outliers
 
