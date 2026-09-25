@@ -55,7 +55,7 @@ trades one runtime for another.
 _MIN_BAND_YIELD = 1
 """Bucket-count-to-band-count ratio below which the bands stop paying for themselves.
 
-A band ``w`` bits wide sorts the corpus into ``2**w`` buckets, so each band proposes about
+A band ``w`` bits wide sorts the codes into ``2**w`` buckets, so each band proposes about
 ``n / 2**w`` candidates per code and all ``bands`` of them propose ``bands * n / 2**w``. Once
 that reaches ``n`` -- that is, once ``2**w`` falls to ``bands`` -- the index is enumerating as
 many candidates as the scan compares outright, and the scan's tighter inner loop wins.
@@ -65,7 +65,7 @@ _MAX_PAIRS = 10_000_000
 """Default ceiling on the pairs :func:`hash_neighbors` will return before refusing.
 
 Ten million pairs is a few hundred megabytes of result and several times that in transients.
-Real perceptual-hash corpora produce orders of magnitude fewer; reaching this means the input
+Real perceptual-hash datasets produce orders of magnitude fewer; reaching this means the input
 holds large sets of identical hashes, whose pair count is quadratic in their own size and for
 which :func:`hash_groups` is almost always the question actually being asked.
 """
@@ -78,7 +78,7 @@ _BRUTE_FORCE_BLOCK_CELLS = 4_000_000
 
 A fixed *row* count does not: the scan is also the path a radius at or above the digest width
 takes, and that path has no size ceiling above it, so ``rows * n`` grows without bound with the
-corpus. Budgeting cells instead holds every transient the block allocates -- the XOR, its
+input. Budgeting cells instead holds every transient the block allocates -- the XOR, its
 popcount gather and the reduction -- to a constant, whatever ``n`` is.
 """
 
@@ -380,7 +380,7 @@ def _multi_index(
     """Multi-index hashing, yielding each band-and-separation batch of verified pairs.
 
     Yielding rather than accumulating is what bounds memory. The *answer* can be far larger than
-    the input — low-entropy codes put much of the corpus in one band bucket and genuinely do have
+    the input — low-entropy codes put much of the input in one band bucket and genuinely do have
     quadratically many near pairs — so a caller that only needs connectivity must be able to
     consume each batch and drop it. Batches may repeat a pair found in more than one band.
     """
@@ -446,13 +446,13 @@ def _prepare(
 
 
 def _prefer_scan(count: int, width: int, radius: int) -> bool:
-    """Whether the all-pairs scan beats multi-index hashing for this corpus, width and radius.
+    """Whether the all-pairs scan beats multi-index hashing for this code count, width and radius.
 
-    Size alone does not decide it. The scan is quadratic in the corpus whatever the radius, while
+    Size alone does not decide it. The scan is quadratic in ``count`` whatever the radius, while
     the index's cost turns on how finely its bands cut: ``radius + 1`` bands over ``width`` bits
-    are ``width / (radius + 1)`` bits each, and a band that narrow sorts the corpus into only
+    are ``width / (radius + 1)`` bits each, and a band that narrow sorts the codes into only
     ``2 ** that`` buckets. Choosing on ``count`` alone therefore hands the scan the case it loses
-    worst -- a large corpus at the small radii perceptual hashing actually uses, where wide bands
+    worst -- a large input at the small radii perceptual hashing actually uses, where wide bands
     make the index tens of times faster.
 
     Three things send the search to the scan:
@@ -460,7 +460,7 @@ def _prefer_scan(count: int, width: int, radius: int) -> bool:
     - a radius at or above the digest width, where every pair is a neighbor and no blocking
       scheme can narrow anything, and which is also the only radius the pigeonhole argument
       cannot supply enough bands for;
-    - a corpus small enough that the index's grouping costs more than the whole comparison;
+    - an input small enough that the index's grouping costs more than the whole comparison;
     - bands too narrow to pay for themselves, i.e. fewer buckets per band than there are bands.
     """
     if radius >= width:
@@ -488,7 +488,7 @@ def _search(
     ``prune`` is consulted on each batch of candidates *before* they are verified, and keeps the
     ones it returns True for. A caller tracking connectivity uses it to drop pairs whose answer
     cannot change anything, which is what makes low-entropy input — a static camera, where much
-    of the corpus lands in one band bucket — tractable rather than merely bounded.
+    of the input lands in one band bucket — tractable rather than merely bounded.
     """
     if radius == 0 or len(unique) < 2:
         return
@@ -727,7 +727,7 @@ def hash_groups(
         Significant bits per code. When None, all ``W * 64`` are used, which is correct for any
         digest that fills its words. Pass the true width for a digest padded to a word boundary,
         so the padding is not spent on bands of its own -- a band lying wholly in the padding
-        reads the same value from every code, putting the whole corpus in one bucket. Must be
+        reads the same value from every code, putting the whole input in one bucket. Must be
         between 1 and ``W * 64``.
 
     Returns
@@ -785,7 +785,7 @@ def hash_groups(
     if radius >= width:
         # No two codes can differ in more bits than the digest holds, so this radius links all of
         # them into one group. Answering it directly keeps a degenerate query from paying for a
-        # scan that is quadratic in the corpus to rediscover a foregone conclusion.
+        # scan that is quadratic in the input to rediscover a foregone conclusion.
         group = np.sort(positions)
         labels[group] = 0
         _logger.debug("hash_groups: radius %d spans the full %d-bit width; one group", radius, width)
@@ -841,7 +841,7 @@ def hash_neighbors(
         digest that fills its words -- every hash DataEval produces does. Pass the true width for
         a digest padded to a word boundary, so the padding is not spent on a band of its own --
         a band lying wholly in the padding reads the same value from every code, putting the
-        whole corpus in one bucket. Must be between 1 and ``W * 64``.
+        whole input in one bucket. Must be between 1 and ``W * 64``.
     max_pairs : int, default 10000000
         Refuse rather than return more pairs than this. See Notes.
 
@@ -880,10 +880,10 @@ def hash_neighbors(
     substring yields a candidate set that provably contains every true pair, which a popcount
     then filters.
 
-    A blocked all-pairs scan takes over where that stops paying: a corpus of a few hundred, where
+    A blocked all-pairs scan takes over where that stops paying: an input of a few hundred codes, where
     the grouping costs more than the comparison, and a radius large enough that the bands are cut
     too fine to exclude anything. Multi-index hashing narrows as the radius grows -- bands shrink,
-    so more of the corpus shares each one -- and at a radius approaching half the digest width it
+    so more of the input shares each one -- and at a radius approaching half the digest width it
     degenerates into the scan it replaced, which is not a defect but a statement about the
     question: at that radius most pairs *are* neighbors.
 

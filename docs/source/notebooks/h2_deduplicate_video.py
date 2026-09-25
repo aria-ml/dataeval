@@ -30,14 +30,14 @@
 # - Is one object annotated twice, under two track identifiers?
 #
 # The :class:`~dataeval.quality.Duplicates` class answers these questions for a multi-object tracking (MOT) dataset.
-# In this guide you will build a small corpus with known duplicates, run each detection against it, and read the
+# In this guide you will build a small dataset with known duplicates, run each detection against it, and read the
 # results.
 
 # %% [markdown]
 # ### When to use
 #
 # Use this guide when you work with full-motion video (FMV) or any multi-object tracking (MOT) dataset and you need to
-# know what the corpus contains before you split it or train on it. For still images, use
+# know what the dataset contains before you split it or train on it. For still images, use
 # [How to identify duplicates](./h2_deduplicate.py), which covers the same class on simpler, image-level cases.
 
 # %% [markdown]
@@ -88,7 +88,7 @@ set_max_processes(4)
 pl.Config.set_tbl_width_chars(160)
 
 # %% [markdown]
-# ## Building a corpus with known duplicates
+# ## Building a dataset with known duplicates
 #
 # FMV datasets with labeled duplicates are not readily available, so you will synthesize four short sequences. Each
 # one is a textured ground plane with two objects moving across it, and each one is given a different coarse layout.
@@ -186,7 +186,7 @@ class VideoDataset:
 
 
 # %% [markdown]
-# The corpus holds four training sequences with three kinds of duplication built into them:
+# The dataset holds four training sequences with three kinds of duplication built into them:
 #
 # | # | Sequence | Contents |
 # | --- | --- | --- |
@@ -289,7 +289,7 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
 # ```
 
 # %% [markdown]
-# ## Triaging the corpus
+# ## Triaging the dataset
 #
 # Start with the per-sequence summary. It gives one row per sequence and tells you which sequences are worth
 # investigating.
@@ -317,7 +317,7 @@ display(summary)
 #   while the same number of frames spread over ten short runs is ten.
 #
 # `duplicate_frames` counts only frames matched in another sequence. Consecutive frames of almost any video
-# resemble one another within a usable `hash_radius`, so counting that resemblance here would make a corpus of
+# resemble one another within a usable `hash_radius`, so counting that resemblance here would make a dataset of
 # unrelated videos read as fully duplicated. It is self-redundancy, and `redundant_fraction` already reports it.
 
 # %% [markdown]

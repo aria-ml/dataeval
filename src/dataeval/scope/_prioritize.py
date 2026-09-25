@@ -405,7 +405,7 @@ class Prioritize(Evaluator):
         Optional reference dataset or pre-computed embeddings. When provided,
         incoming datasets will be prioritized relative to this reference set.
         Useful for active learning (reference = labeled data) or quality
-        filtering (reference = high-quality corpus).
+        filtering (reference = high-quality dataset).
     config : Prioritize.Config or None, default None
         Optional configuration object with default parameters. Parameters
         specified directly in __init__ will override config defaults.

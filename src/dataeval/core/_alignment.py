@@ -261,7 +261,7 @@ def align_subsequence(
     -----
     **This is a verifier, not a search.** Cost is ``O(N * M)`` unbanded, against the near-linear
     grouping :func:`~dataeval.core.hash_groups` performs, so it belongs at the end of a cascade
-    where an earlier tier has already reduced the corpus to a short list of candidate pairs.
+    where an earlier tier has already reduced the dataset to a short list of candidate pairs.
 
     **An unconstrained warp aligns anything.** Given no ``band``, dynamic time warping will happily
     match one frame of the query against nine hundred of the candidate to save a few bits, and

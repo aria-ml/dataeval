@@ -3237,7 +3237,7 @@ class TestFactorAxis:
         assert result.factor_cardinality == {"ts": 1}
 
     def test_a_useless_factor_says_so_through_its_cardinality(self, dataset_with_metadata):
-        """One value across the corpus groups everything -- the result reports the count that
+        """One value across the dataset groups everything -- the result reports the count that
         explains why, and refuses to guess a threshold on the caller's behalf."""
         data, md = dataset_with_metadata
         result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["weather"])

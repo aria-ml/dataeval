@@ -358,7 +358,7 @@ Embeddings
     - *Coverage and completeness* require that the embedding reflects the
       variation that matters operationally — scene content, target type,
       background, imaging conditions. Self-supervised models (DINO, SimCLR,
-      CLIP) trained on large natural-image corpora are appropriate for general
+      CLIP) trained on large natural-image datasets are appropriate for general
       natural imagery but may fail to encode operationally relevant variation
       in specialized domains (sonar, synthetic aperture radar, infrared).
 

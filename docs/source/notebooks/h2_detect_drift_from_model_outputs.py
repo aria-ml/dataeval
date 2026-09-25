@@ -23,7 +23,7 @@
 # or the original training data. You might only have logs of what the model outputted — class probabilities,
 # logits, embeddings, or hard prediction labels — recorded over time.
 #
-# This "model-free" or "corpus-free" monitoring is critical for real-world observability. Fortunately,
+# Monitoring from outputs alone is critical for real-world observability. Fortunately,
 # DataEval's drift detectors treat raw arrays as first-class citizens. You do not need to wrap a model in
 # a `FeatureExtractor` if you already have the outputs; you can pass numpy arrays directly to `.fit()` and
 # `.predict()`.

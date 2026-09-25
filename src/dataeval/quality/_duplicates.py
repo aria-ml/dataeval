@@ -747,7 +747,7 @@ def _measure_divergence(
     """Measure how far one flagged group's annotations disagree, per pair.
 
     Called only for a group whose ``differs_on`` already says ``"annotation"``. The reading is
-    bounded by those candidates, not by the corpus. Matching boxes across every pair of a large
+    bounded by those candidates, not by the dataset. Matching boxes across every pair of a large
     collection would be unaffordable. The correspondence is not re-derived either. The pixel
     group that produced the candidate already says which data are the same footage, and its
     members, in order, are the two annotations to compare.
@@ -874,7 +874,7 @@ def _build_duplicates_dataframe(  # noqa: C901
     ``annotation_sources`` is what turns a flagged group into a figure. These are the boxes
     themselves, read once off the targets, so a group whose ``differs_on`` says ``"annotation"``
     can also say by how much. Only those groups are measured. The reading is bounded by the
-    flagged candidates, never by the corpus. ``annotation_divergences`` carries readings already
+    flagged candidates, never by the dataset. ``annotation_divergences`` carries readings already
     taken, so a re-detection, which no longer has the annotations to hand, keeps the figures the
     evaluation found.
 
@@ -1383,7 +1383,7 @@ class _HashedRuns(NamedTuple):
     bits : int or None
         Significant bits per digest, or None when nothing was measured anywhere. Passed to the
         searches so a digest padded to a word boundary does not spend bands on bits that are zero
-        in every code -- a band lying wholly in the padding puts the whole corpus in one bucket.
+        in every code -- a band lying wholly in the padding puts the whole dataset in one bucket.
     """
 
     method: str
@@ -1405,7 +1405,7 @@ def _sequence_frames(
 
     The shared prologue of redundancy, whole-sequence matching and segment matching: which measured
     rows are whole frames, which sequence each belongs to, and their digests packed for comparison.
-    Shared rather than repeated, so one call does not pack the whole corpus three times over.
+    Shared rather than repeated, so one call does not pack the whole dataset three times over.
     """
     method = next((name for name in _REDUNDANCY_METHODS if name in stats), None)
     if method is None:
@@ -1621,7 +1621,7 @@ def _sharing_runs(
 ) -> list[tuple[int, int]]:
     """Return the pairs of runs sharing any row at all -- the screen before the pairwise search.
 
-    Grouping rather than pairing, so a corpus full of identical frames costs its own size rather
+    Grouping rather than pairing, so a dataset full of identical frames costs its own size rather
     than the square of it. Transitive grouping over-reports, which is the safe direction: a pair
     that shares nothing simply yields no segments.
     """
@@ -2957,7 +2957,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
          - :meth:`aggregate_by_pair`
        * - Is content shared across my splits?
          - ``result.crossing.aggregate_by_pair()``
-       * - How much does each video repeat itself, or the corpus?
+       * - How much does each video repeat itself, or the rest of the dataset?
          - :meth:`aggregate_by_sequence`
        * - Which items should I look at first?
          - :meth:`aggregate_by_image`
@@ -3052,7 +3052,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         How many distinct values each factor named in ``duplicate_factors`` took. None where the
         axis did not run. A diagnostic and not a decision. A factor with a handful of values
         groups items by *condition* rather than by identity. This makes that visible at a glance.
-        It stops a caller wondering why one group holds the corpus.
+        It stops a caller wondering why one group holds the whole dataset.
 
         .. versionadded:: 1.2
     """
@@ -3612,12 +3612,12 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         ``duplicate_frames`` counts distinct frames, so a frame in several groups is counted once.
         It counts only frames shared with a *different* sequence: a frame that merely resembles its
         own neighbor is this sequence repeating itself, which ``redundant_frames`` already
-        reports. Counting both would make a corpus of unrelated videos read as wholly duplicated,
+        reports. Counting both would make a dataset of unrelated videos read as wholly duplicated,
         since consecutive frames of any video resemble one another at a useful ``hash_radius``.
 
         The two columns answer different questions, and both are worth asking: ``redundant_frames``
         is *what this video costs you for nothing*, and ``duplicate_frames`` with ``shared_with``
-        is *what it has in common with the rest of the corpus*.
+        is *what it has in common with the rest of the dataset*.
 
         ``longest_run`` beside ``redundant_fraction`` separates two very different sequences that
         score the same. A high fraction made of one long run is a camera holding still, and dropping
@@ -3696,7 +3696,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         )
         # Only groups reaching *another* sequence count as duplication. A frame that merely
         # resembles its own neighbor is this sequence repeating itself, which `redundant_frames`
-        # already reports -- counting it here too makes an unrelated corpus read as wholly
+        # already reports -- counting it here too makes unrelated videos read as wholly
         # duplicated, which is the opposite of what the column is for.
         shared = exploded.filter(pl.col("dup_type") != "redundant")
         crossing = shared.join(
@@ -4716,7 +4716,7 @@ class Duplicates(Evaluator):
             than reconciling them silently. ``levels`` is the more direct spelling for video,
             where ``per_target=True`` is otherwise the only way to ask for track relations.
 
-            A level not asked for is not searched for: ``levels="sequence"`` over a video corpus
+            A level not asked for is not searched for: ``levels="sequence"`` over a video dataset
             reports which videos duplicate which and pays for no frame-level grouping at all.
 
             None keeps the behavior of whichever of ``per_image``/``per_target`` was given, and

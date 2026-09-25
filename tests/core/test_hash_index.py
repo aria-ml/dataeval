@@ -297,7 +297,7 @@ class TestHashGroups:
 
 @pytest.mark.required
 class TestLowEntropyRegime:
-    """Digests spanning few bits put much of the corpus in one band, which pruning must survive.
+    """Digests spanning few bits put much of the input in one band, which pruning must survive.
 
     This is the FMV case, not a synthetic one: consecutive frames of a static camera differ by a
     handful of bits, so their hashes concentrate rather than spread.
@@ -351,7 +351,7 @@ class TestStrategyAgreement:
         assert indexed["distances"].tolist() == scanned["distances"].tolist()
         assert [g.tolist() for g in indexed_groups["groups"]] == [g.tolist() for g in scanned_groups["groups"]]
 
-    def test_a_corpus_past_the_threshold_uses_the_index_and_still_agrees(self, monkeypatch):
+    def test_an_input_past_the_threshold_uses_the_index_and_still_agrees(self, monkeypatch):
         """At the size the index is actually chosen for, not just the size that fits a scan."""
         rng = np.random.default_rng(21)
         digests = random_hexes(rng, 4200, 16, near=400, duplicates=200)
