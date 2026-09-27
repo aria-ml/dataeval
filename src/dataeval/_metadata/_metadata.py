@@ -3837,6 +3837,71 @@ class Metadata(Array, FeatureExtractor):
             )
         return dict(sorted(entries.items()))
 
+    def unusable_rows(self, factor: str) -> pl.DataFrame:
+        """Where an unusable factor's values sit: one row for each row of its level that holds one.
+
+        :attr:`unusable` says what a column holds -- how many rows read each way, and which
+        distinct values they were. This says where they are: the item each value came from
+        and, for a factor below the item, the key naming its row there (``target_index`` for
+        a detection). It is what finds the records behind a value nobody expected, such as
+        the few rows whose latitude reads ``"N"``, so they can be looked at or fixed where
+        the dataset wrote them.
+
+        Parameters
+        ----------
+        factor : str
+            A factor :attr:`unusable` reports as repairable: one whose values were kept.
+
+        Returns
+        -------
+        pl.DataFrame
+            ``item_index``; the level's key column where the factor sits below the item;
+            ``value``, each value in its text form, the form :attr:`Unusable.distinct` sorts
+            by; and ``kind``, ``"numeric"`` or ``"text"``, as :attr:`Unusable.counts` counts
+            it. Rows in the order the level holds them. Absent values are left out, as they
+            are from both.
+
+        Raises
+        ------
+        ValueError
+            When `factor` is not unusable, or is but kept no values to place.
+
+        Examples
+        --------
+        >>> md.unusable_rows("latitude").filter(pl.col("kind") == "text")  # doctest: +SKIP
+        """
+        self._structure()
+        if (kept := self._unusable_kept(factor)) is None:
+            placeable = sorted(name for name, entry in self.unusable.items() if entry.repairable)
+            raise ValueError(
+                f"{factor!r} is not unusable with its values kept, so it has no rows to place. "
+                f"Those that are: {placeable}.",
+            )
+        level, values = kept
+        key_column = self._address_key_column(level, keyed=level != self._item_level)
+        frame = self._store.select(level, ("item_index",) if key_column is None else ("item_index", key_column))
+        present = [i for i, value in enumerate(values) if not corrections.is_absent(value)]
+        return frame[present].with_columns(
+            pl.Series("value", [str(values[i]) for i in present], dtype=pl.String),
+            pl.Series("kind", [value_kind(values[i]) for i in present], dtype=pl.String),
+        )
+
+    def _unusable_kept(self, factor: str) -> tuple[FactorLevel, list[Any]] | None:
+        """Return an unusable factor's kept values and their level, or None where it kept none.
+
+        The same two kinds :attr:`unusable` reports as repairable, by the same rules: a column
+        held back for mixing numbers with text, and one dropped for naming its rows. A
+        repaired factor is neither any more.
+        """
+        if factor in self._repaired:
+            return None
+        for level, columns in self._unusable_values.items():
+            if factor in columns:
+                return level, list(columns[factor])
+        if "cardinality_over_budget" in self._dropped_factors.get(factor, ()):
+            return self._column_values(factor)
+        return None
+
     def _column_values(self, factor: str) -> tuple[FactorLevel, list[Any]] | None:
         """One column's values as the dataset wrote them, or None where this holds no such column.
 

@@ -15,7 +15,8 @@ from dataeval._metadata._corrections import apply
 from dataeval._metadata._encoding import DESCRIPTOR_VERSION
 from dataeval._metadata._metadata import _kinds
 from dataeval.types import ParseDateTime, ParseValue, Remap, Rescale, Unusable
-from tests.metadata.test_structurers import _mot_dataset
+from tests.embeddings.test_embeddings import MockDataset
+from tests.metadata.test_structurers import _mot_dataset, _od_target
 
 
 def _md(values, **kwargs):
@@ -117,6 +118,39 @@ class TestRepairMakesAHeldBackColumnAFactor:
         md = md.repair([Remap("d", {None: -9, "N": 0})])
         assert len(md.repairs) == 1
         assert md.rows_at("sequence")["d"].to_list() == [-9, 0]
+
+
+@pytest.mark.required
+class TestUnusableRows:
+    """Where an unusable factor's values sit, so the records behind a bad one can be found."""
+
+    def test_each_row_holding_a_value_is_named_by_its_item(self):
+        """Absent rows are left out, as :attr:`unusable` leaves them out of its counts."""
+        rows = _md([1.0, "N", None, "NE"]).unusable_rows("d")
+        assert rows.columns == ["item_index", "value", "kind"]
+        assert rows.rows() == [(0, "1.0", "numeric"), (1, "N", "text"), (3, "NE", "text")]
+
+    def test_a_row_below_the_item_is_named_by_its_key_as_well(self):
+        dataset = MockDataset(["a", "b"], [_od_target(2), _od_target(1)], [{"d": [1.0, "N"]}, {"d": ["NE"]}])
+        rows = Metadata(dataset).unusable_rows("d")
+        assert rows.columns == ["item_index", "target_index", "value", "kind"]
+        assert rows.rows() == [(0, 0, "1.0", "numeric"), (0, 1, "N", "text"), (1, 0, "NE", "text")]
+
+    def test_a_column_dropped_for_naming_its_rows_names_them_too(self):
+        """Its values were kept, like a held-back column's, so they can be found the same way."""
+        values = _timestamps()
+        rows = _md(values).unusable_rows("d")
+        assert rows["item_index"].to_list() == list(range(len(values)))
+        assert rows["value"].to_list() == values
+
+    def test_a_repaired_factor_has_no_unusable_rows(self):
+        md = _md([1.0, "N"]).repair([Remap("d", {None: -1, "N": 0})])
+        with pytest.raises(ValueError, match="not unusable"):
+            md.unusable_rows("d")
+
+    def test_a_factor_that_reads_cleanly_is_refused(self):
+        with pytest.raises(ValueError, match="not unusable"):
+            _md([1.0, 2.0]).unusable_rows("d")
 
 
 @pytest.mark.required
