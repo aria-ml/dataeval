@@ -1,11 +1,14 @@
 """Tests for BoVWExtractor (Bag of Visual Words)."""
 
+import multiprocessing
+
 import numpy as np
 import pytest
 
 pytest.importorskip("cv2", reason="opencv-python not installed")
 
-from dataeval.config import get_seed, set_seed
+from dataeval import Embeddings
+from dataeval.config import get_seed, set_seed, use_max_processes, use_seed
 from dataeval.exceptions import NotFittedError
 from dataeval.extractors._bovw import BoVWExtractor
 
@@ -200,6 +203,19 @@ class TestBoVWExtractor:
         np.testing.assert_array_almost_equal(emb1, emb2)
 
         set_seed(orig)
+
+    def test_parallel_uses_threads_and_matches_serial(self, rgb_images, monkeypatch):
+        """Several workers fit and embed exactly as one does, without starting a process per batch."""
+
+        def embed(processes):
+            with use_max_processes(processes), use_seed(0):
+                extractor = BoVWExtractor(vocab_size=32).fit(rgb_images)
+                return np.asarray(Embeddings(rgb_images, extractor=extractor, batch_size=2)[:])
+
+        serial = embed(1)
+        # OpenCV releases the GIL, so threads parallelize SIFT; a process pool per batch was 14x slower than serial.
+        monkeypatch.setattr(multiprocessing, "get_context", lambda *_: pytest.fail("BoVW started a process pool"))
+        np.testing.assert_array_equal(embed(4), serial)
 
     def test_repr_unfitted(self):
         """Test __repr__ for unfitted extractor."""

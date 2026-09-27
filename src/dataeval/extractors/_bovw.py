@@ -208,7 +208,9 @@ class BoVWExtractor:
             If no SIFT features are found in any image. This typically occurs
             when all images are uniform (e.g., solid color).
         """
-        with PoolWrapper(get_max_processes(), context="spawn") as pool:
+        # Threads, not processes: OpenCV and k-means release the GIL, so threads scale SIFT
+        # without paying process startup and model pickling on every Embeddings batch.
+        with PoolWrapper(get_max_processes(), context="threads") as pool:
             all_descriptors = [
                 des for _, des in sorted(pool.imap_unordered(_extract_single, enumerate(data))) if len(des) > 0
             ]
@@ -269,7 +271,7 @@ class BoVWExtractor:
 
         result = np.zeros((len(images), n_clusters), dtype=np.float32)
 
-        with PoolWrapper(get_max_processes(), context="spawn") as pool:
+        with PoolWrapper(get_max_processes(), context="threads") as pool:
             for idx, histogram in pool.imap_unordered(
                 partial(_transform_single, kmeans=self._kmeans, n_clusters=n_clusters),
                 enumerate(images),
