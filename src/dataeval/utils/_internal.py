@@ -7,6 +7,7 @@ import multiprocessing
 import sys
 from collections.abc import Callable, Iterable, Iterator
 from importlib import import_module
+from multiprocessing.pool import ThreadPool
 from os import cpu_count
 from types import ModuleType
 from typing import Any, Literal, Self, TypeVar, overload
@@ -129,9 +130,14 @@ class PoolWrapper:
     Also supports 'threads' for workloads where the GIL is released during computation.
     """
 
-    def __init__(self, processes: int | None, context: Literal["fork", "spawn"] = DEFAULT_CONTEXT) -> None:
+    def __init__(self, processes: int | None, context: Literal["fork", "spawn", "threads"] = DEFAULT_CONTEXT) -> None:
         procs = 1 if processes is None else max(1, (cpu_count() or 1) + processes + 1) if processes < 0 else processes
-        self._pool = multiprocessing.get_context(context).Pool(procs) if procs > 1 else None
+        if procs <= 1:
+            self._pool = None
+        elif context == "threads":
+            self._pool = ThreadPool(procs)
+        else:
+            self._pool = multiprocessing.get_context(context).Pool(procs)
 
     def imap_unordered(self, func: Callable[[T], R], iterable: Iterable[T]) -> Iterator[R]:
         """Apply `func` to each item in `iterable`, optionally using a pool."""
