@@ -56,13 +56,13 @@ class TestSufficiencyConfigValidation:
     @pytest.mark.parametrize("runs", [-1, 0])
     def test_config_rejects_negative_runs(self, mock_train, mock_eval, runs):
         """Verify config validates runs is positive."""
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match="runs"):
             Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=runs)
 
     @pytest.mark.parametrize("substeps", [-1, 0])
     def test_config_rejects_negative_substeps(self, mock_train, mock_eval, substeps):
         """Verify config validates substeps is positive."""
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match="substeps"):
             Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, substeps=substeps)
 
     def test_config_accepts_positive_values(self, mock_train, mock_eval):

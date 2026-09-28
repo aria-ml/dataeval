@@ -93,6 +93,17 @@ def is_any_metadata_like(candidate: Any) -> TypeIs[AnyMetadataLike]:
     return is_metadata_like(candidate) or isinstance(candidate, ValuedMetadataLike)
 
 
+class BareLabels(NamedTuple):
+    """Class labels, and their names where known: the least a :class:`~dataeval.protocols.LabelsLike` holds.
+
+    What an evaluator wraps a raw label array in before handing it to its own ``from_*`` method, so
+    that method reads one kind of input whichever form the caller gave.
+    """
+
+    class_labels: NDArray[np.intp]
+    index2label: Mapping[int, str] = {}
+
+
 def is_labels_like(candidate: Any) -> TypeIs[LabelsLike]:
     """Whether ``candidate`` carries class labels, whatever else it does or does not.
 

@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 import numpy as np
 import polars as pl
+from pydantic import PositiveInt
 
 from dataeval import Metadata
 from dataeval._helpers import (
@@ -20,6 +21,7 @@ from dataeval._helpers import (
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
 from dataeval.protocols import AnnotatedDataset, AnyMetadataLike
 from dataeval.types import ClassAxis, DictOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types._config import UnitInterval
 
 DEFAULT_BALANCE_NUM_NEIGHBORS = 5
 DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD = 0.3
@@ -268,9 +270,9 @@ class Balance(Evaluator):
             Which representation of each factor to score; see :class:`.Balance`.
         """
 
-        num_neighbors: int = DEFAULT_BALANCE_NUM_NEIGHBORS
-        class_imbalance_threshold: float = DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD
-        factor_correlation_threshold: float = DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD
+        num_neighbors: PositiveInt = DEFAULT_BALANCE_NUM_NEIGHBORS
+        class_imbalance_threshold: UnitInterval = DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD
+        factor_correlation_threshold: UnitInterval = DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD
         label: str | Sequence[str] | None = None
         factor_source: Literal["coded", "values", "auto"] = DEFAULT_BALANCE_FACTOR_SOURCE
 
@@ -306,7 +308,7 @@ class Balance(Evaluator):
             "encoding_digest",
         ]
     )
-    def evaluate(self, data: AnnotatedDataset[Any] | AnyMetadataLike) -> BalanceOutput:  # noqa: C901
+    def evaluate(self, data: AnnotatedDataset[Any] | AnyMetadataLike) -> BalanceOutput:
         """
         Compute normalized mutual information between factors and identify imbalanced classes.
 
@@ -396,13 +398,68 @@ class Balance(Evaluator):
         │ plane      ┆ weather     ┆ 0.0      ┆ false         │
         └────────────┴─────────────┴──────────┴───────────────┘
         """
-        # Convert AnnotatedDataset to Metadata if needed. Either representation counts as
-        # metadata here: `factor_source` decides which one is read, so a container carrying
-        # only measured values must not be mistaken for a dataset and re-derived.
-        if is_any_metadata_like(data):
-            self.metadata = data
-        else:
-            self.metadata = Metadata(data)
+        # Either representation counts as metadata here: `factor_source` decides which one is
+        # read, so a container carrying only measured values must not be mistaken for a dataset
+        # and re-derived.
+        return self.from_metadata(data if is_any_metadata_like(data) else Metadata(data))
+
+    @set_metadata(
+        state=[
+            "num_neighbors",
+            "class_imbalance_threshold",
+            "factor_correlation_threshold",
+            "label",
+            "class_axis",
+            "class_axis_source",
+            "class_axis_level",
+            "factor_source",
+            "encoding_digest",
+        ]
+    )
+    def from_metadata(self, metadata: AnyMetadataLike) -> BalanceOutput:  # noqa: C901
+        """
+        Measure mutual information between the factors and the class axis in metadata you already hold.
+
+        :meth:`evaluate` builds a :class:`~dataeval.Metadata` from a dataset and calls this.
+        Call it directly when the metadata is already built, for example to share one
+        between several evaluators, so it is not built again.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        metadata : AnyMetadataLike
+            A :class:`~dataeval.Metadata`, or any container implementing either metadata
+            protocol: codes (:class:`~dataeval.protocols.CodedMetadataLike`) or measured values
+            (:class:`~dataeval.protocols.ValuedMetadataLike`). ``factor_source`` decides which
+            representation is read.
+
+        Returns
+        -------
+        BalanceOutput
+            The same output :meth:`evaluate` returns for the dataset the metadata describes.
+
+        Raises
+        ------
+        ValueError
+            If the metadata has no factors.
+
+        See Also
+        --------
+        evaluate : Measure a dataset, building its metadata first.
+
+        Examples
+        --------
+        Build the metadata once and share it between the bias evaluators:
+
+        >>> from dataeval import Metadata
+        >>> from dataeval.bias import Diversity, Parity
+        >>> metadata = Metadata(dataset)
+        >>> balance = Balance().from_metadata(metadata)
+        >>> diversity = Diversity().from_metadata(metadata)
+        >>> parity = Parity().from_metadata(metadata)
+        """
+        self.metadata = metadata
 
         if not self.metadata.factor_names:
             raise ValueError("No factors found in provided metadata.")

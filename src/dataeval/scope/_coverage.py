@@ -36,15 +36,17 @@ from typing import Any, Literal, cast
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
+from pydantic import PositiveFloat, PositiveInt
 
 from dataeval import Metadata
-from dataeval._helpers import is_labels_like, reject_filtered_metadata
+from dataeval._helpers import BareLabels, is_labels_like, reject_filtered_metadata
 from dataeval._log import get_logger
 from dataeval.core._completeness import completeness as _completeness
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import AnnotatedDataset, Array, ArrayLike, FeatureExtractor, LabelsLike
 from dataeval.types import ClassAxis, DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types._config import OpenUnitInterval
 
 _logger = get_logger(__name__)
 
@@ -247,13 +249,13 @@ class Coverage(Evaluator):
         """
 
         extractor: FeatureExtractor | None = None
-        batch_size: int | None = None
+        batch_size: PositiveInt | None = None
         method: MethodType = "adaptive"
-        num_observations: int = 20
-        percent: float = 0.01
-        min_class_samples: int = 20
-        isotropy_min_samples: int | None = None
-        near_duplicate_factor: float = 0.5
+        num_observations: PositiveInt = 20
+        percent: OpenUnitInterval = 0.01
+        min_class_samples: PositiveInt = 20
+        isotropy_min_samples: PositiveInt | None = None
+        near_duplicate_factor: PositiveFloat = 0.5
 
     # Set by apply_config from Config.
     extractor: FeatureExtractor | None
@@ -298,37 +300,26 @@ class Coverage(Evaluator):
             _Embeddings(image_source, extractor=self.extractor, batch_size=self.batch_size), dtype=np.float64
         )
 
-    def _resolve_labels(
+    def _labels(
         self,
         dataset: AnnotatedDataset[Any] | LabelsLike | ArrayLike,
         embeddings: Array | None,
-    ) -> tuple[NDArray[np.intp], Mapping[int, str]]:
-        """Read class labels and their names from a dataset/metadata, or accept raw labels.
+    ) -> LabelsLike:
+        """Return the labels ``dataset`` carries, as a labels container :meth:`from_embeddings` reads.
 
-        A full :class:`~dataeval.protocols.AnnotatedDataset`, a :class:`~dataeval.Metadata`,
-        or any object implementing the :class:`~dataeval.protocols.LabelsLike` protocol
-        yields the class labels (and, when available, an ``index2label`` naming). When
-        pre-computed ``embeddings`` are supplied, ``dataset`` may instead be a raw sequence
-        of integer class labels (one per embedding) so no MAITE dataset or metadata object
-        is required; the labels then name themselves by their integer index.
+        A dataset becomes its :class:`~dataeval.Metadata`, and a raw label array is wrapped. Any
+        other labels container passes through as it is, so an axis it records is kept.
         """
-        # A Metadata already carries labels (and is not an AnnotatedDataset), so the branch
-        # below covers it — no separate concrete-Metadata case needed. Labels are the whole
-        # of what is read here, so a container that carries only those is enough.
         if isinstance(dataset, AnnotatedDataset):
             dataset = Metadata(dataset)
-        # Recorded off whatever container the labels actually came from, converted or not:
-        # a pivoted Metadata reports its own axis here, and a raw label array reports none.
-        self._axis_record = getattr(dataset, "class_axis_info", None)
         if is_labels_like(dataset):
-            index2label = getattr(dataset, "index2label", None) or {}
-            return np.asarray(dataset.class_labels, dtype=np.intp), index2label
+            return dataset
         if embeddings is None:
             raise ValueError(
                 "Raw class labels require pre-computed embeddings. Pass embeddings=..., or provide a "
                 "dataset/Metadata so labels and embeddings can be read/computed from it."
             )
-        return np.asarray(dataset, dtype=np.intp).reshape(-1), {}
+        return BareLabels(np.asarray(dataset, dtype=np.intp).reshape(-1))
 
     def _coverage(self, embeddings: NDArray[np.float64]) -> CoverageResult:
         """Run the configured global coverage computation (auto-rescaling to unit interval)."""
@@ -474,8 +465,64 @@ class Coverage(Evaluator):
         """
         reject_filtered_metadata(dataset, "Coverage")
 
-        class_labels, index2label = self._resolve_labels(dataset, embeddings)
-        emb = self._embeddings(dataset, embeddings)
+        labels = self._labels(dataset, embeddings)
+        return self.from_embeddings(self._embeddings(dataset, embeddings), labels)
+
+    @set_metadata(state=["class_axis", "class_axis_source", "class_axis_level"])
+    def from_embeddings(self, embeddings: Array, labels: LabelsLike | None = None) -> CoverageOutput:
+        """
+        Measure coverage from embeddings, and class labels, you already hold.
+
+        :meth:`evaluate` reads or computes both from a dataset and calls this. Call it
+        directly when the embeddings are already computed, for example shared with other
+        evaluators, so they are not extracted again.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        embeddings : Array
+            One embedding per item, shape ``(n_items, n_features)``.
+        labels : LabelsLike or None, default None
+            One class label per embedding, such as a :class:`~dataeval.Metadata` of an
+            image-classification dataset. Its ``index2label``, where it has one, names the
+            classes. When None, every item is one class, ``0``, and the table has one row.
+
+        Returns
+        -------
+        CoverageOutput
+            The same output :meth:`evaluate` returns for the same embeddings and labels.
+
+        Raises
+        ------
+        ShapeMismatchError
+            If ``labels`` does not hold one label per embedding, as with a detection dataset,
+            which has one label per target.
+        ValueError
+            If ``labels`` is a filtered :class:`~dataeval.Metadata`.
+
+        See Also
+        --------
+        evaluate : Measure a dataset, computing its embeddings with the extractor.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> embeddings = np.random.default_rng(0).random((100, 8))
+        >>> result = Coverage().from_embeddings(embeddings)
+        >>> result.data()["class"].to_list()
+        ['0']
+        """
+        reject_filtered_metadata(labels, "Coverage")
+        emb = np.asarray(embeddings, dtype=np.float64)
+        # Recorded off whatever container the labels came from: a pivoted Metadata reports its own
+        # axis here, and a raw label array, or no labels, reports none.
+        self._axis_record = getattr(labels, "class_axis_info", None)
+        if labels is None:
+            class_labels, index2label = np.zeros(len(emb), dtype=np.intp), {}
+        else:
+            class_labels = np.asarray(labels.class_labels, dtype=np.intp)
+            index2label = getattr(labels, "index2label", None) or {}
         if len(emb) != len(class_labels):
             raise ShapeMismatchError(
                 f"Got {len(emb)} embeddings for {len(class_labels)} labels. Coverage assumes one embedding per "

@@ -10,17 +10,18 @@ Licensed under Apache Software License (Apache 2.0)
 __all__ = []
 
 import math
-from dataclasses import dataclass
 from typing import Any, Literal, Self, TypedDict
 
 import numpy as np
 import scipy.stats
 from numpy.typing import NDArray
+from pydantic import PositiveInt
 
 from dataeval.exceptions import NotFittedError
-from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
-from dataeval.types import set_metadata
+from dataeval.types import EvaluatorConfig, set_metadata
+from dataeval.types._config import OpenUnitInterval
 from dataeval.utils.scipy.stats import anderson_ksamp, bws_test, cramervonmises_2samp, ks_2samp, mannwhitneyu
 from dataeval.utils.thresholds import ZScoreThreshold
 
@@ -178,8 +179,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             Shape matches the number of features in the input data.
         """
 
-    @dataclass
-    class Config:
+    class Config(EvaluatorConfig):
         """
         Configuration for DriftUnivariate detector.
 
@@ -202,10 +202,10 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
         """
 
         method: Literal["ks", "cvm", "mwu", "anderson", "bws"] = "ks"
-        p_val: float = 0.05
+        p_val: OpenUnitInterval = 0.05
         correction: Literal["bonferroni", "fdr"] = "bonferroni"
         alternative: Literal["two-sided", "less", "greater"] = "two-sided"
-        n_features: int | None = None
+        n_features: PositiveInt | None = None
         update_strategy: UpdateStrategy | None = None
         extractor: FeatureExtractor | None = None
 
@@ -247,26 +247,13 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
             update_strategy=update_strategy,
         )
 
-        # Validate correction (only used by Univariate)
-        if correction not in ["bonferroni", "fdr"]:
-            raise ValueError("`correction` must be `bonferroni` or `fdr`.")
-
         self.p_val = p_val
         self.correction = correction
         self._n_features = n_features
 
-        # Validate method
-        valid_methods = ["ks", "cvm", "mwu", "anderson", "bws"]
-        if method not in valid_methods:
-            raise ValueError(f"`method` must be one of {valid_methods}, got '{method}'.")
-
         # Check bws availability
         if method == "bws" and not hasattr(scipy.stats, "bws_test"):
             raise ImportError("The 'bws' method requires scipy>=1.12.0.")
-
-        # Validate alternative
-        if alternative not in ["two-sided", "less", "greater"]:
-            raise ValueError("`alternative` must be 'two-sided', 'less', or 'greater'.")
 
         self.method = method
         self.alternative = alternative
@@ -302,6 +289,41 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
                 self._n_features = int(math.prod(self._data[0].shape))
 
         return self._n_features
+
+    @set_metadata
+    def from_embeddings(self, reference: Array, data: Array) -> DriftOutput["DriftUnivariate.Stats"]:
+        """
+        Fit on reference embeddings and test data embeddings in one call.
+
+        The same as ``fit(reference).predict(data)``. Call :meth:`fit` and :meth:`predict`
+        separately to fit once and test several datasets against the same reference.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        reference : Array
+            Embeddings of the reference data, shape ``(n_reference, n_features)``.
+        data : Array
+            Embeddings of the data to test for drift, shape ``(n_data, n_features)``.
+
+        Returns
+        -------
+        DriftOutput[DriftUnivariate.Stats]
+            The output :meth:`predict` returns after :meth:`fit`.
+
+        See Also
+        --------
+        fit : Fit on the reference alone.
+        predict : Test data against the fitted reference.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> rng = np.random.default_rng(0)
+        >>> result = DriftUnivariate().from_embeddings(rng.random((100, 8)), rng.random((50, 8)))
+        """
+        return self.fit(reference).predict(data)
 
     def fit(self, reference_data: Any) -> Self:
         """Fit detector with reference data.

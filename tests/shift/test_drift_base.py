@@ -33,6 +33,7 @@ from dataeval.shift._drift._mmd import DriftMMD
 from dataeval.shift._drift._reconstruction import DriftReconstruction
 from dataeval.shift._drift._univariate import DriftUnivariate
 from dataeval.utils.models import AE
+from dataeval.utils.thresholds import resolve_threshold
 
 
 @pytest.mark.required
@@ -50,15 +51,15 @@ class TestBaseDrift:
         return mock
 
     def test_base_init_update_x_ref_valueerror(self):
-        with pytest.raises(ValueError, match="not a valid UpdateStrategy"):
+        with pytest.raises(ValueError, match="update_strategy"):
             DriftUnivariate(update_strategy="invalid")  # type: ignore
 
     def test_base_init_correction_valueerror(self):
-        with pytest.raises(ValueError, match="must be `bonferroni` or `fdr`"):
+        with pytest.raises(ValueError, match="correction"):
             DriftUnivariate(n_features=2, correction="invalid")  # type: ignore
 
     def test_base_init_extractor_valueerror(self):
-        with pytest.raises(ValueError, match="not a valid FeatureExtractor"):
+        with pytest.raises(ValueError, match="extractor"):
             DriftUnivariate(extractor="invalid")  # type: ignore
 
     def test_base_init_infer_n_features(self):
@@ -351,6 +352,37 @@ class TestChunkedDriftReferenceChunks:
         chunked = DriftUnivariate().chunked(chunk_count=3).fit(self.reference)
         assert chunked._baseline_values is not None
         assert len(chunked._baseline_values) == 3
+
+
+@pytest.mark.required
+class TestChunkedDriftThresholdLike:
+    """chunked() takes the threshold spellings Outliers takes, resolved as resolve_threshold resolves them."""
+
+    reference = np.random.default_rng(0).random((240, 8)).astype(np.float32)
+    test = np.random.default_rng(1).random((120, 8)).astype(np.float32) + 0.2
+
+    @pytest.mark.parametrize("spelling", ["zscore", 2.5, ("zscore", 2.5), ["modzscore", 3.0]], ids=str)
+    def test_a_spelling_gives_the_result_of_its_resolved_threshold(self, spelling):
+        spelled = DriftUnivariate().chunked(chunk_count=6, threshold=spelling).fit(self.reference)
+        resolved = DriftUnivariate().chunked(chunk_count=6, threshold=resolve_threshold(spelling)).fit(self.reference)
+
+        assert spelled._threshold_bounds == resolved._threshold_bounds
+        assert spelled.predict(self.test).details.equals(resolved.predict(self.test).details)
+
+    def test_a_constant_spelling_needs_no_spread(self):
+        chunked = DriftUnivariate().chunked(chunk_size=200, threshold=("constant", (None, 0.5))).fit(self.reference)
+        assert chunked._threshold_bounds == (None, 0.5)
+
+    def test_unset_keeps_the_detector_default(self):
+        default = DriftUnivariate()._default_chunk_threshold()
+        unset = DriftUnivariate().chunked(chunk_count=6).fit(self.reference)
+        explicit = DriftUnivariate().chunked(chunk_count=6, threshold=default).fit(self.reference)
+        assert unset._threshold_bounds == explicit._threshold_bounds
+
+    def test_chunked_drift_takes_a_spelling_directly(self):
+        assert ChunkedDrift(DriftUnivariate(), chunk_count=6, threshold="iqr")._threshold_override == resolve_threshold(
+            "iqr"
+        )
 
 
 @pytest.mark.required

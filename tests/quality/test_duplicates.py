@@ -1081,7 +1081,7 @@ class TestHashRadius:
         assert [sorted(g) for g in result.exact] == [[0, len(images) - 1]]
 
     def test_negative_radius_rejected(self):
-        with pytest.raises(ValueError, match="non-negative"):
+        with pytest.raises(ValueError, match="hash_radius"):
             Duplicates(hash_radius=-1).evaluate(_near_variants())
 
     def test_from_stats_honors_the_radius(self):
@@ -1707,7 +1707,7 @@ class TestAlignmentVerification:
         assert self._rows(dataset, "aligned", verify_alignment=0, min_segment_frames=20).shape[0] == 0
 
     def test_a_negative_threshold_is_rejected_before_anything_is_measured(self):
-        with pytest.raises(ValueError, match="verify_alignment must be non-negative"):
+        with pytest.raises(ValueError, match="verify_alignment"):
             Duplicates(flags=ImageStats.HASH_XXHASH, verify_alignment=-1).evaluate(MockDataset())
 
     def test_alignments_survive_a_redetection(self):
@@ -1765,10 +1765,10 @@ class TestSegmentPolicyValidation:
     @pytest.mark.parametrize(
         ("kwargs", "match"),
         [
-            ({"min_segment_frames": 0}, "min_segment_frames must be at least 1"),
-            ({"max_segment_gap": -1}, "must be non-negative"),
-            ({"segment_offset_tolerance": -1}, "must be non-negative"),
-            ({"verify_alignment": -1}, "verify_alignment must be non-negative"),
+            ({"min_segment_frames": 0}, "min_segment_frames"),
+            ({"max_segment_gap": -1}, "max_segment_gap"),
+            ({"segment_offset_tolerance": -1}, "segment_offset_tolerance"),
+            ({"verify_alignment": -1}, "verify_alignment"),
         ],
     )
     def test_a_nonsense_policy_is_refused_for_image_data(self, kwargs, match):
@@ -1779,8 +1779,8 @@ class TestSegmentPolicyValidation:
     @pytest.mark.parametrize(
         ("kwargs", "match"),
         [
-            ({"min_segment_frames": 0}, "min_segment_frames must be at least 1"),
-            ({"verify_alignment": -1}, "verify_alignment must be non-negative"),
+            ({"min_segment_frames": 0}, "min_segment_frames"),
+            ({"verify_alignment": -1}, "verify_alignment"),
         ],
     )
     def test_a_nonsense_policy_is_refused_for_tracking_data(self, kwargs, match):
@@ -1951,7 +1951,7 @@ class TestTrackDuplicates:
         assert "track_indices" not in rows.columns
 
     def test_a_nonsense_track_length_is_refused_up_front(self):
-        with pytest.raises(ValueError, match="min_track_frames must be at least 1"):
+        with pytest.raises(ValueError, match="min_track_frames"):
             Duplicates(flags=ImageStats.HASH_XXHASH, min_track_frames=0).evaluate(MockDataset())
 
     def test_track_relations_survive_a_redetection(self):

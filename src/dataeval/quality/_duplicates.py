@@ -10,6 +10,7 @@ from typing import Any, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar, 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
+from pydantic import NonNegativeInt, PositiveFloat, PositiveInt
 
 from dataeval import Embeddings
 from dataeval._log import get_logger
@@ -4317,16 +4318,17 @@ class Duplicates(Evaluator):
         """
 
         flags: ImageStats = DEFAULT_DUPLICATES_FLAGS
-        cluster_sensitivity: float | None = DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR
+        cluster_sensitivity: PositiveFloat | None = DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR
         merge_near_duplicates: bool = DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES
-        hash_radius: int = DEFAULT_DUPLICATES_HASH_RADIUS
-        redundancy_radius: int = DEFAULT_DUPLICATES_REDUNDANCY_RADIUS
-        min_segment_frames: int = DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES
-        max_segment_gap: int = DEFAULT_DUPLICATES_MAX_SEGMENT_GAP
-        segment_offset_tolerance: int = DEFAULT_DUPLICATES_SEGMENT_OFFSET_TOLERANCE
-        verify_alignment: int | None = DEFAULT_DUPLICATES_VERIFY_ALIGNMENT
-        min_track_frames: int = DEFAULT_DUPLICATES_MIN_TRACK_FRAMES
-        frame_sample: FrameSample = DEFAULT_DUPLICATES_FRAME_SAMPLE
+        hash_radius: NonNegativeInt = DEFAULT_DUPLICATES_HASH_RADIUS
+        redundancy_radius: NonNegativeInt = DEFAULT_DUPLICATES_REDUNDANCY_RADIUS
+        min_segment_frames: PositiveInt = DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES
+        max_segment_gap: NonNegativeInt = DEFAULT_DUPLICATES_MAX_SEGMENT_GAP
+        segment_offset_tolerance: NonNegativeInt = DEFAULT_DUPLICATES_SEGMENT_OFFSET_TOLERANCE
+        verify_alignment: NonNegativeInt | None = DEFAULT_DUPLICATES_VERIFY_ALIGNMENT
+        min_track_frames: PositiveInt = DEFAULT_DUPLICATES_MIN_TRACK_FRAMES
+        # A stride of at least one frame, or a positive rate in frames per second.
+        frame_sample: PositiveInt | PositiveFloat | FrameSelector | None = DEFAULT_DUPLICATES_FRAME_SAMPLE
 
     stats: StatsResult
     flags: ImageStats
@@ -4562,6 +4564,11 @@ class Duplicates(Evaluator):
         duplicates are returned as **near duplicates** because embeddings are
         approximate representations - identical embeddings don't guarantee
         pixel-identical images.
+
+        An unset ``cluster_sensitivity`` means ``1.0`` here. :meth:`evaluate` reads unset
+        as "skip cluster-based detection", but calling this method asks for it, so it runs
+        with the middle of the typical range instead. The value used is recorded on the
+        output's ``cluster_sensitivity``.
         """
         threshold = self.cluster_sensitivity if self.cluster_sensitivity is not None else 1.0
         cluster_dupes = _find_cluster_duplicates(

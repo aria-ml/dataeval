@@ -2,17 +2,17 @@
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Any, Self, TypedDict
 
 import numpy as np
 import scipy.stats
 from numpy.typing import NDArray
+from pydantic import PositiveFloat, PositiveInt
 
 from dataeval.exceptions import NotFittedError
-from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
-from dataeval.types import set_metadata
+from dataeval.types import EvaluatorConfig, set_metadata
 from dataeval.utils.thresholds import ConstantThreshold
 
 
@@ -128,8 +128,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
             Shape matches the number of features.
         """
 
-    @dataclass
-    class Config:
+    class Config(EvaluatorConfig):
         """Configuration for DriftWasserstein detector.
 
         Attributes
@@ -144,8 +143,8 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
             Feature extractor for transforming input data before drift detection.
         """
 
-        ratio_threshold: float = 1.4
-        n_features: int | None = None
+        ratio_threshold: PositiveFloat = 1.4
+        n_features: PositiveInt | None = None
         update_strategy: UpdateStrategy | None = None
         extractor: FeatureExtractor | None = None
 
@@ -178,8 +177,6 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         if not isinstance(ratio_threshold, float | int) or isinstance(ratio_threshold, bool):
             raise ValueError("`ratio_threshold` must be a positive float.")
-        if ratio_threshold <= 0:
-            raise ValueError(f"`ratio_threshold` must be positive, got {ratio_threshold}.")
 
         self.ratio_threshold = ratio_threshold
         self._n_features = n_features
@@ -231,6 +228,46 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         if self._baseline_distances is None:
             raise NotFittedError("Must call fit() before accessing baseline_distances.")
         return self._baseline_distances
+
+    @set_metadata
+    def from_embeddings(
+        self, reference: Array, validation: Array, data: Array
+    ) -> DriftOutput["DriftWasserstein.Stats"]:
+        """
+        Fit on reference embeddings and test data embeddings in one call.
+
+        The same as ``fit(reference, validation).predict(data)``. Call :meth:`fit` and :meth:`predict`
+        separately to fit once and test several datasets against the same reference.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        reference : Array
+            Embeddings of the reference data, shape ``(n_reference, n_features)``.
+        validation : Array
+            Embeddings of in-distribution data held out from the reference, which set the
+            baseline distance, as :meth:`fit` takes them.
+        data : Array
+            Embeddings of the data to test for drift, shape ``(n_data, n_features)``.
+
+        Returns
+        -------
+        DriftOutput[DriftWasserstein.Stats]
+            The output :meth:`predict` returns after :meth:`fit`.
+
+        See Also
+        --------
+        fit : Fit on the reference alone.
+        predict : Test data against the fitted reference.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> rng = np.random.default_rng(0)
+        >>> result = DriftWasserstein().from_embeddings(rng.random((100, 8)), rng.random((100, 8)), rng.random((50, 8)))
+        """
+        return self.fit(reference, validation).predict(data)
 
     def fit(self, reference_data: Any, validation_data: Any = None) -> Self:
         """Fit detector with training and validation reference data.

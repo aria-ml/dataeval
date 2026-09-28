@@ -2,17 +2,18 @@
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Any, Literal, Self, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
+from pydantic import PositiveInt
 
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
-from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
 from dataeval.shift._shared._kneighbors import KNeighborsScorer
-from dataeval.types import set_metadata
+from dataeval.types import EvaluatorConfig, set_metadata
+from dataeval.types._config import OpenUnitInterval
 from dataeval.utils.scipy.stats import mannwhitneyu
 from dataeval.utils.thresholds import ZScoreThreshold
 
@@ -97,8 +98,7 @@ class DriftKNeighbors(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftKNeigh
             Mean k-NN distance for the test samples.
         """
 
-    @dataclass
-    class Config:
+    class Config(EvaluatorConfig):
         """
         Configuration for DriftKNeighbors detector.
 
@@ -116,9 +116,9 @@ class DriftKNeighbors(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftKNeigh
             Strategy for updating reference data over time.
         """
 
-        k: int = 10
+        k: PositiveInt = 10
         distance_metric: Literal["cosine", "euclidean"] = "euclidean"
-        p_val: float = 0.05
+        p_val: OpenUnitInterval = 0.05
         extractor: FeatureExtractor | None = None
         update_strategy: UpdateStrategy | None = None
 
@@ -155,6 +155,41 @@ class DriftKNeighbors(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftKNeigh
         self._metric_name = "knn_distance"
         self._ref_mean: float = 0.0
         self._ref_std: float = 1.0
+
+    @set_metadata
+    def from_embeddings(self, reference: Array, data: Array) -> DriftOutput["DriftKNeighbors.Stats"]:
+        """
+        Fit on reference embeddings and test data embeddings in one call.
+
+        The same as ``fit(reference).predict(data)``. Call :meth:`fit` and :meth:`predict`
+        separately to fit once and test several datasets against the same reference.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        reference : Array
+            Embeddings of the reference data, shape ``(n_reference, n_features)``.
+        data : Array
+            Embeddings of the data to test for drift, shape ``(n_data, n_features)``.
+
+        Returns
+        -------
+        DriftOutput[DriftKNeighbors.Stats]
+            The output :meth:`predict` returns after :meth:`fit`.
+
+        See Also
+        --------
+        fit : Fit on the reference alone.
+        predict : Test data against the fitted reference.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> rng = np.random.default_rng(0)
+        >>> result = DriftKNeighbors(k=5).from_embeddings(rng.random((100, 8)), rng.random((50, 8)))
+        """
+        return self.fit(reference).predict(data)
 
     def fit(self, reference_data: Any) -> Self:
         """Fit the k-NN drift detector on reference data.

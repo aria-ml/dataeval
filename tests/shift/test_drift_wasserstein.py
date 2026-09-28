@@ -67,7 +67,7 @@ class TestDriftWassersteinValidation:
     """ratio_threshold validation."""
 
     def test_rejects_non_positive(self):
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match="ratio_threshold"):
             DriftWasserstein(ratio_threshold=0.0)
 
     def test_rejects_bool(self):

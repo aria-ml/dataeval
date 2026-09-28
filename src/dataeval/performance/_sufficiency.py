@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable, Sized
 from typing import Any, Generic, TypeVar
 
 import numpy as np
-from pydantic import field_validator
+from pydantic import PositiveInt
 
 from dataeval.performance._aggregator import ResultAggregator
 from dataeval.performance._output import SufficiencyOutput
@@ -171,16 +171,9 @@ class Sufficiency(Evaluator, Generic[T, M]):
         training_strategy: TrainingStrategy[_T] | None = None
         evaluation_strategy: EvaluationStrategy[_T] | None = None
         reset_strategy: Callable[[_M], _M] | None = None
-        runs: int = DEFAULT_SUFFICIENCY_RUNS
-        substeps: int = DEFAULT_SUFFICIENCY_SUBSTEPS
+        runs: PositiveInt = DEFAULT_SUFFICIENCY_RUNS
+        substeps: PositiveInt = DEFAULT_SUFFICIENCY_SUBSTEPS
         unit_interval: bool = DEFAULT_SUFFICIENCY_UNIT_INTERVAL
-
-        @field_validator("runs", "substeps")
-        @classmethod
-        def validate_positive(cls, v: int) -> int:
-            if v <= 0:
-                raise ValueError("must be positive")
-            return v
 
     runs: int
     substeps: int
@@ -216,12 +209,6 @@ class Sufficiency(Evaluator, Generic[T, M]):
         super().__init__(locals(), exclude={"model", "reset_strategy"})
 
         self.reset_strategy = _reset_strategy
-
-        # Validate parameters
-        if self.runs <= 0:
-            raise ValueError(f"runs must be positive, got {self.runs}")
-        if self.substeps <= 0:
-            raise ValueError(f"substeps must be positive, got {self.substeps}")
 
     def _create_schedule(self, schedule: EvaluationSchedule | int | Iterable[int] | None) -> EvaluationSchedule:
         """

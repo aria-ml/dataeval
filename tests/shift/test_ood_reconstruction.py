@@ -82,7 +82,7 @@ def test_custom_loss_fn(mock_train, x_ref):
 @pytest.mark.required
 @patch("dataeval.shift._shared._reconstruction.train")
 def test_custom_optimizer(mock_train, x_ref):
-    mock_opt = MagicMock()
+    mock_opt = MagicMock(spec=torch.optim.Optimizer)
     ae = OODReconstruction(AE(input_shape=input_shape), config=OODReconstruction.Config(optimizer=mock_opt))
     ae.fit(x_ref)
     # Check that the custom optimizer was passed to train

@@ -11,16 +11,18 @@ Licensed under Apache Software License (Apache 2.0)
 __all__ = []
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Literal, Self
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
+from pydantic import PositiveInt
 
 from dataeval.protocols import ArrayLike, DeviceLike, FeatureExtractor
 from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODScoreOutput
 from dataeval.shift._shared._reconstruction import ReconstructionScorer
+from dataeval.types import EvaluatorConfig
+from dataeval.types._config import Percentage, UnitInterval
 from dataeval.utils._array import to_numpy
 
 
@@ -99,7 +101,7 @@ class OODReconstruction(ExtractorMixin, BaseOOD):
     >>> config = OODReconstruction.Config(epochs=20)
     >>> ood = OODReconstruction(vae, model_type="vae", use_gmm=False, threshold_perc=95, config=config)
     >>> ood.fit(train_data)
-    OODReconstruction(loss_fn=None, optimizer=None, epochs=20, batch_size=64, threshold_perc=95, gmm_weight=0.5, gmm_score_mode='standardized', fitted=False)
+    OODReconstruction(loss_fn=None, optimizer=None, epochs=20, batch_size=64, threshold_perc=95.0, gmm_weight=0.5, gmm_score_mode='standardized', fitted=False)
 
     References
     ----------
@@ -112,8 +114,7 @@ class OODReconstruction(ExtractorMixin, BaseOOD):
         https://docs.seldon.ai/alibi-detect
     """  # noqa: E501
 
-    @dataclass
-    class Config:
+    class Config(EvaluatorConfig):
         """
         Configuration for OODReconstruction detector training and threshold computation.
 
@@ -175,10 +176,10 @@ class OODReconstruction(ExtractorMixin, BaseOOD):
 
         loss_fn: Callable[..., torch.Tensor] | None = None
         optimizer: torch.optim.Optimizer | None = None
-        epochs: int = 20
-        batch_size: int = 64
-        threshold_perc: float = 95.0
-        gmm_weight: float = 0.5
+        epochs: PositiveInt = 20
+        batch_size: PositiveInt = 64
+        threshold_perc: Percentage = 95.0
+        gmm_weight: UnitInterval = 0.5
         gmm_score_mode: Literal["standardized", "percentile"] = "standardized"
 
     def __init__(
@@ -279,7 +280,7 @@ class OODReconstruction(ExtractorMixin, BaseOOD):
         >>> config = OODReconstruction.Config(epochs=10, threshold_perc=95)
         >>> ood = OODReconstruction(AE(input_shape), config=config)
         >>> ood.fit(train_data)
-        OODReconstruction(loss_fn=None, optimizer=None, epochs=10, batch_size=64, threshold_perc=95, gmm_weight=0.5, gmm_score_mode='standardized', fitted=False)
+        OODReconstruction(loss_fn=None, optimizer=None, epochs=10, batch_size=64, threshold_perc=95.0, gmm_weight=0.5, gmm_score_mode='standardized', fitted=False)
         """  # noqa: E501
         loss_fn = self.config.loss_fn
         optimizer = self.config.optimizer

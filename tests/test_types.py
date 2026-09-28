@@ -5,7 +5,6 @@ from __future__ import annotations
 import copy
 import dataclasses
 import warnings
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, get_args
 
@@ -468,17 +467,21 @@ class TestEvaluatorRepr:
         with warnings.catch_warnings(action="ignore"):  # pydantic model_fields instance-access deprecation
             assert repr(MyEval(alpha=0.9)) == "MyEval(alpha=0.9, beta=3)"
 
-    def test_repr_with_dataclass_config(self):
-        @dataclass
-        class DataclassConfig:
-            x: int = 1
+    def test_repr_with_config_kept_without_underscore(self):
+        """The shift detectors keep their config as ``config`` rather than ``_config``."""
 
         class DriftLike(Evaluator):
-            pass
+            class Config(EvaluatorConfig):
+                x: int = 1
+
+            config: Config
+
+            def _repr_extras(self):
+                return {"fitted": False}
 
         evaluator = DriftLike()
-        evaluator._config = DataclassConfig()
-        assert evaluator._repr() == "DriftLike(x=1)"
+        evaluator.config = DriftLike.Config()
+        assert evaluator._repr() == "DriftLike(x=1, fitted=False)"
         # extras=False takes the branch that skips the extras loop
         assert evaluator._repr(extras=False) == "DriftLike(x=1)"
 

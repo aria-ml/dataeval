@@ -20,6 +20,7 @@ from dataeval._log import get_logger
 from dataeval.core._parity import parity
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import ClassAxis, DictOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types._config import OpenUnitInterval, UnitInterval
 
 _logger = get_logger(__name__)
 
@@ -168,8 +169,8 @@ class Parity(Evaluator):
             asked at a coarser view, where there is no single class label per row.
         """
 
-        score_threshold: float = DEFAULT_PARITY_SCORE_THRESHOLD
-        p_value_threshold: float = DEFAULT_PARITY_P_VALUE_THRESHOLD
+        score_threshold: UnitInterval = DEFAULT_PARITY_SCORE_THRESHOLD
+        p_value_threshold: OpenUnitInterval = DEFAULT_PARITY_P_VALUE_THRESHOLD
         label: str | Sequence[str] | None = None
 
     metadata: MetadataLike
@@ -236,11 +237,56 @@ class Parity(Evaluator):
         │ weather     ┆ 0.154338 ┆ 0.108807   ┆ false          ┆ false                 │
         └─────────────┴──────────┴────────────┴────────────────┴───────────────────────┘
         """  # noqa: E501
-        # Convert AnnotatedDataset to Metadata if needed
-        if is_metadata_like(data):
-            self.metadata = data
-        else:
-            self.metadata = Metadata(data)
+        return self.from_metadata(data if is_metadata_like(data) else Metadata(data))
+
+    @set_metadata(
+        state=[
+            "score_threshold",
+            "p_value_threshold",
+            "label",
+            "class_axis",
+            "class_axis_source",
+            "class_axis_level",
+            "encoding_digest",
+        ]
+    )
+    def from_metadata(self, metadata: MetadataLike) -> ParityOutput:
+        """
+        Measure the association between each factor and the class axis in metadata you already hold.
+
+        :meth:`evaluate` builds a :class:`~dataeval.Metadata` from a dataset and calls this.
+        Call it directly when the metadata is already built, for example to share one
+        between several evaluators, so it is not built again.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        metadata : MetadataLike
+            A :class:`~dataeval.Metadata`, or any container implementing
+            :class:`~dataeval.protocols.MetadataLike`.
+
+        Returns
+        -------
+        ParityOutput
+            The same output :meth:`evaluate` returns for the dataset the metadata describes.
+
+        Raises
+        ------
+        ValueError
+            If the metadata has no factors.
+
+        See Also
+        --------
+        evaluate : Measure a dataset, building its metadata first.
+
+        Examples
+        --------
+        >>> from dataeval import Metadata
+        >>> metadata = Metadata(dataset)
+        >>> result = Parity().from_metadata(metadata)
+        """
+        self.metadata = metadata
 
         axis = resolve_label_axis(self.metadata, self.label)
         # Recorded before anything is computed from it: the three scalar members

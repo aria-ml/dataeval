@@ -406,5 +406,5 @@ class TestPrioritizeEvaluateRejections:
 
     def test_class_balanced_needs_labels(self):
         prioritize = Prioritize(method="knn", policy="class_balanced")
-        with pytest.raises(ValueError, match="requires an AnnotatedDataset with metadata"):
+        with pytest.raises(ValueError, match="requires class labels"):
             prioritize.evaluate(np.zeros((8, 4), dtype=np.float32))
