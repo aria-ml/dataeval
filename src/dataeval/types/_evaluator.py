@@ -8,6 +8,8 @@ __all__ = [
 import inspect
 from typing import Any
 
+from pydantic import BaseModel
+
 from dataeval._helpers import apply_config, get_overrides
 from dataeval.types._factors import ClassAxis
 
@@ -120,29 +122,23 @@ class Evaluator:
         if config_cls is None:
             raise NotImplementedError("Evaluator subclasses must define a Config class.")
         base_config = kwargs.get("config") or config_cls()
-        self._config = base_config.model_copy(update=get_overrides(kwargs, exclude))
+        # Validated rather than merged with ``model_copy``, which skips validation. Only the
+        # fields the caller chose are passed, so ``model_fields_set`` still means chosen, and
+        # only Config fields, since ``kwargs`` is the constructor's ``locals()``.
+        chosen = {name: getattr(base_config, name) for name in base_config.model_fields_set}
+        overrides = {k: v for k, v in get_overrides(kwargs, exclude).items() if k in config_cls.model_fields}
+        self._config = config_cls.model_validate(chosen | overrides)
         apply_config(self, self._config)
 
     def _repr_extras(self) -> dict[str, Any]:
         """Override to append extra state to ``__repr__``."""
         return {}
 
-    def _repr(self, *, extras: bool = True) -> str:  # noqa: C901
+    def _repr(self, *, extras: bool = True) -> str:
         """Build repr string, optionally suppressing extras."""
-        config = getattr(self, "_config", None)
-        if config is not None and hasattr(config, "model_fields"):
-            # Pydantic config (bias, performance, quality, scope)
-            fields = config.model_fields
-        elif config is not None and hasattr(config, "__dataclass_fields__"):
-            # Dataclass config (drift, OOD)
-            fields = config.__dataclass_fields__
-        else:
-            # Fallback: try self.config (drift/OOD store config without underscore)
-            config = getattr(self, "config", None)
-            if config is not None and hasattr(config, "__dataclass_fields__"):
-                fields = config.__dataclass_fields__
-            else:
-                fields = {}
+        # Most evaluators keep their config as ``_config``; the shift detectors keep it as ``config``.
+        config = getattr(self, "_config", None) or getattr(self, "config", None)
+        fields = type(config).model_fields if isinstance(config, BaseModel) else {}
         params = [f"{k}={getattr(config, k)!r}" for k in fields]
         if extras:
             for k, v in self._repr_extras().items():

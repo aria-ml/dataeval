@@ -61,10 +61,10 @@ class TestSufficiencyConstructorValidation:
 
     @pytest.mark.parametrize("runs", [0, -1])
     def test_non_positive_runs_is_rejected(self, mock_model, mock_train, mock_eval, runs: int):
-        with pytest.raises(Exception, match="[Mm]ust be positive"):
+        with pytest.raises(ValueError, match="runs"):
             Sufficiency(mock_model, training_strategy=mock_train, evaluation_strategy=mock_eval, runs=runs)
 
     @pytest.mark.parametrize("substeps", [0, -1])
     def test_non_positive_substeps_is_rejected(self, mock_model, mock_train, mock_eval, substeps: int):
-        with pytest.raises(Exception, match="[Mm]ust be positive"):
+        with pytest.raises(ValueError, match="substeps"):
             Sufficiency(mock_model, training_strategy=mock_train, evaluation_strategy=mock_eval, substeps=substeps)

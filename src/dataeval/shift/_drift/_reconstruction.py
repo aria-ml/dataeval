@@ -3,19 +3,20 @@
 __all__ = []
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Literal, Self, TypedDict
 
 import numpy as np
 import torch
 from numpy.typing import ArrayLike, NDArray
+from pydantic import PositiveInt
 from scipy.stats import norm
 
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import DeviceLike, FeatureExtractor, Threshold
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftOutput
 from dataeval.shift._shared._reconstruction import ReconstructionScorer
-from dataeval.types import set_metadata
+from dataeval.types import EvaluatorConfig, set_metadata
+from dataeval.types._config import OpenUnitInterval, UnitInterval
 from dataeval.utils.thresholds import ZScoreThreshold
 
 
@@ -105,8 +106,7 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
             Mean reconstruction error for the test samples.
         """
 
-    @dataclass
-    class Config:
+    class Config(EvaluatorConfig):
         """
         Configuration for DriftReconstruction detector.
 
@@ -128,12 +128,12 @@ class DriftReconstruction(ChunkableMixin, BaseDrift[_DriftReconstructionStats]):
             Method for combining reconstruction and GMM scores.
         """
 
-        p_val: float = 0.05
+        p_val: OpenUnitInterval = 0.05
         loss_fn: Callable[..., torch.Tensor] | None = None
         optimizer: torch.optim.Optimizer | None = None
-        epochs: int = 20
-        batch_size: int = 64
-        gmm_weight: float = 0.5
+        epochs: PositiveInt = 20
+        batch_size: PositiveInt = 64
+        gmm_weight: UnitInterval = 0.5
         gmm_score_mode: Literal["standardized", "percentile"] = "standardized"
 
     def __init__(

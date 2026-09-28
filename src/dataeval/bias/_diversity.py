@@ -13,6 +13,7 @@ from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.protocols import AnnotatedDataset, MetadataLike
 from dataeval.types import ClassAxis, DictOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types._config import UnitInterval
 
 _DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
@@ -152,7 +153,7 @@ class Diversity(Evaluator):
         """
 
         method: Literal["simpson", "shannon"] = DEFAULT_DIVERSITY_METHOD
-        threshold: float = DEFAULT_DIVERSITY_THRESHOLD
+        threshold: UnitInterval = DEFAULT_DIVERSITY_THRESHOLD
         label: str | Sequence[str] | None = None
 
     metadata: MetadataLike
@@ -181,7 +182,7 @@ class Diversity(Evaluator):
             "encoding_digest",
         ]
     )
-    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> DiversityOutput:  # noqa: C901
+    def evaluate(self, data: AnnotatedDataset[Any] | MetadataLike) -> DiversityOutput:
         """
         Compute diversity and classwise diversity for the dataset.
 
@@ -241,11 +242,57 @@ class Diversity(Evaluator):
         │ plane      ┆ weather     ┆ 0.918288        ┆ false            │
         └────────────┴─────────────┴─────────────────┴──────────────────┘
         """
-        # Convert AnnotatedDataset to Metadata if needed
-        if is_metadata_like(data):
-            self.metadata = data
-        else:
-            self.metadata = Metadata(data)
+        return self.from_metadata(data if is_metadata_like(data) else Metadata(data))
+
+    @set_metadata(
+        state=[
+            "method",
+            "threshold",
+            "label",
+            "class_axis",
+            "class_axis_source",
+            "class_axis_level",
+            "encoding_digest",
+        ]
+    )
+    def from_metadata(self, metadata: MetadataLike) -> DiversityOutput:  # noqa: C901
+        """
+        Measure how evenly each factor's values are spread in metadata you already hold.
+
+        :meth:`evaluate` builds a :class:`~dataeval.Metadata` from a dataset and calls this.
+        Call it directly when the metadata is already built, for example to share one
+        between several evaluators, so it is not built again.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        metadata : MetadataLike
+            A :class:`~dataeval.Metadata`, or any container implementing
+            :class:`~dataeval.protocols.MetadataLike`.
+
+        Returns
+        -------
+        DiversityOutput
+            The same output :meth:`evaluate` returns for the dataset the metadata describes.
+
+        Raises
+        ------
+        ValueError
+            If the metadata has no factors, or ``method`` was reassigned after construction to
+            a method Diversity does not know.
+
+        See Also
+        --------
+        evaluate : Measure a dataset, building its metadata first.
+
+        Examples
+        --------
+        >>> from dataeval import Metadata
+        >>> metadata = Metadata(dataset)
+        >>> result = Diversity().from_metadata(metadata)
+        """
+        self.metadata = metadata
 
         if not self.metadata.factor_names:
             raise ValueError("No factors found in provided metadata.")

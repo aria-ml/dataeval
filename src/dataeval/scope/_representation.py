@@ -27,6 +27,7 @@ from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
 from dataeval.core._label_stats import label_stats
 from dataeval.protocols import AnnotatedDataset, LabelsLike
 from dataeval.types import DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
+from dataeval.types._config import UnitInterval
 
 _logger = get_logger(__name__)
 
@@ -159,7 +160,7 @@ class Representation(Evaluator):
             uniform expectation across leaf species.
         """
 
-        expected: Mapping[str, float] | None = None
+        expected: Mapping[str, UnitInterval] | None = None
 
     # Set by apply_config from Config.
     expected: Mapping[str, float] | None
@@ -258,10 +259,12 @@ class Representation(Evaluator):
 
     def _label_counts(
         self,
-        data: "AnnotatedDataset[Any] | LabelsLike | Mapping[str, int] | Mapping[int, int] | Sequence[int] | NDArray[np.integer]",  # noqa: E501
+        data: "Mapping[str, int] | Mapping[int, int] | Sequence[int] | NDArray[np.integer]",
         index2label: Mapping[int, str] | None,
     ) -> dict[str, int]:
-        """Reduce any accepted input form to the ``{label_name: count}`` mapping the core consumes.
+        """Reduce a count mapping or a raw label array to the ``{label_name: count}`` mapping the core consumes.
+
+        Datasets and labels containers never reach here: :meth:`evaluate` sends them to :meth:`from_labels`.
 
         Class *names* (not indices) are what resolve against the ontology, so integer labels
         are named through ``index2label`` (or their own string form when it is absent).
@@ -272,16 +275,6 @@ class Representation(Evaluator):
                 return {str(key): int(count) for key, count in data.items()}
             i2l = {int(k): str(v) for k, v in (index2label or {}).items()}
             return {i2l.get(int(key), str(int(key))): int(count) for key, count in data.items()}
-        # Dataset / Metadata / any labeled container: all reduce to a label array plus a
-        # naming. A Metadata already carries labels, so only AnnotatedDataset needs
-        # converting first. Labels are the whole of what is read here, so that is the whole
-        # of what is asked for -- a container built for this evaluator should not have to
-        # declare factors it has none of.
-        if isinstance(data, AnnotatedDataset):
-            data = Metadata(data)
-        reject_derived_axis(data, "Representation")
-        if is_labels_like(data):
-            return self._counts_from_labels(data.class_labels, getattr(data, "index2label", None) or index2label)
         # A raw label sequence: count it, then name the observed indices.
         return self._counts_from_labels(data, index2label)
 
@@ -360,6 +353,59 @@ class Representation(Evaluator):
         >>> result.leaf_coverage
         0.75
         """
-        label_counts = self._label_counts(data, index2label)
+        if isinstance(data, AnnotatedDataset):
+            data = Metadata(data)
+        if not isinstance(data, Mapping) and is_labels_like(data):
+            return self.from_labels(data, index2label=index2label)
+        return self._output(self._label_counts(data, index2label))
+
+    @set_metadata
+    def from_labels(self, labels: LabelsLike, *, index2label: Mapping[int, str] | None = None) -> RepresentationOutput:
+        """
+        Measure representation from class labels you already hold.
+
+        :meth:`evaluate` reads the labels of a dataset, or of a
+        :class:`~dataeval.Metadata`, and calls this. Call it directly when the labels are
+        already in hand, for example from a metadata shared with other evaluators.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        labels : LabelsLike
+            Any container with ``class_labels``, such as a :class:`~dataeval.Metadata`. Its
+            ``index2label``, where it has one, names the classes.
+        index2label : Mapping[int, str] or None, default None
+            Names for the class indices, used when ``labels`` carries none of its own. An
+            index with no name is counted under its own string form.
+
+        Returns
+        -------
+        RepresentationOutput
+            The same output :meth:`evaluate` returns for the same labels.
+
+        Raises
+        ------
+        ValueError
+            If ``labels`` is a :class:`~dataeval.Metadata` conditioned on an axis other than
+            its class labels. Representation counts class labels against the ontology.
+
+        See Also
+        --------
+        evaluate : Measure a dataset, or label counts, directly.
+
+        Examples
+        --------
+        >>> from dataeval import Metadata, Ontology
+        >>> ontology = Ontology.from_hierarchy({"thing": ["0", "1", "2"]})
+        >>> result = Representation(ontology).from_labels(Metadata(dataset))
+        """
+        reject_derived_axis(labels, "Representation")
+        return self._output(
+            self._counts_from_labels(labels.class_labels, getattr(labels, "index2label", None) or index2label)
+        )
+
+    def _output(self, label_counts: dict[str, int]) -> RepresentationOutput:
+        """Build the worklist and summary for a ``{label_name: count}`` mapping."""
         coverage = label_coverage(label_counts, self._ontology)
         return self._build_output(coverage, total=sum(label_counts.values()))

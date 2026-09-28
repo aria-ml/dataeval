@@ -33,8 +33,13 @@ class TestDiversityUnit:
         assert diversity_obj.threshold == 0.6
 
     @pytest.mark.parametrize("met", ["Simpson", "ShANnOn"])
-    def test_invalid_method(self, metadata_results, met):
-        diversity_obj = Diversity(method=met)
+    def test_invalid_method(self, met):
+        with pytest.raises(ValueError, match="method"):
+            Diversity(method=met)
+
+    def test_invalid_method_set_after_construction(self, metadata_results):
+        diversity_obj = Diversity()
+        diversity_obj.method = "Simpson"  # type: ignore[assignment]
         with pytest.raises(ValueError, match="Invalid method"):
             diversity_obj.evaluate(metadata_results)
 

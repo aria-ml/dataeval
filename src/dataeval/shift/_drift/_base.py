@@ -12,11 +12,11 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.exceptions import NotFittedError
-from dataeval.protocols import Array, Chunker, FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.protocols import Array, Chunker, FeatureExtractor, Threshold, ThresholdLike, UpdateStrategy
 from dataeval.shift._drift._chunk import BaseChunker, SizeChunker, resolve_chunker
 from dataeval.types import DictOutput, Evaluator, set_metadata
 from dataeval.utils._array import flatten_samples
-from dataeval.utils.thresholds import ConstantThreshold, ZScoreThreshold
+from dataeval.utils.thresholds import ConstantThreshold, ZScoreThreshold, resolve_threshold
 
 TDetails = TypeVar("TDetails", Mapping[str, Any], pl.DataFrame)
 
@@ -242,7 +242,7 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         chunker: Chunker | None = None,
         chunk_size: int | None = None,
         chunk_count: int | None = None,
-        threshold: Threshold | None = None,
+        threshold: ThresholdLike | None = None,
         incomplete: Literal["keep", "drop", "append"] | None = None,
     ) -> "ChunkedDrift[TDetails]":
         """Create a chunked wrapper around this drift detector.
@@ -260,9 +260,15 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
             Create fixed-size chunks of this many samples.
         chunk_count : int or None, default None
             Split into this many equal chunks.
-        threshold : Threshold or None, default None
-            Threshold strategy for determining drift bounds from baseline.
-            When None, uses the detector's default threshold.
+        threshold : ThresholdLike or None, default None
+            Threshold strategy for determining drift bounds from baseline: a
+            :class:`~dataeval.protocols.Threshold`, or any spelling
+            :func:`~dataeval.utils.thresholds.resolve_threshold` reads, such as
+            ``"zscore"``, ``2.5`` or ``("iqr", 1.5)``. When None, uses the detector's
+            default threshold.
+
+            .. versionchanged:: 1.2
+                Accepts every ``ThresholdLike`` spelling, not only a ``Threshold``.
         incomplete : {"keep", "drop", "append"} or None, default None
             What ``chunk_size`` does with the reference's final chunk when it falls
             short: ``"keep"`` (the default when None) scores it as a chunk of its own,
@@ -378,8 +384,10 @@ class ChunkedDrift(Generic[TDetails]):
         Create fixed-size chunks.
     chunk_count : int or None, default None
         Split into this many equal chunks.
-    threshold : Threshold or None, default None
-        Threshold strategy for drift bounds.
+    threshold : ThresholdLike or None, default None
+        Threshold strategy for drift bounds: a :class:`~dataeval.protocols.Threshold`, or
+        any spelling :func:`~dataeval.utils.thresholds.resolve_threshold` reads. When None,
+        uses the detector's default threshold.
     incomplete : {"keep", "drop", "append"} or None, default None
         What ``chunk_size`` does with the reference's final chunk when it falls
         short: ``"keep"`` (the default when None) scores it as a chunk of its own,
@@ -403,7 +411,7 @@ class ChunkedDrift(Generic[TDetails]):
         chunker: Chunker | None = None,
         chunk_size: int | None = None,
         chunk_count: int | None = None,
-        threshold: Threshold | None = None,
+        threshold: ThresholdLike | None = None,
         incomplete: Literal["keep", "drop", "append"] | None = None,
     ) -> None:
         if not isinstance(detector, ChunkableMixin):
@@ -412,7 +420,8 @@ class ChunkedDrift(Generic[TDetails]):
             raise ValueError("incomplete applies only to chunk_size, and a chunker given alongside takes precedence.")
         self._detector: BaseDrift[TDetails] = detector
         self._chunkable: ChunkableMixin = detector
-        self._threshold_override = threshold
+        # None stays None: it means the detector's own default, which resolve_threshold does not know.
+        self._threshold_override = resolve_threshold(threshold) if threshold is not None else None
         self._baseline_values: NDArray[np.float32] | None = None
         self._threshold_bounds: tuple[float | None, float | None] = (None, None)
 
@@ -427,6 +436,54 @@ class ChunkedDrift(Generic[TDetails]):
         fitted = self._baseline_values is not None
         detector_repr = self._detector._repr(extras=False)
         return f"ChunkedDrift({detector_repr}, chunker={self._init_chunker!r}, fitted={fitted})"
+
+    @set_metadata
+    def from_embeddings(self, *embeddings: Array) -> DriftOutput[pl.DataFrame]:
+        """
+        Fit on reference embeddings and test data embeddings in one call.
+
+        Takes the arrays the wrapped detector's own ``from_embeddings`` takes, in the same order:
+        the reference, then any validation set the detector fits on (as
+        :class:`~dataeval.shift.DriftWasserstein` does), then the data to test. The same as
+        ``fit(*embeddings[:-1]).predict(embeddings[-1])``.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        *embeddings : Array
+            The reference, any validation set, then the data to test: at least two arrays.
+
+        Returns
+        -------
+        DriftOutput[pl.DataFrame]
+            The output :meth:`predict` returns after :meth:`fit`.
+
+        Raises
+        ------
+        ValueError
+            If fewer than two arrays are given.
+
+        See Also
+        --------
+        fit : Fit on the reference alone.
+        predict : Test data against the fitted reference.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from dataeval.shift import DriftUnivariate
+        >>> rng = np.random.default_rng(0)
+        >>> chunked = DriftUnivariate().chunked(chunk_count=4)
+        >>> result = chunked.from_embeddings(rng.random((100, 8)), rng.random((50, 8)))
+        """
+        if len(embeddings) < 2:
+            raise ValueError(
+                "from_embeddings takes the reference, any validation set the detector fits on, then the data "
+                f"to test: at least two arrays, got {len(embeddings)}."
+            )
+        *reference, data = embeddings
+        return self.fit(*reference).predict(data)
 
     def fit(self, *reference_data: Any) -> Self:
         """Fit the underlying detector and compute chunked baseline.

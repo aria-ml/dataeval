@@ -12,10 +12,11 @@ from typing import Any, Literal, Self, cast
 
 import numpy as np
 from numpy.typing import NDArray
+from pydantic import PositiveInt
 
 from dataeval import Metadata
 from dataeval._embeddings import Embeddings
-from dataeval._helpers import reject_filtered_metadata
+from dataeval._helpers import BareLabels, reject_filtered_metadata
 from dataeval._log import get_logger
 from dataeval.core._rank import (
     RankResult,
@@ -27,7 +28,8 @@ from dataeval.core._rank import (
     rank_result_class_balanced,
     rank_result_stratified,
 )
-from dataeval.protocols import AnnotatedDataset, Array, FeatureExtractor
+from dataeval.exceptions import ShapeMismatchError
+from dataeval.protocols import AnnotatedDataset, Array, FeatureExtractor, LabelsLike
 from dataeval.types import Evaluator, EvaluatorConfig, Output, set_metadata
 
 _logger = get_logger(__name__)
@@ -500,15 +502,15 @@ class Prioritize(Evaluator):
         """
 
         extractor: FeatureExtractor | None = None
-        batch_size: int | None = None
+        batch_size: PositiveInt | None = None
         method: MethodType = DEFAULT_PRIORITIZE_METHOD
-        k: int | None = None
-        c: int | None = None
+        k: PositiveInt | None = None
+        c: PositiveInt | None = None
         n_init: int | Literal["auto"] = DEFAULT_PRIORITIZE_N_INIT
-        max_cluster_size: int | None = None
+        max_cluster_size: PositiveInt | None = None
         policy: PolicyType = DEFAULT_PRIORITIZE_POLICY
         order: OrderType = DEFAULT_PRIORITIZE_ORDER
-        num_bins: int = DEFAULT_PRIORITIZE_NUM_BINS
+        num_bins: PositiveInt = DEFAULT_PRIORITIZE_NUM_BINS
 
     # Type declarations for attributes set by apply_config
     extractor: FeatureExtractor | Embeddings | None
@@ -754,7 +756,7 @@ class Prioritize(Evaluator):
         )
 
     @set_metadata(state=["method", "k", "c", "n_init", "policy", "num_bins"])
-    def evaluate(  # noqa: C901
+    def evaluate(
         self,
         dataset: AnnotatedDataset[Any] | Array,
         class_labels: NDArray[np.integer[Any]] | None = None,
@@ -806,12 +808,8 @@ class Prioritize(Evaluator):
         >>> result = prioritizer.evaluate(unlabeled_data)
         """
         reject_filtered_metadata(dataset, "Prioritize")
-
-        # Validate stratified + complexity method combinations
-        if self.policy == "stratified" and self.method in ("kmeans_complexity", "hdbscan_complexity"):
-            raise ValueError(
-                f"stratified policy is not available with {self.method} method ({self.method} does not produce scores)",
-            )
+        # Checked before any embedding is computed, so a bad combination fails fast.
+        self._check_policy()
 
         # Check if dataset is an Array (pre-computed) or AnnotatedDataset
         if isinstance(dataset, Array):
@@ -834,25 +832,75 @@ class Prioritize(Evaluator):
                     f"dataset must be either an AnnotatedDataset or Array, but got {type(dataset).__name__}",
                 ) from e
 
-        if self._reference is None:
-            reference_array = None
-        elif isinstance(self._reference, Array):
-            reference_array = np.asarray(self._reference)
-        elif self.extractor is None:
-            raise ValueError(
-                "Provide pre-computed embeddings for `reference` (an Embeddings or Array), "
-                "or configure an extractor to compute them."
+        labels = None if class_labels is None else BareLabels(np.asarray(class_labels, dtype=np.intp))
+        return self.from_embeddings(embeddings_array, labels)
+
+    @set_metadata(state=["method", "k", "c", "n_init", "policy", "num_bins"])
+    def from_embeddings(self, embeddings: Array, labels: LabelsLike | None = None) -> PrioritizeOutput:
+        """
+        Rank items by embeddings, and class labels, you already hold.
+
+        :meth:`evaluate` computes the embeddings from a dataset, and reads its labels, then calls
+        this. Call it directly when the embeddings are already computed, for example shared with
+        other evaluators, so they are not extracted again. A reference given to the constructor
+        applies here as it does to :meth:`evaluate`.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        embeddings : Array
+            One embedding per item, shape ``(n_items, n_features)``.
+        labels : LabelsLike or None, default None
+            One class label per embedding, such as a :class:`~dataeval.Metadata` of an
+            image-classification dataset. Required by the ``class_balanced`` policy.
+
+        Returns
+        -------
+        PrioritizeOutput
+            The same output :meth:`evaluate` returns for the same embeddings and labels.
+
+        Raises
+        ------
+        ShapeMismatchError
+            If ``labels`` does not hold one label per embedding, as with a detection dataset,
+            which has one label per target.
+        ValueError
+            If the policy is ``class_balanced`` and no labels are given, if the policy is
+            ``stratified`` with a method that produces no scores, or if ``labels`` is a
+            filtered :class:`~dataeval.Metadata`.
+
+        See Also
+        --------
+        evaluate : Rank a dataset, computing its embeddings with the extractor.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> embeddings = np.random.default_rng(0).random((100, 8))
+        >>> ranked = Prioritize(k=5).from_embeddings(embeddings)
+        >>> len(ranked.data())
+        100
+        """
+        reject_filtered_metadata(labels, "Prioritize")
+        self._check_policy()
+        embeddings_array = np.asarray(embeddings)
+        class_labels = None if labels is None else np.asarray(labels.class_labels)
+        if class_labels is not None and len(class_labels) != len(embeddings_array):
+            raise ShapeMismatchError(
+                f"Got {len(embeddings_array)} embeddings for {len(class_labels)} labels. Prioritize needs one "
+                "label per embedding. For object detection, wrap the dataset with "
+                "dataeval.data.DetectionCrops to get one crop per detection aligned 1:1 with the labels."
             )
-        else:
-            reference_array = np.asarray(
-                Embeddings(self._reference, extractor=self.extractor, batch_size=self.batch_size)
-            )
+
+        reference_array = self._reference_array()
 
         # Check if we have labels for the requested policy
         if self.policy == "class_balanced" and class_labels is None:
             raise ValueError(
-                "Policy 'class_balanced' requires an AnnotatedDataset with metadata. "
-                "For raw arrays, use result.class_balanced(labels) instead.",
+                "Policy 'class_balanced' requires class labels: an AnnotatedDataset with metadata, "
+                "class_labels= to evaluate, or labels= to from_embeddings. For raw arrays without labels, "
+                "use result.class_balanced(labels) instead.",
             )
         result = self._perform_ranking(embeddings_array, reference_array)
 
@@ -864,6 +912,26 @@ class Prioritize(Evaluator):
             num_bins=self.num_bins,
             class_labels=class_labels,
         )
+
+    def _reference_array(self) -> NDArray[Any] | None:
+        """Return the reference's embeddings, computing them with the extractor when it is a dataset."""
+        if self._reference is None:
+            return None
+        if isinstance(self._reference, Array):
+            return np.asarray(self._reference)
+        if self.extractor is None:
+            raise ValueError(
+                "Provide pre-computed embeddings for `reference` (an Embeddings or Array), "
+                "or configure an extractor to compute them."
+            )
+        return np.asarray(Embeddings(self._reference, extractor=self.extractor, batch_size=self.batch_size))
+
+    def _check_policy(self) -> None:
+        """Refuse a policy the method cannot serve."""
+        if self.policy == "stratified" and self.method in ("kmeans_complexity", "hdbscan_complexity"):
+            raise ValueError(
+                f"stratified policy is not available with {self.method} method ({self.method} does not produce scores)",
+            )
 
     def _perform_ranking(  # noqa: C901
         self,

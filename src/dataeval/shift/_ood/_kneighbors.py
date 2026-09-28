@@ -1,12 +1,14 @@
-from dataclasses import dataclass
 from typing import Any, Literal, Self
 
 import numpy as np
 from numpy.typing import NDArray
+from pydantic import PositiveInt
 
-from dataeval.protocols import FeatureExtractor
-from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODScoreOutput
+from dataeval.protocols import Array, FeatureExtractor
+from dataeval.shift._ood._base import BaseOOD, ExtractorMixin, OODOutput, OODScoreOutput
 from dataeval.shift._shared._kneighbors import KNeighborsScorer
+from dataeval.types import EvaluatorConfig, set_metadata
+from dataeval.types._config import Percentage
 
 
 class OODKNeighbors(ExtractorMixin, BaseOOD):
@@ -70,8 +72,7 @@ class OODKNeighbors(ExtractorMixin, BaseOOD):
     OODKNeighbors(k=15, distance_metric='euclidean', threshold_perc=99.0, extractor=None, fitted=True)
     """
 
-    @dataclass
-    class Config:
+    class Config(EvaluatorConfig):
         """
         Configuration for OODKNeighbors detector.
 
@@ -87,9 +88,9 @@ class OODKNeighbors(ExtractorMixin, BaseOOD):
             Feature extractor for transforming input data before scoring.
         """
 
-        k: int = 10
+        k: PositiveInt = 10
         distance_metric: Literal["cosine", "euclidean"] = "cosine"
-        threshold_perc: float = 95.0
+        threshold_perc: Percentage = 95.0
         extractor: FeatureExtractor | None = None
 
     def __init__(
@@ -121,6 +122,52 @@ class OODKNeighbors(ExtractorMixin, BaseOOD):
     def reference_embeddings(self) -> NDArray[np.float32]:
         """Reference embeddings stored by the scorer."""
         return self._scorer.reference_embeddings
+
+    @set_metadata
+    def from_embeddings(
+        self,
+        reference: Array,
+        data: Array,
+        *,
+        batch_size: int | None = None,
+        ood_type: Literal["feature", "instance"] = "instance",
+    ) -> OODOutput:
+        """
+        Fit on reference embeddings and score data embeddings in one call.
+
+        The same as ``fit(reference).predict(data, batch_size=batch_size, ood_type=ood_type)``.
+        Call :meth:`fit` and :meth:`predict` separately to fit once and score several datasets.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        reference : Array
+            Embeddings of the in-distribution reference data, shape ``(n_reference, n_features)``.
+        data : Array
+            Embeddings of the data to score, shape ``(n_data, n_features)``.
+        batch_size : int or None, default None
+            Passed to :meth:`predict`.
+        ood_type : {"feature", "instance"}, default "instance"
+            Passed to :meth:`predict`.
+
+        Returns
+        -------
+        OODOutput
+            The output :meth:`predict` returns after :meth:`fit`.
+
+        See Also
+        --------
+        fit : Fit on the reference alone.
+        predict : Score data against the fitted reference.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> rng = np.random.default_rng(0)
+        >>> result = OODKNeighbors(k=5).from_embeddings(rng.random((100, 8)), rng.random((50, 8)))
+        """
+        return self.fit(reference).predict(data, batch_size=batch_size, ood_type=ood_type)
 
     def fit(self, reference_data: Any) -> Self:
         """

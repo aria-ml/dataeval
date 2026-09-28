@@ -10,18 +10,19 @@ Licensed under Apache Software License (Apache 2.0)
 __all__ = []
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any, Literal, Self, TypedDict
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
+from pydantic import PositiveInt
 
 from dataeval.config import get_device
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array, DeviceLike, FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
-from dataeval.types import set_metadata
+from dataeval.types import EvaluatorConfig, set_metadata
+from dataeval.types._config import OpenUnitInterval
 from dataeval.utils.thresholds import ZScoreThreshold
 
 
@@ -233,8 +234,7 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
             Determined from permutation test at specified significance level.
         """
 
-    @dataclass
-    class Config:
+    class Config(EvaluatorConfig):
         """
         Configuration for DriftMMD detector.
 
@@ -256,10 +256,10 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
             Feature extractor for transforming input data before drift detection.
         """
 
-        p_val: float = 0.05
+        p_val: OpenUnitInterval = 0.05
         sigma: Array | None = None
-        n_permutations: int = 100
-        permutation_batch_size: int | Literal["auto"] = "auto"
+        n_permutations: PositiveInt = 100
+        permutation_batch_size: PositiveInt | Literal["auto"] = "auto"
         device: DeviceLike | None = None
         update_strategy: UpdateStrategy | None = None
         extractor: FeatureExtractor | None = None
@@ -314,6 +314,41 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
         self._kernel: GaussianRBF | None = None
         self._k_xx: torch.Tensor | None = None
         self._metric_name = "mmd2"
+
+    @set_metadata
+    def from_embeddings(self, reference: Array, data: Array) -> DriftOutput["DriftMMD.Stats"]:
+        """
+        Fit on reference embeddings and test data embeddings in one call.
+
+        The same as ``fit(reference).predict(data)``. Call :meth:`fit` and :meth:`predict`
+        separately to fit once and test several datasets against the same reference.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        reference : Array
+            Embeddings of the reference data, shape ``(n_reference, n_features)``.
+        data : Array
+            Embeddings of the data to test for drift, shape ``(n_data, n_features)``.
+
+        Returns
+        -------
+        DriftOutput[DriftMMD.Stats]
+            The output :meth:`predict` returns after :meth:`fit`.
+
+        See Also
+        --------
+        fit : Fit on the reference alone.
+        predict : Test data against the fitted reference.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> rng = np.random.default_rng(0)
+        >>> result = DriftMMD(n_permutations=10).from_embeddings(rng.random((100, 8)), rng.random((50, 8)))
+        """
+        return self.fit(reference).predict(data)
 
     def fit(self, reference_data: Any) -> Self:
         """Fit detector with reference data.

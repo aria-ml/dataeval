@@ -21,6 +21,20 @@ from dataeval.utils.thresholds import (
 from tests.conftest import MockMetadata, _get_dataset
 
 
+class _RecordingExtractor:
+    """A FeatureExtractor that records how many items each call is handed."""
+
+    batch_size = None
+
+    def __init__(self) -> None:
+        self.chunk_sizes: list[int] = []
+
+    def __call__(self, data) -> np.ndarray:
+        items = list(data)
+        self.chunk_sizes.append(len(items))
+        return np.asarray([np.ravel(np.asarray(item)) for item in items], dtype=np.float32)
+
+
 def make_mock_metadata(lstat: LabelStatsResult) -> MockMetadata:
     """Create a MockMetadata (Metadata) for testing aggregate_by_class."""
     # class_labels maps item_id -> class: [0,1,2,0,1,2,1,0,2,1] (from lstat)
@@ -1001,6 +1015,33 @@ class TestOutliersNaNColumns:
 
 
 @pytest.mark.required
+class TestOutliersPixelUnits:
+    """evaluate measures pixel statistics as compute_stats does by default: in the image's own units."""
+
+    def test_evaluate_agrees_with_from_stats_on_default_stats(self):
+        images = np.full((10, 1, 8, 8), 100, dtype=np.uint8)
+        images[0] = 255
+        outliers = Outliers(flags=ImageStats.PIXEL_MEAN, outlier_threshold=("constant", (None, 200.0)))
+
+        via_evaluate = outliers.evaluate(images)
+        via_stats = outliers.from_stats(
+            compute_stats(images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        )
+
+        assert via_evaluate.data()["item_index"].to_list() == [0]
+        assert via_stats.data()["item_index"].to_list() == [0]
+
+    def test_evaluate_multi_dataset_measures_unnormalized(self):
+        images = np.full((4, 1, 8, 8), 100, dtype=np.uint8)
+
+        output = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(images, images)
+
+        results = output.calculation_results
+        assert isinstance(results, list)
+        np.testing.assert_allclose(results[0]["stats"]["mean"], 100.0)
+
+
+@pytest.mark.required
 class TestBuildClassIds:
     def test_ic_dataset_1to1(self):
         """IC dataset: each image has exactly one class."""
@@ -1597,6 +1638,18 @@ class TestOutliersMultiDataset:
                 assert all(idx < 20 for idx in ds0["item_index"].to_list())
             if ds1.shape[0] > 0:
                 assert all(idx < 30 for idx in ds1["item_index"].to_list())
+
+    def test_evaluate_multi_dataset_passes_batch_size_to_the_extractor(self):
+        """batch_size sizes the extractor's chunks with several datasets, as it does with one."""
+        extractor = _RecordingExtractor()
+        rng = np.random.default_rng(0)
+
+        Outliers(flags=ImageStats.NONE, extractor=extractor, batch_size=3).evaluate(
+            rng.random((10, 1, 4, 4)), rng.random((10, 1, 4, 4))
+        )
+
+        assert extractor.chunk_sizes
+        assert max(extractor.chunk_sizes) <= 3
 
     def test_evaluate_multi_dataset_with_threshold(self):
         """with_threshold works on multi-dataset evaluate output."""

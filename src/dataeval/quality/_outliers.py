@@ -1223,6 +1223,18 @@ class Outliers(Evaluator):
     All threshold types support asymmetric lower/upper multipliers via
     ``lower_multiplier`` and ``upper_multiplier`` parameters.
 
+    **Pixel Units:**
+
+    ``PIXEL`` statistics are measured in the units the data is stored in, as
+    :func:`~dataeval.core.compute_stats` measures them by default, so :meth:`evaluate` and
+    :meth:`from_stats` given statistics from ``compute_stats`` agree. Only a
+    ``ConstantThreshold`` depends on the unit. To compare images stored at different bit
+    depths on one scale, compute the statistics with ``normalize_pixel_values=True`` and
+    pass them to :meth:`from_stats`.
+
+    .. versionchanged:: 1.2
+        :meth:`evaluate` no longer normalizes pixel values to ``[0, 1]`` before measuring.
+
     **Cluster-based Detection:**
 
     Uses adaptive distance-based detection that accounts for varying cluster densities.
@@ -1936,7 +1948,7 @@ class Outliers(Evaluator):
                 caller=type(self).__name__,
                 per_image=per_image,
                 per_target=per_target,
-                normalize_pixel_values=True,
+                normalize_pixel_values=False,
             )[0]
             stats_result = self.stats
             source_index = self.stats["source_index"]
@@ -1987,7 +1999,7 @@ class Outliers(Evaluator):
                 caller=type(self).__name__,
                 per_image=per_image,
                 per_target=per_target,
-                normalize_pixel_values=True,
+                normalize_pixel_values=False,
             )
             self.stats = stats_results[-1]
 
@@ -2009,7 +2021,7 @@ class Outliers(Evaluator):
         stored_cluster_stats: ClusterStats | None = None
         if self.extractor is not None:
             all_images = [img for ds in datasets for img in iter_images(ds)]
-            embeddings = Embeddings(all_images, self.extractor)
+            embeddings = Embeddings(all_images, self.extractor, batch_size=self.batch_size)
 
             cluster_result = cluster(
                 embeddings,

@@ -10,18 +10,18 @@ Licensed under Apache Software License (Apache 2.0)
 
 __all__ = []
 
-from dataclasses import dataclass
-from typing import Any, Self, TypedDict
+from typing import Annotated, Any, Self, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
+from pydantic import Field
 
 from dataeval._log import get_logger
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
-from dataeval.protocols import FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
 from dataeval.shift._shared._domain_classifier import compute_auroc
-from dataeval.types import set_metadata
+from dataeval.types import EvaluatorConfig, set_metadata
 from dataeval.utils.thresholds import ConstantThreshold
 
 _logger = get_logger(__name__)
@@ -115,8 +115,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
             test data.
         """
 
-    @dataclass
-    class Config:
+    class Config(EvaluatorConfig):
         """
         Configuration for DriftDomainClassifier detector.
 
@@ -132,7 +131,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
             Strategy for updating reference data over time.
         """
 
-        n_folds: int = 5
+        n_folds: Annotated[int, Field(ge=2)] = 5
         threshold: float | tuple[float, float] = 0.55
         extractor: FeatureExtractor | None = None
         update_strategy: UpdateStrategy | None = None
@@ -179,6 +178,41 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
             t_lower = max(0.0, tc - 0.1)
             t_upper = min(1.0, tc + 0.1)
         return ConstantThreshold(lower=t_lower, upper=t_upper)
+
+    @set_metadata
+    def from_embeddings(self, reference: Array, data: Array) -> DriftOutput["DriftDomainClassifier.Stats"]:
+        """
+        Fit on reference embeddings and test data embeddings in one call.
+
+        The same as ``fit(reference).predict(data)``. Call :meth:`fit` and :meth:`predict`
+        separately to fit once and test several datasets against the same reference.
+
+        .. versionadded:: 1.2
+
+        Parameters
+        ----------
+        reference : Array
+            Embeddings of the reference data, shape ``(n_reference, n_features)``.
+        data : Array
+            Embeddings of the data to test for drift, shape ``(n_data, n_features)``.
+
+        Returns
+        -------
+        DriftOutput[DriftDomainClassifier.Stats]
+            The output :meth:`predict` returns after :meth:`fit`.
+
+        See Also
+        --------
+        fit : Fit on the reference alone.
+        predict : Test data against the fitted reference.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> rng = np.random.default_rng(0)
+        >>> result = DriftDomainClassifier(n_folds=2).from_embeddings(rng.random((100, 8)), rng.random((50, 8)))
+        """
+        return self.fit(reference).predict(data)
 
     def fit(self, reference_data: Any) -> Self:
         """Fit the domain classifier on the reference data.
