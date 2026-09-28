@@ -304,6 +304,17 @@ class TestChunkedDriftConstruction:
         with pytest.raises(ValueError, match="Must provide chunker, chunk_size, or chunk_count"):
             ChunkedDrift(DriftUnivariate())
 
+    def test_any_chunker_the_protocol_describes_is_accepted(self):
+        """A plain callable satisfying :class:`~dataeval.protocols.Chunker` needs none of the private base class."""
+
+        class _EqualChunker:
+            def __call__(self, n: int) -> list[np.ndarray]:
+                return [idx.astype(np.intp) for idx in np.array_split(np.arange(n), 4)]
+
+        reference = np.random.default_rng(0).random((80, 3)).astype(np.float32)
+        chunked = DriftUnivariate().chunked(chunker=_EqualChunker()).fit(reference)
+        assert len(chunked.predict(reference).details) == 4
+
 
 @pytest.mark.required
 class TestChunkedDriftReferenceChunks:

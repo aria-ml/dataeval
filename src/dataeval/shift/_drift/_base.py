@@ -12,7 +12,7 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.exceptions import NotFittedError
-from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
+from dataeval.protocols import Array, Chunker, FeatureExtractor, Threshold, UpdateStrategy
 from dataeval.shift._drift._chunk import BaseChunker, SizeChunker, resolve_chunker
 from dataeval.types import DictOutput, Evaluator, set_metadata
 from dataeval.utils._array import flatten_samples
@@ -239,7 +239,7 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
 
     def chunked(
         self,
-        chunker: BaseChunker | None = None,
+        chunker: Chunker | None = None,
         chunk_size: int | None = None,
         chunk_count: int | None = None,
         threshold: Threshold | None = None,
@@ -253,8 +253,9 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
 
         Parameters
         ----------
-        chunker : BaseChunker or None, default None
-            Explicit chunker instance.
+        chunker : Chunker or None, default None
+            Explicit chunker: any callable that maps a sample count to a list of index
+            arrays, as :class:`~dataeval.protocols.Chunker` describes.
         chunk_size : int or None, default None
             Create fixed-size chunks of this many samples.
         chunk_count : int or None, default None
@@ -370,8 +371,9 @@ class ChunkedDrift(Generic[TDetails]):
     ----------
     detector : BaseDrift
         The underlying drift detector (must also be a :class:`ChunkableMixin`).
-    chunker : BaseChunker or None, default None
-        Explicit chunker instance.
+    chunker : Chunker or None, default None
+        Explicit chunker: any callable that maps a sample count to a list of index
+        arrays, as :class:`~dataeval.protocols.Chunker` describes.
     chunk_size : int or None, default None
         Create fixed-size chunks.
     chunk_count : int or None, default None
@@ -398,7 +400,7 @@ class ChunkedDrift(Generic[TDetails]):
     def __init__(
         self,
         detector: BaseDrift[TDetails],
-        chunker: BaseChunker | None = None,
+        chunker: Chunker | None = None,
         chunk_size: int | None = None,
         chunk_count: int | None = None,
         threshold: Threshold | None = None,
@@ -470,7 +472,7 @@ class ChunkedDrift(Generic[TDetails]):
         # Get reference data and split into chunks
         x_ref = self._detector.reference_data
         n_ref = len(x_ref)
-        index_groups = self._init_chunker.split(n_ref)
+        index_groups = self._init_chunker(n_ref)
         threshold = self._threshold_override or self._chunkable._default_chunk_threshold()
         if not isinstance(threshold, ConstantThreshold) and len(index_groups) < _MIN_REFERENCE_CHUNKS:
             raise ValueError(

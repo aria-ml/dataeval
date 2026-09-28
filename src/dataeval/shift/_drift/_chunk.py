@@ -136,21 +136,21 @@ class IndexChunker(BaseChunker):
 
 
 def resolve_chunker(
-    chunker: BaseChunker | None = None,
+    chunker: Chunker | None = None,
     chunk_size: int | None = None,
     chunk_count: int | None = None,
     chunk_indices: list[list[int]] | None = None,
     incomplete: Literal["keep", "drop", "append"] = "keep",
-) -> BaseChunker | None:
-    """Resolve various chunking specifications into a BaseChunker.
+) -> Chunker | None:
+    """Resolve various chunking specifications into a chunker.
 
     Only one of the parameters should be provided. If multiple are given,
     priority is: chunker > chunk_indices > chunk_size > chunk_count.
 
     Parameters
     ----------
-    chunker : BaseChunker or None
-        An explicit chunker instance.
+    chunker : Chunker or None
+        An explicit chunker, returned as given.
     chunk_size : int or None
         Create a SizeChunker with this size.
     chunk_count : int or None
@@ -162,7 +162,7 @@ def resolve_chunker(
 
     Returns
     -------
-    BaseChunker or None
+    Chunker or None
         Resolved chunker, or None if no chunking was requested.
     """
     if chunker is not None:
