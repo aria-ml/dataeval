@@ -140,6 +140,7 @@ def resolve_chunker(
     chunk_size: int | None = None,
     chunk_count: int | None = None,
     chunk_indices: list[list[int]] | None = None,
+    incomplete: Literal["keep", "drop", "append"] = "keep",
 ) -> BaseChunker | None:
     """Resolve various chunking specifications into a BaseChunker.
 
@@ -156,6 +157,8 @@ def resolve_chunker(
         Create a CountChunker with this count.
     chunk_indices : list[list[int]] or None
         Create an IndexChunker with these index groups.
+    incomplete : {"keep", "drop", "append"}, default "keep"
+        Passed to the SizeChunker built from ``chunk_size``.
 
     Returns
     -------
@@ -167,7 +170,7 @@ def resolve_chunker(
     if chunk_indices is not None:
         return IndexChunker(chunk_indices)
     if chunk_size is not None:
-        return SizeChunker(chunk_size)
+        return SizeChunker(chunk_size, incomplete)
     if chunk_count is not None:
         return CountChunker(chunk_count)
     return None

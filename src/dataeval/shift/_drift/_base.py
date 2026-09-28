@@ -5,7 +5,7 @@ __all__ = []
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Generic, Literal, Self, TypeVar
 
 import numpy as np
 import polars as pl
@@ -243,6 +243,7 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         chunk_size: int | None = None,
         chunk_count: int | None = None,
         threshold: Threshold | None = None,
+        incomplete: Literal["keep", "drop", "append"] | None = None,
     ) -> "ChunkedDrift[TDetails]":
         """Create a chunked wrapper around this drift detector.
 
@@ -261,13 +262,32 @@ class BaseDrift(Evaluator, ABC, Generic[TDetails]):
         threshold : Threshold or None, default None
             Threshold strategy for determining drift bounds from baseline.
             When None, uses the detector's default threshold.
+        incomplete : {"keep", "drop", "append"} or None, default None
+            What ``chunk_size`` does with the reference's final chunk when it falls
+            short: ``"keep"`` (the default when None) scores it as a chunk of its own,
+            ``"drop"`` leaves it out of the baseline, and ``"append"`` merges it into the
+            chunk before it. A short chunk's baseline score is noisier than the rest,
+            which widens bounds derived from their spread. Test data always merges its
+            remainder into its last chunk. Applies only to ``chunk_size``.
 
         Returns
         -------
         ChunkedDrift[TDetails]
             A chunked drift wrapper around this detector.
+
+        Raises
+        ------
+        ValueError
+            If ``incomplete`` is given without ``chunk_size``, or alongside ``chunker``.
         """
-        return ChunkedDrift(self, chunker=chunker, chunk_size=chunk_size, chunk_count=chunk_count, threshold=threshold)
+        return ChunkedDrift(
+            self,
+            chunker=chunker,
+            chunk_size=chunk_size,
+            chunk_count=chunk_count,
+            threshold=threshold,
+            incomplete=incomplete,
+        )
 
 
 class ChunkableMixin(ABC):
@@ -358,6 +378,21 @@ class ChunkedDrift(Generic[TDetails]):
         Split into this many equal chunks.
     threshold : Threshold or None, default None
         Threshold strategy for drift bounds.
+    incomplete : {"keep", "drop", "append"} or None, default None
+        What ``chunk_size`` does with the reference's final chunk when it falls
+        short: ``"keep"`` (the default when None) scores it as a chunk of its own,
+        ``"drop"`` leaves it out of the baseline, and ``"append"`` merges it into the
+        chunk before it. A short chunk's baseline score is noisier than the rest,
+        which widens bounds derived from their spread. Test data always merges its
+        remainder into its last chunk. Applies only to ``chunk_size``.
+
+    Raises
+    ------
+    TypeError
+        If ``detector`` does not support chunked mode.
+    ValueError
+        If no chunking is specified, or ``incomplete`` is given without ``chunk_size``
+        or alongside ``chunker``.
     """
 
     def __init__(
@@ -367,9 +402,12 @@ class ChunkedDrift(Generic[TDetails]):
         chunk_size: int | None = None,
         chunk_count: int | None = None,
         threshold: Threshold | None = None,
+        incomplete: Literal["keep", "drop", "append"] | None = None,
     ) -> None:
         if not isinstance(detector, ChunkableMixin):
             raise TypeError(f"{type(detector).__name__} does not support chunked mode (missing ChunkableMixin).")
+        if incomplete is not None and (chunk_size is None or chunker is not None):
+            raise ValueError("incomplete applies only to chunk_size, and a chunker given alongside takes precedence.")
         self._detector: BaseDrift[TDetails] = detector
         self._chunkable: ChunkableMixin = detector
         self._threshold_override = threshold
@@ -377,7 +415,7 @@ class ChunkedDrift(Generic[TDetails]):
         self._threshold_bounds: tuple[float | None, float | None] = (None, None)
 
         # Resolve chunker from convenience params
-        resolved = resolve_chunker(chunker, chunk_size, chunk_count)
+        resolved = resolve_chunker(chunker, chunk_size, chunk_count, incomplete=incomplete or "keep")
         if resolved is None:
             raise ValueError("Must provide chunker, chunk_size, or chunk_count.")
         self._init_chunker = resolved

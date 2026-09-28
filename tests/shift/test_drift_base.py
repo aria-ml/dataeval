@@ -343,6 +343,43 @@ class TestChunkedDriftReferenceChunks:
 
 
 @pytest.mark.required
+class TestChunkedDriftIncomplete:
+    """``incomplete`` decides what becomes of the reference's short final chunk."""
+
+    reference = np.random.default_rng(0).random((261, 8)).astype(np.float32)
+
+    @pytest.mark.parametrize(
+        ("incomplete", "sizes"),
+        [(None, [50] * 5 + [11]), ("keep", [50] * 5 + [11]), ("drop", [50] * 5), ("append", [50] * 4 + [61])],
+    )
+    def test_the_reference_is_split_as_asked(self, incomplete, sizes):
+        detector = DriftUnivariate()
+        seen: list[int] = []
+        baselines = detector._compute_chunk_baselines
+
+        def spy(chunks):
+            seen.extend(len(chunk) for chunk in chunks)
+            return baselines(chunks)
+
+        detector._compute_chunk_baselines = spy
+        detector.chunked(chunk_size=50, incomplete=incomplete).fit(self.reference)
+        assert seen == sizes
+
+    def test_test_data_always_merges_its_remainder(self):
+        """Only the reference is split as asked; predict appends so every test chunk is full size."""
+        chunked = DriftUnivariate().chunked(chunk_size=50, incomplete="keep").fit(self.reference)
+        output = chunked.predict(self.reference)
+        assert output.details["key"].to_list() == ["[0:49]", "[50:99]", "[100:149]", "[150:199]", "[200:260]"]
+
+    @pytest.mark.parametrize(
+        "spec", [{"chunk_count": 5}, {"chunker": SizeChunker(50)}, {"chunker": SizeChunker(50), "chunk_size": 50}]
+    )
+    def test_incomplete_without_a_chunk_size_is_rejected(self, spec):
+        with pytest.raises(ValueError, match="incomplete applies only to chunk_size"):
+            DriftUnivariate().chunked(incomplete="drop", **spec)
+
+
+@pytest.mark.required
 class TestChunkedDriftPredictEdges:
     """Predict needs a chunking rule at call time, and answers an empty run without one."""
 
