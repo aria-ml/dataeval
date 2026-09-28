@@ -306,6 +306,43 @@ class TestChunkedDriftConstruction:
 
 
 @pytest.mark.required
+class TestChunkedDriftReferenceChunks:
+    """The thresholds are a spread of reference-chunk scores, so fit needs enough chunks to have one."""
+
+    reference = np.random.default_rng(0).random((261, 8)).astype(np.float32)
+
+    @pytest.mark.parametrize(
+        "detector",
+        [DriftMMD(n_permutations=10, device="cpu"), DriftUnivariate(method="ks")],
+        ids=["mmd", "ks"],
+    )
+    def test_two_reference_chunks_are_rejected(self, detector):
+        """Two chunks scored against each other are one pair measured twice, so the baseline has no spread.
+
+        MMD's two scores then differ only by float rounding, which pins both bounds to one value and flags
+        every chunk; KS's are exactly equal, which leaves no bounds at all and flags none.
+        """
+        with pytest.raises(ValueError, match=r"261 reference samples into 2 chunks.*at least 3"):
+            detector.chunked(chunk_size=200).fit(self.reference)
+
+    def test_one_reference_chunk_is_rejected(self):
+        with pytest.raises(ValueError, match=r"into 1 chunk.*at least 3"):
+            DriftUnivariate().chunked(chunk_count=1).fit(self.reference)
+
+    def test_a_constant_threshold_needs_no_spread(self):
+        """ConstantThreshold ignores the baseline, so two reference chunks are enough for it."""
+        from dataeval.utils.thresholds import ConstantThreshold
+
+        chunked = DriftUnivariate().chunked(chunk_size=200, threshold=ConstantThreshold(upper=0.5)).fit(self.reference)
+        assert chunked._threshold_bounds == (None, 0.5)
+
+    def test_three_reference_chunks_are_enough(self):
+        chunked = DriftUnivariate().chunked(chunk_count=3).fit(self.reference)
+        assert chunked._baseline_values is not None
+        assert len(chunked._baseline_values) == 3
+
+
+@pytest.mark.required
 class TestChunkedDriftPredictEdges:
     """Predict needs a chunking rule at call time, and answers an empty run without one."""
 
@@ -398,7 +435,7 @@ class TestDriftOutputFeatureNames:
         from dataeval.shift import DriftUnivariate
 
         extractor = Metadata()
-        chunked = DriftUnivariate(extractor=extractor).chunked(chunk_size=10)
+        chunked = DriftUnivariate(extractor=extractor).chunked(chunk_size=5)
         chunked.fit(metadata_dataset)
         feature_names = chunked.predict(metadata_dataset).feature_names
 

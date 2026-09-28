@@ -612,7 +612,10 @@ how to choose among them.
     detector's own chunk threshold.
   - Chunk size trades detection latency against statistical power; small chunks
     give unstable per-chunk verdicts. A configuration choice, not a property of
-    the wrapped detector.
+    the wrapped detector. The chunk size is also applied to the reference, and
+    every threshold except `ConstantThreshold` sets its bounds from the spread
+    of the reference chunks, so `fit` rejects a reference that splits into
+    fewer than 3 chunks. A few more than 3 still gives a rough spread.
 - - {class}`.OODReconstruction`
   - Autoencoder / VAE reconstruction-based OOD scoring.
   - Ported (alibi-detect 0.11.4); Cross-checked against scikit-learn in tests

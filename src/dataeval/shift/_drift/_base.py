@@ -16,9 +16,11 @@ from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrateg
 from dataeval.shift._drift._chunk import BaseChunker, SizeChunker, resolve_chunker
 from dataeval.types import DictOutput, Evaluator, set_metadata
 from dataeval.utils._array import flatten_samples
-from dataeval.utils.thresholds import ZScoreThreshold
+from dataeval.utils.thresholds import ConstantThreshold, ZScoreThreshold
 
 TDetails = TypeVar("TDetails", Mapping[str, Any], pl.DataFrame)
+
+_MIN_REFERENCE_CHUNKS = 3
 
 
 @dataclass(frozen=True, repr=False)
@@ -407,6 +409,22 @@ class ChunkedDrift(Generic[TDetails]):
         Returns
         -------
         Self
+
+        Raises
+        ------
+        ValueError
+            If the threshold is derived from the baseline and the chunking splits the
+            reference into fewer than 3 chunks.
+
+        Notes
+        -----
+        Every threshold except :class:`~dataeval.utils.thresholds.ConstantThreshold`
+        derives its bounds from the spread of the reference chunks' baseline scores, so
+        the reference must then split into at least 3 chunks. Two chunks scored against
+        each other measure one pair twice: a symmetric statistic such as MMD² or KS gives
+        both the same value, leaving either no bounds at all (every chunk passes) or
+        bounds a rounding error apart (every chunk drifts). Choose a ``chunk_size`` well
+        below the reference size, or a ``chunk_count`` of 3 or more.
         """
         # Fit underlying detector
         self._detector.fit(*reference_data)
@@ -415,13 +433,20 @@ class ChunkedDrift(Generic[TDetails]):
         x_ref = self._detector.reference_data
         n_ref = len(x_ref)
         index_groups = self._init_chunker.split(n_ref)
+        threshold = self._threshold_override or self._chunkable._default_chunk_threshold()
+        if not isinstance(threshold, ConstantThreshold) and len(index_groups) < _MIN_REFERENCE_CHUNKS:
+            raise ValueError(
+                f"{self._init_chunker!r} splits the {n_ref} reference samples into {len(index_groups)} "
+                f"chunk{'' if len(index_groups) == 1 else 's'}, but {threshold!r} needs at least "
+                f"{_MIN_REFERENCE_CHUNKS} to derive drift bounds from their spread. "
+                "Use a smaller chunk_size or a larger chunk_count."
+            )
         chunks = [x_ref[idx] for idx in index_groups]
 
         # Compute baseline metrics
         baseline = self._chunkable._compute_chunk_baselines(chunks)
 
         # Derive threshold bounds
-        threshold = self._threshold_override or self._chunkable._default_chunk_threshold()
         self._threshold_bounds = threshold(data=baseline)
         self._baseline_values = baseline
 

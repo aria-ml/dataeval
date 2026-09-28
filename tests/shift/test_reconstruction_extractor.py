@@ -131,7 +131,7 @@ def test_drift_reconstruction_extractor_chunked(image_list):
             extractor=StackingExtractor(),
             config=DriftReconstruction.Config(epochs=1, batch_size=10),
         )
-        .chunked(chunk_size=10)
+        .chunked(chunk_size=5)
         .fit(image_list)
     )
     result = det.predict(image_list)
