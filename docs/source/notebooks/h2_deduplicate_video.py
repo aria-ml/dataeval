@@ -8,13 +8,14 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.19.5
 #   kernelspec:
-#     display_name: dataeval
+#     display_name: dataeval (3.12.12)
 #     language: python
 #     name: python3
 # ---
 
 # %% [markdown]
 # # How to identify duplicate video
+#
 
 # %% [markdown]
 # ## Problem statement
@@ -32,6 +33,7 @@
 # The :class:`~dataeval.quality.Duplicates` class answers these questions for a multi-object tracking (MOT) dataset.
 # In this guide you will build a small dataset with known duplicates, run each detection against it, and read the
 # results.
+#
 
 # %% [markdown]
 # ### When to use
@@ -39,6 +41,7 @@
 # Use this guide when you work with full-motion video (FMV) or any multi-object tracking (MOT) dataset and you need to
 # know what the dataset contains before you split it or train on it. For still images, use
 # [How to identify duplicates](./h2_deduplicate.py), which covers the same class on simpler, image-level cases.
+#
 
 # %% [markdown]
 # ### What you will need
@@ -47,9 +50,11 @@
 #    - dataeval
 #    - maite-datasets
 # 2. A multi-object tracking dataset
+#
 
 # %% [markdown]
 # ## Getting started
+#
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -99,6 +104,7 @@ pl.Config.set_tbl_width_chars(160)
 # fine texture and small detail. That is what makes the hash useful here, since a re-encoded frame hashes to the same
 # value as its source and you are left comparing content rather than bytes. It also means two frames that share a
 # coarse layout hash alike even when their fine detail differs, so distinct scenes need distinct layouts.
+#
 
 # %%
 HEIGHT, WIDTH = 72, 96
@@ -132,8 +138,9 @@ def transcode(frames: list[np.ndarray], seed: int) -> list[np.ndarray]:
 
 # %% [markdown]
 # A MAITE multi-object tracking datum is a `(VideoStream, MultiobjectTrackingTarget, metadata)` tuple. The video
-# stream is an iterable of frames rather than an indexable sequence. Reaching frame *k* means decoding every frame
+# stream is an iterable of frames rather than an indexable sequence. Reaching frame _k_ means decoding every frame
 # before it, so DataEval streams video sequentially instead of indexing into it.
+#
 
 
 # %%
@@ -188,18 +195,19 @@ class VideoDataset:
 # %% [markdown]
 # The dataset holds four training sequences with three kinds of duplication built into them:
 #
-# | # | Sequence | Contents |
-# | --- | --- | --- |
-# | 0 | `sequence_a` | 60 frames of baseline footage |
-# | 1 | `sequence_a_transcode` | Sequence 0 re-encoded: the same footage, different pixel values |
-# | 2 | `sequence_b` | Different footage, holding on one frame for 20 frames |
-# | 3 | `sequence_c` | Different footage that reuses frames 5-24 of sequence 0 as its own frames 15-34 |
+# | #   | Sequence               | Contents                                                                        |
+# | --- | ---------------------- | ------------------------------------------------------------------------------- |
+# | 0   | `sequence_a`           | 60 frames of baseline footage                                                   |
+# | 1   | `sequence_a_transcode` | Sequence 0 re-encoded: the same footage, different pixel values                 |
+# | 2   | `sequence_b`           | Different footage, holding on one frame for 20 frames                           |
+# | 3   | `sequence_c`           | Different footage that reuses frames 5-24 of sequence 0 as its own frames 15-34 |
 #
 # It also holds one test sequence: a 20-frame clip cut from `sequence_a` and re-encoded. You will use that sequence
 # to find, measure and remove a data leak.
 #
 # Sequences 0 and 1 duplicate each other end to end. Sequence 3 covers the case where part of one sequence duplicates
 # part of another, which the class reports the same way whether the two sequences sit in one split or across two.
+#
 
 # %%
 frames_a = scene(1, 60)
@@ -233,6 +241,7 @@ test = VideoDataset({"test_clip": transcode(frames_a[30:50], seed=3)}, dataset_i
 #
 # The sequences here are short, so the code below also lowers `min_segment_frames` from its default of `30` to `10`.
 # Otherwise the 20-frame stretch that sequence 3 reuses falls below the reporting threshold.
+#
 
 # %%
 strict = Duplicates(min_segment_frames=10).evaluate(train)
@@ -254,6 +263,7 @@ for name, result in (("hash_radius=0", strict), ("hash_radius=6", relaxed)):
 # the strict result as it stands and you would keep a sequence that is a full copy of one you already have.
 #
 # The same under-reporting shrinks a leakage measurement, where the extent is what you act on:
+#
 
 # %%
 extent = {}
@@ -273,7 +283,7 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
 # It has found half of one. The whole test clip comes from train frames 30-49, so acting on the strict result alone
 # drops 10 frames and leaves the other 10 leaked frames in the test split.
 #
-# ```{note}
+# ````{note}
 # Start at `hash_radius=6` for video. The perceptual hash is 64 bits wide. DataEval reads a distance of 1-5 bits as
 # highly similar and 6-10 bits as possibly similar, and published video hashing work puts its threshold near 10% of
 # the hash length, which is about 6 bits here. The default stays at `0` so that the parameter means the same thing on
@@ -285,14 +295,19 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
 # ```python
 # import logging
 # logging.basicConfig(level=logging.WARNING)
+# ````
+#
 # ```
+#
 # ```
+#
 
 # %% [markdown]
 # ## Triaging the dataset
 #
 # Start with the per-sequence summary. It gives one row per sequence and tells you which sequences are worth
 # investigating.
+#
 
 # %%
 summary = relaxed.aggregate_by_sequence()
@@ -319,18 +334,21 @@ display(summary)
 # `duplicate_frames` counts only frames matched in another sequence. Consecutive frames of almost any video
 # resemble one another within a usable `hash_radius`, so counting that resemblance here would make a dataset of
 # unrelated videos read as fully duplicated. It is self-redundancy, and `redundant_fraction` already reports it.
+#
 
 # %% [markdown]
 # ## Identifying sequence-level duplicates
 #
 # The summary tells you that a sequence shares content. It does not tell you which sequence it shares with, how much,
 # or where. The sequence-level rows answer that.
+#
 
 # %%
 display(
-    relaxed.sequences.data().select(
-        "dup_type", "item_indices", "span_start", "span_end", "containment", "mean_distance"
-    )
+    relaxed.sequences
+    .data()
+    .filter(pl.col("dup_type") != "annotation")
+    .select("dup_type", "item_indices", "span_start", "span_end", "containment", "mean_distance")
 )
 
 # %% [markdown]
@@ -351,18 +369,20 @@ display(
 #
 # The `dup_type` column names the kind of relationship:
 #
-# | `dup_type` | Description |
-# | --- | --- |
-# | `exact` | The two sequences hold identical frames in identical order. |
-# | `segment` | The two sequences run together over a continuous stretch at a fixed frame offset. |
-# | `aligned` | The two sequences run together but not at the same rate, which is a speed edit. See below. |
-# | `redundant` | A continuous run inside one sequence that carries nothing new over the frames before it. |
+# | `dup_type`  | Description                                                                                |
+# | ----------- | ------------------------------------------------------------------------------------------ |
+# | `exact`     | The two sequences hold identical frames in identical order.                                |
+# | `segment`   | The two sequences run together over a continuous stretch at a fixed frame offset.          |
+# | `aligned`   | The two sequences run together but not at the same rate, which is a speed edit. See below. |
+# | `redundant` | A continuous run inside one sequence that carries nothing new over the frames before it.   |
+#
 
 # %% [markdown]
 # ## Detecting train-test leakage
 #
 # Footage shared between the training and test splits inflates your measured performance. Pass both splits to
 # `evaluate`, and the `dataset_indices` column records which split each side of a match came from.
+#
 
 # %%
 leakage = Duplicates(hash_radius=6, min_segment_frames=10).evaluate(train, test)
@@ -381,6 +401,7 @@ display(leaks)
 # The second row is the same clip found in the transcoded training sequence.
 #
 # For the frame numbers themselves, read the sequence-level rows. Spans are reported in source-video coordinates:
+#
 
 # %%
 for row in leakage.sequences.data().filter(pl.col("dataset_indices").list.n_unique() > 1).iter_rows(named=True):
@@ -396,12 +417,14 @@ for row in leakage.sequences.data().filter(pl.col("dataset_indices").list.n_uniq
 # Spans are reported as source-video frame numbers, matching the coordinates in `unit_indices`. Seeking to a reported
 # frame in a video player lands on the duplicated footage, whatever frame sampling the evaluation used.
 # ```
+#
 
 # %% [markdown]
 # ## Identifying redundant video segments
 #
 # `redundant_fraction` tells you how much of a sequence repeats itself. To act on it you need the intervals. Filter
 # for the redundant rows and sort them by length.
+#
 
 # %%
 runs = (
@@ -422,14 +445,16 @@ display(runs.head(4))
 #
 # This is why `aggregate_by_sequence` reports `longest_run` next to `redundant_fraction`. Two sequences can score the
 # same fraction and be nothing alike, one holding still once and the other moving slowly throughout:
+#
 
 # %%
 display(summary.select("sequence", "redundant_fraction", "longest_run"))
 
 # %% [markdown]
-# A static run of *k* frames can be cut to a single frame without losing content, and `redundant_frames` counts what
+# A static run of _k_ frames can be cut to a single frame without losing content, and `redundant_frames` counts what
 # that would save. Check before you cut: dwell time can be signal, and a tracker trained only on moving objects can
 # fail on stationary ones.
+#
 
 # %% [markdown]
 # ## Detecting repackaged or resampled footage
@@ -437,6 +462,7 @@ display(summary.select("sequence", "redundant_fraction", "longest_run"))
 # Segment matching looks for a constant frame offset between two sequences. Re-export or resample a video at another
 # frame rate and that offset drifts, so the shared footage arrives as fragments too short to report and the default
 # settings find nothing.
+#
 
 # %%
 source = scene(1, 40)
@@ -462,6 +488,7 @@ display(
 # The value you give `verify_alignment` is the largest mean Hamming distance per aligned frame you will accept. Start
 # at `8` for perceptual hashes. The check is off by default because warping is quadratic in the two sequence lengths,
 # against a near-linear segment search. DataEval runs it only on the pairs the segment search could not explain.
+#
 
 # %% [markdown]
 # ## Identifying duplicated annotations
@@ -472,6 +499,7 @@ display(
 #
 # `levels` names the granularities to evaluate, and any level you leave out is not computed. This run skips
 # frame-level work entirely and reports track relationships only.
+#
 
 # %%
 tracked = Duplicates(hash_radius=6, min_track_frames=10).evaluate(train, levels="track")
@@ -506,6 +534,7 @@ display(
 # `per_target=True` is equivalent to asking for track-level relationships, since it computes the crop-level hashes
 # they read. Do not pass both: `Duplicates` raises a configuration error rather than reconciling them for you.
 # ```
+#
 
 # %% [markdown]
 # ## Mapping results back to the dataset
@@ -515,6 +544,7 @@ display(
 # :class:`~dataeval.data.FrameIndices`, which `frame_sample` accepts.
 #
 # To pull the leaked stretch, frames 30-49 of training sequence 0:
+#
 
 # %%
 row = leakage.crossing.sequences.data().row(0, named=True)
@@ -532,6 +562,7 @@ print(f"first of them: frame {meta['frame']} of sequence {meta['sequence']}, pix
 # %% [markdown]
 # The same selector gives you the complement, the footage you want to keep. DataEval reports where the sequences
 # overlap; which side to cut is your decision.
+#
 
 # %%
 n_frames = len(train[sequence][1].frame_tracks)
@@ -559,25 +590,27 @@ print(f"sequence {sequence} without the shared stretch: {len(without_leak)} of {
 # come back in ascending order per sequence whatever order you list them in, because video streams are read forwards
 # without rewinding.
 # ```
+#
 
 # %% [markdown]
 # ## Acting on the results
 #
 # The relationships map onto a handful of curation decisions:
 #
-# | What you found | What to do |
-# | --- | --- |
-# | `containment` near `[1.0, 1.0]` between two sequences | The same footage stored twice. Keep one, preferring the copy with better annotations. |
-# | Lopsided `containment` across two splits | Leakage. Cut the shared frames from the test split, or split by sequence instead. |
-# | A `segment` shared by two sequences in one split | A reused clip. Keep one copy of the stretch, or keep both and make sure the split keeps them together. |
-# | High `redundant_fraction` | Thin the sequence with `frame_sample` rather than deleting frames, after checking that the dwell is not itself signal. |
-# | An `aligned` relationship | Repackaged or resampled footage. Treat the aligned stretch as a duplicate of the source. |
-# | A track match across two sequences | Shared footage, not a labeling error. Remove the reused clip, or record it if the objects were pasted in as augmentation. |
-# | A track match inside one sequence | Two identifiers on one object. Merge them in the annotations. |
+# | What you found                                        | What to do                                                                                                                |
+# | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+# | `containment` near `[1.0, 1.0]` between two sequences | The same footage stored twice. Keep one, preferring the copy with better annotations.                                     |
+# | Lopsided `containment` across two splits              | Leakage. Cut the shared frames from the test split, or split by sequence instead.                                         |
+# | A `segment` shared by two sequences in one split      | A reused clip. Keep one copy of the stretch, or keep both and make sure the split keeps them together.                    |
+# | High `redundant_fraction`                             | Thin the sequence with `frame_sample` rather than deleting frames, after checking that the dwell is not itself signal.    |
+# | An `aligned` relationship                             | Repackaged or resampled footage. Treat the aligned stretch as a duplicate of the source.                                  |
+# | A track match across two sequences                    | Shared footage, not a labeling error. Remove the reused clip, or record it if the objects were pasted in as augmentation. |
+# | A track match inside one sequence                     | Two identifiers on one object. Merge them in the annotations.                                                             |
 #
 # Split by sequence. `SequenceFrames` exposes `sequence` as a unit-level metadata attribute, so
 # `split_dataset(..., split_on=["sequence"])` keeps every frame of a video on one side of the split and stops you
 # reintroducing the leakage you just found.
+#
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -585,8 +618,9 @@ print(f"sequence {sequence} without the shared stretch: {len(without_leak)} of {
 strict_pair = strict.sequences.data().filter(pl.col("item_indices") == [0, 1]).row(0, named=True)
 assert strict_pair["containment"][0] < 0.6
 
-# three relations: the whole-sequence copy, and the reused clip against both copies of its source
-assert relaxed.sequences.data().shape[0] == 3
+# three content relations: the whole-sequence copy, and the reused clip against both copies of its source
+# (the fourth row is the annotation match between sequences 0 and 1, covered in its own section)
+assert relaxed.sequences.data().filter(pl.col("dup_type") != "annotation").shape[0] == 3
 copied = relaxed.sequences.data().filter(pl.col("item_indices") == [0, 1]).row(0, named=True)
 assert copied["containment"] == [1.0, 1.0]
 reused = relaxed.sequences.data().filter(pl.col("item_indices") == [0, 3]).row(0, named=True)
@@ -643,3 +677,4 @@ assert set(tracked.data()["level"].to_list()) == {"track"}
 # - [Data Integrity](../concepts/DataIntegrity.md) — Image-level and target-level statistics for finding data quality issues.
 # - [How to build dataset views](./h2_build_dataset_views.py) — Compose filtered and transformed views over a dataset.
 # - [Validation and Trust](../concepts/ValidationAndTrust.md) — Build splits that hold up, and know what your evaluation is measuring.
+#
