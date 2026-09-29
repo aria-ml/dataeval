@@ -55,6 +55,14 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
     the final indices lazily based on the configured order and policy.
     All transformation methods return new PriorityOutput instances that
     operate on the same source data.
+
+    Examples
+    --------
+    Keep the 100 highest-priority items, in priority order. A removal plan would lose the order, so select with
+    :class:`~dataeval.data.Indices` directly:
+
+    >>> from dataeval.data import Indices, View
+    >>> top = View(dataset, Indices(result.indices[:100]))  # doctest: +SKIP
     """
 
     _fields: tuple[str, ...] = ("indices", "scores", "method", "order", "policy")

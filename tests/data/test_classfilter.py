@@ -1,3 +1,4 @@
+import pickle
 from dataclasses import dataclass
 from typing import NamedTuple
 from unittest.mock import MagicMock
@@ -328,3 +329,14 @@ class TestObjectDetectionSelections:
         assert isinstance(target, ObjectDetectionTarget)  # the exact pre-fix failure
         assert np.array_equal(target.labels, np.array([0]))  # class 2 detection dropped
         assert len(np.asarray(target.boxes)) == 1
+
+
+@pytest.mark.required
+class TestPickle:
+    """A view built with ClassFilter pickles, so a multi-worker DataLoader can hand it to its workers."""
+
+    def test_a_view_that_masks_detections_pickles(self, od_dataset):
+        view = View(od_dataset([[0, 1, 0], [1], [0]], {0: "car", 1: "person"}), ClassFilter([0]))
+        copy = pickle.loads(pickle.dumps(view))
+        assert copy.selection == view.selection == [0, 2]
+        assert copy[0][1].labels.tolist() == view[0][1].labels.tolist() == [0, 0]

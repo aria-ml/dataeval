@@ -1,3 +1,8 @@
+import pickle
+
+import numpy as np
+import pytest
+
 from dataeval.data._view import Operation, View
 from dataeval.protocols import DatasetMetadata
 
@@ -293,3 +298,53 @@ class TestSource:
         assert "index2label" in view.metadata
         assert view.metadata["index2label"] == {0: "animal"}
         assert not hasattr(view, "index2label")
+
+
+@pytest.mark.required
+class TestMapEach:
+    """One transform per source index, registered as one step."""
+
+    def test_each_index_gets_its_own_transform(self):
+        from dataeval.data import View
+
+        view = View(["a", "b", "c"])
+        view.map_each({0: str.upper, 2: lambda s: s * 2})
+        assert list(view) == ["A", "b", "cc"]
+
+    def test_it_runs_in_registration_order_with_map(self):
+        from dataeval.data import View
+
+        view = View(["a", "b"])
+        view.map(lambda s: s + "!")
+        view.map_each({1: str.upper})
+        view.map(lambda s: s + "?", where={1})
+        assert list(view) == ["a!", "B!?"]
+
+    def test_changing_the_mapping_afterwards_changes_nothing(self):
+        from dataeval.data import View
+
+        chosen = {0: str.upper}
+        view = View(["a", "b"])
+        view.map_each(chosen)
+        chosen[1] = str.upper
+        assert list(view) == ["A", "b"]
+
+
+@pytest.mark.required
+class TestPickle:
+    """A view pickles, so a DataLoader can hand it to worker processes."""
+
+    def test_a_view_that_transforms_content_pickles(self):
+        from dataeval.data import Resize
+
+        images = np.arange(2 * 3 * 8 * 8, dtype=np.float32).reshape(2, 3, 8, 8)
+        view = View(images, Resize((4, 4)))
+        copy = pickle.loads(pickle.dumps(view))
+        assert copy[1].shape == (3, 4, 4)
+        np.testing.assert_array_equal(copy[1], view[1])
+
+    def test_restricted_and_per_index_transforms_pickle(self):
+        view = View(["ab", "cd", "ef"])
+        view.map(str.upper, where={0})
+        view.map_each({2: str.title})
+        assert list(pickle.loads(pickle.dumps(view))) == ["AB", "cd", "Ef"]

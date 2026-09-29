@@ -1,10 +1,12 @@
 import logging
 import warnings
+from dataclasses import dataclass
 from typing import Any, cast
 
 import numpy as np
 import polars as pl
 import pytest
+from numpy.typing import NDArray
 
 from dataeval import Metadata
 from dataeval.core import align_subsequence, pack_hashes
@@ -15,7 +17,6 @@ from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, DuplicatesOutput, _duplicates
 from dataeval.quality._duplicates import (
-    SourceIndex,
     _aligned_digests,
     _annotation_digests,
     _as_frames,
@@ -26,6 +27,7 @@ from dataeval.quality._duplicates import (
     _find_hash_groups,
     _merge_near_groups,
 )
+from dataeval.types import RemovalPlan, SourceIndex
 
 
 class MockDataset:
@@ -2441,62 +2443,84 @@ class TestDefaultRadiusWarning:
 
 def _frame(rows: list[dict[str, Any]]) -> pl.DataFrame:
     """Build a duplicates frame from bare group descriptions, filling the constant columns."""
-    return pl.DataFrame(
-        [
-            {
-                "group_id": index,
-                "level": row.get("level", "item"),
-                "dup_type": row.get("dup_type", "exact"),
-                "item_indices": row["item_indices"],
-                "methods": row.get("methods", ["xxhash"]),
-            }
-            for index, row in enumerate(rows)
-        ],
-        schema={
-            "group_id": pl.Int64,
-            "level": pl.Utf8,
-            "dup_type": pl.Utf8,
-            "item_indices": pl.List(pl.Int64),
-            "methods": pl.List(pl.Utf8),
-        },
-    )
+    with_targets = any("target_indices" in row for row in rows)
+    schema: dict[str, Any] = {
+        "group_id": pl.Int64,
+        "level": pl.Utf8,
+        "dup_type": pl.Utf8,
+        "item_indices": pl.List(pl.Int64),
+        "methods": pl.List(pl.Utf8),
+    }
+    if with_targets:
+        schema["target_indices"] = pl.List(pl.Int64)
+    records = []
+    for index, row in enumerate(rows):
+        record = {
+            "group_id": index,
+            "level": row.get("level", "item"),
+            "dup_type": row.get("dup_type", "exact"),
+            "item_indices": row["item_indices"],
+            "methods": row.get("methods", ["xxhash"]),
+        }
+        if with_targets:
+            record["target_indices"] = row.get("target_indices", [None] * len(row["item_indices"]))
+        records.append(record)
+    return pl.DataFrame(records, schema=schema)
+
+
+@dataclass
+class _BoxTarget:
+    boxes: NDArray[np.float32]
+    labels: NDArray[np.intp]
+    scores: NDArray[np.float32]
+
+
+class _BoxedImages:
+    """A detection dataset of distinct random images, with a real target that a view can mask."""
+
+    def __init__(self, boxes: list[list[list[int]]], labels: list[list[int]]) -> None:
+        rng = np.random.default_rng(0)
+        self._images = [rng.random((3, 32, 32)) for _ in boxes]
+        self._boxes = boxes
+        self._labels = labels
+        self.metadata = {"id": "boxed", "index2label": {0: "a", 1: "b"}}
+
+    def __len__(self) -> int:
+        return len(self._boxes)
+
+    def __getitem__(self, index: int) -> tuple[NDArray[np.float64], _BoxTarget, dict[str, Any]]:
+        target = _BoxTarget(
+            boxes=np.asarray(self._boxes[index], dtype=np.float32),
+            labels=np.asarray(self._labels[index], dtype=np.intp),
+            scores=np.ones(len(self._labels[index]), dtype=np.float32),
+        )
+        return self._images[index], target, {"id": index}
 
 
 @pytest.mark.required
 class TestDeduplicate:
-    """The keep/discard plan, and the policy it is asked for."""
+    """The removal plan, and the policy it is asked for."""
 
     def test_one_member_of_each_group_survives(self):
         result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}, {"item_indices": [2, 6]}]))
-        plan = result.deduplicate(n_items=8)
-        assert plan.discard == [4, 6]
-
-    def test_keep_is_every_retained_item_not_just_the_survivors(self):
-        """``Indices(plan.keep)`` has to yield the whole kept dataset, not only the deduped part."""
-        result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}]))
-        plan = result.deduplicate(n_items=6)
-        assert plan.keep == [0, 1, 2, 3, 5]
+        assert result.deduplicate() == RemovalPlan([4, 6])
 
     def test_overlapping_groups_merge_before_a_survivor_is_chosen(self):
         """Per-group choice would keep 3 for its own group while group 0 discards it."""
         result = DuplicatesOutput(_frame([{"item_indices": [0, 3]}, {"item_indices": [3, 7]}]))
-        plan = result.deduplicate(n_items=8)
-        assert plan.discard == [3, 7]
-        assert 0 in plan.keep
+        assert result.deduplicate() == RemovalPlan([3, 7])
 
     def test_keep_last_survives_the_highest_index(self):
         result = DuplicatesOutput(_frame([{"item_indices": [0, 3]}, {"item_indices": [3, 7]}]))
-        plan = result.deduplicate(n_items=8, keep="last")
-        assert plan.discard == [0, 3]
-        assert 7 in plan.keep
+        assert result.deduplicate(keep="last") == RemovalPlan([0, 3])
 
     def test_near_duplicates_are_left_alone_by_default(self):
         result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "dup_type": "near"}]))
-        assert result.deduplicate(n_items=6).discard == []
+        assert result.deduplicate() == RemovalPlan()
 
     def test_near_duplicates_are_deduped_when_asked_for(self):
         result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "dup_type": "near"}]))
-        assert result.deduplicate(n_items=6, dup_types=("exact", "near")).discard == [4]
+        assert result.deduplicate(dup_types=("exact", "near")) == RemovalPlan([4])
 
     def test_a_near_group_bridges_two_exact_groups(self):
         """Merging spans dup_types: the near link makes 2 and 7 one set with 0 and 3."""
@@ -2508,7 +2532,7 @@ class TestDeduplicate:
                 {"item_indices": [2, 7], "dup_type": "near"},
             ])
         )
-        assert result.deduplicate(n_items=8, dup_types=("exact", "near")).discard == [2, 3, 4, 7]
+        assert result.deduplicate(dup_types=("exact", "near")) == RemovalPlan([2, 3, 4, 7])
 
     def test_a_dup_type_left_out_contributes_no_edges(self):
         """Asking for near alone must not merge through the exact group it overlaps."""
@@ -2519,82 +2543,96 @@ class TestDeduplicate:
                 {"item_indices": [4, 6], "dup_type": "near"},
             ])
         )
-        assert result.deduplicate(n_items=8, dup_types=["near"]).discard == [4, 6]
+        assert result.deduplicate(dup_types=["near"]) == RemovalPlan([4, 6])
 
-    def test_a_redundant_run_names_no_item_to_drop(self):
-        """A redundant run repeats one sequence, so collapsing it drops nothing."""
+    def test_a_redundant_run_names_nothing_to_remove(self):
+        """A redundant run repeats one sequence, so collapsing it removes nothing."""
         result = DuplicatesOutput(
             _frame([{"item_indices": [2, 2, 2, 2], "level": "sequence", "dup_type": "redundant"}])
         )
-        plan = result.deduplicate(n_items=4, dup_types="redundant")
-        assert plan.discard == []
-        assert plan.keep == [0, 1, 2, 3]
+        assert result.deduplicate(dup_types="redundant") == RemovalPlan()
 
     def test_a_single_dup_type_may_be_given_as_a_string(self):
         """``dup_types="near"`` is one type, not the five characters of the word."""
         result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "dup_type": "near"}]))
-        assert result.deduplicate(n_items=6, dup_types="near").discard == [4]
+        assert result.deduplicate(dup_types="near") == RemovalPlan([4])
 
     def test_an_excluded_group_contributes_nothing(self):
         result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}, {"item_indices": [2, 6]}]))
-        assert result.deduplicate(n_items=8, exclude_groups=[1]).discard == [4]
+        assert result.deduplicate(exclude_groups=[1]) == RemovalPlan([4])
 
     def test_excluding_a_group_does_not_pin_its_members(self):
         """Excluding group 1 means 'do not dedupe on account of it', not 'protect 3 forever'."""
         result = DuplicatesOutput(_frame([{"item_indices": [0, 3]}, {"item_indices": [3, 7]}]))
-        plan = result.deduplicate(n_items=8, exclude_groups=[1])
-        assert plan.discard == [3]
-        assert 7 in plan.keep
+        assert result.deduplicate(exclude_groups=[1]) == RemovalPlan([3])
 
-    def test_target_level_groups_are_skipped(self):
-        """``Indices`` addresses items; a target-level group names something else."""
-        result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "level": "target"}]))
-        assert result.deduplicate(n_items=6).discard == []
+    def test_target_groups_are_planned_as_detection_addresses(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4], "level": "target", "target_indices": [0, 2]}]))
+        assert result.deduplicate() == RemovalPlan([SourceIndex(4, 2)])
 
-    def test_an_empty_result_discards_nothing(self):
-        result = DuplicatesOutput(_frame([]))
-        plan = result.deduplicate(n_items=4)
-        assert plan.discard == []
-        assert plan.keep == [0, 1, 2, 3]
+    def test_keep_last_among_detections_follows_address_order(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 1], "level": "target", "target_indices": [3, 0]}]))
+        assert result.deduplicate(keep="last") == RemovalPlan([SourceIndex(1, 0)])
+
+    def test_item_and_target_groups_do_not_merge(self):
+        result = DuplicatesOutput(
+            _frame([
+                {"item_indices": [1, 4]},
+                {"item_indices": [1, 4], "level": "target", "target_indices": [0, 0]},
+            ])
+        )
+        assert result.deduplicate() == RemovalPlan([4, SourceIndex(4, 0)])
+
+    def test_levels_limits_the_plan(self):
+        result = DuplicatesOutput(
+            _frame([
+                {"item_indices": [1, 4]},
+                {"item_indices": [2, 5], "level": "target", "target_indices": [0, 0]},
+            ])
+        )
+        assert result.deduplicate(levels="item") == RemovalPlan([4])
+        assert result.deduplicate(levels=["target"]) == RemovalPlan([SourceIndex(5, 0)])
+
+    def test_a_video_frame_level_is_refused(self):
+        result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}]))
+        with pytest.raises(ValueError, match="cannot plan removals"):
+            result.deduplicate(levels="unit")
+
+    def test_an_empty_result_removes_nothing(self):
+        assert DuplicatesOutput(_frame([])).deduplicate() == RemovalPlan()
 
     def test_a_cross_dataset_result_is_refused(self):
         frame = _frame([{"item_indices": [1, 4]}]).with_columns(
             pl.Series("dataset_indices", [[0, 1]], dtype=pl.List(pl.Int64)),
         )
         with pytest.raises(ValueError, match="single dataset"):
-            DuplicatesOutput(frame).deduplicate(n_items=6)
-
-    def test_the_item_count_is_read_off_the_statistics(self):
-        data = np.random.random((6, 3, 16, 16))
-        result = Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0).evaluate(np.concatenate((data, data)))
-        plan = result.deduplicate()
-        assert sorted(plan.keep + plan.discard) == list(range(12))
-        assert plan.discard == [6, 7, 8, 9, 10, 11]
-
-    def test_an_unresolvable_item_count_says_what_to_pass(self):
-        result = DuplicatesOutput(_frame([{"item_indices": [1, 4]}]))
-        with pytest.raises(ValueError, match="n_items"):
-            result.deduplicate()
-
-    def test_a_calculation_result_with_no_image_count_says_so(self):
-        # track_stats results place values by level and key and never counted
-        # images, so `image_count` is absent rather than zero: `.get(..., 0)` used to read
-        # that as "zero images" and summed it in silently.
-        by_level_and_key = {"stats": {"pan_speed": np.array([1.0, 2.0])}}
-        result = DuplicatesOutput(
-            _frame([{"item_indices": [1, 4]}]),
-            calculation_results=cast("Any", by_level_and_key),
-        )
-        with pytest.raises(ValueError, match="image_count"):
-            result.deduplicate()
+            DuplicatesOutput(frame).deduplicate()
 
     def test_the_plan_feeds_view_directly(self):
         from dataeval.data import Indices, View
 
         data = np.random.random((6, 3, 16, 16))
-        result = Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0).evaluate(np.concatenate((data, data)))
-        kept = View(np.concatenate((data, data)), Indices(result.deduplicate().keep))
-        assert len(kept) == 6
+        doubled = np.concatenate((data, data))
+        plan = Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0).evaluate(doubled).deduplicate()
+        assert plan == RemovalPlan(range(6, 12))
+        assert len(View(doubled, Indices(plan, exclude=True))) == 6
+
+    def test_a_detection_plan_leaves_no_exact_detection_duplicates(self):
+        """Two identical boxes in image 0 are one exact duplicate; removing the second leaves none."""
+        from dataeval.data import Indices, View
+
+        boxes = [[[0, 0, 16, 16], [0, 0, 16, 16], [16, 16, 32, 32]], [[8, 8, 24, 24]]]
+        dataset = _BoxedImages(boxes, [[0, 0, 1], [1]])
+        duplicates = Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0)
+
+        result = duplicates.evaluate(dataset, per_target=True)
+        assert _get_exact_groups(result, "target").shape[0] == 1
+        plan = result.deduplicate()
+        assert plan == RemovalPlan([SourceIndex(0, 1)])
+
+        cleaned = View(dataset, Indices(plan, exclude=True))
+        assert cleaned[0][1].labels.tolist() == [0, 1]
+        assert _get_exact_groups(duplicates.evaluate(cleaned, per_target=True), "target").shape[0] == 0
 
 
 @pytest.mark.required
@@ -3470,12 +3508,11 @@ class TestMetadataOnly:
         result = Duplicates().evaluate(md, levels="item", duplicate_factors=["timestamp"])
         assert result.factor_groups == [([0, 1], "factors")]
 
-    def test_deduplicate_needs_no_item_count(self, dataset_with_metadata):
-        """Verifies that deduplicate infers item count directly from metadata."""
+    def test_deduplicate_plans_from_metadata_alone(self, dataset_with_metadata):
+        """Verifies that deduplicate plans from a metadata-only result."""
         _, md = dataset_with_metadata
         plan = Duplicates().evaluate(md, duplicate_factors=["timestamp"]).deduplicate(dup_types="factors")
-        assert plan.discard == [1]
-        assert plan.keep == [0, 2, 3]
+        assert plan == RemovalPlan([1])
 
     def test_no_hash_radius_warning_is_raised(self, dataset_with_metadata):
         """Verifies that metadata evaluation raises no hash radius deprecation warning."""

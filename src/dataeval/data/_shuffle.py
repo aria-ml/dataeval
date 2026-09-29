@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 from dataeval.data._view import Operation, View
 from dataeval.protocols import Array
 from dataeval.utils._array import as_numpy
+from dataeval.utils.data import DatasetKind
 
 
 class Shuffle(Operation):
@@ -27,6 +28,8 @@ class Shuffle(Operation):
     --------
     :class:`numpy.random.Generator`
     """
+
+    requires: DatasetKind | None = None
 
     seed: int | NDArray[Any] | SeedSequence | BitGenerator | Generator | None
 

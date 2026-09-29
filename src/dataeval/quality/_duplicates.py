@@ -58,10 +58,12 @@ from dataeval.types import (
     Evaluator,
     EvaluatorConfig,
     FactorLevel,
+    RemovalPlan,
     SourceIndex,
     StatsMap,
     set_metadata,
 )
+from dataeval.types._removal import canonical_address
 from dataeval.utils._array import flatten_samples, to_numpy
 from dataeval.utils.data import iter_images
 
@@ -276,10 +278,26 @@ _EMPTY_DUPS_SCHEMA: dict[str, pl.DataType | type] = {
 _IMAGE_LEVELS = {"item": "item", "target": "target"}
 _TRACKING_LEVELS = {"item": "unit", "target": "instance", "sequence": "sequence", "track": "track"}
 
-# The only levels whose members are whole dataset items, which is what `Indices` addresses. A
-# video's item is its sequence, so `sequence` joins `item` here while `unit` -- one frame of a
-# sequence -- does not: dropping a frame is not dropping the item it came from.
-_ADDRESSES_ITEMS = frozenset({"item", "sequence"})
+# The result levels `deduplicate` turns into addresses: whole items (an image, or a video's sequence) and an
+# image's targets. A video's frame, track and detection rows name their members by position within a sequence
+# and a frame, not by the keys an address uses, so they are not planned yet.
+_PLANNED_LEVELS = frozenset({"item", "sequence", "target"})
+
+
+def _planned_levels(levels: str | Sequence[str] | None) -> frozenset[str]:
+    """Return the result levels a plan is built from, refusing any not yet convertible to addresses."""
+    if levels is None:
+        return _PLANNED_LEVELS
+    asked = frozenset([levels] if isinstance(levels, str) else levels)
+    refused = sorted(asked - _PLANNED_LEVELS)
+    if refused:
+        raise ValueError(
+            f"deduplicate cannot plan removals at level(s) {refused} yet. It plans whole items ('item', "
+            "'sequence') and image targets ('target'). A video's frame, track and detection rows name their "
+            "members by position, not by the keys an address uses."
+        )
+    return asked
+
 
 # The levels an annotation digest speaks about: a whole item, or a whole sequence. A run that
 # asks for neither has nothing to compare annotation against, and so does not read any.
@@ -2360,14 +2378,6 @@ def _is_metadata(data: Any) -> bool:
     return _is_protocol_instance(data, MetadataLike)
 
 
-def _metadata_item_count(metadata: Any) -> int | None:
-    """Return the number of items described by metadata, or None if unavailable."""
-    item_level = getattr(metadata, "item_level", None)
-    if item_level is None or not hasattr(metadata, "rows_at"):
-        return None
-    return int(metadata.rows_at(item_level).height)
-
-
 def _is_tracking(data: Any) -> bool:
     """Whether `data` is a tracking dataset, asked without raising on anything else.
 
@@ -2873,27 +2883,6 @@ def _pair_frame(folded: Mapping[tuple[Any, ...], dict[str, Any]], cross: bool) -
     return frame.drop(drop).sort(["level", "n_groups", "item_a", "item_b"], descending=[False, True, False, False])
 
 
-class DedupePlan(NamedTuple):
-    """What a deduplication policy keeps and what it drops.
-
-    Returned by :meth:`DuplicatesOutput.deduplicate`. Both fields are plain item indices into
-    the source dataset, sorted ascending, and either one feeds
-    :class:`~dataeval.data.Indices` directly.
-
-    Attributes
-    ----------
-    keep : list[int]
-        Every item the policy retains -- not just the survivor of each duplicate set, but
-        every index that is not in `discard`, so ``View(dataset, Indices(plan.keep))`` is the
-        whole deduplicated dataset.
-    discard : list[int]
-        The items the policy drops. Equivalent to ``Indices(plan.discard, exclude=True)``.
-    """
-
-    keep: list[int]
-    discard: list[int]
-
-
 def _discarded(groups: Sequence[Sequence[int]], keep: Literal["first", "last"]) -> list[int]:
     """Merge every group that shares a member, then drop all but one item of each merged set.
 
@@ -2913,29 +2902,15 @@ def _discarded(groups: Sequence[Sequence[int]], keep: Literal["first", "last"]) 
     return sorted(index for members in merged for index in members if index != members[position])
 
 
-def _sum_image_counts(results: StatsResult | Sequence[StatsResult]) -> int:
-    """Total 'image_count' across one or more calculation results.
+def _discarded_addresses(groups: Sequence[Sequence[SourceIndex]], keep: Literal["first", "last"]) -> list[SourceIndex]:
+    """Merge groups sharing a member and drop all but one member of each merged set, in address order.
 
-    `image_count` is `NotRequired` so `track_stats` results, which place their values by
-    level and key and never counted images, can share `StatsResult`. A result that lacks it
-    is not the same as one that is zero, so this raises instead of reading the absence as
-    zero.
+    Numbers each distinct address by its place in ``SourceIndex.sort_key`` order and hands the numbers to
+    `_discarded`, so "first" and "last" mean the same thing for a detection as for an item.
     """
-    every = [results] if isinstance(results, Mapping) else list(results)
-    counts: list[int] = []
-    unaddressable: list[int] = []
-    for i, result in enumerate(every):
-        if "image_count" in result:
-            counts.append(int(result["image_count"]))
-        else:
-            unaddressable.append(i)
-    if unaddressable:
-        raise ValueError(
-            f"Cannot resolve item count from calculation_results: result(s) at index "
-            f"{unaddressable} carry no 'image_count', as ego_stats and track_stats "
-            "results do not. Pass n_items=len(dataset) instead.",
-        )
-    return sum(counts)
+    members = sorted({member for group in groups for member in group}, key=lambda member: member.sort_key)
+    number = {member: position for position, member in enumerate(members)}
+    return [members[i] for i in _discarded([[number[member] for member in group] for group in groups], keep)]
 
 
 class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDuplicatesGroup]):
@@ -2976,7 +2951,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
          - :attr:`sequences`, :attr:`frames`, :attr:`tracks`, :attr:`detections`
        * - The groups as plain indices, to act on
          - :attr:`exact`, :attr:`near`
-       * - Which indices to keep and which to drop, under a policy I state
+       * - What to remove, under a policy I state
          - :meth:`deduplicate`
        * - Everything, unreshaped
          - :meth:`data`
@@ -3081,7 +3056,6 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         annotation_divergences: Mapping[_PairKey, AnnotationDivergence] | None = None,
         factor_groups: MethodGroups | None = None,
         factor_cardinality: Mapping[str, int] | None = None,
-        item_count: int | None = None,
     ) -> None:
         super().__init__(data)
         self.calculation_results = calculation_results
@@ -3104,7 +3078,6 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         self.annotation_divergences = annotation_divergences
         self.factor_groups = factor_groups
         self.factor_cardinality = factor_cardinality
-        self.item_count = item_count
 
     def _segment_policy(self, hash_radius: int | None = None) -> _SegmentPolicy:
         """Rebuild the shared-stretch policy these results were found under."""
@@ -3244,7 +3217,6 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             annotation_divergences=self.annotation_divergences,
             factor_groups=self.factor_groups,
             factor_cardinality=self.factor_cardinality,
-            item_count=self.item_count,
         )
 
     @property
@@ -3781,94 +3753,65 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     # Acting on the result
     # ------------------------------------------------------------------
 
-    def _counted_items(self) -> int | None:
-        """Return the number of items recorded in this result, or None if unavailable."""
-        if self.frame_map is not None and len(self.frame_map):
-            # A video's items are its sequences, and the frame map names the sequence each
-            # measured frame came from.
-            return int(self.frame_map[:, 0].max()) + 1
-        if self.calculation_results is not None:
-            return _sum_image_counts(self.calculation_results)
-        if self.cluster_result is not None:
-            return int(len(self.cluster_result["clusters"]))
-        return self.item_count
-
-    def _item_count(self, n_items: int | None) -> int:
-        """Resolve how many items the source dataset holds, which `keep` is the complement of."""
-        if n_items is not None:
-            return int(n_items)
-        counted = self._counted_items()
-        if counted is None:
-            raise ValueError(
-                "deduplicate cannot tell how many items the dataset holds: this result carries "
-                "neither statistics nor clusters to read it off. Pass n_items=len(dataset), or use "
-                "Indices(plan.discard, exclude=True), which needs no count.",
-            )
-        return counted
-
     def deduplicate(
         self,
         *,
         dup_types: str | Sequence[str] = "exact",
         keep: Literal["first", "last"] = "first",
         exclude_groups: Sequence[int] | None = None,
-        n_items: int | None = None,
-    ) -> DedupePlan:
-        """Turn these duplicates into the indices to keep and the indices to drop.
+        levels: str | Sequence[str] | None = None,
+    ) -> RemovalPlan:
+        """Turn these duplicates into a plan of what to remove.
 
-        The one method here that acts on a policy rather than only reporting. Every choice the
-        policy makes is an argument, because none of them follow from the evidence: which kinds
-        of duplicate are worth collapsing, which member of a set survives, and which groups to
-        leave alone are yours to state.
+        The one method here that acts on a policy rather than only reporting. Every choice the policy makes is an
+        argument, because none of them follow from the evidence: which kinds of duplicate are worth collapsing,
+        which member of a set survives, which groups to leave alone, and at which levels are yours to state.
 
         Parameters
         ----------
         dup_types : str or Sequence[str], default ``"exact"``
-            Which ``dup_type`` values to collapse. The default touches only exact matches, where
-            the members are the same content and dropping all but one loses nothing. Add
-            ``"near"`` to collapse near duplicates, which is a judgment about how similar is too
-            similar. ``"redundant"`` relates a sequence to itself and names no items to drop;
-            see :meth:`aggregate_by_sequence` for that.
+            Which ``dup_type`` values to collapse. The default touches only exact matches, where the members are
+            the same content and removing all but one loses nothing. Add ``"near"`` to collapse near duplicates,
+            which is a judgment about how similar is too similar. ``"redundant"`` relates a sequence to itself and
+            names nothing to remove.
         keep : {"first", "last"}, default "first"
-            Which member of each merged duplicate set survives -- the lowest item index, or the
-            highest.
+            Which member of each merged duplicate set survives: the first or the last in address order, which for
+            whole items is the lowest or the highest item index.
         exclude_groups : Sequence[int] or None, default None
-            ``group_id`` values to leave alone. An excluded group contributes nothing, so its
-            members are not collapsed *on its account*; a member that also sits in a group you
-            did not exclude can still be dropped through that one.
-        n_items : int or None, default None
-            How many items the source dataset holds. Read off the stored statistics, clusters or
-            frame map when None, which covers every result these detectors produce. Pass it when
-            the result was built by hand.
+            ``group_id`` values to leave alone. An excluded group contributes nothing, so its members are not
+            collapsed *on its account*; a member that also sits in a group you did not exclude can still be
+            removed through that one.
+        levels : str or Sequence[str] or None, default None
+            Which of the result's ``level`` values to plan from: ``"item"`` and ``"sequence"`` for whole items,
+            ``"target"`` for an image's detections. None plans from every one of these the result holds. A result
+            only holds target rows when you asked Duplicates for them, so no second opt-in is needed.
 
         Returns
         -------
-        DedupePlan
-            ``keep`` and ``discard``, both plain item indices.
+        RemovalPlan
+            The rows to remove. Pass it to :class:`~dataeval.data.Indices` with ``exclude=True``.
 
         Raises
         ------
         ValueError
-            If the result spans multiple datasets, where the question is leakage rather than
-            deduplication -- see :meth:`aggregate_by_pair`. Also if the item count cannot be
-            resolved and ``n_items`` was not given.
+            If the result spans several datasets, where the question is leakage rather than deduplication (see
+            :meth:`aggregate_by_pair`), or if `levels` names a level this version cannot plan: a video's frame,
+            track and detection rows.
 
         See Also
         --------
-        :class:`~dataeval.data.Indices` : The operation that consumes either list
+        :class:`~dataeval.data.Indices` : The operation that applies the plan
         :meth:`~dataeval.quality.DuplicatesOutput.aggregate_by_pair` : Which items duplicate which
 
         Notes
         -----
-        **Only whole items are collapsed.** Target-, frame-, track- and detection-level groups
-        are skipped: :class:`~dataeval.data.Indices` addresses dataset items, and those rows name
-        something smaller. For a video dataset the item is the sequence, so whole-sequence groups
-        take part and per-frame ones do not.
+        **Overlapping groups are merged first.** An item routinely sits in several groups, and choosing a survivor
+        within each group separately can remove an item that another group is keeping. Groups sharing a member are
+        merged into one set, and one member of that set survives. Groups at different levels never share a member,
+        so an image and its own detection are planned separately.
 
-        **Overlapping groups are merged first.** An item routinely sits in several groups;
-        choosing a survivor within each group separately can discard an item that another group
-        is keeping. Groups sharing any member are merged into one set, and one member of that set
-        survives.
+        **Apply the plan to the dataset this result was computed on.** Its item indices are positions in that
+        dataset.
 
         Examples
         --------
@@ -3876,28 +3819,31 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
 
         >>> result = Duplicates().evaluate(dataset)
         >>> plan = result.deduplicate()
-        >>> deduplicated = View(dataset, Indices(plan.keep))
+        >>> deduplicated = View(dataset, Indices(plan, exclude=True))
 
         Collapse near duplicates too, but leave one group untouched:
 
         >>> plan = result.deduplicate(dup_types=("exact", "near"), exclude_groups=[3])
         """
-        if "dataset_indices" in self.data().columns:
+        frame = self.data()
+        if "dataset_indices" in frame.columns:
             raise ValueError(
                 "deduplicate only works with output from a single dataset. Across datasets the "
                 "question is which content is shared, not which copy to drop -- see "
                 "aggregate_by_pair().",
             )
-        total = self._item_count(n_items)
         wanted = [dup_types] if isinstance(dup_types, str) else list(dup_types)
-        rows = self.data().filter(
-            pl.col("level").is_in(list(_ADDRESSES_ITEMS))
+        rows = frame.filter(
+            pl.col("level").is_in(list(_planned_levels(levels)))
             & pl.col("dup_type").is_in(wanted)
             & ~pl.col("group_id").is_in(list(exclude_groups or [])),
         )
-        discard = _discarded(rows["item_indices"].to_list(), keep)
-        dropped = set(discard)
-        return DedupePlan(keep=[index for index in range(total) if index not in dropped], discard=discard)
+        has_targets = "target_indices" in frame.columns
+        groups = [
+            [canonical_address(member) for member in _extract_members(row, has_targets)]
+            for row in rows.iter_rows(named=True)
+        ]
+        return RemovalPlan(_discarded_addresses(groups, keep))
 
     # ------------------------------------------------------------------
     # Redetection
@@ -4041,7 +3987,6 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             annotation_divergences=divergences,
             factor_groups=self.factor_groups,
             factor_cardinality=self.factor_cardinality,
-            item_count=self.item_count,
         )
 
 
@@ -4898,7 +4843,6 @@ class Duplicates(Evaluator):
             annotation_divergences=divergences,
             factor_groups=factor_groups,
             factor_cardinality=factor_cardinality,
-            item_count=_metadata_item_count(metadata),
         )
 
     def _evaluate_single(

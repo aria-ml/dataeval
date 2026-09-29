@@ -13,6 +13,7 @@ from numpy.typing import NDArray
 from dataeval.data._view import Operation, View
 from dataeval.flags import ImageStats
 from dataeval.utils._array import as_numpy
+from dataeval.utils.data import DatasetKind
 from dataeval.utils.preprocessing import _validate_index_selection, normalize_image_shape
 
 ChannelSelection: TypeAlias = "Sequence[int] | Literal['gray', 'rgb']"
@@ -114,6 +115,8 @@ class SelectChannels(Operation):
     >>> view[0][0].shape
     (3, 64, 64)
     """
+
+    requires: DatasetKind | None = None
 
     def __init__(self, channels: ChannelSelection, *, invalidates: ImageStats | None = None) -> None:
         _validate_params(channels)

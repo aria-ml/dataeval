@@ -136,6 +136,27 @@ for k, v in duplicates.items():
 
 
 # %% [markdown]
+# ## Removing the duplicates
+#
+# `deduplicate()` turns the result into a plan of what to remove. Its arguments state the policy: which kinds of
+# duplicate to collapse, and which member of each set to keep. By default it collapses exact duplicates and keeps
+# the first member of each set.
+#
+# Pass the plan to `Indices` with `exclude=True`. Build the view on `duplicates_ds`, the dataset the result was
+# computed on, because the plan names positions in that dataset.
+
+# %%
+plan = results.deduplicate()
+deduplicated_ds = View(duplicates_ds, Indices(plan, exclude=True))
+print(plan)
+print(f"{len(duplicates_ds)} items before, {len(deduplicated_ds)} after")
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+assert len(plan) == len(duplicates)
+assert len(deduplicated_ds) == len(duplicates_ds) - len(duplicates)
+
+# %% [markdown]
 # ## Beyond pixels: annotation duplicates
 #
 # MNIST has no object detection targets, so everything above compared pixels only. When a dataset does carry targets

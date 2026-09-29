@@ -13,6 +13,7 @@ from dataeval.data._geometry import GeometryMap, rewrite_geometry
 from dataeval.data._view import Operation, View
 from dataeval.flags import ImageStats
 from dataeval.utils._array import as_numpy, resize_chw
+from dataeval.utils.data import DatasetKind
 from dataeval.utils.preprocessing import crop_with_fill, normalize_image_shape
 
 ResizeMode: TypeAlias = Literal["stretch", "pad", "crop"]
@@ -148,6 +149,8 @@ class Resize(Operation):
     >>> image.shape
     (3, 64, 64)
     """
+
+    requires: DatasetKind | None = None
 
     def __init__(
         self,

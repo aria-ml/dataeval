@@ -1,7 +1,7 @@
 __all__ = []
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any, TypeVar
 
 from dataeval.flags import ImageStats
@@ -12,6 +12,39 @@ from dataeval.utils.data import DatasetKind, validate_dataset
 _TDatum = TypeVar("_TDatum")
 
 Transform = Callable[[Any], Any]
+
+IndexedTransform = Callable[[int, Any], Any]
+
+
+class _Restricted:
+    """A transform registered with `where`, in the ``(index, datum)`` form :meth:`View.read` applies.
+
+    A class rather than a closure so that a view holding it pickles, which a multi-worker DataLoader needs.
+    """
+
+    def __init__(self, fn: Transform, where: set[int] | None) -> None:
+        self.fn = fn
+        self.where = where
+
+    def __call__(self, index: int, datum: Any) -> Any:
+        """Apply the transform if `index` is one it targets, and return `datum` unchanged otherwise."""
+        if self.where is None or index in self.where:
+            return self.fn(datum)
+        return datum
+
+
+class _EachIndex:
+    """The transforms :meth:`View.map_each` registers, looked up by source index on each read.
+
+    A class rather than a closure so that a view holding it pickles, which a multi-worker DataLoader needs.
+    """
+
+    def __init__(self, chosen: Mapping[int, Transform]) -> None:
+        self.chosen = dict(chosen)
+
+    def __call__(self, index: int, datum: Any) -> Any:
+        """Apply the transform chosen for `index`, and return `datum` unchanged if none was."""
+        return self.chosen[index](datum) if index in self.chosen else datum
 
 
 def _aggregate_required_kind(kinds: Iterable[DatasetKind | None]) -> DatasetKind | None:
@@ -38,7 +71,8 @@ class Operation(ReprMixin, ABC):
     - **change cardinality / order** — set or reorder :attr:`View.selection`, the list
       of surviving source indices (filter, reorder, limit, resample).
     - **rewrite content** — register a per-datum transform via :meth:`View.map`; a
-      transform may target every datum or only a subset of source indices.
+      transform may target every datum or only a subset of source indices, or,
+      through :meth:`View.map_each`, give each source index its own transform.
     - **rewrite metadata** — override :meth:`apply_metadata`, folded once at build.
 
     Operations run in the order given, and each reads the source *through* the
@@ -52,7 +86,9 @@ class Operation(ReprMixin, ABC):
         *target*. :class:`View` aggregates the ``requires`` of all operations and
         validates the source dataset once, upfront, raising
         :class:`~dataeval.exceptions.MaiteShapeError` before any operation runs.
-        Leave as ``None`` when the operation ignores targets.
+        Leave as ``None`` when the operation ignores targets. An operation whose need
+        depends on its arguments sets it on the instance in ``__init__``, as
+        :class:`~dataeval.data.Indices` does, before the view reads it.
 
     Examples
     --------
@@ -78,8 +114,8 @@ class Operation(ReprMixin, ABC):
         evaluators intersect this against the statistics they were asked to compute and warn
         on the overlap; it never changes what is computed.
 
-        Unlike :attr:`requires`, which is a static class attribute, this is a read-only
-        property, and concrete operations override it as one — what a transform invalidates
+        Unlike :attr:`requires`, which is an attribute an operation may set per instance,
+        this is a read-only property, and concrete operations override it as one — what a transform invalidates
         depends on its constructor arguments (``Resize(size, mode="stretch")`` leaves the
         pixel statistics alone; ``mode="pad"`` does not). A wrapper *dataset* may declare it
         directly instead (see :class:`~dataeval.data.DetectionCrops`), as either a class
@@ -160,7 +196,7 @@ class View(AnnotatedDataset[_TDatum]):
         self._dataset = dataset
         self._operations = self._normalize(operations)
         self.selection = list(range(len(dataset)))
-        self._transforms: list[tuple[Transform, set[int] | None]] = []
+        self._transforms: list[IndexedTransform] = []
 
         # Fail fast if any operation requires a target the source dataset cannot provide.
         required_kind = _aggregate_required_kind(op.requires for op in self._operations)
@@ -189,14 +225,46 @@ class View(AnnotatedDataset[_TDatum]):
     # -- levers an Operation uses ---------------------------------------------
     def map(self, fn: Transform, *, where: set[int] | None = None) -> None:
         """Register a per-datum content transform. ``where=None`` targets all indices."""
-        self._transforms.append((fn, where))
+        self._transforms.append(_Restricted(fn, where))
+
+    def map_each(self, transforms: Mapping[int, Transform]) -> None:
+        """
+        Register a different content transform for each of several source indices, as one step.
+
+        :meth:`map` gives every datum it targets the same transform. An operation that rewrites each datum
+        differently, such as :class:`~dataeval.data.Indices` removing different detections from each image, would
+        need one :meth:`map` call per datum, and every read would then check every one of them. This registers
+        them together, and a read looks up its own index once.
+
+        Parameters
+        ----------
+        transforms : Mapping[int, Callable[[Any], Any]]
+            The transform for each source index, keyed as :meth:`map`'s `where` is: by index into the dataset this
+            view wraps. An index the mapping does not hold is left unchanged.
+
+        Notes
+        -----
+        The step runs in registration order with the ones :meth:`map` registers. The mapping is copied, so changing
+        it afterwards changes nothing.
+
+        Examples
+        --------
+        >>> from dataeval.data import View
+
+        Upper-case the first datum and title-case the third, leaving the second as it is:
+
+        >>> view = View(["ab", "cd", "ef"])
+        >>> view.map_each({0: str.upper, 2: str.title})
+        >>> list(view)
+        ['AB', 'cd', 'Ef']
+        """
+        self._transforms.append(_EachIndex(transforms))
 
     def read(self, src_index: int) -> _TDatum:
         """Read one source datum with all currently-registered transforms applied."""
         datum = self._dataset[src_index]
-        for fn, where in self._transforms:
-            if where is None or src_index in where:
-                datum = fn(datum)
+        for transform in self._transforms:
+            datum = transform(src_index, datum)
         return datum
 
     # -- dataset interface ----------------------------------------------------

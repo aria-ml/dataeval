@@ -3,6 +3,7 @@ __all__ = []
 from typing import Any
 
 from dataeval.data._view import Operation, View
+from dataeval.utils.data import DatasetKind
 
 
 class Limit(Operation):
@@ -19,6 +20,8 @@ class Limit(Operation):
     size : int
         The maximum size of the dataset.
     """
+
+    requires: DatasetKind | None = None
 
     def __init__(self, size: int) -> None:
         self.size = size

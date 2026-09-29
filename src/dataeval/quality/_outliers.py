@@ -34,6 +34,7 @@ from dataeval.types import (
     Evaluator,
     EvaluatorConfig,
     FactorLevel,
+    RemovalPlan,
     SourceIndex,
     StatsMap,
     set_metadata,
@@ -52,6 +53,16 @@ SingleTargetOutliersMap = Mapping[SourceIndex, Sequence[str]]
 MultiOutliersMap = Mapping[int, Mapping[int, Sequence[str]]]
 MultiTargetOutliersMap = Mapping[int, Mapping[SourceIndex, Sequence[str]]]
 TOutliers = TypeVar("TOutliers", SingleOutliersMap, SingleTargetOutliersMap, MultiOutliersMap, MultiTargetOutliersMap)
+
+
+def _row_address(row: Mapping[str, Any], *, has_level: bool) -> SourceIndex:
+    """Return the address an outliers row names, spelled as the result spelled it.
+
+    The level is carried rather than filled in: an unstated one is the task-generic reading, and stating it here
+    would make ``outliers[SourceIndex(0, 3)]`` (the spelling a caller writes) miss the row it names, since two
+    spellings of one address do not hash alike.
+    """
+    return SourceIndex(row["item_index"], row.get("target_index"), row["level"] if has_level else None)
 
 
 class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
@@ -175,25 +186,12 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         # the item's own row, and which level that is is what the column says.
         has_targets = has_level or ("target_index" in df.columns and df["target_index"].null_count() < len(df))
 
-        def address(row: Mapping[str, Any]) -> SourceIndex:
-            """Return the row's address, spelled as the result that produced it spelled it.
-
-            The level is carried rather than filled in: an unstated one is the task-generic
-            reading, and stating it here would make ``outliers[SourceIndex(0, 3)]`` — the
-            spelling a caller writes — miss the row it names, since two spellings of one
-            address do not hash alike.
-            """
-            return SourceIndex(
-                row["item_index"],
-                row.get("target_index"),
-                row["level"] if has_level else None,
-            )
-
         if is_cross:
             if has_targets:
                 result_cross_target: dict[int, dict[SourceIndex, list[str]]] = {}
                 for row in df.iter_rows(named=True):
-                    result_cross_target.setdefault(row["dataset_index"], {}).setdefault(address(row), []).append(
+                    address = _row_address(row, has_level=has_level)
+                    result_cross_target.setdefault(row["dataset_index"], {}).setdefault(address, []).append(
                         row["metric_name"]
                     )
                 return result_cross_target  # type: ignore[return-value]
@@ -207,7 +205,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         if has_targets:
             result_target: dict[SourceIndex, list[str]] = {}
             for row in df.iter_rows(named=True):
-                result_target.setdefault(address(row), []).append(row["metric_name"])
+                result_target.setdefault(_row_address(row, has_level=has_level), []).append(row["metric_name"])
             return result_target  # type: ignore[return-value]
 
         result_single: dict[int, list[str]] = {}
@@ -707,6 +705,88 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         if outlier_threshold is self._UNSET and cluster_threshold is self._UNSET:
             raise ValueError("At least one of outlier_threshold or cluster_threshold must be provided.")
         return self._redetect(outlier_threshold=outlier_threshold, cluster_threshold=cluster_threshold)
+
+    def _check_metrics(self, wanted: Sequence[str]) -> None:
+        """Refuse metric names this result was not measured on, when it kept the statistics that say so."""
+        combined = self._combined
+        if combined is None and self.cluster_stats is None:
+            return
+        known = set(self.data()["metric_name"].cast(pl.Utf8).to_list())
+        if combined is not None:
+            known |= set(combined[0])
+        if self.cluster_stats is not None:
+            known.add("cluster_distance")
+        unknown = sorted(set(wanted) - known)
+        if unknown:
+            raise ValueError(f"prune: {unknown} are not metrics this result was measured on; it holds {sorted(known)}.")
+
+    def prune(
+        self,
+        *,
+        metrics: str | Sequence[str] | None = None,
+        min_flags: int = 1,
+    ) -> RemovalPlan:
+        """
+        Turn these outliers into a plan of what to remove.
+
+        Every choice the policy makes is an argument: which metrics are worth removing a row over, and how many of
+        them have to agree. The result itself only reports.
+
+        Parameters
+        ----------
+        metrics : str or Sequence[str] or None, default None
+            The metrics whose flags count. None counts every metric.
+        min_flags : int, default 1
+            How many distinct metrics, among those that count, have to flag a row before it is removed.
+
+        Returns
+        -------
+        RemovalPlan
+            The flagged rows: whole items, or detections when the statistics were measured per target, at the
+            level each row was flagged at. Pass it to :class:`~dataeval.data.Indices` with ``exclude=True``.
+
+        Raises
+        ------
+        ValueError
+            If the result spans several datasets, if `min_flags` is less than 1, or if `metrics` names a metric
+            this result was not measured on. The last is checked only when the result kept its statistics or
+            cluster statistics; without them an unknown name cannot be told from one that flagged nothing.
+
+        Notes
+        -----
+        A metric that was measured but flagged nothing is not an error: it contributes no rows.
+
+        Apply the plan to the dataset this result was computed on. Its item indices are positions in that dataset.
+
+        On tracking data a plan can name frames, which :class:`~dataeval.data.Indices` cannot remove yet. Leave
+        them out before you apply the plan: ``RemovalPlan(a for a in plan if a.kind != "unit")``.
+
+        Examples
+        --------
+        >>> from dataeval.data import Indices, View
+        >>> from dataeval.flags import ImageStats
+
+        >>> result = Outliers(flags=ImageStats.VISUAL).evaluate(dataset)
+        >>> plan = result.prune(min_flags=2)
+        >>> cleaned = View(dataset, Indices(plan, exclude=True))
+        """
+        frame = self.data()
+        if "dataset_index" in frame.columns:
+            raise ValueError(
+                "prune only works with output from a single dataset, since a plan names rows of one dataset. "
+                "Evaluate each dataset on its own and prune each result."
+            )
+        if min_flags < 1:
+            raise ValueError(f"min_flags must be at least 1; got {min_flags}.")
+        if metrics is not None:
+            wanted = [metrics] if isinstance(metrics, str) else list(metrics)
+            self._check_metrics(wanted)
+            frame = frame.filter(pl.col("metric_name").cast(pl.Utf8).is_in(wanted))
+        has_level = "level" in frame.columns
+        flagged: dict[SourceIndex, set[str]] = {}
+        for row in frame.iter_rows(named=True):
+            flagged.setdefault(_row_address(row, has_level=has_level), set()).add(str(row["metric_name"]))
+        return RemovalPlan(address for address, names in flagged.items() if len(names) >= min_flags)
 
 
 # Convenience type aliases for parameterized output

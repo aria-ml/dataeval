@@ -10,6 +10,7 @@ from dataeval.data._geometry import GeometryMap, rewrite_geometry
 from dataeval.data._view import Operation, View
 from dataeval.flags import ImageStats
 from dataeval.utils._array import as_numpy
+from dataeval.utils.data import DatasetKind
 from dataeval.utils.preprocessing import normalize_image_shape
 
 #: Cropping reframes the image, so every dimension statistic describes the region rather
@@ -76,6 +77,8 @@ class Crop(Operation):
     >>> image.shape
     (3, 44, 64)
     """
+
+    requires: DatasetKind | None = None
 
     def __init__(self, region: tuple[int, int, int, int], *, invalidates: ImageStats | None = None) -> None:
         _validate_params(region)

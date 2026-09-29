@@ -1917,3 +1917,115 @@ class TestClusterDistanceReportsARawValue:
         assert flagged["population_mean"].null_count() == 0
         assert flagged["population_std"].null_count() == 0
         assert flagged["direction"].to_list() == ["upper"] * flagged.height
+
+
+def _flags(rows: list[dict]) -> pl.DataFrame:
+    """A hand-built outliers frame; only the columns prune reads."""
+    schema = {"item_index": pl.Int64, "target_index": pl.Int64, "metric_name": pl.Utf8, "metric_value": pl.Float64}
+    defaults: dict = {"metric_value": 1.0, "target_index": None}
+    if any("level" in row for row in rows):
+        schema["level"] = pl.Utf8
+        defaults["level"] = None
+    return pl.DataFrame([{**defaults, **row} for row in rows], schema=schema)
+
+
+@pytest.mark.required
+class TestPrune:
+    """The removal plan an outliers result gives under a stated policy."""
+
+    ROWS = [
+        {"item_index": 1, "metric_name": "a"},
+        {"item_index": 1, "metric_name": "b"},
+        {"item_index": 2, "metric_name": "a"},
+    ]
+
+    def test_every_flagged_item_by_default(self):
+        from dataeval.types import RemovalPlan
+
+        assert OutliersOutput(_flags(self.ROWS)).prune() == RemovalPlan([1, 2])
+
+    def test_min_flags_counts_distinct_metrics(self):
+        from dataeval.types import RemovalPlan
+
+        assert OutliersOutput(_flags(self.ROWS)).prune(min_flags=2) == RemovalPlan([1])
+
+    def test_metrics_limits_which_flags_count(self):
+        from dataeval.types import RemovalPlan
+
+        output = OutliersOutput(_flags(self.ROWS))
+        assert output.prune(metrics="b") == RemovalPlan([1])
+        assert output.prune(metrics=["a"]) == RemovalPlan([1, 2])
+
+    def test_detection_rows_become_detection_addresses(self):
+        from dataeval.types import RemovalPlan
+
+        rows = [{"item_index": 5, "target_index": 2, "metric_name": "a"}, {"item_index": 5, "metric_name": "a"}]
+        assert OutliersOutput(_flags(rows)).prune() == RemovalPlan([5, SourceIndex(5, 2)])
+
+    def test_a_stated_level_is_kept(self):
+        from dataeval.types import RemovalPlan
+
+        rows = [{"item_index": 0, "target_index": 12, "level": "unit", "metric_name": "a"}]
+        assert OutliersOutput(_flags(rows)).prune() == RemovalPlan([SourceIndex(0, 12, "unit")])
+
+    def test_min_flags_below_one_is_refused(self):
+        with pytest.raises(ValueError, match="min_flags"):
+            OutliersOutput(_flags(self.ROWS)).prune(min_flags=0)
+
+    def test_a_cross_dataset_result_is_refused(self):
+        frame = _flags(self.ROWS).with_columns(pl.lit(0).alias("dataset_index"))
+        with pytest.raises(ValueError, match="single dataset"):
+            OutliersOutput(frame).prune()
+
+    def test_a_measured_metric_that_flagged_nothing_prunes_nothing(self):
+        from dataeval.types import RemovalPlan
+
+        images = np.random.default_rng(0).random((16, 3, 16, 16))
+        stats = compute_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS | ImageStats.VISUAL_CONTRAST)
+        flagged, quiet = sorted(stats["stats"])[:2]
+        output = OutliersOutput(_flags([{"item_index": 1, "metric_name": flagged}]), calculation_results=stats)
+        assert output.prune(metrics=quiet) == RemovalPlan()
+
+    def test_a_metric_the_result_never_measured_is_refused(self):
+        images = np.random.default_rng(0).random((16, 3, 16, 16))
+        stats = compute_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS)
+        output = OutliersOutput(_flags(self.ROWS), calculation_results=stats)
+        with pytest.raises(ValueError, match="not metrics"):
+            output.prune(metrics="no_such_metric")
+
+    def test_without_statistics_any_name_is_accepted(self):
+        from dataeval.types import RemovalPlan
+
+        assert OutliersOutput(_flags(self.ROWS)).prune(metrics="anything") == RemovalPlan()
+
+    def test_a_classwise_result_gives_a_plan(self):
+        """Image 5 is dark among bright class 0, so only the per-class thresholds flag it."""
+        from dataeval.types import RemovalPlan
+
+        rng = np.random.default_rng(42)
+        images = rng.random((20, 3, 16, 16))
+        images[:10] = images[:10] * 0.3 + 0.7
+        images[10:] = images[10:] * 0.3
+        images[5] = 0.01
+        metadata = MockMetadata(
+            class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
+            factor_data=np.array([], dtype=np.int64),
+            factor_names=[],
+            is_binned=[],
+            index2label={0: "bright", 1: "dark"},
+        )
+        classwise = Outliers(flags=ImageStats.PIXEL, outlier_threshold=1.5).evaluate(images).classwise(metadata)
+        plan = classwise.prune()
+        assert isinstance(plan, RemovalPlan)
+        assert 5 in plan
+        assert plan == RemovalPlan(classwise.data()["item_index"].unique().to_list())
+
+    def test_the_plan_feeds_view_directly(self):
+        from dataeval.data import Indices, View
+
+        images = np.random.default_rng(0).random((20, 3, 16, 16)) * 0.2
+        images = np.concatenate((images, np.ones((1, 3, 16, 16))))
+        plan = Outliers(flags=ImageStats.VISUAL_BRIGHTNESS).evaluate(images).prune()
+        view = View(images, Indices(plan, exclude=True))
+        assert 20 not in view.selection
+        assert len(view) == 21 - len(plan)

@@ -40,6 +40,7 @@ __all__ = [
     "ParseValue",
     "ReductionName",
     "Remap",
+    "RemovalPlan",
     "ReprMixin",
     "Rescale",
     "SCHEMA_VERSION",
@@ -89,6 +90,7 @@ from dataeval.types._output import (
     SequenceOutput,
     set_metadata,
 )
+from dataeval.types._removal import RemovalPlan
 from dataeval.types._schema import (
     SCHEMA_VERSION,
     DatasetInfo,

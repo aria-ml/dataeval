@@ -1,6 +1,6 @@
 __all__ = []
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -58,15 +58,20 @@ class ClassFilter(Operation):
 
         view.selection = selection
         if mask_where:
-            view.map(_mask_to_classes(self.classes), where=mask_where)
+            view.map(_MaskToClasses(self.classes), where=mask_where)
 
 
-def _mask_to_classes(classes: Sequence[int]) -> Callable[[Any], Any]:
-    keep = list(classes)
+class _MaskToClasses:
+    """The transform that drops the detections outside `classes` from one datum's target and its metadata.
 
-    def mask(datum: Any) -> Any:
+    A class rather than a closure so that a view holding it pickles, which a multi-worker DataLoader needs.
+    """
+
+    def __init__(self, classes: Sequence[int]) -> None:
+        self.keep = list(classes)
+
+    def __call__(self, datum: Any) -> Any:
+        """Return `datum` with only the detections whose label is kept."""
         image, target, metadata = datum
-        detection_mask = np.isin(as_numpy(target.labels), keep)
+        detection_mask = np.isin(as_numpy(target.labels), self.keep)
         return image, MaskedTarget(target, detection_mask), mask_metadata(metadata, detection_mask)
-
-    return mask
