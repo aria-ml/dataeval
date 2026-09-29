@@ -17,7 +17,9 @@ class ClassFilter(Operation):
     Select dataset indices based on class labels, keeping only those present in `classes`.
 
     Filters images by class (cardinality) and, for object-detection and segmentation
-    datasets, masks out the detections that belong to other classes (content). Reads
+    datasets, masks out the detections that belong to other classes (content). A
+    segmentation mask with one plane per detection, shape ``(N, H, W)``, loses the planes of
+    the detections it drops; a label map, shape ``(H, W)``, is kept whole. Reads
     each datum through preceding operations, so ``[Relabel(...), ClassFilter([0])]``
     filters on the relabeled vocabulary.
 

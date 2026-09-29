@@ -26,6 +26,11 @@ def try_mask_object(obj: T, mask: NDArray[np.bool_]) -> T:
     return obj
 
 
+def _is_label_map(name: str, value: Any) -> bool:
+    """Tell whether `value` is a segmentation label map, whose first axis holds rows of pixels, not detections."""
+    return name == "mask" and len(getattr(value, "shape", ())) == 2
+
+
 def materialize_target_attrs(target: Any) -> dict[str, Any]:
     """Collect a MAITE target's attributes into a plain dict for ``MaskedTarget.__dict__``.
 
@@ -62,7 +67,9 @@ class MaskedTarget:
 
     Each attribute read is filtered through :func:`try_mask_object`, dropping detections
     where ``mask`` is False. ``overrides`` supplies replacement values (e.g. relabeled
-    ``labels``) that bypass masking.
+    ``labels``) that bypass masking. A segmentation ``mask`` of shape ``(H, W)`` is a label
+    map, not one plane per detection, so it passes through whole even when ``H`` matches the
+    detection count.
 
     ``__init__`` copies the target's protocol-relevant attributes into ``__dict__`` so a
     ``getattr_static``-based ``isinstance`` check still recognizes the proxy as the wrapped
@@ -80,4 +87,5 @@ class MaskedTarget:
             return super().__getattribute__(name)
         if name in self._overrides:
             return self._overrides[name]
-        return try_mask_object(getattr(self._target, name), self._mask)
+        value = getattr(self._target, name)
+        return value if _is_label_map(name, value) else try_mask_object(value, self._mask)

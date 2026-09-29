@@ -72,3 +72,29 @@ class TestMaterializeTargetAttrs:
 
         proxy = MaskedTarget(_SegPropertyBacked(), np.array([True]))
         assert _is_protocol_instance(proxy, SegmentationTarget)
+
+
+@pytest.mark.required
+class TestMaskedTarget:
+    @staticmethod
+    def _segmentation(mask):
+        class _Seg:
+            def __init__(self) -> None:
+                self.mask = mask
+                self.labels = np.asarray([0, 1], dtype=np.intp)
+                self.scores = np.asarray([0.9, 0.8], dtype=np.float32)
+
+        return _Seg()
+
+    def test_one_mask_per_detection_loses_the_dropped_detections(self):
+        planes = np.arange(12).reshape(2, 2, 3)
+        proxy = MaskedTarget(self._segmentation(planes), np.array([True, False]))
+        np.testing.assert_array_equal(proxy.mask, planes[:1])
+
+    def test_a_label_map_is_kept_whole_when_its_height_equals_the_detection_count(self):
+        """An (H, W) map's first axis holds rows of pixels, not detections, so matching the
+        detection count by coincidence must not cut rows from it."""
+        label_map = np.arange(6).reshape(2, 3)
+        proxy = MaskedTarget(self._segmentation(label_map), np.array([True, False]))
+        np.testing.assert_array_equal(proxy.mask, label_map)
+        np.testing.assert_array_equal(proxy.labels, [0])

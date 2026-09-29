@@ -176,6 +176,10 @@ class Indices(Operation):
     Removing every detection in an image or a frame leaves the image or frame, since an unlabeled one is valid
     data.
 
+    **A segmentation label map is kept whole.** A mask with one plane per detection, shape ``(N, H, W)``, loses
+    the removed detections' planes. A label map, shape ``(H, W)``, keeps every pixel, since its pixels are not
+    divided by detection.
+
     **Detections are renumbered.** :class:`~dataeval.Metadata` built over the view numbers the remaining
     detections from 0, within each image, and across each whole sequence on a tracking dataset, so an address
     from before the removal does not name the same detection afterwards.

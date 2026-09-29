@@ -332,6 +332,17 @@ class TestObjectDetectionSelections:
 
 
 @pytest.mark.required
+class TestSegmentationSelections:
+    def test_a_label_map_is_kept_whole(self):
+        """Filtering detections leaves an (H, W) label map whole, even when its height matches the detection count."""
+        label_map = np.arange(6).reshape(2, 3)
+        target = MockSegmentationTarget(mask=label_map, labels=np.array([0, 1]), scores=np.array([0.9, 0.8]))
+        _, filtered, _ = View([("image", target, {"id": 0})], ClassFilter([0]))[0]
+        np.testing.assert_array_equal(filtered.mask, label_map)
+        np.testing.assert_array_equal(filtered.labels, [0])
+
+
+@pytest.mark.required
 class TestPickle:
     """A view built with ClassFilter pickles, so a multi-worker DataLoader can hand it to its workers."""
 

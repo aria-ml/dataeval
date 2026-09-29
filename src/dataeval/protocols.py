@@ -460,7 +460,10 @@ class SegmentationTarget(Protocol):
 
     @property
     def mask(self) -> ArrayLike:
-        """:obj:`ArrayLike` segmentation mask."""
+        """:obj:`ArrayLike` segmentation mask.
+
+        One plane per detection, shape ``(N, H, W)``, or a label map, shape ``(H, W)``.
+        """
         ...
 
     @property
