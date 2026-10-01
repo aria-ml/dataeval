@@ -44,6 +44,13 @@ standards in force when that release was assessed, not by this draft.
   - `v1.0.6`
 ```
 
+## Exemptions
+
+DataEval has been granted an exemption from the Containerization (CS)
+requirements. DataEval publishes no container images. For containerized use, see
+[DataEval-Flow](https://github.com/aria-ml/dataeval-flow), which packages DataEval
+in a container-based workflow.
+
 ## Maturity by Release
 
 A release carries the maturity label `JATIC Maturity I` only if it was assessed
