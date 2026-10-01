@@ -275,7 +275,6 @@ Overview <concepts/index>
 
 API Reference <reference/autoapi/dataeval/index>
 Functional Overview <reference/FunctionalOverview>
-Container <reference/container>
 JATIC Maturity <reference/maturity>
 reference/glossary
 :::
