@@ -1,5 +1,16 @@
 # DataEval Change Log
 
+## v1.1.4
+
+🛠️ **Improvements and Enhancements**
+
+- `e84e31cf` - [impr] Run BoVW on threads so set_max_processes speeds it up
+
+📝 **Miscellaneous**
+
+- `6c0246f5` - [docs] Note the containerization exemption and point to DataEval-Flow
+- `499dc67a` - [devsecops] Remove container export
+
 ## v1.1.3
 
 🛠️ **Improvements and Enhancements**
