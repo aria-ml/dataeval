@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,32,27
+/aria-ml/dataeval/releases,2,2
+/aria-ml/dataeval/blob/main/CONTRIBUTING.md,1,1
+/aria-ml/dataeval/blob/main/docs/source/getting-started/which-tool.md,1,1
+/aria-ml/dataeval/blob/main/docs/source/notebooks/tt_clean_dataset.py,1,1
+/aria-ml/dataeval/blob/main/requirements.cpu.txt,1,1
+/aria-ml/dataeval/blob/main/src/conftest.py,1,1
+/aria-ml/dataeval/deployments/pypi-publish,1,1
+/aria-ml/dataeval/graphs/contributors,1,1
+/aria-ml/dataeval/releases/tag/v1.1.4,1,1
