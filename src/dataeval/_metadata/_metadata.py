@@ -3782,8 +3782,8 @@ class Metadata(Array, FeatureExtractor):
 
         The companion to :attr:`dropped_factors`, which records *that* a factor was
         dropped and why. This says what is behind the drop: for a column set aside for
-        mixing numbers with text, how many rows read each way and which distinct values
-        they were, which is what a :meth:`repair` has to be written against. A column
+        mixing numbers, text or booleans, how many rows read each way and which distinct
+        values they were, which is what a :meth:`repair` has to be written against. A column
         dropped for naming its rows reports its values the same way — reading a few of them
         is how the format a :class:`~dataeval.types.ParseDateTime` needs is chosen.
 
@@ -3857,9 +3857,9 @@ class Metadata(Array, FeatureExtractor):
         pl.DataFrame
             ``item_index``; the level's key column where the factor sits below the item;
             ``value``, each value in its text form, the form :attr:`Unusable.distinct` sorts
-            by; and ``kind``, ``"numeric"`` or ``"text"``, as :attr:`Unusable.counts` counts
-            it. Rows in the order the level holds them. Absent values are left out, as they
-            are from both.
+            by; and ``kind``, ``"numeric"``, ``"text"`` or ``"boolean"``, as
+            :attr:`Unusable.counts` counts it. Rows in the order the level holds them.
+            Absent values are left out, as they are from both.
 
         Raises
         ------

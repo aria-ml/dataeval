@@ -104,7 +104,7 @@ class DatasetStructurer(Structurer, ABC):
         -------
         tuple[Mapping[str, Any], Mapping[str, Sequence[str]], Mapping[str, list[Any]]]
             The merged factors, the factors that were dropped, and the values of the
-            columns held back because they mix numbers with text — kept as the dataset
+            columns held back because they mix numbers, text or booleans — kept as the dataset
             wrote them, since nobody has yet said how they should be read.
         """
         merged, dropped, unusable = _merge(

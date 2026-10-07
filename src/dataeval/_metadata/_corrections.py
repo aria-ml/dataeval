@@ -29,19 +29,9 @@ import numpy as np
 
 from dataeval.types import ParseDateTime, ParseValue, Remap, Rescale
 from dataeval.types._factors import EPOCH_SECONDS
-from dataeval.utils._internal import simplify_type
+from dataeval.utils._internal import is_absent, simplify_type
 
 Correction = ParseValue | ParseDateTime | Remap | Rescale
-
-
-def is_absent(value: Any) -> bool:
-    """Whether a row recorded no value at all.
-
-    Checked before any correction is consulted, which is what keeps "not recorded" and
-    "a value the mapping does not name" two different answers. A catch-all that swallowed
-    absence would collapse them, and the reserved missing code exists to hold them apart.
-    """
-    return value is None or (isinstance(value, float | np.floating) and bool(np.isnan(value)))
 
 
 def for_factor(factor: str, corrections: Sequence[Correction]) -> list[Correction]:

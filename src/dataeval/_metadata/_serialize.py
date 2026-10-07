@@ -140,7 +140,7 @@ def _plain(value: Any) -> Any:
     """Render one retained value as something JSON can hold.
 
     A metadata value may arrive as a NumPy scalar, which ``json`` cannot serialize. Only
-    numbers and text reach here -- a column is set aside for mixing those two -- so
+    numbers, text and booleans reach here -- a column is set aside for mixing those -- so
     unwrapping to the Python value it stands for is the whole conversion.
     """
     return value.item() if isinstance(value, np.generic) else value

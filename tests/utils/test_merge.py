@@ -483,10 +483,27 @@ class TestAColumnWhoseValuesDisagreeAboutTheirType:
         merged = merge_metadata([{"n": "1"}, {"n": 2.0}])
         assert merged["n"] == [1, 2]
 
-    @pytest.mark.parametrize("value", [np.int64(1), np.float64(1.0), True])
-    def test_a_value_numpy_or_bool_still_counts_as_a_number(self, value):
+    @pytest.mark.parametrize("value", [np.int64(1), np.float64(1.0)])
+    def test_a_numpy_value_still_counts_as_a_number(self, value):
         merged, dropped = merge_metadata([{"d": value}, {"d": "N"}], return_dropped=True)
         assert dropped == {"d": ["mixed_types"]}
+
+    @pytest.mark.parametrize("other", [2, "N", np.int64(2)])
+    def test_a_boolean_is_its_own_kind(self, other):
+        """Read as a number ``True`` is ``1``, so beside ``1`` it merged into that value."""
+        merged, dropped = merge_metadata([{"d": True}, {"d": other}], return_dropped=True)
+        assert "d" not in merged
+        assert dropped == {"d": ["mixed_types"]}
+
+    @pytest.mark.parametrize(
+        ("values", "expected"),
+        [([None, "sun"], [None, "sun"]), ([None, 1], [None, 1]), ([float("nan"), "sun"], [None, "sun"])],
+    )
+    def test_a_missing_value_stays_missing(self, values, expected):
+        """It became the category ``'None'``, and made a column of numbers text with it."""
+        merged, dropped = merge_metadata([{"d": value} for value in values], return_dropped=True)
+        assert merged["d"] == expected
+        assert dropped == {}
 
     @pytest.mark.parametrize(
         "entries",

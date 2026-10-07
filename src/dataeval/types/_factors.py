@@ -1223,14 +1223,16 @@ class Unusable:
         dropped before any level could be settled on.
     repairable : bool
         Whether :meth:`~dataeval.Metadata.repair` can make this a factor. True for a column
-        whose values are kept: one set aside for mixing numbers with text, and one dropped
-        for naming its rows, which a :class:`ParseDateTime` can give a vocabulary to. False
-        where the values are gone or no reading of them would produce a column -- a
-        vector-valued statistic has no single-column form however it is read.
+        whose values are kept: one set aside for mixing numbers, text or booleans, and one
+        dropped for naming its rows, which a :class:`ParseDateTime` can give a vocabulary
+        to. False where the values are gone or no reading of them would produce a column --
+        a vector-valued statistic has no single-column form however it is read.
     counts : Mapping[str, int]
-        Rows that read as ``"numeric"`` and rows that read as ``"text"``. A numeral is
+        Rows that read as ``"numeric"``, as ``"text"`` and as ``"boolean"``. A numeral is
         numeric whichever way it is spelled, so a column that has been through JSON is
-        described by what its values *mean* rather than by how they were written.
+        described by what its values *mean* rather than by how they were written. A boolean
+        is its own kind, since read as a number ``True`` would be the ``1`` beside it.
+        Missing values are not counted.
     distinct : Mapping[str, tuple[Any, ...]]
         The distinct values behind those counts, in the spelling the dataset used, so that
         a repair can be written against what is actually there. Sorted within each kind.
