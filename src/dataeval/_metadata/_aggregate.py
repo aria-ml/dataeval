@@ -336,7 +336,7 @@ def _working_frame(
     names = _read_names(exprs)
     if any(store.source_of(from_level, name) is None for name in names):
         return _as_missing(store.resolve(from_level)).with_columns(group)
-    return _as_missing(pl.DataFrame([store.column(from_level, name) for name in names])).with_columns(group)
+    return _as_missing(pl.DataFrame([store.column(from_level, name) for name in names] + [group]))
 
 
 def _report_participation(
