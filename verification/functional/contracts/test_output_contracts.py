@@ -8,10 +8,8 @@ Maps to meta repo test cases:
 """
 
 import numpy as np
-import pytest
 
 
-@pytest.mark.test_case("3-1")
 class TestOutputContracts:
     """Verify outputs conform to documented return types and structures."""
 

@@ -30,7 +30,6 @@ def _meta(frames: SequenceFrames) -> list[dict[str, Any]]:
     return [cast(dict[str, Any], meta) for _, _, meta in frames.stream()]
 
 
-@pytest.mark.test_case("6-1")
 class TestFrameViewProvenance:
     """Verify SequenceFrames provenance through View transforms, above it and below it."""
 

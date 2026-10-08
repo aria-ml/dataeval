@@ -6,10 +6,7 @@ Maps to meta repo test cases:
 
 import importlib.resources
 
-import pytest
 
-
-@pytest.mark.test_case("10-1")
 class TestTypeSafety:
     """Verify type annotation infrastructure."""
 

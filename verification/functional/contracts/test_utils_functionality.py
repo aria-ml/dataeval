@@ -8,7 +8,6 @@ import numpy as np
 import pytest
 
 
-@pytest.mark.test_case("12-1")
 class TestUtilsFunctionality:
     """Verify evaluation support and data preparation utilities."""
 

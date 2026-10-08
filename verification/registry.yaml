@@ -1,455 +1,910 @@
-# Verification Registry
+# Verification registry for DataEval (JATIC Program Standards v1.2.0 labeling).
 #
-# Static metadata for generating meta repo artifacts (test case markdown files
-# and VCRM) from automated verification test results.
+# Source of truth for the requirements, test cases, and VCRM that CI publishes to the meta repo
+# (see verification/generate_metarepo.py). Everything under <metarepo.path>/requirements,
+# test-cases, and vcrm.md is generated from this file.
 #
-# Structure:
-#   metarepo     - GitLab project ID for the meta repo
-#   requirements - FR/NFR definitions with file links and test case mappings
-#   test_cases   - Test case definitions with descriptive metadata
+# A test case is a list of steps. Each step has `do` (an instruction), `expect` (the result),
+# and `tests`, its evidence:
+#   <alias>::<test>   a pytest node (aliases below expand to file and class)
+#   CI: <job>         a pipeline job whose result is the evidence
+#   NEW: <what>       a test that is planned and not yet written; the step reports as pending
+#
+# Test case ids are test-case-<requirement number>-<k>; NFR-n cases use 20+n.
 
 metarepo:
   project_id: 409
-
-# ---------------------------------------------------------------------------
-# Requirements — rows in the VCRM
-# ---------------------------------------------------------------------------
+  path: DataEval
+product: DataEval
+distribution: dataeval
+aliases:
+  pip: verification/functional/install/test_pip_install.py::TestPipInstall
+  extras: verification/functional/install/test_extras_install.py::TestExtrasInstall
+  metaemb: verification/functional/test_metadata_embeddings.py::TestMetadataEmbeddings
+  feat: verification/functional/extractors/test_feature_extraction.py::TestFeatureExtraction
+  onnxe2e: verification/functional/extractors/test_onnx_end_to_end.py::TestOnnxEndToEnd
+  sel: verification/functional/selection/test_dataset_selection.py::TestDatasetSelection
+  bias: verification/functional/bias/test_bias_evaluation.py::TestBiasEvaluation
+  quality: verification/functional/quality/test_quality_evaluation.py::TestQualityEvaluation
+  inputs: verification/functional/contracts/test_input_contracts.py::TestInputContracts
+  drift: verification/functional/shift/test_drift_detection.py::TestDriftDetection
+  ood: verification/functional/shift/test_ood_detection.py::TestOODDetection
+  prio: verification/functional/test_prioritization.py::TestPrioritization
+  suff: verification/functional/test_sufficiency.py::TestSufficiency
+  core: verification/functional/contracts/test_core_functional.py::TestCoreFunctional
+  utils: verification/functional/contracts/test_utils_functionality.py::TestUtilsFunctionality
+  maite: verification/functional/contracts/test_maite_entrypoints.py
+  mjson: verification/functional/test_metadata_json_io.py::TestMetadataJsonSchema
+  pyver: verification/nonfunctional/compatibility/test_python_versions.py::TestPythonVersions
+  wheel: verification/nonfunctional/packaging/test_wheel_contents.py::TestWheelContents
+  vmeta: verification/nonfunctional/packaging/test_version_metadata.py::TestVersionMetadata
+  types: verification/nonfunctional/test_type_safety.py::TestTypeSafety
+  cfg: verification/nonfunctional/test_config_reproducibility.py::TestConfigReproducibility
+  perf: verification/nonfunctional/test_performance.py::TestPerformance
 requirements:
-  FR-1:
-    name: Installation & Cross-Environment Compatibility
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-1-installation-compatibility.md
-    test_cases: ["1-1", "1-2", "1-7"]
-
-  FR-2:
-    name: Bias Analysis Suite
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-2-bias-analysis.md
-    test_cases: ["2-1"]
-
-  FR-3:
-    name: Data Quality Analysis
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-3-data-quality.md
-    test_cases: ["3-1"]
-
-  FR-4:
-    name: Distribution Shift Detection
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-4-drift-detection.md
-    test_cases: ["4-1"]
-
-  FR-5:
-    name: Out-of-Distribution Detection
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-5-ood-detection.md
-    test_cases: ["5-1"]
-
-  FR-6:
-    name: Dataset Selection & Filtering
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-6-dataset-selection.md
-    test_cases: ["6-1"]
-
-  FR-7:
-    name: Feature Extraction
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-7-feature-extraction.md
-    test_cases: ["7-1"]
-
-  FR-8:
-    name: Data Sufficiency Analysis
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-8-sufficiency-analysis.md
-    test_cases: ["8-1"]
-
-  FR-9:
-    name: Metadata & Embeddings Management
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-9-metadata-embeddings.md
-    test_cases: ["9-1"]
-
-  FR-10:
-    name: Core Functional Interface
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-10-core-functionality.md
-    test_cases: ["10-2"]
-
-  FR-11:
-    name: Dataset Prioritization
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-11-dataset-prioritization.md
-    test_cases: ["11-2"]
-
-  FR-12:
-    name: Evaluation Support & Data Preparation Utilities
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: FR-12-utility-components.md
-    test_cases: ["12-1"]
-
-  FR-13:
-    name: Dataset & Model Metadata Export
-    origin: IR-3-S-12
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/software/interoperability/#ir-3-model-and-data-interoperability
-    file: FR-13-metadata-export.md
-    test_cases: ["13-1"]
-
-  NFR-1:
-    name: Python Version Compatibility
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: NFR-1-python-compatibility.md
-    test_cases: ["1-1"]
-
-  NFR-2:
-    name: Packaging & Distribution
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: NFR-2-packaging-distribution.md
-    test_cases: ["1-7"]
-
-  NFR-3:
-    name: Type Safety
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: NFR-3-type-safety.md
-    test_cases: ["10-1"]
-
-  NFR-4:
-    name: Configuration & Reproducibility
-    origin: DR-1.5
-    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
-    file: NFR-4-configuration-reproducibility.md
-    test_cases: ["11-1"]
-
-# ---------------------------------------------------------------------------
-# Test Cases — columns in the VCRM, individual markdown files
-# ---------------------------------------------------------------------------
+- id: FR-1
+  name: Installation & Optional Dependencies
+  description: A user shall be able to install DataEval and run its core evaluators with no optional extras. A capability
+    that needs a missing extra shall fail with a message that says what to install.
+  criteria:
+  - Core evaluators (bias, quality, shift) import and run with only the core dependencies installed.
+  - Every optional extra (`cpu`, `cu126`, `cu130`, `litert`, `onnx`, `onnx-cu126`, `onnx-cu130`, `opencv`, `ontology`)
+    installs without conflicts; the mutually exclusive PyTorch and ONNX groups are declared as such.
+  - Using a capability whose optional dependency is absent raises an `ImportError` naming the missing package and
+    the install command that supplies it (`BoVWExtractor`, `OnnxExtractor`, `dataeval.utils.onnx`, `TorchvisionTransform`,
+    `Ontology.from_rdf`, `LiteRtBackend`).
+  - With an extra installed, the capability it enables is discoverable and functional.
+- id: FR-2
+  name: Dataset Metadata & Embeddings
+  description: DataEval shall convert dataset metadata into analysis-ready factors and manage feature embeddings
+    so that every evaluator consumes datasets through one consistent representation.
+  criteria:
+  - '`dataeval.Metadata` exposes `factor_names`, `factor_data`, `class_labels`, `is_discrete`, and `index2label`
+    for both image-classification and object-detection datasets.'
+  - Continuous factors are binned (configurable `continuous_factor_bins`) and factors can be filtered with `include`
+    / `exclude`.
+  - '`dataeval.Embeddings` computes embeddings with a feature extractor on demand, supports `len()` and indexing,
+    and can cache to memory or disk. Within one instance, repeated access reuses the cached values instead of recomputing;
+    a new instance does not reload an earlier disk cache.'
+  - '`Embeddings` satisfies the `Array` and `FeatureExtractor` protocols so it can be passed wherever either is
+    accepted.'
+- id: FR-3
+  name: Feature Extraction
+  description: DataEval shall generate embeddings from image datasets using interchangeable extractor backends.
+  criteria:
+  - '`FlattenExtractor`, `TorchExtractor`, `OnnxExtractor`, `BoVWExtractor`, `UncertaintyExtractor`, and `ClasswiseUncertaintyExtractor`
+    each return one embedding row per dataset item.'
+  - '`OnnxExtractor` output matches the source model''s output and can be passed to the drift detectors.'
+  - All extractors satisfy the `FeatureExtractor` protocol (`__call__(data) -> Array`).
+- id: FR-4
+  name: Dataset Selection
+  description: DataEval shall let a user narrow, reorder, or rebalance a MAITE dataset without copying it and without
+    losing MAITE compatibility.
+  criteria:
+  - '`View` applies an ordered sequence of operations (`Limit`, `Indices`, `Shuffle`, `Reverse`, `ClassFilter`,
+    `ClassBalance`) lazily and composes them in the order given.'
+  - '`Shuffle` is reproducible for a given seed.'
+  - A `View` is sized, iterable, and integer-indexable, and is itself a valid dataset for every evaluator.
+- id: FR-5
+  name: Bias Analysis
+  description: DataEval shall detect and quantify dataset bias between metadata factors and class labels.
+  criteria:
+  - '`Balance` returns mutual information between factors and class labels (`balance`, `factors`, `classwise`),
+    with an `is_imbalanced` flag on `classwise`.'
+  - '`Diversity` (Simpson or Shannon) returns `factors` and `classwise` diversity, with an `is_low_diversity` flag
+    on `factors`.'
+  - '`Parity` returns bias-corrected Cramér''s V per factor with `is_significant` and `insufficient_data` diagnostics.'
+  - All three accept a `Metadata` object or an annotated dataset and handle categorical and continuous factors.
+  - Outputs extend `DictOutput` and support `.data()` and `.meta()`.
+- id: FR-6
+  name: Data Quality Analysis
+  description: DataEval shall identify duplicate and outlying samples in image and object-detection datasets.
+  criteria:
+  - '`Duplicates` reports exact duplicates and near duplicates (perceptual hashing, or embedding clustering) in
+    `items` and `targets`, and supports cross-dataset comparison via `from_stats()`.'
+  - '`Outliers` reports outliers per sample and statistic in an `issues` DataFrame using `modzscore`, `zscore`,
+    or `iqr`, with configurable thresholds.'
+  - Both handle single-image and object-detection datasets and return an empty result for an empty dataset.
+  - Outputs extend `DictOutput` and support `.data()` and `.meta()`.
+- id: FR-7
+  name: Distribution Shift Detection
+  description: DataEval shall determine whether a test dataset has drifted from a reference dataset.
+  criteria:
+  - '`DriftUnivariate` (`ks`, `cvm`, `mwu`, `anderson`, `bws`), `DriftMMD`, `DriftKNeighbors`, `DriftReconstruction`,
+    and `DriftDomainClassifier` share one interface: `.fit(reference)` then `.predict(test)` returning a `DriftOutput`.'
+  - '`DriftOutput` reports `drifted`, `distance`, `threshold`, `metric_name`, and method-specific `details` (per-feature
+    `p_vals`, `feature_drift`, `distances` for `DriftUnivariate`).'
+  - A detector flags a clear shift. On a sample drawn from the reference distribution it reports drift only at about
+    the configured significance level, so an occasional false alarm is expected. `DriftReconstruction` compares
+    against reconstruction error on its training data, so it needs an autoencoder that fits the structure of the
+    data to avoid flagging held-out data from the same distribution.
+  - '`ChunkedDrift` applies a detector over chunks of a data stream.'
+  - Reference data can be updated with `LastSeenUpdateStrategy` or `ReservoirSamplingUpdateStrategy`.
+- id: FR-8
+  name: Out-of-Distribution Detection
+  description: DataEval shall identify samples that fall outside a reference distribution.
+  criteria:
+  - '`OODKNeighbors`, `OODReconstruction`, and `OODDomainClassifier` return an `OODOutput` with `is_ood`, `instance_score`,
+    and optional `feature_score`.'
+  - The decision threshold is configurable by percentile.
+  - Detectors flag clearly out-of-distribution samples and do not flag in-distribution samples.
+- id: FR-9
+  name: Data Sufficiency Analysis
+  description: DataEval shall project how model performance scales with training-set size and how much data is needed
+    to reach a target.
+  criteria:
+  - '`Sufficiency` trains and evaluates a model over an evaluation schedule (`GeometricSchedule`, `ManualSchedule`)
+    and returns a `SufficiencyOutput` with `steps`, `measures`, and `averaged_measures`.'
+  - '`SufficiencyOutput.project()` predicts performance at larger dataset sizes and `inv_project()` predicts the
+    dataset size needed for a target performance; both return a DataFrame.'
+  - Training, evaluation, and model reset are replaceable through the `TrainingStrategy`, `EvaluationStrategy`,
+    and `ModelResetStrategy` protocols.
+- id: FR-10
+  name: Dataset Prioritization
+  description: DataEval shall rank dataset samples by difficulty so a user can choose which to label, review, or
+    train on first.
+  criteria:
+  - '`Prioritize` ranks samples using KNN, KMeans, or HDBSCAN and returns a `PrioritizeOutput` whose ranked `indices`
+    are evaluated lazily.'
+  - Selection policies `difficulty`, `stratified`, and `class_balanced` are supported, and `.easy_first()`, `.hard_first()`,
+    `.stratified()`, and `.class_balanced()` re-derive the ordering from the same scores.
+  - Classification and object-detection datasets are both supported.
+- id: FR-11
+  name: Core Functions & Utilities
+  description: DataEval shall expose its statistical building blocks as stateless functions (`dataeval.core`) and
+    its data-preparation helpers (`dataeval.utils`) for integrators who compose their own workflows.
+  criteria:
+  - '`dataeval.core` provides stateless functions for hashing, clustering, mutual information, divergence, minimum
+    spanning tree and neighbors, label errors and parity, ranking, and null-model metrics; each returns a structured
+    result.'
+  - '`dataeval.utils` provides thresholding (`ConstantThreshold`, `ZScoreThreshold`, `ModifiedZScoreThreshold`,
+    `IQRThreshold`, `AdaptiveThreshold`), bounding-box and image preparation, dataset-shape validation, ONNX embedding-layer
+    handling, and the PyTorch models, loss, and training helpers used by model-based evaluators.'
+  - Dataset-shape validation rejects a dataset that does not match the shape the caller consumes.
+- id: FR-12
+  name: Ecosystem Interoperability
+  description: DataEval shall interoperate with the JATIC ecosystem through MAITE entry points and a portable `metadata.json`
+    schema (IR-1, IR-3-S-12).
+  criteria:
+  - DataEval declares MAITE task and model entry points, and each entry point target is importable.
+  - '`MetadataJson` describes dataset, model, and extractor artifacts with a provenance block (`ExecutionMetadata`,
+    as returned by `Output.meta()`), and round-trips through `model_dump_json()` / `model_validate_json()` without
+    loss.'
+  - The schema rejects a document with none of `dataset`, `model`, or `extractor`, and rejects unknown fields.
+  origin: IR-3-S-12
+  origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/software/interoperability/#ir-3-model-and-data-interoperability
+- id: NFR-1
+  name: Platform Compatibility
+  description: DataEval shall behave consistently on every supported Python version, installer, and hardware configuration.
+  criteria:
+  - Installs and passes the verification suite on Python 3.11, 3.12, 3.13, and 3.14.
+  - Installs from PyPI with pip and uv, from conda-forge with conda, and from source with pip, uv, and poetry.
+  - Core dependencies resolve at their lowest declared direct versions.
+  - Runs with and without CUDA, falling back to CPU automatically.
+  - No version-specific deprecation warnings during normal operation.
+- id: NFR-2
+  name: Packaging & Distribution
+  description: DataEval shall be published as a Python package on PyPI and conda-forge.
+  criteria:
+  - Each release is published to PyPI and conda-forge as `dataeval`.
+  - The wheel and sdist contain only `src/dataeval/` files, including the `py.typed` marker.
+  - '`__version__` is derived from the git tag and is a valid version in every release.'
+  - Package metadata (`Name`, `Requires-Python`, `License-Expression`, `Project-URL`) is set.
+  - Lock files and `environment.yml` are in sync with `pyproject.toml`.
+- id: NFR-3
+  name: Type Safety
+  description: DataEval shall ship complete, checkable type information.
+  criteria:
+  - '`pyright --verifytypes dataeval` reports completeness above 90%.'
+  - '`pyright` passes on `src/` and `tests/` on every supported Python version.'
+  - '`dataeval.protocols` and `dataeval.types` export the protocols and output base classes that public interfaces
+    use, and every public module defines `__all__`.'
+- id: NFR-4
+  name: Configuration & Reproducibility
+  description: DataEval shall provide global control of seed, device, batch size, and parallelism, and shall record
+    how each result was produced.
+  criteria:
+  - '`set_seed`, `set_device`, `set_batch_size`, and `set_max_processes` set and `get_*` return global values; `use_device`,
+    `use_batch_size`, and `use_max_processes` override them within a scope and restore the previous value on exit.'
+  - The same seed produces identical results across runs.
+  - Every evaluator output exposes execution metadata through `.meta()` (name, time, duration, arguments, version).
+  - DataEval logs through Python's standard `logging` framework.
+- id: NFR-5
+  name: Performance & Scale
+  description: DataEval shall read datasets lazily in batches, keep its memory use predictable, and track the time
+    of reference workloads for regressions.
+  criteria:
+  - Embedding extraction reads the dataset in batches of the configured batch size and can cache to disk. Peak memory
+    grows with the size of the stored embeddings (about 9 KB per 32x32 image in reference measurements), not with
+    the size of the images, and spills to disk only past `memory_threshold`.
+  - '`set_max_processes` bounds the number of worker processes. The default is a single process.'
+  - Raising it may shorten workloads on large images and may slow workloads on small images, where the cost of starting
+    extra processes can outweigh the gain. In reference measurements, a large-image `data-analysis` run was faster
+    with 4 processes and a small-image `Duplicates` run was slower with 2 or more; the figures are recorded with
+    the test evidence.
+  - The effect depends on the workload, image size, CPU architecture, and platform. The measurements were taken
+    on CPU on one development machine, so DataEval makes no performance promise for other environments and does
+    not recommend a process count; users should measure their own workload.
+  - Reference workloads (`Duplicates`, `Outliers`, `Balance`, `DriftKNeighbors` on a 10,000-image dataset) are timed
+    on the pipeline runner, and a run that takes more than twice the recorded v1.1.4 baseline on that runner fails
+    verification. The budget guards against regressions and is not a performance guarantee.
+  notes:
+  - 'Measured with `dataeval==1.1.4` on synthetic 32x32 images, median of 3 runs at 10,000 images: `Duplicates`
+    2.8 s, `Outliers` 3.8 s, `Balance` 0.5 s, `DriftKNeighbors` 2.6 s.'
+  - Embeddings with a disk cache and batch size 256 peaked at 419 MB at 5,000 samples, 537 MB at 20,000, and 772
+    MB at 50,000, against a 380 MB baseline.
+  - 'Process count, 10,000 images at 32x32 (best of 2): `Duplicates` took 2.7 s at 1 process and 4.2 to 4.5 s at
+    2 to 32 processes; `Outliers` took 3.7 s at 1 process and 4.5 to 4.8 s at 2 to 32.'
+  - 'Test environment: Windows 11 Pro (build 26300) host running WSL2 (kernel 6.18.40.1-microsoft-standard-WSL2,
+    Ubuntu 24.04), AMD Ryzen 9 9950X3D (x86_64, 16 cores, 32 threads), 62 GB of memory visible to WSL2, ext4 virtual
+    disk, CPU only (no GPU used). Python 3.12.12, PyTorch 2.14.1 (CPU), dataeval 1.1.4. Other development workloads
+    were running on the machine during the measurements.'
+  - 'Limitations: a small number of synthetic workloads on one machine, three repetitions (median) for the workload
+    times and two (best) for the process-count table, which is too few to estimate variance, and no measurements
+    on other hardware, operating systems, containers, or CI runners. Treat the figures as illustrative, not as expected
+    performance.'
+- id: NFR-6
+  name: Robustness
+  description: DataEval shall reject invalid input with a clear error instead of returning a wrong result.
+  criteria:
+  - Invalid parameters raise `ValueError` or `TypeError` that names the offending argument for the arguments the
+    verification suite covers (18 cases across the evaluators, schedules, and view operations). The known exceptions
+    are listed under Known Limitations.
+  - A dataset of the wrong shape or kind is rejected before analysis begins.
+  - Empty datasets return an empty result or a clear error, with no unhandled exception.
+  notes_title: Known Limitations (informative; tracked as expected failures in the verification suite)
+  notes:
+  - 'These arguments are accepted without validation, or rejected without naming the argument: `DriftUnivariate(p_val=2)`,
+    `DriftMMD(n_permutations=0)`, `OODKNeighbors(threshold_perc=150)`, `Prioritize(order="bogus")`, `GeometricSchedule(0)`,
+    `ManualSchedule([-1])`, `Limit(-1)`, `ClassBalance("bogus")`, `Duplicates(cluster_algorithm="bogus")`, and `Balance(num_neighbors=-1)`,
+    which raises without naming `num_neighbors`.'
+  - '`Diversity(method="bogus")` fails only at `evaluate()`, not at construction.'
 test_cases:
-  "1-1":
-    name: Python Version Compatibility
-    test_type: Core Functionality
-    business_case: >-
-      Verify that DataEval installs and functions correctly across all
-      supported Python versions (3.11 through 3.14), and that optional
-      dependencies degrade gracefully when they are absent, to ensure broad
-      compatibility and reliable operation across different environments.
-    initial_conditions:
-      - Clean Python environment for the target version (3.11 through 3.14)
-      - Network access or a local package cache for installation
-      - >-
-        The graceful-degradation steps simulate a missing optional dependency by
-        making it unimportable, so they run regardless of which extras are installed
-    expected_results:
-      - Package imports without errors on the current Python version
-      - Version string is set and valid (not "unknown")
-      - All core modules and subpackages are discoverable and importable
-      - Key user-facing classes (Embeddings, Metadata, Balance, etc.) exist
-      - Protocol types are exported from dataeval.protocols
-      - Package metadata (name, requires-python, license, project URLs) is correctly set
-      - >-
-        Optional capabilities raise an ImportError naming the missing package and
-        its install command when their optional dependency is absent
-
-  "1-2":
-    name: Dependency Resolution
-    test_type: Core Functionality
-    business_case: >-
-      Verify that optional dependency extras (torch, torchvision, onnxruntime,
-      opencv) install without conflicts and enable their corresponding features
-      in the DataEval package.
-    initial_conditions:
-      - Clean Python environment with DataEval installed
-      - Optional extras installed (cpu, onnx, opencv)
-    expected_results:
-      - torch is importable with a valid version
-      - torchvision is importable (or gracefully skipped on version mismatch)
-      - onnxruntime is importable with a valid version
-      - opencv (cv2) is importable with a valid version
-      - Torch-based, ONNX-based, and OpenCV-based extractors are discoverable
-
-  "1-7":
-    name: Package Manager Installation
-    test_type: Core Functionality
-    business_case: >-
-      Verify that DataEval installs correctly via pip/uv, that the distributed
-      wheel contains all expected subpackages, and that no test files leak into
-      the installed package.
-    initial_conditions:
-      - Clean Python environment
-      - Network access for pip/uv package installation
-    expected_results:
-      - Package imports and basic computation completes without error
-      - py.typed marker is present (PEP 561)
-      - All documented subpackages (bias, core, quality, scope, data, shift, extractors, utils) are installed
-      - No test files are included in the distributed package
-      - Optional extras install and expose expected functionality
-      - >-
-        Optional capabilities raise an ImportError naming the missing package and
-        its install command when their optional dependency is absent
-
-  "2-1":
-    name: Bias Analysis Suite
-    test_type: Core Functionality
-    business_case: >-
-      Verify that Balance, Diversity, and Parity evaluators produce correctly
-      typed outputs with expected DataFrame attributes, flag columns, and
-      support for multiple analysis methods.
-    initial_conditions:
-      - DataEval installed with core dependencies (polars)
-      - Metadata object with class labels, factor data, and factor names
-    expected_results:
-      - Balance returns BalanceOutput with balance, factors, and classwise DataFrames
-      - Balance classwise DataFrame includes is_imbalanced flag column
-      - Diversity returns DiversityOutput with factors and classwise DataFrames
-      - Diversity factors DataFrame includes is_low_diversity flag column
-      - Diversity supports shannon method
-      - Parity returns ParityOutput with factors DataFrame and insufficient_data dict
-      - Parity factors DataFrame includes is_significant flag column
-      - All bias outputs support meta() method
-
-  "3-1":
-    name: Data Quality Analysis
-    test_type: Core Functionality
-    business_case: >-
-      Verify that Duplicates and Outliers evaluators correctly identify data
-      quality issues -- exact duplicate images, near-duplicate images via
-      perceptual hashing, and statistical outliers -- support multiple detection
-      methods, and produce properly structured output objects.
-    initial_conditions:
-      - DataEval installed with core dependencies (polars)
-      - Numpy image arrays for evaluation
-    expected_results:
-      - Duplicates detects exact copies and returns items and targets attributes
-      - Duplicates items has exact field for exact duplicate detection
-      - Duplicates detects near duplicates via perceptual hashing
-      - Outliers returns issues as a polars DataFrame
-      - Outliers supports zscore detection method
-      - Outliers supports iqr detection method
-      - All quality outputs support meta() method
-
-  "4-1":
-    name: Distribution Shift Detection
-    test_type: Core Functionality
-    business_case: >-
-      Verify that DriftUnivariate and DriftMMD detectors correctly identify
-      distribution shifts in embedding space and produce properly structured
-      output with per-feature breakdown.
-    initial_conditions:
-      - DataEval installed with core dependencies
-      - Reference and test embedding arrays
-    expected_results:
-      - DriftUnivariate returns output with drifted, p_val, and distance attributes
-      - DriftUnivariate detects clear shift between different distributions
-      - DriftUnivariate does not false-alarm on same distribution
-      - DriftUnivariate provides per-feature results (feature_drift, p_vals, distances)
-      - DriftUnivariate supports KS and CVM test methods
-      - DriftMMD returns output with drifted, p_val, distance, and distance_threshold
-      - DriftMMD detects clear shift between different distributions
-
-  "5-1":
-    name: Out-of-Distribution Detection
-    test_type: Core Functionality
-    business_case: >-
-      Verify that the OODKNeighbors detector correctly scores and classifies
-      out-of-distribution samples using k-nearest neighbor distance in
-      embedding space.
-    initial_conditions:
-      - DataEval installed with scikit-learn
-      - Reference embedding array fitted to the detector
-    expected_results:
-      - OODKNeighbors score returns OODScoreOutput with instance_score array
-      - OODKNeighbors predict returns OODOutput with is_ood and instance_score
-      - OODKNeighbors correctly flags far-away samples as OOD
-      - OODKNeighbors supports euclidean distance metric
-
-  "6-1":
-    name: Dataset Selection & Filtering
-    test_type: Core Functionality
-    business_case: >-
-      Verify that View and its composable operation steps (Limit, Indices,
-      Shuffle, Reverse) correctly transform datasets and support chaining
-      multiple operations.
-    initial_conditions:
-      - DataEval installed
-      - Dataset object implementing __getitem__ and __len__
-    expected_results:
-      - View with Limit restricts dataset length correctly
-      - View with Indices selects specified indices
-      - View with Shuffle preserves dataset length while reordering
-      - View with Reverse reverses item order
-      - View composes multiple operations (e.g., Limit + Shuffle)
-      - View result is iterable
-
-  "7-1":
-    name: Feature Extraction
-    test_type: Core Functionality
-    business_case: >-
-      Verify that FlattenExtractor produces correctly shaped embeddings and
-      that optional backend extractors (Torch, ONNX, BoVW) are importable
-      when their dependencies are available.
-    initial_conditions:
-      - DataEval installed with numpy
-      - Optional backends (torch, onnxruntime, opencv) available for import tests
-    expected_results:
-      - FlattenExtractor produces embeddings with correct sample count
-      - FlattenExtractor flattens spatial dimensions to 1D per image
-      - TorchExtractor is importable when torch is installed
-      - OnnxExtractor is importable when onnxruntime is installed
-      - BoVWExtractor is importable when opencv is installed
-      - All extractor classes are listed in the extractors module
-
-  "8-1":
-    name: Data Sufficiency Analysis
-    test_type: Core Functionality
-    business_case: >-
-      Verify that the Sufficiency class is importable, configurable, and
-      provides expected configuration fields for data sufficiency analysis.
-    initial_conditions:
-      - DataEval installed with performance module available
-    expected_results:
-      - Sufficiency class is importable from dataeval.performance
-      - SufficiencyOutput class is importable from dataeval.performance
-      - Sufficiency has a Config inner class
-      - Sufficiency.Config has runs and substeps fields
-
-  "9-1":
-    name: Metadata & Embeddings Management
-    test_type: Core Functionality
-    business_case: >-
-      Verify that the top-level Metadata and Embeddings classes are importable,
-      integrate with feature extractors, and support standard collection
-      operations (len, indexing).
-    initial_conditions:
-      - DataEval installed with numpy
-      - FlattenExtractor available as embedding backend
-    expected_results:
-      - Metadata class is importable from dataeval
-      - Embeddings class is importable from dataeval
-      - Embeddings with FlattenExtractor produces correct output shape
-      - Embeddings supports len() returning sample count
-      - Embeddings supports indexing to retrieve individual items
-      - MetadataLike protocol attributes (factor_names, factor_data, class_labels, is_discrete) are present
-
-  "10-2":
-    name: Core Functional Interface
-    test_type: Core Functionality
-    business_case: >-
-      Verify that the dataeval.core module provides stateless functional
-      components for core operations like hashing, clustering, and mutual information.
-    initial_conditions:
-      - DataEval installed
-    expected_results:
-      - core.xxhash produces consistent image hashes
-      - core.cluster performs KMeans and HDBSCAN clustering
-      - core.mutual_info calculates mutual information between factors
-      - core.label_stats computes label distribution statistics
-      - All core functions return structured result objects
-
-  "11-2":
-    name: Dataset Prioritization
-    test_type: Core Functionality
-    business_case: >-
-      Verify that the Prioritize evaluator correctly ranks dataset samples
-      using multiple policies and provides lazy index evaluation.
-    initial_conditions:
-      - DataEval installed
-      - Image dataset and feature extractor
-    expected_results:
-      - Prioritize ranks samples by difficulty using KNN method
-      - PrioritizeOutput provides ranked indices lazily
-      - PrioritizeOutput supports reorder and resample methods
-      - Prioritize supports stratified selection policy
-
-  "12-1":
-    name: Evaluation Support & Data Preparation Utilities
-    test_type: Core Functionality
-    business_case: >-
-      Verify that the public utilities DataEval exposes under dataeval.utils --
-      statistical thresholding, image and bounding-box preparation, dataset
-      validation, ONNX graph handling, and the PyTorch model/loss/training
-      helpers -- are available and functional.
-    initial_conditions:
-      - DataEval installed with core dependencies
-    expected_results:
-      - utils.thresholds provides callable ZScore and IQR threshold calculators
-      - >-
-        utils.preprocessing provides bounding-box integer conversion, canonical
-        grayscale conversion, and dynamic range rescaling
-      - >-
-        utils.data validates MAITE dataset shape and rejects a dataset that does
-        not match the expected kind
-      - utils.onnx provides ONNX graph utilities for embedding extraction
-      - utils.models, utils.losses, and utils.training provide the PyTorch helpers
-        used by the model-based evaluators
-
-  "10-1":
-    name: Type Safety Infrastructure
-    test_type: Non-Functional
-    business_case: >-
-      Verify that DataEval provides PEP 561 type safety infrastructure,
-      exports protocol types for downstream type checking, and defines
-      __all__ for public API clarity.
-    initial_conditions:
-      - DataEval installed
-    expected_results:
-      - py.typed marker file exists (PEP 561 compliance)
-      - protocols module exports Array, FeatureExtractor, Dataset, AnnotatedDataset
-      - types module exports Output and DictOutput base classes
-      - Top-level dataeval module defines __all__ with entries
-
-  "11-1":
-    name: Configuration & Reproducibility
-    test_type: Non-Functional
-    business_case: >-
-      Verify that DataEval's global configuration functions (seed, device,
-      max_processes) work correctly with both direct setters and context
-      managers, and that setting a seed produces reproducible results.
-    initial_conditions:
-      - DataEval installed
-    expected_results:
-      - set_seed/get_seed correctly store and retrieve seed values
-      - set_device/get_device correctly store and retrieve device strings
-      - use_device context manager restores original device on exit
-      - set_max_processes/get_max_processes correctly store and retrieve values
-      - use_max_processes context manager restores original value on exit
-      - Setting the same seed produces identical results across runs
-
-  "13-1":
-    name: Dataset & Model Metadata Export
-    test_type: Core Functionality
-    business_case: >-
-      Verify that DataEval provides a validated, portable metadata.json schema for
-      dataset, model, and feature-extractor artifacts, supporting cross-tool
-      interoperability per IR-3-S-12.
-    initial_conditions:
-      - DataEval installed with core dependencies (pydantic)
-    expected_results:
-      - DatasetInfo round-trips through serialize/validate with all fields preserved
-      - ModelInfo round-trips through serialize/validate with framework and IO specs preserved
-      - A single MetadataJson document may carry both dataset and model blocks
-      - DatasetInfo and ModelInfo are independently serializable for consumers that need only one
-      - >-
-        The emitted JSON is indented, valid JSON carrying schema_version and a
-        provenance block
-      - >-
-        The provenance block is an ExecutionMetadata record, so an Output.meta()
-        record can be passed straight to MetadataJson
-      - >-
-        Dataset selections and an extractor with its own model and transforms
-        round-trip within one document
-      - >-
-        The schema rejects a document carrying none of dataset, model, or extractor
-        with a clear error
+- id: 1-1
+  req: FR-1
+  name: Install and Extras
+  type: Core Functionality
+  business: A user can install DataEval, run the core evaluators with no extras, and see a clear message when an
+    optional dependency is missing.
+  conditions:
+  - A clean virtual environment with `pip install dataeval` (no extras)
+  - A second environment with the `cpu`, `onnx`, and `opencv` extras installed
+  steps:
+  - do: Import `dataeval` and read `__version__`.
+    expect: The package imports and `__version__` is a valid version string.
+    tests:
+    - pip::test_import_dataeval
+    - pip::test_version_is_set
+  - do: Import every core module and subpackage.
+    expect: All core modules and subpackages import.
+    tests:
+    - pip::test_core_modules_importable
+    - pip::test_subpackages_importable
+  - do: Run a bias or quality evaluator on a small synthetic dataset using only core dependencies.
+    expect: The evaluator returns a result with no optional extra installed.
+    tests:
+    - pip::test_basic_smoke_test
+  - do: In the core environment, invoke each capability that needs an optional dependency (BoVW, ONNX extractor,
+      torchvision transform, ontology, ONNX utils, LiteRT).
+    expect: Each raises an `ImportError` naming the missing package and the install command.
+    tests:
+    - pip::test_optional_dependencies_graceful_degradation_bovw
+    - pip::test_optional_dependencies_graceful_degradation_onnx
+    - pip::test_optional_dependencies_graceful_degradation_torchvision
+    - pip::test_optional_dependencies_graceful_degradation_ontology
+    - pip::test_optional_dependencies_graceful_degradation_onnx_utils
+    - pip::test_optional_dependencies_graceful_degradation_litert
+  - do: In the extras environment, import torch, torchvision, onnxruntime, and opencv and list the extractors.
+    expect: Each import succeeds and the Torch, ONNX, and OpenCV extractors are discoverable.
+    tests:
+    - extras::test_torch_importable
+    - extras::test_torchvision_importable
+    - extras::test_onnxruntime_importable
+    - extras::test_opencv_importable
+    - extras::test_torch_extractors_available
+    - extras::test_onnx_extractors_available
+    - extras::test_opencv_features_available
+  - do: Review the `conda` and `minimum install` CI jobs for conflicts when installing all extras.
+    expect: All extras install without dependency conflicts.
+    tests:
+    - 'CI: conda'
+    - 'CI: minimum install'
+- id: 2-1
+  req: FR-2
+  name: Metadata and Embeddings
+  type: Core Functionality
+  business: Dataset metadata becomes analysis-ready factors, and embeddings are computed, indexed, and cached.
+  conditions:
+  - DataEval installed
+  - A classification dataset and an object-detection dataset with categorical and continuous metadata
+  steps:
+  - do: Build `Metadata` from a classification dataset and read its properties.
+    expect: '`factor_names`, `factor_data`, `class_labels`, `is_discrete`, and `index2label` are present and consistent.'
+    tests:
+    - metaemb::test_metadata_protocol_attributes
+  - do: Build `Metadata` from an object-detection dataset with a continuous factor, set `continuous_factor_bins`,
+      and apply `exclude`.
+    expect: The continuous factor is binned to the requested bins and the excluded factor is absent.
+    tests:
+    - metaemb::test_metadata_od_continuous_bins_and_exclude
+  - do: Compute `Embeddings` with `FlattenExtractor` and check its length and shape.
+    expect: One embedding row per sample with the expected dimension.
+    tests:
+    - metaemb::test_embeddings_with_flatten_extractor
+    - metaemb::test_embeddings_supports_len
+  - do: Index `Embeddings` by sample.
+    expect: Individual embeddings are returned by index.
+    tests:
+    - metaemb::test_embeddings_supports_indexing
+  - do: Compute `Embeddings` with a disk cache, then access it again.
+    expect: The second access reads the cache and does not call the extractor again.
+    tests:
+    - metaemb::test_embeddings_disk_cache_reused_without_recomputing
+    - metaemb::test_embeddings_bind_is_lazy
+  - do: Pass `Embeddings` to a function typed as `Array` and to one typed as `FeatureExtractor`.
+    expect: Both accept it.
+    tests:
+    - metaemb::test_embeddings_satisfies_array_and_feature_extractor_protocols
+- id: 3-1
+  req: FR-3
+  name: Feature Extractors
+  type: Core Functionality
+  business: Each extractor backend produces embeddings that downstream evaluators can consume.
+  conditions:
+  - DataEval installed with `onnx` and `opencv` extras
+  - A small image dataset and a small ONNX model
+  steps:
+  - do: Run `FlattenExtractor` on the dataset.
+    expect: One row per image, flattened to one dimension.
+    tests:
+    - feat::test_flatten_extractor_produces_embeddings
+    - feat::test_flatten_extractor_flattens_to_1d_per_image
+  - do: Run `TorchExtractor` on a small model layer.
+    expect: One embedding row per image from the chosen layer.
+    tests:
+    - feat::test_torch_extractor_named_layer_embeddings
+  - do: Run `OnnxExtractor` on the ONNX model and compare with the model's own output.
+    expect: The embeddings match the model output.
+    tests:
+    - onnxe2e::test_onnx_extractor_produces_embeddings_matching_model_output
+  - do: Run `BoVWExtractor` on the dataset.
+    expect: One bag-of-visual-words vector per image.
+    tests:
+    - feat::test_bovw_extractor_one_vector_per_image
+  - do: Run `UncertaintyExtractor` and `ClasswiseUncertaintyExtractor` with a stub model.
+    expect: Per-instance and per-class uncertainty values are returned.
+    tests:
+    - feat::test_uncertainty_extractors_with_stub_model
+  - do: Pass ONNX embeddings to `DriftMMD` and `DriftKNeighbors`.
+    expect: Both detectors accept the embeddings and return a `DriftOutput`.
+    tests:
+    - onnxe2e::test_onnx_embeddings_feed_drift_detector
+- id: 4-1
+  req: FR-4
+  name: Dataset Selection
+  type: Core Functionality
+  business: A dataset can be narrowed, reordered, and rebalanced lazily, and the result is still a valid dataset.
+  conditions:
+  - DataEval installed
+  - A dataset implementing `__getitem__` and `__len__`
+  steps:
+  - do: Apply `Limit`, `Indices`, and `Reverse` in turn.
+    expect: Length and item order match each operation.
+    tests:
+    - sel::test_select_with_limit
+    - sel::test_select_with_indices
+    - sel::test_select_with_reverse
+  - do: Apply `Shuffle` twice with the same seed.
+    expect: Length is preserved, order changes, and both runs give the same order.
+    tests:
+    - sel::test_select_with_shuffle
+    - sel::test_shuffle_is_reproducible_for_fixed_seed
+  - do: Apply `ClassFilter` and `ClassBalance` to a labeled dataset.
+    expect: Only the requested classes remain, and the class counts are balanced.
+    tests:
+    - sel::test_class_filter_and_class_balance_on_labeled_dataset
+  - do: Chain `Limit` and `Shuffle` in one `View`.
+    expect: Operations apply in the order given.
+    tests:
+    - sel::test_select_composes_multiple_operations
+  - do: Iterate and index the `View`, and pass it to an evaluator.
+    expect: The `View` is sized, iterable, indexable, and accepted as a dataset.
+    tests:
+    - sel::test_select_is_iterable
+- id: 5-1
+  req: FR-5
+  name: Bias Evaluators
+  type: Core Functionality
+  business: Balance, Diversity, and Parity report bias between metadata factors and class labels.
+  conditions:
+  - DataEval installed
+  - A dataset with categorical and continuous metadata factors
+  steps:
+  - do: Run `Balance` on the dataset.
+    expect: A `BalanceOutput` with `balance`, `factors`, and `classwise` frames, and an `is_imbalanced` column on
+      `classwise`.
+    tests:
+    - bias::test_balance_returns_output
+    - bias::test_balance_output_has_dataframes
+    - bias::test_balance_classwise_has_imbalance_flag
+  - do: Run `Diversity` with the Simpson and Shannon methods.
+    expect: A `DiversityOutput` with `factors` and `classwise` frames and an `is_low_diversity` column; both methods
+      run.
+    tests:
+    - bias::test_diversity_returns_output
+    - bias::test_diversity_output_has_dataframes
+    - bias::test_diversity_factors_has_low_diversity_flag
+    - bias::test_diversity_supports_shannon_method
+  - do: Run `Parity` on the dataset.
+    expect: A `ParityOutput` with a `factors` frame, an `is_significant` column, and `insufficient_data` diagnostics.
+    tests:
+    - bias::test_parity_returns_output
+    - bias::test_parity_output_has_factors_and_insufficient_data
+    - bias::test_parity_factors_has_correlation_flag
+  - do: Run each evaluator on a `Metadata` object with a continuous factor.
+    expect: Continuous factors are handled and appear in the results.
+    tests:
+    - bias::test_bias_evaluators_handle_continuous_factors_in_metadata
+  - do: Call `.meta()` and `.data()` on each output.
+    expect: Execution metadata and data are returned.
+    tests:
+    - bias::test_all_bias_outputs_support_meta
+- id: 6-1
+  req: FR-6
+  name: Duplicates and Outliers
+  type: Core Functionality
+  business: Duplicates and Outliers find the intended samples and handle empty and object-detection input.
+  conditions:
+  - DataEval installed
+  - An image dataset containing exact copies, near copies, and extreme-statistic images
+  steps:
+  - do: Run `Duplicates` on the dataset.
+    expect: Exact and near duplicates are reported in `items` and `targets`.
+    tests:
+    - quality::test_duplicates_detects_exact_copies
+    - quality::test_duplicates_items_has_exact_field
+    - quality::test_duplicates_detects_near_duplicates
+  - do: Compare two datasets with `Duplicates.from_stats()`.
+    expect: Duplicates across the two datasets are reported.
+    tests:
+    - quality::test_duplicates_from_stats_across_datasets
+  - do: Run `Outliers` with `modzscore`, `zscore`, and `iqr`.
+    expect: An `issues` frame is returned for each method.
+    tests:
+    - quality::test_outliers_returns_issues_dataframe
+    - quality::test_outliers_supports_zscore_threshold
+    - quality::test_outliers_supports_iqr_threshold
+  - do: Run both on an object-detection dataset.
+    expect: Results are reported per detection target.
+    tests:
+    - quality::test_duplicates_and_outliers_on_object_detection_dataset
+  - do: Run both on an empty dataset.
+    expect: An empty result is returned without an exception.
+    tests:
+    - inputs::test_duplicates_handles_empty_dataset
+    - inputs::test_outliers_handles_empty_dataset
+  - do: Call `.meta()` on each output.
+    expect: Execution metadata is returned.
+    tests:
+    - quality::test_quality_outputs_support_meta
+- id: 7-1
+  req: FR-7
+  name: Drift Detectors
+  type: Core Functionality
+  business: Every drift detector flags a clear shift, stays quiet when there is none, and reports its evidence.
+  conditions:
+  - DataEval installed
+  - A reference sample, a clearly shifted sample, and a second sample from the reference distribution
+  steps:
+  - do: Fit each of `DriftUnivariate`, `DriftMMD`, `DriftKNeighbors`, `DriftReconstruction`, and `DriftDomainClassifier`
+      on the reference and predict on the shifted sample.
+    expect: Each returns a `DriftOutput` with `drifted` true.
+    tests:
+    - drift::test_drift_univariate_detects_clear_shift
+    - drift::test_drift_mmd_detects_clear_shift
+    - drift::test_drift_kneighbors_detects_shift
+    - drift::test_drift_reconstruction_detects_shift
+    - drift::test_drift_domain_classifier_detects_shift
+  - do: Predict with each detector on the second reference-distribution sample.
+    expect: '`drifted` is false.'
+    tests:
+    - drift::test_no_false_alarm_on_same_distribution_sample[univariate]
+    - drift::test_no_false_alarm_on_same_distribution_sample[mmd]
+    - drift::test_no_false_alarm_on_same_distribution_sample[kneighbors]
+    - drift::test_no_false_alarm_on_same_distribution_sample[domain_classifier]
+    - drift::test_no_false_alarm_on_same_distribution_sample[reconstruction]
+  - do: Inspect the `DriftOutput`.
+    expect: '`distance`, `threshold`, `metric_name`, and `details` are present, with per-feature `p_vals`, `feature_drift`,
+      and `distances` for `DriftUnivariate`.'
+    tests:
+    - drift::test_drift_output_fields_and_univariate_details
+  - do: Run `DriftUnivariate` with `ks` and `cvm`.
+    expect: Both methods run and flag the shift.
+    tests:
+    - drift::test_drift_univariate_method_selection[ks]
+    - drift::test_drift_univariate_method_selection[cvm]
+  - do: Run a detector wrapped in `ChunkedDrift` over a chunked stream.
+    expect: A drift verdict is reported per chunk.
+    tests:
+    - drift::test_chunked_drift_wrapper
+  - do: Update the reference with `LastSeenUpdateStrategy` and `ReservoirSamplingUpdateStrategy`.
+    expect: The reference set reflects each strategy's policy.
+    tests:
+    - drift::test_reference_update_strategies
+- id: 8-1
+  req: FR-8
+  name: OOD Detectors
+  type: Core Functionality
+  business: The OOD detectors flag out-of-distribution samples and pass in-distribution ones.
+  conditions:
+  - DataEval installed
+  - A reference set, in-distribution samples, and clearly out-of-distribution samples
+  steps:
+  - do: Fit `OODKNeighbors` and predict on mixed samples.
+    expect: An `OODOutput` with `is_ood` and `instance_score`; far samples are flagged and in-distribution samples
+      are not.
+    tests:
+    - ood::test_ood_kneighbors_predict_returns_output
+  - do: Fit `OODReconstruction` and predict on mixed samples.
+    expect: Out-of-distribution samples are flagged.
+    tests:
+    - ood::test_ood_reconstruction_detects_ood
+  - do: Fit `OODDomainClassifier` and predict on mixed samples.
+    expect: Out-of-distribution samples are flagged.
+    tests:
+    - ood::test_ood_domain_classifier_detects_ood
+  - do: Vary the threshold percentile.
+    expect: A stricter percentile flags fewer samples.
+    tests:
+    - ood::test_ood_detectors_support_threshold_perc
+- id: 9-1
+  req: FR-9
+  name: Sufficiency Projection
+  type: Core Functionality
+  business: Sufficiency measures a learning curve and projects how much data a performance target needs.
+  conditions:
+  - DataEval installed
+  - A small dataset and a small trainable model
+  steps:
+  - do: Run `Sufficiency` with a `GeometricSchedule` and a `ManualSchedule`.
+    expect: A `SufficiencyOutput` with `steps`, `measures`, and `averaged_measures` for each schedule.
+    tests:
+    - suff::test_sufficiency_end_to_end_with_both_schedules
+  - do: Call `project()` for larger dataset sizes.
+    expect: A DataFrame of projected performance.
+    tests:
+    - suff::test_sufficiency_output_project
+  - do: Call `inv_project()` for a target performance.
+    expect: A DataFrame with the dataset size required for the target.
+    tests:
+    - suff::test_sufficiency_output_inv_project
+  - do: Supply custom `TrainingStrategy`, `EvaluationStrategy`, and `ModelResetStrategy` implementations.
+    expect: '`Sufficiency` calls each custom strategy.'
+    tests:
+    - suff::test_sufficiency_calls_custom_strategies
+- id: 10-1
+  req: FR-10
+  name: Sample Prioritization
+  type: Core Functionality
+  business: Prioritize ranks samples by difficulty and supports each selection policy.
+  conditions:
+  - DataEval installed
+  - A classification dataset and an object-detection dataset with a feature extractor
+  steps:
+  - do: Run `Prioritize` with KNN, KMeans, and HDBSCAN.
+    expect: Samples are ranked by each method.
+    tests:
+    - prio::test_prioritize_ranks_samples_knn
+    - prio::test_prioritize_ranks_samples_with_each_method[knn]
+    - prio::test_prioritize_ranks_samples_with_each_method[kmeans_distance]
+    - prio::test_prioritize_ranks_samples_with_each_method[hdbscan_distance]
+    - prio::test_prioritize_ranks_samples_with_each_method[kmeans_complexity]
+    - prio::test_prioritize_ranks_samples_with_each_method[hdbscan_complexity]
+  - do: Read `indices` and `scores` from the output.
+    expect: '`indices` are evaluated lazily on first access.'
+    tests:
+    - prio::test_prioritize_output_lazy_evaluation
+  - do: Call `.easy_first()` and `.hard_first()`.
+    expect: The ordering reverses and uses the same scores.
+    tests:
+    - prio::test_prioritize_output_order_transformation
+  - do: Apply the `stratified` and `class_balanced` policies.
+    expect: The selection is stratified by score and balanced by class.
+    tests:
+    - prio::test_prioritize_stratified_policy
+    - prio::test_prioritize_stratified_and_class_balanced_policies
+  - do: Run `Prioritize` on an object-detection dataset.
+    expect: Ranking works for detections.
+    tests:
+    - prio::test_prioritize_on_object_detection_dataset
+- id: 11-1
+  req: FR-11
+  name: Core and Utils
+  type: Core Functionality
+  business: The stateless core functions and the utility helpers that integrators build on behave as the API reference
+    describes.
+  conditions:
+  - DataEval installed with core dependencies
+  steps:
+  - do: Call the core hashing, clustering, mutual information, and label statistics functions.
+    expect: Each returns a structured result, and hashing is consistent.
+    tests:
+    - core::test_xxhash_produces_consistent_hashes
+    - core::test_cluster_performs_clustering
+    - core::test_mutual_info_calculates_scores
+    - core::test_label_stats_computes_distribution
+  - do: Call the divergence, MST and neighbors, label error and parity, ranking, and null-model functions.
+    expect: Each returns a structured result.
+    tests:
+    - core::test_divergence_separates_distributions
+    - core::test_mst_and_neighbors
+    - core::test_label_errors_flag_flipped_labels
+    - core::test_label_parity_and_factor_parity
+    - core::test_rank_functions_return_full_ranking
+    - core::test_nullmodel_metrics
+  - do: Call the threshold helpers.
+    expect: Each returns `(lower, upper)` bounds for an array.
+    tests:
+    - utils::test_utils_thresholds_zscore
+    - utils::test_utils_thresholds_iqr
+  - do: Call the bounding-box and image preparation helpers.
+    expect: Boxes convert, images become canonical grayscale, and value ranges rescale.
+    tests:
+    - utils::test_utils_preprocessing_box_conversion
+    - utils::test_utils_preprocessing_canonical_grayscale
+    - utils::test_utils_preprocessing_rescale
+  - do: Validate a dataset against its expected kind, then against the wrong kind.
+    expect: The matching dataset passes and the other is rejected.
+    tests:
+    - utils::test_utils_data_validation_helpers
+    - utils::test_utils_data_rejects_wrong_shape
+  - do: Run the ONNX graph helpers, then build the model, loss, and training helpers.
+    expect: The embedding layer is found and exposed, and the models, `ELBOLoss`, `train`, and `predict` run.
+    tests:
+    - utils::test_utils_onnx_graph_utilities
+    - utils::test_utils_models_architectures
+    - utils::test_utils_losses_elbo
+    - utils::test_utils_training_helpers
+- id: 12-1
+  req: FR-12
+  name: MAITE Entry Points
+  type: Integration
+  business: MAITE can discover DataEval through its declared entry points.
+  conditions:
+  - DataEval installed
+  steps:
+  - do: Read the MAITE task entry points declared by the installed package and import each target.
+    expect: Every task entry point resolves to an importable target.
+    tests:
+    - maite::test_declares_maite_task_entrypoints
+    - maite::test_task_entrypoint_target_importable
+  - do: Read the MAITE model entry points and import each target.
+    expect: Every model entry point resolves to an importable target.
+    tests:
+    - maite::test_declares_maite_model_protocol_entrypoints
+    - maite::test_model_entrypoint_targets_importable
+- id: 12-2
+  req: FR-12
+  name: Metadata JSON Schema
+  type: Integration
+  business: The `metadata.json` schema round-trips dataset, model, and extractor records with provenance, and rejects
+    malformed documents.
+  conditions:
+  - DataEval installed with `pydantic`
+  steps:
+  - do: Serialize and re-parse `DatasetInfo` and `ModelInfo` separately and in one document.
+    expect: All fields survive each round trip.
+    tests:
+    - mjson::test_dataset_info_round_trip
+    - mjson::test_model_info_round_trip
+    - mjson::test_combined_dataset_and_model
+    - mjson::test_individual_info_types_serialize_independently
+  - do: Serialize a document with dataset selections and an extractor with a model and transforms.
+    expect: All blocks round-trip within one document.
+    tests:
+    - mjson::test_dataset_selections_and_extractor_round_trip
+  - do: Emit JSON and stamp it with `Output.meta()`.
+    expect: The JSON is indented, valid, carries `schema_version`, and its `provenance` block is the `ExecutionMetadata`
+      record.
+    tests:
+    - mjson::test_emitted_json_is_human_readable
+    - mjson::test_execution_metadata_serializes_as_provenance
+  - do: Parse a document with no `dataset`, `model`, or `extractor`, and one with an unknown field.
+    expect: Each raises a validation error that names the problem.
+    tests:
+    - mjson::test_schema_rejects_empty_payload
+    - mjson::test_schema_rejects_unknown_fields
+- id: 21-1
+  req: NFR-1
+  name: Platform Compatibility
+  type: Core Functionality
+  business: DataEval installs and runs on every supported Python version, installer, and hardware configuration.
+  conditions:
+  - CI pipeline results for the supported Python versions (3.11-3.14)
+  steps:
+  - do: Run the version checks on the current Python version.
+    expect: The version is supported, the package imports, and `typing_extensions` is available.
+    tests:
+    - pyver::test_running_on_supported_version
+    - pyver::test_import_succeeds_on_current_version
+    - pyver::test_typing_extensions_available
+  - do: Review the `test` and `verify` CI jobs across the Python 3.11-3.14 matrix.
+    expect: The unit and verification suites pass on every supported version.
+    tests:
+    - 'CI: test'
+    - 'CI: verify'
+  - do: Review the `conda`, `minimum install`, and `verify lock` CI jobs.
+    expect: conda, lowest-direct, and lock-file installs resolve without conflicts; poetry installs from source.
+    tests:
+    - 'CI: conda'
+    - 'CI: minimum install'
+    - 'CI: verify lock'
+  - do: Run a core evaluator with CUDA hidden.
+    expect: The evaluator runs on CPU without error.
+    tests:
+    - cfg::test_core_evaluator_falls_back_to_cpu_without_cuda
+  - do: Run the verification suite with warnings as errors.
+    expect: No version-specific deprecation warnings are raised.
+    tests:
+    - 'NEW: verification suite runs with -W error::DeprecationWarning'
+- id: 22-1
+  req: NFR-2
+  name: Package Distribution
+  type: Core Functionality
+  business: The released package has the right contents and is published to both channels.
+  conditions:
+  - A built wheel and sdist, and the release published
+  steps:
+  - do: Inspect the wheel and sdist contents.
+    expect: Only `src/dataeval/` files are included, with the `py.typed` marker and all expected subpackages, and
+      no tests.
+    tests:
+    - wheel::test_py_typed_marker_exists
+    - wheel::test_expected_subpackages_present
+    - wheel::test_no_test_files_in_package
+  - do: Read the installed version and metadata.
+    expect: '`__version__` is not `unknown`, and Name, Requires-Python, License, and Project-URL are set.'
+    tests:
+    - vmeta::test_version_not_unknown
+    - vmeta::test_package_name
+    - vmeta::test_requires_python
+    - vmeta::test_license_set
+    - vmeta::test_project_urls_set
+  - do: Check the published release on PyPI and conda-forge.
+    expect: The release version is available on both.
+    tests:
+    - 'NEW: published-release check (PyPI and conda-forge) in the release pipeline'
+  - do: Review the `verify lock` CI job.
+    expect: Lock files and `environment.yml` match `pyproject.toml`.
+    tests:
+    - 'CI: verify lock'
+- id: 23-1
+  req: NFR-3
+  name: Type Safety
+  type: Core Functionality
+  business: DataEval ships complete type information that downstream projects can check.
+  conditions:
+  - DataEval installed
+  steps:
+  - do: Check for the `py.typed` marker.
+    expect: The marker exists.
+    tests:
+    - types::test_py_typed_marker_exists
+  - do: Import `dataeval.protocols` and `dataeval.types`.
+    expect: The protocols and output base classes are exported.
+    tests:
+    - types::test_protocols_module_exports_types
+    - types::test_types_module_exports_output_bases
+  - do: Read `__all__` for the public modules.
+    expect: Each public module defines `__all__`.
+    tests:
+    - types::test_public_modules_have_all
+  - do: Review the `pyright` CI jobs.
+    expect: '`pyright --verifytypes` reports more than 90% completeness and `pyright` passes on `src/` and `tests/`.'
+    tests:
+    - 'CI: pyright'
+    - 'NEW: verifytypes completeness gate in verification'
+- id: 24-1
+  req: NFR-4
+  name: Config and Reproducibility
+  type: Core Functionality
+  business: Global settings take effect, scoped overrides restore, and a seed gives identical results with recorded
+    execution metadata.
+  conditions:
+  - DataEval installed
+  steps:
+  - do: Set and get the seed, device, and maximum processes.
+    expect: Each `get_*` returns what was set.
+    tests:
+    - cfg::test_set_seed_and_get_seed
+    - cfg::test_set_device_and_get_device
+    - cfg::test_set_max_processes
+  - do: Set and get the batch size.
+    expect: '`get_batch_size` returns what was set.'
+    tests:
+    - cfg::test_set_batch_size_and_get_batch_size
+  - do: Override device, batch size, and maximum processes in `use_*` scopes.
+    expect: Each previous value is restored on exit.
+    tests:
+    - cfg::test_use_device_context_manager
+    - cfg::test_use_max_processes_context_manager
+    - cfg::test_use_batch_size_context_manager
+    - cfg::test_use_scopes_nest_and_restore_after_error
+  - do: Run the same evaluator twice with the same seed.
+    expect: The results are identical.
+    tests:
+    - cfg::test_seed_produces_reproducible_results
+  - do: Call `.meta()` on an evaluator output.
+    expect: Name, time, duration, arguments, and version are present.
+    tests:
+    - bias::test_all_bias_outputs_support_meta
+    - quality::test_quality_outputs_support_meta
+  - do: Run an evaluator with a `logging` handler attached.
+    expect: DataEval emits records through the standard framework.
+    tests:
+    - cfg::test_dataeval_logging_uses_standard_logging_framework
+- id: 25-1
+  req: NFR-5
+  name: Performance and Scale
+  type: Performance
+  business: Memory use follows the size of the stored embeddings, and reference workloads are checked against their
+    recorded time budgets for regressions.
+  conditions:
+  - A 10,000-image synthetic dataset
+  - Reference hardware for the pipeline runner
+  - Budgets recorded from the v1.1.4 baseline
+  steps:
+  - do: Compute `Embeddings` with a disk cache at two dataset sizes.
+    expect: Peak memory grows roughly in proportion to the stored embeddings (baseline about 9 KB per sample) and
+      stays well below the size of the raw dataset.
+    tests:
+    - perf::test_cached_embeddings_memory_bounded
+  - do: Set `max_processes` to 1, 2, 4, and N and time `Duplicates` and `Outliers` at each setting.
+    expect: The worker count stays at or below the setting, and the timing at each setting is recorded.
+    tests:
+    - perf::test_max_processes_bounds_workers
+  - do: Time `Duplicates`, `Outliers`, `Balance`, and `DriftKNeighbors` on the dataset.
+    expect: Each completes within its budget. The CI-runner baselines are 7.96 s, 13.87 s, 0.72 s, and 2.08 s
+      (2.8 s, 3.8 s, 0.5 s, and 2.6 s on the development machine), so the budgets are 16 s, 28 s, 1.5 s, and
+      4.5 s.
+    tests:
+    - perf::test_reference_workloads_within_time_budgets
+- id: 26-1
+  req: NFR-6
+  name: Input Validation
+  type: Edge Case
+  business: Invalid input is rejected with a clear error, and empty input is handled.
+  conditions:
+  - DataEval installed
+  steps:
+  - do: Call each evaluator with out-of-range or unknown parameters and mismatched lengths.
+    expect: Each raises `ValueError` or `TypeError` that names the argument.
+    tests:
+    - inputs::test_invalid_argument_raises_error_naming_it[diversity-method]
+    - inputs::test_invalid_argument_raises_error_naming_it[outliers-threshold]
+    - inputs::test_invalid_argument_raises_error_naming_it[duplicates-flags]
+    - inputs::test_invalid_argument_raises_error_naming_it[drift-univariate-method]
+    - inputs::test_invalid_argument_raises_error_naming_it[drift-univariate-correction]
+    - inputs::test_invalid_argument_raises_error_naming_it[drift-kneighbors-k]
+    - inputs::test_invalid_argument_raises_error_naming_it[ood-kneighbors-k]
+    - inputs::test_invalid_argument_raises_error_naming_it[drift-wasserstein-ratio]
+    - inputs::test_invalid_argument_raises_error_naming_it[prioritize-method]
+    - inputs::test_invalid_argument_raises_error_naming_it[sufficiency-runs]
+    - inputs::test_invalid_argument_raises_error_naming_it[sufficiency-substeps]
+    - inputs::test_invalid_argument_raises_error_naming_it[embeddings-batch-size]
+    - inputs::test_invalid_argument_raises_error_naming_it[bovw-vocab-size]
+    - inputs::test_invalid_argument_raises_error_naming_it[resize-size]
+    - inputs::test_invalid_argument_raises_error_naming_it[resize-mode]
+    - inputs::test_invalid_argument_raises_error_naming_it[select-channels]
+    - inputs::test_invalid_argument_raises_error_naming_it[crop-region]
+    - inputs::test_invalid_argument_raises_error_naming_it[metadata-length-mismatch]
+  - do: Pass a dataset of the wrong kind to an evaluator.
+    expect: It is rejected before analysis begins.
+    tests:
+    - utils::test_utils_data_rejects_wrong_shape
+  - do: Run evaluators and label statistics on empty input.
+    expect: An empty result or clear error is returned.
+    tests:
+    - inputs::test_label_stats_handles_empty_labels
+    - inputs::test_duplicates_handles_empty_dataset
+    - inputs::test_outliers_handles_empty_dataset

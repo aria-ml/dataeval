@@ -10,8 +10,6 @@ import importlib.util
 import pytest
 
 
-@pytest.mark.test_case("1-2")
-@pytest.mark.test_case("1-7")
 class TestExtrasInstall:
     """Verify optional dependency extras provide expected functionality."""
 

@@ -6,10 +6,7 @@ Maps to meta repo test cases:
 
 from importlib.metadata import metadata
 
-import pytest
 
-
-@pytest.mark.test_case("1-1")
 class TestVersionMetadata:
     """Verify the installed package metadata matches expectations."""
 
