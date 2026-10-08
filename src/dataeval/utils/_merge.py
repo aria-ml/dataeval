@@ -245,25 +245,6 @@ def _was_dropped(column: str, dropped: Mapping[str, set[DropReason]], sep: str =
     )
 
 
-def _simplify_present(values: list[Any]) -> list[Any]:
-    """Simplify the values an entry recorded, leaving the ones it did not as missing.
-
-    :func:`simplify_type` reads every element as a string, so a missing value reaches it as
-    ``None`` and comes back as the *string* ``"None"`` -- which then makes the whole column
-    a string column, since one string forces the widest type. Both are wrong for a column
-    that is simply incomplete: the absence stops being an absence, and the numbers that were
-    recorded stop being numbers.
-
-    Only the partial path routes through here, so a column with no missing values reaches
-    :func:`simplify_type` exactly as it always has.
-    """
-    if not any(value is None for value in values):
-        return simplify_type(values)
-    present = simplify_type([value for value in values if value is not None])
-    filled = iter(present)
-    return [None if value is None else next(filled) for value in values]
-
-
 def _merge(  # noqa: C901
     dicts: list[Mapping[str, Any]],
     ignore_lists: bool,
@@ -341,8 +322,7 @@ def _merge(  # noqa: C901
             dropped.setdefault(k, set()).add(DropReason.MIXED_TYPES)
     unusable = {k: list(merged[k]) for k in sorted(kept) if DropReason.MIXED_TYPES in dropped.get(k, set())}
     kept = {k for k in kept if k not in unusable}
-    simplify = _simplify_present if keep_partial else simplify_type
-    merged = {k: simplify(v) for k, v in merged.items() if k in kept}
+    merged = {k: simplify_type(v) for k, v in merged.items() if k in kept}
     return merged, dropped, unusable
 
 

@@ -14,6 +14,9 @@ class TestCastSimplify:
             ([123, "12.3"], [123.0, 12.3]),
             ([123, "foo"], ["123", "foo"]),
             (["123", "456"], [123, 456]),
+            ([None, "foo"], [None, "foo"]),
+            ([None, "1"], [None, 1]),
+            ([float("nan"), "foo"], [None, "foo"]),
         ],
     )
     def test_convert_type(self, value, output):

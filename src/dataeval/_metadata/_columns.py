@@ -19,7 +19,7 @@ from numpy.typing import NDArray
 
 from dataeval.types import Array1D, FactorInfo, FactorLevel
 from dataeval.utils._array import as_numpy
-from dataeval.utils._internal import promotion_is_lossy, value_kind
+from dataeval.utils._internal import is_absent, promotion_is_lossy, value_kind
 
 
 def _flatten_column_vector(values: NDArray[np.generic]) -> NDArray[np.generic]:
@@ -66,7 +66,7 @@ def reject_mixed_values(factors: Mapping[str, Any]) -> None:
     Raises
     ------
     ValueError
-        When a factor mixes values that read as numbers with values that do not.
+        When a factor mixes kinds of value: numbers, text and booleans.
     """
     for name, values in factors.items():
         array = np.asarray(values)
@@ -74,14 +74,13 @@ def reject_mixed_values(factors: Mapping[str, Any]) -> None:
             # Any other dtype is one type by construction; only an object array can hold
             # values that disagree.
             continue
-        present = [value for value in array.reshape(-1).tolist() if value is not None]
+        present = [value for value in array.reshape(-1).tolist() if not is_absent(value)]
         if not promotion_is_lossy(present):
             continue
-        counts = Counter(value_kind(value) for value in present)
+        counts = ", ".join(f"{n} {kind}" for kind, n in sorted(Counter(map(value_kind, present)).items()))
         raise ValueError(
-            f"{name!r} holds both numbers and text ({counts['numeric']} numeric, "
-            f"{counts['text']} text), so it has no single value type. Pass values of one "
-            f"type — map the text to numbers, or render the numbers as text.",
+            f"{name!r} holds values of more than one kind ({counts}), so it has no single "
+            f"value type. Pass values of one type — map the others onto it, or render them all as text.",
         )
 
 

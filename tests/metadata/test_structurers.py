@@ -1096,6 +1096,78 @@ class TestAMixedMetadataColumnIsNotAFactor:
         assert Metadata(dataset).rows_at("sequence")["alt"].to_list() == [1.0, 2.0, 3.0]
 
 
+def _one_field(values) -> Metadata:
+    """One classification item per value, each recording it as ``field``."""
+    count = len(values)
+    labels = np.eye(2)[np.arange(count) % 2]
+    return Metadata(MockDataset(np.zeros((count, 3, 4, 4)), labels, [{"field": value} for value in values]))
+
+
+def _per_box_field(per_item) -> Metadata:
+    """Two detections per item, each item recording one ``f`` per box."""
+    count = len(per_item)
+    return Metadata(MockDataset([np.zeros((3, 4, 4))] * count, [_od_target(2)] * count, [{"f": v} for v in per_item]))
+
+
+@pytest.mark.required
+class TestAFactorKeepsItsValuesApart:
+    """A missing value is null, and no two distinct values are coerced into one.
+
+    ``None`` used to become the category ``"None"`` and turn the whole column into text, so
+    ``[1, "1", True, 2, None, 3.5]`` came out as ``['1', '1', '1', '2', 'None', '3.5']``:
+    the boolean merged with the integer, and the absence became a value.
+    """
+
+    @pytest.mark.parametrize(
+        ("values", "expected"),
+        [
+            ([None, "rain", "sun"], [None, "rain", "sun"]),
+            ([None, 1, 2], [None, 1, 2]),
+            ([None, 1.5, 2.5], [None, 1.5, 2.5]),
+            ([float("nan"), "rain", "sun"], [None, "rain", "sun"]),
+            ([1, 2.5, 3], [1.0, 2.5, 3.0]),
+            ([1, "1", 2], [1, 1, 2]),  # a numeral is a number however it is spelled
+            ([True, False, True], [1, 0, 1]),
+        ],
+    )
+    def test_a_column_of_one_kind_is_a_factor(self, values, expected):
+        md = _one_field(values)
+        assert dict(md.dropped_factors) == {}
+        assert md.rows_at("unit")["field"].to_list() == expected
+
+    @pytest.mark.parametrize(
+        ("values", "counts"),
+        [
+            ([1, "a", 2], {"numeric": 2, "text": 1}),
+            ([True, 2, 3], {"boolean": 1, "numeric": 2}),
+            ([True, "a", "b"], {"boolean": 1, "text": 2}),
+            ([53.7] * 10 + ["N"] * 2, {"numeric": 10, "text": 2}),
+            ([1, "1", True, 2, None, 3.5], {"boolean": 1, "numeric": 4}),
+        ],
+    )
+    def test_a_column_mixing_kinds_is_held_back_for_repair(self, values, counts):
+        md = _one_field(values)
+        assert "field" not in md.factor_names
+        assert dict(md.dropped_factors) == {"field": ["mixed_types"]}
+        assert md.unusable["field"].repairable is True
+        assert md.unusable["field"].counts == counts
+
+    def test_a_missing_per_box_value_is_null(self):
+        md = _per_box_field([[None, "car"], ["bus", "car"]])
+        assert md.rows_at("instance")["f"].to_list() == [None, "car", "bus", "car"]
+
+    def test_a_per_box_field_mixing_kinds_is_held_back_at_the_instance_level(self):
+        md = _per_box_field([[True, 2], [3, 4]])
+        assert dict(md.dropped_factors) == {"f": ["mixed_types"]}
+        assert md.unusable["f"].level == "instance"
+        assert md.unusable["f"].counts == {"boolean": 1, "numeric": 3}
+
+    def test_a_nested_field_is_read_by_its_leaf(self):
+        md = _one_field([{"sky": None, "wind": True}, {"sky": "clear", "wind": 3}, {"sky": "fog", "wind": 4}])
+        assert md.rows_at("unit")["sky"].to_list() == [None, "clear", "fog"]
+        assert dict(md.dropped_factors) == {"wind": ["mixed_types"]}
+
+
 @pytest.mark.required
 class TestUnusableSaysWhatItWouldTakeToReadTheColumn:
     """``dropped_factors`` records that a factor was dropped; this says what is behind it."""

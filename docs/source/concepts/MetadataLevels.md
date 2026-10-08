@@ -625,6 +625,10 @@ value — a metadata key some items omit, and a per-frame timing some frames omi
 Two opposite answers to that question in one pass would be the harder thing to
 explain.
 
+A key an item *does* declare, holding `None`, is a missing value under either
+policy: the dataset recorded that it has no value there, so the factor keeps it
+as null rather than reading it as the category `"None"`.
+
 ```{note}
 A factor **no** row declares is dropped either way. That is a factor the dataset
 does not carry, rather than one it carries incompletely, and an all-null column
