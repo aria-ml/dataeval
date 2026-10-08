@@ -1,22 +1,16 @@
 """Verification test configuration and report generation plugin.
 
 Provides:
-- ``test_case(*ids)`` marker linking tests to ``test-case-<id>.md`` in the meta repo
-- JSON report generation mapping test case numbers to pass/fail results
+- JSON report of every test's outcome, keyed by node id (read by generate_metarepo.py)
 - Terminal summary of verification results
-
-A single test may map to multiple test cases (and therefore multiple FRs/NFRs
-via the VCRM in the meta repo) by stacking markers::
-
-    @pytest.mark.test_case(1)
-    @pytest.mark.test_case(5)
-    def test_something(): ...
 """
 
 from __future__ import annotations
 
 import json
+import platform
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -29,13 +23,6 @@ OUTPUT_DIR = VERIFICATION_DIR.parent / "output"
 _PROJECT_ROOT = str(VERIFICATION_DIR.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
-
-
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers",
-        "test_case(*ids): link test to one or more test-case-<id>.md files in the meta repo",
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -81,66 +68,65 @@ def _get_test_status(item):
 # ---------------------------------------------------------------------------
 
 
-def _tc_status(tests: list[dict]) -> str:
-    """Determine overall test case status from individual test results.
+def pytest_sessionstart(session):
+    session.config._verification_started = datetime.now(timezone.utc)
 
-    - "failed"  if any test failed or errored
-    - "skipped" if all tests were skipped
-    - "passed"  if no failures (passed tests + optional skips)
-    """
-    statuses = {t["status"] for t in tests}
-    if statuses & {"failed", "error"}:
-        return "failed"
-    if statuses == {"skipped"}:
-        return "skipped"
-    return "passed"
+
+def _get_test_message(item) -> str | None:
+    """Return the first line of an item's skip, xfail, or failure reason, if any."""
+    reports = getattr(item, "_verification_reports", {})
+    for phase in ("setup", "call", "teardown"):
+        r = reports.get(phase)
+        if r is None:
+            continue
+        if r.skipped:
+            reason = getattr(r, "wasxfail", None)
+            if reason is None and isinstance(r.longrepr, tuple):
+                reason = r.longrepr[2].removeprefix("Skipped: ")
+            return reason.splitlines()[0][:200] if reason else None
+        if r.failed:
+            crash = getattr(r.longrepr, "reprcrash", None)
+            message = crash.message if crash is not None else str(r.longrepr)
+            return message.splitlines()[0][:200] if message else None
+    return None
+
+
+def _utc(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """Write ``output/reports/verification_report.json``."""
-    results: dict[str, list[dict]] = {}
+    """Write ``output/verification_report.json``: run metadata and the outcome of every collected test.
 
+    The registry (``verification/registry.yaml``) maps test cases and their steps to node ids, so
+    ``generate_metarepo.py`` reads results from this map rather than from markers on the tests.
+    """
+    tests: dict[str, dict] = {}
     for item in session.items:
-        status = _get_test_status(item)
-        for marker in item.iter_markers("test_case"):
-            for tc_num in marker.args:
-                tc_id = f"test-case-{tc_num}"
-                results.setdefault(tc_id, []).append(
-                    {
-                        "test": item.nodeid,
-                        "file": str(Path(item.fspath).relative_to(VERIFICATION_DIR)),
-                        "status": status,
-                    },
-                )
-
-    if not results:
+        message = _get_test_message(item)
+        tests[item.nodeid] = {"status": _get_test_status(item), **({"message": message} if message else {})}
+    if not tests:
         return
 
-    tc_statuses = {tc_id: _tc_status(tests) for tc_id, tests in results.items()}
-    passed = sum(1 for s in tc_statuses.values() if s == "passed")
-    failed = sum(1 for s in tc_statuses.values() if s == "failed")
-    skipped = sum(1 for s in tc_statuses.values() if s == "skipped")
-
+    statuses = [t["status"] for t in tests.values()]
     report = {
         "summary": {
-            "total_test_cases": len(results),
-            "passed": passed,
-            "failed": failed,
-            "skipped": skipped,
+            "total_tests": len(tests),
+            **{s: statuses.count(s) for s in ("passed", "failed", "error", "skipped")},
         },
-        "test_cases": {
-            tc_id: {
-                "meta_repo_file": f"test-cases/{tc_id}.md",
-                "status": _tc_status(tests),
-                "tests": tests,
-            }
-            for tc_id, tests in sorted(results.items())
+        "run": {
+            "started": _utc(session.config._verification_started),
+            "finished": _utc(datetime.now(timezone.utc)),
+            "exit_status": int(exitstatus),
+            "command": " ".join(["pytest", *session.config.invocation_params.args]),
+            "python": platform.python_version(),
+            "platform": f"{platform.system().lower()} {platform.machine()}",
         },
+        "tests": dict(sorted(tests.items())),
     }
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = OUTPUT_DIR / "verification_report.json"
-    report_path.write_text(json.dumps(report, indent=2))
+    (OUTPUT_DIR / "verification_report.json").write_text(json.dumps(report, indent=2))
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
@@ -154,16 +140,10 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     terminalreporter.section("Verification Report")
     terminalreporter.write_line(
-        f"Test Cases: {summary['total_test_cases']} total, "
-        f"{summary['passed']} passed, "
-        f"{summary['failed']} failed, "
-        f"{summary['skipped']} skipped",
+        f"Tests: {summary['total_tests']} total, {summary['passed']} passed, "
+        f"{summary['failed']} failed, {summary['error']} errored, {summary['skipped']} skipped",
     )
     terminalreporter.write_line(f"Report: {report_path}")
-
-    for tc_id, tc_data in report["test_cases"].items():
-        if tc_data["status"] == "failed":
-            terminalreporter.write_line(f"  FAILED: {tc_id} ({tc_data['meta_repo_file']})")
-            for test in tc_data["tests"]:
-                if test["status"] in ("failed", "error"):
-                    terminalreporter.write_line(f"    - {test['test']}")
+    for node, result in report["tests"].items():
+        if result["status"] in ("failed", "error"):
+            terminalreporter.write_line(f"  {result['status'].upper()}: {node}")

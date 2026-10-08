@@ -35,7 +35,6 @@ def onnx_extractor(onnx_encoder_path: Path):
     return OnnxExtractor(onnx_encoder_path)
 
 
-@pytest.mark.test_case("7-1")
 class TestOnnxEndToEnd:
     """Verify the full ONNX -> Embeddings -> downstream evaluator path."""
 

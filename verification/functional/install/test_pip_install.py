@@ -8,8 +8,6 @@ Maps to meta repo test cases:
 import pytest
 
 
-@pytest.mark.test_case("1-1")
-@pytest.mark.test_case("1-7")
 class TestPipInstall:
     """Verify the package is importable and functional after pip installation."""
 

@@ -314,6 +314,7 @@ markers = [
   "required: marks tests for required features",
   "optional: marks tests for optional features",
   "cuda: marks tests that require cuda",
+  "performance: marks verification tests that time workloads or measure memory",
 ]
 
 [tool.coverage.run]

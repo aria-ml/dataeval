@@ -5,10 +5,8 @@ Maps to meta repo test cases:
 """
 
 import numpy as np
-import pytest
 
 
-@pytest.mark.test_case("3-1")
 class TestQualityEvaluation:
     """Verify Duplicates and Outliers evaluators."""
 
@@ -96,3 +94,50 @@ class TestQualityEvaluation:
 
         out_result = Outliers().evaluate(images)
         assert out_result.meta() is not None
+
+    def test_duplicates_from_stats_across_datasets(self):
+        """Duplicates.from_stats compares precomputed hashes from two datasets."""
+        from dataeval.core import compute_stats
+        from dataeval.flags import ImageStats
+        from dataeval.quality import Duplicates
+
+        rng = np.random.default_rng(0)
+        first = rng.random((10, 3, 16, 16)).astype(np.float32)
+        second = np.concatenate([rng.random((5, 3, 16, 16)).astype(np.float32), first[:3]])
+        stats = [
+            compute_stats(d, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
+            for d in (first, second)
+        ]
+
+        df = Duplicates().from_stats(stats).data()
+        assert "dataset_indices" in df.columns
+        exact = df.filter(df["dup_type"] == "exact")
+        assert exact.shape[0] == 3
+        for datasets in exact["dataset_indices"]:
+            assert sorted(datasets) == [0, 1]  # each group spans both datasets
+        assert sorted(sorted(items) for items in exact["item_indices"]) == [[0, 5], [1, 6], [2, 7]]
+
+    def test_duplicates_and_outliers_on_object_detection_dataset(self):
+        """Duplicates and Outliers report per detection target when asked to."""
+        from dataeval.quality import Duplicates, Outliers
+        from verification.helpers import SimpleODDataset
+
+        rng = np.random.default_rng(0)
+        images = (0.5 + 0.02 * rng.standard_normal((30, 3, 32, 32))).astype(np.float32)
+        images[7] = 0.0  # uniform black image
+        images[12] = images[3]  # exact copy
+        dataset = SimpleODDataset(images, [np.array([0, 1])] * 30)
+
+        dup = Duplicates().evaluate(dataset, per_target=True).data()
+        targets = dup.filter(dup["level"] == "target")
+        assert targets.shape[0] > 0
+        assert sorted(targets["item_indices"][0]) == [3, 12]
+        assert "target_indices" in dup.columns
+        assert set(targets["target_indices"][0]) <= {0, 1}
+
+        out = Outliers().evaluate(dataset, per_target=True).data()
+        assert "target_index" in out.columns
+        flagged = out.filter(out["target_index"].is_not_null())
+        assert flagged.shape[0] > 0
+        assert set(flagged["item_index"]) == {7}
+        assert set(flagged["target_index"]) == {0, 1}

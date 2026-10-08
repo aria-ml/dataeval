@@ -26,7 +26,6 @@ from dataeval.types import (
 )
 
 
-@pytest.mark.test_case("13-1")
 class TestMetadataJsonSchema:
     """End-to-end verification of the metadata.json schema."""
 
@@ -102,6 +101,15 @@ class TestMetadataJsonSchema:
     def test_schema_rejects_empty_payload(self):
         with pytest.raises(ValueError, match="at least one"):
             MetadataJson()
+
+    def test_schema_rejects_unknown_fields(self):
+        """Unknown keys fail validation at the top level and inside nested records, naming the key."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match=r"bogus[\s\S]*Extra inputs are not permitted"):
+            MetadataJson.model_validate_json('{"dataset": {"name": "x"}, "bogus": 1}')
+        with pytest.raises(ValidationError, match=r"dataset\.bogus[\s\S]*Extra inputs are not permitted"):
+            MetadataJson.model_validate_json('{"dataset": {"name": "x", "bogus": 1}}')
 
     def test_dataset_selections_and_extractor_round_trip(self):
         """A realistic full sidecar: filtered dataset + ONNX extractor with transforms."""

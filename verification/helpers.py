@@ -118,3 +118,58 @@ class SimpleAnnotatedDataset:
 
     def __len__(self) -> int:
         return len(self.images)
+
+
+@dataclass
+class _ODTarget:
+    boxes: NDArray[np.floating]
+    labels: NDArray[np.intp]
+    scores: NDArray[np.floating]
+
+
+@dataclass
+class SimpleICDataset:
+    """Image-classification dataset with one-hot targets and per-image metadata."""
+
+    images: NDArray[np.floating]
+    labels: NDArray[np.integer]
+    n_classes: int | None = None
+    _metadata: DatasetMetadata = field(default_factory=lambda: DatasetMetadata(id="verification-ic"))
+
+    @property
+    def metadata(self) -> DatasetMetadata:
+        return self._metadata
+
+    def __getitem__(self, idx: int):
+        n = self.n_classes or int(self.labels.max()) + 1
+        target = np.zeros(n, dtype=np.float32)
+        target[int(self.labels[idx])] = 1.0
+        return self.images[idx], target, {"brightness": float(self.images[idx].mean())}
+
+    def __len__(self) -> int:
+        return len(self.images)
+
+
+@dataclass
+class SimpleODDataset:
+    """Object-detection dataset: ``labels[i]`` are the class ids of image ``i``'s boxes."""
+
+    images: NDArray[np.floating]
+    labels: list[NDArray[np.integer]]
+    factors: list[dict] | None = None
+    _metadata: DatasetMetadata = field(default_factory=lambda: DatasetMetadata(id="verification-od"))
+
+    @property
+    def metadata(self) -> DatasetMetadata:
+        return self._metadata
+
+    def __getitem__(self, idx: int):
+        k = len(self.labels[idx])
+        h, w = self.images[idx].shape[-2:]
+        # distinct, non-overlapping boxes inside the image
+        boxes = np.array([[j, j, j + h // 2, j + w // 2] for j in range(k)], dtype=np.float32).reshape(k, 4)
+        target = _ODTarget(boxes, np.asarray(self.labels[idx], dtype=np.intp), np.ones(k, dtype=np.float32))
+        return self.images[idx], target, (self.factors[idx] if self.factors else {})
+
+    def __len__(self) -> int:
+        return len(self.images)
