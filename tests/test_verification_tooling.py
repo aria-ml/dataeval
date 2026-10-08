@@ -154,3 +154,28 @@ class TestResultsLog:
         assert "pkg/test_a.py::TestA::test_two" in log
         assert "FAILED" in log  # the requirement is FAILED
         assert "pkg/test_a.py::TestA::test_skip" in log.split("TESTS NOT CITED")[1]
+
+
+class TestParametrizedEvidence:
+    NODES = {
+        "t.py::A::test_x[one]": "passed",
+        "t.py::A::test_x[two]": "passed",
+        "t.py::A::test_y[one]": "passed",
+        "t.py::A::test_y[two]": "failed",
+        "t.py::A::test_z[one]": "skipped",
+    }
+
+    def test_bare_reference_covers_every_variant(self):
+        assert gen.evidence_status("t.py::A::test_x", self.NODES, None) == "passed"
+
+    def test_one_failing_variant_fails_the_reference(self):
+        assert gen.evidence_status("t.py::A::test_y", self.NODES, None) == "failed"
+
+    def test_skipped_variants_stay_skipped(self):
+        assert gen.evidence_status("t.py::A::test_z", self.NODES, None) == "skipped"
+
+    def test_a_reference_matching_nothing_is_pending(self):
+        assert gen.evidence_status("t.py::A::test_missing", self.NODES, None) == "pending"
+
+    def test_a_prefix_of_another_name_does_not_match(self):
+        assert gen.evidence_status("t.py::A::test", self.NODES, None) == "pending"
