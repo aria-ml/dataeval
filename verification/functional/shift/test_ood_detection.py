@@ -17,7 +17,6 @@ def set_batch_size():
     config.set_batch_size(None)
 
 
-@pytest.mark.test_case("5-1")
 class TestOODDetection:
     """Verify OOD detectors."""
 

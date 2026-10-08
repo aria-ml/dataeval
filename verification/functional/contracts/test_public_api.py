@@ -7,10 +7,7 @@ Maps to meta repo test cases:
 import importlib
 import pkgutil
 
-import pytest
 
-
-@pytest.mark.test_case("1-1")
 class TestPublicAPI:
     """Verify the public API surface is complete and importable."""
 

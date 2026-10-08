@@ -7,10 +7,7 @@ Maps to meta repo test cases:
 import importlib.resources
 import importlib.util
 
-import pytest
 
-
-@pytest.mark.test_case("1-7")
 class TestWheelContents:
     """Verify the installed package structure matches expectations."""
 
