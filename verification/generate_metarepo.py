@@ -81,9 +81,15 @@ def evidence_status(ref: str, nodes: dict[str, str] | None, ci_jobs: dict[str, s
         if not ci_jobs or job not in ci_jobs:
             return PENDING
         return {"success": PASS, "failed": FAIL, "skipped": SKIP}.get(ci_jobs[job], PENDING)
-    if nodes is None or ref not in nodes:
+    if nodes is None:
         return PENDING
-    return {"passed": PASS, "skipped": SKIP}.get(nodes[ref], FAIL)
+    if ref in nodes:
+        return {"passed": PASS, "skipped": SKIP}.get(nodes[ref], FAIL)
+    # A parametrized test runs as `<ref>[<id>]` per case: the bare reference stands for all of them.
+    variants = [nodes[k] for k in nodes if k.startswith(ref + "[")]
+    if not variants:
+        return PENDING
+    return combine([{"passed": PASS, "skipped": SKIP}.get(s, FAIL) for s in variants])
 
 
 def combine(statuses: list[str]) -> str:
