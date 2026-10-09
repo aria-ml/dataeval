@@ -103,6 +103,12 @@ def combine(statuses: list[str]) -> str:
     return PASS
 
 
+def combine_steps(statuses: list[str]) -> str:
+    """Test case outcome: like ``combine``, but a case with any skipped step is skipped, not passed."""
+    out = combine(statuses)
+    return SKIP if out == PASS and SKIP in statuses else out
+
+
 def step_statuses(
     tc: dict, aliases: dict[str, str], nodes: dict | None, ci_jobs: dict | None
 ) -> list[tuple[str, list[tuple[str, str]]]]:
@@ -116,7 +122,7 @@ def step_statuses(
 
 def tc_outcome(tc: dict, aliases: dict, nodes: dict | None, ci_jobs: dict | None) -> str:
     """Outcome of a whole test case."""
-    return combine([s for s, _ in step_statuses(tc, aliases, nodes, ci_jobs)])
+    return combine_steps([s for s, _ in step_statuses(tc, aliases, nodes, ci_jobs)])
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +157,7 @@ def test_case_md(tc: dict, aliases: dict, nodes: dict | None, ci_jobs: dict | No
     """Render one test case in the DR-1.6-H-4 template."""
     steps = step_statuses(tc, aliases, nodes, ci_jobs)
     n = len(steps)
-    overall = combine([s for s, _ in steps])
+    overall = combine_steps([s for s, _ in steps])
     lines = [
         f"# {tc['name']}",
         "",
@@ -333,7 +339,7 @@ def test_results_log(registry: dict, report: dict, ci_jobs: dict | None) -> str:
     tests = report.get("tests", {})
     nodes = {k: v["status"] for k, v in tests.items()}
     cases = {t["id"]: (t, step_statuses(t, aliases, nodes, ci_jobs)) for t in registry["test_cases"]}
-    outcome = {i: combine([s for s, _ in steps]) for i, (_, steps) in cases.items()}
+    outcome = {i: combine_steps([s for s, _ in steps]) for i, (_, steps) in cases.items()}
     reqs = registry["requirements"]
 
     rstatus = {r["id"]: _requirement_status(r["id"], cases, outcome) for r in reqs}

@@ -56,6 +56,11 @@ class TestOutcomes:
     def test_all_skipped_is_skipped_not_failed(self):
         assert gen.tc_outcome(_tc("a::test_skip"), ALIASES, NODES, None) == "skipped"
 
+    def test_a_case_with_a_skipped_step_is_not_passed(self):
+        tc = _tc("a::test_one")
+        tc["steps"].append({"do": "d", "expect": "e", "tests": ["a::test_skip"]})
+        assert gen.tc_outcome(tc, ALIASES, NODES, None) == "skipped"
+
     def test_ci_job_results_are_read(self):
         assert gen.tc_outcome(_tc("CI: lint"), ALIASES, None, {"lint": "success"}) == "passed"
         assert gen.tc_outcome(_tc("CI: lint"), ALIASES, None, {"lint": "failed"}) == "failed"
