@@ -4,6 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 
+from dataeval._helpers import lexical_categorical
 from dataeval.config import use_max_processes
 from dataeval.core import compute_stats
 from dataeval.core._clusterer import ClusterResult
@@ -462,7 +463,7 @@ class TestOutliersOutput:
         assert "Total" in result["class_name"].to_list()
 
         # Verify data types
-        assert result["class_name"].dtype == pl.Categorical("lexical")
+        assert result["class_name"].dtype == lexical_categorical()
         for col in ["contrast", "depth", "skew", "Total"]:
             assert result[col].dtype == pl.UInt32
 
@@ -582,7 +583,7 @@ class TestOutliersOutput:
             schema={
                 "item_index": pl.Int64,
                 "target_index": pl.Int64,
-                "metric_name": pl.Categorical("lexical"),
+                "metric_name": lexical_categorical(),
                 "metric_value": pl.Float64,
             },
         )
@@ -646,7 +647,7 @@ class TestOutliersOutput:
             schema={
                 "item_index": pl.Int64,
                 "target_index": pl.Int64,
-                "metric_name": pl.Categorical("lexical"),
+                "metric_name": lexical_categorical(),
                 "metric_value": pl.Float64,
             },
         )
@@ -657,7 +658,7 @@ class TestOutliersOutput:
         assert result.shape[0] == 0
         assert "metric_name" in result.columns
         assert "Total" in result.columns
-        assert result["metric_name"].dtype == pl.Categorical("lexical")
+        assert result["metric_name"].dtype == lexical_categorical()
         assert result["Total"].dtype == pl.UInt32
 
     def test_aggregate_by_item_without_target_id(self):
@@ -698,7 +699,7 @@ class TestOutliersOutput:
             schema={
                 "item_index": pl.Int64,
                 "target_index": pl.Int64,
-                "metric_name": pl.Categorical("lexical"),
+                "metric_name": lexical_categorical(),
                 "metric_value": pl.Float64,
             },
         )
@@ -709,7 +710,7 @@ class TestOutliersOutput:
         assert result.shape[0] == 0
         assert "class_name" in result.columns
         assert "Total" in result.columns
-        assert result["class_name"].dtype == pl.Categorical("lexical")
+        assert result["class_name"].dtype == lexical_categorical()
         assert result["Total"].dtype == pl.UInt32
 
 
@@ -781,7 +782,7 @@ class TestOutliersEdgeCases:
         empty_schema = {
             "item_index": pl.Int64,
             "target_index": pl.Int64,
-            "metric_name": pl.Categorical("lexical"),
+            "metric_name": lexical_categorical(),
             "metric_value": pl.Float64,
         }
         out = OutliersOutput(pl.DataFrame(schema=empty_schema))
@@ -1267,7 +1268,7 @@ class TestOutliersPerClass:
             pl.DataFrame(
                 schema={
                     "item_index": pl.Int64,
-                    "metric_name": pl.Categorical("lexical"),
+                    "metric_name": lexical_categorical(),
                     "metric_value": pl.Float64,
                 }
             )
@@ -1288,7 +1289,7 @@ class TestOutliersPerClass:
             pl.DataFrame(
                 schema={
                     "item_index": pl.Int64,
-                    "metric_name": pl.Categorical("lexical"),
+                    "metric_name": lexical_categorical(),
                     "metric_value": pl.Float64,
                 }
             )
@@ -1427,7 +1428,7 @@ class TestOutliersPerClass:
             pl.DataFrame(
                 schema={
                     "item_index": pl.Int64,
-                    "metric_name": pl.Categorical("lexical"),
+                    "metric_name": lexical_categorical(),
                     "metric_value": pl.Float64,
                 }
             )
