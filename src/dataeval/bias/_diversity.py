@@ -8,7 +8,7 @@ import numpy as np
 import polars as pl
 
 from dataeval import Metadata
-from dataeval._helpers import axis_record, factors_excluding, is_metadata_like, resolve_label_axis
+from dataeval._helpers import axis_record, factors_excluding, is_metadata_like, lexical_categorical, resolve_label_axis
 from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.protocols import AnnotatedDataset, MetadataLike
@@ -337,7 +337,7 @@ class Diversity(Evaluator):
                 "is_low_diversity": (diversity_index <= self.threshold).astype(bool),
             },
             schema={
-                "factor_name": pl.Categorical("lexical"),
+                "factor_name": lexical_categorical(),
                 "diversity_value": pl.Float64,
                 "is_low_diversity": pl.Boolean,
             },
@@ -367,8 +367,8 @@ class Diversity(Evaluator):
                 "is_low_diversity": is_low_diversity_col,
             },
             schema={
-                "class_name": pl.Categorical("lexical"),
-                "factor_name": pl.Categorical("lexical"),
+                "class_name": lexical_categorical(),
+                "factor_name": lexical_categorical(),
                 "diversity_value": pl.Float64,
                 "is_low_diversity": pl.Boolean,
             },

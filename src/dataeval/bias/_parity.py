@@ -14,6 +14,7 @@ from dataeval._helpers import (
     factor_code_names,
     factors_excluding,
     is_metadata_like,
+    lexical_categorical,
     resolve_label_axis,
 )
 from dataeval._log import get_logger
@@ -348,7 +349,7 @@ class Parity(Evaluator):
                 "has_insufficient_data": has_insufficient_data_col,
             },
             schema={
-                "factor_name": pl.Categorical("lexical"),
+                "factor_name": lexical_categorical(),
                 "score": pl.Float64,
                 "p_value": pl.Float64,
                 "is_significant": pl.Boolean,

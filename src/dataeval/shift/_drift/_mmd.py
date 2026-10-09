@@ -511,12 +511,11 @@ class DriftMMD(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftMMDStats]):
         return result
 
 
-@torch.jit.script
 def _squared_pairwise_distance(
     x: torch.Tensor,
     y: torch.Tensor,
     a_min: float = 1e-30,
-) -> torch.Tensor:  # pragma: no cover - torch.jit.script code is compiled and copied
+) -> torch.Tensor:
     """
     PyTorch pairwise squared Euclidean distance between samples x and y.
 

@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal, NamedTuple
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
 from pydantic import BaseModel
 from typing_extensions import TypeIs
@@ -12,6 +13,13 @@ from dataeval.protocols import AnyMetadataLike, LabelsLike, MetadataLike, Valued
 from dataeval.types._factors import BinSpec, ClassAxis, LevelSpec
 
 IGNORE_KEYS = {"self", "config", "__class__"}
+
+_POLARS_VERSION = tuple(int(part) for part in pl.__version__.split(".")[:2])
+
+
+def lexical_categorical() -> pl.Categorical:
+    """Categorical dtype that orders lexically: polars 1.32 made that the only behavior and deprecated the argument."""
+    return pl.Categorical() if _POLARS_VERSION >= (1, 32) else pl.Categorical("lexical")
 
 
 def get_overrides(local_vars: dict[str, Any], exclude: set[str] | None = None) -> dict[str, Any]:

@@ -8,7 +8,7 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval import Embeddings
-from dataeval._helpers import _get_index2label, _get_item_indices, reject_filtered_metadata
+from dataeval._helpers import _get_index2label, _get_item_indices, lexical_categorical, reject_filtered_metadata
 from dataeval.core import (
     ClusterResult,
     ClusterStats,
@@ -274,7 +274,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         if "dataset_index" in self.data().columns:
             raise ValueError("Aggregation by class only works with output from a single dataset.")
 
-        schema: Any = {"class_name": pl.Categorical("lexical"), "Total": pl.UInt32}
+        schema: Any = {"class_name": lexical_categorical(), "Total": pl.UInt32}
 
         # Handle empty DataFrame case
         if self.data().shape[0] == 0:
@@ -363,7 +363,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         # Handle empty DataFrame case
         if self.data().shape[0] == 0:
-            return pl.DataFrame(schema={"metric_name": pl.Categorical("lexical"), "Total": pl.UInt32})
+            return pl.DataFrame(schema={"metric_name": lexical_categorical(), "Total": pl.UInt32})
 
         # Group by metric_name and count unique images
         return (
@@ -799,7 +799,7 @@ MultiTargetOutliersOutput = OutliersOutput[MultiTargetOutliersMap]
 # The frame of reference every flagged row carries, beside the value that was flagged. Declared
 # once: the schema, the empty-frame schema and the cross-dataset merge all read it from here.
 _CONTEXT_COLUMNS: dict[str, Any] = {
-    "direction": pl.Categorical("lexical"),
+    "direction": lexical_categorical(),
     "bound": pl.Float64,
     "percentile": pl.Float64,
     "population_mean": pl.Float64,
@@ -1182,8 +1182,8 @@ def _detect_outliers(  # noqa: C901
             schema={
                 "item_index": pl.Int64,
                 "target_index": pl.Int64,
-                "level": pl.Categorical("lexical"),
-                "metric_name": pl.Categorical("lexical"),
+                "level": lexical_categorical(),
+                "metric_name": lexical_categorical(),
                 "metric_value": pl.Float64,
                 **_CONTEXT_COLUMNS,
             },
@@ -1193,8 +1193,8 @@ def _detect_outliers(  # noqa: C901
         {
             "item_index": pl.Series(item_ids, dtype=pl.Int64),
             "target_index": pl.Series(target_ids, dtype=pl.Int64),
-            "level": pl.Series(levels, dtype=pl.Categorical("lexical")),
-            "metric_name": pl.Series(metric_names, dtype=pl.Categorical("lexical")),
+            "level": pl.Series(levels, dtype=lexical_categorical()),
+            "metric_name": pl.Series(metric_names, dtype=lexical_categorical()),
             "metric_value": pl.Series(metric_values, dtype=pl.Float64),
             **{name: pl.Series(context[name], dtype=dtype) for name, dtype in _CONTEXT_COLUMNS.items()},
         },
@@ -1649,7 +1649,7 @@ class Outliers(Evaluator):
                 schema={
                     "item_index": pl.Int64,
                     "target_index": pl.Int64,
-                    "metric_name": pl.Categorical("lexical"),
+                    "metric_name": lexical_categorical(),
                     "metric_value": pl.Float64,
                     **_CONTEXT_COLUMNS,
                 },
@@ -1682,7 +1682,7 @@ class Outliers(Evaluator):
             if has_target_id and "target_index" not in df.columns:
                 df = df.with_columns(pl.lit(None, dtype=pl.Int64).alias("target_index"))
             if has_level and "level" not in df.columns:
-                df = df.with_columns(pl.lit(None, dtype=pl.Categorical("lexical")).alias("level"))
+                df = df.with_columns(pl.lit(None, dtype=lexical_categorical()).alias("level"))
             missing = [name for name in context if name not in df.columns]
             df = df.with_columns(pl.lit(None, dtype=_CONTEXT_COLUMNS[name]).alias(name) for name in missing)
             normalized_dfs.append(df.select(column_order))
@@ -1749,7 +1749,7 @@ class Outliers(Evaluator):
         outlier_indices = np.nonzero(is_outlier)[0]
         schema: Any = {
             "item_index": pl.Int64,
-            "metric_name": pl.Categorical("lexical"),
+            "metric_name": lexical_categorical(),
             "metric_value": pl.Float64,
             **_CONTEXT_COLUMNS,
         }
@@ -1764,9 +1764,9 @@ class Outliers(Evaluator):
         return pl.DataFrame(
             {
                 "item_index": pl.Series(outlier_indices.tolist(), dtype=pl.Int64),
-                "metric_name": pl.Series(["cluster_distance"] * len(outlier_indices), dtype=pl.Categorical("lexical")),
+                "metric_name": pl.Series(["cluster_distance"] * len(outlier_indices), dtype=lexical_categorical()),
                 "metric_value": pl.Series(distances[outlier_indices].tolist(), dtype=pl.Float64),
-                "direction": pl.Series(["upper"] * len(outlier_indices), dtype=pl.Categorical("lexical")),
+                "direction": pl.Series(["upper"] * len(outlier_indices), dtype=lexical_categorical()),
                 "bound": pl.Series(bounds[outlier_indices].tolist(), dtype=pl.Float64),
                 "percentile": pl.Series(percentiles[outlier_indices].tolist(), dtype=pl.Float64),
                 "population_mean": pl.Series(means.tolist(), dtype=pl.Float64),

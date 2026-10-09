@@ -14,6 +14,7 @@ from dataeval._helpers import (
     effective_entity_counts,
     is_any_metadata_like,
     kept_factors,
+    lexical_categorical,
     resolve_factor_channel,
     resolve_label_axis,
     scored_as,
@@ -529,8 +530,8 @@ class Balance(Evaluator):
                 "is_imbalanced": is_imbalanced_col,
             },
             schema={
-                "class_name": pl.Categorical("lexical"),
-                "factor_name": pl.Categorical("lexical"),
+                "class_name": lexical_categorical(),
+                "factor_name": lexical_categorical(),
                 "mi_value": pl.Float64,
                 "is_imbalanced": pl.Boolean,
             },
@@ -568,11 +569,11 @@ class Balance(Evaluator):
                 "scored_as": scored_as_col,
             },
             schema={
-                "factor1": pl.Categorical("lexical"),
-                "factor2": pl.Categorical("lexical"),
+                "factor1": lexical_categorical(),
+                "factor2": lexical_categorical(),
                 "mi_value": pl.Float64,
                 "is_correlated": pl.Boolean,
-                "scored_as": pl.Categorical("lexical"),
+                "scored_as": lexical_categorical(),
             },
         ).sort(["factor1", "factor2"])
 
@@ -592,7 +593,7 @@ class Balance(Evaluator):
                 "mi_value": mi_values,
             },
             schema={
-                "factor_name": pl.Categorical("lexical"),
+                "factor_name": lexical_categorical(),
                 "mi_value": pl.Float64,
             },
         )
