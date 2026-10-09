@@ -40,6 +40,7 @@ from dataeval._metadata._encoding import (
 from dataeval._metadata._filters import evaluate, report_orphaned_rows
 from dataeval._metadata._input import (
     build_index2label,
+    declared_categorical,
     reject_length_mismatch,
     resolve_aggregations,
     unpack_stats_result,
@@ -5618,6 +5619,7 @@ class Metadata(Array, FeatureExtractor):
         ['instance_mean', 'unit_mean']
         """
         self._structure()
+        categorical = declared_categorical(factors)
         factors, source_index, declared = unpack_stats_result(factors, source_index, level=level)
         rollups = resolve_aggregations(declared, aggregate, how, aggregations)
 
@@ -5661,6 +5663,9 @@ class Metadata(Array, FeatureExtractor):
         self._record_multidimensional(skipped)
         self._record_vacuous(vacuous)
         self._commit_factors(resolved)
+        # After the commit: binning is lazy, so the vocabulary must be recorded before any
+        # factor read.
+        self._declare_categorical_levels(placed, resolved, categorical, kept)
         self._register_rollups(rollups, changed=frozenset(factor.name for factor in resolved))
 
     def _register_rollups(self, rollups: tuple[Aggregator, ...], changed: frozenset[str] = frozenset()) -> None:
@@ -5680,6 +5685,29 @@ class Metadata(Array, FeatureExtractor):
         if rollups:
             self._declared_aggregations = (*self._declared_aggregations, *rollups)
         self._replay_aggregations(changed)
+
+    def _declare_categorical_levels(
+        self,
+        placed: Sequence[tuple[str, FactorLevel, Any]],
+        resolved: Sequence[_ResolvedFactor],
+        categorical: tuple[str, ...],
+        kept: Mapping[str, Any],
+    ) -> None:
+        """Record a producer's declared categorical factors, as ``factor_levels=`` would.
+
+        `placed` and `resolved` are the same length and order, so pairing them by position recovers each
+        column's name as placed. The placed name is not always the name the producer declared: `_place`
+        prefixes a name that spans several levels with its level and leaves a single-level name bare.
+        `kept`, the mapping placement read the un-prefixed names from, says which: a name found there
+        verbatim is bare, otherwise strip the column's own level prefix.
+
+        A vocabulary the caller already declared for the name is kept.
+        """
+        for (name, factor_level, _), factor in zip(placed, resolved, strict=True):
+            declared_name = name if name in kept else name.removeprefix(f"{factor_level}_")
+            if declared_name in categorical and factor.name not in self._encoding:
+                values = sorted(factor.native.drop_nulls().unique().to_list())
+                self._encoding.update(declared_levels({factor.name: values}))
 
     def _commit_factors(self, resolved: Sequence[_ResolvedFactor]) -> None:
         """Write resolved columns to the dataframe and register their levels.

@@ -12,12 +12,38 @@ from dataeval.core import StatsResult, compute_stats
 from dataeval.data._invalidates import invalidating_sources
 from dataeval.exceptions import StatsInvalidatedWarning
 from dataeval.flags import ImageStats
+from dataeval.protocols import MetadataLike, _is_protocol_instance
 from dataeval.types import FactorLevel, SourceIndex
 
 # What :attr:`SourceIndex.kind` reports for a row that is one of an item's labels. An
 # unstated level under a key resolves here on every task, so the evaluators can name the
 # label end without a dataset to resolve against.
 LABEL_KIND = "instance"
+
+
+def is_metadata(data: Any) -> bool:
+    """Whether `data` is a metadata container rather than a dataset.
+
+    Asked before any decode path: :class:`~dataeval.Metadata` structurally implements
+    :class:`~dataeval.protocols.Dataset` as well.
+    """
+    return _is_protocol_instance(data, MetadataLike)
+
+
+def checked_sole_metadata(data: Any, metadata: Any, caller: str) -> Any:
+    """Return `data` when it is the only metadata container named.
+
+    Raises
+    ------
+    ValueError
+        If `metadata` names a different container than `data`.
+    """
+    if metadata is not None and metadata is not data:
+        raise ValueError(
+            f"{caller}.evaluate: `data` and `metadata` specify two different metadata containers. "
+            "Pass a single metadata container."
+        )
+    return data
 
 
 def _stat_names(stats: ImageStats) -> str:

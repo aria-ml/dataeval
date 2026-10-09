@@ -19,11 +19,14 @@ from dataeval.core import (
 )
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, MetadataLike, Threshold, ThresholdLike
+from dataeval.quality._factor_stats import eligible_factors, factor_stats
 from dataeval.quality._shared import (
     LABEL_KIND,
     add_dataset_index,
     checked_compute_stats,
+    checked_sole_metadata,
     drop_null_index_columns,
+    is_metadata,
     reported_level,
     selected_by_flags,
 )
@@ -1205,6 +1208,71 @@ def _detect_outliers(  # noqa: C901
     return df.sort(["item_index", "target_index", "level", "metric_name"])
 
 
+def _check_metadata_evaluate_preconditions(
+    data: Any,
+    other: Sequence[Any],
+    has_extractor: bool,
+    per_image: bool,
+    per_target: bool,
+) -> None:
+    """Validate a metadata `evaluate()` call before any factor is read."""
+    if other:
+        raise ValueError("Outliers.evaluate: metadata evaluation takes one metadata, not several.")
+    if has_extractor:
+        raise ValueError(
+            "Outliers.evaluate: cluster-based detection embeds images, and a metadata holds none. "
+            "Pass the dataset for cluster detection."
+        )
+    if not all(hasattr(data, name) for name in ("levels", "rows_at", "at", "item_level", "label_level")):
+        raise TypeError("Outliers.evaluate: thresholding factors needs a dataeval.Metadata with a level schema.")
+    if not (per_image or per_target):
+        raise ValueError("At least one of per_image or per_target must be True.")
+
+
+def _excluded_by_flags(
+    levels: Mapping[str, FactorLevel],
+    data: Any,
+    per_image: bool,
+    per_target: bool,
+) -> dict[str, str]:
+    """Return each factor the `per_image`/`per_target` flags exclude, and the flag that would include it.
+
+    Mirrors ``selected_by_flags`` on the addresses ``factor_stats`` writes: an item-level row is addressed as
+    an item, so `per_image` gates it; a label-level row is addressed as a label, so `per_target` gates it;
+    levels between the two are gated by neither.
+    """
+    # The item level last, so it wins where the two levels coincide.
+    gates = {data.label_level: ("per_target=True", per_target), data.item_level: ("per_image=True", per_image)}
+    return {name: gates[level][0] for name, level in levels.items() if level in gates and not gates[level][1]}
+
+
+def _flag_selected_factors(
+    levels: Mapping[str, FactorLevel],
+    data: Any,
+    per_image: bool,
+    per_target: bool,
+    named: bool,
+) -> dict[str, FactorLevel]:
+    """Return the factors the `per_image`/`per_target` flags select.
+
+    A named factor that the flags exclude raises. An excluded factor from the default selection is dropped,
+    unless that would drop every factor.
+    """
+    excluded = _excluded_by_flags(levels, data, per_image, per_target)
+    flags = sorted(set(excluded.values()))
+    if named and excluded:
+        raise ValueError(
+            f"Outliers.evaluate: {sorted(excluded)} were named but live at a level the flags "
+            f"exclude; pass {flags} to threshold them."
+        )
+    if len(excluded) == len(levels):
+        raise ValueError(
+            f"Outliers.evaluate: every ordered factor of this metadata ({sorted(excluded)}) lives at a "
+            f"level the flags exclude, so nothing would be thresholded; pass {flags} to threshold them."
+        )
+    return {name: level for name, level in levels.items() if name not in excluded}
+
+
 class Outliers(Evaluator):
     r"""
     Computes statistical outliers of a dataset using various statistical tests applied to each image.
@@ -1810,6 +1878,7 @@ class Outliers(Evaluator):
         per_target: Literal[False] = ...,
         per_class: bool = False,
         metadata: MetadataLike | None = None,
+        factors: Sequence[str] | None = None,
     ) -> SingleOutliersOutput: ...
 
     @overload
@@ -1821,6 +1890,7 @@ class Outliers(Evaluator):
         per_target: Literal[True],
         per_class: bool = False,
         metadata: MetadataLike | None = None,
+        factors: Sequence[str] | None = None,
     ) -> SingleTargetOutliersOutput: ...
 
     @overload
@@ -1832,6 +1902,7 @@ class Outliers(Evaluator):
         per_target: Literal[False] = ...,
         per_class: bool = False,
         metadata: MetadataLike | None = None,
+        factors: Sequence[str] | None = None,
     ) -> MultiOutliersOutput: ...
 
     @overload
@@ -1843,6 +1914,7 @@ class Outliers(Evaluator):
         per_target: Literal[True],
         per_class: bool = False,
         metadata: MetadataLike | None = None,
+        factors: Sequence[str] | None = None,
     ) -> MultiTargetOutliersOutput: ...
 
     @set_metadata(
@@ -1862,6 +1934,7 @@ class Outliers(Evaluator):
         per_target: bool = False,
         per_class: bool = False,
         metadata: MetadataLike | None = None,
+        factors: Sequence[str] | None = None,
     ) -> SingleOutliersOutput | SingleTargetOutliersOutput | MultiOutliersOutput | MultiTargetOutliersOutput:
         """
         Return indices of Outliers with the issues identified for each.
@@ -1883,6 +1956,11 @@ class Outliers(Evaluator):
 
             A plain array or list of image arrays also structurally satisfies
             :class:`~dataeval.protocols.Dataset` and is accepted directly.
+
+            `data` may instead be a :class:`~dataeval.Metadata` as a whole, whose ordered
+            factors are thresholded, each against the rows at the level it was measured at
+            (a track against tracks, a frame against frames). Only raw values are read;
+            bins never are.
         *other : Dataset
             Zero or more additional datasets for cross-dataset outlier
             detection, each accepting the same forms as ``data``. When provided,
@@ -1906,6 +1984,11 @@ class Outliers(Evaluator):
             This is a secondary, per-class grouping input for image-statistics
             detection only; it is not an alternative to ``data`` and does not
             itself supply the images to scan.
+        factors : Sequence[str] or None, default None
+            Metadata factors to threshold, when `data` is a :class:`~dataeval.Metadata`. None
+            thresholds every *ordered* factor -- numeric or temporal by its raw dtype. A
+            categorical factor (strings, booleans, or integers with a declared vocabulary) has
+            no location or scale and is refused if named.
 
         Returns
         -------
@@ -1922,12 +2005,25 @@ class Outliers(Evaluator):
 
             For multi-dataset input, includes a ``dataset_index`` column.
 
+            For a :class:`~dataeval.Metadata` input, a row judged at a level between the
+            item and the label level -- a track, a video frame -- names that level in a
+            ``level`` column, and its ``target_index`` holds the level's own key:
+            ``track_id`` for a track, ``unit_index`` for a unit.
+
         Raises
         ------
         ValueError
             If ``flags`` is ``ImageStats.NONE`` and no ``extractor`` is provided.
             If both ``per_image`` and ``per_target`` are False.
             If ``per_class`` is True and ``metadata`` is None.
+            If `factors` is given without a Metadata as `data`, or is empty; if a named factor
+            is categorical, ineligible, or excluded by `per_image`/`per_target`; if `per_image`/
+            `per_target` exclude every ordered factor; if a Metadata is evaluated with an
+            ``extractor``.
+        KeyError
+            If a named factor is not one of the metadata's.
+        TypeError
+            If `factors` is a single string rather than a list of names.
 
         Examples
         --------
@@ -1970,12 +2066,41 @@ class Outliers(Evaluator):
         >>> outliers = Outliers()
         >>> results = outliers.evaluate(train_ds, test_ds)
         >>> results = outliers.evaluate(train_ds_area1, train_ds_area2, train_ds_area3, test_ds)  # or more
+
+        Threshold metadata factors, each against the rows at its own level:
+
+        >>> from dataeval import Metadata
+        >>> md = Metadata.from_factors({"temperature": [20.1, 19.8, 20.3, 20.0, 19.9, 20.2, 20.1, 19.7, 20.0, 45.0]})
+        >>> Outliers().evaluate(md).data().select("item_index", "metric_name", "metric_value")
+        shape: (1, 3)
+        ┌────────────┬─────────────┬──────────────┐
+        │ item_index ┆ metric_name ┆ metric_value │
+        │ ---        ┆ ---         ┆ ---          │
+        │ i64        ┆ cat         ┆ f64          │
+        ╞════════════╪═════════════╪══════════════╡
+        │ 9          ┆ temperature ┆ 45.0         │
+        └────────────┴─────────────┴──────────────┘
         """
         # Every input, not just the first: a filtered metadata among ``other`` misaligns
         # the same way, and is the one an evaluator handed several datasets is likeliest
         # to reach for.
         for candidate in (metadata, data, *other):
             reject_filtered_metadata(candidate, "Outliers")
+
+        if is_metadata(data):
+            return self._evaluate_metadata(
+                data,
+                other,
+                per_image=per_image,
+                per_target=per_target,
+                per_class=per_class,
+                metadata=metadata,
+                factors=factors,
+            )
+        if factors is not None:
+            raise ValueError(
+                "Outliers.evaluate: `factors` names metadata factors to threshold; pass the Metadata itself as `data`."
+            )
 
         if other:
             return self._evaluate_multi(
@@ -2004,6 +2129,32 @@ class Outliers(Evaluator):
             raise ValueError("At least one of per_image or per_target must be True.")
         if per_class and metadata is None:
             raise ValueError("metadata must be provided when per_class=True.")
+
+    def _evaluate_metadata(
+        self,
+        data: Any,
+        other: Sequence[Any],
+        *,
+        per_image: bool,
+        per_target: bool,
+        per_class: bool,
+        metadata: MetadataLike | None,
+        factors: Sequence[str] | None,
+    ) -> OutliersOutput[Any]:
+        """Threshold a metadata's ordered factors, each against the rows at its own level.
+
+        The factors are laid out as a stats result and handed to :meth:`from_stats`, so the
+        per-level fitting, the `per_image`/`per_target` selection and every re-detection
+        method behave exactly as they do for image statistics.
+        """
+        labels = checked_sole_metadata(data, metadata, "Outliers")
+        _check_metadata_evaluate_preconditions(data, other, self.extractor is not None, per_image, per_target)
+
+        levels = _flag_selected_factors(
+            eligible_factors(data, factors), data, per_image, per_target, named=factors is not None
+        )
+        result = self.from_stats(factor_stats(data, levels), per_image=per_image, per_target=per_target)
+        return result.classwise(labels) if per_class else result
 
     def _evaluate_single(
         self,

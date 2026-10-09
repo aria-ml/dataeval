@@ -50,6 +50,14 @@ def _default_ratio_map() -> OverrideFunctionMap:
         "aspect_ratio": lambda box, _img: box["aspect_ratio"],
         "channels": lambda box, _img: box["channels"],
         "depth": lambda box, _img: box["depth"],
+        # Already relative to the image; pass through unchanged, like aspect_ratio above.
+        "rel_offset_x": lambda box, _img: box["rel_offset_x"],
+        "rel_offset_y": lambda box, _img: box["rel_offset_y"],
+        "rel_width": lambda box, _img: box["rel_width"],
+        "rel_height": lambda box, _img: box["rel_height"],
+        "rel_size": lambda box, _img: box["rel_size"],
+        "rel_distance_center": lambda box, _img: box["rel_distance_center"],
+        "rel_distance_edge": lambda box, _img: box["rel_distance_edge"],
         # Hash stats should be kept as-is (they're strings, not numeric)
         "xxhash": lambda box, _img: box["xxhash"],
         "phash": lambda box, _img: box["phash"],
@@ -471,6 +479,13 @@ def compute_ratios(  # noqa: C901
       ``channels=`` mapping yields ``<group>_<statistic>`` ratios beside whichever unprefixed
       ones the run produced — a ``stats`` mapping naming no ``None`` view produces none
     - BASE_ATTRS (source_index, object_count, etc.) are preserved for box entries only
+
+    Box geometry relative to the image is also available directly from
+    :func:`compute_stats` as the ``rel_*`` dimension statistics
+    (:attr:`~dataeval.flags.ImageStats.DIMENSION_RELATIVE`), with the same definitions
+    this function applies to ``offset_x``/``offset_y``, ``width``, ``height``, ``size``,
+    ``distance_center`` and ``distance_edge``. Prefer those for geometry; this function
+    remains the way to relate a box's pixel and visual statistics to its image's.
 
     Examples
     --------

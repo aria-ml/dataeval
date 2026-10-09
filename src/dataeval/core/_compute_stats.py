@@ -170,10 +170,15 @@ class FactorResult(TypedDict, Generic[TFactors]):
         How these factors roll up to a coarser level, declared by the producer.
         :meth:`~dataeval.Metadata.add_factors` applies them unless told not to. Absent where
         a producer declares nothing.
+    categorical : tuple[str, ...], optional
+        Factors whose integer values are category codes, such as class ids. :meth:`~dataeval.Metadata.add_factors`
+        records each as a declared vocabulary, as ``factor_levels=`` would, so consumers treat the column as
+        categorical. A vocabulary the caller already declared for the name is kept.
     """
 
     stats: TFactors
     aggregations: NotRequired[tuple[Aggregator, ...]]
+    categorical: NotRequired[tuple[str, ...]]
 
 
 class StatsResult(FactorResult[TFactors]):

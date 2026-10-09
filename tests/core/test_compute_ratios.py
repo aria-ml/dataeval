@@ -408,6 +408,32 @@ class TestCalculateRatios:
         assert "offset_x" in ratios["stats"]
         assert len(ratios.get(SOURCE_INDEX, [])) == 1
 
+    def test_relative_geometry_carries_the_ratio_definitions_over(self):
+        """rel_* equals what compute_ratios reports for the absolute stat, and passes through it."""
+        images = [np.random.random((3, 100, 200)), np.random.random((3, 50, 100))]
+        boxes = [[[10, 20, 50, 60], [150, 40, 190, 90]], [[5, 10, 25, 30], [15, 20, 45, 45]]]
+        stats = compute_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
+        ratios = compute_ratios(stats)
+        on_boxes = np.array([si.key is not None for si in stats[SOURCE_INDEX]])
+
+        for absolute in ("offset_x", "offset_y", "width", "height", "size", "distance_center", "distance_edge"):
+            relative = f"rel_{absolute}"
+            np.testing.assert_allclose(ratios["stats"][absolute], stats["stats"][relative][on_boxes], rtol=1e-6)
+            # Passed through rather than divided by the image row's own relative value, which
+            # is 1 for a size and 0 for an offset.
+            np.testing.assert_allclose(ratios["stats"][relative], stats["stats"][relative][on_boxes], rtol=1e-6)
+
+    def test_relative_geometry_alone_passes_through(self):
+        """With no absolute stat beside it, no suffix fallback can stand in for the passthrough."""
+        images = [np.random.random((3, 100, 200)), np.random.random((3, 50, 100))]
+        boxes = [[[10, 20, 50, 60], [150, 40, 190, 90]], [[5, 10, 25, 30], [15, 20, 45, 45]]]
+        stats = compute_stats(images, boxes=boxes, stats=ImageStats.DIMENSION_RELATIVE, per_image=True, per_target=True)
+        ratios = compute_ratios(stats)
+        on_boxes = np.array([si.key is not None for si in stats[SOURCE_INDEX]])
+
+        for relative in (name for name in stats["stats"] if name.startswith("rel_")):
+            np.testing.assert_allclose(ratios["stats"][relative], stats["stats"][relative][on_boxes], rtol=1e-6)
+
 
 class TestCalculateRatiosSeparateInputs:
     """Test compute_ratios with separate image and box stats inputs (Pattern 2)."""

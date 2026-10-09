@@ -117,6 +117,61 @@ class DimensionStatCalculator(Calculator[ImageStats]):
     def _invalid_box(self) -> list[bool]:
         return [not self.cache.box.is_valid()]
 
+    def _image_extent(self) -> tuple[float, float]:
+        # The datum's width and height, which every relative stat divides by. Read off
+        # `raw`, as `_distance_center` does, so a box is measured against its own image.
+        return float(self.cache.raw.shape[-1]), float(self.cache.raw.shape[-2])
+
+    @staticmethod
+    def _relative(numerator: float, denominator: float) -> float:
+        # Return NaN instead of raising when the denominator is zero, matching the
+        # zero-dividend guard in `_aspect_ratio`. One shared guard rather than one per `_rel_*` method.
+        return float("nan") if denominator == 0 else numerator / denominator
+
+    def _rel_offset_x(self) -> list[float]:
+        if not self.is_spatial:
+            return [np.nan]
+        return [self._relative(self.cache.box.x0, self._image_extent()[0])]
+
+    def _rel_offset_y(self) -> list[float]:
+        if not self.is_spatial:
+            return [np.nan]
+        return [self._relative(self.cache.box.y0, self._image_extent()[1])]
+
+    def _rel_width(self) -> list[float]:
+        if not self.is_spatial:
+            return [np.nan]
+        return [self._relative(self.cache.box.width, self._image_extent()[0])]
+
+    def _rel_height(self) -> list[float]:
+        if not self.is_spatial:
+            return [np.nan]
+        return [self._relative(self.cache.box.height, self._image_extent()[1])]
+
+    def _rel_size(self) -> list[float]:
+        if not self.is_spatial:
+            return [np.nan]
+        width, height = self._image_extent()
+        return [self._relative(self.cache.box.width * self.cache.box.height, width * height)]
+
+    def _rel_distance_center(self) -> list[float]:
+        if not self.is_spatial:
+            return [np.nan]
+        width, height = self._image_extent()
+        return [self._relative(self._distance_center()[0], np.hypot(width, height) / 2)]
+
+    def _rel_distance_edge(self) -> list[float]:
+        # Divide by the dimension of whichever edge is nearest, as compute_ratios does:
+        # a box near the left or right edge reads against the width, one near the top or
+        # bottom against the height.
+        if not self.is_spatial:
+            return [np.nan]
+        box = self.cache.box
+        width, height = self._image_extent()
+        horizontal = min(abs(box.x0), abs(box.x1 - width))
+        vertical = min(abs(box.y0), abs(box.y1 - height))
+        return [self._relative(self._distance_edge()[0], width if horizontal < vertical else height)]
+
     def get_empty_values(self) -> dict[str, Any]:
         """Return empty values for dimension statistics."""
         return {
@@ -149,4 +204,11 @@ class DimensionStatCalculator(Calculator[ImageStats]):
             ImageStats.DIMENSION_DISTANCE_CENTER: Handler("distance_center", self._distance_center),
             ImageStats.DIMENSION_DISTANCE_EDGE: Handler("distance_edge", self._distance_edge),
             ImageStats.DIMENSION_INVALID_BOX: Handler("invalid_box", self._invalid_box),
+            ImageStats.DIMENSION_REL_OFFSET_X: Handler("rel_offset_x", self._rel_offset_x),
+            ImageStats.DIMENSION_REL_OFFSET_Y: Handler("rel_offset_y", self._rel_offset_y),
+            ImageStats.DIMENSION_REL_WIDTH: Handler("rel_width", self._rel_width),
+            ImageStats.DIMENSION_REL_HEIGHT: Handler("rel_height", self._rel_height),
+            ImageStats.DIMENSION_REL_SIZE: Handler("rel_size", self._rel_size),
+            ImageStats.DIMENSION_REL_DISTANCE_CENTER: Handler("rel_distance_center", self._rel_distance_center),
+            ImageStats.DIMENSION_REL_DISTANCE_EDGE: Handler("rel_distance_edge", self._rel_distance_edge),
         }

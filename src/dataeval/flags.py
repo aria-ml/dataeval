@@ -58,6 +58,13 @@ class ImageStats(Flag):
     - `DIMENSION_DISTANCE_CENTER` : Distance from box center to image center
     - `DIMENSION_DISTANCE_EDGE` : Distance from box to nearest image edge
     - `DIMENSION_INVALID_BOX` : Whether bounding box is invalid
+    - `DIMENSION_REL_OFFSET_X` : X-offset of bounding box as a fraction of image width
+    - `DIMENSION_REL_OFFSET_Y` : Y-offset of bounding box as a fraction of image height
+    - `DIMENSION_REL_WIDTH` : Box width as a fraction of image width
+    - `DIMENSION_REL_HEIGHT` : Box height as a fraction of image height
+    - `DIMENSION_REL_SIZE` : Box area as a fraction of image area
+    - `DIMENSION_REL_DISTANCE_CENTER` : Distance to the image center as a fraction of the half-diagonal
+    - `DIMENSION_REL_DISTANCE_EDGE` : Distance to the nearest edge as a fraction of that edge's dimension
 
     Hash Statistics (computed on raw image data):
 
@@ -77,7 +84,9 @@ class ImageStats(Flag):
     - `DIMENSION_BASIC` : Width, height, channels
     - `DIMENSION_OFFSET` : Offset X and Y
     - `DIMENSION_POSITION` : Center, distance to center, distance to edge
-    - `DIMENSION_BOX` : Width, height, aspect ratio, size, offset, distance to center/edge, invalid box
+    - `DIMENSION_RELATIVE` : Box geometry relative to the image (the seven `DIMENSION_REL_*` stats)
+    - `DIMENSION_BOX` : Width, height, aspect ratio, size, offset, distance to center/edge,
+      invalid box, and their relative forms
     - `HASH_DUPLICATES_BASIC` : Standard duplicate detection (xxhash + phash + dhash)
     - `HASH_DUPLICATES_D4` : Rotation/flip-invariant detection (xxhash + phash_d4 + dhash_d4)
 
@@ -143,6 +152,13 @@ class ImageStats(Flag):
     DIMENSION_DISTANCE_CENTER = auto()
     DIMENSION_DISTANCE_EDGE = auto()
     DIMENSION_INVALID_BOX = auto()
+    DIMENSION_REL_OFFSET_X = auto()
+    DIMENSION_REL_OFFSET_Y = auto()
+    DIMENSION_REL_WIDTH = auto()
+    DIMENSION_REL_HEIGHT = auto()
+    DIMENSION_REL_SIZE = auto()
+    DIMENSION_REL_DISTANCE_CENTER = auto()
+    DIMENSION_REL_DISTANCE_EDGE = auto()
 
     # ===== HASH STATS =====
     HASH_XXHASH = auto()
@@ -180,6 +196,13 @@ class ImageStats(Flag):
         | DIMENSION_DISTANCE_CENTER
         | DIMENSION_DISTANCE_EDGE
         | DIMENSION_INVALID_BOX
+        | DIMENSION_REL_OFFSET_X
+        | DIMENSION_REL_OFFSET_Y
+        | DIMENSION_REL_WIDTH
+        | DIMENSION_REL_HEIGHT
+        | DIMENSION_REL_SIZE
+        | DIMENSION_REL_DISTANCE_CENTER
+        | DIMENSION_REL_DISTANCE_EDGE
     )
 
     HASH = HASH_XXHASH | HASH_PHASH | HASH_DHASH | HASH_PHASH_D4 | HASH_DHASH_D4
@@ -193,6 +216,15 @@ class ImageStats(Flag):
     DIMENSION_BASIC = DIMENSION_WIDTH | DIMENSION_HEIGHT | DIMENSION_CHANNELS | DIMENSION_ASPECT_RATIO
     DIMENSION_OFFSET = DIMENSION_OFFSET_X | DIMENSION_OFFSET_Y
     DIMENSION_POSITION = DIMENSION_CENTER | DIMENSION_DISTANCE_CENTER | DIMENSION_DISTANCE_EDGE
+    DIMENSION_RELATIVE = (
+        DIMENSION_REL_OFFSET_X
+        | DIMENSION_REL_OFFSET_Y
+        | DIMENSION_REL_WIDTH
+        | DIMENSION_REL_HEIGHT
+        | DIMENSION_REL_SIZE
+        | DIMENSION_REL_DISTANCE_CENTER
+        | DIMENSION_REL_DISTANCE_EDGE
+    )
     DIMENSION_BOX = (
         DIMENSION_WIDTH
         | DIMENSION_HEIGHT
@@ -202,6 +234,7 @@ class ImageStats(Flag):
         | DIMENSION_DISTANCE_CENTER
         | DIMENSION_DISTANCE_EDGE
         | DIMENSION_INVALID_BOX
+        | DIMENSION_RELATIVE
     )
 
     HASH_DUPLICATES_BASIC = HASH_XXHASH | HASH_PHASH | HASH_DHASH

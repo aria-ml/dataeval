@@ -61,6 +61,7 @@ ALL_FIELDS = (
     "track_duration",
     "n_gaps",
     "total_gap_length",
+    "gap_fraction",
     "mean_speed",
     "speed_variance",
     "net_displacement",
@@ -534,7 +535,7 @@ class TestNestedShape:
     def test_values_live_under_stats(self):
         track = make_track([[0, 0, 10, 10], [10, 0, 20, 10]], [0, 1])
         result = track_stats({1: track})
-        assert set(result) == {"stats"}
+        assert set(result) == {"stats", "categorical"}
         assert "track_ids" in result["stats"]
 
     def test_the_whole_result_still_attaches(self):
@@ -613,6 +614,32 @@ class TestTrackStatsOverDataset:
     def test_non_positive_dimensions_are_refused(self, dim):
         with pytest.raises(ValueError, match=f"{dim} must be positive"):
             track_stats(self._dataset([[[5]]]), **{dim: 0})
+
+
+@pytest.mark.required
+class TestTrackStatsDeclarations:
+    def test_gap_fraction_is_the_share_of_the_span_missing(self):
+        """Two appearances 300 frames apart: 298 of the 300 frames spanned are gaps."""
+        stats = track_stats({0: make_track([[0, 0, 1, 1]] * 2, [0, 299])})["stats"]
+        assert stats["gap_fraction"] == [pytest.approx(298 / 300)]
+
+    def test_a_contiguous_track_has_no_gap_fraction(self):
+        stats = track_stats({0: make_track([[0, 0, 1, 1]] * 3, [0, 1, 2])})["stats"]
+        assert stats["gap_fraction"] == [0.0]
+
+    def test_labels_are_declared_categorical(self):
+        assert track_stats({0: make_track([[0, 0, 1, 1]], [0])}).get("categorical", ()) == ("labels",)
+
+    def test_the_dataset_form_declares_them_too(self):
+        from tests.metadata.test_structurers import _mot_dataset
+
+        assert track_stats(_mot_dataset([[[5]]])).get("categorical", ()) == ("labels",)
+
+    def test_a_track_with_no_frames_leaves_every_list_aligned(self):
+        """A skipped track must not keep its id: track_ids[i] names the stats at index i."""
+        stats = track_stats({0: make_track([], []), 1: make_track([[0, 0, 1, 1]] * 2, [0, 1], track_id=1)})["stats"]
+        assert stats["track_ids"] == [1]
+        assert {len(values) for values in cast("Mapping[str, Sequence[Any]]", stats).values()} == {1}
 
 
 @pytest.mark.required

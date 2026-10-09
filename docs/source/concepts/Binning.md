@@ -314,6 +314,13 @@ handed.
   - **Not applied**
   - Both take a plain mapping of factor name to raw array and never touch
     `factor_data`, so they see the values you measured.
+- - {class}`.Outliers` over metadata factors (in development)
+  - **Never applied**
+  - A threshold over bin codes measures the bin edges, not the values. It
+    reads raw values only, and the continuous/discrete heuristic below does
+    not decide which factors it tests. Re-binning a metadata does not change
+    an outlier result. See
+    [Outlier detection over annotation and metadata factors](DataIntegrity.md#outlier-detection-over-annotation-and-metadata-factors).
 :::
 
 The `Balance` row is a property of what it passes, not of the estimator it calls.
