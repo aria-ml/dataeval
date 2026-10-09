@@ -72,6 +72,11 @@ class TrackFactors(TypedDict):
         Total number of frames between a track's first and last appearance
         where the track ID is absent. Equal to
         ``track_duration - n_appearances``.
+    gap_fraction : Sequence[float]
+        Share of the frames a track spans in which it is absent,
+        ``total_gap_length / track_duration``. Zero for a contiguous track; near one when
+        a track is seen only at its two ends, which suggests one id used for two objects.
+        A single ratio, so it is comparable across tracks, unlike the counts it comes from.
     mean_speed : Sequence[float]
         Mean per-frame displacement of the bounding-box center in pixels,
         computed over consecutive observed frame pairs and normalized by
@@ -133,6 +138,7 @@ class TrackFactors(TypedDict):
     track_duration: Sequence[int]
     n_gaps: Sequence[int]
     total_gap_length: Sequence[int]
+    gap_fraction: Sequence[float]
     mean_speed: Sequence[float]
     speed_variance: Sequence[float]
     net_displacement: Sequence[float]
@@ -406,7 +412,7 @@ def _sequence_stats(
     # Output lists — one entry per track, in sorted track ID order.
     sorted_ids = sorted(tracks.keys())
 
-    track_ids: list[int] = sorted_ids
+    track_ids: list[int] = []
     labels: list[int] = []
     label_confidence: list[float] = []
     mean_score: list[float] = []
@@ -414,6 +420,7 @@ def _sequence_stats(
     track_duration: list[int] = []
     n_gaps: list[int] = []
     total_gap_length: list[int] = []
+    gap_fraction: list[float] = []
     mean_speed: list[float] = []
     speed_variance: list[float] = []
     net_displacement: list[float] = []
@@ -435,6 +442,7 @@ def _sequence_stats(
 
         if len(frames) == 0:
             continue
+        track_ids.append(tid)
 
         label, confidence, score = _label_score_stats(track.labels, track.scores)
         labels.append(label)
@@ -450,6 +458,7 @@ def _sequence_stats(
         gaps, gap_len = _compute_gaps(frames, tl, duration)
         n_gaps.append(gaps)
         total_gap_length.append(gap_len)
+        gap_fraction.append(gap_len / duration)
 
         delta_pos, step_speeds = _compute_step_speeds(ctrs, frames, tl)
 
@@ -479,6 +488,7 @@ def _sequence_stats(
             track_duration=track_duration,
             n_gaps=n_gaps,
             total_gap_length=total_gap_length,
+            gap_fraction=gap_fraction,
             mean_speed=mean_speed,
             speed_variance=speed_variance,
             net_displacement=net_displacement,
@@ -487,6 +497,7 @@ def _sequence_stats(
             entry_at_edge=entry_at_edge,
             exit_at_edge=exit_at_edge,
         ),
+        categorical=("labels",),
     )
 
 
@@ -531,6 +542,7 @@ def _dataset_stats(
     # result type rather than from whatever the walk happened to produce.
     return TrackStatsResult(
         stats=cast("TrackFactors", {name: merged.get(name, []) for name in TrackFactors.__annotations__}),
+        categorical=("labels",),
     )
 
 

@@ -82,6 +82,11 @@ def unpack_stats_result(
     return factors["stats"], source_index if source_index is not None else carried, aggregations
 
 
+def declared_categorical(factors: Any) -> tuple[str, ...]:
+    """Return the factors a stats result declares categorical; none for a plain mapping."""
+    return tuple(factors.get("categorical", ())) if _is_stats_result(factors) else ()
+
+
 def reject_length_mismatch(factors: Mapping[str, Any], source_index: Sequence[SourceIndex]) -> None:
     """Reject factors that do not hold exactly one value per source-index entry.
 

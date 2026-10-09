@@ -459,6 +459,62 @@ class TestDimensionStatsCalculator:
         # Non-spatial data should return NaN
         assert np.isnan(result[0])
 
+    def test_relative_geometry(self):
+        """Each relative stat is its absolute counterpart over the image the box sits in."""
+        image = np.random.rand(3, 100, 150)
+        box = BoundingBox(10, 20, 60, 80, image_shape=image.shape)
+        calculator = DimensionStatCalculator(image, CalculatorCache(image, box))
+
+        stats = calculator.compute(ImageStats.DIMENSION_RELATIVE)
+
+        assert stats["rel_offset_x"][0] == pytest.approx(10 / 150)
+        assert stats["rel_offset_y"][0] == pytest.approx(20 / 100)
+        assert stats["rel_width"][0] == pytest.approx(50 / 150)
+        assert stats["rel_height"][0] == pytest.approx(60 / 100)
+        assert stats["rel_size"][0] == pytest.approx(3000 / 15000)
+        # Box center (35, 50) sits 40 px from the image center (75, 50).
+        assert stats["rel_distance_center"][0] == pytest.approx(40 / (np.hypot(150, 100) / 2))
+        # The nearest edge is the left one, 10 px away, so the distance reads against the width.
+        assert stats["rel_distance_edge"][0] == pytest.approx(10 / 150)
+
+    def test_relative_geometry_of_the_whole_image(self):
+        """An item's own row is the whole frame: full size, no offset, centered."""
+        image = np.random.rand(3, 100, 150)
+        calculator = DimensionStatCalculator(image, CalculatorCache(image, None))
+
+        stats = calculator.compute(ImageStats.DIMENSION_RELATIVE)
+
+        assert (stats["rel_width"][0], stats["rel_height"][0], stats["rel_size"][0]) == (1.0, 1.0, 1.0)
+        assert (stats["rel_offset_x"][0], stats["rel_offset_y"][0]) == (0.0, 0.0)
+        assert stats["rel_distance_center"][0] == 0.0
+
+    def test_relative_geometry_non_spatial(self):
+        """Relative to an image means nothing without one."""
+        data = np.random.rand(100)
+        calculator = DimensionStatCalculator(data, CalculatorCache(data, None))
+
+        stats = calculator.compute(ImageStats.DIMENSION_RELATIVE)
+
+        assert all(np.isnan(values[0]) for values in stats.values())
+
+    def test_relative_geometry_with_no_extent(self):
+        """A relative stat divides by zero along an axis with no extent, so it reads NaN rather than raising."""
+        zero_width = np.random.rand(3, 100, 0)
+        stats = DimensionStatCalculator(zero_width, CalculatorCache(zero_width, None)).compute(
+            ImageStats.DIMENSION_RELATIVE,
+        )
+        assert np.isnan(stats["rel_offset_x"][0])
+        assert np.isnan(stats["rel_width"][0])
+        assert np.isnan(stats["rel_size"][0])
+
+        zero_height = np.random.rand(3, 0, 100)
+        stats = DimensionStatCalculator(zero_height, CalculatorCache(zero_height, None)).compute(
+            ImageStats.DIMENSION_RELATIVE,
+        )
+        assert np.isnan(stats["rel_offset_y"][0])
+        assert np.isnan(stats["rel_height"][0])
+        assert np.isnan(stats["rel_size"][0])
+
 
 class TestHashStatsCalculator:
     @patch("dataeval.core._hash._xxhash")

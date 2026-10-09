@@ -59,6 +59,7 @@ datasets for machine learning.
 ../notebooks/h2_cluster_analysis.py
 ../notebooks/h2_deduplicate.py
 ../notebooks/h2_deduplicate_video.py
+../notebooks/h2_find_factor_outliers.py
 ../notebooks/h2_visualize_cleaning_issues.py
 ../notebooks/h2_trace_findings_to_source.py
 ../notebooks/h2_custom_image_stats_object_detection.py
@@ -132,6 +133,10 @@ datasets for machine learning.
 - - [](../notebooks/h2_deduplicate_video.py)
   - Find duplicate video, train/test leakage, and redundant footage
   - [![Open In Colab][colab-badge]][vdupe-colab]
+- - [](../notebooks/h2_find_factor_outliers.py)
+  - Threshold metadata factors, each against its own level, and trace a
+    flagged track back to the metadata
+  - [![Open In Colab][colab-badge]][fout-colab]
 - - [](../notebooks/h2_visualize_cleaning_issues.py)
   - Find negatively impactful images in multiple backgrounds
   - [![Open In Colab][colab-badge]][clean-colab]
@@ -193,6 +198,7 @@ datasets for machine learning.
 [clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_cluster_analysis.ipynb
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_deduplicate.ipynb
 [vdupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_deduplicate_video.ipynb
+[fout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_find_factor_outliers.ipynb
 [clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_visualize_cleaning_issues.ipynb
 [trace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_trace_findings_to_source.ipynb
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_custom_image_stats_object_detection.ipynb

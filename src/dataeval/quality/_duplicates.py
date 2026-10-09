@@ -48,8 +48,10 @@ from dataeval.protocols import (
 from dataeval.quality._shared import (
     LABEL_KIND,
     checked_compute_stats,
+    checked_sole_metadata,
     drop_null_index_columns,
     get_dataset_step_from_idx,
+    is_metadata,
     reported_level,
 )
 from dataeval.types import (
@@ -1528,22 +1530,6 @@ def _checked_factor_request(metadata: Any, cross: bool, factors: Sequence[str] |
         raise ValueError("Duplicates.evaluate: `duplicate_factors` supports only one dataset.")
 
 
-def _checked_sole_metadata(data: Any, metadata: Any) -> Any:
-    """Validate that only one metadata container is specified.
-
-    Raises
-    ------
-    ValueError
-        If `metadata` is a different container than `data`.
-    """
-    if metadata is not None and metadata is not data:
-        raise ValueError(
-            "Duplicates.evaluate: `data` and `metadata` specify two different metadata "
-            "containers. Pass a single metadata container."
-        )
-    return data
-
-
 def _find_factor_duplicates(metadata: Any, factors: Sequence[str]) -> tuple[MethodGroups, dict[str, int]]:
     """Group items whose metadata factor rows match exactly.
 
@@ -2376,6 +2362,14 @@ def _is_metadata(data: Any) -> bool:
     structurally implements :class:`~dataeval.protocols.Dataset`.
     """
     return _is_protocol_instance(data, MetadataLike)
+
+
+def _metadata_item_count(metadata: Any) -> int | None:
+    """Return the number of items described by metadata, or None if unavailable."""
+    item_level = getattr(metadata, "item_level", None)
+    if item_level is None or not hasattr(metadata, "rows_at"):
+        return None
+    return int(metadata.rows_at(item_level).height)
 
 
 def _is_tracking(data: Any) -> bool:
@@ -4776,8 +4770,8 @@ class Duplicates(Evaluator):
         """
         # Resolve metadata when passed in the data argument. Metadata satisfies Dataset
         # structurally, so this check precedes image decoding paths.
-        alone = _is_metadata(data)
-        metadata = _checked_sole_metadata(data, metadata) if alone else metadata
+        alone = is_metadata(data)
+        metadata = checked_sole_metadata(data, metadata, "Duplicates") if alone else metadata
 
         # Recorded before detection runs. `set_metadata` reads `encoding_digest` through this
         # *after* the call. Assigned unconditionally. A second pass on the same detector,

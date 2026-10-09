@@ -39,33 +39,33 @@ embedding-based clustering as a third detection mode alongside its hash methods.
 ### Redundancy and duplication
 
 A {term}`duplicate <Duplicates>` is not simply "a sample identical or
-near-identical to another" — that description only covers pixels, and pixels
-are one of three projections a duplicate can be found in. A duplicate is a
-**collision in some projection of the datum**: reduce a sample through pixels,
-through its annotation, or through its coded metadata factors, and two
+near-identical to another" — that description only covers content, and content
+is one of three projections a duplicate can be found in. A duplicate is a
+**collision in some projection of the datum**: reduce a sample through its
+content, through its annotation, or through its coded metadata factors, and two
 samples whose reduction agrees are duplicates in that projection, whether or
 not they agree in any other.
 
 | Projection | What it reduces to |
 | --- | --- |
-| Pixels | phash / dhash / xxhash over decoded frames |
+| Content | phash / dhash / xxhash over decoded frames |
 | Annotation | a digest over boxes, labels, and track ids |
 | Metadata factors | the coded {class}`.Metadata` factor row |
 
-**Pixels** are the common case and the one most tooling assumes. Near-duplicates
-here include images with minor lighting shifts, JPEG re-compression artifacts,
-slight crops of the same underlying scene, or rotated and flipped versions of
-the same image.
+**Content** is the common case and the one most tooling assumes — for images
+and video frames, the pixels. Near-duplicates here include images with minor
+lighting shifts, JPEG re-compression artifacts, slight crops of the same
+underlying scene, or rotated and flipped versions of the same image.
 
 **Annotation** duplicates share a box/label/track-id digest even when their
-pixels differ or were never compared. **Factor** duplicates share a named
+content differs or was never compared. **Factor** duplicates share a named
 {class}`.Metadata` factor row — a capture timestamp, GPS fix, or source
 filename — even before either image is decoded.
 
 Which projections agree, and which disagree, is itself the finding: two
-samples agreeing on pixels but disagreeing on annotation is one collect
+samples agreeing on content but disagreeing on annotation is one collect
 carrying two conflicting label passes; agreeing on annotation while
-disagreeing on pixels is a synthetically augmented copy; agreeing on both is a
+disagreeing on content is a synthetically augmented copy; agreeing on both is a
 plain re-ingest under a new name. {class}`.Duplicates` reports which
 projections it checked and which of those agreed on every group — see
 [Duplicates and near-duplicates](ActingOnResults.md#duplicates-and-near-duplicates)
@@ -115,6 +115,25 @@ actively harm the model by introducing irrelevant class structure. Embedding-
 based outlier detection catches many semantic anomalies that statistical linting
 misses, because the samples arrange differently in the embedding space, even when
 their pixel statistics look normal.
+
+An outlier, like a duplicate, can be found in any projection of the datum:
+its content, its annotation (box geometry, labels, tracks), or its metadata
+factors. The reference population a value is judged against determines the
+kind of finding:
+
+| Kind | Judged against | Example |
+| --- | --- | --- |
+| Marginal | every row at its level | a track with 11 gaps where tracks have 0–1 |
+| Stratified | rows sharing a categorical context (class, sequence, or categorical factor) | a class that is always a small box near the corner, drawn once large and centered |
+| Sequential | the row's neighbors within its sequence | a timestamp that jumps three hours for one frame; a GPS fix that moves 40 km and back |
+| Joint | a multivariate or continuous-on-continuous relationship | in one class, distant boxes are small and near ones large; a large box at the horizon |
+
+The marginal kind is the one most tooling implements, and it misses the other
+three. A timestamp is roughly uniform over a dataset, so a wrong one is
+unremarkable until it is compared with its neighbors. A large, centered box is
+unremarkable if other classes are also large and centered. Most annotation and
+metadata defects are *conditional*: a value that is improbable only given the
+rest of the datum.
 
 ### Corruption and sensor artifacts
 
@@ -191,7 +210,7 @@ landscape without the practitioner realizing it.
 
 ### Duplicate detection: hashing and clustering
 
-{class}`.Duplicates` computes the pixel projection through three complementary
+{class}`.Duplicates` computes the content projection through three complementary
 approaches, each suited to a different kind of redundancy. Two further
 projections — annotation and metadata factors — are covered afterward.
 
@@ -243,12 +262,12 @@ space.
 (object detection boxes and labels). Each item's annotation — its boxes,
 labels, and, for tracking data, track ids — is reduced to a digest; items
 whose digest agrees are grouped as an annotation duplicate, whether or not
-their pixels do. Because it runs alongside pixel detection rather than
+their content does. Because it runs alongside content detection rather than
 instead of it, the same pair of items can be checked on both projections at
-once: a pair agreeing on pixels but not on annotation surfaces as an exact
-pixel match whose annotation disagreed (one collect carrying two conflicting
-label passes); a pair agreeing on annotation but not on pixels surfaces as an
-annotation duplicate whose pixels disagreed (a synthetically augmented copy).
+once: a pair agreeing on content but not on annotation surfaces as an exact
+content match whose annotation disagreed (one collect carrying two conflicting
+label passes); a pair agreeing on annotation but not on content surfaces as an
+annotation duplicate whose content disagreed (a synthetically augmented copy).
 No feature extractor or threshold is needed — it is an exact, transitive
 comparison, like xxHash for pixels.
 
@@ -330,6 +349,186 @@ not belong to any established class or scene type in the dataset.
 Both detection paths can run simultaneously and their results are merged into
 a single output DataFrame. A sample flagged by both paths warrants immediate
 inspection.
+
+### Outlier detection over annotation and metadata factors
+
+```{note}
+{class}`.Outliers` thresholds ordered metadata factors -- each against the rows
+at the level it was measured at -- when a {class}`.Metadata` is passed as
+`data`. The stratified, categorical, and sequential detection described below is
+in development; this section describes the method it follows and the evidence
+behind its defaults.
+```
+
+Extending {class}`.Outliers` beyond image statistics raises three questions the
+image path never faced: which columns can be thresholded, how a categorical
+value can be an outlier, and how small a population can support a finding.
+
+#### Which columns can be thresholded
+
+A {class}`.Metadata` holds whatever was attached to it. Several kinds of column
+are numeric without being measurements -- identifiers, booleans, and the codes
+a categorical factor is stored as -- and thresholding them produces findings
+that are hard to act on.
+
+The tempting rule is to threshold only factors that {class}`.Metadata`
+classifies as continuous. That classification exists to choose **bins**, so it
+answers a different question. It is a heuristic over the spacing of the values
+(see [Binning](Binning.md)) that calls data discrete whenever the values sit on
+a lattice or number fewer than 20:
+
+| Column | Classified continuous? | Meaningful to threshold? |
+| --- | --- | --- |
+| gap count per track (Poisson counts, n = 3000) | no | yes |
+| track duration in frames (integers, n = 3000) | no | yes |
+| mean speed (floating point, n = 3000) | yes | yes |
+| any per-video factor in a 12-video dataset | no — fewer than 20 rows | yes, with the small-n caveat below |
+| capture time in epoch seconds at 1 Hz | no — a lattice | yes, sequentially |
+
+Gating on that classification would silently exclude every integer count a
+track produces and every factor at the sequence level. Eligibility is instead
+decided by the **raw column's type**:
+
+- **Ordered** — integers, floats, datetimes, durations. Thresholded on the raw
+  values with the same tests the image path uses.
+- **Categorical** — strings, booleans, and integers the caller has declared as
+  a fixed vocabulary. Never given a location or scale; judged by rarity within a
+  stratum (below).
+- **Ineligible** — list-valued columns, and the reserved addressing columns
+  (row indices, `track_id`, `item_id`), by construction rather than by
+  heuristic.
+
+Integer identifiers are the one case a type check cannot catch -- a numeric
+`camera_serial` looks ordered. Declare it as a fixed vocabulary, or name the
+factors to analyze explicitly. A cardinality heuristic is deliberately not
+used: it would add a threshold to tune and defend.
+
+#### Why bins are never used
+
+A factor's coded form — its bin indices — describes the cut, not the
+measurement: a z-score over bin codes `[0, 1, 2, 3]` measures the bin edges.
+Two further problems exist. A categorical factor's numeric reading is its
+codes, and a missing categorical value is stored as one code past the last
+level rather than as NaN, so a missing value would read as the highest level
+instead of being excluded. Stratifying on a binned continuous factor makes
+every stratum depend on the bin edges.
+
+Detection therefore reads raw values only, and stratifies only on categorical
+columns. A continuous conditioning variable is a joint relationship, not a
+stratum. As a result, **re-binning a metadata does not change an outlier
+result.**
+
+#### Relative box geometry
+
+Box width, height, area, and position are measured in pixels. Stratifying them
+by class compares a box in a 4K frame against one in a 640-pixel frame, and
+resolution dominates the comparison. Geometry relative to the image — area as a
+fraction of the frame, offsets as fractions of width and height, distance from
+the center as a fraction of the half-diagonal — turns "this class is usually a
+small box near the corner" into a statement about composition, not the camera.
+Absolute size remains its own question: it determines whether an object is
+detectable at all.
+
+#### Categorical rarity within a stratum
+
+A categorical value is an outlier when it is **improbable given its stratum**:
+one frame stamped `weather="snow"` inside an otherwise clear 300-frame
+sequence, or three frames of a sequence reporting a different `sensor_id`.
+
+No widely used data validation tool ships a default for this. Great
+Expectations, TensorFlow Data Validation, Deequ, ydata-profiling, Evidently,
+and whylogs flag values outside a known domain or shares the user sets; none
+flags a rare value with a default frequency cutoff, and none uses a minimum
+count. The default below is derived rather than borrowed.
+
+**The test.** For a stratum of $n$ rows in which level $v$ appears $k$ times
+(counting the row being judged), the value is flagged when the exact one-sided
+binomial test rejects "$v$ occurs in this stratum with probability at least
+$p$":
+
+$$P(X \le k \mid X \sim \mathrm{Binomial}(n, p)) \le \alpha$$
+
+Equivalently, the one-sided Clopper–Pearson upper confidence bound on
+$P(v \mid s)$ falls below $p$ ([Clopper & Pearson, 1934](#ref5)); that bound is
+the number reported, because it reads directly as "this level occurs in at most
+this share of its stratum". Every row of a level within a stratum shares one
+test, so the unit of the test is the (stratum, level) cell.
+
+**Defaults.** Rarity $p = 0.05$ at 95 % confidence ($\alpha = 0.05$). The
+confidence level follows the conventional limit used for zero- and
+small-numerator bounds ([Hanley & Lippman-Hand, 1983](#ref6)). The rarity is a
+judgment: of $p \in \{0.01, 0.02, 0.05\}$ it is the only value under which
+three wrong-sensor frames in a 300-frame sequence are flagged.
+
+**The minimum group size.** A singleton can only be flagged once the stratum is
+large enough for $P(X \le 1) \le \alpha$, which at the defaults is $n \ge 93$
+— approximately $4.74 / p$, the one-occurrence extension of the "rule of
+three" for zero occurrences. [Das & Schneider (2007)](#ref7) derive the minimum
+support of their categorical detector from its significance level in the same
+way. One setting, $p$, moves both the rarity and the minimum. Strata below the
+minimum are reported as a ranking, without a verdict, and are left out of the
+multiple-testing count — a discrete test that cannot reach significance need
+not count against the ones that can ([Tarone, 1990](#ref8)). Across the
+testable cells at a level, the Benjamini–Hochberg procedure controls the false
+discovery rate at 0.05 ([Benjamini & Hochberg, 1995](#ref9)).
+
+**Levels rare everywhere are not outliers.** A class that is rare in every
+stratum is a finding about the dataset's balance (see [Dataset Bias and
+Coverage](DatasetBias.md)). [Das & Schneider (2007)](#ref7) make the same
+argument — a pairing that is rare because both of its parts are rare "can be
+explained" — and divide by the marginal frequencies to remove it. That
+correction fails a common video case: with 100 sequences each captured on its
+own sensor, every sensor has a global share of about 1 %, so three frames of
+sensor B inside sequence A look expected. The rule used instead: a level is
+withheld as rare everywhere only when it is rare in *every* stratum large enough
+to test. A level common in at least one stratum — the snow videos, sensor B's
+own sequence — stays flagged for its rare appearances elsewhere.
+
+| Case | Upper bound on the level's share | Flagged |
+| --- | --- | --- |
+| 1 snow frame in a clear 300-frame sequence | 0.016 | yes |
+| 3 wrong-sensor frames in a 300-frame sequence | 0.026 | yes |
+| 2 "truck" frames in a 60-frame "car" track | 0.101 | no — 60 rows cannot support it |
+
+The last case is not a coverage gap. Label drift within a track is already
+measured as an ordered, per-track quantity — the chosen label's share of the
+track — and thresholded against other tracks. The categorical test covers strata
+too large for such a summary to exist.
+
+**The rejected alternative.** A conformal p-value — the share of the stratum
+made of levels at least as rare as the row's own — is the other candidate, and
+is what the "q-value" of [Das & Schneider (2007)](#ref7) computes. Its validity
+is exact at any sample size ([Laxhammar, 2014](#ref10); [Bates et al., 2023]
+(#ref11)), and it can flag a singleton in a stratum of $1/\alpha$ rows. But
+scored within the stratum it bounds the *number* of flags — at most
+$\lfloor \alpha n \rfloor$ rows per stratum — rather than giving evidence that
+the value is improbable. [Laxhammar (2014)](#ref10) notes that a conformal
+anomaly may be "a relatively rare … example generated from the same probability
+distribution".
+
+| | Conformal p-value | Exact binomial |
+| --- | --- | --- |
+| What a flag claims | the row is in the rarest $\alpha$ of its stratum | its level's share is below $p$, with 95 % confidence |
+| Smallest stratum that can flag a singleton | $1/\alpha$ (20 at $\alpha$ = 0.05) | 93 at $p$ = 0.05 |
+| Rows flagged in a clean stratum of 20 classes with Zipf-distributed shares | about $\alpha$ of them — 0.8 % at $\alpha$ = 0.01 | 0.07–0.26 % |
+| A legitimate level with true share 0.5 %, $n$ = 300, $\alpha$ = 0.01 | flagged in 71 % of simulations | flagged only if its share is truly below $p$ |
+| Benjamini–Hochberg across strata | loses power: no p-value can fall below $1/n$ | usable |
+
+The binomial rule is the one that does not flood a clean, diverse dataset with
+findings about its rare classes.
+
+**Calibration beside the ordered tests.** On clean data the default adaptive
+threshold flags about 0.0004 % of normal values, 0.09 % of gamma-distributed
+values, and 0.6 % of log-normal values (5,000 values, 50 draws each). The
+binomial rule's 0.07–0.26 % on a clean stratum is the same order, so ordered and
+categorical findings carry comparable weight in one result.
+
+**Known limits.** Both tests assume the rows of a stratum are exchangeable.
+Consecutive video frames are not: a three-frame burst of a wrong value is
+closer to one event than to three independent ones. A stratum smaller than the
+minimum cannot support a verdict on its own; borrowing strength across strata
+with an empirical-Bayes prior is the principled route to judging them, and is
+not part of the default.
 
 ### Image statistics as a linting vocabulary
 
@@ -493,6 +692,13 @@ removing samples changes what counts as an outlier. When comparing results
 across dataset versions, re-run the full analysis rather than assuming prior
 flags remain valid.
 
+Stratified and categorical outlier tests assume the rows of a stratum are
+exchangeable, which consecutive video frames are not, and they return no
+verdict on strata too small to support one. Relationships between two ordered
+quantities — box size against distance from the camera, image brightness
+against capture hour — are joint and are not found by testing one column at a
+time, within a stratum or not.
+
 ## Related concept pages
 
 - [Clustering](Clustering.md) — the underlying algorithm used by Duplicates
@@ -509,6 +715,7 @@ flags remain valid.
 ### How-to guides
 
 - [How to detect and remove duplicates](../notebooks/h2_deduplicate.py)
+- [How to find outliers in metadata factors](../notebooks/h2_find_factor_outliers.py)
 - [How to visualize data cleaning issues](../notebooks/h2_visualize_cleaning_issues.py)
 - [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
 
@@ -533,3 +740,29 @@ flags remain valid.
 
 4. [Zauner, C. (2010). Implementation and benchmarking of perceptual image hash
    functions. *Bachelor's thesis, Upper Austria University of Applied Sciences.* [thesis](https://www.phash.org/docs/pubs/thesis_zauner.pdf)]{#ref4}
+
+5. [Clopper, C. J., & Pearson, E. S. (1934). The use of confidence or fiducial
+   limits illustrated in the case of the binomial. *Biometrika*, 26(4), 404–413. [paper](https://academic.oup.com/biomet/article-abstract/26/4/404/291538)]{#ref5}
+
+6. [Hanley, J. A., & Lippman-Hand, A. (1983). If nothing goes wrong, is
+   everything all right? Interpreting zero numerators. *JAMA*, 249(13),
+   1743–1745. [paper](https://jhanley.biostat.mcgill.ca/c607/ch08/zero_numerator.pdf)]{#ref6}
+
+7. [Das, K., & Schneider, J. (2007). Detecting anomalous records in categorical
+   datasets. In *Proceedings of the 13th ACM SIGKDD International Conference on
+   Knowledge Discovery and Data Mining* (pp. 220–229). [paper](https://dl.acm.org/doi/10.1145/1281192.1281219)]{#ref7}
+
+8. [Tarone, R. E. (1990). A modified Bonferroni method for discrete data.
+   *Biometrics*, 46(2), 515–522. [paper](https://pubmed.ncbi.nlm.nih.gov/2364136/)]{#ref8}
+
+9. [Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate:
+   a practical and powerful approach to multiple testing. *Journal of the Royal
+   Statistical Society: Series B*, 57(1), 289–300. [paper](https://doi.org/10.1111/j.2517-6161.1995.tb02031.x)]{#ref9}
+
+10. [Laxhammar, R. (2014). *Conformal anomaly detection: Detecting abnormal
+    trajectories in surveillance applications.* PhD thesis, University of
+    Skövde. [thesis](https://www.diva-portal.org/smash/get/diva2:690997/FULLTEXT02.pdf)]{#ref10}
+
+11. [Bates, S., Candès, E., Lei, L., Romano, Y., & Sesia, M. (2023). Testing for
+    outliers with conformal p-values. *The Annals of Statistics*, 51(1),
+    149–178. [paper](https://arxiv.org/abs/2104.08279)]{#ref11}

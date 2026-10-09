@@ -8,13 +8,13 @@ import pytest
 
 from dataeval import Metadata
 from dataeval._metadata._columns import binned
-from dataeval.core import compute_stats
+from dataeval.core import FactorResult, compute_stats
 from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._label_stats import label_stats
 from dataeval.data import unzip_dataset
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.flags import ImageStats
-from dataeval.types import FactorInfo
+from dataeval.types import FactorInfo, LevelSpec
 from tests.embeddings.test_embeddings import MockDataset
 
 
@@ -691,3 +691,42 @@ class TestDerivedCopiesShareNothingMutable:
         before = set(metadata.factor_names)
         metadata.at("instance").exclude.add("w")
         assert set(metadata.factor_names) == before
+
+
+@pytest.mark.required
+class TestProducerDeclaredCategorical:
+    """A producer can say an integer factor is a set of codes rather than a quantity."""
+
+    @staticmethod
+    def _metadata(**kwargs):
+        return Metadata.from_factors({"x": np.arange(30, dtype=float)}, **kwargs)
+
+    def test_a_declared_factor_gets_a_declared_vocabulary(self):
+        md = self._metadata()
+        md.add_factors({"stats": {"cls": np.array([2, 0] * 15)}, "categorical": ("cls",)}, level="unit")
+        encoding = md.factor_info["cls"].encoding
+        assert encoding == LevelSpec(levels=(0, 2), provenance="declared")
+
+    def test_the_callers_own_vocabulary_wins(self):
+        md = self._metadata(factor_levels={"cls": [2, 0]})
+        md.add_factors({"stats": {"cls": np.array([2, 0] * 15)}, "categorical": ("cls",)}, level="unit")
+        assert md.factor_info["cls"].encoding == LevelSpec(levels=(2, 0), provenance="declared")
+
+    def test_an_undeclared_factor_is_left_to_derivation(self):
+        md = self._metadata()
+        md.add_factors({"stats": {"cls": np.array([2, 0] * 15)}}, level="unit")
+        encoding = md.factor_info["cls"].encoding
+        assert encoding is None or encoding.provenance == "derived"
+
+    def test_a_declaration_survives_the_level_prefix_of_a_multi_level_split(self, get_od_dataset):
+        """A source_index spanning two levels makes `_place` prefix the name -- `unit_cls`,
+        `instance_cls` -- rather than storing `cls` bare. The declaration has to follow it."""
+        dataset = get_od_dataset(4, targets_per_image=2)
+        stats = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        cls = np.arange(len(stats["source_index"])) % 2
+        md = Metadata(dataset)
+        md.add_factors(FactorResult(stats={"cls": cls}, categorical=("cls",)), source_index=stats["source_index"])
+        for name in ("unit_cls", "instance_cls"):
+            encoding = md.factor_info[name].encoding
+            assert isinstance(encoding, LevelSpec)
+            assert encoding.provenance == "declared"

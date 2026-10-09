@@ -1,9 +1,11 @@
+import warnings
 from unittest.mock import MagicMock
 
 import numpy as np
 import polars as pl
 import pytest
 
+from dataeval import Metadata
 from dataeval._helpers import lexical_categorical
 from dataeval.config import use_max_processes
 from dataeval.core import compute_stats
@@ -2030,3 +2032,110 @@ class TestPrune:
         view = View(images, Indices(plan, exclude=True))
         assert 20 not in view.selection
         assert len(view) == 21 - len(plan)
+
+
+@pytest.mark.required
+class TestOutliersOverMetadata:
+    @staticmethod
+    def _temperature():
+        return Metadata.from_factors({"temperature": [20.1, 19.8, 20.3, 20.0, 19.9, 20.2, 20.1, 19.7, 20.0, 45.0]})
+
+    @staticmethod
+    def _tracked(n_sequences=12):
+        """Twelve one-track sequences, contiguous but for sequence 3's, which flickers."""
+        from dataeval.core import track_stats
+        from tests.metadata.test_structurers import _mot_dataset
+
+        frames = [[[1]] * 6 for _ in range(n_sequences)]
+        frames[3] = [[1], [], [1], [], [1], [], [1], [], [1], [], [1]]  # track 1 gaps five times
+        ds = _mot_dataset(frames)
+        md = Metadata(ds)
+        md.add_factors(track_stats(ds), level="track", key="track_id")
+        return md
+
+    def test_an_ordered_factor_is_thresholded(self):
+        result = Outliers().evaluate(self._temperature())
+        rows = result.data().select("item_index", "metric_name", "metric_value").rows()
+        assert rows == [(9, "temperature", 45.0)]
+
+    def test_a_track_is_judged_against_tracks(self):
+        result = Outliers().evaluate(self._tracked(), factors=["n_gaps"])
+        assert SourceIndex(3, 1, "track") in result.outliers
+
+    def test_track_labels_are_never_thresholded(self):
+        result = Outliers().evaluate(self._tracked())
+        assert "labels" not in set(result.data()["metric_name"].cast(pl.Utf8))
+
+    def test_rebinning_does_not_change_the_result(self):
+        values = np.r_[np.random.default_rng(0).normal(20, 1, 40), 90.0]
+        plain = Outliers().evaluate(Metadata.from_factors({"x": values}))
+        cut = Outliers().evaluate(Metadata.from_factors({"x": values}, continuous_factor_bins={"x": 3}))
+        assert plain.data().equals(cut.data())
+
+    def test_redetection_reuses_the_factor_table(self):
+        result = Outliers().evaluate(self._temperature())
+        assert len(result.with_threshold(("zscore", 100.0))) == 0
+
+    def test_an_entirely_missing_factor_flags_nothing(self):
+        md = Metadata.from_factors({"x": np.full(20, np.nan), "y": np.r_[np.zeros(19), 50.0]})
+        result = Outliers().evaluate(md)
+        assert set(result.data()["metric_name"].cast(pl.Utf8)) == {"y"}
+
+    def test_a_named_factor_the_flags_exclude_is_refused(self):
+        md = self._tracked()
+        md.add_factors({"iou": np.linspace(0, 1, md.level_counts["instance"])}, level="instance")
+        with pytest.raises(ValueError, match="per_target=True"):
+            Outliers().evaluate(md, factors=["iou"])
+
+    def test_factors_without_a_metadata_are_refused(self):
+        with pytest.raises(ValueError, match="factors"):
+            Outliers().evaluate([np.zeros((3, 8, 8))] * 3, factors=["x"])
+
+    def test_cluster_detection_is_refused(self):
+        with pytest.raises(ValueError, match="images"):
+            Outliers(flags=ImageStats.NONE, extractor=FlattenExtractor()).evaluate(self._temperature())
+
+    def test_encoding_digest_is_not_recorded(self):
+        assert "encoding_digest" not in Outliers().evaluate(self._temperature()).meta().state
+
+    @staticmethod
+    def _boxes(get_od_dataset):
+        """Ten images of two boxes each: one image-level and one box-level factor, box 19 far off."""
+        ds = get_od_dataset(list(np.random.default_rng(0).random((10, 3, 16, 16))), 2, True)
+        md = Metadata(ds)
+        md.add_factors({"iou": np.r_[np.random.default_rng(1).normal(0.8, 0.02, 19), 0.05]}, level="instance")
+        return md
+
+    def test_a_box_factor_is_judged_against_boxes(self, get_od_dataset):
+        result = Outliers().evaluate(self._boxes(get_od_dataset), factors=["iou"], per_target=True)
+        assert SourceIndex(9, 1) in result.outliers
+
+    def test_box_stats_do_not_trouble_the_default_flags(self, get_od_dataset):
+        ds = get_od_dataset(list(np.random.default_rng(0).random((10, 3, 16, 16))), 2, True)
+        md = Metadata(ds)
+        md.add_factors(compute_stats(ds, stats=ImageStats.PIXEL_MEAN, per_target=True, normalize_pixel_values=False))
+        assert set(Outliers().evaluate(md).data()["metric_name"].cast(pl.Utf8)) <= {"unit_mean"}
+        assert set(Outliers().evaluate(md, per_target=True).data()["metric_name"].cast(pl.Utf8)) <= {
+            "unit_mean",
+            "instance_mean",
+        }
+
+    def test_a_one_level_factor_needs_per_image(self):
+        with pytest.raises(ValueError, match=r"per_image=True"):
+            Outliers().evaluate(self._temperature(), factors=["temperature"], per_image=False, per_target=True)
+
+    def test_every_factor_excluded_by_the_flags_is_refused_rather_than_reported_clean(self, get_od_dataset):
+        with pytest.raises(ValueError, match=r"per_target=True"):
+            Outliers().evaluate(self._boxes(get_od_dataset))
+
+    def test_a_factor_the_flags_exclude_is_left_out_of_the_default_selection(self, get_od_dataset):
+        md = self._boxes(get_od_dataset)
+        md.add_factors({"temperature": np.r_[np.full(9, 20.0) + np.arange(9) * 0.1, 45.0]}, level="unit")
+        assert set(Outliers().evaluate(md).data()["metric_name"].cast(pl.Utf8)) == {"temperature"}
+
+    def test_no_bins_are_computed(self):
+        md = Metadata.from_factors({"x": np.r_[np.random.default_rng(0).normal(20, 1, 40), 90.0]})
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            Outliers().evaluate(md)
+        assert not [w for w in caught if "binned automatically" in str(w.message)]
