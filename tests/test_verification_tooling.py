@@ -130,6 +130,11 @@ class TestDefaultBranchGuard:
         with pytest.raises(SystemExit):
             push.refuse_default_branch()
 
+    def test_the_moving_latest_known_good_tag_is_refused(self, push, monkeypatch):
+        monkeypatch.setenv("CI_COMMIT_TAG", "latest-known-good")
+        with pytest.raises(SystemExit, match="not a version tag"):
+            push.refuse_default_branch()
+
     def test_release_branch_and_tag_are_allowed(self, push, monkeypatch):
         monkeypatch.setenv("CI_DEFAULT_BRANCH", "main")
         monkeypatch.setenv("CI_COMMIT_BRANCH", "release/v1.1")

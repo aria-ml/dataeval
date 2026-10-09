@@ -130,14 +130,21 @@ def refuse_default_branch() -> None:
     The meta repo keeps one copy of the requirements, test cases, and VCRM, so whichever
     pipeline publishes last wins. The default branch runs ahead of the release, and its
     results would overwrite the evidence recorded for the released version. Publish from a
-    release tag, or from a release branch.
+    version tag (vX.Y.Z), or from a release branch. A tag that is not a version, such as the
+    moving `latest-known-good` tag on main, is refused too.
     """
     branch = os.environ.get("CI_COMMIT_BRANCH", "")
     default = os.environ.get("CI_DEFAULT_BRANCH", "main")
-    if branch and branch in {default, "main"} and not os.environ.get("CI_COMMIT_TAG"):
+    tag = os.environ.get("CI_COMMIT_TAG", "")
+    if tag and not re.match(r"v\d+", tag):
+        raise SystemExit(
+            f"error: refusing to publish verification artifacts from tag {tag!r}, which is not a version tag. "
+            "Publish from a version tag (vX.Y.Z) or a release branch; --dry-run is allowed here."
+        )
+    if branch and branch in {default, "main"} and not tag:
         raise SystemExit(
             f"error: refusing to publish verification artifacts from the default branch ({branch}). "
-            "Publish from a release tag or a release branch; --dry-run is allowed here."
+            "Publish from a version tag or a release branch; --dry-run is allowed here."
         )
 
 
