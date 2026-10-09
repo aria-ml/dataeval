@@ -186,7 +186,7 @@ requirements:
   name: Packaging & Distribution
   description: DataEval shall be published as a Python package on PyPI and conda-forge.
   criteria:
-  - Each release is published to PyPI and conda-forge as `dataeval`.
+  - Each release is published to PyPI as `dataeval`, and to conda-forge once its feedstock updates.
   - The wheel and sdist contain only `src/dataeval/` files, including the `py.typed` marker.
   - '`__version__` is derived from the git tag and is a valid version in every release.'
   - Package metadata (`Name`, `Requires-Python`, `License-Expression`, `Project-URL`) is set.
@@ -743,10 +743,11 @@ test_cases:
     expect: The evaluator runs on CPU without error.
     tests:
     - cfg::test_core_evaluator_falls_back_to_cpu_without_cuda
-  - do: Run the verification suite with warnings as errors.
-    expect: No version-specific deprecation warnings are raised.
+  - do: Run the verification suite with the deprecation warnings DataEval raises treated as errors.
+    expect: No deprecation warning is raised from DataEval code, so a release does not depend on a deprecated call.
     tests:
-    - 'NEW: verification suite runs with -W error::DeprecationWarning'
+    - pyver::test_deprecation_warnings_from_dataeval_fail_the_suite
+    - 'CI: verify'
 - id: 22-1
   req: NFR-2
   name: Package Distribution
@@ -770,10 +771,11 @@ test_cases:
     - vmeta::test_requires_python
     - vmeta::test_license_set
     - vmeta::test_project_urls_set
-  - do: Check the published release on PyPI and conda-forge.
-    expect: The release version is available on both.
+  - do: Check the published release on PyPI.
+    expect: The wheel and sdist for the release version are available. conda-forge follows through its feedstock, which
+      updates after PyPI, so it is checked after the release rather than in the pipeline.
     tests:
-    - 'NEW: published-release check (PyPI and conda-forge) in the release pipeline'
+    - 'CI: release:check-pypi'
   - do: Review the `verify lock` CI job.
     expect: Lock files and `environment.yml` match `pyproject.toml`.
     tests:
@@ -803,7 +805,6 @@ test_cases:
     expect: '`pyright --verifytypes` reports more than 90% completeness and `pyright` passes on `src/` and `tests/`.'
     tests:
     - 'CI: typecheck'
-    - 'NEW: verifytypes completeness gate in verification'
 - id: 24-1
   req: NFR-4
   name: Config and Reproducibility

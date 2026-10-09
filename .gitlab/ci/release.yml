@@ -123,19 +123,41 @@ publish verification:
     - .nox
     - .rules_verification_only
   # A tag pipeline already carries the tag in CI_COMMIT_TAG, so the artifacts label
-  # themselves; nothing has to run first.
-  needs: []
+  # themselves. On a release tag the gate jobs run too, and this job waits for them so
+  # their results can be recorded as evidence (`CI: <job>` steps in the registry).
+  needs:
+    - {job: lint, optional: true}
+    - {job: test, optional: true}
+    - {job: verify, optional: true}
+    - {job: conda, optional: true}
+    - {job: typecheck, optional: true}
+    - {job: minimum install, optional: true}
+    - {job: verify lock, optional: true}
+    - {job: release:check-pypi, optional: true}
   variables:
     GIT_DEPTH: 0
   before_script:
     - uv tool install nox --with nox-uv
     - uv pip install requests pyyaml --system
   script:
+    - python .gitlab/scripts/collect_ci_jobs.py
     - uvx nox -e verify
     - uv run python .gitlab/scripts/push_verification.py
   artifacts:
     paths:
       - output/metarepo/
+
+# The package is published by the GitHub workflow that starts when the tag is mirrored, so
+# this waits for it to appear on PyPI. A failure is recorded in the evidence rather than
+# blocking it.
+release:check-pypi:
+  stage: release
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+  needs: []
+  allow_failure: true
+  script:
+    - python .gitlab/scripts/check_pypi_release.py "$CI_COMMIT_TAG"
 
 export-merged-sbom:
   stage: release

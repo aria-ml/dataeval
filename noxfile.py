@@ -1,6 +1,7 @@
 import argparse
 import functools
 import glob
+import json
 import os
 import re
 import shutil
@@ -273,7 +274,15 @@ def verify(session: nox.Session) -> None:
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
     session.run("pyright", "--stats")
-    session.run("pyright", "--ignoreexternal", "--verifytypes", "dataeval")
+    # NFR-3: public type completeness must stay above 90%. pyright exits 1 when it reports any diagnostic, so the
+    # score is read from the JSON report rather than from the exit code.
+    report = session.run(
+        "pyright", "--ignoreexternal", "--verifytypes", "dataeval", "--outputjson", silent=True, success_codes=[0, 1]
+    )
+    score = json.loads(str(report))["typeCompleteness"]["completenessScore"]
+    session.log(f"Type completeness: {score:.1%}")
+    if score <= 0.9:
+        session.error(f"Type completeness {score:.1%} is not above the 90% required by NFR-3")
 
 
 @session(python=PYTHON_VERSIONS[0], uv_only_groups=["base"], reuse_venv=False)

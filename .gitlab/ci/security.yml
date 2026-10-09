@@ -6,7 +6,11 @@ include:
   - template: Security/SAST.gitlab-ci.yml
 
 .security_rules: &security_rules
-  - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
+  - if: $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
+    when: never
+  # A release is scanned too: the tag pipeline is the record of what shipped.
+  - if: $CI_COMMIT_TAG =~ /^v\d+/
+  - if: $CI_COMMIT_TAG
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
   - if: $CI_COMMIT_REF_PROTECTED == "true"

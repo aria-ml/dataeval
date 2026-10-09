@@ -6,6 +6,8 @@ Maps to meta repo test cases:
 
 import sys
 
+import pytest
+
 SUPPORTED_VERSIONS = [(3, 11), (3, 12), (3, 13), (3, 14)]
 
 
@@ -27,3 +29,11 @@ class TestPythonVersions:
     def test_typing_extensions_available(self):
         """typing_extensions is required for Python <3.12 backports."""
         import typing_extensions  # noqa: F401
+
+    def test_deprecation_warnings_from_dataeval_fail_the_suite(self):
+        """The verification conftest turns DeprecationWarning attributed to dataeval into an error."""
+        import warnings
+
+        caller = {"__name__": "dataeval.example", "warnings": warnings}
+        with pytest.raises(DeprecationWarning):
+            exec(compile("warnings.warn('deprecated', DeprecationWarning)", "dataeval/example.py", "exec"), caller)

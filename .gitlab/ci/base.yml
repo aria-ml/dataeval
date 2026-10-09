@@ -123,14 +123,22 @@ stages:
 
 .rules_main_mr:
   rules:
-    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
+    - if: $PUBLISH_VERIFICATION
+      when: never
+    # A release runs the whole gate; the verification evidence records its results.
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+    - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 .rules_main_mr_code:
   rules:
-    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
+    - if: $PUBLISH_VERIFICATION
+      when: never
+    # A release runs the whole gate; the verification evidence records its results.
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+    - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -142,7 +150,11 @@ stages:
 
 .rules_main_mr_deps:
   rules:
-    - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
+    - if: $PUBLISH_VERIFICATION
+      when: never
+    # A release runs the whole gate; the verification evidence records its results.
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+    - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'

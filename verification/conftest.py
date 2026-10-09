@@ -25,6 +25,17 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 
+def pytest_configure(config):
+    """Turn the deprecation warnings DataEval itself raises into errors (NFR-1).
+
+    pyproject.toml silences DeprecationWarning for the unit tests. Drop that here so the verification suite sees
+    them, and fail on the ones attributed to ``dataeval`` rather than on every dependency's own deprecations.
+    """
+    for namespace in (config.option, config.known_args_namespace):
+        namespace.pythonwarnings = [w for w in namespace.pythonwarnings or [] if w != "ignore::DeprecationWarning"]
+    config.addinivalue_line("filterwarnings", "error::DeprecationWarning:dataeval.*")
+
+
 # ---------------------------------------------------------------------------
 # Collect per-phase reports so we can determine the final status of each item
 # ---------------------------------------------------------------------------
