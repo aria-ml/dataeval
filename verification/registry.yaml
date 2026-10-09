@@ -799,10 +799,10 @@ test_cases:
     expect: Each public module defines `__all__`.
     tests:
     - types::test_public_modules_have_all
-  - do: Review the `pyright` CI jobs.
+  - do: Review the `typecheck` CI jobs.
     expect: '`pyright --verifytypes` reports more than 90% completeness and `pyright` passes on `src/` and `tests/`.'
     tests:
-    - 'CI: pyright'
+    - 'CI: typecheck'
     - 'NEW: verifytypes completeness gate in verification'
 - id: 24-1
   req: NFR-4

@@ -189,3 +189,29 @@ class TestParametrizedEvidence:
 
     def test_a_prefix_of_another_name_does_not_match(self):
         assert gen.evidence_status("t.py::A::test", self.NODES, None) == "pending"
+
+
+class TestCitedCiJobs:
+    def test_every_cited_ci_job_exists_in_the_ci_config(self):
+        import re
+
+        import yaml
+
+        class Loader(yaml.SafeLoader):
+            """GitLab CI uses custom tags such as !reference that SafeLoader rejects."""
+
+        Loader.add_multi_constructor("!", lambda *_: None)
+        jobs: set[str] = set()
+        for path in [ROOT / ".gitlab-ci.yml", *sorted((ROOT / ".gitlab").glob("**/*.yml"))]:
+            doc = yaml.load(path.read_text(), Loader=Loader)
+            if isinstance(doc, dict):
+                jobs |= {k for k in doc if isinstance(k, str) and not k.startswith(".")}
+        registry = gen.load_registry()
+        cited = {
+            re.sub(r"\s*\[.*\]$", "", ref[3:].strip())
+            for tc in registry["test_cases"]
+            for step in tc["steps"]
+            for ref in step["tests"]
+            if ref.startswith("CI:")
+        }
+        assert cited <= jobs, f"CI jobs cited in the registry but not defined in the CI config: {sorted(cited - jobs)}"
