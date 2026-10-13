@@ -48,7 +48,7 @@ class TestMaterializeTargetAttrs:
         assert _is_protocol_instance(proxy, ObjectDetectionTarget)
 
     def test_a_property_backed_segmentation_target_still_surfaces_its_mask(self):
-        """ClassFilter wraps segmentation targets in MaskedTarget too, and SegmentationTarget's
+        """Filter wraps segmentation targets in MaskedTarget too, and SegmentationTarget's
         ``mask`` member is not among ObjectDetectionTarget's -- it needs its own probe.
         """
 

@@ -175,7 +175,7 @@ class TestTheTargetProtocolsStayInstanceCheckable:
     (``maite>=0.9.4``): 0.9.x leaves ``MultiobjectTrackingTarget`` un-``runtime_checkable``
     and 0.10 wraps both in ``Annotated[..., Is[...]]``. Either way ``isinstance`` raises
     :class:`TypeError` for *every* object handed to it, so the whole task-dispatch layer
-    (``detect_task``, ``dataeval.utils.data``, ``ClassFilter``, ``Relabel``, ...)
+    (``detect_task``, ``dataeval.utils.data``, ``Filter``, ``Relabel``, ...)
     fails closed on every dataset rather than on non-conforming ones.
 
     Mirroring is only safe while the members match, so these pin them to MAITE's.
@@ -224,7 +224,7 @@ class TestTheTargetProtocolsStayInstanceCheckable:
         assert not isinstance(np.zeros(3), protocols.ObjectDetectionTarget)
 
     def test_a_union_of_targets_is_instance_checkable(self):
-        """``isinstance(t, A | B)`` is how ClassFilter and ClassBalance ask the question."""
+        """``isinstance(t, A | B)`` is how Filter and ClassBalance ask the question."""
 
         class Detection:
             boxes = np.zeros((2, 4))

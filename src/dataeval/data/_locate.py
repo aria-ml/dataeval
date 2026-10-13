@@ -143,7 +143,7 @@ class SourceItem:
 
         Equal to :attr:`item_index` unless the locator was built over a
         :class:`~dataeval.data.View`, in which case operations such as
-        :class:`~dataeval.data.Shuffle` and :class:`~dataeval.data.ClassFilter` have
+        :class:`~dataeval.data.Shuffle` and :class:`~dataeval.data.Filter` have
         renumbered positions and this is the position before any of them did. Use it to
         trace a finding back to a file on disk; use :attr:`item_index` to index the object
         you measured.

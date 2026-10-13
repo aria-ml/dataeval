@@ -186,7 +186,7 @@ def _is_protocol_instance(obj: Any, protocol: type[_TProtocol]) -> TypeIs[_TProt
       :class:`AttributeError` escapes the type test rather than making it answer False --
       a raising ``boxes`` turns ``isinstance`` into a ``ValueError`` on 3.11 --
       and a getter that does real work (as the masking proxies behind
-      :class:`~dataeval.data.ClassFilter` do, filtering detections on every read) does it
+      :class:`~dataeval.data.Filter` do, filtering detections on every read) does it
       again for the type test.
     - ``hasattr`` is answered by anything that fabricates attributes on demand, so an
       attribute-fabricating stand-in lands on whichever task is checked first.

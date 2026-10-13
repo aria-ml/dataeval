@@ -35,7 +35,7 @@
 # %% [markdown]
 # ```{note}
 # The dataset-view API is {class}`.View`, built from an ordered pipeline of
-# {class}`.Operation` steps (such as {class}`.Relabel`, {class}`.ClassFilter`, and
+# {class}`.Operation` steps (such as {class}`.Relabel`, {class}`.Filter`, and
 # {class}`.Limit`).
 # ```
 

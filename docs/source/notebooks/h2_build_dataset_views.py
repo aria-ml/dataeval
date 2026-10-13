@@ -64,7 +64,7 @@ import numpy as np
 from maite_datasets.image_classification import MNIST
 
 from dataeval.config import set_seed
-from dataeval.data import ClassFilter, Limit, Operation, Relabel, Shuffle, View
+from dataeval.data import Filter, Limit, Operation, Relabel, Shuffle, View
 
 set_seed(0)  # For reproducibility
 
@@ -87,7 +87,7 @@ print("source vocabulary:", mnist.metadata.get("index2label"))
 # untouched.
 
 # %%
-view = View(mnist, operations=[ClassFilter([0, 1]), Limit(500)])
+view = View(mnist, operations=[Filter(classes=[0, 1]), Limit(500)])
 
 print("view size:", len(view))
 print("source is unchanged:", len(mnist))
@@ -106,11 +106,11 @@ assert len(mnist) == 10000
 # two operations in opposite orders answer different questions.
 
 # %%
-limit_then_filter = View(mnist, operations=[Limit(500), ClassFilter([0, 1])])
-filter_then_limit = View(mnist, operations=[ClassFilter([0, 1]), Limit(500)])
+limit_then_filter = View(mnist, operations=[Limit(500), Filter(classes=[0, 1])])
+filter_then_limit = View(mnist, operations=[Filter(classes=[0, 1]), Limit(500)])
 
-print("Limit(500) -> ClassFilter([0, 1]):", len(limit_then_filter), "(0s and 1s *within* the first 500)")
-print("ClassFilter([0, 1]) -> Limit(500):", len(filter_then_limit), "(the first 500 0s and 1s)")
+print("Limit(500) -> Filter(classes=[0, 1]):", len(limit_then_filter), "(0s and 1s *within* the first 500)")
+print("Filter(classes=[0, 1]) -> Limit(500):", len(filter_then_limit), "(the first 500 0s and 1s)")
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -151,13 +151,13 @@ def source_digits(v: View) -> list[int]:
     return sorted({int(np.argmax(mnist[i][1])) for i in v.resolve_indices()})
 
 
-relabel_first = View(mnist, operations=[Relabel(parity, EVEN_ODD), ClassFilter([0])])
-filter_first = View(mnist, operations=[ClassFilter([0]), Relabel(parity, EVEN_ODD)])
+relabel_first = View(mnist, operations=[Relabel(parity, EVEN_ODD), Filter(classes=[0])])
+filter_first = View(mnist, operations=[Filter(classes=[0]), Relabel(parity, EVEN_ODD)])
 
 print("vocabulary after Relabel:", relabel_first.metadata.get("index2label"))
 print()
-print("Relabel -> ClassFilter([0]):", len(relabel_first), "images, source digits", source_digits(relabel_first))
-print("ClassFilter([0]) -> Relabel:", len(filter_first), "images, source digits", source_digits(filter_first))
+print("Relabel -> Filter(classes=[0]):", len(relabel_first), "images, source digits", source_digits(relabel_first))
+print("Filter(classes=[0]) -> Relabel:", len(filter_first), "images, source digits", source_digits(filter_first))
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -169,8 +169,8 @@ assert len(relabel_first) > len(filter_first)
 
 # %% [markdown]
 # The same two operations in the opposite order give very different results. With `Relabel`
-# first, `ClassFilter([0])` reads each datum *through* it, so class `0` means the **new**
-# vocabulary's `even` — every even digit is kept. With `ClassFilter` first, class `0` still
+# first, `Filter(classes=[0])` reads each datum *through* it, so class `0` means the **new**
+# vocabulary's `even` — every even digit is kept. With `Filter` first, class `0` still
 # means the source digit `zero`, so only zeros survive.
 
 # %% [markdown]
@@ -236,7 +236,7 @@ assert np.array_equal(np.asarray(custom[0][0]), 255 - np.asarray(mnist[0][0]))
 #
 # | operation | what it does |
 # | --- | --- |
-# | {class}`.ClassFilter` | keep datums containing one of the given classes (and mask other detections for object detection) |
+# | {class}`.Filter` | keep datums matching classes and/or a metadata-factor predicate, and drop the detections or tracks that do not match |
 # | {class}`.ClassBalance` | resample to a balanced class distribution, optionally to a target size |
 # | {class}`.Limit` | cap to the first *n* of the current selection |
 # | {class}`.Shuffle` | randomize order, optionally seeded |
@@ -251,7 +251,7 @@ assert np.array_equal(np.asarray(custom[0][0]), 255 - np.asarray(mnist[0][0]))
 # metadata alongside derived datasets.
 
 # %%
-nested = View(View(mnist, [ClassFilter([0, 1])]), [Limit(25)])
+nested = View(View(mnist, [Filter(classes=[0, 1])]), [Limit(25)])
 
 print("operations, innermost first:", nested.operation_groups)
 print("original dataset:", type(nested.root).__name__)

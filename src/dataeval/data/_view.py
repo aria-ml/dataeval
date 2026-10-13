@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any, TypeVar
 
+from dataeval.data._reads import Reads, skeleton
 from dataeval.flags import ImageStats
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
@@ -148,7 +149,7 @@ class View(AnnotatedDataset[_TDatum]):
         ``__getitem__`` and ``__len__`` -- is accepted, including a bare,
         image-only dataset. A target-bearing (annotated) dataset is only
         required when an applied operation reads per-datum targets, i.e. when an
-        operation declares :attr:`Operation.requires` (e.g. :class:`ClassFilter`,
+        operation declares :attr:`Operation.requires` (e.g. :class:`Filter`,
         :class:`ClassBalance`, :class:`Relabel`). Target-free operations such as
         :class:`Limit`, :class:`Shuffle`, :class:`Reverse`, and :class:`Indices`
         operate on a plain dataset. Operations that need targets trigger an
@@ -161,7 +162,7 @@ class View(AnnotatedDataset[_TDatum]):
     Notes
     -----
     Operations are applied strictly in the order provided, each one seeing the result
-    of the previous. Order is therefore meaningful — ``[Relabel(...), ClassFilter([0])]``
+    of the previous. Order is therefore meaningful — ``[Relabel(...), Filter(classes=[0])]``
     filters on the *relabeled* classes, while the reverse filters on the source ones,
     and ``[Limit(1000), Shuffle(), Limit(100)]`` keeps a random 100 of the first 1000.
 
@@ -174,19 +175,26 @@ class View(AnnotatedDataset[_TDatum]):
 
     Examples
     --------
-    >>> from dataeval.data import View, ClassFilter, Limit
+    >>> from dataeval.data import View, Filter, Limit
 
-    >>> view = View(dataset, [ClassFilter(classes=[0, 2]), Limit(size=5)])
+    >>> view = View(dataset, [Filter(classes=[0, 2]), Limit(size=5)])
     >>> print(view)  # doctest: +SKIP
     View Dataset
     ------------
-        Operations: [ClassFilter(classes=[0, 2], filter_detections=True), Limit(size=5)]
+        Operations: [Filter(where=None, classes=[0, 2], drop='both'), Limit(size=5)]
         Selected Size: 5
     """
 
     _dataset: Dataset[_TDatum]
     _operations: Sequence[Operation]
     selection: list[int]
+    _reads: dict[int, Any] | None = None
+    """Skeletons of this view's datums (see ``dataeval.data._reads``), keyed by source index.
+
+    Created by a :class:`Filter` given `where`, which structures every datum anyway; a :class:`Filter` given `classes`
+    alone keeps one current but never starts one. Read by :class:`~dataeval.Metadata` in place of the view. Keyed by
+    source index, so a change of `selection` never invalidates it; any new transform does.
+    """
 
     def __init__(
         self,
@@ -225,6 +233,7 @@ class View(AnnotatedDataset[_TDatum]):
     # -- levers an Operation uses ---------------------------------------------
     def map(self, fn: Transform, *, where: set[int] | None = None) -> None:
         """Register a per-datum content transform. ``where=None`` targets all indices."""
+        self._reads = None
         self._transforms.append(_Restricted(fn, where))
 
     def map_each(self, transforms: Mapping[int, Transform]) -> None:
@@ -245,7 +254,8 @@ class View(AnnotatedDataset[_TDatum]):
         Notes
         -----
         The step runs in registration order with the ones :meth:`map` registers. The mapping is copied, so changing
-        it afterwards changes nothing.
+        it afterwards changes nothing. Registering a transform clears the view's read cache, since it can change what
+        a read returns.
 
         Examples
         --------
@@ -258,6 +268,7 @@ class View(AnnotatedDataset[_TDatum]):
         >>> list(view)
         ['AB', 'cd', 'Ef']
         """
+        self._reads = None
         self._transforms.append(_EachIndex(transforms))
 
     def read(self, src_index: int) -> _TDatum:
@@ -266,6 +277,36 @@ class View(AnnotatedDataset[_TDatum]):
         for transform in self._transforms:
             datum = transform(src_index, datum)
         return datum
+
+    def _skeletons(self) -> list[Any]:
+        """Return the datums without their pixels, in selection order, starting or extending the read cache."""
+        reads = {} if self._reads is None else self._reads
+        for index in dict.fromkeys(self.selection):
+            if index not in reads:
+                reads[index] = skeleton(self.read(index))
+        self._reads = reads
+        return [reads[index] for index in self.selection]
+
+    def _structuring_source(self) -> Any:
+        """Return what :class:`~dataeval.Metadata` structures in place of this view: its cached reads if it has any.
+
+        A view with no cache answers itself, so building metadata never starts one.
+        """
+        return self if self._reads is None else Reads(self._skeletons(), self.metadata)
+
+    def _keep_reads(self, reads: dict[int, Any] | None, changed: Mapping[int, Transform]) -> None:
+        """Reinstate a read cache an operation's own transform cleared, pruned to the selection.
+
+        ``changed`` holds the transform the operation registered for each source index, applied here to that index's
+        skeleton. Only a transform that never reads ``datum[0]`` may be passed, since a skeleton holds no pixels.
+        """
+        if reads is None:
+            return
+        kept = {index: reads[index] for index in dict.fromkeys(self.selection) if index in reads}
+        for index, transform in changed.items():
+            if index in kept:
+                kept[index] = transform(kept[index])
+        self._reads = kept
 
     # -- dataset interface ----------------------------------------------------
     @property
@@ -339,6 +380,12 @@ class View(AnnotatedDataset[_TDatum]):
         sep = "-" * len(title)
         operations = f"Operations: [{', '.join(str(op) for op in self._operations)}]"
         return f"{title}\n{sep}{nt}{operations}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Pickle without the read cache, so a DataLoader worker is not sent every target."""
+        state = self.__dict__.copy()
+        state["_reads"] = None
+        return state
 
     def resolve_indices(self, indices: int | SourceIndex | Sequence[int | SourceIndex] | None = None) -> list[int]:
         """
