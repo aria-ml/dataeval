@@ -81,7 +81,7 @@ requirements:
   description: DataEval shall let a user narrow, reorder, or rebalance a MAITE dataset without copying it and without
     losing MAITE compatibility.
   criteria:
-  - '`View` applies an ordered sequence of operations (`Limit`, `Indices`, `Shuffle`, `Reverse`, `ClassFilter`,
+  - '`View` applies an ordered sequence of operations (`Limit`, `Indices`, `Shuffle`, `Reverse`, `Filter`,
     `ClassBalance`) lazily and composes them in the order given.'
   - '`Shuffle` is reproducible for a given seed.'
   - A `View` is sized, iterable, and integer-indexable, and is itself a valid dataset for every evaluator.
@@ -399,7 +399,7 @@ test_cases:
     tests:
     - sel::test_select_with_shuffle
     - sel::test_shuffle_is_reproducible_for_fixed_seed
-  - do: Apply `ClassFilter` and `ClassBalance` to a labeled dataset.
+  - do: Apply `Filter` and `ClassBalance` to a labeled dataset.
     expect: Only the requested classes remain, and the class counts are balanced.
     tests:
     - sel::test_class_filter_and_class_balance_on_labeled_dataset

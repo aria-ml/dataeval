@@ -561,3 +561,31 @@ def test_a_multi_column_predicate_is_rejected(get_od_dataset):
     metadata._structure()
     with pytest.raises(ValueError, match="must answer one column"):
         evaluate(metadata._store, metadata._item_level, pl.col("a", "b"))
+
+
+@pytest.mark.required
+class TestEvaluateNanAsNull:
+    """A NaN is a missing value to Filter, while Metadata.where keeps polars' ordering of NaN above every number."""
+
+    @staticmethod
+    def _store():
+        md = Metadata.from_factors({"t": np.array([0.0, np.nan, 1.0])})
+        return md._store, md.item_level
+
+    def test_nan_matches_a_comparison_by_default(self):
+        from dataeval._metadata._filters import evaluate
+
+        store, level = self._store()
+        assert evaluate(store, level, pl.col("t") > 0.6).tolist() == [False, True, True]
+
+    def test_nan_as_null_never_matches(self):
+        from dataeval._metadata._filters import evaluate
+
+        store, level = self._store()
+        assert evaluate(store, level, pl.col("t") > 0.6, nan_as_null=True).tolist() == [False, False, True]
+
+    def test_nan_as_null_is_null(self):
+        from dataeval._metadata._filters import evaluate
+
+        store, level = self._store()
+        assert evaluate(store, level, pl.col("t").is_null(), nan_as_null=True).tolist() == [False, True, False]

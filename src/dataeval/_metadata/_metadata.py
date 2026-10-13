@@ -4706,11 +4706,18 @@ class Metadata(Array, FeatureExtractor):
         if self._dataset is None:
             raise NotFittedError("No dataset bound. Call bind() first.")
 
-        structurer = select_structurer(self._dataset, self._task, partial_factors=self._partial_factors)
-        datum_count = len(self._dataset) if isinstance(self._dataset, Sized) else 0
+        # A view a Filter(where=...) has structured holds its datums without their pixels; structuring those reads
+        # nothing again. Duck-typed, so this module never imports dataeval.data, and looked up on the class, so a
+        # wrapper whose __getattr__ forwards to a view inside it is not mistaken for that view.
+        dataset: Any = self._dataset
+        source = getattr(type(dataset), "_structuring_source", None)
+        if source is not None:
+            dataset = source(dataset)
+        structurer = select_structurer(dataset, self._task, partial_factors=self._partial_factors)
+        datum_count = len(dataset)
         _logger.info("Processing metadata for %d dataset items using %r", datum_count, structurer)
 
-        data = structurer.build(self._dataset, progress_callback=progress_callback)
+        data = structurer.build(dataset, progress_callback=progress_callback)
 
         unique_labels = np.unique(data.class_labels) if len(data.class_labels) else np.array([], dtype=np.intp)
         self._index2label = build_index2label(self._dataset.metadata.get("index2label", None), unique_labels)

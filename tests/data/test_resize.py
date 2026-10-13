@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from dataeval.data import ClassFilter, Resize, View
+from dataeval.data import Filter, Resize, View
 from dataeval.flags import ImageStats
 from dataeval.protocols import DatasetMetadata
 
@@ -253,8 +253,8 @@ class TestResizeInvalidates:
 class TestResizeComposition:
     def test_composes_with_classfilter_in_either_order(self):
         boxes = [[4.0, 4.0, 8.0, 8.0], [12.0, 4.0, 16.0, 8.0]]
-        before = View(_ODDataset((20, 40), boxes, [0, 1], n=3), [Resize((10, 10)), ClassFilter(classes=[0])])
-        after = View(_ODDataset((20, 40), boxes, [0, 1], n=3), [ClassFilter(classes=[0]), Resize((10, 10))])
+        before = View(_ODDataset((20, 40), boxes, [0, 1], n=3), [Resize((10, 10)), Filter(classes=[0])])
+        after = View(_ODDataset((20, 40), boxes, [0, 1], n=3), [Filter(classes=[0]), Resize((10, 10))])
         assert before.selection == after.selection
         assert _boxes_of(before) == _boxes_of(after)
 

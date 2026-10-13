@@ -37,7 +37,7 @@ class SelectionInfo(BaseModel):
     Attributes
     ----------
     type : str
-        Operation class name (e.g. ``"ClassFilter"``, ``"Limit"``, ``"Indices"``).
+        Operation class name (e.g. ``"Filter"``, ``"Limit"``, ``"Indices"``).
     params : dict
         Keyword arguments passed to the operation's constructor.
     """

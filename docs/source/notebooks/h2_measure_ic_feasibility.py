@@ -65,7 +65,7 @@ from maite_datasets.image_classification import MNIST
 from dataeval import Embeddings, Metadata
 from dataeval.config import set_seed
 from dataeval.core import ber_mst
-from dataeval.data import ClassBalance, ClassFilter, View
+from dataeval.data import ClassBalance, Filter, View
 from dataeval.extractors import FlattenExtractor
 
 set_seed(42)  # For reproducibility
@@ -121,7 +121,7 @@ assert 0.92 < 1 - ber_all["upper_bound"] < 0.95
 # same 6,000-image budget concentrated on fewer classes, balance to 2,000 per class.
 
 # %%
-digits_149 = View(mnist, operations=[ClassFilter((1, 4, 9)), ClassBalance("interclass", num_samples=6000)])
+digits_149 = View(mnist, operations=[Filter(classes=(1, 4, 9)), ClassBalance("interclass", num_samples=6000)])
 embeddings_149 = Embeddings(digits_149, extractor=extractor, batch_size=64)
 labels_149 = Metadata(digits_149).class_labels
 print("Label counts:", np.unique(labels_149, return_counts=True))

@@ -1,4 +1,6 @@
 import pickle
+import subprocess
+import sys
 from dataclasses import dataclass
 from typing import NamedTuple
 from unittest.mock import MagicMock
@@ -8,6 +10,7 @@ import pytest
 from numpy.typing import NDArray
 
 from dataeval import Metadata
+from dataeval.data import Filter
 from dataeval.data._classfilter import ClassFilter
 from dataeval.data._view import View
 from dataeval.protocols import ObjectDetectionTarget
@@ -351,3 +354,41 @@ class TestPickle:
         copy = pickle.loads(pickle.dumps(view))
         assert copy.selection == view.selection == [0, 2]
         assert copy[0][1].labels.tolist() == view[0][1].labels.tolist() == [0, 0]
+
+
+@pytest.mark.required
+class TestClassFilterShim:
+    def test_it_is_a_filter(self):
+        assert isinstance(ClassFilter([0]), Filter)
+
+    def test_the_deprecation_names_the_replacement(self):
+        assert "Filter(classes=...)" in getattr(ClassFilter, "__deprecated__")  # noqa: B009
+
+    def test_it_warns_once_per_process(self):
+        # In a subprocess: the decorator warns once per process, so under xdist an earlier ClassFilter in the same
+        # worker would make an in-process assertion depend on test order.
+        code = (
+            "import warnings\n"
+            "from dataeval.data import ClassFilter\n"
+            "from dataeval.exceptions import DeprecatedWarning\n"
+            "with warnings.catch_warnings(record=True) as caught:\n"
+            "    warnings.simplefilter('always')\n"
+            "    ClassFilter([0]); ClassFilter([1])\n"
+            "print(sum(issubclass(w.category, DeprecatedWarning) for w in caught))\n"
+        )
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+        assert result.stdout.strip() == "1"
+
+    def test_an_empty_class_list_keeps_everything(self, od_dataset):
+        dataset = od_dataset([[0], [1]], {0: "a", 1: "b"})
+        assert View(dataset, ClassFilter([])).selection == [0, 1]
+
+    def test_the_repr_is_unchanged(self):
+        assert repr(ClassFilter((0, 1))) == "ClassFilter(classes=(0, 1), filter_detections=True)"
+
+    @pytest.mark.parametrize(("filter_detections", "drop"), [(True, "both"), (False, "items")])
+    def test_filter_detections_maps_to_drop(self, filter_detections, drop):
+        assert ClassFilter([0], filter_detections).drop == drop
+
+    def test_it_now_filters_tracking_data(self, factor_videos):
+        assert View(factor_videos, ClassFilter([1])).selection == [0, 2]

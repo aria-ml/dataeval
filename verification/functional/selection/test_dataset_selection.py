@@ -8,7 +8,7 @@ import numpy as np
 
 
 class TestDatasetSelection:
-    """Verify View, Indices, Limit, Shuffle, Reverse, and ClassFilter."""
+    """Verify View, Indices, Limit, Shuffle, Reverse, and Filter."""
 
     def test_select_with_limit(self):
         from dataeval.data import Limit, View
@@ -86,7 +86,7 @@ class TestDatasetSelection:
         assert order(8) != first
 
     def test_class_filter_and_class_balance_on_labeled_dataset(self):
-        from dataeval.data import ClassBalance, ClassFilter, View
+        from dataeval.data import ClassBalance, Filter, View
         from verification.helpers import SimpleICDataset
 
         labels = np.array([0] * 30 + [1] * 10 + [2] * 20)
@@ -96,7 +96,7 @@ class TestDatasetSelection:
         def classes_of(view):
             return np.array([int(np.argmax(view[i][1])) for i in range(len(view))])
 
-        filtered = classes_of(View(dataset, ClassFilter([0, 2])))
+        filtered = classes_of(View(dataset, Filter(classes=[0, 2])))
         assert len(filtered) == 50
         assert set(filtered) == {0, 2}
 

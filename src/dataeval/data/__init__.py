@@ -9,6 +9,7 @@ __all__ = [
     "DatasetSplits",
     "DetectionCrops",
     "EvenlySpaced",
+    "Filter",
     "FrameCandidate",
     "FrameIndices",
     "FrameInput",
@@ -47,6 +48,7 @@ from dataeval.data._classbalance import ClassBalance
 from dataeval.data._classfilter import ClassFilter
 from dataeval.data._crop import Crop
 from dataeval.data._crops import DetectionCrops
+from dataeval.data._filter import Filter
 from dataeval.data._frames import SequenceFrames
 from dataeval.data._indices import Indices
 from dataeval.data._limit import Limit

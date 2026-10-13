@@ -72,7 +72,9 @@ def _reject_unreadable_columns(store: LevelStore, level: FactorLevel, predicate:
     raise ValueError(f"Cannot evaluate this predicate on {level!r} rows: " + "; ".join(reasons) + ".")
 
 
-def evaluate(store: LevelStore, level: FactorLevel, predicate: pl.Expr) -> NDArray[np.bool_]:
+def evaluate(
+    store: LevelStore, level: FactorLevel, predicate: pl.Expr, *, nan_as_null: bool = False
+) -> NDArray[np.bool_]:
     """Answer ``predicate`` once per row at ``level``.
 
     Evaluated against the *resolved* frame, so a predicate may read any factor defined at
@@ -92,6 +94,11 @@ def evaluate(store: LevelStore, level: FactorLevel, predicate: pl.Expr) -> NDArr
         Level supplying the rows.
     predicate : pl.Expr
         A polars expression answering one boolean per row.
+    nan_as_null : bool, default False
+        Read a NaN in any float column the predicate reads as null, so that it never matches.
+        polars orders NaN above every number, so without this ``t > 0.6`` matches a NaN while
+        ``t IS NULL`` misses it. :class:`dataeval.data.Filter` asks for this;
+        :meth:`~dataeval.Metadata.where` and :meth:`~dataeval.Metadata.having` do not.
 
     Returns
     -------
@@ -109,6 +116,8 @@ def evaluate(store: LevelStore, level: FactorLevel, predicate: pl.Expr) -> NDArr
     # holds — each ancestor factor gathered down, the rest typed nulls — to answer a
     # comparison against one of them, which is the cost ``select`` exists to avoid.
     given = store.select(level, names) if names else store.resolve(level)
+    if nan_as_null:
+        given = given.with_columns(pl.col(pl.Float32, pl.Float64).fill_nan(None))
     answered_frame = given.select(predicate.fill_null(value=False))
     if answered_frame.width != 1:
         raise ValueError(
