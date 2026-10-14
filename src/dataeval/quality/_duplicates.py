@@ -46,13 +46,17 @@ from dataeval.protocols import (
     _optional_attr,
 )
 from dataeval.quality._shared import (
+    IMAGE_LEVEL_NAMES,
     LABEL_KIND,
+    TRACKING_LEVEL_NAMES,
+    LevelPlan,
     checked_compute_stats,
     checked_sole_metadata,
     drop_null_index_columns,
     get_dataset_step_from_idx,
     is_metadata,
     reported_level,
+    resolve_levels,
 )
 from dataeval.types import (
     ClusterConfigMixin,
@@ -2153,15 +2157,6 @@ def _aligned_track_map(
     return aligned
 
 
-#: Which level names each task understands. Image spellings are the ones that shipped; a tracking
-#: dataset uses the names :class:`~dataeval.Metadata` gives its levels.
-_IMAGE_LEVEL_NAMES = ("item", "target")
-_TRACKING_LEVEL_NAMES = ("sequence", "unit", "track", "instance")
-
-#: Levels whose relations are read from per-detection crop hashes rather than whole frames.
-_TARGET_LEVELS = frozenset({"target", "instance", "track"})
-
-
 class _DetectionPolicy(NamedTuple):
     """Everything that decides what a pass of hash-based detection looks for.
 
@@ -2194,74 +2189,6 @@ class _Relations(NamedTuple):
     def empty(cls) -> "_Relations":
         """Return the nothing-found result, which is what a cluster-only run reports."""
         return cls([], [], [], [], [], [], [], _SharedStretches([], []), _TrackRelations([], []))
-
-
-class _LevelPlan(NamedTuple):
-    """Which levels to report, and the statistics that reporting them needs.
-
-    ``levels`` and ``per_image``/``per_target`` are two spellings of one thing -- one names the
-    answers wanted, the other the measurements taken -- so this resolves whichever was given into
-    both. Passing both spellings at once is refused rather than reconciled.
-    """
-
-    per_image: bool
-    per_target: bool
-    levels: frozenset[str]
-
-
-def _resolve_levels(
-    levels: str | Sequence[str] | None,
-    per_image: bool | None,
-    per_target: bool | None,
-    tracking: bool,
-) -> _LevelPlan:
-    """Resolve the requested levels and the statistics they need.
-
-    Raises
-    ------
-    ValueError
-        If both spellings are given, or a level name is not one this task has.
-    """
-    names = _TRACKING_LEVEL_NAMES if tracking else _IMAGE_LEVEL_NAMES
-    if levels is not None and (per_image is not None or per_target is not None):
-        raise ValueError(
-            "Duplicates.evaluate: pass either `levels` or `per_image`/`per_target`, not both -- "
-            "they are two spellings of one thing, and reconciling them silently would hide "
-            f"whichever lost. `levels` for this dataset accepts {list(names)}."
-        )
-    if levels is None:
-        return _implied_levels(bool(per_image if per_image is not None else True), bool(per_target), tracking)
-
-    wanted = frozenset([levels] if isinstance(levels, str) else levels)
-    unknown = sorted(wanted - set(names))
-    if unknown:
-        raise ValueError(
-            f"Duplicates.evaluate: {unknown} {'is' if len(unknown) == 1 else 'are'} not a level of "
-            f"{'a tracking' if tracking else 'an image'} dataset; it accepts {list(names)}."
-        )
-    if not wanted:
-        raise ValueError("Duplicates.evaluate: `levels` must name at least one level.")
-    # Frames are the substrate every tracking relation is built on -- a track is found among the
-    # detections of frames, and the frame map that places them is built either way -- so they are
-    # always measured. What `levels` decides there is which of them are reported.
-    return _LevelPlan(
-        per_image=True if tracking else bool(wanted - _TARGET_LEVELS),
-        per_target=bool(wanted & _TARGET_LEVELS),
-        levels=wanted,
-    )
-
-
-def _implied_levels(per_image: bool, per_target: bool, tracking: bool) -> _LevelPlan:
-    """Resolve the older spelling, reproducing what each combination reports today."""
-    if tracking:
-        levels = {"sequence", "unit"} if per_image else set()
-        if per_target:
-            levels |= {"instance", "track"}
-    else:
-        levels = {"item"} if per_image else set()
-        if per_target:
-            levels |= {"target"}
-    return _LevelPlan(per_image=per_image, per_target=per_target, levels=frozenset(levels))
 
 
 def _find_relations(
@@ -3064,7 +2991,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         self.segment_offset_tolerance = segment_offset_tolerance
         self.verify_alignment = verify_alignment
         self.min_track_frames = min_track_frames
-        default = _TRACKING_LEVEL_NAMES if frame_map is not None else _IMAGE_LEVEL_NAMES
+        default = TRACKING_LEVEL_NAMES if frame_map is not None else IMAGE_LEVEL_NAMES
         self.levels: frozenset[str] = frozenset(default) if levels is None else levels
         self.frame_map = frame_map
         self.track_map = track_map
@@ -4336,7 +4263,7 @@ class Duplicates(Evaluator):
             stacklevel=3,
         )
 
-    def _detection_policy(self, plan: _LevelPlan) -> _DetectionPolicy:
+    def _detection_policy(self, plan: LevelPlan) -> _DetectionPolicy:
         """Bundle every knob one pass of detection consults."""
         return _DetectionPolicy(
             levels=plan.levels,
@@ -4786,7 +4713,7 @@ class Duplicates(Evaluator):
 
         tracking = _yields_frames(data) or any(_yields_frames(dataset) for dataset in other)
         self._warn_default_radius(tracking)
-        plan = _resolve_levels(levels, per_image, per_target, tracking)
+        plan = resolve_levels(levels, per_image, per_target, tracking, caller="Duplicates.evaluate")
 
         if other:
             return self._evaluate_multi([data, *other], plan)
@@ -4807,7 +4734,7 @@ class Duplicates(Evaluator):
             raise ValueError("Duplicates.evaluate: metadata evaluation supports only one dataset.")
         if not duplicate_factors:
             raise ValueError("Duplicates.evaluate: metadata evaluation requires `duplicate_factors`.")
-        plan = _resolve_levels(levels, per_image, per_target, tracking=False)
+        plan = resolve_levels(levels, per_image, per_target, tracking=False, caller="Duplicates.evaluate")
         if plan.levels != frozenset({"item"}):
             raise ValueError(
                 f"Duplicates.evaluate: metadata evaluation supports only the 'item' level, got {sorted(plan.levels)}."
@@ -4842,7 +4769,7 @@ class Duplicates(Evaluator):
     def _evaluate_single(
         self,
         data: _DatasetInput,
-        plan: _LevelPlan,
+        plan: LevelPlan,
         factor_groups: MethodGroups | None = None,
         factor_cardinality: Mapping[str, int] | None = None,
     ) -> SingleDuplicatesOutput:
@@ -4951,7 +4878,7 @@ class Duplicates(Evaluator):
             factor_cardinality=factor_cardinality,
         )
 
-    def _evaluate_multi(self, datasets: Sequence[_DatasetInput], plan: _LevelPlan) -> MultiDuplicatesOutput:
+    def _evaluate_multi(self, datasets: Sequence[_DatasetInput], plan: LevelPlan) -> MultiDuplicatesOutput:
         """Multi-dataset evaluate: compute stats per dataset, then combine."""
         has_hash_detection = bool(self.flags & ImageStats.HASH)
         has_cluster_detection = self.extractor is not None and self.cluster_sensitivity is not None

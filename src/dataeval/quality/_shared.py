@@ -4,7 +4,7 @@ __all__ = []
 
 import warnings
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, NamedTuple
 
 import polars as pl
 
@@ -19,6 +19,104 @@ from dataeval.types import FactorLevel, SourceIndex
 # unstated level under a key resolves here on every task, so the evaluators can name the
 # label end without a dataset to resolve against.
 LABEL_KIND = "instance"
+
+#: Which level names each task understands. Image spellings are the ones that shipped; a tracking
+#: dataset uses the names :class:`~dataeval.Metadata` gives its levels.
+IMAGE_LEVEL_NAMES = ("item", "target")
+TRACKING_LEVEL_NAMES = ("sequence", "unit", "track", "instance")
+
+#: Levels measured per detection rather than per whole frame.
+TARGET_LEVELS = frozenset({"target", "instance", "track"})
+
+
+class LevelPlan(NamedTuple):
+    """Which levels to report, and the statistics that reporting them needs.
+
+    ``levels`` and ``per_image``/``per_target`` are two spellings of one thing -- one names the
+    answers wanted, the other the measurements taken -- so this resolves whichever was given into
+    both. Passing both spellings at once is refused rather than reconciled.
+    """
+
+    per_image: bool
+    per_target: bool
+    levels: frozenset[str]
+
+
+def resolve_levels(
+    levels: str | Sequence[str] | None,
+    per_image: bool | None,
+    per_target: bool | None,
+    tracking: bool,
+    *,
+    caller: str,
+    subject: str = "dataset",
+) -> LevelPlan:
+    """Resolve the requested levels and the statistics they need.
+
+    Parameters
+    ----------
+    levels : str or Sequence[str] or None
+        The levels asked for by name, or None to derive them from the flags.
+    per_image, per_target : bool or None
+        The flags spelling of the same request. None means not given.
+    tracking : bool
+        Whether the data is tracking data, which decides the names `levels` accepts.
+    caller : str
+        The ``Class.method`` that prefixes every message.
+    subject : str, default "dataset"
+        What the messages call the thing that was passed, for example "metadata".
+
+    Returns
+    -------
+    LevelPlan
+        The levels to report and the flags that measure them. Flags that name no level resolve
+        to an empty plan, which callers refuse before resolving.
+
+    Raises
+    ------
+    ValueError
+        If both spellings are given, `levels` is empty, or a level name is not one this task has.
+    """
+    names = TRACKING_LEVEL_NAMES if tracking else IMAGE_LEVEL_NAMES
+    if levels is not None and (per_image is not None or per_target is not None):
+        raise ValueError(
+            f"{caller}: pass either `levels` or `per_image`/`per_target`, not both -- "
+            "they are two spellings of one thing, and reconciling them silently would hide "
+            f"whichever lost. `levels` for this {subject} accepts {list(names)}."
+        )
+    if levels is None:
+        return _implied_levels(bool(per_image if per_image is not None else True), bool(per_target), tracking)
+
+    wanted = frozenset([levels] if isinstance(levels, str) else levels)
+    unknown = sorted(wanted - set(names))
+    if unknown:
+        raise ValueError(
+            f"{caller}: {unknown} {'is' if len(unknown) == 1 else 'are'} not a level of "
+            f"{'a tracking' if tracking else 'an image'} {subject}; it accepts {list(names)}."
+        )
+    if not wanted:
+        raise ValueError(f"{caller}: `levels` must name at least one level.")
+    # Frames are the substrate every tracking relation is built on -- a track is found among the
+    # detections of frames, and the frame map that places them is built either way -- so they are
+    # always measured. What `levels` decides there is which of them are reported.
+    return LevelPlan(
+        per_image=True if tracking else bool(wanted - TARGET_LEVELS),
+        per_target=bool(wanted & TARGET_LEVELS),
+        levels=wanted,
+    )
+
+
+def _implied_levels(per_image: bool, per_target: bool, tracking: bool) -> LevelPlan:
+    """Resolve the older spelling, reproducing what each combination reports today."""
+    if tracking:
+        levels = {"sequence", "unit"} if per_image else set()
+        if per_target:
+            levels |= {"instance", "track"}
+    else:
+        levels = {"item"} if per_image else set()
+        if per_target:
+            levels |= {"target"}
+    return LevelPlan(per_image=per_image, per_target=per_target, levels=frozenset(levels))
 
 
 def is_metadata(data: Any) -> bool:
@@ -236,6 +334,26 @@ def selected_by_flags(source_index: SourceIndex, per_image: bool, per_target: bo
     if kind == LABEL_KIND:
         return per_target
     return True
+
+
+def row_kinds(frame: pl.DataFrame) -> pl.Series:
+    """Return the kind of each row of a result frame, as :attr:`SourceIndex.kind` would report it.
+
+    A result frame states a level only for the rows between an item's own row and its labels, so the
+    two ends are told apart by ``target_index``: a key is one of an item's labels, no key is the item
+    itself. A column the frame no longer holds, because it was entirely null, reads as all null.
+    """
+    level = pl.col("level").cast(pl.Utf8) if "level" in frame.columns else pl.lit(None, dtype=pl.Utf8)
+    keyed = pl.col("target_index").is_not_null() if "target_index" in frame.columns else pl.lit(False)
+    kind = (
+        pl
+        .when(level.is_not_null())
+        .then(level)
+        .when(keyed)
+        .then(pl.lit(LABEL_KIND))
+        .otherwise(pl.lit(None, dtype=pl.Utf8))
+    )
+    return frame.with_columns(kind.alias("_kind"))["_kind"]
 
 
 def drop_null_index_columns(df: pl.DataFrame, columns: Sequence[str]) -> pl.DataFrame:

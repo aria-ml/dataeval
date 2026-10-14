@@ -1669,6 +1669,17 @@ class TestOutliersMultiDataset:
         assert isinstance(lenient.data(), pl.DataFrame)
         assert len(strict) >= len(lenient)
 
+    def test_evaluate_multi_dataset_per_target_numbers_every_dataset(self, get_od_dataset):
+        """Targets add rows per item, and each dataset still receives its own index and local item numbers."""
+        first, second = (
+            get_od_dataset(list(np.random.default_rng(seed).random((12, 3, 16, 16))), 2, True) for seed in (0, 1)
+        )
+        outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold=ZScoreThreshold(0.5))
+        frame = outliers.evaluate(first, second, per_target=True).data()
+
+        assert set(frame["dataset_index"]) == {0, 1}
+        assert all(index < 12 for index in frame["item_index"])
+
 
 @pytest.mark.required
 class TestOutliersPropertySingleDataset:
@@ -2059,11 +2070,11 @@ class TestOutliersOverMetadata:
         assert rows == [(9, "temperature", 45.0)]
 
     def test_a_track_is_judged_against_tracks(self):
-        result = Outliers().evaluate(self._tracked(), factors=["n_gaps"])
+        result = Outliers().evaluate(self._tracked(), factors=["n_gaps"], levels="track")
         assert SourceIndex(3, 1, "track") in result.outliers
 
     def test_track_labels_are_never_thresholded(self):
-        result = Outliers().evaluate(self._tracked())
+        result = Outliers().evaluate(self._tracked(), levels="track")
         assert "labels" not in set(result.data()["metric_name"].cast(pl.Utf8))
 
     def test_rebinning_does_not_change_the_result(self):
