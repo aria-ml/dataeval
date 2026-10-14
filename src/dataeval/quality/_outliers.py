@@ -1,6 +1,6 @@
 __all__ = []
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Generic, Literal, NamedTuple, Self, TypeVar, overload
 
 import numpy as np
@@ -22,12 +22,17 @@ from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, MetadataLik
 from dataeval.quality._factor_stats import eligible_factors, factor_stats
 from dataeval.quality._shared import (
     LABEL_KIND,
+    TARGET_LEVELS,
+    TRACKING_LEVEL_NAMES,
+    LevelPlan,
     add_dataset_index,
     checked_compute_stats,
     checked_sole_metadata,
     drop_null_index_columns,
     is_metadata,
     reported_level,
+    resolve_levels,
+    row_kinds,
     selected_by_flags,
 )
 from dataeval.types import (
@@ -124,9 +129,21 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         Preserved across re-detection calls unless overridden via
         :meth:`with_threshold`.
     dataset_steps : list[int] or None
-        Cumulative dataset boundaries for multi-dataset index remapping.
-        None for single-dataset output.
+        Cumulative image counts per dataset, used to number cluster rows. Statistics rows are
+        numbered by steps recomputed from `calculation_results`. None for single-dataset output.
+    restricted_to : frozenset[FactorLevel or None] or None
+        The kinds of row this output re-detects: None for an item's own row, ``"instance"`` for one of
+        its labels, otherwise a level name. None means every row. A level view, and a :meth:`~Outliers.from_stats`
+        result built with ``per_image=False`` or ``per_target=False``, set it, so re-detection
+        reproduces the rows the result describes.
+    tracking : bool
+        Whether the result describes tracking data, which decides what the level views select.
     """
+
+    # Class-level defaults, not set only in __init__: an output pickled before these existed has
+    # no such instance attribute, and DataFrameOutput.__getattr__ refuses names starting with "_".
+    restricted_to: frozenset[FactorLevel | None] | None = None
+    tracking: bool = False
 
     def __init__(
         self,
@@ -137,6 +154,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         cluster_stats: ClusterStats | None = None,
         cluster_threshold: ThresholdLike | None = None,
         dataset_steps: Sequence[int] | None = None,
+        restricted_to: frozenset[FactorLevel | None] | None = None,
+        tracking: bool = False,
     ) -> None:
         super().__init__(data)
         self.calculation_results = calculation_results
@@ -144,6 +163,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         self.cluster_stats = cluster_stats
         self.cluster_threshold = cluster_threshold
         self.dataset_steps = dataset_steps
+        self.restricted_to = restricted_to
+        self.tracking = tracking
 
     @property
     def _combined(self) -> tuple[StatsMap, list[SourceIndex], list[int]] | None:
@@ -163,6 +184,54 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             # in level name different rows, at different levels of the same item.
             cols.append("level")
         return self.data().select(cols).n_unique()
+
+    def _kept(self, source_index: Sequence[SourceIndex]) -> NDArray[np.bool_] | None:
+        """Mark the source-index entries this output re-detects, or return None when it re-detects all of them."""
+        if self.restricted_to is None:
+            return None
+        return np.fromiter(
+            (si.kind in self.restricted_to for si in source_index), dtype=np.bool_, count=len(source_index)
+        )
+
+    def _kinds(self) -> set[FactorLevel | None]:
+        """Return the kinds of row this output covers: its stored statistics' when it kept them, else its frame's."""
+        results = self.calculation_results
+        if results is None:
+            kinds: set[FactorLevel | None] = set(row_kinds(self.data()).to_list())  # type: ignore[arg-type]
+        else:
+            parts = [results] if isinstance(results, Mapping) else results
+            kinds = {si.kind for part in parts for si in part["source_index"]}
+        return kinds if self.restricted_to is None else kinds & self.restricted_to
+
+    def _in_between_kinds(self) -> list[str]:
+        """Return the levels between an item and its labels that this output covers, such as frames or tracks."""
+        return sorted(str(kind) for kind in self._kinds() if kind not in (None, LABEL_KIND))
+
+    def _refuse_in_between_kinds(self) -> None:
+        """Raise when this output covers a level between an item and its labels, whose rows have no class."""
+        between = self._in_between_kinds()
+        if between:
+            raise ValueError(
+                f"aggregate_by_class: {between} rows have no class -- a frame or a track is not a label. "
+                "Narrow the result to rows that do first, with `.targets` (or `.detections` for tracking data)."
+            )
+
+    def _metric_totals_by_level(self) -> pl.DataFrame:
+        """Count the addresses each metric flagged at each level."""
+        schema: Any = {"level": pl.Utf8, "metric_name": lexical_categorical(), "Total": pl.UInt32}
+        frame = self.data()
+        if frame.is_empty():
+            return pl.DataFrame(schema=schema)
+        addresses = [name for name in ("item_index", "target_index") if name in frame.columns]
+        return (
+            frame
+            .with_columns(row_kinds(frame).alias("level"))
+            .group_by(["level", "metric_name"])
+            .agg(pl.struct(addresses).n_unique().alias("Total"))
+            .select("level", "metric_name", "Total")
+            .sort(["Total", "level", "metric_name"], descending=[True, False, False], nulls_last=False)
+            .cast(schema)
+        )
 
     # ------------------------------------------------------------------
     # Convenience accessor
@@ -225,9 +294,10 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         Return a Polars DataFrame summarizing outliers per class and metric.
 
         Creates a pivot table showing the count of outlier images for each combination
-        of class and metric. Includes a Total row showing the total number of
-        outliers per metric across all classes, and a Total column showing the total number
-        of outliers per class across all metrics.
+        of class and metric. A flagged box is counted under its own class, or under its
+        item's class when the metadata labels items rather than boxes. Includes a Total
+        row showing the total number of outliers per metric across all classes, and a
+        Total column showing the total number of outliers per class across all metrics.
 
         Parameters
         ----------
@@ -250,6 +320,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         ------
         ValueError
             If the issues contain multiple DataFrames (from multiple datasets).
+            If the result holds rows at a level between an item and its labels, which have no class.
 
         Examples
         --------
@@ -277,6 +348,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         if "dataset_index" in self.data().columns:
             raise ValueError("Aggregation by class only works with output from a single dataset.")
 
+        self._refuse_in_between_kinds()
+
         schema: Any = {"class_name": lexical_categorical(), "Total": pl.UInt32}
 
         # Handle empty DataFrame case
@@ -294,8 +367,25 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         labels_df = pl.DataFrame({"item_index": item_ids, "class_name": class_names})
 
-        # Join the Issues with the Labels
-        joined_df = self.data().join(labels_df, on="item_index", how="left")
+        # Join the Issues with the Labels. When some item holds more than one label, a box is joined to its
+        # own label -- the label's position within its item is the box's target index, as _build_class_ids
+        # reads it -- while an item's own row is joined to every label of the item, as it always was. Labels
+        # one per item, such as a class axis read at the item level, name no box, so every row takes its
+        # item's label.
+        frame = self.data()
+        per_box = labels_df["item_index"].n_unique() < labels_df.height
+        if per_box and "target_index" in frame.columns:
+            # A column that holds only nulls has the Null dtype, which cannot be a join key beside an Int64.
+            frame = frame.with_columns(pl.col("target_index").cast(pl.Int64))
+            own_label = labels_df.with_columns(target_index=pl.int_range(pl.len(), dtype=pl.Int64).over("item_index"))
+            joined_df = pl.concat([
+                frame.filter(pl.col("target_index").is_null()).join(labels_df, on="item_index", how="left"),
+                frame.filter(pl.col("target_index").is_not_null()).join(
+                    own_label, on=["item_index", "target_index"], how="left"
+                ),
+            ])
+        else:
+            joined_df = frame.join(labels_df, on="item_index", how="left")
 
         # Create the Summary Pivot (classes as rows, metrics as columns)
         summary_df = (
@@ -343,6 +433,11 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             - metric_name: str - Name of the metric
             - Total: int - Number of images flagged by this metric
 
+            When the statistics hold frames or tracks, the summary is by level, even when nothing
+            was flagged: the columns are ``level``, ``metric_name`` and ``Total``, and ``Total``
+            counts each flagged frame, track, detection or item once. ``level`` is the level's name,
+            ``"instance"`` for an item's labels, and null for an item's own row.
+
         Examples
         --------
         >>> outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold="zscore")
@@ -363,6 +458,9 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         """
         if "dataset_index" in self.data().columns:
             raise ValueError("Aggregation by metric only works with output from a single dataset.")
+
+        if self._in_between_kinds():
+            return self._metric_totals_by_level()
 
         # Handle empty DataFrame case
         if self.data().shape[0] == 0:
@@ -508,6 +606,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     ) -> Self:
         """Re-run outlier detection with optional class grouping or threshold override.
 
+        Only the rows this output is restricted to are re-detected, so a level view stays at its level.
+
         Raises
         ------
         ValueError
@@ -529,6 +629,10 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
                 raise ValueError("Combined stats or source_index is None, cannot re-detect outliers.")
             stats_map, source_index, ds_steps = combined
 
+            keep = self._kept(source_index)
+            if keep is not None:
+                stats_map, source_index, class_ids = _restrict(stats_map, source_index, class_ids, keep)
+
             stats_df = _detect_outliers(stats_map, source_index, threshold, class_ids)
 
             if ds_steps:
@@ -536,10 +640,11 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
             outlier_dfs.append(stats_df)
 
-        # Cluster-based re-detection
+        # Cluster-based re-detection. Cluster rows are item rows, so a view that excludes the item
+        # end must not gain them back.
         ct = self.cluster_threshold if cluster_threshold is self._UNSET else cluster_threshold
         resolved_ct = resolve_threshold(ct) if ct is not None else DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
-        if self.cluster_stats is not None:
+        if self.cluster_stats is not None and (self.restricted_to is None or None in self.restricted_to):
             cluster_df = Outliers._find_outliers_adaptive(self.cluster_stats, resolved_ct)
             if self.dataset_steps:
                 cluster_df = add_dataset_index(cluster_df, self.dataset_steps)
@@ -555,6 +660,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             cluster_stats=self.cluster_stats,
             cluster_threshold=ct,
             dataset_steps=self.dataset_steps,
+            restricted_to=self.restricted_to,
+            tracking=self.tracking,
         )
 
     def classwise(self, metadata: MetadataLike) -> Self:
@@ -635,6 +742,103 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         >>> global_result = result.itemwise()
         """
         return self._redetect()
+
+    def _filtered_by_kind(self, *kinds: FactorLevel | None) -> Self:
+        """Return these results narrowed to rows of the given kinds, still re-detectable at those kinds.
+
+        Narrowing intersects with any restriction already in place, so a view of a view can only shrink.
+        """
+        wanted = frozenset(kinds)
+        restricted = wanted if self.restricted_to is None else self.restricted_to & wanted
+        frame = self.data()
+        keep = pl.Series([kind in restricted for kind in row_kinds(frame).to_list()], dtype=pl.Boolean)
+        return OutliersOutput(  # type: ignore[return-value]
+            drop_null_index_columns(frame.filter(keep), ["target_index", "level"]),
+            calculation_results=self.calculation_results,
+            outlier_threshold=self.outlier_threshold,
+            cluster_stats=self.cluster_stats,
+            cluster_threshold=self.cluster_threshold,
+            dataset_steps=self.dataset_steps,
+            restricted_to=restricted,
+            tracking=self.tracking,
+        )
+
+    def _tracking_level(self, kind: FactorLevel | None) -> Self:
+        """Return the view of one tracking level, which is empty on a result that is not tracking."""
+        return self._filtered_by_kind(kind) if self.tracking else self._filtered_by_kind()
+
+    @property
+    def items(self) -> Self:
+        """Filtered OutliersOutput holding only the rows that name one piece of media.
+
+        An item's own row for an image dataset, a frame for a tracking one, so this reads the same
+        for either. It matches :attr:`.DuplicatesOutput.items`. The view keeps re-detecting at that
+        level: ``result.items.with_threshold(2.0)`` is still about items.
+
+        Returns
+        -------
+        OutliersOutput
+            The same kind of output, narrowed.
+        """
+        return self._filtered_by_kind("unit" if self.tracking else None)
+
+    @property
+    def targets(self) -> Self:
+        """Filtered OutliersOutput holding only rows that name one of an item's labels.
+
+        A box for an object detection dataset, a detection for a tracking one. The view keeps
+        re-detecting at that level.
+
+        Returns
+        -------
+        OutliersOutput
+            The same kind of output, narrowed.
+        """
+        return self._filtered_by_kind(LABEL_KIND)
+
+    @property
+    def sequences(self) -> Self:
+        """Filtered OutliersOutput holding only whole-sequence rows. Empty for a result that is not tracking.
+
+        Returns
+        -------
+        OutliersOutput
+            The same kind of output, narrowed.
+        """
+        return self._tracking_level(None)
+
+    @property
+    def frames(self) -> Self:
+        """Filtered OutliersOutput holding only frame rows. Empty for a result that is not tracking.
+
+        Returns
+        -------
+        OutliersOutput
+            The same kind of output, narrowed.
+        """
+        return self._tracking_level("unit")
+
+    @property
+    def tracks(self) -> Self:
+        """Filtered OutliersOutput holding only track rows. Empty for a result that is not tracking.
+
+        Returns
+        -------
+        OutliersOutput
+            The same kind of output, narrowed.
+        """
+        return self._tracking_level("track")
+
+    @property
+    def detections(self) -> Self:
+        """Filtered OutliersOutput holding only detection rows. Empty for a result that is not tracking.
+
+        Returns
+        -------
+        OutliersOutput
+            The same kind of output, narrowed.
+        """
+        return self._tracking_level(LABEL_KIND)
 
     def with_threshold(
         self,
@@ -813,6 +1017,21 @@ _CONTEXT_COLUMNS: dict[str, Any] = {
 # The measurements, which describe a row rather than identify it. Everything else in the frame
 # is part of which row this is, and so is what the frame is ordered on.
 _UNSORTED_COLUMNS = frozenset({"metric_value", *_CONTEXT_COLUMNS})
+
+
+def _restrict(
+    stats: StatsMap,
+    source_index: Sequence[SourceIndex],
+    class_ids: NDArray[np.intp] | None,
+    keep: NDArray[np.bool_],
+) -> tuple[StatsMap, list[SourceIndex], NDArray[np.intp] | None]:
+    """Keep the entries `keep` marks, in all three arrays `_detect_outliers` indexes by position."""
+    indices = np.flatnonzero(keep)
+    return (
+        {name: values[indices] for name, values in stats.items()},
+        [source_index[i] for i in indices.tolist()],
+        None if class_ids is None else class_ids[indices],
+    )
 
 
 def _extend_context(context: dict[str, list[Any]], fit: "_Fit") -> None:
@@ -1208,13 +1427,7 @@ def _detect_outliers(  # noqa: C901
     return df.sort(["item_index", "target_index", "level", "metric_name"])
 
 
-def _check_metadata_evaluate_preconditions(
-    data: Any,
-    other: Sequence[Any],
-    has_extractor: bool,
-    per_image: bool,
-    per_target: bool,
-) -> None:
+def _check_metadata_evaluate_preconditions(data: Any, other: Sequence[Any], has_extractor: bool) -> None:
     """Validate a metadata `evaluate()` call before any factor is read."""
     if other:
         raise ValueError("Outliers.evaluate: metadata evaluation takes one metadata, not several.")
@@ -1225,52 +1438,87 @@ def _check_metadata_evaluate_preconditions(
         )
     if not all(hasattr(data, name) for name in ("levels", "rows_at", "at", "item_level", "label_level")):
         raise TypeError("Outliers.evaluate: thresholding factors needs a dataeval.Metadata with a level schema.")
-    if not (per_image or per_target):
+
+
+def _refuse_no_flag(levels: str | Sequence[str] | None, per_image: bool | None, per_target: bool | None) -> None:
+    """Refuse flags that judge nothing. A dataset reaches the same refusal after its own preconditions."""
+    if levels is None and not (True if per_image is None else per_image) and not per_target:
         raise ValueError("At least one of per_image or per_target must be True.")
 
 
-def _excluded_by_flags(
-    levels: Mapping[str, FactorLevel],
-    data: Any,
-    per_image: bool,
-    per_target: bool,
-) -> dict[str, str]:
-    """Return each factor the `per_image`/`per_target` flags exclude, and the flag that would include it.
+def _plan_for(
+    levels: str | Sequence[str] | None,
+    per_image: bool | None,
+    per_target: bool | None,
+    tracking: bool,
+    subject: str,
+) -> LevelPlan:
+    """Resolve which levels to judge, refusing a tracking name on a dataset."""
+    if subject == "dataset" and levels is not None:
+        named = {levels} if isinstance(levels, str) else set(levels)
+        tracking_only = sorted(named & set(TRACKING_LEVEL_NAMES))
+        if tracking_only:
+            raise ValueError(
+                f"Outliers.evaluate: levels {tracking_only} are tracking levels, which a dataset does not report "
+                "yet. Pass a Metadata (Metadata(dataset) plus add_factors) to judge them."
+            )
+    return resolve_levels(levels, per_image, per_target, tracking, caller="Outliers.evaluate", subject=subject)
 
-    Mirrors ``selected_by_flags`` on the addresses ``factor_stats`` writes: an item-level row is addressed as
-    an item, so `per_image` gates it; a label-level row is addressed as a label, so `per_target` gates it;
-    levels between the two are gated by neither.
-    """
-    # The item level last, so it wins where the two levels coincide.
-    gates = {data.label_level: ("per_target=True", per_target), data.item_level: ("per_image=True", per_image)}
-    return {name: gates[level][0] for name, level in levels.items() if level in gates and not gates[level][1]}
+
+def _level_names(data: Any, tracking: bool) -> dict[FactorLevel, str]:
+    """Map each of the metadata's levels to the name `levels=` spells it with."""
+    if tracking:
+        return {level: level for level in data.levels}
+    # The item level last, so it keeps the name where a single-level metadata puts both ends on one level.
+    return {data.label_level: "target", data.item_level: "item"}
 
 
-def _flag_selected_factors(
-    levels: Mapping[str, FactorLevel],
-    data: Any,
-    per_image: bool,
-    per_target: bool,
+def _refuse_lone_target(plan: LevelPlan, data: Any, tracking: bool) -> None:
+    """Refuse `target` alone on a metadata whose item and label levels are one level; `item` names it."""
+    if tracking or data.item_level != data.label_level:
+        return
+    if "target" in plan.levels and "item" not in plan.levels:
+        raise ValueError(
+            "Outliers.evaluate: this metadata has one level, which `levels` calls 'item'; "
+            "judge it with per_image=True or levels='item'."
+        )
+
+
+def _include_hint(names: Iterable[str]) -> str:
+    """Spell how to include levels: by `levels=` and by the flag that implies them."""
+    wanted = sorted(set(names))
+    flags = sorted({"per_target=True" if name in TARGET_LEVELS else "per_image=True" for name in wanted})
+    return f"pass levels={wanted} or {' and '.join(flags)}"
+
+
+def _factors_at_planned_levels(
+    factor_levels: Mapping[str, FactorLevel],
+    plan: LevelPlan,
+    names: Mapping[FactorLevel, str],
     named: bool,
 ) -> dict[str, FactorLevel]:
-    """Return the factors the `per_image`/`per_target` flags select.
+    """Return the factors that live at a planned level.
 
-    A named factor that the flags exclude raises. An excluded factor from the default selection is dropped,
-    unless that would drop every factor.
+    A named factor that lives elsewhere raises. A factor left out of the default selection is
+    dropped, unless that would leave nothing to threshold.
     """
-    excluded = _excluded_by_flags(levels, data, per_image, per_target)
-    flags = sorted(set(excluded.values()))
-    if named and excluded:
+    kept: dict[str, FactorLevel] = {
+        name: level for name, level in factor_levels.items() if names.get(level) in plan.levels
+    }
+    left_out = {name: names.get(level, level) for name, level in factor_levels.items() if name not in kept}
+    if named and left_out:
+        # The hint keeps the levels of the named factors already judged, so following it leaves them judged.
+        wanted = set(left_out.values()) | {names[level] for level in kept.values()}
         raise ValueError(
-            f"Outliers.evaluate: {sorted(excluded)} were named but live at a level the flags "
-            f"exclude; pass {flags} to threshold them."
+            f"Outliers.evaluate: {sorted(left_out)} were named but live at {sorted(set(left_out.values()))}, "
+            f"which this call does not judge; {_include_hint(wanted)}."
         )
-    if len(excluded) == len(levels):
+    if not kept:
         raise ValueError(
-            f"Outliers.evaluate: every ordered factor of this metadata ({sorted(excluded)}) lives at a "
-            f"level the flags exclude, so nothing would be thresholded; pass {flags} to threshold them."
+            f"Outliers.evaluate: no ordered factor lives at {sorted(plan.levels)}. The ordered factors live at "
+            f"{sorted(set(left_out.values()))}; {_include_hint(left_out.values())}."
         )
-    return {name: level for name, level in levels.items() if name not in excluded}
+    return kept
 
 
 class Outliers(Evaluator):
@@ -1571,6 +1819,7 @@ class Outliers(Evaluator):
             *between* those, such as a video frame, is neither and is always included; the
             ``.outliers`` accessor then uses :class:`SourceIndex` keys whatever `per_target`
             says, since a plain item index cannot name such a row.
+            Re-detection (`with_threshold`, `classwise`, `itemwise`) covers the same rows.
 
         Returns
         -------
@@ -1616,16 +1865,18 @@ class Outliers(Evaluator):
         """
         combined_stats, combined_source_index, dataset_steps = combine_stats_results(stats)
 
-        # Filter source_index based on per_image/per_target flags. An address that states
-        # a level is selected by neither and is always kept: the flags name the two ends of
-        # the two-way reading — an item's own row and one of its labels — and a level
-        # between them is not either, so a caller who supplied one has already said which
-        # rows they mean.
+        # An address that states a level is selected by neither flag and is always kept: the flags
+        # name the two ends of the two-way reading -- an item's own row and one of its labels -- and
+        # a level between them is not either, so a caller who supplied one has already said which
+        # rows they mean. The kinds that survive are remembered, so a re-detection reproduces them.
+        tracking = any(si.kind in ("unit", "track") for si in combined_source_index)
+        restricted: frozenset[FactorLevel | None] | None = None
         if not (per_image and per_target):
-            mask = np.array([selected_by_flags(si, per_image, per_target) for si in combined_source_index])
-            indices = np.flatnonzero(mask)
-            combined_source_index = [combined_source_index[i] for i in indices]
-            combined_stats = {k: v[indices] for k, v in combined_stats.items()}
+            keep = np.array(
+                [selected_by_flags(si, per_image, per_target) for si in combined_source_index], dtype=np.bool_
+            )
+            restricted = frozenset(si.kind for si, kept in zip(combined_source_index, keep, strict=True) if kept)
+            combined_stats, combined_source_index, _ = _restrict(combined_stats, combined_source_index, None, keep)
 
         outliers_df = self._get_outliers(combined_stats, combined_source_index)
         outliers_df = drop_null_index_columns(outliers_df, ["target_index", "level"])
@@ -1637,6 +1888,8 @@ class Outliers(Evaluator):
             outliers_df,
             calculation_results=stats,
             outlier_threshold=self.outlier_threshold,
+            restricted_to=restricted,
+            tracking=tracking,
         )
 
     @set_metadata(state=["cluster_threshold", "cluster_algorithm", "n_clusters"])
@@ -1873,9 +2126,21 @@ class Outliers(Evaluator):
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
         data: _DatasetInput,
+        *other: _DatasetInput,
+        levels: str | Sequence[str],
+        per_class: bool = False,
+        metadata: MetadataLike | None = None,
+        factors: Sequence[str] | None = None,
+    ) -> OutliersOutput[Any]: ...
+
+    @overload
+    def evaluate(  # pyright: ignore[reportOverlappingOverload]
+        self,
+        data: _DatasetInput,
         *,
-        per_image: bool = True,
-        per_target: Literal[False] = ...,
+        levels: None = None,
+        per_image: bool | None = None,
+        per_target: Literal[False] | None = ...,
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
@@ -1886,7 +2151,8 @@ class Outliers(Evaluator):
         self,
         data: _DatasetInput,
         *,
-        per_image: bool = True,
+        levels: None = None,
+        per_image: bool | None = None,
         per_target: Literal[True],
         per_class: bool = False,
         metadata: MetadataLike | None = None,
@@ -1898,8 +2164,9 @@ class Outliers(Evaluator):
         self,
         data: _DatasetInput,
         *other: _DatasetInput,
-        per_image: bool = True,
-        per_target: Literal[False] = ...,
+        levels: None = None,
+        per_image: bool | None = None,
+        per_target: Literal[False] | None = ...,
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
@@ -1910,7 +2177,8 @@ class Outliers(Evaluator):
         self,
         data: _DatasetInput,
         *other: _DatasetInput,
-        per_image: bool = True,
+        levels: None = None,
+        per_image: bool | None = None,
         per_target: Literal[True],
         per_class: bool = False,
         metadata: MetadataLike | None = None,
@@ -1930,8 +2198,9 @@ class Outliers(Evaluator):
         self,
         data: _DatasetInput,
         *other: _DatasetInput,
-        per_image: bool = True,
-        per_target: bool = False,
+        levels: str | Sequence[str] | None = None,
+        per_image: bool | None = None,
+        per_target: bool | None = None,
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
@@ -1958,22 +2227,37 @@ class Outliers(Evaluator):
             :class:`~dataeval.protocols.Dataset` and is accepted directly.
 
             `data` may instead be a :class:`~dataeval.Metadata` as a whole, whose ordered
-            factors are thresholded, each against the rows at the level it was measured at
-            (a track against tracks, a frame against frames). Only raw values are read;
-            bins never are.
+            factors at the judged levels (see `levels`) are thresholded, each against the rows
+            at the level it was measured at (a track against tracks, a frame against frames).
+            Only raw values are read; bins never are.
         *other : Dataset
             Zero or more additional datasets for cross-dataset outlier
             detection, each accepting the same forms as ``data``. When provided,
             the output includes a ``dataset_index`` column identifying each
             item's originating dataset.
-        per_image : bool, default True
+        levels : str or Sequence[str] or None, default None
+            Which levels to judge. An image or detection dataset, or a :class:`~dataeval.Metadata` of
+            one, accepts ``"item"`` and ``"target"``; a tracking metadata accepts ``"sequence"``,
+            ``"unit"`` (a frame), ``"track"`` and ``"instance"`` (a detection).
+
+            This and ``per_image``/``per_target`` are two spellings of one thing, so passing both
+            raises. Without either, a tracking metadata judges its sequence and frame levels, as
+            :class:`~dataeval.quality.Duplicates` does, so judge track factors with
+            ``levels="track"``. ``per_target=True`` adds every detection and track.
+
+            A dataset accepts only ``"item"`` and ``"target"`` until it can report tracking levels;
+            pass a :class:`~dataeval.Metadata` to judge the others.
+
+            .. versionadded:: 1.2
+        per_image : bool or None, default None
             Whether to compute statistics for full items (images/videos).
-            When True, item-level outliers will be detected.
-        per_target : bool, default False
+            When True, item-level outliers will be detected. None is True, unless `levels` is given.
+        per_target : bool or None, default None
             Whether to compute statistics for individual targets/detections.
             When True, the ``.outliers`` accessor uses :class:`SourceIndex` keys;
             when False, it uses plain ``int`` item indices.
             Has no effect for datasets without targets or for cluster-based detection.
+            None is False, unless `levels` is given.
         per_class : bool, default False
             Whether to compute outlier thresholds within each class separately,
             rather than globally across the entire dataset. When True, ``metadata``
@@ -2016,9 +2300,11 @@ class Outliers(Evaluator):
             If ``flags`` is ``ImageStats.NONE`` and no ``extractor`` is provided.
             If both ``per_image`` and ``per_target`` are False.
             If ``per_class`` is True and ``metadata`` is None.
+            If `levels` is given together with `per_image` or `per_target`, is empty, or names a
+            level the data does not have; if `levels` names a tracking level for a dataset.
             If `factors` is given without a Metadata as `data`, or is empty; if a named factor
-            is categorical, ineligible, or excluded by `per_image`/`per_target`; if `per_image`/
-            `per_target` exclude every ordered factor; if a Metadata is evaluated with an
+            is categorical, ineligible, or lives at a level `levels` or the flags do not judge;
+            if the levels judged hold no ordered factor; if a Metadata is evaluated with an
             ``extractor``.
         KeyError
             If a named factor is not one of the metadata's.
@@ -2091,6 +2377,7 @@ class Outliers(Evaluator):
             return self._evaluate_metadata(
                 data,
                 other,
+                levels=levels,
                 per_image=per_image,
                 per_target=per_target,
                 per_class=per_class,
@@ -2102,19 +2389,20 @@ class Outliers(Evaluator):
                 "Outliers.evaluate: `factors` names metadata factors to threshold; pass the Metadata itself as `data`."
             )
 
+        plan = _plan_for(levels, per_image, per_target, tracking=False, subject="dataset")
         if other:
             return self._evaluate_multi(
                 [data, *other],
-                per_image=per_image,
-                per_target=per_target,
+                per_image=plan.per_image,
+                per_target=plan.per_target,
                 per_class=per_class,
                 metadata=metadata,
             )
 
         return self._evaluate_single(
             data,
-            per_image=per_image,
-            per_target=per_target,
+            per_image=plan.per_image,
+            per_target=plan.per_target,
             per_class=per_class,
             metadata=metadata,
         )
@@ -2135,8 +2423,9 @@ class Outliers(Evaluator):
         data: Any,
         other: Sequence[Any],
         *,
-        per_image: bool,
-        per_target: bool,
+        levels: str | Sequence[str] | None,
+        per_image: bool | None,
+        per_target: bool | None,
         per_class: bool,
         metadata: MetadataLike | None,
         factors: Sequence[str] | None,
@@ -2144,16 +2433,20 @@ class Outliers(Evaluator):
         """Threshold a metadata's ordered factors, each against the rows at its own level.
 
         The factors are laid out as a stats result and handed to :meth:`from_stats`, so the
-        per-level fitting, the `per_image`/`per_target` selection and every re-detection
-        method behave exactly as they do for image statistics.
+        per-level fitting and every re-detection method behave exactly as they do for image
+        statistics. Which levels are judged is decided by the plan `levels=` or the flags resolve to.
         """
         labels = checked_sole_metadata(data, metadata, "Outliers")
-        _check_metadata_evaluate_preconditions(data, other, self.extractor is not None, per_image, per_target)
-
-        levels = _flag_selected_factors(
-            eligible_factors(data, factors), data, per_image, per_target, named=factors is not None
+        _check_metadata_evaluate_preconditions(data, other, self.extractor is not None)
+        tracking = "sequence" in data.levels
+        _refuse_no_flag(levels, per_image, per_target)
+        plan = _plan_for(levels, per_image, per_target, tracking, "metadata")
+        _refuse_lone_target(plan, data, tracking)
+        chosen = _factors_at_planned_levels(
+            eligible_factors(data, factors), plan, _level_names(data, tracking), named=factors is not None
         )
-        result = self.from_stats(factor_stats(data, levels), per_image=per_image, per_target=per_target)
+        result = self.from_stats(factor_stats(data, chosen), per_image=True, per_target=True)
+        result.tracking = tracking
         return result.classwise(labels) if per_class else result
 
     def _evaluate_single(
@@ -2237,7 +2530,8 @@ class Outliers(Evaluator):
         outliers_dfs: list[pl.DataFrame] = []
 
         if stats_results:
-            combined_stats, combined_source_index, _ = combine_stats_results(stats_results)
+            # combined_steps count statistics rows, target rows included; dataset_steps count images, for cluster rows.
+            combined_stats, combined_source_index, combined_steps = combine_stats_results(stats_results)
 
             class_ids: NDArray[np.intp] | None = None
             if per_class and metadata is not None:
@@ -2245,7 +2539,7 @@ class Outliers(Evaluator):
 
             outliers_df = self._get_outliers(combined_stats, combined_source_index, class_ids)
             outliers_df = drop_null_index_columns(outliers_df, ["target_index", "level"])
-            outliers_df = add_dataset_index(outliers_df, dataset_steps)
+            outliers_df = add_dataset_index(outliers_df, combined_steps)
             outliers_dfs.append(outliers_df)
 
         # Cluster-based: early fusion — combine all images, cluster globally

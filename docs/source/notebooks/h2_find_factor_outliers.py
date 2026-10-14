@@ -219,11 +219,13 @@ except ValueError as error:
 # %% [markdown]
 # ## Thresholding every factor
 #
-# With no `factors=`, every ordered factor is checked, each at its own level. The `level` column says which population
-# a row was judged in.
+# With no `factors=`, every ordered factor at the levels you name is checked, each against the rows at its own level.
+# Name the levels with `levels=`: `("unit", "track")` checks the frame and track factors. Without `levels=`, only the
+# sequence and frame levels are checked, as `Duplicates` does. The `level` column says which population a row was
+# judged in.
 
 # %%
-result = Outliers().evaluate(metadata)
+result = Outliers().evaluate(metadata, levels=("unit", "track"))
 display(result.aggregate_by_metric())
 
 # %% [markdown]
@@ -232,7 +234,7 @@ display(result.aggregate_by_metric())
 
 # %%
 signals = ["n_gaps", "gap_fraction", "speed_variance", "exposure_ms"]
-focused = Outliers().evaluate(metadata, factors=signals)
+focused = Outliers().evaluate(metadata, factors=signals, levels=("unit", "track"))
 display(focused.data().select("item_index", "target_index", "level", "metric_name", "metric_value", "percentile"))
 
 # %% [markdown]
