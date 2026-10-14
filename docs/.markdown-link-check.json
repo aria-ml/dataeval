@@ -22,6 +22,12 @@
       "pattern": "^https://ieeexplore\\.ieee\\.org"
     },
     {
+      "pattern": "^https://academic\\.oup\\.com"
+    },
+    {
+      "pattern": "^https://pubmed\\.ncbi\\.nlm\\.nih\\.gov"
+    },
+    {
       "pattern": "^#ref\\d+$"
     },
     {
