@@ -396,7 +396,8 @@ decided by the **raw column's type**:
   stratum (below).
 - **Ineligible** — list-valued columns, and the reserved addressing columns
   (row indices, `track_id`, `item_id`), by construction rather than by
-  heuristic.
+  heuristic. List-valued columns are still read when several columns are
+  judged together (see [Combinations of factors](#combinations-of-factors)).
 
 Integer identifiers are the one case a type check cannot catch -- a numeric
 `camera_serial` looks ordered. Declare it as a fixed vocabulary, or name the
@@ -529,6 +530,47 @@ closer to one event than to three independent ones. A stratum smaller than the
 minimum cannot support a verdict on its own; borrowing strength across strata
 with an empirical-Bayes prior is the principled route to judging them, and is
 not part of the default.
+
+#### Combinations of factors
+
+A row can be ordinary in every column and still be improbable as a combination: a large box near the horizon, where
+boxes of that class are small; a frame stamped 02:00 with daylight brightness; a fast track with low straightness.
+Judging one column at a time cannot find these. {func}`.combination_scores` scores each row once per group of columns,
+within its stratum, and reports numbers rather than findings.
+
+Each group is scored by the method that fits its columns:
+
+| Columns | Method | Score |
+| --- | --- | --- |
+| numbers, vectors, samples | robust Mahalanobis distance | higher is more unusual |
+| categories, tag sets | count of rows sharing the combination | lower is rarer |
+| one sample of values per row | distance to the typical distribution, adjusted for sample length | higher is more unusual |
+| one number given another | robust z against the nearest rows of the other | larger magnitude is more unusual |
+
+**Why numbers and not findings.** Deciding what counts as an outlier needs a threshold, a minimum population and a
+correction for running many tests. Those are judgments, so they belong to the evaluator that reads these scores, as they
+do for single columns.
+
+**The tail of the distance.** The textbook reference for a squared Mahalanobis distance is a chi-square distribution.
+With a robust fit on a few dozen rows it is too optimistic: on clean normal data, 19 % of rows fell below 0.01 at
+10 rows and 2 columns, where 1 % should. The tail reported here uses the finite-sample distribution of reweighted
+minimum covariance determinant distances ([Cerioli, 2010](#ref12)). From 50 rows per dimension, 0.5–2 % of clean rows
+fall below 0.01. A vector adds one dimension per element. Below that, and whenever a sample column is in the group, no
+tail is reported and only the distance is.
+
+**Curved relationships.** One column given another is fitted locally, against the rows nearest in the conditioning
+column, not with a straight line. Brightness rises and falls over a day, so a straight line through it is nearly flat
+and leaves the daily curve in every residual.
+
+**Category and value together.** To ask whether a value is unusual for its category, pass the category as a stratum.
+A group that mixes numbers and categories is refused, since it would only repeat that split.
+
+**Rejected approaches.** One model over every column at once, such as an isolation forest on a mixed-type distance,
+gives scores without a calibrated meaning and cannot say which combination made a row unusual. Encoding categories as
+numbers and fitting one distance makes the covariance singular and lets rare categories dominate it.
+
+**Known limits.** The conditioning column of a residual does not wrap, so hour 23 is not next to hour 0. Consecutive
+frames are not exchangeable, so a burst of rows inflates counts and fits, as it does for single columns.
 
 ### Image statistics as a linting vocabulary
 
@@ -766,3 +808,7 @@ time, within a stratum or not.
 11. [Bates, S., Candès, E., Lei, L., Romano, Y., & Sesia, M. (2023). Testing for
     outliers with conformal p-values. *The Annals of Statistics*, 51(1),
     149–178. [paper](https://arxiv.org/abs/2104.08279)]{#ref11}
+
+12. [Cerioli, A. (2010). Multivariate outlier detection with high-breakdown
+    estimators. *Journal of the American Statistical Association*, 105(489),
+    147–156. [paper](https://doi.org/10.1198/jasa.2009.tm09147)]{#ref12}

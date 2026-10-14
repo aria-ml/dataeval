@@ -5,6 +5,8 @@ __all__ = [
     "BERResult",
     "ClusterResult",
     "ClusterStats",
+    "ColumnKind",
+    "CombinationScoresResult",
     "CompletenessResult",
     "CoverageResult",
     "DivergenceResult",
@@ -38,6 +40,7 @@ __all__ = [
     "ber_knn",
     "ber_mst",
     "cluster",
+    "combination_scores",
     "combine_stats_results",
     "completeness",
     "compute_cluster_stats",
@@ -104,6 +107,7 @@ from dataeval.core._annotation_match import (
 from dataeval.core._ber import BERResult, ber_knn, ber_mst
 from dataeval.core._bin import is_continuous
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
+from dataeval.core._combination_scores import ColumnKind, CombinationScoresResult, combination_scores
 from dataeval.core._completeness import CompletenessResult, completeness
 from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._compute_stats import FactorResult, StatsResult, combine_stats_results, compute_stats
