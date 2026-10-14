@@ -1583,6 +1583,17 @@ class TestOutliersMultiDataset:
         assert isinstance(lenient.data(), pl.DataFrame)
         assert len(strict) >= len(lenient)
 
+    def test_evaluate_multi_dataset_per_target_numbers_every_dataset(self, get_od_dataset):
+        """Targets add rows per item, and each dataset still receives its own index and local item numbers."""
+        first, second = (
+            get_od_dataset(list(np.random.default_rng(seed).random((12, 3, 16, 16))), 2, True) for seed in (0, 1)
+        )
+        outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold=ZScoreThreshold(0.5))
+        frame = outliers.evaluate(first, second, per_target=True).data()
+
+        assert set(frame["dataset_index"]) == {0, 1}
+        assert all(index < 12 for index in frame["item_index"])
+
 
 @pytest.mark.required
 class TestOutliersPropertySingleDataset:

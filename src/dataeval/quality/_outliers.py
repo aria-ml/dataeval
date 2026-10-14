@@ -84,8 +84,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         Preserved across re-detection calls unless overridden via
         :meth:`with_threshold`.
     dataset_steps : list[int] or None
-        Cumulative dataset boundaries for multi-dataset index remapping.
-        None for single-dataset output.
+        Cumulative image counts per dataset, used to number cluster rows. Statistics rows are
+        numbered by steps recomputed from `calculation_results`. None for single-dataset output.
     """
 
     def __init__(
@@ -1752,7 +1752,8 @@ class Outliers(Evaluator):
         outliers_dfs: list[pl.DataFrame] = []
 
         if stats_results:
-            combined_stats, combined_source_index, _ = combine_stats_results(stats_results)
+            # combined_steps count statistics rows, target rows included; dataset_steps count images, for cluster rows.
+            combined_stats, combined_source_index, combined_steps = combine_stats_results(stats_results)
 
             class_ids: NDArray[np.intp] | None = None
             if per_class and metadata is not None:
@@ -1760,7 +1761,7 @@ class Outliers(Evaluator):
 
             outliers_df = self._get_outliers(combined_stats, combined_source_index, class_ids)
             outliers_df = drop_null_index_columns(outliers_df, ["target_index", "channel_index"])
-            outliers_df = add_dataset_index(outliers_df, dataset_steps)
+            outliers_df = add_dataset_index(outliers_df, combined_steps)
             outliers_dfs.append(outliers_df)
 
         # Cluster-based: early fusion — combine all images, cluster globally
