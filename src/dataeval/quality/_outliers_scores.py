@@ -23,6 +23,8 @@ from dataeval.quality._outliers_rows import (
     _MIN_ROWS_PER_DIMENSION,
     DEFAULT_OUTLIERS_OUTLIER_THRESHOLD,
     FINDINGS_SCHEMA,
+    ORDER_COLUMN,
+    SEQUENCE_KEYS,
     _Fit,
     _fit_outliers,
     _floor_reason,
@@ -45,8 +47,16 @@ _STRATUM = "__stratum__"
 _CATEGORICAL_KINDS = ("categorical", "tags")
 # Core's reasons that hold for a whole population: none of its rows could be scored.
 _POPULATION_REASONS = frozenset({"too few rows", "exact fit", "degenerate covariance"})
-# Core's reasons that keep a row out of its population: it has no value to compare, or no spread to compare it with.
-_ROW_REASONS = frozenset({"missing value", "missing stratum", "constant residual"})
+# Core's reasons that keep a row out of its population: it has no value to compare, or no spread to compare it with,
+# or no sequence to compare it along.
+_ROW_REASONS = frozenset({
+    "missing value",
+    "missing stratum",
+    "constant residual",
+    "missing order",
+    "missing sequence",
+    "short sequence",
+})
 # A small distance or a typical sample is not unusual, so only the upper bound flags these.
 _UPPER_ONLY = frozenset({"mahalanobis", "distribution"})
 
@@ -71,6 +81,8 @@ class _ScoreInput(NamedTuple):
     given: Mapping[FactorLevel, Mapping[str, str]]
     kinds: Mapping[FactorLevel, Mapping[str, ColumnKind]]
     level_kinds: Mapping[FactorLevel, str | None]  # the SourceIndex.kind of each level's rows
+    # The factors judged along their sequence at each level. Defaulted, so a score input pickled before it loads.
+    neighbors: Mapping[FactorLevel, tuple[str, ...]] | None = None
 
     def is_categorical(self, level: FactorLevel, group: Sequence[str]) -> bool:
         """Whether every column of a group is counted by rarity at `level`."""
@@ -89,7 +101,12 @@ class _ScoreInput(NamedTuple):
         return kept
 
     def scored_levels(self) -> list[FactorLevel]:
-        """Return the levels with a numeric group or a residual to score."""
+        """Return the levels with stored scores to judge within strata: a group, a residual or a neighbor check."""
+        combined, neighbors = self.combination_levels(), self.neighbors or {}
+        return [level for level in self.frames if level in combined or neighbors.get(level)]
+
+    def combination_levels(self) -> list[FactorLevel]:
+        """Return the levels with a numeric group or a residual, which :func:`score_combinations` scores."""
         return [level for level in self.frames if self.numeric_groups(level) or self.given.get(level)]
 
     def numeric_groups(self, level: FactorLevel) -> list[tuple[str, ...]]:
@@ -111,6 +128,7 @@ def _scored_columns(
     categorical: Mapping[FactorLevel, Sequence[str]],
     groups: Mapping[FactorLevel, Sequence[tuple[str, ...]]],
     given: Mapping[FactorLevel, Mapping[str, str]],
+    neighbors: Mapping[FactorLevel, Sequence[str]],
 ) -> dict[FactorLevel, list[str]]:
     """Return the columns each level's checks read, each once, in the order the checks name them."""
     columns: dict[FactorLevel, list[str]] = {level: list(names) for level, names in categorical.items()}
@@ -118,7 +136,14 @@ def _scored_columns(
         columns.setdefault(level, []).extend(name for group in found for name in group)
     for level, pairs in given.items():
         columns.setdefault(level, []).extend(name for pair in pairs.items() for name in pair)
+    for level, names in neighbors.items():
+        columns.setdefault(level, []).extend(names)
     return {level: list(dict.fromkeys(names)) for level, names in columns.items()}
+
+
+def _ordering(level: FactorLevel, neighbors: Mapping[FactorLevel, Sequence[str]]) -> tuple[str, ...]:
+    """Return the columns that identify and order a level's sequences, when a neighbor check reads them."""
+    return (*SEQUENCE_KEYS[level], ORDER_COLUMN) if level in neighbors else ()
 
 
 def read_score_input(
@@ -127,22 +152,27 @@ def read_score_input(
     groups: Mapping[FactorLevel, Sequence[tuple[str, ...]]] | None = None,
     given: Mapping[FactorLevel, Mapping[str, str]] | None = None,
     kinds: Mapping[str, ColumnKind] | None = None,
+    neighbors: Mapping[FactorLevel, Sequence[str]] | None = None,
 ) -> _ScoreInput | None:
     """Read each level's scored columns once, with the columns that address its rows; None when nothing is scored.
 
     Each level's `kinds` are the caller's entries for its own columns, plus ``"categorical"`` for every column
-    :func:`factor_kind` calls categorical, the caller's entry winning.
+    :func:`factor_kind` calls categorical, the caller's entry winning. `neighbors` are the factors to judge along their
+    sequence at each level; their sequence and order columns are read into the level's frame beside the factors.
     """
     by_level: dict[FactorLevel, tuple[str, ...]] = {}
     for name, level in categorical.items():
         by_level[level] = (*by_level.get(level, ()), name)
-    groups, given, kinds = groups or {}, given or {}, kinds or {}
-    columns = _scored_columns(by_level, groups, given)
+    groups, given, kinds, neighbors = groups or {}, given or {}, kinds or {}, neighbors or {}
+    columns = _scored_columns(by_level, groups, given, neighbors)
     if not columns:
         return None
     store = metadata._store
     frames: dict[FactorLevel, pl.DataFrame] = {
-        level: store.select(level, [*found, *_key_columns(metadata, level)]) for level, found in columns.items()
+        level: store.select(
+            level, list(dict.fromkeys([*found, *_key_columns(metadata, level), *_ordering(level, neighbors)]))
+        )
+        for level, found in columns.items()
     }
     level_column_kinds: dict[FactorLevel, Mapping[str, ColumnKind]] = {
         level: {
@@ -158,6 +188,7 @@ def read_score_input(
         {level: dict(pairs) for level, pairs in given.items()},
         level_column_kinds,
         {level: level_kind(metadata, level) for level in columns},
+        {level: tuple(names) for level, names in neighbors.items()},
     )
 
 
@@ -305,12 +336,12 @@ def _findings(
 
 
 class _ScoredCheck(NamedTuple):
-    """One combination check's stored scores at one level, enough to refit thresholds without rescoring."""
+    """One score check's stored scores at one level, enough to refit thresholds without rescoring."""
 
     level: FactorLevel
     kind: str | None  # the SourceIndex.kind of the level's rows, which populations list it under
     metric_name: str  # "a, b" for a group, "y given x" for a residual, the column for a distribution
-    method: str  # "mahalanobis" | "residual" | "distribution"
+    method: str  # "mahalanobis" | "residual" | "distribution" | "neighbors"
     dims: int
     rows: NDArray[np.int64]  # positions in the level frame, one array shared by every check at the level
     score: NDArray[np.float64]
@@ -318,6 +349,18 @@ class _ScoredCheck(NamedTuple):
     reasons: tuple[str, ...]
     stratum: NDArray[np.intp]  # Outliers' code per entry, shared at the level; a code with no label is the whole level
     labels: Mapping[int, str]  # the population label of each code
+    value: NDArray[np.float64] | None = None  # a neighbor check's factor values, which its rows report
+    expected: NDArray[np.float64] | None = None  # where a neighbor check's neighbors put each value
+    spread: NDArray[np.float64] | None = None  # what a neighbor check divided each residual by
+
+
+def stratum_codes(
+    reached: tuple[pl.Series, Mapping[int, str]] | None, height: int
+) -> tuple[NDArray[np.intp], Mapping[int, str]]:
+    """Return one level's stratum code per row and their labels, every row in the whole level when none reach it."""
+    if reached is None:
+        return np.full(height, -1, dtype=np.intp), {}
+    return reached[0].cast(pl.Int64).to_numpy().astype(np.intp), reached[1]
 
 
 def score_combinations(score_input: _ScoreInput, strata: LevelStrata) -> list[_ScoredCheck]:
@@ -336,7 +379,7 @@ def score_combinations(score_input: _ScoreInput, strata: LevelStrata) -> list[_S
         One entry per check per level, in the order core returns them.
     """
     checks: list[_ScoredCheck] = []
-    for level in score_input.scored_levels():
+    for level in score_input.combination_levels():
         frame = score_input.frames[level]
         reached = strata.get(level)
         if reached is not None:
@@ -348,8 +391,7 @@ def score_combinations(score_input: _ScoreInput, strata: LevelStrata) -> list[_S
             given=dict(score_input.given.get(level, {})),
             kinds=dict(score_input.kinds.get(level, {})),
         )
-        codes = np.full(frame.height, -1, np.intp) if reached is None else reached[0].cast(pl.Int64).to_numpy()
-        labels = {} if reached is None else reached[1]
+        codes, labels = stratum_codes(reached, frame.height)
         checks.extend(_split(result, level, score_input.level_kinds[level], codes, labels))
     return checks
 
@@ -482,21 +524,32 @@ def _score_findings(
     addresses = [address(check.level, row) for row in check.rows[flagged].tolist()]
     count = len(addresses)
     label = check.labels.get(int(check.stratum[flagged[0]]))
+    value, bound, mean, std = _reported(check, flagged, fit)
     return pl.DataFrame(
         {
             "item_index": [si.item for si in addresses],
             "target_index": [si.key for si in addresses],
             "level": [reported_level(si) for si in addresses],
             "metric_name": [check.metric_name] * count,
-            "metric_value": check.score[flagged].tolist(),
+            "metric_value": value.tolist(),
             "direction": np.where(fit.above[fit.mask], "upper", "lower").tolist(),
-            "bound": fit.bound[fit.mask].tolist(),
+            "bound": bound.tolist(),
             "percentile": fit.percentile[fit.mask].tolist(),
-            "population_mean": fit.mean[fit.mask].tolist(),
-            "population_std": fit.std[fit.mask].tolist(),
+            "population_mean": mean.tolist(),
+            "population_std": std.tolist(),
             "method": [check.method] * count,
             "population": [label] * count,
             "observed": [None] * count,
         },
         schema=FINDINGS_SCHEMA,
     )
+
+
+def _reported(
+    check: _ScoredCheck, flagged: NDArray[np.intp], fit: _Fit
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    """Return the value, bound, mean and spread a finding reports: the score's own, or a neighbor check's factor's."""
+    if check.value is None or check.expected is None or check.spread is None:
+        return check.score[flagged], fit.bound[fit.mask], fit.mean[fit.mask], fit.std[fit.mask]
+    expected, spread = check.expected[flagged], check.spread[flagged]
+    return check.value[flagged], expected + fit.bound[fit.mask] * spread, expected, spread

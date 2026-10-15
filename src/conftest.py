@@ -342,6 +342,65 @@ class ObjectDetectionDataset:
 
 
 # =============================================================================
+# Tracking video fixture
+# =============================================================================
+
+
+class _DoctestVideoFrame:
+    """One frame of a doctest video, declaring its position and timings."""
+
+    def __init__(self, index: int) -> None:
+        self.frame_index = index
+        self.time_s = index / 30
+        self.pts = index
+        self.pixels = np.zeros((3, 4, 4), dtype=np.float32)
+
+
+class _DoctestFrameDetections:
+    """One frame's single detection, on track 0."""
+
+    def __init__(self) -> None:
+        self.boxes = np.array([[1.0, 1.0, 2.0, 2.0]])
+        self.labels = np.array([0])
+        self.scores = np.array([0.5])
+        self.track_ids = np.array([0])
+
+
+@dataclass
+class _DoctestVideoTracks:
+    """One video's per-frame detections."""
+
+    frame_tracks: list[_DoctestFrameDetections]
+
+
+class _DoctestVideos:
+    """Four videos of 60 frames with one tracked detection per frame."""
+
+    @property
+    def metadata(self) -> DatasetMetadata:
+        return DatasetMetadata(id="doctest_videos", index2label={0: "car"})
+
+    def __len__(self) -> int:
+        return 4
+
+    def __getitem__(self, index: int) -> tuple[list[_DoctestVideoFrame], _DoctestVideoTracks, DatumMetadata]:
+        frames = [_DoctestVideoFrame(j) for j in range(60)]
+        tracks = _DoctestVideoTracks([_DoctestFrameDetections() for _ in range(60)])
+        return frames, tracks, cast(DatumMetadata, {"id": f"video_{index}"})
+
+
+def _video_metadata() -> Any:
+    """Return a tracking Metadata of four videos whose brightness drifts, with frame 30 of video 2 glitched."""
+    rng = np.random.default_rng(0)
+    video, frame = np.repeat(np.arange(4), 60), np.tile(np.arange(60), 4)
+    brightness = 100 + 20 * video + 10 * np.sin(frame / 9) + rng.normal(0, 1, video.size)
+    brightness[2 * 60 + 30] += 25
+    metadata = Metadata(_DoctestVideos())
+    metadata.add_factors({"brightness": brightness}, level="unit")
+    return metadata
+
+
+# =============================================================================
 # Model factory
 # =============================================================================
 
@@ -573,6 +632,9 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
     # _metadata package, and the modules inside it that cannot import the class at
     # runtime without a cycle.
     doctest_namespace["Metadata"] = Metadata
+
+    # A tracking Metadata of four videos with one glitched frame, for the sequence-neighbor examples.
+    doctest_namespace["video_metadata"] = _video_metadata()
 
     # -------------------------------------------------------------------------
     # Train/test splits

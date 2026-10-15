@@ -23,6 +23,7 @@ from dataeval.core._combination_scores import _named_groups
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, MetadataLike, Threshold, ThresholdLike
 from dataeval.quality._factor_stats import eligible_factors, factor_kind, factor_levels, factor_stats
+from dataeval.quality._outliers_neighbors import neighbor_checks, restratified, score_neighbors
 from dataeval.quality._outliers_rows import (
     _CONTEXT_COLUMNS,
     _EXTRA_COLUMNS,
@@ -182,8 +183,9 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
       judged within strata, by ``strata=``, :meth:`stratified` or :meth:`classwise`.
     - method: str - The check that flagged the row: ``"rarity"`` for a categorical value rare within
       its stratum, ``"mahalanobis"`` for an unusual combination of factors, ``"residual"`` for a
-      factor unusual given another, null for a single-column threshold. Present only when a row
-      has one.
+      factor unusual given another, ``"neighbors"`` for a value unusual beside its sequence neighbors,
+      ``"order"`` for a timestamp out of order, null for a single-column threshold. Present only when a
+      row has one.
     - observed: str - The categorical value a rarity row found rare, such as ``weather=snow``. Present
       only on a result with rarity rows.
 
@@ -196,6 +198,12 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     ``"upper"``. A residual row is named ``brightness given hour`` and reports the signed robust z
     of the one factor among the rows nearest in the other. Both carry ``percentile``,
     ``population_mean`` and ``population_std`` of the score within the population it was judged in.
+
+    A neighbor row is named ``brightness along sequence`` (a frame along its video) or ``box_size along track`` (a
+    detection along its track). It reports the raw value as ``metric_value``, where its neighbors put it as
+    ``population_mean``, its sequence's spread as ``population_std``, and the crossed limit in the factor's units as
+    ``bound``. An order row reports the value as ``metric_value`` and the value it is out of order against as
+    ``bound``, with no ``percentile``, ``population_mean``, ``population_std`` or ``population``.
 
     Rows are thresholded **within a level**: a metric's distribution is fitted separately
     over each kind of row the statistics name, so a per-frame reading is never compared
@@ -246,8 +254,12 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         :meth:`stratified`, :meth:`classwise` and :meth:`itemwise` can judge them again within new populations.
         None on a result of a dataset or of :meth:`~Outliers.from_stats`.
     scored : tuple[_ScoredCheck, ...]
-        The scores of each combination and residual check, kept so :meth:`with_threshold` refits them without
-        scoring again.
+        The scores of each combination, residual and neighbor check, kept so :meth:`with_threshold` refits them
+        without scoring again.
+    order : pl.DataFrame or None
+        The rows a monotonic factor's order rule flagged under ``neighbors=``, kept as they are on every
+        re-detection, since a rule has no threshold to refit. Read them in the result's rows with ``method``
+        ``"order"``.
     """
 
     # Class-level defaults, not set only in __init__: an output pickled before these existed has
@@ -259,6 +271,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     _populations: pl.DataFrame | None = None
     _rarity: tuple[pl.DataFrame, list[_Population]] | None = None
     scored: tuple[_ScoredCheck, ...] = ()
+    _order: pl.DataFrame | None = None
 
     def __init__(
         self,
@@ -276,6 +289,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         score_input: _ScoreInput | None = None,
         rarity: tuple[pl.DataFrame, list[_Population]] | None = None,
         scored: Sequence[_ScoredCheck] = (),
+        order: pl.DataFrame | None = None,
     ) -> None:
         super().__init__(data)
         self.calculation_results = calculation_results
@@ -290,6 +304,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         self.score_input = score_input
         self._rarity = rarity
         self.scored = tuple(scored)
+        self._order = order
 
     @property
     def populations(self) -> pl.DataFrame:
@@ -303,6 +318,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         Rarity judges a categorical factor only within a stratum of at least 93 rows, the fewest in which one
         occurrence can be rare at 95 % confidence. A combination of ``d`` factors needs at least 20 rows and
         10 rows per dimension, and a residual (``given=``) at least 31 rows for its window.
+        A neighbor check (``neighbors=``) needs at least 20 scored rows in a pool.
 
         Every combination and residual you name is listed at its level, even when none of its rows has a value
         (``n=0``, ``judged=False``). A single-column metric is left out of a population where it has no real
@@ -788,6 +804,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         strata = self.strata if strata is self._UNSET else strata
         rarity = _narrowed(self._rarity if rarity is self._UNSET else rarity, self.restricted_to)
         scored = _kept_checks(self.scored if scored is self._UNSET else scored, self.restricted_to)
+        order = _narrowed_rows(self._order, self.restricted_to)
         if self.calculation_results is not None:
             combined = self._combined
             if combined is None:
@@ -809,7 +826,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             # Rarity and combinations are judged only on a metadata, which spans one dataset, so their rows need no
             # dataset index.
             outlier_dfs.append(stats_df)
-            outlier_dfs.extend(df for df in (None if rarity is None else rarity[0], score_df) if df is not None)
+            outlier_dfs.extend(df for df in (None if rarity is None else rarity[0], score_df, order) if df is not None)
 
         # Cluster-based re-detection. Cluster rows are item rows, so a view that excludes the item
         # end must not gain them back.
@@ -838,6 +855,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             score_input=self.score_input,
             rarity=rarity,
             scored=scored,
+            order=order,
         )
 
     def _flag_scored(
@@ -849,10 +867,10 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         return flag_scored(scored, threshold, self.score_input.address)
 
     def _rescored(self, strata: Mapping[FactorLevel, Any]) -> tuple[_ScoredCheck, ...]:
-        """Score the stored combinations again within the populations `strata` give each level."""
+        """Score the stored combinations again, and re-code the stored neighbor checks, within `strata`."""
         if self.score_input is None:
             return ()
-        return tuple(score_combinations(self.score_input, strata))
+        return (*score_combinations(self.score_input, strata), *restratified(self.scored, strata))
 
     def classwise(self, metadata: MetadataLike) -> Self:
         """Re-detect outliers using per-class thresholds.
@@ -879,7 +897,9 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         ``population`` column, such as ``class_label=cat``, or ``class_label=null`` for a
         row with no one class. Any strata from :meth:`stratified` are replaced. Combinations
         and residuals asked for with ``combinations=`` and ``given=`` are scored again within
-        each class; categorical factors are not judged by rarity.
+        each class; categorical factors are not judged by rarity. Neighbor checks asked for with
+        ``neighbors=`` are judged again within the new populations without rescoring, and order rows
+        are kept.
 
         Parameters
         ----------
@@ -959,7 +979,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         the dataset rather than out of place in one stratum. Each rarity row names the value in
         an ``observed`` column and ``"rarity"`` in a ``method`` column. Combinations and
         residuals asked for with ``combinations=`` and ``given=`` are scored again within the
-        new strata.
+        new strata. Neighbor checks asked for with ``neighbors=`` are judged again within the new
+        populations without rescoring, and order rows are kept.
 
         Parameters
         ----------
@@ -1059,7 +1080,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         This is the inverse of :meth:`classwise` -- it re-runs detection without
         per-class grouping, using the full dataset distribution for thresholds. It also
         drops any strata and the rarity rows judged within them, and scores combinations
-        and residuals again over each whole level.
+        and residuals again over each whole level. Neighbor checks asked for with ``neighbors=``
+        are judged again over each whole level without rescoring, and order rows are kept.
 
         Returns
         -------
@@ -1104,6 +1126,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             score_input=self.score_input,
             rarity=_narrowed(self._rarity, restricted),
             scored=_kept_checks(self.scored, restricted),
+            order=_narrowed_rows(self._order, restricted),
         )
 
     def _tracking_level(self, kind: FactorLevel | None) -> Self:
@@ -1360,6 +1383,14 @@ _DROPPABLE = ["target_index", "level", "method", "population", "observed"]
 _UNSORTED_COLUMNS = frozenset({"metric_value", *_CONTEXT_COLUMNS, *_EXTRA_COLUMNS})
 
 
+def _narrowed_rows(frame: pl.DataFrame | None, restricted: frozenset[FactorLevel | None] | None) -> pl.DataFrame | None:
+    """Keep the rows of a stored findings frame at the kinds of row an output is restricted to."""
+    if frame is None or restricted is None:
+        return frame
+    keep = pl.Series([kind in restricted for kind in row_kinds(frame).to_list()], dtype=pl.Boolean)
+    return frame.filter(keep)
+
+
 def _narrowed(
     rarity: tuple[pl.DataFrame, list[_Population]] | None, restricted: frozenset[FactorLevel | None] | None
 ) -> tuple[pl.DataFrame, list[_Population]] | None:
@@ -1367,8 +1398,8 @@ def _narrowed(
     if rarity is None or restricted is None:
         return rarity
     frame, populations = rarity
-    keep = pl.Series([kind in restricted for kind in row_kinds(frame).to_list()], dtype=pl.Boolean)
-    return frame.filter(keep), [population for population in populations if population.level in restricted]
+    kept = _narrowed_rows(frame, restricted)
+    return cast(pl.DataFrame, kept), [population for population in populations if population.level in restricted]
 
 
 def _kept_checks(
@@ -1875,11 +1906,12 @@ def _rarity_runs(data: Any, categorical: Mapping[str, FactorLevel], strata: Sequ
 
 
 class _Requested(NamedTuple):
-    """The combination and residual checks an evaluate call asked for, as given."""
+    """The combination, residual and neighbor checks an evaluate call asked for, as given."""
 
     combinations: Sequence[Sequence[str]] | Literal["all"] | None
     given: Mapping[str, str] | None
     kinds: Mapping[str, ColumnKind] | None
+    neighbors: Sequence[str] | Literal["all"] | None
 
 
 def _refuse_factor_arguments(factors: Sequence[str] | None, checks: _Requested) -> None:
@@ -1888,8 +1920,10 @@ def _refuse_factor_arguments(factors: Sequence[str] | None, checks: _Requested) 
         raise ValueError(
             "Outliers.evaluate: `factors` names metadata factors to threshold; pass the Metadata itself as `data`."
         )
-    if checks != (None, None, None):
-        raise ValueError("Outliers.evaluate: combinations read metadata factors; pass the Metadata.")
+    if any(value is not None for value in checks):
+        raise ValueError(
+            "Outliers.evaluate: combinations=, given=, kinds= and neighbors= read metadata factors; pass the Metadata."
+        )
 
 
 def _family(data: Any, name: str, kinds: Mapping[str, ColumnKind]) -> str | None:
@@ -2046,6 +2080,11 @@ def _searched_pairs(
     return found
 
 
+def _judged_levels(data: Any, plan: LevelPlan, names: Mapping[FactorLevel, str]) -> list[FactorLevel]:
+    """Return the metadata's levels that the plan judges."""
+    return [level for level in data.levels if names.get(level) in plan.levels]
+
+
 def _combination_checks(
     data: Any,
     checks: _Requested,
@@ -2058,7 +2097,7 @@ def _combination_checks(
     levels = factor_levels(data)
     _refuse_unknown_kinds(checks, levels, factors)
     if checks.combinations == "all":
-        judged = [level for level in data.levels if names.get(level) in plan.levels]
+        judged = _judged_levels(data, plan, names)
         groups = _searched_pairs(data, levels, checks, factors, strata, judged)
     else:
         groups = _named_checks(data, levels, checks, strata, plan, names)
@@ -2066,6 +2105,15 @@ def _combination_checks(
     for y, x in (checks.given or {}).items():
         given.setdefault(_scoring_level(data, levels, (y, x), plan, names), {})[y] = x
     return {level: list(dict.fromkeys(found)) for level, found in groups.items()}, given
+
+
+def _attach_neighbors(result: OutliersOutput[Any], neighbors: Mapping[FactorLevel, Sequence[str]]) -> None:
+    """Score the neighbor checks once and store them on a fresh metadata result, before its first re-detection."""
+    if not neighbors or result.score_input is None:
+        return
+    scored, order = score_neighbors(result.score_input, neighbors)
+    result.scored = tuple(scored)
+    result._order = order
 
 
 def _strata_names(strata: str | Sequence[str] | None, per_class: bool) -> list[str] | None:
@@ -2700,6 +2748,7 @@ class Outliers(Evaluator):
         combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
         given: Mapping[str, str] | None = None,
         kinds: Mapping[str, ColumnKind] | None = None,
+        neighbors: Sequence[str] | Literal["all"] | None = None,
     ) -> OutliersOutput[Any]: ...
 
     @overload
@@ -2717,6 +2766,7 @@ class Outliers(Evaluator):
         combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
         given: Mapping[str, str] | None = None,
         kinds: Mapping[str, ColumnKind] | None = None,
+        neighbors: Sequence[str] | Literal["all"] | None = None,
     ) -> SingleOutliersOutput: ...
 
     @overload
@@ -2734,6 +2784,7 @@ class Outliers(Evaluator):
         combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
         given: Mapping[str, str] | None = None,
         kinds: Mapping[str, ColumnKind] | None = None,
+        neighbors: Sequence[str] | Literal["all"] | None = None,
     ) -> SingleTargetOutliersOutput: ...
 
     @overload
@@ -2751,6 +2802,7 @@ class Outliers(Evaluator):
         combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
         given: Mapping[str, str] | None = None,
         kinds: Mapping[str, ColumnKind] | None = None,
+        neighbors: Sequence[str] | Literal["all"] | None = None,
     ) -> MultiOutliersOutput: ...
 
     @overload
@@ -2768,6 +2820,7 @@ class Outliers(Evaluator):
         combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
         given: Mapping[str, str] | None = None,
         kinds: Mapping[str, ColumnKind] | None = None,
+        neighbors: Sequence[str] | Literal["all"] | None = None,
     ) -> MultiTargetOutliersOutput: ...
 
     @set_metadata(
@@ -2793,6 +2846,7 @@ class Outliers(Evaluator):
         combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
         given: Mapping[str, str] | None = None,
         kinds: Mapping[str, ColumnKind] | None = None,
+        neighbors: Sequence[str] | Literal["all"] | None = None,
     ) -> SingleOutliersOutput | SingleTargetOutliersOutput | MultiOutliersOutput | MultiTargetOutliersOutput:
         """
         Return indices of Outliers with the issues identified for each.
@@ -2920,6 +2974,24 @@ class Outliers(Evaluator):
             own columns.
 
             .. versionadded:: 1.2
+        neighbors : Sequence[str] or "all" or None, default None
+            Metadata factors to judge against their neighbors along a sequence, when `data` is a
+            :class:`~dataeval.Metadata` of a tracking dataset: a frame's value against the frames before and after it in
+            its video, a detection's against the detections before and after it in its track, ordered by
+            ``unit_index``. A value is compared with the median of each side and with the line between them, so a
+            scene cut, a fade or a slow drift is not flagged and a value that departs from all of them is; see
+            :func:`~dataeval.core.sequence_residuals`. ``"all"`` judges every ordered factor at the judged ``"unit"``
+            and ``"instance"`` levels, within `factors` when given.
+
+            Each flagged row has ``method`` ``"neighbors"``, ``metric_name`` such as ``"brightness along sequence"``
+            or ``"box_size along track"``, the raw value as ``metric_value``, and the value its neighbors put it at as
+            ``population_mean``. A timestamp (a date, datetime or duration factor, or ``time_s`` or ``pts``) is also
+            checked for order, and a row out of order is flagged with ``method`` ``"order"`` and the value it is out
+            of order against as ``bound``. A timestamp held as plain numbers under another name is read as an
+            ordinary factor, so cast it to a Datetime or Duration before adding it. The scores of every sequence are
+            judged together, each divided by its sequence's spread, and a pool needs at least 20 scored rows.
+
+            .. versionadded:: 1.2
 
         Returns
         -------
@@ -2964,12 +3036,16 @@ class Outliers(Evaluator):
             column also named in `strata`; if
             ``combinations="all"`` finds no pair and `given` is empty; or if
             :func:`~dataeval.core.combination_scores` refuses a group or a `given` entry.
+            If `neighbors` is given for a dataset or for a metadata with no sequence level, names a factor
+            that holds no numbers or times, lives at a level with no order or that the call does not judge,
+            or is ``"all"`` and finds no factor.
         KeyError
             If a named factor, stratum, or column of `combinations` or `given` is not one of the
-            metadata's; if a key of `kinds` is not a column of `combinations` or `given`.
+            metadata's; if a key of `kinds` is not a column of `combinations` or `given`; if a name in
+            `neighbors` is not a factor of the metadata.
         TypeError
             If `factors` is a single string rather than a list of names, or `combinations` (or one of
-            its groups) is a string other than ``"all"``.
+            its groups) is a string other than ``"all"``, or `neighbors` is a string other than ``"all"``.
 
         Examples
         --------
@@ -3048,6 +3124,20 @@ class Outliers(Evaluator):
         ╞════════════╪═══════════════════════╪══════════════╪═══════════╡
         │ 299        ┆ brightness given hour ┆ 9.017146     ┆ upper     │
         └────────────┴───────────────────────┴──────────────┴───────────┘
+
+        Judge a frame against the frames before and after it in its video. Frame 30 of video 2 is ordinary among
+        every frame and far brighter than its neighbors:
+
+        >>> result = Outliers().evaluate(video_metadata, factors=["brightness"], neighbors=["brightness"])
+        >>> result.data().select("item_index", "target_index", "metric_name", "metric_value", "method")
+        shape: (1, 5)
+        ┌────────────┬──────────────┬───────────────────────────┬──────────────┬───────────┐
+        │ item_index ┆ target_index ┆ metric_name               ┆ metric_value ┆ method    │
+        │ ---        ┆ ---          ┆ ---                       ┆ ---          ┆ ---       │
+        │ i64        ┆ i64          ┆ cat                       ┆ f64          ┆ cat       │
+        ╞════════════╪══════════════╪═══════════════════════════╪══════════════╪═══════════╡
+        │ 2          ┆ 30           ┆ brightness along sequence ┆ 162.805554   ┆ neighbors │
+        └────────────┴──────────────┴───────────────────────────┴──────────────┴───────────┘
         """
         # Every input, not just the first: a filtered metadata among ``other`` misaligns
         # the same way, and is the one an evaluator handed several datasets is likeliest
@@ -3067,9 +3157,9 @@ class Outliers(Evaluator):
                 metadata=metadata,
                 factors=factors,
                 strata=strata,
-                checks=_Requested(combinations, given, kinds),
+                checks=_Requested(combinations, given, kinds, neighbors),
             )
-        _refuse_factor_arguments(factors, _Requested(combinations, given, kinds))
+        _refuse_factor_arguments(factors, _Requested(combinations, given, kinds, neighbors))
 
         plan = _plan_for(levels, per_image, per_target, tracking=False, subject="dataset")
         if other:
@@ -3156,8 +3246,10 @@ class Outliers(Evaluator):
         categorical = _categorical_factors(data, factors, strata, plan, names)
         rarity = _rarity_runs(data, categorical, strata, named=factors is not None)
         groups, given = _combination_checks(data, checks, factors, strata, plan, names)
+        judged = _judged_levels(data, plan, names)
+        neighbors = neighbor_checks(data, checks.neighbors, factors, judged)
         # A named categorical factor needs rarity; with factors=None any other check may run alone.
-        scores = bool(groups or given)
+        scores = bool(groups or given or neighbors)
         chosen = _factors_at_planned_levels(
             eligible_factors(data, factors, others=rarity or (scores and factors is None)),
             plan,
@@ -3167,7 +3259,8 @@ class Outliers(Evaluator):
         )
         result = self.from_stats(factor_stats(data, chosen), per_image=True, per_target=True)
         result.tracking = tracking
-        result.score_input = read_score_input(data, categorical, groups, given, checks.kinds)
+        result.score_input = read_score_input(data, categorical, groups, given, checks.kinds, neighbors)
+        _attach_neighbors(result, neighbors)
         if strata is not None:
             return result.stratified(data, *strata)
         if per_class:
