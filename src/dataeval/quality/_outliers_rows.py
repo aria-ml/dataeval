@@ -34,6 +34,10 @@ DEFAULT_OUTLIERS_OUTLIER_THRESHOLD: Threshold = AdaptiveThreshold()
 _MIN_POPULATION = 20
 # The fewest scored rows per dimension a multi-column score is judged from.
 _MIN_ROWS_PER_DIMENSION = 10
+# The columns that identify one sequence at each level a factor can be judged along, and the column that orders it:
+# a frame along its video, a detection along its track.
+SEQUENCE_KEYS: Mapping[FactorLevel, tuple[str, ...]] = {"unit": ("item_index",), "instance": ("item_index", "track_id")}
+ORDER_COLUMN = "unit_index"
 
 _POPULATION_SCHEMA: dict[str, Any] = {
     "level": pl.Utf8,  # the level name, or null for an item's own row on the two-way split

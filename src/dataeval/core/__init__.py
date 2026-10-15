@@ -31,6 +31,7 @@ __all__ = [
     "RedundantRunResult",
     "SegmentMatchResult",
     "SequenceFingerprint",
+    "SequenceResidualsResult",
     "StatsResult",
     "SubsequenceAlignment",
     "TrackStatsResult",
@@ -92,6 +93,7 @@ __all__ = [
     "redundant_runs",
     "sequence_containment",
     "sequence_fingerprint",
+    "sequence_residuals",
     "track_stats",
     "xxhash",
     "uap",
@@ -160,6 +162,7 @@ from dataeval.core._sequence_match import (
     sequence_containment,
     sequence_fingerprint,
 )
+from dataeval.core._sequence_residuals import SequenceResidualsResult, sequence_residuals
 from dataeval.core._temporal import RedundantRunResult, redundant_runs
 from dataeval.core._track_stats import TrackStatsResult, track_stats
 from dataeval.core._uap import uap

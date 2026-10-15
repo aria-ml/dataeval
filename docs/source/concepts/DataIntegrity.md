@@ -357,8 +357,10 @@ When a {class}`.Metadata` is passed as `data`, {class}`.Outliers` thresholds
 ordered metadata factors, each against the rows at the level it was measured at.
 With `strata=` it judges each factor within the rows that share a categorical
 value and judges categorical factors by rarity. With `combinations=` and
-`given=` it flags rows whose combination of factors is unusual. This section
-describes the method behind each of these and the evidence behind its defaults.
+`given=` it flags rows whose combination of factors is unusual. With
+`neighbors=` it flags a value that departs from the rows next to it along its
+video or track. This section describes the method behind each of these and the
+evidence behind its defaults.
 ```
 
 Extending {class}`.Outliers` beyond image statistics raises three questions the
@@ -741,6 +743,71 @@ numbers and fitting one distance makes the covariance singular and lets rare cat
 **Known limits.** The conditioning column of a residual does not wrap, so hour 23 is not next to hour 0. Consecutive
 frames are not exchangeable, so a burst of rows inflates counts and fits, as it does for single columns.
 
+#### Neighbors along a sequence
+
+Some wrong values are ordinary over the whole dataset and only stand out against the rows next to them. A timestamp
+three hours off sits inside the dataset's range of capture times. A GPS fix that jumps 40 km for one frame is a
+plausible location. A box whose size doubles for one frame of its track is a plausible box size. Judging a column
+against its level, or within a stratum, cannot find these. {func}`.sequence_residuals` compares each frame with the
+frames before and after it in its video, and each detection with the detections before and after it in its track,
+ordered by `unit_index`.
+
+**Where the neighbors put a value.** Each row is compared with up to five rows on each side. The candidates for where
+it should sit are the median of the rows before it, the median of the rows after it, and the line through those two
+medians read at the row's position. The candidate nearest the row's value is its expected value, so each kind of
+change matches the candidate that follows it:
+
+| Along the sequence | Left median | Right median | Line between them | Flagged |
+| --- | --- | --- | --- | --- |
+| a scene cut: the level jumps and stays | matches the frames before the cut | matches the frames after the cut | sits between the two levels | no |
+| a fade: the level ramps over several frames | lags behind | runs ahead | follows the ramp | no |
+| a one-frame glitch | far from it | far from it | far from it | yes |
+
+The first and last row of a sequence have one side. For them, the line runs through the medians of the near half and the
+far half of that side, so a sequence that ends on a trend does not flag its last frame.
+
+**Why interpolate and not extrapolate.** The other way to follow a trend is to project each side's own slope into the
+row. The slope then comes from a few steps between noisy rows, and projected several rows, its error is as large as
+the glitches the check looks for. In measurements, a spike of 8 standard deviations was caught in 62 to 100 % of runs by
+extrapolation and in 100 % of runs by the line on most shapes. A clock rounded to milliseconds flagged 15 % of its
+clean frames by extrapolation and none by the line. The line through the two side medians uses no slope estimated from
+steps, only the two medians the side candidates already compute.
+
+**One scale for every sequence.** The residual is the value minus its expected value. Each residual is divided by its
+sequence's spread, shrunk toward the spread of every sequence with a weight of 30 rows, and the scores of every sequence
+are judged together. A quiet video is not judged by a noisy video's jitter, and a short track is scaled mostly by the
+pooled spread instead of by a dozen rows. Pooling raw residuals instead flagged about 2 % of clean rows once videos
+differed in noise; the shrunk scale flags 0.1 to 0.9 %.
+
+**Timestamps.** A date, datetime or duration factor is detrended by its median interval per frame before the comparison,
+and so are `time_s` and `pts`. A steady rise, a varying frame rate and a dropped frame then do not read as departures,
+and a residual within the clock's own rounding is set to zero. Each timestamp is also checked for order. The fewest
+frames to remove for the sequence to be non-decreasing are flagged when there are at most five, so one bad stamp flags
+only its own frame. A larger set is a reset, and only the frame where the clock went back is flagged. A timestamp held
+as plain numbers under another name is read as an ordinary factor, so cast it to a Datetime or Duration before you
+add it.
+
+**How `Outliers` flags a neighbor.** Pass `neighbors=` to {meth}`.Outliers.evaluate`:
+
+```python
+result = Outliers().evaluate(metadata, levels=("unit", "instance"), neighbors=["brightness", "box_size"])
+```
+
+| Method | What the threshold is fitted to | `metric_value` | `bound` |
+| --- | --- | --- | --- |
+| `neighbors` | the scores of every sequence at the level | the raw value | the crossed limit, in the factor's units |
+| `order` | nothing: it is a rule | the raw value | the value it is out of order against |
+
+A frame's row is named `brightness along sequence` and a detection's `box_size along track`. A pool needs at least 20
+scored rows, and `strata=` splits the pool as it does for any check.
+
+**Known limits.** A run of more than five departing frames is read as a segment, which the per-level threshold or the
+sequence-level `variability` reduction judges. A run of exactly five can still flag a frame in its middle. On a steep
+ramp, a glitch in the ramp's own direction must exceed the ramp's rise over about three frames: on a ramp of one
+standard deviation per frame, a spike of eight was caught in 60 to 90 % of runs. On a steep trend, a glitch can also
+flag the clean frames next to it, because it shifts the median of each nearby frame's side. A clock that runs
+backwards throughout flags every frame but the first. A video that is noisy throughout is not flagged frame by frame.
+
 ### Image statistics as a linting vocabulary
 
 {func}`.compute_stats` is the underlying computation engine for image
@@ -908,7 +975,9 @@ exchangeable, which consecutive video frames are not, and they return no
 verdict on strata too small to support one. Relationships between two ordered
 quantities — box size against distance from the camera, image brightness
 against capture hour — are joint and are not found by testing one column at a
-time, within a stratum or not.
+time, within a stratum or not. The neighbor check (`neighbors=`) is the test that
+reads consecutive frames in order: it judges a frame against the frames next to
+it, and reads a run of more than five departing frames as a segment.
 
 ## Related concept pages
 

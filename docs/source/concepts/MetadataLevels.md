@@ -423,6 +423,13 @@ reads straight through where it would have been.
 {attr}`.AggregationRecord.gaps` counts the steps larger than the tightest one,
 and DataEval says so at info level.
 
+The neighbor check of {meth}`.Outliers.evaluate` (`neighbors=`) reads a level
+as a series too, with a different ordering. It orders a video's frames, and a
+track's detections, by `unit_index` and never by `time_s` or `pts`, because the
+timestamp may be the value under test: a frame stamped three hours late would
+sort itself out of place and look ordinary. See
+[Neighbors along a sequence](DataIntegrity.md#neighbors-along-a-sequence).
+
 **A name states which values it is about.** `mean` over a class label is a
 category error that an expression would compute anyway and hand back as a
 number. Asked for by name, it is refused before evaluation, and the refusal says
