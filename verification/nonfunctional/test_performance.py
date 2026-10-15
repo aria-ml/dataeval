@@ -25,11 +25,17 @@ N_REFERENCE = 10_000
 # measured on the CI runner (Duplicates 7.96 s, Outliers 13.87 s, Balance 0.72 s, DriftKNeighbors
 # 2.08 s; the development machine measured 2.8, 3.8, 0.5, and 2.6 s). Regression guards, not
 # performance promises.
+#
+# DriftKNeighbors is re-baselined for the 2-CPU k8s-medium-cpu runner. Its brute-force kNN search runs on
+# BLAS/OpenMP threads, so its time scales with the CPUs available (on a development machine about 6.2, 3.3,
+# and 1.7 s on 1, 2, and 4 CPUs), while the other workloads run in a single process. The 2.08 s baseline
+# above came from the former docker-machine runner; on a 2-CPU medium pod it measured 5.4-5.7 s (6.4-8.6 s
+# on the 1-CPU small pod), so its budget is twice 5.5 s.
 TIME_BUDGETS_S = {
     "Duplicates": 16.0,
     "Outliers": 28.0,
     "Balance": 1.5,
-    "DriftKNeighbors": 4.5,
+    "DriftKNeighbors": 11.0,
 }
 
 
