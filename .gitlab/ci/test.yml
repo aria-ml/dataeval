@@ -17,6 +17,8 @@ minimum install:
     - nox -e deps
 
 typecheck:
+  tags:
+    - k8s-medium-cpu
   extends: 
     - .nox_all
     - .rules_main_mr_code
