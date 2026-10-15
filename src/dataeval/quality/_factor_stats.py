@@ -58,8 +58,11 @@ def factor_kind(metadata: Any, name: str) -> FactorKind:
     return "ineligible"
 
 
-def eligible_factors(metadata: Any, factors: Sequence[str] | None) -> dict[str, FactorLevel]:
-    """Return the factors to threshold, each mapped to its level: the ones named, or every ordered one.
+def eligible_factors(metadata: Any, factors: Sequence[str] | None, *, others: bool = False) -> dict[str, FactorLevel]:
+    """Return the factors to threshold, each mapped to its level: the ordered ones named, or every ordered one.
+
+    `others` says a rarity, combination or residual check will run: it judges the categorical factors named, and the
+    call may then hold no ordered factor.
 
     Raises
     ------
@@ -68,25 +71,25 @@ def eligible_factors(metadata: Any, factors: Sequence[str] | None) -> dict[str, 
     KeyError
         When a named factor is not one of the metadata's.
     ValueError
-        When `factors` is empty, when a named factor is categorical or ineligible, or when
-        nothing is left to threshold.
+        When `factors` is empty, when a named factor is ineligible, or categorical without
+        `others`, or when nothing is left to threshold and `others` is False.
     """
     levels = factor_levels(metadata)
     kinds: dict[str, FactorKind] = {name: factor_kind(metadata, name) for name in levels}
     if factors is None:
         ordered: dict[str, FactorLevel] = {name: level for name, level in levels.items() if kinds[name] == "ordered"}
-        if not ordered:
+        if not ordered and not others:
             raise ValueError(
                 "Outliers.evaluate: no ordered factors to threshold. Factors "
                 f"{sorted(levels)} are categorical or ineligible. Categorical values are judged "
                 "by rarity within a stratum, which is a separate test."
             )
         return ordered
-    _check_named(metadata, factors, kinds)
-    return {name: levels[name] for name in factors}
+    _check_named(metadata, factors, kinds, others)
+    return {name: levels[name] for name in factors if kinds[name] == "ordered"}
 
 
-def _check_named(metadata: Any, factors: Sequence[str], kinds: Mapping[str, FactorKind]) -> None:
+def _check_named(metadata: Any, factors: Sequence[str], kinds: Mapping[str, FactorKind], others: bool) -> None:
     """Validate `factors`: reject a single string, an empty list, and names that are not thresholdable."""
     if isinstance(factors, str):
         raise TypeError(f"Outliers.evaluate: `factors` takes a list of factor names; pass [{factors!r}].")
@@ -100,11 +103,13 @@ def _check_named(metadata: Any, factors: Sequence[str], kinds: Mapping[str, Fact
             + (f" (dropped: {dropped})" if dropped else "")
             + f". Its factors are {sorted(kinds)}."
         )
-    refused = {name: kinds[name] for name in factors if kinds[name] != "ordered"}
+    allowed = ("ordered", "categorical") if others else ("ordered",)
+    refused = {name: kinds[name] for name in factors if kinds[name] not in allowed}
     if refused:
+        hint = "; pass strata= to judge it by rarity" if "categorical" in refused.values() else ""
         raise ValueError(
             f"Outliers.evaluate: {refused} cannot be thresholded: categorical factors have no "
-            "location or scale, and ineligible columns are not quantities."
+            f"location or scale, and ineligible columns are not quantities{hint}."
         )
 
 

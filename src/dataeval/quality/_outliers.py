@@ -1,25 +1,58 @@
 __all__ = []
 
+import itertools
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, Generic, Literal, NamedTuple, Self, TypeVar, overload
+from typing import Any, Generic, Literal, NamedTuple, Self, TypeVar, cast, overload
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
-from dataeval import Embeddings
+from dataeval import Embeddings, Metadata
 from dataeval._helpers import _get_index2label, _get_item_indices, lexical_categorical, reject_filtered_metadata
 from dataeval.core import (
     ClusterResult,
     ClusterStats,
+    ColumnKind,
     StatsResult,
     cluster,
     combine_stats_results,
     compute_cluster_stats,
 )
+from dataeval.core._combination_scores import _named_groups
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, MetadataLike, Threshold, ThresholdLike
-from dataeval.quality._factor_stats import eligible_factors, factor_stats
+from dataeval.quality._factor_stats import eligible_factors, factor_kind, factor_levels, factor_stats
+from dataeval.quality._outliers_rows import (
+    _CONTEXT_COLUMNS,
+    _EXTRA_COLUMNS,
+    _POPULATION_SCHEMA,
+    DEFAULT_OUTLIERS_OUTLIER_THRESHOLD,
+    FINDINGS_SCHEMA,
+    _Fit,
+    _fit_outliers,
+    _percentile_of,
+    _Population,
+    _populations_frame,
+    _Strata,
+    _unfitted,
+    classes_of,
+    coded,
+    has_level_schema,
+    reached_levels,
+    row_positions,
+    strata_codes,
+)
+from dataeval.quality._outliers_scores import (
+    _CATEGORICAL_KINDS,
+    _ScoredCheck,
+    _ScoreInput,
+    flag_scored,
+    rarity_within,
+    read_score_input,
+    score_combinations,
+    strata_by_level,
+)
 from dataeval.quality._shared import (
     LABEL_KIND,
     TARGET_LEVELS,
@@ -49,11 +82,11 @@ from dataeval.types import (
 )
 from dataeval.utils._array import flatten_samples, to_numpy
 from dataeval.utils.data import iter_images
-from dataeval.utils.thresholds import AdaptiveThreshold, ZScoreThreshold, resolve_threshold
+from dataeval.utils.thresholds import ZScoreThreshold, resolve_threshold
 
 DEFAULT_OUTLIERS_FLAGS = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
 DEFAULT_OUTLIERS_CLUSTER_THRESHOLD: Threshold = ZScoreThreshold(upper_multiplier=2.5, lower_multiplier=None)
-DEFAULT_OUTLIERS_OUTLIER_THRESHOLD: Threshold = AdaptiveThreshold()
+
 
 OutlierReasons = Sequence[str]
 SingleOutliersMap = Mapping[int, Sequence[str]]
@@ -71,6 +104,54 @@ def _row_address(row: Mapping[str, Any], *, has_level: bool) -> SourceIndex:
     spellings of one address do not hash alike.
     """
     return SourceIndex(row["item_index"], row.get("target_index"), row["level"] if has_level else None)
+
+
+def _join_classes_at_view(frame: pl.DataFrame, metadata: Any) -> pl.DataFrame:
+    """Give each flagged row the classes it has at the metadata's view, one output row per distinct class."""
+    has_level = "level" in frame.columns
+    addresses = [_row_address(row, has_level=has_level) for row in frame.iter_rows(named=True)]
+    levels, positions = row_positions(metadata, addresses)
+    index2label = _get_index2label(metadata)
+    names = [
+        [None] if not classes else [index2label[c] for c in classes]
+        for classes in classes_of(metadata, levels, positions)
+    ]
+    return frame.with_columns(pl.Series("class_name", names, dtype=pl.List(pl.Utf8))).explode("class_name")
+
+
+def _join_labels_by_item(frame: pl.DataFrame, metadata: MetadataLike) -> pl.DataFrame:
+    """Join each flagged row to the labels of a plain MetadataLike, which has no level schema."""
+    item_ids = _get_item_indices(metadata)
+    index2label = _get_index2label(metadata)
+    # Whatever the metadata calls a class: a pivoted one groups by its own axis here,
+    # which is what handing this method a metadata rather than a dataset is for. The
+    # ``class_name`` column then holds that axis's group names, so a reader who did not
+    # build the metadata should check ``metadata.class_axis_source`` before reading them
+    # as classes.
+    class_names = [index2label[label] for label in metadata.class_labels]
+
+    labels_df = pl.DataFrame({"item_index": item_ids, "class_name": class_names})
+
+    # Join the Issues with the Labels. When some item holds more than one label, a box is joined to its
+    # own label -- the label's position within its item is the box's target index, as _build_class_ids
+    # reads it -- while an item's own row is joined once to each distinct class of the item, as a
+    # Metadata's rows above its view are. Labels one per item, such as a class axis read at the item
+    # level, name no box, so every row takes its item's label.
+    distinct = labels_df.unique(maintain_order=True)
+    per_box = labels_df["item_index"].n_unique() < labels_df.height
+    if per_box and "target_index" in frame.columns:
+        # A column that holds only nulls has the Null dtype, which cannot be a join key beside an Int64.
+        frame = frame.with_columns(pl.col("target_index").cast(pl.Int64))
+        own_label = labels_df.with_columns(target_index=pl.int_range(pl.len(), dtype=pl.Int64).over("item_index"))
+        joined_df = pl.concat([
+            frame.filter(pl.col("target_index").is_null()).join(distinct, on="item_index", how="left"),
+            frame.filter(pl.col("target_index").is_not_null()).join(
+                own_label, on=["item_index", "target_index"], how="left"
+            ),
+        ])
+    else:
+        joined_df = frame.join(distinct, on="item_index", how="left")
+    return joined_df
 
 
 class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
@@ -96,6 +177,25 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     - percentile: float - Where the value ranks within its reference population, as a
       percentage. Quartiles and quintiles are readings of this column, not separate ones.
     - population_mean, population_std: float - The reference population's own figures
+    - population: str - The stratum or class the row was judged in, such as ``weather=rain`` or
+      ``class_label=cat``, null where it was judged with its whole level. Present only on a result
+      judged within strata, by ``strata=``, :meth:`stratified` or :meth:`classwise`.
+    - method: str - The check that flagged the row: ``"rarity"`` for a categorical value rare within
+      its stratum, ``"mahalanobis"`` for an unusual combination of factors, ``"residual"`` for a
+      factor unusual given another, null for a single-column threshold. Present only when a row
+      has one.
+    - observed: str - The categorical value a rarity row found rare, such as ``weather=snow``. Present
+      only on a result with rarity rows.
+
+    A rarity row reports the one-sided 95 % Clopper-Pearson upper bound on the value's share of its
+    stratum as ``metric_value``, the share it is tested against (0.05) as ``bound``, ``direction``
+    ``"lower"``, and no ``percentile``, ``population_mean`` or ``population_std``.
+
+    A combination row names its group as ``metric_name``, such as ``rel_size, rel_offset_y``, and
+    reports the robust Mahalanobis distance as ``metric_value``, always with ``direction``
+    ``"upper"``. A residual row is named ``brightness given hour`` and reports the signed robust z
+    of the one factor among the rows nearest in the other. Both carry ``percentile``,
+    ``population_mean`` and ``population_std`` of the score within the population it was judged in.
 
     Rows are thresholded **within a level**: a metric's distribution is fitted separately
     over each kind of row the statistics name, so a per-frame reading is never compared
@@ -138,12 +238,27 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         reproduces the rows the result describes.
     tracking : bool
         Whether the result describes tracking data, which decides what the level views select.
+    strata : _Strata or None
+        Which population each statistics row is judged in, kept so re-detection judges the rows the same way.
+        None means every row is judged with its whole level.
+    score_input : _ScoreInput or None
+        The categorical factors, combinations and residuals of a metadata result, one frame per level, kept so
+        :meth:`stratified`, :meth:`classwise` and :meth:`itemwise` can judge them again within new populations.
+        None on a result of a dataset or of :meth:`~Outliers.from_stats`.
+    scored : tuple[_ScoredCheck, ...]
+        The scores of each combination and residual check, kept so :meth:`with_threshold` refits them without
+        scoring again.
     """
 
     # Class-level defaults, not set only in __init__: an output pickled before these existed has
     # no such instance attribute, and DataFrameOutput.__getattr__ refuses names starting with "_".
     restricted_to: frozenset[FactorLevel | None] | None = None
     tracking: bool = False
+    strata: _Strata | None = None
+    score_input: _ScoreInput | None = None
+    _populations: pl.DataFrame | None = None
+    _rarity: tuple[pl.DataFrame, list[_Population]] | None = None
+    scored: tuple[_ScoredCheck, ...] = ()
 
     def __init__(
         self,
@@ -156,6 +271,11 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         dataset_steps: Sequence[int] | None = None,
         restricted_to: frozenset[FactorLevel | None] | None = None,
         tracking: bool = False,
+        strata: _Strata | None = None,
+        populations: pl.DataFrame | None = None,
+        score_input: _ScoreInput | None = None,
+        rarity: tuple[pl.DataFrame, list[_Population]] | None = None,
+        scored: Sequence[_ScoredCheck] = (),
     ) -> None:
         super().__init__(data)
         self.calculation_results = calculation_results
@@ -165,6 +285,65 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         self.dataset_steps = dataset_steps
         self.restricted_to = restricted_to
         self.tracking = tracking
+        self.strata = strata
+        self._populations = populations
+        self.score_input = score_input
+        self._rarity = rarity
+        self.scored = tuple(scored)
+
+    @property
+    def populations(self) -> pl.DataFrame:
+        """The populations statistical checks were asked to judge, and whether each was.
+
+        A population is the rows of one metric at one level, or within one stratum under :meth:`stratified` or
+        one class under :meth:`classwise`. A
+        statistical threshold is fitted only to a population with at least 20 real values; a smaller one yields
+        no findings and is listed here with ``judged=False``. A
+        :class:`~dataeval.utils.thresholds.ConstantThreshold` needs no data and judges every population.
+        Rarity judges a categorical factor only within a stratum of at least 93 rows, the fewest in which one
+        occurrence can be rare at 95 % confidence. A combination of ``d`` factors needs at least 20 rows and
+        10 rows per dimension, and a residual (``given=``) at least 31 rows for its window.
+
+        Every combination and residual you name is listed at its level, even when none of its rows has a value
+        (``n=0``, ``judged=False``). A single-column metric is left out of a population where it has no real
+        value: every factor is read at every level, and has no value at the levels it is not measured at.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per population, with columns:
+
+            - level: str | None - The level the population sits at, None for an item's own row
+            - metric_name: str - The metric judged
+            - method: str | None - The check that judged it, None for a single-column threshold
+            - population: str | None - The stratum or class the population holds, such as ``weather=rain`` or
+              ``class_label=cat``, or None for the whole level
+            - n: int - How many real values the population has
+            - judged: bool - Whether a threshold was fitted to it
+            - reason: str | None - Why it was not judged (``"below 20 rows"``, ``"below 93 rows"``,
+              ``"no spread"``; for a combination or residual also ``"exact fit"``, ``"degenerate
+              covariance"``, ``"too few rows"`` and ``"no upper bound"``), None when it was
+
+            Multi-dataset populations are pooled across the datasets. A result from
+            :meth:`~Outliers.from_clusters` has no populations and returns an empty frame.
+
+        Examples
+        --------
+        >>> from dataeval import Metadata
+        >>> md = Metadata.from_factors({"temperature": [20.1, 19.8, 20.3, 20.0, 19.9, 45.0]})
+        >>> Outliers().evaluate(md).populations.select("metric_name", "n", "judged", "reason")
+        shape: (1, 4)
+        ┌─────────────┬─────┬────────┬───────────────┐
+        │ metric_name ┆ n   ┆ judged ┆ reason        │
+        │ ---         ┆ --- ┆ ---    ┆ ---           │
+        │ cat         ┆ i64 ┆ bool   ┆ str           │
+        ╞═════════════╪═════╪════════╪═══════════════╡
+        │ temperature ┆ 6   ┆ false  ┆ below 20 rows │
+        └─────────────┴─────┴────────┴───────────────┘
+
+        .. versionadded:: 1.2
+        """
+        return pl.DataFrame(schema=_POPULATION_SCHEMA) if self._populations is None else self._populations
 
     @property
     def _combined(self) -> tuple[StatsMap, list[SourceIndex], list[int]] | None:
@@ -295,7 +474,8 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
         Creates a pivot table showing the count of outlier images for each combination
         of class and metric. A flagged box is counted under its own class, or under its
-        item's class when the metadata labels items rather than boxes. Includes a Total
+        item's class when the metadata labels items rather than boxes. A flagged item is
+        counted once under each distinct class among its labels. Includes a Total
         row showing the total number of outliers per metric across all classes, and a
         Total column showing the total number of outliers per class across all metrics.
 
@@ -356,36 +536,12 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         if self.data().shape[0] == 0:
             return pl.DataFrame(schema=schema)
 
-        item_ids = _get_item_indices(metadata)
-        index2label = _get_index2label(metadata)
-        # Whatever the metadata calls a class: a pivoted one groups by its own axis here,
-        # which is what handing this method a metadata rather than a dataset is for. The
-        # ``class_name`` column then holds that axis's group names, so a reader who did not
-        # build the metadata should check ``metadata.class_axis_source`` before reading them
-        # as classes.
-        class_names = [index2label[label] for label in metadata.class_labels]
-
-        labels_df = pl.DataFrame({"item_index": item_ids, "class_name": class_names})
-
-        # Join the Issues with the Labels. When some item holds more than one label, a box is joined to its
-        # own label -- the label's position within its item is the box's target index, as _build_class_ids
-        # reads it -- while an item's own row is joined to every label of the item, as it always was. Labels
-        # one per item, such as a class axis read at the item level, name no box, so every row takes its
-        # item's label.
         frame = self.data()
-        per_box = labels_df["item_index"].n_unique() < labels_df.height
-        if per_box and "target_index" in frame.columns:
-            # A column that holds only nulls has the Null dtype, which cannot be a join key beside an Int64.
-            frame = frame.with_columns(pl.col("target_index").cast(pl.Int64))
-            own_label = labels_df.with_columns(target_index=pl.int_range(pl.len(), dtype=pl.Int64).over("item_index"))
-            joined_df = pl.concat([
-                frame.filter(pl.col("target_index").is_null()).join(labels_df, on="item_index", how="left"),
-                frame.filter(pl.col("target_index").is_not_null()).join(
-                    own_label, on=["item_index", "target_index"], how="left"
-                ),
-            ])
-        else:
-            joined_df = frame.join(labels_df, on="item_index", how="left")
+        joined_df = (
+            _join_classes_at_view(frame, metadata)
+            if has_level_schema(metadata)
+            else _join_labels_by_item(frame, metadata)
+        )
 
         # Create the Summary Pivot (classes as rows, metrics as columns)
         summary_df = (
@@ -600,13 +756,18 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
 
     def _redetect(  # noqa: C901
         self,
-        class_ids: NDArray[np.intp] | None = None,
+        strata: Any = _UNSET,
         outlier_threshold: Any = _UNSET,
         cluster_threshold: Any = _UNSET,
+        rarity: Any = _UNSET,
+        scored: Any = _UNSET,
     ) -> Self:
-        """Re-run outlier detection with optional class grouping or threshold override.
+        """Re-run outlier detection with optional strata or threshold override, keeping this output's strata.
 
-        Only the rows this output is restricted to are re-detected, so a level view stays at its level.
+        Only the rows this output is restricted to are re-detected, so a level view stays at its level. Rarity rows
+        and populations are kept as they are unless `rarity` replaces them (None drops them): a threshold does not
+        change them, and a new stratification judges them anew. Combination scores are refitted under the
+        threshold, from `scored` when a new stratification rescored them.
 
         Raises
         ------
@@ -620,9 +781,13 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             )
 
         outlier_dfs: list[pl.DataFrame] = []
+        populations: pl.DataFrame | None = None
 
         # Stats-based re-detection
         threshold = self.outlier_threshold if outlier_threshold is self._UNSET else outlier_threshold
+        strata = self.strata if strata is self._UNSET else strata
+        rarity = _narrowed(self._rarity if rarity is self._UNSET else rarity, self.restricted_to)
+        scored = _kept_checks(self.scored if scored is self._UNSET else scored, self.restricted_to)
         if self.calculation_results is not None:
             combined = self._combined
             if combined is None:
@@ -630,15 +795,21 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             stats_map, source_index, ds_steps = combined
 
             keep = self._kept(source_index)
+            restricted = strata
             if keep is not None:
-                stats_map, source_index, class_ids = _restrict(stats_map, source_index, class_ids, keep)
+                stats_map, source_index, restricted = _restrict(stats_map, source_index, strata, keep)
 
-            stats_df = _detect_outliers(stats_map, source_index, threshold, class_ids)
+            stats_df, rows = _detect_outliers(stats_map, source_index, threshold, restricted)
+            score_df, score_rows = self._flag_scored(scored, threshold)
+            populations = _populations_frame(rows + ([] if rarity is None else rarity[1]) + score_rows)
 
             if ds_steps:
                 stats_df = add_dataset_index(stats_df, ds_steps)
 
+            # Rarity and combinations are judged only on a metadata, which spans one dataset, so their rows need no
+            # dataset index.
             outlier_dfs.append(stats_df)
+            outlier_dfs.extend(df for df in (None if rarity is None else rarity[0], score_df) if df is not None)
 
         # Cluster-based re-detection. Cluster rows are item rows, so a view that excludes the item
         # end must not gain them back.
@@ -651,7 +822,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             outlier_dfs.append(cluster_df)
 
         merged = Outliers._merge_outlier_dfs(outlier_dfs)
-        merged = drop_null_index_columns(merged, ["target_index", "level"])
+        merged = drop_null_index_columns(merged, _DROPPABLE)
 
         return OutliersOutput(  # type: ignore[return-value]
             merged,
@@ -662,7 +833,26 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             dataset_steps=self.dataset_steps,
             restricted_to=self.restricted_to,
             tracking=self.tracking,
+            strata=strata,
+            populations=populations,
+            score_input=self.score_input,
+            rarity=rarity,
+            scored=scored,
         )
+
+    def _flag_scored(
+        self, scored: Sequence[_ScoredCheck], threshold: Any
+    ) -> tuple[pl.DataFrame | None, list[_Population]]:
+        """Refit the stored combination scores under `threshold`; no frame when there are none."""
+        if not scored or self.score_input is None:
+            return None, []
+        return flag_scored(scored, threshold, self.score_input.address)
+
+    def _rescored(self, strata: Mapping[FactorLevel, Any]) -> tuple[_ScoredCheck, ...]:
+        """Score the stored combinations again within the populations `strata` give each level."""
+        if self.score_input is None:
+            return ()
+        return tuple(score_combinations(self.score_input, strata))
 
     def classwise(self, metadata: MetadataLike) -> Self:
         """Re-detect outliers using per-class thresholds.
@@ -676,6 +866,20 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         For object detection datasets, target-level stats use the target's class,
         while image-level stats for images with multiple classes fall back to
         global detection.
+
+        On a :class:`~dataeval.Metadata`, each row takes its class at the metadata's
+        :attr:`~dataeval.Metadata.view`: a row at or below the view takes the class of its
+        ancestor there, and a row above it takes the one class among its rows at the view.
+        Rows with several classes or none form one population, and levels the class does
+        not reach, such as frames on a detection view, are judged whole.
+
+        A statistical threshold is fitted to a class only when it holds at least 20
+        rows with a value. A smaller class yields no findings, and :attr:`populations`
+        lists it with ``judged=False``. Each flagged row names its class in the
+        ``population`` column, such as ``class_label=cat``, or ``class_label=null`` for a
+        row with no one class. Any strata from :meth:`stratified` are replaced. Combinations
+        and residuals asked for with ``combinations=`` and ``given=`` are scored again within
+        each class; categorical factors are not judged by rarity.
 
         Parameters
         ----------
@@ -691,39 +895,171 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         Raises
         ------
         ValueError
-            If this output was not created from an evaluation with stored statistics.
+            If this output was not created from an evaluation with stored statistics; or if it
+            holds combinations and `metadata` holds other items, or other rows at a level they
+            were scored at, than this result was computed on.
 
         Examples
         --------
-        >>> outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold="modzscore")
-        >>> result = outliers.evaluate(dataset)
-        >>> classwise_result = result.classwise(metadata)
-        >>> classwise_result.aggregate_by_class(metadata)
-        shape: (5, 9)
-        ┌────────────┬─────────┬──────────┬──────┬───┬─────┬─────┬───────┬───────┐
-        │ class_name ┆ entropy ┆ kurtosis ┆ mean ┆ … ┆ std ┆ var ┆ zeros ┆ Total │
-        │ ---        ┆ ---     ┆ ---      ┆ ---  ┆   ┆ --- ┆ --- ┆ ---   ┆ ---   │
-        │ cat        ┆ u32     ┆ u32      ┆ u32  ┆   ┆ u32 ┆ u32 ┆ u32   ┆ u32   │
-        ╞════════════╪═════════╪══════════╪══════╪═══╪═════╪═════╪═══════╪═══════╡
-        │ plane      ┆ 2       ┆ 0        ┆ 3    ┆ … ┆ 2   ┆ 2   ┆ 4     ┆ 13    │
-        │ person     ┆ 2       ┆ 1        ┆ 2    ┆ … ┆ 2   ┆ 2   ┆ 1     ┆ 11    │
-        │ boat       ┆ 1       ┆ 0        ┆ 1    ┆ … ┆ 1   ┆ 1   ┆ 4     ┆ 8     │
-        │ car        ┆ 0       ┆ 0        ┆ 0    ┆ … ┆ 0   ┆ 0   ┆ 4     ┆ 4     │
-        │ Total      ┆ 5       ┆ 1        ┆ 6    ┆ … ┆ 5   ┆ 5   ┆ 13    ┆ 36    │
-        └────────────┴─────────┴──────────┴──────┴───┴─────┴─────┴───────┴───────┘
+        Twenty images in each of three classes, where the cars are bright and one boat is as
+        bright as a car:
+
+        >>> rng = np.random.default_rng(0)
+        >>> images = rng.random((60, 3, 16, 16))
+        >>> images[20:40] = images[20:40] * 0.5 + 0.5
+        >>> images[50] = images[50] * 0.5 + 0.5
+        >>> md = Metadata.from_factors(
+        ...     {"hour": np.arange(60) % 24}, np.repeat([0, 1, 2], 20), index2label={0: "plane", 1: "car", 2: "boat"}
+        ... )
+
+        Judged against every image, the bright boat is unremarkable. Judged against the boats,
+        it is not:
+
+        >>> result = Outliers(flags=ImageStats.PIXEL_MEAN | ImageStats.PIXEL_STD).evaluate(images)
+        >>> len(result)
+        0
+        >>> result.classwise(md).aggregate_by_class(md)
+        shape: (2, 4)
+        ┌────────────┬──────┬─────┬───────┐
+        │ class_name ┆ mean ┆ std ┆ Total │
+        │ ---        ┆ ---  ┆ --- ┆ ---   │
+        │ cat        ┆ u32  ┆ u32 ┆ u32   │
+        ╞════════════╪══════╪═════╪═══════╡
+        │ boat       ┆ 1    ┆ 1   ┆ 2     │
+        │ Total      ┆ 1    ┆ 1   ┆ 2     │
+        └────────────┴──────┴─────┴───────┘
         """
         combined = self._combined
         if combined is None:
             raise ValueError("classwise requires statistics stored from evaluate() or from_stats().")
         _, source_index, _ = combined
-        class_ids = _build_class_ids(source_index, metadata)
-        return self._redetect(class_ids)
+        if self.score_input is not None and has_level_schema(metadata):
+            self._refuse_other_items(metadata, "classwise")
+        scored = () if self.score_input is None else self._rescored(_level_class_strata(self.score_input, metadata))
+        return self._redetect(_class_strata(source_index, metadata), rarity=None, scored=scored)
+
+    def stratified(self, metadata: Metadata, *columns: str) -> Self:
+        """Re-detect outliers within strata of categorical metadata factors.
+
+        Each threshold is fitted within each stratum separately, so a value is judged against
+        the rows that share its stratum rather than against its whole level. Several columns
+        cross: a stratum is one combination of their values. The strata replace any this
+        result was judged with, by ``strata=`` or :meth:`classwise`.
+
+        A stratum reaches its own level and the levels below it, where each row takes the
+        value of its ancestor: a detection takes its frame's ``weather``. A null value is a
+        population of its own, ``weather=null``. Levels no stratum reaches are judged whole,
+        and their rows have a null ``population``.
+
+        On the result of evaluating a :class:`~dataeval.Metadata`, each categorical factor at a
+        level the strata reach is also judged by rarity, as ``strata=`` judges it: a value is
+        flagged when it makes up less than 5 % of its stratum at 95 % confidence, after a
+        Benjamini-Hochberg correction across the strata. A stratum needs at least 93 rows to be
+        judged this way, and a value rare in every stratum is not flagged, since it is rare in
+        the dataset rather than out of place in one stratum. Each rarity row names the value in
+        an ``observed`` column and ``"rarity"`` in a ``method`` column. Combinations and
+        residuals asked for with ``combinations=`` and ``given=`` are scored again within the
+        new strata.
+
+        Parameters
+        ----------
+        metadata : Metadata
+            The metadata of the data this result was computed on, holding the strata.
+        *columns : str
+            Categorical factors, or the index columns ``item_index``, ``unit_index`` and
+            ``track_id``. A frame or a track is a stratum within its video, labeled
+            ``item_index=0, unit_index=3``.
+
+        Returns
+        -------
+        OutliersOutput
+            New output whose rows name the stratum they were judged in, in a
+            ``population`` column such as ``weather=rain``.
+
+        Raises
+        ------
+        ValueError
+            If no column is named; if `metadata` has no level schema, or holds a different
+            number of items than the stored statistics, or a different number of rows at a level
+            this result judged factors at; if a column is continuous; if the
+            strata reach no level of the stored statistics or of its categorical factors; or if
+            this output holds no statistics.
+        KeyError
+            If a column is not a factor of `metadata`.
+
+        Examples
+        --------
+        Rain readings sit near 0 and clear ones near 50. Item 3 reads 6, which is ordinary
+        beside every reading and extreme beside the rain:
+
+        >>> from dataeval import Metadata
+        >>> rng = np.random.default_rng(0)
+        >>> weather = ["rain"] * 30 + ["clear"] * 30
+        >>> x = np.r_[rng.normal(0, 1, 30), rng.normal(50, 1, 30)]
+        >>> x[3] = 6.0
+        >>> md = Metadata.from_factors({"x": x, "weather": weather})
+        >>> result = Outliers().evaluate(md)
+        >>> len(result)
+        0
+        >>> result.stratified(md, "weather").data().select("item_index", "metric_value", "population")
+        shape: (1, 3)
+        ┌────────────┬──────────────┬──────────────┐
+        │ item_index ┆ metric_value ┆ population   │
+        │ ---        ┆ ---          ┆ ---          │
+        │ i64        ┆ f64          ┆ cat          │
+        ╞════════════╪══════════════╪══════════════╡
+        │ 3          ┆ 6.0          ┆ weather=rain │
+        └────────────┴──────────────┴──────────────┘
+
+        .. versionadded:: 1.2
+        """
+        if not columns:
+            raise ValueError("stratified names the strata to judge within; to judge each level whole, use itemwise().")
+        if not has_level_schema(metadata):
+            raise ValueError("stratified reads strata from a dataeval.Metadata with a level schema.")
+        combined = self._combined
+        if combined is None:
+            raise ValueError("stratified requires statistics stored from evaluate() or from_stats().")
+        self._refuse_other_items(metadata)
+        _, source_index, _ = combined
+        score_input = self.score_input
+        if score_input is None:
+            strata = strata_codes(metadata, columns, *row_positions(metadata, source_index))
+            return self._redetect(strata, rarity=None)
+        scored_levels = score_input.scored_levels()
+        judged: list[FactorLevel] = [*score_input.judged(columns), *scored_levels]
+        strata = strata_codes(metadata, columns, *row_positions(metadata, source_index), also=judged)
+        rarity = rarity_within(metadata, columns, score_input)
+        scored = self._rescored(strata_by_level(metadata, columns, scored_levels))
+        return self._redetect(strata, rarity=rarity, scored=scored)
+
+    def _refuse_other_items(self, metadata: Any, caller: str = "stratified") -> None:
+        """Raise when `metadata` holds other items, or other rows at a level, than this result describes."""
+        results = self.calculation_results
+        stored = results.get("image_count") if isinstance(results, Mapping) else None
+        metadata._structure()
+        held = metadata._store.height(metadata.item_level)
+        if stored is not None and stored != held:
+            raise ValueError(
+                f"{caller}: the metadata holds {held} items and the stored statistics describe {stored}; "
+                "pass the metadata of the data this result was computed on."
+            )
+        frames = {} if self.score_input is None else self.score_input.frames
+        judged = {level: frame.height for level, frame in frames.items()}
+        rows = {level: metadata._store.height(level) for level in judged}
+        if rows != judged:
+            raise ValueError(
+                f"{caller}: the metadata holds {rows} rows at the levels this result judged, which held {judged}; "
+                "pass the metadata of the data this result was computed on."
+            )
 
     def itemwise(self) -> Self:
         """Re-detect outliers using global thresholds (across all items).
 
         This is the inverse of :meth:`classwise` -- it re-runs detection without
-        per-class grouping, using the full dataset distribution for thresholds.
+        per-class grouping, using the full dataset distribution for thresholds. It also
+        drops any strata and the rarity rows judged within them, and scores combinations
+        and residuals again over each whole level.
 
         Returns
         -------
@@ -741,7 +1077,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         >>> result = outliers.evaluate(dataset, per_class=True, metadata=metadata)
         >>> global_result = result.itemwise()
         """
-        return self._redetect()
+        return self._redetect(None, rarity=None, scored=self._rescored({}))
 
     def _filtered_by_kind(self, *kinds: FactorLevel | None) -> Self:
         """Return these results narrowed to rows of the given kinds, still re-detectable at those kinds.
@@ -752,8 +1088,10 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         restricted = wanted if self.restricted_to is None else self.restricted_to & wanted
         frame = self.data()
         keep = pl.Series([kind in restricted for kind in row_kinds(frame).to_list()], dtype=pl.Boolean)
+        populations = self.populations
+        kept_levels = pl.Series([level in restricted for level in populations["level"].to_list()], dtype=pl.Boolean)
         return OutliersOutput(  # type: ignore[return-value]
-            drop_null_index_columns(frame.filter(keep), ["target_index", "level"]),
+            drop_null_index_columns(frame.filter(keep), _DROPPABLE),
             calculation_results=self.calculation_results,
             outlier_threshold=self.outlier_threshold,
             cluster_stats=self.cluster_stats,
@@ -761,6 +1099,11 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             dataset_steps=self.dataset_steps,
             restricted_to=restricted,
             tracking=self.tracking,
+            strata=self.strata,
+            populations=populations.filter(kept_levels),
+            score_input=self.score_input,
+            rarity=_narrowed(self._rarity, restricted),
+            scored=_kept_checks(self.scored, restricted),
         )
 
     def _tracking_level(self, kind: FactorLevel | None) -> Self:
@@ -852,7 +1195,10 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         quick sensitivity analysis and threshold experimentation.
 
         Can be chained with :meth:`classwise` for per-class detection
-        with a different threshold.
+        with a different threshold. Rarity rows are kept as they are: they are
+        judged against their own share, not against this threshold. Combination and
+        residual scores are refitted under the new threshold without scoring them again;
+        a scalar reaches them only when it is statistical and has no limits.
 
         Parameters
         ----------
@@ -919,6 +1265,9 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         if combined is None and self.cluster_stats is None:
             return
         known = set(self.data()["metric_name"].cast(pl.Utf8).to_list())
+        # Every check judged, including a rarity or combination check that flagged nothing.
+        known |= set(self.populations["metric_name"].cast(pl.Utf8).to_list())
+        known |= {check.metric_name for check in self.scored}
         if combined is not None:
             known |= set(combined[0])
         if self.cluster_stats is not None:
@@ -1003,159 +1352,54 @@ MultiOutliersOutput = OutliersOutput[MultiOutliersMap]
 MultiTargetOutliersOutput = OutliersOutput[MultiTargetOutliersMap]
 
 
-# The frame of reference every flagged row carries, beside the value that was flagged. Declared
-# once: the schema, the empty-frame schema and the cross-dataset merge all read it from here.
-_CONTEXT_COLUMNS: dict[str, Any] = {
-    "direction": lexical_categorical(),
-    "bound": pl.Float64,
-    "percentile": pl.Float64,
-    "population_mean": pl.Float64,
-    "population_std": pl.Float64,
-}
-
+# The columns every outliers frame drops when no row holds a value for them.
+_DROPPABLE = ["target_index", "level", "method", "population", "observed"]
 
 # The measurements, which describe a row rather than identify it. Everything else in the frame
 # is part of which row this is, and so is what the frame is ordered on.
-_UNSORTED_COLUMNS = frozenset({"metric_value", *_CONTEXT_COLUMNS})
+_UNSORTED_COLUMNS = frozenset({"metric_value", *_CONTEXT_COLUMNS, *_EXTRA_COLUMNS})
+
+
+def _narrowed(
+    rarity: tuple[pl.DataFrame, list[_Population]] | None, restricted: frozenset[FactorLevel | None] | None
+) -> tuple[pl.DataFrame, list[_Population]] | None:
+    """Keep the rarity rows and populations at the kinds of row an output is restricted to."""
+    if rarity is None or restricted is None:
+        return rarity
+    frame, populations = rarity
+    keep = pl.Series([kind in restricted for kind in row_kinds(frame).to_list()], dtype=pl.Boolean)
+    return frame.filter(keep), [population for population in populations if population.level in restricted]
+
+
+def _kept_checks(
+    scored: Sequence[_ScoredCheck], restricted: frozenset[FactorLevel | None] | None
+) -> tuple[_ScoredCheck, ...]:
+    """Keep the combination checks at the kinds of row an output is restricted to."""
+    return tuple(check for check in scored if restricted is None or check.kind in restricted)
 
 
 def _restrict(
     stats: StatsMap,
     source_index: Sequence[SourceIndex],
-    class_ids: NDArray[np.intp] | None,
+    strata: _Strata | None,
     keep: NDArray[np.bool_],
-) -> tuple[StatsMap, list[SourceIndex], NDArray[np.intp] | None]:
-    """Keep the entries `keep` marks, in all three arrays `_detect_outliers` indexes by position."""
+) -> tuple[StatsMap, list[SourceIndex], _Strata | None]:
+    """Keep the entries `keep` marks, in the statistics, the source index and the strata `_detect_outliers` indexes."""
     indices = np.flatnonzero(keep)
     return (
         {name: values[indices] for name, values in stats.items()},
         [source_index[i] for i in indices.tolist()],
-        None if class_ids is None else class_ids[indices],
+        None if strata is None else strata._replace(codes=strata.codes[indices]),
     )
 
 
-def _extend_context(context: dict[str, list[Any]], fit: "_Fit") -> None:
+def _extend_context(context: dict[str, list[Any]], fit: _Fit) -> None:
     """Append one fit's flagged rows to the running context columns, in frame order."""
     context["direction"].extend(np.where(fit.above[fit.mask], "upper", "lower").tolist())
     context["bound"].extend(fit.bound[fit.mask].tolist())
     context["percentile"].extend(fit.percentile[fit.mask].tolist())
     context["population_mean"].extend(fit.mean[fit.mask].tolist())
     context["population_std"].extend(fit.std[fit.mask].tolist())
-
-
-class _Fit(NamedTuple):
-    """One threshold fitted to one population, and how each value under it sits against the fit.
-
-    Every field is an array aligned with the values the fit was asked about, so a level made of
-    several class buckets assembles one of these by writing each bucket's fit into its own slots.
-
-    Attributes
-    ----------
-    mask : NDArray[np.bool_]
-        Whether each value is an outlier.
-    bound : NDArray[np.float64]
-        The limit each value crossed, NaN where it crossed none.
-    above : NDArray[np.bool_]
-        Whether the crossed limit was the upper one.
-    percentile : NDArray[np.float64]
-        Each value's rank within the population, as a percentage.
-    mean, std : NDArray[np.float64]
-        The population's own figures, repeated for every value fitted against it.
-    """
-
-    mask: NDArray[np.bool_]
-    bound: NDArray[np.float64]
-    above: NDArray[np.bool_]
-    percentile: NDArray[np.float64]
-    mean: NDArray[np.float64]
-    std: NDArray[np.float64]
-
-
-def _unfitted(count: int) -> _Fit:
-    """Return a fit that flags nothing, for a population no threshold could be derived from."""
-    return _Fit(
-        mask=np.zeros(count, dtype=bool),
-        bound=np.full(count, np.nan, dtype=np.float64),
-        above=np.zeros(count, dtype=bool),
-        percentile=np.full(count, np.nan, dtype=np.float64),
-        mean=np.full(count, np.nan, dtype=np.float64),
-        std=np.full(count, np.nan, dtype=np.float64),
-    )
-
-
-def _percentile_of(values: NDArray[Any], population: NDArray[Any]) -> NDArray[np.float64]:
-    """Rank each value within an ascending population, as a percentage, splitting ties evenly.
-
-    Reported instead of a z-score because it means the same thing under every threshold. A z is
-    only the statistic that flagged the row under :class:`~dataeval.utils.thresholds.ZScoreThreshold`;
-    beside an adaptive or IQR bound it is a second, unrelated summary of the same value. The
-    population's ``mean`` and ``std`` are reported too, so a caller who wants a z can form one.
-    """
-    left = np.searchsorted(population, values, side="left")
-    right = np.searchsorted(population, values, side="right")
-    return 100.0 * (left + right) / (2 * len(population))
-
-
-def _crossings(
-    values: NDArray[np.float64],
-    real: NDArray[np.bool_],
-    lower: float | None,
-    upper: float | None,
-) -> tuple[NDArray[np.bool_], NDArray[np.bool_], NDArray[np.float64]]:
-    """Return which values fell below, which rose above, and the limit each one crossed."""
-    below = real & (values < lower) if lower is not None else np.zeros(len(values), dtype=bool)
-    above = real & (values > upper) if upper is not None else np.zeros(len(values), dtype=bool)
-    bound = np.full(len(values), np.nan, dtype=np.float64)
-    bound[below] = lower
-    bound[above] = upper
-    return below, above, bound
-
-
-def _fit_outliers(values: NDArray[Any], threshold: Threshold) -> _Fit:
-    """Fit a threshold to one population and describe every value against it.
-
-    Parameters
-    ----------
-    values : NDArray
-        1D array of metric values making up one population.
-    threshold : Threshold
-        Threshold instance to compute bounds.
-
-    Returns
-    -------
-    _Fit
-        The outlier mask and the frame of reference behind it.
-
-    Notes
-    -----
-    The population is the array's non-NaN values, which is exactly what the threshold is fitted
-    to. A NaN is never an outlier: it records a measurement that was not made, not an unusual
-    value, and it takes no part in the mean, the spread or the percentile ranking either.
-    """
-    count = len(values)
-    if count == 0:
-        return _unfitted(count)
-
-    float_values = values.astype(np.float64)
-    real = ~np.isnan(float_values)
-    if not np.any(real):
-        return _unfitted(count)
-
-    lower, upper = threshold(float_values)
-    # Both bounds None means the threshold could not be derived (e.g. zero variance).
-    if lower is None and upper is None:
-        return _unfitted(count)
-
-    below, above, bound = _crossings(float_values, real, lower, upper)
-    population = np.sort(float_values[real])
-    return _Fit(
-        mask=below | above,
-        bound=bound,
-        above=above,
-        percentile=_percentile_of(float_values, population),
-        mean=np.full(count, float(population.mean()), dtype=np.float64),
-        std=np.full(count, float(population.std()), dtype=np.float64),
-    )
 
 
 def _build_class_ids(  # noqa: C901
@@ -1217,6 +1461,55 @@ def _build_class_ids(  # noqa: C901
     return class_ids
 
 
+def _class_labels(class_ids: NDArray[np.intp], metadata: MetadataLike) -> dict[int, str | None]:
+    """Label classwise buckets: the class name, and class_label=null for rows with no one class."""
+    index2label = _get_index2label(metadata)
+    labels: dict[int, str | None] = {
+        int(c): f"class_label={index2label.get(int(c), int(c))}" for c in np.unique(class_ids) if c >= 0
+    }
+    labels[-1] = "class_label=null"
+    return labels
+
+
+def _class_strata(source_index: Sequence[SourceIndex], metadata: MetadataLike) -> _Strata:
+    """Stratify the statistics rows by class, for per-class detection."""
+    if has_level_schema(metadata):
+        return _view_class_strata(source_index, metadata)
+    class_ids = _build_class_ids(source_index, metadata)
+    return _Strata(class_ids, _class_labels(class_ids, metadata), ("<class>",))
+
+
+def _view_class_strata(source_index: Sequence[SourceIndex], metadata: Any) -> _Strata:
+    """Stratify by the class each row has at the metadata's view; a row with several classes or none is ``<axis>=null``.
+
+    A level the class does not reach is judged whole: one off the view's branch, and on tracking data every level
+    above the view (a sequence, a frame or a track on the detection view), as per-class detection always judged them.
+    """
+    levels, positions = row_positions(metadata, source_index)
+    classes = classes_of(metadata, levels, positions)
+    if "sequence" in metadata.levels:
+        above = {level for level in levels if metadata._store.schema.is_ancestor(level, metadata.view)}
+        classes = [None if level in above else found for level, found in zip(levels, classes, strict=True)]
+    index2label = _get_index2label(metadata)
+    axis = metadata.class_axis
+    labels = [
+        None if found is None else f"{axis}={index2label.get(found[0], found[0]) if len(found) == 1 else 'null'}"
+        for found in classes
+    ]
+    return coded(labels, ("<class>",))
+
+
+def _level_class_strata(score_input: _ScoreInput, metadata: MetadataLike) -> dict[FactorLevel, Any]:
+    """Stratify the rows of each level with combinations by class, None where the class does not reach the level."""
+    found: dict[FactorLevel, Any] = {}
+    for level in score_input.scored_levels():
+        addresses = [score_input.address(level, row) for row in range(score_input.frames[level].height)]
+        strata = _class_strata(addresses, metadata)
+        labels = {code: label for code, label in strata.labels.items() if label is not None}
+        found[level] = None if np.all(strata.codes == -1) else (pl.Series(strata.codes.astype(str)), labels)
+    return found
+
+
 def _resolve_outlier_threshold(
     outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None,
 ) -> Threshold | Mapping[str, Threshold]:
@@ -1257,10 +1550,9 @@ def _place(into: _Fit, where: NDArray[np.bool_], part: _Fit) -> None:
 def _fit_level(
     level_values: NDArray[Any],
     threshold: Threshold,
-    level_mask: NDArray[np.bool_],
-    class_ids: NDArray[np.intp] | None,
-) -> _Fit:
-    """Fit one level's values, in one population or one per class.
+    level_codes: NDArray[np.intp],
+) -> tuple[_Fit, list[tuple[int, int, str | None]]]:
+    """Fit one level's values, in one population per stratum code.
 
     Parameters
     ----------
@@ -1268,33 +1560,38 @@ def _fit_level(
         Metric values for entries at this level.
     threshold : Threshold
         Threshold instance to compute bounds.
-    level_mask : NDArray[np.bool_]
-        Boolean mask selecting this level from the full source_index.
-    class_ids : NDArray[np.intp] or None
-        Per-entry class IDs aligned with source_index, or None for global detection.
+    level_codes : NDArray[np.intp]
+        Each entry's population code at this level, -1 for the whole level.
 
     Returns
     -------
     _Fit
         Arrays over ``level_values``, each entry described against the population it was
         thresholded within -- the level as a whole, or its own class.
+    list[tuple[int, int, str or None]]
+        One ``(code, n, reason)`` per population: its code, its count of real values, and why it
+        was not judged, or None.
 
     Notes
     -----
-    Entries with no class to look up (``class_id == -1``) form their own bucket, fitted
-    globally, which is the same population the threshold used for them.
+    Entries with no class to look up (code -1) form their own bucket, which is the whole level
+    when no entry has a class.
     """
-    if class_ids is None:
-        return _fit_outliers(level_values, threshold)
-
-    level_class_ids = class_ids[level_mask]
     fit = _unfitted(len(level_values))
-    buckets = [level_class_ids == -1]
-    buckets.extend(level_class_ids == cls for cls in np.unique(level_class_ids[level_class_ids >= 0]))
-    for bucket in buckets:
-        if np.any(bucket):
-            _place(fit, bucket, _fit_outliers(level_values[bucket], threshold))
-    return fit
+    buckets: list[tuple[int, int, str | None]] = []
+    for code in np.unique(level_codes).tolist():
+        bucket = level_codes == code
+        part, n, reason = _fit_outliers(level_values[bucket], threshold)
+        _place(fit, bucket, part)
+        buckets.append((code, n, reason))
+    return fit, buckets
+
+
+def _population_label(strata: _Strata | None, code: int, codes_at_level: NDArray[np.intp]) -> str | None:
+    """Return the label of one bucket: None for the whole level, the strata's label otherwise."""
+    if strata is None or (code == -1 and np.all(codes_at_level == -1)):
+        return None
+    return strata.labels.get(code)
 
 
 def _masks_by_level(source_index: Sequence[SourceIndex]) -> list[NDArray[np.bool_]]:
@@ -1323,9 +1620,9 @@ def _detect_outliers(  # noqa: C901
     stats: StatsMap,
     source_index: Sequence[SourceIndex],
     outlier_threshold: ThresholdLike | Mapping[str, ThresholdLike] | None,
-    class_ids: NDArray[np.intp] | None = None,
-) -> pl.DataFrame:
-    """Detect outliers from pre-computed statistics, optionally per-class.
+    strata: _Strata | None = None,
+) -> tuple[pl.DataFrame, list[_Population]]:
+    """Detect outliers from pre-computed statistics, optionally per stratum.
 
     Parameters
     ----------
@@ -1335,13 +1632,15 @@ def _detect_outliers(  # noqa: C901
         Source index entries aligned with stat values.
     outlier_threshold : ThresholdLike or dict or None
         Threshold configuration for outlier detection.
-    class_ids : NDArray[np.intp] or None
-        Per-entry class IDs for per-class detection, or None for global.
+    strata : _Strata or None
+        Each entry's population, aligned with `source_index`, or None to judge each level whole.
 
     Returns
     -------
     pl.DataFrame
         DataFrame with columns: item_index, target_index, metric_name, metric_value.
+    list[_Population]
+        Every population each metric was judged in at each level, and whether it was.
 
     Notes
     -----
@@ -1359,10 +1658,9 @@ def _detect_outliers(  # noqa: C901
     - **Partly NaN** — thresholded over the values it does have. Every statistical
       threshold reduces NaN-aware, so the surviving values set the bounds and the NaN
       entries are excluded from the result rather than compared against them.
-    - **Too few real values to have a spread** — no outliers. One or two surviving
-      values give bounds that coincide with the values themselves, and
-      :class:`~dataeval.utils.thresholds.AdaptiveThreshold` declines below three
-      outright, so nothing is flagged off a sample too small to describe a distribution.
+    - **Too few real values** — no outliers. A statistical threshold is fitted only to a
+      population of at least ``_MIN_POPULATION`` real values, so nothing is flagged off a
+      sample too small to describe a distribution. The population is listed as not judged.
     """
     item_ids: list[int] = []
     target_ids: list[int | None] = []
@@ -1370,6 +1668,9 @@ def _detect_outliers(  # noqa: C901
     metric_names: list[str] = []
     metric_values: list[float] = []
     context: dict[str, list[Any]] = {name: [] for name in _CONTEXT_COLUMNS}
+    row_populations: list[str | None] = []
+    populations: list[_Population] = []
+    codes = np.full(len(source_index), -1, dtype=np.intp) if strata is None else strata.codes
 
     if len(source_index) > 0:
         # One mask per kind of row the source index names, rather than the two an
@@ -1388,7 +1689,18 @@ def _detect_outliers(  # noqa: C901
 
                     level_values = values[level_mask]
                     level_indices = np.flatnonzero(level_mask)
-                    fit = _fit_level(level_values, threshold, level_mask, class_ids)
+                    level_codes = codes[level_mask]
+                    fit, buckets = _fit_level(level_values, threshold, level_codes)
+                    # The level's kind, which names the level for every row but an item's own. A bucket
+                    # with no real value is not listed: the metric was not measured there, as a metadata
+                    # factor is not at the levels it does not live at.
+                    level = source_index[level_indices[0]].kind
+                    label_of = {code: _population_label(strata, code, level_codes) for code, _, _ in buckets}
+                    populations.extend(
+                        _Population(level, stat, None, label_of[code], n, reason is None, reason)
+                        for code, n, reason in buckets
+                        if n > 0
+                    )
 
                     if np.any(fit.mask):
                         outlier_indices = level_indices[fit.mask]
@@ -1397,19 +1709,11 @@ def _detect_outliers(  # noqa: C901
                         levels.extend(reported_level(source_index[idx]) for idx in outlier_indices)
                         metric_names.extend([stat] * len(outlier_indices))
                         metric_values.extend(values[outlier_indices].tolist())
+                        row_populations.extend(label_of[code] for code in level_codes[fit.mask].tolist())
                         _extend_context(context, fit)
 
     if not item_ids:
-        return pl.DataFrame(
-            schema={
-                "item_index": pl.Int64,
-                "target_index": pl.Int64,
-                "level": lexical_categorical(),
-                "metric_name": lexical_categorical(),
-                "metric_value": pl.Float64,
-                **_CONTEXT_COLUMNS,
-            },
-        )
+        return pl.DataFrame(schema=FINDINGS_SCHEMA), populations
 
     df = pl.DataFrame(
         {
@@ -1419,12 +1723,15 @@ def _detect_outliers(  # noqa: C901
             "metric_name": pl.Series(metric_names, dtype=lexical_categorical()),
             "metric_value": pl.Series(metric_values, dtype=pl.Float64),
             **{name: pl.Series(context[name], dtype=dtype) for name, dtype in _CONTEXT_COLUMNS.items()},
+            "method": pl.Series([None] * len(item_ids), dtype=_EXTRA_COLUMNS["method"]),
+            "population": pl.Series(row_populations, dtype=_EXTRA_COLUMNS["population"]),
+            "observed": pl.Series([None] * len(item_ids), dtype=_EXTRA_COLUMNS["observed"]),
         },
     )
 
     # Level sits between the key and the metric: it is part of which row this is, so two
     # readings of one item at different levels are ordered rather than left tied.
-    return df.sort(["item_index", "target_index", "level", "metric_name"])
+    return df.sort(["item_index", "target_index", "level", "metric_name"]), populations
 
 
 def _check_metadata_evaluate_preconditions(data: Any, other: Sequence[Any], has_extractor: bool) -> None:
@@ -1496,11 +1803,13 @@ def _factors_at_planned_levels(
     plan: LevelPlan,
     names: Mapping[FactorLevel, str],
     named: bool,
+    *,
+    others: bool = False,
 ) -> dict[str, FactorLevel]:
     """Return the factors that live at a planned level.
 
     A named factor that lives elsewhere raises. A factor left out of the default selection is
-    dropped, unless that would leave nothing to threshold.
+    dropped, unless that would leave nothing to threshold and no other check (`others`) runs.
     """
     kept: dict[str, FactorLevel] = {
         name: level for name, level in factor_levels.items() if names.get(level) in plan.levels
@@ -1513,12 +1822,264 @@ def _factors_at_planned_levels(
             f"Outliers.evaluate: {sorted(left_out)} were named but live at {sorted(set(left_out.values()))}, "
             f"which this call does not judge; {_include_hint(wanted)}."
         )
-    if not kept:
+    if not kept and not others:
         raise ValueError(
             f"Outliers.evaluate: no ordered factor lives at {sorted(plan.levels)}. The ordered factors live at "
             f"{sorted(set(left_out.values()))}; {_include_hint(left_out.values())}."
         )
     return kept
+
+
+def _categorical_factors(
+    data: Any,
+    factors: Sequence[str] | None,
+    strata: Sequence[str] | None,
+    plan: LevelPlan,
+    names: Mapping[FactorLevel, str],
+) -> dict[str, FactorLevel]:
+    """Return the categorical factors at the judged levels that rarity reads: the ones named, or every one.
+
+    Without strata a named categorical factor is left to :func:`eligible_factors` to refuse. Every one is kept when
+    `factors` is None, so :meth:`OutliersOutput.stratified` can judge them later.
+    """
+    if factors is not None and strata is None:
+        return {}
+    found: dict[str, FactorLevel] = {
+        name: level
+        for name, level in factor_levels(data).items()
+        if (factors is None or name in factors) and factor_kind(data, name) == "categorical"
+    }
+    return _factors_at_planned_levels(found, plan, names, named=factors is not None, others=True)
+
+
+def _rarity_runs(data: Any, categorical: Mapping[str, FactorLevel], strata: Sequence[str] | None, named: bool) -> bool:
+    """Whether the strata reach a categorical factor that is not itself a stratum, refusing named ones they miss.
+
+    Raises
+    ------
+    ValueError
+        When a categorical factor named in `factors=` lives at a level the strata do not reach.
+    """
+    if strata is None:
+        return False
+    judged: dict[str, FactorLevel] = {name: level for name, level in categorical.items() if name not in strata}
+    reached = set(reached_levels(data, strata, dict.fromkeys(judged.values())))
+    missed = {name: level for name, level in judged.items() if level not in reached}
+    if named and missed:
+        raise ValueError(
+            f"Outliers.evaluate: categorical factors {missed} (each at its own level) are judged by rarity within "
+            f"a stratum, and strata {list(strata)} do not reach their levels. A stratum reaches its own level and "
+            "the levels below it."
+        )
+    return bool(reached)
+
+
+class _Requested(NamedTuple):
+    """The combination and residual checks an evaluate call asked for, as given."""
+
+    combinations: Sequence[Sequence[str]] | Literal["all"] | None
+    given: Mapping[str, str] | None
+    kinds: Mapping[str, ColumnKind] | None
+
+
+def _refuse_factor_arguments(factors: Sequence[str] | None, checks: _Requested) -> None:
+    """Refuse the arguments that read metadata factors on a dataset."""
+    if factors is not None:
+        raise ValueError(
+            "Outliers.evaluate: `factors` names metadata factors to threshold; pass the Metadata itself as `data`."
+        )
+    if checks != (None, None, None):
+        raise ValueError("Outliers.evaluate: combinations read metadata factors; pass the Metadata.")
+
+
+def _family(data: Any, name: str, kinds: Mapping[str, ColumnKind]) -> str | None:
+    """How core reads a column: ``"categorical"``, ``"numeric"``, or None when it reads it not at all."""
+    kind = kinds.get(name) or {"ordered": "numeric", "categorical": "categorical"}.get(factor_kind(data, name))
+    return None if kind is None else "categorical" if kind in _CATEGORICAL_KINDS else "numeric"
+
+
+def _column_level(data: Any, levels: Mapping[str, FactorLevel], name: str) -> FactorLevel:
+    """Return the level a column lives at: a factor's own, or the level whose own frame holds a list column."""
+    if name in levels:
+        return levels[name]
+    for level in data.levels:
+        if name in data._store.frame(level).columns:
+            return level
+    raise KeyError(f"Outliers.evaluate: {name!r} is not a column of this metadata. Its factors are {sorted(levels)}.")
+
+
+def _deepest(data: Any, group: Sequence[str], own: Mapping[str, FactorLevel]) -> FactorLevel:
+    """Return the deepest level among a group's columns, refusing two that lie on different branches."""
+    for (first, at), (second, other) in itertools.combinations(own.items(), 2):
+        if not (data._levels.propagates_to(at, other) or data._levels.propagates_to(other, at)):
+            raise ValueError(
+                f"Outliers.evaluate: {list(group)} holds {first!r} at {at!r} and {second!r} at {other!r}, levels on "
+                "different branches of the level schema, so no row holds both. Group columns on one chain of levels."
+            )
+    return next(level for level in own.values() if all(data._levels.propagates_to(o, level) for o in own.values()))
+
+
+def _scoring_level(
+    data: Any,
+    levels: Mapping[str, FactorLevel],
+    group: Sequence[str],
+    plan: LevelPlan,
+    names: Mapping[FactorLevel, str],
+) -> FactorLevel:
+    """Return the level a group is scored at, the deepest of its columns', refusing one the call does not judge."""
+    level = _deepest(data, group, {name: _column_level(data, levels, name) for name in group})
+    if names.get(level) not in plan.levels:
+        raise ValueError(
+            f"Outliers.evaluate: {list(group)} is scored at {level!r}, the deepest level among its columns, which "
+            f"this call does not judge; {_include_hint([names.get(level, level)])}."
+        )
+    return level
+
+
+def _rarity_reaches(data: Any, strata: Sequence[str] | None, level: FactorLevel) -> bool:
+    """Whether a stratum reaches `level`, so a categorical group there can be judged by rarity."""
+    return strata is not None and bool(reached_levels(data, strata, [level]))
+
+
+def _named_checks(
+    data: Any,
+    levels: Mapping[str, FactorLevel],
+    checks: _Requested,
+    strata: Sequence[str] | None,
+    plan: LevelPlan,
+    names: Mapping[FactorLevel, str],
+) -> dict[FactorLevel, list[tuple[str, ...]]]:
+    """Place each named group at its scoring level, refusing a single column and an unstratified categorical group."""
+    named = _named_groups(cast(Sequence[Sequence[str]] | None, checks.combinations)) or []
+    # A sample column (a list of numbers per row) is not judged on its own elsewhere: core scores it by distribution.
+    single = [group for group in named if len(group) == 1 and (checks.kinds or {}).get(group[0]) != "sample"]
+    if single:
+        raise ValueError(
+            f"Outliers.evaluate: combinations {single} name one column; a single column is already judged on its own. "
+            "Only a list column read as kinds={name: 'sample'} is scored alone, by its distribution."
+        )
+    found: dict[FactorLevel, list[tuple[str, ...]]] = {}
+    for group in named:
+        level = _scoring_level(data, levels, group, plan, names)
+        if all(_family(data, name, checks.kinds or {}) == "categorical" for name in group):
+            _refuse_categorical_group(data, group, strata, level)
+        found.setdefault(level, []).append(group)
+    return found
+
+
+def _refuse_categorical_group(
+    data: Any, group: Sequence[str], strata: Sequence[str] | None, level: FactorLevel
+) -> None:
+    """Refuse a categorical group that no stratum reaches, or that holds a stratum column."""
+    if not _rarity_reaches(data, strata, level):
+        raise ValueError(
+            f"Outliers.evaluate: {list(group)} are categorical, so the group is judged by rarity within a "
+            f"stratum; pass strata= that reach {level!r}."
+        )
+    shared = [name for name in group if name in (strata or ())]
+    if shared:
+        raise ValueError(
+            f"Outliers.evaluate: {list(group)} holds {shared}, also named in strata=. A categorical group is judged "
+            f"by rarity within each stratum, where {shared} holds a single value. Leave {shared} out of the group "
+            "or out of strata=."
+        )
+
+
+def _refuse_unknown_kinds(checks: _Requested, levels: Mapping[str, FactorLevel], factors: Sequence[str] | None) -> None:
+    """Refuse a `kinds=` key that names no column of a group or `given` pair, which would otherwise be ignored."""
+    if checks.combinations == "all":
+        known = {name for name in levels if factors is None or name in factors}
+    else:
+        named = _named_groups(cast(Sequence[Sequence[str]] | None, checks.combinations)) or []
+        known = {name for group in named for name in group}
+    known |= {name for pair in (checks.given or {}).items() for name in pair}
+    unknown = sorted(set(checks.kinds or {}) - known)
+    if unknown:
+        raise KeyError(
+            f"Outliers.evaluate: kinds= names {unknown}, which no group of combinations= or pair of given= holds. "
+            f"Their columns are {sorted(known)}."
+        )
+
+
+def _searched_pairs(
+    data: Any,
+    levels: Mapping[str, FactorLevel],
+    checks: _Requested,
+    factors: Sequence[str] | None,
+    strata: Sequence[str] | None,
+    judged: Sequence[FactorLevel],
+) -> dict[FactorLevel, list[tuple[str, ...]]]:
+    """Every pair of one family among the factors that live at each judged level, within `factors`.
+
+    Categorical pairs are kept for a later stratification, and judged only where a stratum reaches their level.
+
+    Raises
+    ------
+    ValueError
+        When no judged level has a pair to run now and no residual is asked for.
+    """
+    found: dict[FactorLevel, list[tuple[str, ...]]] = {}
+    for level in judged:
+        family = {
+            name: _family(data, name, checks.kinds or {})
+            for name, own in levels.items()
+            if own == level and (factors is None or name in factors)
+        }
+        pairs = [
+            (first, second)
+            for first, second in itertools.combinations(family, 2)
+            if family[first] is not None and family[first] == family[second]
+        ]
+        if pairs:
+            found[level] = pairs
+    runs = any(
+        _family(data, group[0], checks.kinds or {}) == "numeric" or _rarity_reaches(data, strata, level)
+        for level, groups in found.items()
+        for group in groups
+    )
+    if not runs and not checks.given:
+        raise ValueError(
+            f"Outliers.evaluate: combinations='all' finds no pair of factors to score at {list(judged)}; a level needs "
+            "two numeric factors, or two categorical ones and strata= that reach it. Name groups in combinations=, "
+            "or add given=."
+        )
+    return found
+
+
+def _combination_checks(
+    data: Any,
+    checks: _Requested,
+    factors: Sequence[str] | None,
+    strata: Sequence[str] | None,
+    plan: LevelPlan,
+    names: Mapping[FactorLevel, str],
+) -> tuple[dict[FactorLevel, list[tuple[str, ...]]], dict[FactorLevel, dict[str, str]]]:
+    """Place each group and residual the call asked for at the level it is scored at."""
+    levels = factor_levels(data)
+    _refuse_unknown_kinds(checks, levels, factors)
+    if checks.combinations == "all":
+        judged = [level for level in data.levels if names.get(level) in plan.levels]
+        groups = _searched_pairs(data, levels, checks, factors, strata, judged)
+    else:
+        groups = _named_checks(data, levels, checks, strata, plan, names)
+    given: dict[FactorLevel, dict[str, str]] = {}
+    for y, x in (checks.given or {}).items():
+        given.setdefault(_scoring_level(data, levels, (y, x), plan, names), {})[y] = x
+    return {level: list(dict.fromkeys(found)) for level, found in groups.items()}, given
+
+
+def _strata_names(strata: str | Sequence[str] | None, per_class: bool) -> list[str] | None:
+    """Read `strata=` as a list of names, refusing it beside per_class=True."""
+    if strata is None:
+        return None
+    if not strata:
+        raise ValueError("Outliers.evaluate: strata= names no strata; pass None to judge each level whole.")
+    if per_class:
+        raise ValueError(
+            "Outliers.evaluate: strata= and per_class=True both stratify; pass one. "
+            "per_class is strata by the class label, spelled classwise()."
+        )
+    return [strata] if isinstance(strata, str) else list(strata)
 
 
 class Outliers(Evaluator):
@@ -1752,9 +2313,10 @@ class Outliers(Evaluator):
         self,
         stats: StatsMap,
         source_index: Sequence[SourceIndex],
-        class_ids: NDArray[np.intp] | None = None,
-    ) -> pl.DataFrame:
-        return _detect_outliers(stats, source_index, self.outlier_threshold, class_ids)
+        strata: _Strata | None = None,
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        frame, populations = _detect_outliers(stats, source_index, self.outlier_threshold, strata)
+        return frame, _populations_frame(populations)
 
     @overload
     def from_stats(
@@ -1878,8 +2440,8 @@ class Outliers(Evaluator):
             restricted = frozenset(si.kind for si, kept in zip(combined_source_index, keep, strict=True) if kept)
             combined_stats, combined_source_index, _ = _restrict(combined_stats, combined_source_index, None, keep)
 
-        outliers_df = self._get_outliers(combined_stats, combined_source_index)
-        outliers_df = drop_null_index_columns(outliers_df, ["target_index", "level"])
+        outliers_df, populations = self._get_outliers(combined_stats, combined_source_index)
+        outliers_df = drop_null_index_columns(outliers_df, _DROPPABLE)
 
         if dataset_steps:
             outliers_df = add_dataset_index(outliers_df, dataset_steps)
@@ -1890,6 +2452,7 @@ class Outliers(Evaluator):
             outlier_threshold=self.outlier_threshold,
             restricted_to=restricted,
             tracking=tracking,
+            populations=populations,
         )
 
     @set_metadata(state=["cluster_threshold", "cluster_algorithm", "n_clusters"])
@@ -1973,6 +2536,7 @@ class Outliers(Evaluator):
                     "metric_name": lexical_categorical(),
                     "metric_value": pl.Float64,
                     **_CONTEXT_COLUMNS,
+                    **_EXTRA_COLUMNS,
                 },
             )
         if len(outliers_dfs) == 1:
@@ -1995,7 +2559,8 @@ class Outliers(Evaluator):
         column_order.extend(["metric_name", "metric_value"])
         # Carried the same way as `level`: a frame built by hand may not have them, and the
         # merged result should still hold the context every detector-built frame does.
-        context = [name for name in _CONTEXT_COLUMNS if any(name in df.columns for df in outliers_dfs)]
+        described = _CONTEXT_COLUMNS | _EXTRA_COLUMNS
+        context = [name for name in described if any(name in df.columns for df in outliers_dfs)]
         column_order.extend(context)
 
         normalized_dfs: list[pl.DataFrame] = []
@@ -2005,7 +2570,7 @@ class Outliers(Evaluator):
             if has_level and "level" not in df.columns:
                 df = df.with_columns(pl.lit(None, dtype=lexical_categorical()).alias("level"))
             missing = [name for name in context if name not in df.columns]
-            df = df.with_columns(pl.lit(None, dtype=_CONTEXT_COLUMNS[name]).alias(name) for name in missing)
+            df = df.with_columns(pl.lit(None, dtype=described[name]).alias(name) for name in missing)
             normalized_dfs.append(df.select(column_order))
         # Sorted on the columns that survived, not on a fixed list: an item-level-only
         # result has no target_index to sort by, and naming it raised ColumnNotFoundError.
@@ -2131,6 +2696,10 @@ class Outliers(Evaluator):
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
+        strata: str | Sequence[str] | None = None,
+        combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
+        given: Mapping[str, str] | None = None,
+        kinds: Mapping[str, ColumnKind] | None = None,
     ) -> OutliersOutput[Any]: ...
 
     @overload
@@ -2144,6 +2713,10 @@ class Outliers(Evaluator):
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
+        strata: str | Sequence[str] | None = None,
+        combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
+        given: Mapping[str, str] | None = None,
+        kinds: Mapping[str, ColumnKind] | None = None,
     ) -> SingleOutliersOutput: ...
 
     @overload
@@ -2157,6 +2730,10 @@ class Outliers(Evaluator):
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
+        strata: str | Sequence[str] | None = None,
+        combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
+        given: Mapping[str, str] | None = None,
+        kinds: Mapping[str, ColumnKind] | None = None,
     ) -> SingleTargetOutliersOutput: ...
 
     @overload
@@ -2170,6 +2747,10 @@ class Outliers(Evaluator):
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
+        strata: str | Sequence[str] | None = None,
+        combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
+        given: Mapping[str, str] | None = None,
+        kinds: Mapping[str, ColumnKind] | None = None,
     ) -> MultiOutliersOutput: ...
 
     @overload
@@ -2183,6 +2764,10 @@ class Outliers(Evaluator):
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
+        strata: str | Sequence[str] | None = None,
+        combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
+        given: Mapping[str, str] | None = None,
+        kinds: Mapping[str, ColumnKind] | None = None,
     ) -> MultiTargetOutliersOutput: ...
 
     @set_metadata(
@@ -2204,6 +2789,10 @@ class Outliers(Evaluator):
         per_class: bool = False,
         metadata: MetadataLike | None = None,
         factors: Sequence[str] | None = None,
+        strata: str | Sequence[str] | None = None,
+        combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
+        given: Mapping[str, str] | None = None,
+        kinds: Mapping[str, ColumnKind] | None = None,
     ) -> SingleOutliersOutput | SingleTargetOutliersOutput | MultiOutliersOutput | MultiTargetOutliersOutput:
         """
         Return indices of Outliers with the issues identified for each.
@@ -2272,7 +2861,65 @@ class Outliers(Evaluator):
             Metadata factors to threshold, when `data` is a :class:`~dataeval.Metadata`. None
             thresholds every *ordered* factor -- numeric or temporal by its raw dtype. A
             categorical factor (strings, booleans, or integers with a declared vocabulary) has
-            no location or scale and is refused if named.
+            no location or scale, so it is judged by rarity within `strata` instead: every one
+            at the levels the strata reach when `factors` is None, or the ones named. Without
+            `strata`, naming one raises.
+        strata : str or Sequence[str] or None, default None
+            Categorical metadata factors to judge within, or the index columns ``item_index``,
+            ``unit_index`` and ``track_id`` (a video, a frame or a track of one video). Each threshold is
+            fitted within each stratum, and every flagged row names its stratum in a
+            ``population`` column. Several names cross. A bare string is one name. See
+            :meth:`OutliersOutput.stratified`, which this equals on the result of a call
+            without it. On a dataset, `metadata` must be a :class:`~dataeval.Metadata` that
+            holds the strata. Cluster-based detection is not stratified.
+
+            On a :class:`~dataeval.Metadata`, the categorical factors (see `factors`) are judged
+            by rarity within the strata, apart from the strata themselves; see
+            :meth:`OutliersOutput.stratified`. A metadata of only categorical factors can be
+            evaluated this way.
+
+            .. versionadded:: 1.2
+        combinations : Sequence[Sequence[str]] or "all" or None, default None
+            Groups of metadata factors to judge together, when `data` is a :class:`~dataeval.Metadata`:
+            a row is flagged when its combination of values is unusual even though each value is
+            ordinary on its own, such as a large box near the horizon. Each group of two or more numeric
+            factors is scored by its robust Mahalanobis distance, at the deepest level among its
+            factors, with the factors of coarser levels carried down to its rows. The factors of a group
+            must lie on one chain of levels. A group of categorical factors is judged by rarity, and
+            needs `strata` that reach its level.
+
+            ``"all"`` judges every pair of factors that live at each judged level, within `factors` when
+            given, skipping levels with fewer than two and, where no stratum reaches a level, the
+            categorical pairs there. Scoring every pair is slow on a large metadata, and the result keeps
+            every score, so it is not cheap to keep or pickle.
+
+            Each flagged row has ``method`` ``"mahalanobis"``, the group as ``metric_name`` (such as
+            ``"rel_size, rel_offset_y"``), the distance as ``metric_value`` and ``direction``
+            ``"upper"``: a small distance is not unusual. A group is judged in a population of at least
+            20 rows, and 10 rows per dimension.
+
+            .. versionadded:: 1.2
+        given : Mapping[str, str] or None, default None
+            ``{y: x}`` judges numeric factor ``y`` against the rows nearest to it in numeric factor ``x``,
+            when `data` is a :class:`~dataeval.Metadata`: a bright frame at night is ordinary in
+            brightness and in hour, and unusual as a brightness given its hour. The score is the signed
+            robust z of ``y`` against its neighbors in ``x``, so both directions flag. Each row has
+            ``method`` ``"residual"`` and ``metric_name`` ``"y given x"``. A population needs at least 31
+            rows.
+
+            The score checks of `combinations` and `given` take a scalar `outlier_threshold` only when it
+            is statistical and has no ``lower_limit`` or ``upper_limit``, since a constant or a limit is
+            in the units of the factors; otherwise they use the default. Name a check in a mapping, such
+            as ``{"rel_size, rel_offset_y": 4.0}``, to set its threshold.
+
+            .. versionadded:: 1.2
+        kinds : Mapping[str, ColumnKind] or None, default None
+            How to read a column in `combinations` and `given`, such as ``{"camera_id": "categorical"}``,
+            as :func:`~dataeval.core.combination_scores` reads it. A column with a declared vocabulary
+            is read as categorical without an entry here. Each level reads only the entries for its
+            own columns.
+
+            .. versionadded:: 1.2
 
         Returns
         -------
@@ -2303,13 +2950,26 @@ class Outliers(Evaluator):
             If `levels` is given together with `per_image` or `per_target`, is empty, or names a
             level the data does not have; if `levels` names a tracking level for a dataset.
             If `factors` is given without a Metadata as `data`, or is empty; if a named factor
-            is categorical, ineligible, or lives at a level `levels` or the flags do not judge;
-            if the levels judged hold no ordered factor; if a Metadata is evaluated with an
-            ``extractor``.
+            is ineligible, categorical without `strata`, or lives at a level `levels` or the
+            flags do not judge; if a named categorical factor lives at a level `strata` do not
+            reach;
+            if the levels judged hold no ordered factor and no other check runs; if a Metadata is
+            evaluated with an ``extractor``.
+            If `strata` is given with ``per_class=True``, names a continuous factor, reaches
+            none of the judged levels, or is given for a dataset without a
+            :class:`~dataeval.Metadata` as `metadata`.
+            If `combinations`, `given` or `kinds` is given for a dataset; if a group has one column,
+            mixes levels on different branches of the level schema, or is scored at a level the call
+            does not judge; if a categorical group has no stratum reaching its level, or holds a
+            column also named in `strata`; if
+            ``combinations="all"`` finds no pair and `given` is empty; or if
+            :func:`~dataeval.core.combination_scores` refuses a group or a `given` entry.
         KeyError
-            If a named factor is not one of the metadata's.
+            If a named factor, stratum, or column of `combinations` or `given` is not one of the
+            metadata's; if a key of `kinds` is not a column of `combinations` or `given`.
         TypeError
-            If `factors` is a single string rather than a list of names.
+            If `factors` is a single string rather than a list of names, or `combinations` (or one of
+            its groups) is a string other than ``"all"``.
 
         Examples
         --------
@@ -2353,10 +3013,13 @@ class Outliers(Evaluator):
         >>> results = outliers.evaluate(train_ds, test_ds)
         >>> results = outliers.evaluate(train_ds_area1, train_ds_area2, train_ds_area3, test_ds)  # or more
 
-        Threshold metadata factors, each against the rows at its own level:
+        Threshold metadata factors, each against the rows at its own level. A statistical
+        threshold needs at least 20 rows at a level:
 
         >>> from dataeval import Metadata
-        >>> md = Metadata.from_factors({"temperature": [20.1, 19.8, 20.3, 20.0, 19.9, 20.2, 20.1, 19.7, 20.0, 45.0]})
+        >>> readings = [20.1, 19.8, 20.3, 20.0, 19.9, 20.2, 20.1, 19.7, 20.0, 20.2, 19.9, 20.1]
+        >>> readings += [19.8, 20.0, 20.3, 19.9, 20.1, 20.0, 19.8, 20.2, 20.1, 19.9, 20.0, 45.0]
+        >>> md = Metadata.from_factors({"temperature": readings})
         >>> Outliers().evaluate(md).data().select("item_index", "metric_name", "metric_value")
         shape: (1, 3)
         ┌────────────┬─────────────┬──────────────┐
@@ -2364,14 +3027,34 @@ class Outliers(Evaluator):
         │ ---        ┆ ---         ┆ ---          │
         │ i64        ┆ cat         ┆ f64          │
         ╞════════════╪═════════════╪══════════════╡
-        │ 9          ┆ temperature ┆ 45.0         │
+        │ 23         ┆ temperature ┆ 45.0         │
         └────────────┴─────────────┴──────────────┘
+
+        Judge one factor given another. Frame 299 is as bright as noon at 02:00, while each of its
+        brightness and its hour is ordinary on its own:
+
+        >>> rng = np.random.default_rng(0)
+        >>> hour = rng.integers(0, 24, 300).astype(float)
+        >>> brightness = 0.5 + 0.4 * np.cos(2 * np.pi * (hour - 12) / 24) + rng.normal(0, 0.03, 300)
+        >>> hour[-1], brightness[-1] = 2.0, 0.9
+        >>> md = Metadata.from_factors({"brightness": brightness, "hour": hour})
+        >>> result = Outliers().evaluate(md, given={"brightness": "hour"})
+        >>> result.data().select("item_index", "metric_name", "metric_value", "direction")
+        shape: (1, 4)
+        ┌────────────┬───────────────────────┬──────────────┬───────────┐
+        │ item_index ┆ metric_name           ┆ metric_value ┆ direction │
+        │ ---        ┆ ---                   ┆ ---          ┆ ---       │
+        │ i64        ┆ cat                   ┆ f64          ┆ cat       │
+        ╞════════════╪═══════════════════════╪══════════════╪═══════════╡
+        │ 299        ┆ brightness given hour ┆ 9.017146     ┆ upper     │
+        └────────────┴───────────────────────┴──────────────┴───────────┘
         """
         # Every input, not just the first: a filtered metadata among ``other`` misaligns
         # the same way, and is the one an evaluator handed several datasets is likeliest
         # to reach for.
         for candidate in (metadata, data, *other):
             reject_filtered_metadata(candidate, "Outliers")
+        strata = _strata_names(strata, per_class)
 
         if is_metadata(data):
             return self._evaluate_metadata(
@@ -2383,11 +3066,10 @@ class Outliers(Evaluator):
                 per_class=per_class,
                 metadata=metadata,
                 factors=factors,
+                strata=strata,
+                checks=_Requested(combinations, given, kinds),
             )
-        if factors is not None:
-            raise ValueError(
-                "Outliers.evaluate: `factors` names metadata factors to threshold; pass the Metadata itself as `data`."
-            )
+        _refuse_factor_arguments(factors, _Requested(combinations, given, kinds))
 
         plan = _plan_for(levels, per_image, per_target, tracking=False, subject="dataset")
         if other:
@@ -2397,6 +3079,7 @@ class Outliers(Evaluator):
                 per_target=plan.per_target,
                 per_class=per_class,
                 metadata=metadata,
+                strata=strata,
             )
 
         return self._evaluate_single(
@@ -2405,10 +3088,16 @@ class Outliers(Evaluator):
             per_target=plan.per_target,
             per_class=per_class,
             metadata=metadata,
+            strata=strata,
         )
 
     def _validate_evaluate_inputs(
-        self, per_image: bool, per_target: bool, per_class: bool, metadata: MetadataLike | None
+        self,
+        per_image: bool,
+        per_target: bool,
+        per_class: bool,
+        metadata: MetadataLike | None,
+        strata: Sequence[str] | None,
     ) -> None:
         """Validate common inputs for single and multi-dataset evaluation."""
         if self.flags == ImageStats.NONE and self.extractor is None:
@@ -2417,6 +3106,25 @@ class Outliers(Evaluator):
             raise ValueError("At least one of per_image or per_target must be True.")
         if per_class and metadata is None:
             raise ValueError("metadata must be provided when per_class=True.")
+        if strata is not None and not has_level_schema(metadata):
+            raise ValueError(
+                "Outliers.evaluate: strata= on a dataset reads its factors from a Metadata with a level schema; "
+                "pass metadata=Metadata(dataset)."
+            )
+
+    @staticmethod
+    def _dataset_strata(
+        source_index: Sequence[SourceIndex],
+        per_class: bool,
+        metadata: MetadataLike | None,
+        strata: Sequence[str] | None,
+    ) -> _Strata | None:
+        """Stratify a dataset's statistics rows by class or by the strata named, or not at all."""
+        if strata is not None:
+            return strata_codes(metadata, strata, *row_positions(metadata, source_index))
+        if per_class and metadata is not None:
+            return _class_strata(source_index, metadata)
+        return None
 
     def _evaluate_metadata(
         self,
@@ -2429,6 +3137,8 @@ class Outliers(Evaluator):
         per_class: bool,
         metadata: MetadataLike | None,
         factors: Sequence[str] | None,
+        strata: Sequence[str] | None,
+        checks: "_Requested",
     ) -> OutliersOutput[Any]:
         """Threshold a metadata's ordered factors, each against the rows at its own level.
 
@@ -2442,12 +3152,27 @@ class Outliers(Evaluator):
         _refuse_no_flag(levels, per_image, per_target)
         plan = _plan_for(levels, per_image, per_target, tracking, "metadata")
         _refuse_lone_target(plan, data, tracking)
+        names = _level_names(data, tracking)
+        categorical = _categorical_factors(data, factors, strata, plan, names)
+        rarity = _rarity_runs(data, categorical, strata, named=factors is not None)
+        groups, given = _combination_checks(data, checks, factors, strata, plan, names)
+        # A named categorical factor needs rarity; with factors=None any other check may run alone.
+        scores = bool(groups or given)
         chosen = _factors_at_planned_levels(
-            eligible_factors(data, factors), plan, _level_names(data, tracking), named=factors is not None
+            eligible_factors(data, factors, others=rarity or (scores and factors is None)),
+            plan,
+            names,
+            named=factors is not None,
+            others=rarity or scores,
         )
         result = self.from_stats(factor_stats(data, chosen), per_image=True, per_target=True)
         result.tracking = tracking
-        return result.classwise(labels) if per_class else result
+        result.score_input = read_score_input(data, categorical, groups, given, checks.kinds)
+        if strata is not None:
+            return result.stratified(data, *strata)
+        if per_class:
+            return result.classwise(labels)
+        return result._redetect(scored=result._rescored({})) if scores else result
 
     def _evaluate_single(
         self,
@@ -2457,13 +3182,16 @@ class Outliers(Evaluator):
         per_target: bool = True,
         per_class: bool = False,
         metadata: MetadataLike | None = None,
+        strata: Sequence[str] | None = None,
     ) -> SingleOutliersOutput:
         """Single-dataset evaluate implementation."""
-        self._validate_evaluate_inputs(per_image, per_target, per_class, metadata)
+        self._validate_evaluate_inputs(per_image, per_target, per_class, metadata, strata)
 
         outliers_dfs: list[pl.DataFrame] = []
         stats_result: StatsResult | None = None
         stored_cluster_stats: ClusterStats | None = None
+        row_strata: _Strata | None = None
+        populations: pl.DataFrame | None = None
 
         if self.flags != ImageStats.NONE:
             self.stats = checked_compute_stats(
@@ -2476,26 +3204,25 @@ class Outliers(Evaluator):
             )[0]
             stats_result = self.stats
             source_index = self.stats["source_index"]
-
-            class_ids: NDArray[np.intp] | None = None
-            if per_class and metadata is not None:
-                class_ids = _build_class_ids(source_index, metadata)
-
-            outliers_dfs.append(self._get_outliers(self.stats["stats"], source_index, class_ids))
+            row_strata = self._dataset_strata(source_index, per_class, metadata, strata)
+            stats_df, populations = self._get_outliers(self.stats["stats"], source_index, row_strata)
+            outliers_dfs.append(stats_df)
 
         if self.extractor is not None:
             cluster_df, stored_cluster_stats = self._get_cluster_outliers(data)
             outliers_dfs.append(cluster_df)
 
         return OutliersOutput(  # type: ignore[return-value]
-            drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs), ["target_index", "level"]),
+            drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs), _DROPPABLE),
             calculation_results=stats_result,
             outlier_threshold=self.outlier_threshold,
             cluster_stats=stored_cluster_stats,
             cluster_threshold=self.cluster_threshold,
+            strata=row_strata,
+            populations=populations,
         )
 
-    def _evaluate_multi(  # noqa: C901
+    def _evaluate_multi(
         self,
         datasets: Sequence[_DatasetInput],
         *,
@@ -2503,9 +3230,10 @@ class Outliers(Evaluator):
         per_target: bool = True,
         per_class: bool = False,
         metadata: MetadataLike | None = None,
+        strata: Sequence[str] | None = None,
     ) -> MultiOutliersOutput:
         """Multi-dataset evaluate: compute stats per dataset, then combine."""
-        self._validate_evaluate_inputs(per_image, per_target, per_class, metadata)
+        self._validate_evaluate_inputs(per_image, per_target, per_class, metadata, strata)
 
         # Compute dataset_steps from dataset lengths (needed for index remapping)
         dataset_steps: list[int] = []
@@ -2528,17 +3256,17 @@ class Outliers(Evaluator):
             self.stats = stats_results[-1]
 
         outliers_dfs: list[pl.DataFrame] = []
+        row_strata: _Strata | None = None
+        populations: pl.DataFrame | None = None
 
         if stats_results:
             # combined_steps count statistics rows, target rows included; dataset_steps count images, for cluster rows.
             combined_stats, combined_source_index, combined_steps = combine_stats_results(stats_results)
+            row_strata = self._dataset_strata(combined_source_index, per_class, metadata, strata)
 
-            class_ids: NDArray[np.intp] | None = None
-            if per_class and metadata is not None:
-                class_ids = _build_class_ids(combined_source_index, metadata)
-
-            outliers_df = self._get_outliers(combined_stats, combined_source_index, class_ids)
-            outliers_df = drop_null_index_columns(outliers_df, ["target_index", "level"])
+            # Populations are pooled across the datasets, as the thresholds are.
+            outliers_df, populations = self._get_outliers(combined_stats, combined_source_index, row_strata)
+            outliers_df = drop_null_index_columns(outliers_df, _DROPPABLE)
             outliers_df = add_dataset_index(outliers_df, combined_steps)
             outliers_dfs.append(outliers_df)
 
@@ -2569,10 +3297,12 @@ class Outliers(Evaluator):
             outliers_dfs.append(cluster_df)
 
         return OutliersOutput(  # type: ignore[return-value]
-            drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs), ["target_index", "level"]),
+            drop_null_index_columns(self._merge_outlier_dfs(outliers_dfs), _DROPPABLE),
             calculation_results=stats_results if stats_results else None,
             outlier_threshold=self.outlier_threshold,
             cluster_stats=stored_cluster_stats,
             cluster_threshold=self.cluster_threshold,
             dataset_steps=dataset_steps,
+            strata=row_strata,
+            populations=populations,
         )

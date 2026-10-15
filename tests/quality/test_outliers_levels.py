@@ -14,7 +14,8 @@ from dataeval.flags import ImageStats
 from dataeval.quality import Outliers, OutliersOutput
 from dataeval.quality._shared import row_kinds
 from dataeval.types import SourceIndex
-from tests.conftest import MockMetadata
+from dataeval.utils.thresholds import ConstantThreshold
+from tests.conftest import MockMetadata, MockODDataset
 from tests.metadata.test_structurers import _mot_dataset
 from tests.quality.test_outliers import TestOutliersOverMetadata as _MetadataTests  # not collected here
 
@@ -31,6 +32,11 @@ def _columns(result):
     return set(result.data().columns)
 
 
+# Flags about half the pixel means of `_od`, at either level. A constant threshold is fitted to no population, so
+# it judges `_od`'s twenty-odd real box readings however many there are.
+_HALF = ConstantThreshold(upper=0.5)
+
+
 @pytest.mark.required
 class TestFromStatsRedetection:
     def test_without_targets_a_redetection_returns_items_only(self, get_od_dataset):
@@ -41,12 +47,12 @@ class TestFromStatsRedetection:
 
     def test_with_targets_a_redetection_returns_both(self, get_od_dataset):
         stats = _od_stats(_od(get_od_dataset))
-        redetected = Outliers().from_stats(stats, per_target=True).with_threshold(("zscore", 0.5))
+        redetected = Outliers().from_stats(stats, per_target=True).with_threshold(_HALF)
         assert "target_index" in _columns(redetected)
 
     def test_without_images_a_redetection_returns_targets_only(self, get_od_dataset):
         stats = _od_stats(_od(get_od_dataset))
-        redetected = Outliers().from_stats(stats, per_image=False, per_target=True).with_threshold(("zscore", 0.5))
+        redetected = Outliers().from_stats(stats, per_image=False, per_target=True).with_threshold(_HALF)
         assert len(redetected) > 0
         assert redetected.data()["target_index"].null_count() == 0
 
@@ -88,8 +94,17 @@ def _leveled_metadata():
     return md
 
 
+# The sequence and track levels hold twelve rows each, under the floor a statistical threshold needs, so their
+# planted extremes are judged against constants. The frame and detection levels keep the default threshold.
+_SMALL_LEVELS = {"sequence_signal": ConstantThreshold(upper=10.0), "n_gaps": ConstantThreshold(upper=0.5)}
+
+
+def _leveled_outliers():
+    return Outliers(outlier_threshold=_SMALL_LEVELS)
+
+
 def _leveled_result():
-    return Outliers().evaluate(_leveled_metadata(), per_target=True)
+    return _leveled_outliers().evaluate(_leveled_metadata(), per_target=True)
 
 
 def _names(result):
@@ -147,7 +162,8 @@ class TestLevelViews:
 
     def test_a_view_redetects_only_its_own_level(self):
         result = _leveled_result()
-        redetected = result.tracks.with_threshold(("zscore", 0.5)).with_threshold(("zscore", 0.4))
+        once = result.tracks.with_threshold(ConstantThreshold(upper=0.5))
+        redetected = once.with_threshold(ConstantThreshold(upper=0.4))
         assert _levels(redetected) == {"track"}
 
     def test_narrowing_twice_to_different_levels_is_empty(self):
@@ -160,7 +176,7 @@ class TestLevelViews:
         assert len(quiet) == 0
         for view in (quiet.tracks, quiet.items, quiet.detections):
             assert len(view) == 0
-            assert len(view.with_threshold(("zscore", 0.5))) > 0
+            assert len(view.with_threshold(ConstantThreshold(upper=0.5))) > 0
 
     def test_classwise_runs_on_a_view(self):
         md = _leveled_metadata()
@@ -258,6 +274,43 @@ class TestAggregateByClassJoin:
         by_class = OutliersOutput(flagged).aggregate_by_class(self._metadata())
         assert self._totals(by_class) == {"car": 1, "bus": 1, "Total": 2}
 
+    # An image holding boxes [car, car, bus], beside an image holding a bus.
+    _REPEATED = [[0, 0, 1], [1]]
+
+    def test_an_item_row_counts_once_per_distinct_class_of_a_metadata_like(self):
+        md = MockMetadata(
+            class_labels=np.array([c for labels in self._REPEATED for c in labels], dtype=np.intp),
+            factor_data=np.array([], dtype=np.int64),
+            factor_names=[],
+            is_binned=[],
+            index2label={0: "car", 1: "bus"},
+            item_indices=np.array([i for i, labels in enumerate(self._REPEATED) for _ in labels], dtype=np.int64),
+        )
+        flagged = pl.DataFrame([{"item_index": 0, "target_index": None, "metric_name": "mean", "metric_value": 1.0}])
+        assert self._totals(OutliersOutput(flagged).aggregate_by_class(md)) == {"car": 1, "bus": 1, "Total": 2}
+
+    def test_an_item_row_counts_once_per_distinct_class_of_a_metadata(self):
+        images = [np.random.default_rng(i).random((3, 16, 16)) for i in range(len(self._REPEATED))]
+        boxes = [[[0, 0, 4, 4]] * len(labels) for labels in self._REPEATED]
+        md = Metadata(MockODDataset(images, self._REPEATED, boxes, classes=["car", "bus"]))  # type: ignore
+        flagged = pl.DataFrame([{"item_index": 0, "target_index": None, "metric_name": "mean", "metric_value": 1.0}])
+        assert self._totals(OutliersOutput(flagged).aggregate_by_class(md)) == {"car": 1, "bus": 1, "Total": 2}
+
+
+def test_a_detection_counts_under_its_frames_class_on_a_unit_view():
+    md = Metadata(_mot_dataset([[1, 3, 2]]))
+    md.add_factors({"weather": ["rain", "clear", "snow"]}, level="unit")
+    md = md.at("unit").classed_by("weather")
+    frame = pl.DataFrame({
+        "item_index": [0, 0],
+        "target_index": [0, 4],
+        "metric_name": ["m", "m"],
+        "metric_value": [1.0, 1.0],
+    })
+    summary = OutliersOutput(frame).aggregate_by_class(md)
+    counts = dict(zip(summary["class_name"].cast(pl.Utf8), summary["m"], strict=True))
+    assert counts == {"rain": 1, "snow": 1, "Total": 2}
+
 
 @pytest.mark.required
 class TestLeveledAggregations:
@@ -348,31 +401,31 @@ def _two_class_tracked():
 @pytest.mark.required
 class TestEvaluateLevels:
     def test_the_default_judges_sequences_and_frames_only(self):
-        assert _kinds_of(Outliers().evaluate(_leveled_metadata())) == {None, "unit"}
+        assert _kinds_of(_leveled_outliers().evaluate(_leveled_metadata())) == {None, "unit"}
 
     def test_a_track_level_is_asked_for_by_name(self):
-        result = Outliers().evaluate(_leveled_metadata(), levels="track")
+        result = _leveled_outliers().evaluate(_leveled_metadata(), levels="track")
         assert _kinds_of(result) == {"track"}
         assert SourceIndex(3, 1, "track") in result.outliers
 
     def test_several_levels_by_tuple_or_with_a_repeat(self):
-        both = Outliers().evaluate(_leveled_metadata(), levels=("unit", "track"))
+        both = _leveled_outliers().evaluate(_leveled_metadata(), levels=("unit", "track"))
         assert _kinds_of(both) == {"unit", "track"}
-        repeated = Outliers().evaluate(_leveled_metadata(), levels=("track", "track"))
+        repeated = _leveled_outliers().evaluate(_leveled_metadata(), levels=("track", "track"))
         assert _kinds_of(repeated) == {"track"}
 
     def test_per_target_adds_detections_and_tracks(self):
-        result = Outliers().evaluate(_leveled_metadata(), per_target=True)
+        result = _leveled_outliers().evaluate(_leveled_metadata(), per_target=True)
         assert _kinds_of(result) == {None, "unit", "instance", "track"}
 
     def test_flags_without_images_leave_the_frames_out(self):
-        result = Outliers().evaluate(_leveled_metadata(), per_image=False, per_target=True)
+        result = _leveled_outliers().evaluate(_leveled_metadata(), per_image=False, per_target=True)
         assert _kinds_of(result) == {"instance", "track"}
 
     def test_the_result_records_that_it_is_tracking_even_without_frames_or_tracks(self):
         md = _MetadataTests._tracked()
         md.add_factors({"seq_signal": np.r_[np.random.default_rng(0).normal(0, 1, 11), 50.0]}, level="sequence")
-        result = Outliers().evaluate(md, levels="sequence")
+        result = Outliers(outlier_threshold=ConstantThreshold(upper=10.0)).evaluate(md, levels="sequence")
         assert len(result) > 0
         assert result.tracking is True
         assert len(result.sequences) == len(result)
@@ -393,7 +446,9 @@ class TestEvaluateLevels:
         # unit_signal is judged by default and n_gaps is not, so the fix must name both levels.
         with pytest.raises(ValueError, match=r"levels=\['track', 'unit'\] or per_image=True and per_target=True"):
             Outliers().evaluate(_leveled_metadata(), factors=["unit_signal", "n_gaps"])
-        result = Outliers().evaluate(_leveled_metadata(), factors=["unit_signal", "n_gaps"], levels=["track", "unit"])
+        result = _leveled_outliers().evaluate(
+            _leveled_metadata(), factors=["unit_signal", "n_gaps"], levels=["track", "unit"]
+        )
         assert _kinds_of(result) == {"unit", "track"}
 
     def test_a_named_factor_outside_an_explicit_plan_is_refused_with_the_fix(self):
@@ -432,7 +487,7 @@ class TestEvaluateLevelsOverImageMetadata:
     def test_item_names_a_single_level_metadata(self):
         md = _MetadataTests._temperature()
         result = Outliers().evaluate(md, levels="item")
-        assert result.data()["item_index"].to_list() == [9]
+        assert result.data()["item_index"].to_list() == [23]
 
     def test_target_alone_on_a_single_level_metadata_is_refused(self):
         md = _MetadataTests._temperature()
@@ -484,3 +539,39 @@ class TestEvaluateLevelsOverDatasets:
     def test_no_flag_at_all_is_still_refused_on_a_dataset(self, get_od_dataset):
         with pytest.raises(ValueError, match="At least one of per_image or per_target must be True"):
             Outliers().evaluate(_od(get_od_dataset), per_image=False, per_target=False)
+
+
+@pytest.mark.required
+class TestRedetectionKeepsClasses:
+    def _two_classes(self):
+        rng = np.random.default_rng(0)
+        values = np.concatenate([rng.normal(0, 1, 100), rng.normal(50, 1, 100)])
+        values[3] = 6.0  # ordinary over both classes, extreme within class 0
+        labels = np.repeat([0, 1], 100)
+        return Metadata.from_factors({"x": values}, class_labels=labels)
+
+    def test_with_threshold_after_classwise_stays_per_class(self):
+        md = self._two_classes()
+        per_class = Outliers().evaluate(md).classwise(md)
+        assert 3 in per_class.data()["item_index"].to_list()
+        again = per_class.with_threshold(3.5)
+        assert 3 in again.data()["item_index"].to_list()
+
+    def test_a_level_view_keeps_the_classes(self):
+        md = self._two_classes()
+        kept = Outliers().evaluate(md).classwise(md).items.with_threshold(3.5)
+        assert 3 in kept.data()["item_index"].to_list()
+
+    def test_itemwise_drops_the_classes(self):
+        md = self._two_classes()
+        assert Outliers().evaluate(md).classwise(md).itemwise().strata is None
+
+    def test_an_output_without_strata_still_loads(self):
+        md = self._two_classes()
+        result = Outliers().evaluate(md).classwise(md)
+        expected = result.itemwise().with_threshold(3.5).data()
+        # An output pickled before these attributes existed loads with none of them set on the instance.
+        for name in ("strata", "_populations", "score_input", "_rarity", "scored"):
+            vars(result).pop(name, None)
+        assert result.strata is None
+        assert result.with_threshold(3.5).data().equals(expected)

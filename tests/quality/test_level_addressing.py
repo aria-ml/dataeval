@@ -23,14 +23,20 @@ from dataeval.core import StatsResult, compute_stats
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, Outliers
 from dataeval.types import SourceIndex
+from dataeval.utils.thresholds import ConstantThreshold
 
 _LEVELS = ["sequence", "unit", "track", "instance"]
 
 
-def _outlier_stats():
-    """Twelve readings with one obvious outlier, addressed however a test likes."""
+def _outliers():
+    """Flag reading 3 and no other. A constant threshold is fitted to no population, so twelve readings are enough."""
+    return Outliers(outlier_threshold=ConstantThreshold(upper=200.0))
+
+
+def _outlier_stats(n=12):
+    """`n` readings with one obvious outlier, reading 3, addressed however a test likes."""
     rng = np.random.default_rng(0)
-    images = [rng.integers(0, 256, (3, 16, 16), dtype=np.uint8) for _ in range(12)]
+    images = [rng.integers(0, 256, (3, 16, 16), dtype=np.uint8) for _ in range(n)]
     images[3][:] = 255
     return compute_stats(
         images,
@@ -56,14 +62,14 @@ def _releveled(stats: StatsResult, address) -> StatsResult:
 class TestOutliersReportAtTheLevelDetected:
     def test_an_image_result_states_no_level(self):
         """The column is absent, not null: nothing an image dataset produces states one."""
-        result = Outliers().from_stats(_outlier_stats())
+        result = _outliers().from_stats(_outlier_stats())
 
         assert "level" not in result.data().columns
         assert result.outliers == {3: ["brightness", "mean"]}
 
     @pytest.mark.parametrize("level", ["unit", "track"])
     def test_a_level_between_the_ends_survives_the_round_trip(self, level):
-        result = Outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, level)))
+        result = _outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, level)))
 
         assert list(result.outliers) == [SourceIndex(0, 3, level)]
 
@@ -74,7 +80,7 @@ class TestOutliersReportAtTheLevelDetected:
         which is what makes two runs over differently-spelled statistics compare equal.
         """
         stats = _releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "instance"))
-        result = Outliers().from_stats(stats, per_target=True)
+        result = _outliers().from_stats(stats, per_target=True)
 
         assert list(result.outliers) == [SourceIndex(0, 3)]
         assert "level" not in result.data().columns
@@ -86,13 +92,13 @@ class TestOutliersReportAtTheLevelDetected:
         a spelling that is not equal to the `3` the same finding has always been reported
         as, and that `Duplicates` still reports it as.
         """
-        result = Outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i, None, "sequence")))
+        result = _outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i, None, "sequence")))
 
         assert list(result.outliers) == [3]
         assert "level" not in result.data().columns
 
     def test_the_level_is_a_column_of_the_frame(self):
-        result = Outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "unit")))
+        result = _outliers().from_stats(_releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "unit")))
 
         assert result.data()["level"].to_list() == ["unit", "unit"]
 
@@ -100,8 +106,8 @@ class TestOutliersReportAtTheLevelDetected:
         """`per_image`/`per_target` name the two ends; a frame is neither, so neither gates it."""
         stats = _releveled(_outlier_stats(), lambda i: SourceIndex(i // 6, i % 6, "unit"))
 
-        assert Outliers().from_stats(stats, per_target=False).outliers
-        assert Outliers().from_stats(stats, per_image=False).outliers
+        assert _outliers().from_stats(stats, per_target=False).outliers
+        assert _outliers().from_stats(stats, per_image=False).outliers
 
     def test_levels_are_thresholded_apart(self) -> None:
         """A per-frame reading is not compared against a spread that includes sequences.
@@ -110,10 +116,10 @@ class TestOutliersReportAtTheLevelDetected:
         out. Thresholded together the shifted level would drag the bounds and the untouched
         one would stop flagging its own outlier; thresholded apart, both still flag.
         """
-        stats = _outlier_stats()
+        stats = _outlier_stats(24)
         doubled = {name: np.concatenate([values, values + 1000.0]) for name, values in stats["stats"].items()}
-        addresses = [SourceIndex(0, i, "unit") for i in range(12)]
-        addresses += [SourceIndex(0, i, "track") for i in range(12)]
+        addresses = [SourceIndex(0, i, "unit") for i in range(24)]
+        addresses += [SourceIndex(0, i, "track") for i in range(24)]
 
         result = Outliers().from_stats({**stats, "stats": doubled, "source_index": addresses})
         # Every address here states a level, so every key is a SourceIndex rather than an int.
@@ -226,7 +232,7 @@ class TestFindingsFeedBackAsFactors:
             "invalid_box_count": [],
             "image_count": 2,
         }
-        result = Outliers().from_stats(stats)
+        result = Outliers(outlier_threshold=ConstantThreshold(upper=5.0)).from_stats(stats)
 
         assert list(result.outliers) == [SourceIndex(1, 0, "unit")]
 
@@ -253,8 +259,8 @@ class TestTheTwoSpellingsBehaveIdentically:
         minimal = _releveled(_outlier_stats(), lambda i: SourceIndex(0, i))
         explicit = _releveled(_outlier_stats(), lambda i: SourceIndex(0, i, "instance"))
 
-        assert len(Outliers().from_stats(minimal, per_image=per_image, per_target=per_target).outliers) == len(
-            Outliers().from_stats(explicit, per_image=per_image, per_target=per_target).outliers
+        assert len(_outliers().from_stats(minimal, per_image=per_image, per_target=per_target).outliers) == len(
+            _outliers().from_stats(explicit, per_image=per_image, per_target=per_target).outliers
         )
 
     @pytest.mark.parametrize(("per_image", "per_target"), [(True, False), (False, True), (True, True)])
