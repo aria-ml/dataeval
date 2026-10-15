@@ -232,7 +232,9 @@ def test(session: nox.Session) -> None:
 
     # Standard pytest configuration
     pytest_args = ["-m", "not cuda"]
-    xdist_args = ["-n4", "--dist", "loadfile"]
+    # Worker count is a job parameter: CI sets TEST_WORKERS to match the runner it
+    # is on. The default keeps the local run at four workers.
+    xdist_args = [f"-n{os.environ.get('TEST_WORKERS', '4')}", "--dist", "loadfile"]
     cov_args = ["--cov", f"--junitxml=output/junit.{python_version}.xml"]
     cov_term_args = ["--cov-report", "term-missing"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
