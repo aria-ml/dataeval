@@ -51,6 +51,8 @@ conda:
     - pytest -m 'not optional'
 
 verify:
+  tags:
+    - k8s-medium-cpu
   extends:
     - .nox_all
     - .rules_main_mr
