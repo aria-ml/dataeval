@@ -51,6 +51,8 @@ docs:
     GIT_STRATEGY: clone  # Full clone needed for artifact branch operations
 
 doctest:
+  tags:
+    - k8s-medium-cpu
   stage: docs
   extends:
     - .nox
