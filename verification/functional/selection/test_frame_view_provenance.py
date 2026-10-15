@@ -144,7 +144,8 @@ class TestFrameViewProvenance:
         from dataeval.quality import Outliers
         from verification.helpers import make_tracking_dataset
 
-        dataset = make_tracking_dataset((6, 5))
+        # 22 frames: Outliers fits a threshold only to a population of at least 20 rows.
+        dataset = make_tracking_dataset((12, 10))
         # Plant one frame that no statistic can miss: saturated white among random noise.
         dataset.plant_frame(0, 3, np.full((3, 16, 16), 255, dtype=np.uint8))
 

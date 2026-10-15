@@ -7,6 +7,7 @@ import pytest
 from dataeval.config import use_seed
 from dataeval.core import combination_scores
 from dataeval.core._combination_scores import _numeric, _windows
+from dataeval.utils.thresholds import AdaptiveThreshold
 
 
 def _reason(result, row):
@@ -339,13 +340,37 @@ class TestResidual:
         assert result["score"][-1] < 0
 
     def test_constant_residual(self):
-        result = combination_scores({"y": [1.0] * 30, "x": np.arange(30.0)}, groups=[], given={"y": "x"})
-        assert {_reason(result, row) for row in range(30)} == {"constant residual"}
+        result = combination_scores({"y": [1.0] * 40, "x": np.arange(40.0)}, groups=[], given={"y": "x"})
+        assert {_reason(result, row) for row in range(40)} == {"constant residual"}
 
     def test_too_few_rows(self):
-        result = combination_scores({"y": np.arange(10.0), "x": np.arange(10.0)}, groups=[], given={"y": "x"})
-        assert {_reason(result, row) for row in range(10)} == {"too few rows"}
+        result = combination_scores({"y": np.arange(30.0), "x": np.arange(30.0)}, groups=[], given={"y": "x"})
+        assert {_reason(result, row) for row in range(30)} == {"too few rows"}
         assert np.isnan(result["marginal"]).all()
+
+    def test_the_residual_window_needs_thirty_one_rows(self):
+        x = np.arange(30, dtype=float)
+        result = combination_scores({"y": x * 2.0, "x": x}, groups=[], given={"y": "x"})
+        assert {_reason(result, row) for row in range(30)} == {"too few rows"}
+        x = np.arange(31, dtype=float)
+        noise = np.random.default_rng(0).normal(0, 0.1, 31)
+        result = combination_scores({"y": x * 2.0 + noise, "x": x}, groups=[], given={"y": "x"})
+        assert np.isfinite(result["score"]).all()
+
+    def test_the_residual_flags_few_clean_rows_at_fifty_rows(self):
+        rng = np.random.default_rng(2)
+        flagged = total = 0
+        threshold = AdaptiveThreshold()
+        for _ in range(200):
+            x = rng.normal(size=50)
+            y = 0.5 * x + rng.normal(size=50)
+            score = combination_scores({"y": y, "x": x}, groups=[], given={"y": "x"})["score"]
+            lower, upper = threshold(score)
+            assert lower is not None
+            assert upper is not None
+            flagged += int(((score < lower) | (score > upper)).sum())
+            total += score.size
+        assert flagged / total < 0.002
 
     def test_a_missing_conditioner_is_a_missing_value(self):
         x = np.arange(40.0)
@@ -355,11 +380,11 @@ class TestResidual:
         assert result["n"][1] == 39
 
     def test_strata_are_scored_separately(self):
-        x = np.r_[np.arange(40.0), np.arange(25.0)]
-        data = {"y": np.sin(x), "x": x, "cls": ["a"] * 40 + ["b"] * 25}
+        x = np.r_[np.arange(50.0), np.arange(40.0)]
+        data = {"y": np.sin(x), "x": x, "cls": ["a"] * 50 + ["b"] * 40}
         result = combination_scores(data, groups=[], given={"y": "x"}, strata="cls")
-        assert set(result["n"][:40]) == {40}
-        assert set(result["n"][40:]) == {25}
+        assert set(result["n"][:50]) == {50}
+        assert set(result["n"][50:]) == {40}
         assert np.isfinite(result["score"]).all()
 
     def test_each_window_holds_its_nearest_rows_without_the_row(self):

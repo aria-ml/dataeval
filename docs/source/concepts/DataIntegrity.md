@@ -353,11 +353,12 @@ inspection.
 ### Outlier detection over annotation and metadata factors
 
 ```{note}
-{class}`.Outliers` thresholds ordered metadata factors -- each against the rows
-at the level it was measured at -- when a {class}`.Metadata` is passed as
-`data`. The stratified, categorical, and sequential detection described below is
-in development; this section describes the method it follows and the evidence
-behind its defaults.
+When a {class}`.Metadata` is passed as `data`, {class}`.Outliers` thresholds
+ordered metadata factors, each against the rows at the level it was measured at.
+With `strata=` it judges each factor within the rows that share a categorical
+value and judges categorical factors by rarity. With `combinations=` and
+`given=` it flags rows whose combination of factors is unusual. This section
+describes the method behind each of these and the evidence behind its defaults.
 ```
 
 Extending {class}`.Outliers` beyond image statistics raises three questions the
@@ -382,7 +383,7 @@ a lattice or number fewer than 20:
 | gap count per track (Poisson counts, n = 3000) | no | yes |
 | track duration in frames (integers, n = 3000) | no | yes |
 | mean speed (floating point, n = 3000) | yes | yes |
-| any per-video factor in a 12-video dataset | no — fewer than 20 rows | yes, with the small-n caveat below |
+| per-video factor, 12 videos | no (under 20 rows) | no (below the floor: listed in `result.populations`, not judged) |
 | capture time in epoch seconds at 1 Hz | no — a lattice | yes, sequentially |
 
 Gating on that classification would silently exclude every integer count a
@@ -416,7 +417,8 @@ every stratum depend on the bin edges.
 
 Detection therefore reads raw values only, and stratifies only on categorical
 columns. A continuous conditioning variable is a joint relationship, not a
-stratum. As a result, **re-binning a metadata does not change an outlier
+stratum, so you pass it to `given=` (see [Combinations of
+factors](#combinations-of-factors)). As a result, **re-binning a metadata does not change an outlier
 result.**
 
 #### Relative box geometry
@@ -429,6 +431,102 @@ the center as a fraction of the half-diagonal — turns "this class is usually a
 small box near the corner" into a statement about composition, not the camera.
 Absolute size remains its own question: it determines whether an object is
 detectable at all.
+
+#### Small populations
+
+A threshold fitted to a handful of rows describes the handful, not the distribution. {class}`.Outliers` therefore fits
+a statistical threshold only to a population of at least 20 rows with a real value. A population is the rows of one
+check at one level within one stratum, or the whole level when you pass no `strata=`. Below 20 rows, nothing is fitted
+and no row is flagged from that population.
+
+The floor comes from the share of clean rows the default adaptive threshold flags as the population shrinks. Each cell
+below is the share of rows flagged on a single column of clean data, from 20,000 or more rows per cell:
+
+| Rows | Normal | Gamma (shape 2) | Lognormal |
+| --- | --- | --- | --- |
+| 5 | 3.37 % | 3.46 % | 4.30 % |
+| 10 | 0.17 % | 0.28 % | 0.98 % |
+| 20 | 0.05 % | 0.19 % | 1.09 % |
+| 30 | 0.04 % | 0.18 % | 1.06 % |
+| 100 | 0.008 % | 0.12 % | 1.09 % |
+| 1,000 | 0.003 % | 0.09 % | 1.04 % |
+
+From 20 rows, the rate on normal and gamma data stays at or below about 0.2 % of clean rows. At 10 rows it is 0.17 to
+0.28 %, and at 5 rows it is above 3 %. The rate climbs fastest below 20 rows, so 20 is where a finding stops being
+mostly noise. Lognormal data stays near 1 % from 10 rows on, so the floor does not govern heavy tails. The table
+measures about 1 % for lognormal values at 1,000 rows, and the calibration paragraph under rarity measures 0.6 % at
+5,000 rows. Neither rate is set by the floor.
+
+The checks that score a combination have their own minimum, because each one fits more than a location and a scale:
+
+| Check | Judged when the population has |
+| --- | --- |
+| single column, or a distribution of values | at least 20 rows with a real value |
+| robust Mahalanobis distance over $d$ dimensions | at least $\max(20,\ 10d)$ scored rows |
+| residual of one column given another | at least 31 rows |
+| categorical rarity | at least 93 rows |
+
+The clean-data rates of the score checks, under the same default threshold, are in the same range as a single
+column's. The robust Mahalanobis distance flags 0.12 % of clean rows at 20 rows and 2 dimensions, 0.025 % at 100 rows
+and 2 dimensions, and 0.01 % at 500 rows and 10 dimensions. The distribution distance flags 0.18 % at 20 rows and
+0.08 % at 50 rows.
+
+**Why skip, and not warn or rank.** A warning on every population below the floor fires on every video dataset, where
+a per-video factor has a dozen rows, and a warning that always fires is ignored. A ranking of a small population asserts
+nothing you can act on, because with no threshold the top of the ranking is always some row. Skipping the population and
+saying so in a table states the limit of the evidence and leaves the findings meaning something.
+
+A `ConstantThreshold` is exempt. Its bounds do not depend on the data, so a small population supports it. The floor
+does not apply to cluster-distance detection.
+
+**See what was skipped.** `result.populations` has one row per level, metric and population, with the number of rows,
+whether a threshold was fitted and, when it was not, the reason. Besides `below 20 rows` and `below 93 rows`, the reason
+can be `no spread` (no threshold can be derived, as when every value is the same) or `no upper bound`. A residual or a
+Mahalanobis distance that core could not score reports its own reason, such as `exact fit` or `too few rows`. When the
+floor and one of those reasons both apply, the floor's reason is reported.
+
+```python
+result = Outliers().evaluate(metadata, levels="unit")
+result.populations.filter(judged=False)
+```
+
+#### Stratification
+
+A check judges a row against its whole level by default. A frame of a clear day and a frame of a snowy day then share
+one threshold, and a value that is ordinary for snow can look extreme beside the clear frames. Pass `strata=` with
+one or more categorical factors to judge each row against the rows that share its value:
+
+```python
+result = Outliers().evaluate(metadata, levels="target", strata="weather")
+result.data().select("item_index", "metric_name", "metric_value", "population")
+```
+
+Every flagged row then names the stratum it was judged in, such as `weather=rain`, in a `population` column. To change
+the strata of a result you already have, call `result.stratified(metadata, "time_of_day")`. It replaces the current
+strata and equals a new `evaluate` call with the same arguments and `strata=`. `itemwise()` removes the strata.
+
+**What a stratum is.**
+
+- A stratum is a categorical factor, or one of the reserved columns `item_index`, `unit_index` and `track_id`. The
+  reserved columns are paired with `item_index`, so a population is one frame or one track of one video, such as
+  `item_index=0, unit_index=3`. Several names cross: a population is one combination of their values.
+- A continuous factor is refused. Strata built from its bins would depend on the bin edges (see [Why bins are never
+  used](#why-bins-are-never-used)). To judge a value against rows that are near it in a continuous factor, use
+  `given=` (see [Combinations of factors](#combinations-of-factors)).
+- Strata come from raw values, never from bins.
+- A row takes the value of the ancestor that defines it. A detection takes its frame's `weather`, and a frame takes
+  its video's. A level that no stratum reaches stays whole, and its rows have a null `population`.
+- A null stratum value is a population of its own, labeled `weather=null`, and every check scores it. A detection with
+  no track, read for a track stratum, joins `track_id=null`.
+
+**What `strata=` adds.** Besides fitting each threshold within the stratum, `strata=` turns on rarity for the
+categorical factors at the levels the strata reach (next section), and it is the condition for judging a group of
+categorical factors in `combinations=`. A factor named in `strata=` is not also judged.
+
+**What it does not do.** Cluster-distance detection is not stratified. `classwise()` is stratification by the class
+label: it re-fits the threshold checks and any combination checks within each class, runs no rarity, and on tracking
+data leaves sequence, frame and track rows whole. `strata=` and `per_class=True` are two spellings of the same thing,
+so passing both raises.
 
 #### Categorical rarity within a stratum
 
@@ -466,12 +564,15 @@ large enough for $P(X \le 1) \le \alpha$, which at the defaults is $n \ge 93$
 — approximately $4.74 / p$, the one-occurrence extension of the "rule of
 three" for zero occurrences. [Das & Schneider (2007)](#ref7) derive the minimum
 support of their categorical detector from its significance level in the same
-way. One setting, $p$, moves both the rarity and the minimum. Strata below the
-minimum are reported as a ranking, without a verdict, and are left out of the
-multiple-testing count — a discrete test that cannot reach significance need
-not count against the ones that can ([Tarone, 1990](#ref8)). Across the
-testable cells at a level, the Benjamini–Hochberg procedure controls the false
-discovery rate at 0.05 ([Benjamini & Hochberg, 1995](#ref9)).
+way. The setting $p$ sets both the rarity and the minimum. Strata below the
+minimum are listed in `result.populations` with the reason `below 93 rows` and
+without a verdict, and are left out of the multiple-testing count, because a
+discrete test that cannot reach significance need not count against the ones that
+can ([Tarone, 1990](#ref8)). Across the observed cells of the testable strata at a
+level, the Benjamini–Hochberg procedure controls the false discovery rate at
+0.05 ([Benjamini & Hochberg, 1995](#ref9)). The cells of a level are counted
+together across all of its categorical checks, and a cell withheld as rare
+everywhere (below) still counts, because it was tested.
 
 **Levels rare everywhere are not outliers.** A class that is rare in every
 stratum is a finding about the dataset's balance (see [Dataset Bias and
@@ -482,8 +583,12 @@ correction fails a common video case: with 100 sequences each captured on its
 own sensor, every sensor has a global share of about 1 %, so three frames of
 sensor B inside sequence A look expected. The rule used instead: a level is
 withheld as rare everywhere only when it is rare in *every* stratum large enough
-to test. A level common in at least one stratum — the snow videos, sensor B's
-own sequence — stays flagged for its rare appearances elsewhere.
+to test. A stratum where the level does not occur at all counts as rare for
+this rule, so a level seen in only one testable stratum is withheld: it is rare
+in the dataset. A level common in at least one stratum and also seen in another
+(the snow videos, sensor B's own sequence) stays flagged for its rare
+appearances elsewhere. The rule is applied to the cells that survive the
+Benjamini–Hochberg correction, and every row of a flagged cell is one finding.
 
 | Case | Upper bound on the level's share | Flagged |
 | --- | --- | --- |
@@ -560,7 +665,71 @@ tail is reported and only the distance is.
 
 **Curved relationships.** One column given another is fitted locally, against the rows nearest in the conditioning
 column, not with a straight line. Brightness rises and falls over a day, so a straight line through it is nearly flat
-and leaves the daily curve in every residual.
+and leaves the daily curve in every residual. Each row is compared with its nearest 30 rows, or $\lceil\sqrt{n}\rceil$
+when that is larger, so a population needs at least 31 rows. Fewer neighbors make
+the spread too noisy and flag clean rows too often. With `y = 0.5x + noise`, the
+share of clean rows flagged by the default threshold depends on the smallest
+window:
+
+| Smallest window | 50 rows | 100 rows | 200 rows | 1,000 rows |
+| --- | --- | --- | --- | --- |
+| 10 neighbors | 0.50 % | 0.46 % | 0.22 % | 0.04 % |
+| 20 neighbors | 0.14 % | 0.13 % | 0.10 % | 0.04 % |
+| 30 neighbors | 0.075 % | 0.06 % | 0.04 % | 0.04 % |
+
+With 10 neighbors the spread estimate is noisy and the z-scores are heavy-tailed
+(0.89 % of rows at 50 rows on a cosine relationship). A window of 30 brings the
+rate to the single-column level.
+
+**How `Outliers` flags a combination.** Pass `combinations=` (groups of columns, or `"all"` for every pair at each
+judged level), `given=` (`{y: x}`) and, to declare how a column is read, `kinds=` to {meth}`.Outliers.evaluate`:
+
+```python
+result = Outliers().evaluate(
+    metadata,
+    levels="target",
+    strata="class_name",
+    combinations=[("rel_size", "rel_offset_y")],
+    given={"brightness": "hour"},
+)
+```
+
+`Outliers` turns the scores into findings with the same machinery it uses for a column. It fits the threshold to the
+scores of each population and flags the rows beyond it:
+
+| Method | What the threshold is fitted to | Rows flagged | `metric_value` |
+| --- | --- | --- | --- |
+| `mahalanobis` | the robust distances | above the upper bound only | the distance |
+| `distribution` | the length-adjusted distances | above the upper bound only | the distance |
+| `residual` | the signed robust z | above the upper bound or below the lower | the signed z |
+| `rarity` | the binomial test above | cells with an improbably low count | the upper bound on the share |
+
+A small distance is not unusual, so the two distance methods flag only the upper side. Each flagged row names its check
+in `method` and its group in `metric_name`, such as `rel_size, rel_offset_y` or `brightness given hour`. The populations
+and floors are the ones in [Small populations](#small-populations), and `result.populations` lists the checks that were
+not judged. A `distribution` check is a one-column group whose column you declare with `kinds={name: "sample"}`; every
+other group of one column is refused, since the column is already judged on its own. A group of categorical columns is
+judged by rarity and needs `strata=` that reach its level. A group mixing numbers and categories, and a group whose
+columns do not lie on one chain of levels (a frame column with a track column), are refused.
+
+A scalar `outlier_threshold` reaches these checks only when it is statistical and has no limits. A constant or limited
+threshold is in the units of the image statistics, so the combination checks use the default instead. To set one
+check, key a mapping by its name, such as `outlier_threshold={"rel_size, rel_offset_y": 4.0}`.
+
+**Why the tail is not used.** {func}`.combination_scores` also reports the tail of the distance, and it is the natural
+cut. At 0.01 it meets its band: 1.3 to 1.8 % of clean rows fall below 0.01 at (100 rows, 2 dimensions), (250, 5) and
+(500, 10). Further out it is liberal, most of all near the edge of 50 rows per dimension. At (100 rows, 2 dimensions)
+the share of clean rows below the nominal level is 1.82 times that level at 0.01, 2.98 times at 0.001 and 4.25 times at
+0.0001. At (250, 5) it is 1.43, 1.64 and 1.80 times. `Outliers` fits its threshold to the distances of each population
+instead, as it does for any column, so a finding never relies on that deep tail. The clean-data rates are in [Small
+populations](#small-populations).
+
+**A combination finding is kept beside single-column findings.** A row flagged on a combination is kept when one of the
+group's columns is also flagged alone. There is no shared error budget between the checks, since each population has its
+own threshold, so reporting both counts nothing twice. The two are separate rows in the result.
+
+Scoring every pair with `"all"` is slow, and the result keeps every score so it can refit thresholds. Such a result is
+large to hold and to pickle, so use `"all"` to look for pairs and name the groups you keep.
 
 **Category and value together.** To ask whether a value is unusual for its category, pass the category as a stratum.
 A group that mixes numbers and categories is refused, since it would only repeat that split.

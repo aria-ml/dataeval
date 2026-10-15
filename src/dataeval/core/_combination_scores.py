@@ -40,6 +40,9 @@ _ABSENT = object()  # a value that keeps its row out of a group's population
 # below 0.01) from 50 rows per dimension. Measured 2026-10-14 over 200 replicates: 2.4 % at 30 rows per dimension, 1.8 %
 # at (100, 2), 1.4 % at (250, 5), 1.3 % at (500, 10).
 _TAIL_ROWS_PER_DIMENSION = 50
+# A spread from fewer neighbors is noisy enough to give the z heavy tails: at 10 neighbors the default
+# threshold flags 0.5 % of clean rows at 50 to 100 rows, at 30 neighbors 0.04-0.08 %, as a single column does.
+_MIN_WINDOW = 30
 _GRID = (np.arange(100) + 0.5) / 100  # quantile levels at which samples are compared
 _DRAWS = 50  # reference draws per sample length, for the expected distance at that length
 _BLOCK_ROWS = 4096  # residual windows are built this many rows at a time, bounding peak memory to about block x window
@@ -666,7 +669,7 @@ def _block_z(ordered: NDArray[np.float64], width: int, start: int, stop: int) ->
 def _local_fit(y: NDArray[np.float64], x: NDArray[np.float64], rows: NDArray[np.intp], scores: _Scores) -> None:
     """Score one population's rows by the robust z of ``y`` against its nearest rows in ``x``."""
     n = rows.size
-    width = max(10, math.ceil(math.sqrt(n)))
+    width = max(_MIN_WINDOW, math.ceil(math.sqrt(n)))
     scores.n[rows] = n
     if n < width + 1:
         scores.reason[rows] = _TOO_FEW_ROWS
@@ -820,7 +823,8 @@ def combination_scores(
     Notes
     -----
     A row that cannot be scored keeps its entry, with ``score`` NaN and a ``reason``: a missing
-    value, a missing stratum, too few rows, more rows sharing one value than a robust fit can use
+    value, a missing stratum, too few rows (a ``given=`` residual needs at least 31 rows in each
+    population), more rows sharing one value than a robust fit can use
     (``exact fit``), a covariance without full rank, or a constant residual. Missing means null,
     NaN or infinite for numbers; a null category is a level of its own.
 

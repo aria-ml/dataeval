@@ -17,6 +17,7 @@ from dataeval.flags import ImageStats
 from dataeval.quality._outliers import Outliers, OutliersOutput, _build_class_ids, _fit_outliers
 from dataeval.types import SourceIndex
 from dataeval.utils.thresholds import (
+    ConstantThreshold,
     IQRThreshold,
     ModifiedZScoreThreshold,
     ZScoreThreshold,
@@ -52,6 +53,23 @@ def make_mock_metadata(lstat: LabelStatsResult) -> MockMetadata:
     )
 
 
+def _bright_and_dark():
+    """Twenty bright images of class 0 and twenty dark ones of class 1, with image 5 dark among the bright."""
+    rng = np.random.default_rng(42)
+    images = rng.random((40, 3, 16, 16))
+    images[:20] = images[:20] * 0.3 + 0.7
+    images[20:] = images[20:] * 0.3
+    images[5] = 0.01
+    metadata = MockMetadata(
+        class_labels=np.array([0] * 20 + [1] * 20, dtype=np.intp),
+        factor_data=np.array([], dtype=np.int64),
+        factor_names=[],
+        is_binned=[],
+        index2label={0: "bright", 1: "dark"},
+    )
+    return images, metadata
+
+
 @pytest.mark.required
 class TestOutliers:
     def test_outliers(self):
@@ -62,7 +80,7 @@ class TestOutliers:
         assert results is not None
 
     def test_get_outlier_mask_empty(self):
-        mask = _fit_outliers(np.zeros([0]), ZScoreThreshold()).mask
+        mask = _fit_outliers(np.zeros([0]), ZScoreThreshold())[0].mask
         assert mask is not None
         assert len(mask) == 0
 
@@ -72,13 +90,14 @@ class TestOutliers:
     )
     def test_fit_outliers(self, threshold):
         data = np.array([0.1, 0.2, 0.1, 1.0])
-        mask = _fit_outliers(data, threshold).mask
-        # With only 4 values, 2.5x multiplier should not flag anything
-        assert mask is not None
-        assert len(mask) == len(data)
+        fit, n, reason = _fit_outliers(data, threshold)
+        # Four values are under the floor, so no statistical threshold is fitted to them
+        assert (n, reason) == (4, "below 20 rows")
+        assert not fit.mask.any()
+        assert len(fit.mask) == len(data)
 
     def test_get_outlier_mask_all_nan(self):
-        mask = _fit_outliers(np.array([np.nan, np.nan, np.nan]), ZScoreThreshold()).mask
+        mask = _fit_outliers(np.array([np.nan, np.nan, np.nan]), ZScoreThreshold())[0].mask
         np.testing.assert_array_equal(mask, np.array([False, False, False]))
 
     def test_outliers_with_stats(self):
@@ -273,8 +292,8 @@ class TestOutliers:
         # Create dataset with bounding boxes
         dataset = get_od_dataset(images, 2, True, {0: [(0, 0, 64, 64)], 5: [(0, 0, 64, 64)]})
 
-        # Use a tight threshold to guarantee outliers are detected in this small dataset
-        outliers = Outliers(flags=ImageStats.DIMENSION, outlier_threshold=1.0)
+        # A constant threshold flags the full-image boxes whatever the population size
+        outliers = Outliers(flags=ImageStats.DIMENSION, outlier_threshold=ConstantThreshold(upper=63.0))
         result = outliers.evaluate(dataset, per_image=True, per_target=True)
 
         # target_id column should be kept since we have target-level outliers
@@ -849,13 +868,8 @@ class TestOutliersEdgeCases:
 
     def test_evaluate_drops_null_target_id(self):
         """Covers evaluate logic dropping 'target_id' column if all null."""
-        # Use zscore with threshold 1.0
-        # With values [100.0, 1.0, 100.0]:
-        # - Mean = 67.0, Std ≈ 46.67
-        # - Z-score for 100.0: |100-67|/46.67 ≈ 0.707
-        # - Z-score for 1.0: |1-67|/46.67 ≈ 1.41
-        # Threshold 1.0 means only item 1 (z-score 1.41 > 1.0) is flagged
-        detector = Outliers(outlier_threshold=ZScoreThreshold(1.0))
+        # Only item 1 (1.0) falls below the constant lower bound
+        detector = Outliers(outlier_threshold=ConstantThreshold(lower=50.0))
 
         # We manually construct a result that has all null target_ids
         mock_stats = {
@@ -879,12 +893,8 @@ class TestOutliersEdgeCases:
         The from_stats method combines stats, runs outlier detection, then adds
         dataset_index with local item indices via get_dataset_step_from_idx.
         """
-        # Use threshold 1.5 so only the extreme value (1000.0) is flagged as outlier
-        # With combined values [10.0, 10.0, 1000.0, 10.0]:
-        # - mean ≈ 257.5, std ≈ 428.5
-        # - z-score for 1000.0 ≈ 1.73 > 1.5 (outlier)
-        # - z-score for 10.0 ≈ 0.58 < 1.5 (not outlier)
-        detector = Outliers(outlier_threshold=1.5)
+        # Only the extreme value (1000.0) rises above the constant upper bound
+        detector = Outliers(outlier_threshold=ConstantThreshold(upper=500.0))
 
         # Create stats that mimic 2 datasets
         # Dataset 1: 1 item (value 10.0)
@@ -918,10 +928,10 @@ class TestOutliersEdgeCases:
         """Covers _fit_outliers specific branches (all nan, empty)."""
         t = ZScoreThreshold(3.0)
         # Empty
-        assert len(_fit_outliers(np.array([]), t).mask) == 0
+        assert len(_fit_outliers(np.array([]), t)[0].mask) == 0
 
         # All NaNs
-        res = _fit_outliers(np.array([np.nan, np.nan]), t).mask
+        res = _fit_outliers(np.array([np.nan, np.nan]), t)[0].mask
         assert not np.any(res)
 
     def test_evaluate_with_tuple_dataset(self, get_mock_ic_dataset):
@@ -975,7 +985,7 @@ class TestOutliersNaNColumns:
     def test_partly_nan_column_thresholds_over_survivors(self):
         """The values that exist set the bounds; the NaN entries are simply not compared."""
         detector = Outliers(outlier_threshold=IQRThreshold(1.5))
-        values = np.array([10.0, 10.1, 9.9, 10.2, 9.8, 10.05, np.nan, np.nan, 1000.0])
+        values = np.r_[np.linspace(9.8, 10.2, 21), np.nan, np.nan, 1000.0]
         mock_stats = {
             "stats": {"nir_mean": values},
             "source_index": [SourceIndex(i, None) for i in range(len(values))],
@@ -985,7 +995,7 @@ class TestOutliersNaNColumns:
         flagged = output.data()["item_index"].to_list()
 
         # The real outlier is found, and neither NaN row is reported.
-        assert flagged == [8]
+        assert flagged == [23]
 
     def test_too_few_real_values_yields_no_outliers(self):
         """One or two survivors cannot describe a distribution, so nothing is flagged."""
@@ -1000,10 +1010,12 @@ class TestOutliersNaNColumns:
             output = detector.from_stats(mock_stats)  # type: ignore
 
             assert len(output) == 0, f"{real} should not produce an outlier"
+            population = output.populations.row(0, named=True)
+            assert (population["n"], population["reason"]) == (len(real), "below 20 rows")
 
     def test_unsatisfiable_band_group_yields_no_outliers(self):
         """End to end: a band group no datum can satisfy contributes no flags."""
-        images = [np.random.default_rng(i).random((3, 32, 32)) for i in range(6)]
+        images = [np.random.default_rng(i).random((3, 32, 32)) for i in range(24)]
         stats = compute_stats(
             images,
             stats=ImageStats.PIXEL,
@@ -1014,6 +1026,7 @@ class TestOutliersNaNColumns:
         assert np.isnan(stats["stats"]["nir_mean"]).all()
 
         output = Outliers(outlier_threshold=ZScoreThreshold(1.0)).from_stats(stats)
+        assert len(output) > 0
         assert all(name != "nir_mean" for name in output.data()["metric_name"].to_list())
 
 
@@ -1130,23 +1143,8 @@ class TestOutliersPerClass:
 
     def test_per_class_basic(self):
         """per_class=True with IC dataset runs and returns valid output."""
-        rng = np.random.default_rng(42)
-        images = rng.random((20, 3, 16, 16))
-        # Class 0 (images 0-9): bright
-        images[:10] = images[:10] * 0.3 + 0.7
-        # Class 1 (images 10-19): dark
-        images[10:] = images[10:] * 0.3
-        # Make image 5 dark (outlier within class 0, but similar to class 1 globally)
-        images[5] = 0.01
-
-        metadata = MockMetadata(
-            class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
-            factor_data=np.array([], dtype=np.int64),
-            factor_names=[],
-            is_binned=[],
-            index2label={0: "bright", 1: "dark"},
-        )
-
+        # Image 5 is dark: an outlier within bright class 0, but similar to class 1 globally
+        images, metadata = _bright_and_dark()
         outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold=1.5)
         result = outliers.evaluate(images, per_class=True, metadata=metadata)
         assert isinstance(result.data(), pl.DataFrame)
@@ -1202,20 +1200,7 @@ class TestOutliersPerClass:
 
     def test_classwise_output_method(self):
         """classwise() on output produces per-class outliers."""
-        rng = np.random.default_rng(42)
-        images = rng.random((20, 3, 16, 16))
-        images[:10] = images[:10] * 0.3 + 0.7
-        images[10:] = images[10:] * 0.3
-        images[5] = 0.01
-
-        metadata = MockMetadata(
-            class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
-            factor_data=np.array([], dtype=np.int64),
-            factor_names=[],
-            is_binned=[],
-            index2label={0: "bright", 1: "dark"},
-        )
-
+        images, metadata = _bright_and_dark()
         outliers = Outliers(flags=ImageStats.PIXEL, outlier_threshold=1.5)
         result = outliers.evaluate(images)
         classwise_result = result.classwise(metadata)
@@ -1224,24 +1209,14 @@ class TestOutliersPerClass:
 
     def test_classwise_matches_evaluate_per_class(self):
         """classwise() produces same results as evaluate(per_class=True)."""
-        rng = np.random.default_rng(42)
-        images = rng.random((20, 3, 16, 16))
-        images[:10] = images[:10] * 0.3 + 0.7
-        images[10:] = images[10:] * 0.3
-        images[5] = 0.01
-
-        metadata = MockMetadata(
-            class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
-            factor_data=np.array([], dtype=np.int64),
-            factor_names=[],
-            is_binned=[],
-            index2label={0: "bright", 1: "dark"},
-        )
+        images, metadata = _bright_and_dark()
 
         outliers = Outliers(flags=ImageStats.PIXEL)
         via_evaluate = outliers.evaluate(images, per_class=True, metadata=metadata)
         via_output = outliers.evaluate(images).classwise(metadata)
+        assert len(via_output) > 0
         assert via_evaluate.data().equals(via_output.data())
+        assert via_evaluate.populations.equals(via_output.populations)
 
     def test_itemwise_output_method(self):
         """itemwise() re-runs global detection from stored stats."""
@@ -1301,23 +1276,12 @@ class TestOutliersPerClass:
 
     def test_classwise_chaining_with_aggregation(self):
         """classwise() result supports aggregate methods."""
-        rng = np.random.default_rng(42)
-        images = rng.random((20, 3, 16, 16))
-        images[:10] = images[:10] * 0.3 + 0.7
-        images[10:] = images[10:] * 0.3
-        images[5] = 0.01
-
-        metadata = MockMetadata(
-            class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
-            factor_data=np.array([], dtype=np.int64),
-            factor_names=[],
-            is_binned=[],
-            index2label={0: "bright", 1: "dark"},
-        )
+        images, metadata = _bright_and_dark()
 
         outliers = Outliers(flags=ImageStats.PIXEL)
         result = outliers.evaluate(images)
         classwise_result = result.classwise(metadata)
+        assert len(classwise_result) > 0
 
         # Can chain with aggregation methods
         by_class = classwise_result.aggregate_by_class(metadata)
@@ -1330,25 +1294,14 @@ class TestOutliersPerClass:
 
     def test_from_stats_classwise(self):
         """classwise() works on output from from_stats()."""
-        rng = np.random.default_rng(42)
-        images = rng.random((20, 3, 16, 16))
-        images[:10] = images[:10] * 0.3 + 0.7
-        images[10:] = images[10:] * 0.3
-        images[5] = 0.01
-
-        metadata = MockMetadata(
-            class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
-            factor_data=np.array([], dtype=np.int64),
-            factor_names=[],
-            is_binned=[],
-            index2label={0: "bright", 1: "dark"},
-        )
+        images, metadata = _bright_and_dark()
 
         stats = compute_stats(images, stats=ImageStats.PIXEL)
         outliers = Outliers(flags=ImageStats.PIXEL)
         result = outliers.from_stats(stats)
         classwise_result = result.classwise(metadata)
         assert isinstance(classwise_result.data(), pl.DataFrame)
+        assert 5 in classwise_result.data()["item_index"].to_list()
 
     def test_with_threshold_changes_results(self):
         """with_threshold() produces different outliers with different sensitivity."""
@@ -1392,24 +1345,13 @@ class TestOutliersPerClass:
 
     def test_with_threshold_chained_with_classwise(self):
         """with_threshold() can be chained after classwise()."""
-        rng = np.random.default_rng(42)
-        images = rng.random((20, 3, 16, 16))
-        images[:10] = images[:10] * 0.3 + 0.7
-        images[10:] = images[10:] * 0.3
-        images[5] = 0.01
-
-        metadata = MockMetadata(
-            class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
-            factor_data=np.array([], dtype=np.int64),
-            factor_names=[],
-            is_binned=[],
-            index2label={0: "bright", 1: "dark"},
-        )
+        images, metadata = _bright_and_dark()
 
         outliers = Outliers(flags=ImageStats.PIXEL)
         result = outliers.evaluate(images)
         chained = result.classwise(metadata).with_threshold(2.0)
         assert isinstance(chained.data(), pl.DataFrame)
+        assert 5 in chained.data()["item_index"].to_list()
 
     def test_with_threshold_preserves_stored_state(self):
         """with_threshold() result can be further re-detected."""
@@ -1669,6 +1611,29 @@ class TestOutliersMultiDataset:
         assert isinstance(lenient.data(), pl.DataFrame)
         assert len(strict) >= len(lenient)
 
+    def test_multi_dataset_per_class_with_threshold_stays_per_class(self):
+        """with_threshold after a per-class evaluate over two datasets re-detects the same rows per class."""
+        rng = np.random.default_rng(7)
+        ds_a = rng.random((20, 3, 16, 16))
+        ds_b = rng.random((20, 3, 16, 16))
+        ds_a[:10] = ds_a[:10] * 0.3 + 0.7
+        ds_b[:10] = ds_b[:10] * 0.3 + 0.7
+        ds_a[10:] *= 0.3
+        ds_b[10:] *= 0.3
+        ds_a[5] = 0.01
+        md = MockMetadata(
+            class_labels=np.array(([0] * 10 + [1] * 10) * 2, dtype=np.intp),
+            factor_data=np.array([], dtype=np.int64),
+            factor_names=[],
+            is_binned=[],
+            index2label={0: "bright", 1: "dark"},
+        )
+
+        result = Outliers(flags=ImageStats.PIXEL).evaluate(ds_a, ds_b, per_class=True, metadata=md)
+        again = result.with_threshold(result.outlier_threshold)
+        assert again.data().equals(result.data())
+        assert "dataset_index" in again.data().columns
+
     def test_evaluate_multi_dataset_per_target_numbers_every_dataset(self, get_od_dataset):
         """Targets add rows per item, and each dataset still receives its own index and local item numbers."""
         first, second = (
@@ -1817,14 +1782,15 @@ class TestOutlierContextColumns:
 
     @staticmethod
     def _detect(values, threshold, levels=None, class_ids=None):
-        from dataeval.quality._outliers import _detect_outliers
+        from dataeval.quality._outliers import _detect_outliers, _Strata
 
         array = np.asarray(values, dtype=np.float64)
         levels = levels if levels is not None else [None] * len(array)
         # A stated level only separates rows when the address is keyed; an unkeyed one folds
         # onto the task-generic kind whatever it names.
         source_index = [SourceIndex(i, None if level is None else i, level) for i, level in enumerate(levels)]
-        return _detect_outliers({"m": array}, source_index, threshold, class_ids)
+        strata = None if class_ids is None else _Strata(class_ids, {}, ("<class>",))
+        return _detect_outliers({"m": array}, source_index, threshold, strata)[0]
 
     def test_an_upper_outlier_names_the_limit_it_crossed(self):
         from dataeval.utils.thresholds import ConstantThreshold
@@ -2016,18 +1982,7 @@ class TestPrune:
         """Image 5 is dark among bright class 0, so only the per-class thresholds flag it."""
         from dataeval.types import RemovalPlan
 
-        rng = np.random.default_rng(42)
-        images = rng.random((20, 3, 16, 16))
-        images[:10] = images[:10] * 0.3 + 0.7
-        images[10:] = images[10:] * 0.3
-        images[5] = 0.01
-        metadata = MockMetadata(
-            class_labels=np.array([0] * 10 + [1] * 10, dtype=np.intp),
-            factor_data=np.array([], dtype=np.int64),
-            factor_names=[],
-            is_binned=[],
-            index2label={0: "bright", 1: "dark"},
-        )
+        images, metadata = _bright_and_dark()
         classwise = Outliers(flags=ImageStats.PIXEL, outlier_threshold=1.5).evaluate(images).classwise(metadata)
         plan = classwise.prune()
         assert isinstance(plan, RemovalPlan)
@@ -2045,11 +2000,16 @@ class TestPrune:
         assert len(view) == 21 - len(plan)
 
 
+# Twenty-three ordinary readings, so the default threshold has a population of 24 to fit.
+_TEMPERATURES = [20.1, 19.8, 20.3, 20.0, 19.9, 20.2, 20.1, 19.7, 20.0, 20.2, 19.9, 20.1]
+_TEMPERATURES += [19.8, 20.0, 20.3, 19.9, 20.1, 20.0, 19.8, 20.2, 20.1, 19.9, 20.0]
+
+
 @pytest.mark.required
 class TestOutliersOverMetadata:
     @staticmethod
     def _temperature():
-        return Metadata.from_factors({"temperature": [20.1, 19.8, 20.3, 20.0, 19.9, 20.2, 20.1, 19.7, 20.0, 45.0]})
+        return Metadata.from_factors({"temperature": [*_TEMPERATURES, 45.0]})
 
     @staticmethod
     def _tracked(n_sequences=12):
@@ -2067,15 +2027,20 @@ class TestOutliersOverMetadata:
     def test_an_ordered_factor_is_thresholded(self):
         result = Outliers().evaluate(self._temperature())
         rows = result.data().select("item_index", "metric_name", "metric_value").rows()
-        assert rows == [(9, "temperature", 45.0)]
+        assert rows == [(23, "temperature", 45.0)]
 
     def test_a_track_is_judged_against_tracks(self):
-        result = Outliers().evaluate(self._tracked(), factors=["n_gaps"], levels="track")
+        result = Outliers(outlier_threshold=ConstantThreshold(upper=0.5)).evaluate(
+            self._tracked(), factors=["n_gaps"], levels="track"
+        )
         assert SourceIndex(3, 1, "track") in result.outliers
 
     def test_track_labels_are_never_thresholded(self):
+        # Twelve tracks are under the floor, so read what was asked to be judged rather than what was flagged.
         result = Outliers().evaluate(self._tracked(), levels="track")
-        assert "labels" not in set(result.data()["metric_name"].cast(pl.Utf8))
+        judged = set(result.populations["metric_name"].cast(pl.Utf8))
+        assert "n_gaps" in judged
+        assert "labels" not in judged
 
     def test_rebinning_does_not_change_the_result(self):
         values = np.r_[np.random.default_rng(0).normal(20, 1, 40), 90.0]
@@ -2125,8 +2090,9 @@ class TestOutliersOverMetadata:
         ds = get_od_dataset(list(np.random.default_rng(0).random((10, 3, 16, 16))), 2, True)
         md = Metadata(ds)
         md.add_factors(compute_stats(ds, stats=ImageStats.PIXEL_MEAN, per_target=True, normalize_pixel_values=False))
-        assert set(Outliers().evaluate(md).data()["metric_name"].cast(pl.Utf8)) <= {"unit_mean"}
-        assert set(Outliers().evaluate(md, per_target=True).data()["metric_name"].cast(pl.Utf8)) <= {
+        # Ten items are under the floor, so read what was asked to be judged rather than what was flagged.
+        assert set(Outliers().evaluate(md).populations["metric_name"].cast(pl.Utf8)) == {"unit_mean"}
+        assert set(Outliers().evaluate(md, per_target=True).populations["metric_name"].cast(pl.Utf8)) == {
             "unit_mean",
             "instance_mean",
         }
@@ -2142,7 +2108,8 @@ class TestOutliersOverMetadata:
     def test_a_factor_the_flags_exclude_is_left_out_of_the_default_selection(self, get_od_dataset):
         md = self._boxes(get_od_dataset)
         md.add_factors({"temperature": np.r_[np.full(9, 20.0) + np.arange(9) * 0.1, 45.0]}, level="unit")
-        assert set(Outliers().evaluate(md).data()["metric_name"].cast(pl.Utf8)) == {"temperature"}
+        outliers = Outliers(outlier_threshold={"temperature": ConstantThreshold(upper=30.0)})
+        assert set(outliers.evaluate(md).data()["metric_name"].cast(pl.Utf8)) == {"temperature"}
 
     def test_no_bins_are_computed(self):
         md = Metadata.from_factors({"x": np.r_[np.random.default_rng(0).normal(20, 1, 40), 90.0]})
