@@ -9,6 +9,26 @@ from pathlib import Path
 
 import nox
 
+
+def available_cpus(cgroup: Path = Path("/sys/fs/cgroup")) -> int:
+    """CPUs this process may use: the container's CPU limit if it has one, else the affinity mask."""
+    cpus = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+    try:
+        quota, period = (cgroup / "cpu.max").read_text().split()  # cgroup v2: "<quota> <period>" or "max <period>"
+    except (OSError, ValueError):
+        try:  # cgroup v1
+            quota = (cgroup / "cpu/cpu.cfs_quota_us").read_text().strip()
+            period = (cgroup / "cpu/cpu.cfs_period_us").read_text().strip()
+        except OSError:
+            return cpus
+    if quota in ("max", "-1"):
+        return cpus
+    return min(cpus, max(1, int(quota) // int(period)))
+
+
+# pytest-xdist workers: TEST_WORKERS (default 4), never more than the CPUs the container may use.
+TEST_WORKERS = min(int(os.environ.get("TEST_WORKERS") or 4), available_cpus())
+
 # Try importing nox_uv. If it fails, define a fallback decorator.
 try:
     import nox_uv
@@ -232,9 +252,7 @@ def test(session: nox.Session) -> None:
 
     # Standard pytest configuration
     pytest_args = ["-m", "not cuda"]
-    # Worker count is a job parameter: CI sets TEST_WORKERS to match the runner it
-    # is on. The default keeps the local run at four workers.
-    xdist_args = [f"-n{os.environ.get('TEST_WORKERS', '4')}", "--dist", "loadfile"]
+    xdist_args = [f"-n{TEST_WORKERS}", "--dist", "loadfile"]
     cov_args = ["--cov", f"--junitxml=output/junit.{python_version}.xml"]
     cov_term_args = ["--cov-report", "term-missing"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
