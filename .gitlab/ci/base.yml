@@ -10,6 +10,12 @@ variables:
   # suite warms it; see tests/fixtures/numba_cache.py.
   NUMBA_CACHE_DIR: .numba-cache
   FORCE_COLOR: '1'
+  # The k8s runners check the repo out under a different uid than the job
+  # container runs as; git then refuses it ("dubious ownership"). Env-supplied
+  # config counts as command-line scope, which git honours for safe.directory.
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: $CI_PROJECT_DIR
   RELEASE_BRANCH_PATTERN: '/^release\/v.*/'
   # Commits to main normally force a full notebook re-execution (DOCS_CLEAN
   # below). Putting +skipdocsclean in the commit message drops that, so the docs
