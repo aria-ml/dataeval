@@ -28,6 +28,8 @@ typecheck:
 test:
   tags:
     - k8s-medium-cpu
+  variables:
+    TEST_WORKERS: '2'
   extends: 
     - .nox_all
     - .rules_main_mr_code
