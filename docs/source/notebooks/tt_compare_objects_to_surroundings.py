@@ -93,7 +93,7 @@ from maite_datasets.object_detection import SeaDrone
 from dataeval import Metadata
 from dataeval.bias import Balance
 from dataeval.config import set_max_processes
-from dataeval.core import compute_ratios, compute_stats
+from dataeval.core import compute_stats
 from dataeval.data import Limit, View
 from dataeval.flags import ImageStats
 
@@ -131,7 +131,10 @@ print(f"Image shape: {dataset[0][0].shape}")
 # %%
 stats = compute_stats(
     dataset,
-    stats=ImageStats.VISUAL_BRIGHTNESS | ImageStats.VISUAL_CONTRAST | ImageStats.DIMENSION_SIZE,
+    stats=ImageStats.VISUAL_BRIGHTNESS
+    | ImageStats.VISUAL_CONTRAST
+    | ImageStats.DIMENSION_SIZE
+    | ImageStats.DIMENSION_REL_SIZE,
     per_image=True,
     per_target=True,
     per_background=True,
@@ -334,34 +337,22 @@ print(camouflaged.select("item_index", "target_index", "class_name", "separation
 # the conditions of the image each detection came from. Two boats in different lighting
 # differ more from each other than a boat and a swimmer in the same frame.
 #
-# {func}`.compute_ratios` removes that by expressing each box relative to the image it
-# sits in, which is what makes detections from different scenes comparable.
+# Dividing each box's value by its image's removes that, which is what makes detections
+# from different scenes comparable. Each `instance` row of the metadata already carries
+# its image's `unit_` value, so a ratio is one division. Box size relative to the frame
+# is a statistic of its own, `rel_size`, computed with the others above.
 
 # %%
-ratios = compute_ratios(stats)
-print(sorted(ratios["stats"]))
-
-# %% [markdown]
-# Background statistics are deliberately absent from the ratio output: a box has no
-# background of its own, so there is nothing to divide.
-#
-# Adding the ratios as their own factors puts the raw and the scene-relative view side by
-# side.
-
-# %%
-relative = Metadata(dataset)
-relative.add_factors({f"relative_{k}": v for k, v in ratios["stats"].items()}, source_index=ratios["source_index"])
-
 comparison = (
-    relative
+    metadata
     .rows_at("instance")
     .with_columns(pl.col("class_label").replace_strict(labels, return_dtype=pl.Utf8).alias("class_name"))
     .group_by("class_name")
     .agg(
         pl.len().alias("n"),
-        pl.col("relative_brightness").mean().round(3).alias("brightness_vs_image"),
-        pl.col("relative_contrast").mean().round(3).alias("contrast_vs_image"),
-        pl.col("relative_size").mean().round(4).alias("size_vs_image"),
+        (pl.col("instance_brightness") / pl.col("unit_brightness")).mean().round(3).alias("brightness_vs_image"),
+        (pl.col("instance_contrast") / pl.col("unit_contrast")).mean().round(3).alias("contrast_vs_image"),
+        pl.col("instance_rel_size").mean().round(4).alias("size_vs_image"),
     )
     .sort("brightness_vs_image")
 )
@@ -395,7 +386,8 @@ print(comparison)
 # makes the same factor measured twice not necessarily comparable - and which factor comes
 # out flagged can move with them. Declare them once, on the scale each statistic actually
 # lives on: brightness on the 0-255 display range, contrast and background fraction on
-# their natural bounds, and size in half-decades because it spans three of them.
+# their natural bounds, and size, in pixels and as a fraction of the frame, in
+# half-decades because it spans three of them.
 
 # %%
 capture_metadata = [
@@ -424,6 +416,7 @@ BRIGHTNESS_BINS = [0, 32, 64, 96, 128, 160, 192, 224, 255]
 CONTRAST_BINS = [0.0, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
 FRACTION_BINS = [0.0, 0.9, 0.95, 0.99, 0.999, 1.0]
 SIZE_BINS = [0, 316, 1000, 3162, 10000, 31623, 100000]
+REL_SIZE_BINS = [0, 3.162e-5, 1e-4, 3.162e-4, 1e-3, 3.162e-3, 1e-2, 3.162e-2, 1.0]
 
 focused = Metadata(
     dataset,
@@ -437,6 +430,7 @@ focused = Metadata(
         "instance_contrast": CONTRAST_BINS,
         "unit_background_fraction": FRACTION_BINS,
         "instance_size": SIZE_BINS,
+        "instance_rel_size": REL_SIZE_BINS,
     },
 )
 focused.add_factors(stats)
@@ -500,5 +494,5 @@ print(classwise)
 # Try applying these scene-relative analysis techniques to your own dataset:
 #
 # - Test `compute_stats` with `per_background=True` on a dataset with larger or more frequent target objects to see how `background_fraction` behaves when targets occupy a larger portion of the frame.
-# - Use {func}`.compute_ratios` to compare target statistics across scenes captured under varying environmental conditions (e.g. lighting or weather).
+# - Divide `instance_` statistics by their `unit_` counterparts to compare targets across scenes captured under varying environmental conditions (e.g. lighting or weather).
 # - Run {class}`.Balance` on your own dataset to verify whether background factors correlate with target class labels.

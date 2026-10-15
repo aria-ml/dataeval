@@ -1,6 +1,11 @@
+import subprocess
+import sys
+
 import numpy as np
+import polars as pl
 import pytest
 
+from dataeval import Metadata
 from dataeval.core import compute_ratios, compute_stats
 from dataeval.core._compute_stats import SOURCE_INDEX
 from dataeval.flags import ImageStats
@@ -841,3 +846,42 @@ class TestLevelsThatContradictTheKeyAreRejected:
 
         with pytest.raises(ValueError, match="target_stats_output contains addresses"):
             compute_ratios(image_only, target_stats_output=box_only)
+
+
+@pytest.mark.required
+class TestDeprecation:
+    def test_it_warns_once_per_process(self):
+        # In a subprocess: the decorator warns once per process, so under xdist an earlier call in the same worker
+        # would make an in-process assertion depend on test order.
+        code = (
+            "import warnings\n"
+            "import numpy as np\n"
+            "from dataeval.core import compute_ratios, compute_stats\n"
+            "from dataeval.exceptions import DeprecatedWarning\n"
+            "stats = compute_stats([np.ones((3, 8, 8))], boxes=[[[1, 1, 4, 4]]], per_image=True, per_target=True,\n"
+            "                      normalize_pixel_values=False)\n"
+            "with warnings.catch_warnings(record=True) as caught:\n"
+            "    warnings.simplefilter('always')\n"
+            "    compute_ratios(stats); compute_ratios(stats)\n"
+            "print(sum(issubclass(w.category, DeprecatedWarning) for w in caught))\n"
+        )
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+        assert result.stdout.strip() == "1"
+
+    def test_the_replacements_give_the_same_values(self):
+        rng = np.random.default_rng(0)
+        images = [rng.random((3, 40, 60)) * 255 for _ in range(3)]
+        boxes = [[[1, 1, 10, 10], [5, 5, 30, 25]] for _ in range(3)]
+        stats = compute_stats(
+            images,
+            boxes=boxes,
+            stats=ImageStats.VISUAL_BRIGHTNESS | ImageStats.DIMENSION_SIZE | ImageStats.DIMENSION_REL_SIZE,
+            per_image=True,
+            per_target=True,
+            normalize_pixel_values=False,
+        )
+        ratios = compute_ratios(stats)
+        rows = Metadata.from_factors(stats["stats"], source_index=stats["source_index"]).rows_at("instance")
+        divided = rows.select(pl.col("instance_brightness") / pl.col("unit_brightness")).to_series().to_numpy()
+        np.testing.assert_allclose(divided, ratios["stats"]["brightness"], rtol=1e-6)
+        np.testing.assert_allclose(rows["instance_rel_size"].to_numpy(), ratios["stats"]["size"], rtol=1e-6)

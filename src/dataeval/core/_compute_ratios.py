@@ -6,6 +6,7 @@ from typing import Any, TypeAlias
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._experimental import deprecated
 from dataeval._log import get_logger
 from dataeval.core._compute_stats import BACKGROUND_PREFIX, StatsResult, require_same_stat_names
 from dataeval.types import FactorLevel, SourceIndex
@@ -414,6 +415,14 @@ def _validate_unified_input(source_indices: Sequence[SourceIndex], stats: Mappin
         )
 
 
+@deprecated(
+    since="1.2",
+    removal="1.3",
+    details=(
+        "Use the rel_* dimension statistics (ImageStats.DIMENSION_RELATIVE) for box geometry, and divide a "
+        "Metadata's instance_ column by its unit_ column for any other statistic. See the v1.2 migration guide."
+    ),
+)
 def compute_ratios(  # noqa: C901
     stats_output: StatsResult,
     *,
@@ -422,6 +431,12 @@ def compute_ratios(  # noqa: C901
 ) -> StatsResult:
     """
     Compute box-to-image ratios from compute_stats() output.
+
+    .. deprecated:: 1.2
+        Removed in v1.3. For box geometry relative to its image, compute the ``rel_*`` dimension statistics
+        (:attr:`~dataeval.flags.ImageStats.DIMENSION_RELATIVE`). For any other statistic, add the per-image and
+        per-target statistics to a :class:`~dataeval.Metadata` and divide the columns on its ``instance`` rows, where
+        each box row carries its image's value: ``pl.col("instance_brightness") / pl.col("unit_brightness")``.
 
     This function supports two usage patterns:
 
@@ -479,13 +494,6 @@ def compute_ratios(  # noqa: C901
       ``channels=`` mapping yields ``<group>_<statistic>`` ratios beside whichever unprefixed
       ones the run produced — a ``stats`` mapping naming no ``None`` view produces none
     - BASE_ATTRS (source_index, object_count, etc.) are preserved for box entries only
-
-    Box geometry relative to the image is also available directly from
-    :func:`compute_stats` as the ``rel_*`` dimension statistics
-    (:attr:`~dataeval.flags.ImageStats.DIMENSION_RELATIVE`), with the same definitions
-    this function applies to ``offset_x``/``offset_y``, ``width``, ``height``, ``size``,
-    ``distance_center`` and ``distance_edge``. Prefer those for geometry; this function
-    remains the way to relate a box's pixel and visual statistics to its image's.
 
     Examples
     --------
