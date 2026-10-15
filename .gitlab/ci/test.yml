@@ -8,6 +8,8 @@ lint:
     - nox -e lint
 
 minimum install:
+  tags:
+    - k8s-medium-cpu
   extends: 
     - .nox_all
     - .rules_main_mr_code
@@ -22,6 +24,8 @@ typecheck:
     - nox -e type
 
 test:
+  tags:
+    - k8s-medium-cpu
   extends: 
     - .nox_all
     - .rules_main_mr_code
@@ -34,6 +38,8 @@ test:
       - output/*
 
 conda:
+  tags:
+    - k8s-medium-cpu
   extends: 
     - .conda_all
     - .rules_main_mr_code

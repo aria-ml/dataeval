@@ -1,7 +1,7 @@
 variables:
   PYTHON_LATEST_SUPPORTED_VERSION: '3.13'
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output
-  DOCS_RUNNER_TAG: single-gpu
+  DOCS_RUNNER_TAG: k8s-single-gpu
   UV_CACHE_DIR: .uv-cache
   UV_LINK_MODE: copy
   UV_IMAGE: ghcr.io/astral-sh/uv
@@ -41,7 +41,7 @@ workflow:
     # Commit Main Branch Workflow
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
-        DOCS_RUNNER_TAG: 'multi-gpu'
+        DOCS_RUNNER_TAG: 'k8s-multi-gpu'
         ENV_AUTO_STOP_IN: 'never'
     # Commit Release Branch Workflow
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
@@ -52,7 +52,7 @@ default:
   # https://gitlab.jatic.net/help/ci/yaml/index.md#interruptible
   interruptible: true
   tags:
-    - autoscaler
+    - k8s-small-cpu
 
 image: $UV_IMAGE:python$PYTHON_LATEST_SUPPORTED_VERSION-$UV_BASE_LAYER
 

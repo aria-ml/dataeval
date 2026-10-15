@@ -26,6 +26,8 @@ doclint:
     - nox -e doclint
 
 doctest:
+  tags:
+    - k8s-medium-cpu
   stage: docs
   extends: 
     - .nox
