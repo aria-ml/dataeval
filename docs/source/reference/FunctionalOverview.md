@@ -38,7 +38,7 @@ DataEval's public API.
   - 
   - 
 * - {func}`Box to Image ratio statistics <.compute_ratios>`
-  - Computes statistical summaries of target boxes to image ratios
+  - Computes statistical summaries of target boxes to image ratios. Deprecated in v1.2, removed in v1.3
   - 
   - ✔
   - 
