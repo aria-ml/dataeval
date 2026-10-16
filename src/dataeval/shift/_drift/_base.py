@@ -23,6 +23,49 @@ TDetails = TypeVar("TDetails", Mapping[str, Any], pl.DataFrame)
 _MIN_REFERENCE_CHUNKS = 3
 
 
+def apply_correction(
+    p_vals: NDArray[np.floating[Any]],
+    p_val: float,
+    correction: str,
+    n_tests: int | None = None,
+) -> tuple[bool, float]:
+    """Correct a family of p-values for multiple testing.
+
+    Parameters
+    ----------
+    p_vals : NDArray[np.floating]
+        One p-value per test.
+    p_val : float
+        Significance level for the family.
+    correction : {"bonferroni", "fdr"}
+        ``"bonferroni"`` divides ``p_val`` by the number of tests; ``"fdr"`` applies the
+        Benjamini-Hochberg step-up procedure.
+    n_tests : int or None, default None
+        Bonferroni's divisor. None uses ``len(p_vals)``.
+
+    Returns
+    -------
+    tuple[bool, float]
+        Whether any test is significant after correction, and the corrected level. A
+        p-value below the corrected level is significant, for either method.
+    """
+    if correction == "bonferroni":
+        threshold = p_val / (len(p_vals) if n_tests is None else n_tests)
+        return bool((p_vals < threshold).any()), threshold
+    if correction == "fdr":
+        n = p_vals.shape[0]
+        i = np.arange(n) + np.intp(1)
+        p_sorted = np.sort(p_vals)
+        q_threshold = p_val * i / n
+        below_threshold = p_sorted < q_threshold
+        try:
+            idx_threshold = int(np.where(below_threshold)[0].max())
+        except ValueError:  # sorted p-values not below thresholds
+            return bool(below_threshold.any()), float(q_threshold.min())
+        return bool(below_threshold.any()), float(q_threshold[idx_threshold])
+    raise ValueError("`correction` needs to be either `bonferroni` or `fdr`.")
+
+
 @dataclass(frozen=True, repr=False)
 class DriftOutput(DictOutput, Generic[TDetails]):
     """Output class for drift detector classes.
@@ -360,6 +403,14 @@ class ChunkableMixin(ABC):
         """
         return ZScoreThreshold()
 
+    def _check_chunk_threshold(self, threshold: Threshold) -> None:  # noqa: ARG002
+        """Refuse a threshold override the chunk metric cannot be judged by.
+
+        Called by :class:`ChunkedDrift` when given an explicit ``threshold``. The base
+        implementation accepts any threshold.
+        """
+        return
+
 
 class ChunkedDrift(Generic[TDetails]):
     """Chunked drift detection wrapper.
@@ -422,6 +473,8 @@ class ChunkedDrift(Generic[TDetails]):
         self._chunkable: ChunkableMixin = detector
         # None stays None: it means the detector's own default, which resolve_threshold does not know.
         self._threshold_override = resolve_threshold(threshold) if threshold is not None else None
+        if self._threshold_override is not None:
+            self._chunkable._check_chunk_threshold(self._threshold_override)
         self._baseline_values: NDArray[np.float32] | None = None
         self._threshold_bounds: tuple[float | None, float | None] = (None, None)
 
@@ -485,7 +538,7 @@ class ChunkedDrift(Generic[TDetails]):
         *reference, data = embeddings
         return self.fit(*reference).predict(data)
 
-    def fit(self, *reference_data: Any) -> Self:
+    def fit(self, *reference_data: Any, **kwargs: Any) -> Self:
         """Fit the underlying detector and compute chunked baseline.
 
         Delegates to the underlying detector's ``fit()`` method, then
@@ -502,6 +555,9 @@ class ChunkedDrift(Generic[TDetails]):
             ``extractor`` configured, each reference may be any input the extractor
             accepts (e.g. a full MAITE dataset or raw images); otherwise each must be
             array-like or an :class:`~dataeval.Embeddings`.
+        **kwargs : Any
+            Keyword arguments forwarded to the underlying detector's ``fit()``, such as
+            the ``metadata`` of :class:`DriftKnownDomains`.
 
         Returns
         -------
@@ -524,7 +580,7 @@ class ChunkedDrift(Generic[TDetails]):
         below the reference size, or a ``chunk_count`` of 3 or more.
         """
         # Fit underlying detector
-        self._detector.fit(*reference_data)
+        self._detector.fit(*reference_data, **kwargs)
 
         # Get reference data and split into chunks
         x_ref = self._detector.reference_data

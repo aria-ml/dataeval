@@ -19,6 +19,7 @@ __all__ = [
 from collections import deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
+from numbers import Real
 from types import MappingProxyType
 from typing import Any, Literal, TypeAlias, get_args
 
@@ -839,10 +840,19 @@ def _validate_range(over: Any, context: str) -> None:
     Raises
     ------
     ValueError
-        When the range is not a pair, or its bounds are the wrong way round.
+        When the range is not a pair, a bound is not a number, or its bounds are the wrong
+        way round.
     """
     if not isinstance(over, tuple) or len(over) != 2:
         raise ValueError(f"{context} range {over!r} must be a (low, high) pair; None at either end is unbounded.")
+    # Numbers only, so numerals written as text are refused: _within reads a value as a number but
+    # compares it with the bounds as written, so a text bound would raise at the first match.
+    for bound in over:
+        if bound is not None and not isinstance(bound, Real):
+            raise ValueError(
+                f"{context} range {over!r} has a bound {bound!r} that is not a number; a range is "
+                f"an interval of numbers, with None at either end for unbounded.",
+            )
     low, high = over
     if low is not None and high is not None and low > high:
         raise ValueError(f"{context} range {over!r} runs backwards: its low bound is above its high bound.")

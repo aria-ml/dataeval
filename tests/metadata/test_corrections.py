@@ -580,3 +580,30 @@ def test_a_correction_with_no_writer_is_refused():
 
     with pytest.raises(ValueError, match="cannot render"):
         corrections_to_list([_Unknown()])  # type: ignore[arg-type]
+
+
+@pytest.mark.required
+class TestRangeBounds:
+    def test_text_bounds_are_rejected(self):
+        with pytest.raises(ValueError, match="is not a number"):
+            Remap("country", {("France", "Spain"): "west"})
+
+    def test_rescale_shares_the_check(self):
+        with pytest.raises(ValueError, match="is not a number"):
+            Rescale("altitude", over=("low", "high"), multiply=2.0)  # type: ignore
+
+    def test_numeral_text_bounds_are_rejected(self):
+        # _within reads the value as a number but compares it to the bounds as written, so a
+        # text bound that passed here would raise TypeError at the first value matched.
+        with pytest.raises(ValueError, match="is not a number"):
+            Remap("altitude", {("5", "10"): "mid"})
+
+    def test_numpy_bounds_pass(self):
+        Remap("altitude", {(np.int64(0), np.float64(5.5)): "low"})
+
+    def test_backwards_numeric_range_still_raises(self):
+        with pytest.raises(ValueError, match="runs backwards"):
+            Remap("altitude", {(10, 5): "mid"})
+
+    def test_unbounded_ends_still_pass(self):
+        Remap("altitude", {(None, 5): "low", (5, None): "high"})

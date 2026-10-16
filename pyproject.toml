@@ -52,15 +52,18 @@ litert = ["ai-edge-litert>=2.0; python_version <= '3.14'"]
 opencv = ["opencv-python-headless>=4.8.0"]
 onnx = [
   "onnx>=1.14.0",
+  # "onnxmltools>=1.16", # required for LightGBM ONNX export
   "onnxruntime>=1.17",
 ]
 onnx-cu126 = [
   "onnx>=1.14.0",
+  # "onnxmltools>=1.16", # required for LightGBM ONNX export
   "onnxruntime-gpu>=1.17,<1.27; extra != 'onnx-cu130'",  # 1.27+ requires CUDA 13.0
   "onnxruntime-gpu>=1.24,<1.27; python_version >= '3.14' and extra != 'onnx-cu130'",  # 1.24+ for cp314 wheels
 ]
 onnx-cu130 = [
   "onnx>=1.14.0",
+  # "onnxmltools>=1.16", # required for LightGBM ONNX export
   "onnxruntime-gpu>=1.27; extra != 'onnx-cu126'",
 ]
 ontology = ["rdflib>=7.0"]
@@ -111,6 +114,7 @@ test = [
 ]
 test-onnx = [
   { include-group = "test" },
+  "onnxmltools>=1.16",
   "onnxscript>=0.6.0",
 ]
 verify = [

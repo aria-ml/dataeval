@@ -45,6 +45,14 @@ DEFAULT_LGBM_HYPERPARAMS: dict[str, Any] = {
 }
 
 
+def _auroc(y: NDArray[np.intp], preds: NDArray[np.float32]) -> float:
+    """AUROC, or 0.5 when ``y`` holds one class and it is undefined.
+
+    Checked up front: scikit-learn below 1.6 raises on a single class rather than returning NaN.
+    """
+    return float(roc_auc_score(y, preds)) if len(np.unique(y)) == 2 else 0.5
+
+
 def compute_auroc(
     x: NDArray[np.float32],
     y: NDArray[np.intp],
@@ -96,14 +104,12 @@ def compute_auroc(
             preds = np.asarray(model.predict_proba(_tsx), dtype=np.float32)[:, 1]
             all_preds.append(preds)
             all_tgts.append(_tsy)
-            fold_auroc = roc_auc_score(_tsy, preds)
-            fold_aurocs.append(0.5 if fold_auroc == np.nan else float(fold_auroc))
+            fold_aurocs.append(_auroc(_tsy, preds))
             fold_importances.append(np.asarray(model.feature_importances_, dtype=np.float32))
 
     np_all_preds = np.concatenate(all_preds, axis=0)
     np_all_tgts = np.concatenate(all_tgts, axis=0)
-    result = roc_auc_score(np_all_tgts, np_all_preds)
-    auroc = 0.5 if result == np.nan else float(result)
+    auroc = _auroc(np_all_tgts, np_all_preds)
     return (
         auroc,
         np.array(fold_aurocs, dtype=np.float32),

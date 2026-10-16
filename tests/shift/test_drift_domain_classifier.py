@@ -6,6 +6,7 @@ from dataeval.config import use_max_processes
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.shift._drift._base import DriftOutput
 from dataeval.shift._drift._domain_classifier import DriftDomainClassifier
+from dataeval.shift._shared._domain_classifier import compute_auroc
 
 
 @pytest.fixture
@@ -131,3 +132,59 @@ class TestDriftDomainClassifier:
         assert "feature_importances" in result.details
         assert len(result.details["fold_aurocs"]) == 2  # n_folds=2
         assert len(result.details["feature_importances"]) == 4  # n_features=4
+
+
+@pytest.mark.required
+class TestDriftDomainClassifierBugs:
+    def test_int_threshold_is_honored(self, trn_data, tst_data):
+        """An integer threshold is used as given instead of silently falling back to 0.55."""
+        dc = DriftDomainClassifier(n_folds=2, threshold=1).fit(trn_data)
+        result = dc.predict(tst_data)
+        assert result.threshold == 1.0
+        assert not result.drifted  # AUROC cannot exceed 1.0
+
+    def test_tuple_threshold_uses_upper_bound_when_not_chunked(self, trn_data, tst_data):
+        """A (lower, upper) threshold is not silently replaced by 0.55 in non-chunked mode."""
+        dc = DriftDomainClassifier(n_folds=2, threshold=(0.3, 1.0)).fit(trn_data)
+        result = dc.predict(tst_data)
+        assert result.threshold == 1.0
+        assert not result.drifted
+
+    @pytest.mark.filterwarnings("ignore:The least populated class")
+    def test_fold_without_both_classes_scores_neutral(self):
+        """A CV fold missing a class has an undefined AUROC and is reported as 0.5, not NaN."""
+        x = np.random.default_rng(0).normal(size=(20, 3)).astype(np.float32)
+        y = np.zeros(20, dtype=np.intp)
+        y[0] = 1  # single positive: one of the two test folds has no positive
+        _, fold_aurocs, _ = compute_auroc(x, y, n_folds=2)
+        assert not np.isnan(fold_aurocs).any()
+        assert 0.5 in fold_aurocs
+
+
+@pytest.mark.required
+class TestDriftDomainClassifierHyperparameters:
+    STUMP = {"n_estimators": 1, "max_depth": 1, "verbosity": -1}
+
+    def test_hyperparameters_reach_the_classifier(self, trn_data, tst_data):
+        """A single stump makes one split per fold, so split importances sum to 1."""
+        dc = DriftDomainClassifier(n_folds=2, hyperparameters=self.STUMP).fit(trn_data)
+        result = dc.predict(tst_data)
+        assert result.details["feature_importances"].sum() == 1
+
+    def test_hyperparameters_default_is_unchanged(self, trn_data, tst_data):
+        result = DriftDomainClassifier(n_folds=2).fit(trn_data).predict(tst_data)
+        assert result.details["feature_importances"].sum() > 1
+
+    def test_hyperparameters_from_config_and_override(self, trn_data, tst_data):
+        config = DriftDomainClassifier.Config(n_folds=2, hyperparameters=self.STUMP)
+        assert DriftDomainClassifier(config=config).config.hyperparameters == self.STUMP
+        assert DriftDomainClassifier(config=config, hyperparameters={"n_estimators": 2}).config.hyperparameters == {
+            "n_estimators": 2
+        }
+
+    def test_hyperparameters_reach_chunked_baselines(self, trn_data, tst_data):
+        chunked = DriftDomainClassifier(n_folds=2, threshold=(0.45, 0.65), hyperparameters=self.STUMP).chunked(
+            chunk_size=50
+        )
+        result = chunked.fit(trn_data).predict(tst_data)
+        assert len(result.details) == 2

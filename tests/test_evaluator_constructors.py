@@ -23,6 +23,7 @@ from dataeval.shift import (
     OODKNeighbors,
     OODReconstruction,
 )
+from dataeval.shift._drift._known_domains import DriftKnownDomains
 
 _ONTOLOGY = Ontology.from_hierarchy({"animal": ["cat", "dog"]})
 
@@ -125,6 +126,11 @@ _BOUNDS = [
     (DriftWasserstein.Config, "ratio_threshold", 0.01, 0.0),
     (DriftWasserstein.Config, "n_features", 1, 0),
     (DriftDomainClassifier.Config, "n_folds", 2, 1),
+    (DriftKnownDomains.Config, "n_folds", 2, 1),
+    (DriftKnownDomains.Config, "tolerance", 0.99, 1.0),
+    (DriftKnownDomains.Config, "tolerance", 0.01, 0.0),
+    (DriftKnownDomains.Config, "p_val", 0.99, 1.0),
+    (DriftKnownDomains.Config, "p_val", 0.01, 0.0),
     (DriftReconstruction.Config, "p_val", 0.99, 1.0),
     (DriftReconstruction.Config, "epochs", 1, 0),
     (DriftReconstruction.Config, "batch_size", 1, 0),

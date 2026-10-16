@@ -20,6 +20,7 @@ from dataeval.shift._drift._base import (
     ChunkResult,
     DriftOutput,
     _chunk_results_to_dataframe,
+    apply_correction,
 )
 from dataeval.shift._drift._chunk import (
     CountChunker,
@@ -548,3 +549,27 @@ class TestFeatureWiseScoringRefusesMismatchedWidths:
     def test_matching_widths_are_scored(self):
         detector = DriftUnivariate(method="ks").fit(np.random.default_rng(0).normal(size=(40, 3)))
         assert len(detector.predict(np.random.default_rng(1).normal(size=(40, 3))).details["p_vals"]) == 3
+
+
+@pytest.mark.required
+class TestApplyCorrection:
+    def test_bonferroni_divides_by_the_test_count(self):
+        drifted, threshold = apply_correction(np.array([0.02, 0.5]), 0.05, "bonferroni")
+        assert threshold == pytest.approx(0.025)
+        assert drifted
+
+    def test_bonferroni_honors_an_explicit_test_count(self):
+        _, threshold = apply_correction(np.array([0.02, 0.5]), 0.05, "bonferroni", n_tests=10)
+        assert threshold == pytest.approx(0.005)
+
+    def test_fdr_is_less_strict_than_bonferroni(self):
+        p_vals = np.array([0.01, 0.02, 0.03, 0.5])
+        assert apply_correction(p_vals, 0.05, "fdr")[1] > apply_correction(p_vals, 0.05, "bonferroni")[1]
+
+    def test_one_test_leaves_the_level_unchanged(self):
+        for correction in ("bonferroni", "fdr"):
+            assert apply_correction(np.array([0.2]), 0.05, correction) == (False, pytest.approx(0.05))
+
+    def test_unknown_correction_raises_before_reading_p_values(self):
+        with pytest.raises(ValueError, match="needs to be either `bonferroni` or `fdr`"):
+            apply_correction(np.array(0.5), 0.05, "invalid")
