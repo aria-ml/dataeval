@@ -173,6 +173,15 @@ def validate_dataset(  # noqa: C901
 
     where = caller or _infer_caller()
 
+    if expected == "image_only":
+        # Deferred: dataeval._metadata imports this module.
+        from dataeval._helpers import metadata_is_not_images
+        from dataeval._metadata._metadata import Metadata
+
+        # Metadata is Sized and indexable, so it passes for a Dataset, but its rows are factors.
+        if isinstance(dataset, Metadata):
+            raise MaiteShapeError(metadata_is_not_images(where, arg_name, dataset))
+
     if not isinstance(dataset, Sized):
         raise MaiteShapeError(
             f"{where}: argument {arg_name!r} is not Sized (has no __len__); got {type(dataset).__name__}."

@@ -482,7 +482,9 @@ class Metadata(Array, FeatureExtractor):
     """Collection of binned metadata using Polars DataFrames.
 
     Processes dataset metadata by automatically binning continuous factors and digitizing
-    categorical factors for analysis and visualization workflows.
+    categorical factors for analysis and visualization workflows. A Metadata references the
+    dataset it describes (see :attr:`dataset`) but does not serve its images: indexing it
+    returns factor rows.
 
     This class also implements the :class:`~dataeval.protocols.FeatureExtractor` protocol,
     allowing it to be used directly with drift detectors that accept feature extractors.
@@ -1236,6 +1238,31 @@ class Metadata(Array, FeatureExtractor):
             True if a dataset is bound, False otherwise.
         """
         return self._dataset is not None
+
+    @property
+    def dataset(self) -> AnnotatedDataset[tuple[Any, Any, DatumMetadata]] | None:
+        """The dataset these factors describe, or None when none is bound.
+
+        Metadata references its dataset; it does not contain it or serve its images.
+        Indexing a Metadata returns factor rows, never data, so an evaluator that needs
+        the images reads them from here. None for an unbound instance and for one built
+        with :meth:`from_factors` or :meth:`load`.
+
+        .. versionadded:: 1.2
+
+        Returns
+        -------
+        AnnotatedDataset or None
+            The bound dataset, the same object that was passed in.
+
+        Example
+        -------
+        >>> from dataeval import Metadata
+        >>> metadata = Metadata(train_dataset)
+        >>> metadata.dataset is train_dataset
+        True
+        """
+        return self._dataset
 
     @property
     def _is_fitted(self) -> bool:

@@ -16,7 +16,7 @@ from pydantic import PositiveInt
 
 from dataeval import Metadata
 from dataeval._embeddings import Embeddings
-from dataeval._helpers import BareLabels, reject_filtered_metadata
+from dataeval._helpers import BareLabels, metadata_is_not_images, reject_filtered_metadata
 from dataeval._log import get_logger
 from dataeval.core._rank import (
     RankResult,
@@ -28,7 +28,7 @@ from dataeval.core._rank import (
     rank_result_class_balanced,
     rank_result_stratified,
 )
-from dataeval.exceptions import ShapeMismatchError
+from dataeval.exceptions import MaiteShapeError, ShapeMismatchError
 from dataeval.protocols import AnnotatedDataset, Array, FeatureExtractor, LabelsLike
 from dataeval.types import Evaluator, EvaluatorConfig, Output, set_metadata
 
@@ -45,6 +45,13 @@ DEFAULT_PRIORITIZE_POLICY: PolicyType = "difficulty"
 DEFAULT_PRIORITIZE_ORDER: OrderType = "easy_first"
 DEFAULT_PRIORITIZE_N_INIT: int | Literal["auto"] = "auto"
 DEFAULT_PRIORITIZE_NUM_BINS: int = 50
+
+
+def _precomputed(embeddings: Array, name: str) -> NDArray[Any]:
+    """Read pre-computed embeddings, refusing a Metadata: it is an Array of factor rows, not embeddings."""
+    if isinstance(embeddings, Metadata):
+        raise MaiteShapeError(metadata_is_not_images("Prioritize", name, embeddings))
+    return np.asarray(embeddings)
 
 
 class PrioritizeOutput(Output[NDArray[np.intp]]):
@@ -822,7 +829,7 @@ class Prioritize(Evaluator):
         # Check if dataset is an Array (pre-computed) or AnnotatedDataset
         if isinstance(dataset, Array):
             # Pre-computed embeddings - use directly
-            embeddings_array = np.asarray(dataset)
+            embeddings_array = _precomputed(dataset, "dataset")
         else:
             # Assume dataset is an AnnotatedDataset - compute embeddings
             if self.extractor is None:
@@ -926,7 +933,7 @@ class Prioritize(Evaluator):
         if self._reference is None:
             return None
         if isinstance(self._reference, Array):
-            return np.asarray(self._reference)
+            return _precomputed(self._reference, "reference")
         if self.extractor is None:
             raise ValueError(
                 "Provide pre-computed embeddings for `reference` (an Embeddings or Array), "

@@ -17,6 +17,7 @@ from dataeval import Metadata
 from dataeval._embeddings import Embeddings
 from dataeval.data import Filter, Limit, Operation, Shuffle, View, split_dataset, unzip_dataset
 from dataeval.exceptions import MaiteShapeError
+from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import DatasetMetadata, DatumMetadata
 from dataeval.utils import data
 from dataeval.utils.data import requires_maite_dataset, validate_dataset
@@ -558,3 +559,40 @@ class TestIntegrationSplit:
     def test_bare_image_dataset_rejected(self) -> None:
         with pytest.raises(MaiteShapeError, match="3-tuple"):
             split_dataset(_ImageOnly(20), num_folds=2, val_frac=0.0)  # pyright: ignore[reportArgumentType]
+
+
+class TestMetadataIsNotImages:
+    """A Metadata satisfies Dataset structurally, but its rows are factors, not images."""
+
+    def test_validate_rejects_metadata(self) -> None:
+        with pytest.raises(MaiteShapeError, match=r"\.dataset"):
+            validate_dataset(Metadata(_ICDataset()), expected="image_only")
+
+    def test_embeddings_constructor_rejects_metadata(self) -> None:
+        with pytest.raises(MaiteShapeError, match=r"\.dataset"):
+            Embeddings(Metadata(_ICDataset()), extractor=FlattenExtractor(), batch_size=2)
+
+    def test_embeddings_bind_rejects_metadata(self) -> None:
+        with pytest.raises(MaiteShapeError, match=r"\.dataset"):
+            Embeddings(extractor=FlattenExtractor(), batch_size=2).bind(Metadata(_ICDataset()))
+
+    def test_embeddings_call_rejects_metadata(self) -> None:
+        emb = Embeddings(_ICDataset(), extractor=FlattenExtractor(), batch_size=2)
+        with pytest.raises(MaiteShapeError, match=r"\.dataset"):
+            emb(Metadata(_ICDataset()))
+
+    def test_unbound_metadata_points_to_the_original_dataset(self) -> None:
+        """Checked before len(), so an unbound Metadata doesn't surface as NotFittedError.
+
+        Its ``.dataset`` is None (as after ``Metadata.load``), so the advice can't be to pass it.
+        """
+        with pytest.raises(MaiteShapeError, match="no dataset bound") as excinfo:
+            validate_dataset(Metadata(), expected="image_only")
+        assert "Pass its .dataset" not in str(excinfo.value)
+        assert "the dataset it was built from" in str(excinfo.value)
+
+    def test_metadata_message_scoped_to_image_only(self) -> None:
+        """Only image consumers get the Metadata message; other kinds keep their own error."""
+        with pytest.raises(MaiteShapeError) as excinfo:
+            validate_dataset(Metadata(_ICDataset()), expected="classification")
+        assert ".dataset" not in str(excinfo.value)
