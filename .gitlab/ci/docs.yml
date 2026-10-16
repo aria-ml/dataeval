@@ -19,7 +19,16 @@ docs:
     # cache anyway. Equivalent to the old "not main" guard, except a main build
     # marked +skipdocsclean now gets the cache too.
     - if [ -z "$DOCS_CLEAN" ]; then bash docs/fetch-docs-cache.sh || true; fi
+    # Harbor cache of the notebook datasets, kept outside the docs build: the build
+    # downloads whatever is missing, so a miss or a Harbor failure only costs time.
+    # Restore before the build, and only when a notebook is about to execute (the
+    # check exits non-zero if so); store after it, if the restore missed.
+    - |
+      if [ -n "$DOCS_CLEAN" ] || ! uv run --no-project --with jupytext --with nbformat python docs/check_notebook_cache.py >/dev/null 2>&1; then
+        bash docs/harbor-datasets-cache.sh pull
+      fi
     - uvx nox -P 3.13 -e docs $DOCS_CLEAN
+    - bash docs/harbor-datasets-cache.sh push
     - bash docs/push-docs-cache.sh
   cache:
     # uv cache, shared with the other .nox jobs (same key derived from uv.lock).
@@ -57,6 +66,9 @@ docs:
     UV_INSTALL_DIR: /usr/local/bin
     UV_COMPILE_BYTECODE: 1
     UV_NO_PROGRESS: true
+    # Unbuffered so the dataset download shows up in the job log as it happens
+    # (buffered, it printed in one burst after a 1+ hour silence).
+    PYTHONUNBUFFERED: '1'
     DATAEVAL_NOX_UV_EXTRAS_OVERRIDE: cu130
     GIT_STRATEGY: clone  # Full clone needed for artifact branch operations
 
