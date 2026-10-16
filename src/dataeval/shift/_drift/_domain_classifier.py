@@ -56,7 +56,8 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
     n_folds : int, default 5
         Number of cross-validation (CV) folds.
     threshold : float or tuple[float, float], default 0.55
-        For non-chunked mode: float threshold where AUROC > threshold means drift.
+        For non-chunked mode: float threshold where AUROC > threshold means drift
+        (a tuple uses its upper bound).
         For chunked mode: tuple (lower, upper) bounds on AUROC for identifying drift.
     extractor : FeatureExtractor or None, default None
         Feature extractor for transforming input data before drift detection.
@@ -65,6 +66,11 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
     update_strategy : UpdateStrategy or None, default None
         Strategy for updating reference data when new data arrives.
         When None, reference data remains fixed throughout detection.
+    hyperparameters : dict or None, default None
+        LightGBM hyperparameters. When None, a default configuration is used;
+        when given, it replaces that default entirely. Shallow, regularized
+        settings (small ``num_leaves``, ``max_depth`` and larger
+        ``min_child_samples``) suit small reference sets.
     config : DriftDomainClassifier.Config or None, default None
         Optional configuration object with default parameters. Parameters
         specified directly in __init__ will override config defaults.
@@ -88,7 +94,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
 
     >>> chunked = DriftDomainClassifier(threshold=(0.45, 0.65)).chunked(chunk_size=100)
     >>> chunked.fit(ref)
-    ChunkedDrift(DriftDomainClassifier(n_folds=5, threshold=(0.45, 0.65), extractor=None, update_strategy=None), chunker=SizeChunker(chunk_size=100, incomplete='keep'), fitted=True)
+    ChunkedDrift(DriftDomainClassifier(n_folds=5, threshold=(0.45, 0.65), extractor=None, update_strategy=None, hyperparameters=None), chunker=SizeChunker(chunk_size=100, incomplete='keep'), fitted=True)
     >>> result = chunked.predict(test)
 
     Using configuration:
@@ -129,12 +135,15 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
             Feature extractor for transforming input data before drift detection.
         update_strategy : UpdateStrategy or None, default None
             Strategy for updating reference data over time.
+        hyperparameters : dict or None, default None
+            LightGBM hyperparameters. Replaces the default configuration when given.
         """
 
         n_folds: Annotated[int, Field(ge=2)] = 5
         threshold: float | tuple[float, float] = 0.55
         extractor: FeatureExtractor | None = None
         update_strategy: UpdateStrategy | None = None
+        hyperparameters: dict[str, Any] | None = None
 
     def __init__(
         self,
@@ -142,6 +151,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
         threshold: float | tuple[float, float] | None = None,
         extractor: FeatureExtractor | None = None,
         update_strategy: UpdateStrategy | None = None,
+        hyperparameters: dict[str, Any] | None = None,
         config: Config | None = None,
     ) -> None:
         # Store config or create default
@@ -152,12 +162,14 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
         threshold = threshold if threshold is not None else base_config.threshold
         extractor = extractor if extractor is not None else base_config.extractor
         update_strategy = update_strategy if update_strategy is not None else base_config.update_strategy
+        hyperparameters = hyperparameters if hyperparameters is not None else base_config.hyperparameters
 
         self.config: DriftDomainClassifier.Config = DriftDomainClassifier.Config(
             n_folds=n_folds,
             threshold=threshold,
             extractor=extractor,
             update_strategy=update_strategy,
+            hyperparameters=hyperparameters,
         )
 
         # Initialize base + mixins
@@ -165,7 +177,8 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
         self._init_adaptive(extractor=extractor, update_strategy=update_strategy)
 
         self._n_folds = n_folds
-        self._threshold_config = threshold
+        self._hyperparameters = hyperparameters
+        self._threshold_config = self.config.threshold
         self._metric_name = "auroc"
 
     def _make_default_threshold(self) -> Threshold:
@@ -239,7 +252,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
         x_ref = self.reference_data
         x_combined = np.concatenate([x_ref, chunk_data], axis=0)
         y = np.concatenate([np.zeros(len(x_ref), dtype=np.intp), np.ones(len(chunk_data), dtype=np.intp)])
-        auroc, _, _ = compute_auroc(x_combined, y, n_folds=self._n_folds)
+        auroc, _, _ = compute_auroc(x_combined, y, n_folds=self._n_folds, hyperparameters=self._hyperparameters)
         return auroc
 
     def _compute_chunk_baselines(
@@ -252,7 +265,7 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
             rest = np.concatenate([c for j, c in enumerate(chunks) if j != i], axis=0)
             x = np.concatenate([rest, chunk], axis=0)
             y = np.concatenate([np.zeros(len(rest), dtype=np.intp), np.ones(len(chunk), dtype=np.intp)])
-            auroc, _, _ = compute_auroc(x, y, self._n_folds)
+            auroc, _, _ = compute_auroc(x, y, self._n_folds, self._hyperparameters)
             baseline_values.append(auroc)
         return np.array(baseline_values, dtype=np.float32)
 
@@ -286,9 +299,12 @@ class DriftDomainClassifier(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_Drift
         x_ref = self.reference_data
         x_combined = np.concatenate([x_ref, x_test], axis=0)
         y = np.concatenate([np.zeros(len(x_ref), dtype=np.intp), np.ones(len(x_test), dtype=np.intp)])
-        auroc, fold_aurocs, feature_importances = compute_auroc(x_combined, y, n_folds=self._n_folds)
+        auroc, fold_aurocs, feature_importances = compute_auroc(
+            x_combined, y, n_folds=self._n_folds, hyperparameters=self._hyperparameters
+        )
 
-        threshold = self._threshold_config if isinstance(self._threshold_config, float) else 0.55
+        tc = self._threshold_config
+        threshold = max(tc) if isinstance(tc, tuple) else tc
         drifted = auroc > threshold
 
         self._apply_update_strategy(data)

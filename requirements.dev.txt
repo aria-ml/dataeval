@@ -1351,6 +1351,7 @@ numpy==2.4.6 \
     #   numba
     #   onnx
     #   onnx-ir
+    #   onnxmltools
     #   onnxruntime
     #   onnxscript
     #   opencv-python
@@ -1474,11 +1475,16 @@ onnx==1.22.0 \
     # via
     #   dataeval
     #   onnx-ir
+    #   onnxmltools
     #   onnxscript
+    #   skl2onnx
 onnx-ir==1.0.0 \
     --hash=sha256:9e261f25fde8da9612ae5cb43b3b374d5ff469c04af0363cad588b2bb000b812 \
     --hash=sha256:e578f0d608d3062866b48223616eb2d10a6d6d01f8b8faac596129034f483cc7
     # via onnxscript
+onnxmltools==1.16.0 \
+    --hash=sha256:7b27196e7dcc0d9de29110f211e7941ad1c71dd97606baa729144d9acd105d3c \
+    --hash=sha256:cd76e0a7ba6a3c4ca4acf3b4c7973cda6a70f2edc146ab11d4efc3dfbee6805a
 onnxruntime==1.28.0 \
     --hash=sha256:07fb3cbe990d6bf0ab3c22bfbbfb0e314151266046ea6edb4a07f556b4258c5f \
     --hash=sha256:0a83bdb70d143cede762b677789bf2a7acca54b3fb82565601d5c30695aa933c \
@@ -1752,6 +1758,7 @@ protobuf==7.35.1 \
     --hash=sha256:ce115a26fe0c39a2c29973d914d327e516a6455464489fe3cd1e51a1b354f81a
     # via
     #   onnx
+    #   onnxmltools
     #   onnxruntime
 psutil==7.2.2 \
     --hash=sha256:0746f5f8d406af344fd547f1c8daa5f5c33dbc293bb8d6a16d80b4bb88f59372 \
@@ -2415,7 +2422,9 @@ scikit-learn==1.9.0 \
     --hash=sha256:f401448645a3e7bc115aa3c094097865155b34bff1cba8101857d9104e99074c \
     --hash=sha256:f7e254636164090da847715a27f8e5478feb98c40a9e0ee90cbd277de9e5ceb8 \
     --hash=sha256:fd3a8ef0c758555a3b23c03adaa858af32f7736785ded50ad5991f59c4ed03fa
-    # via dataeval
+    # via
+    #   dataeval
+    #   skl2onnx
 scipy==1.17.1 ; python_full_version < '3.12' \
     --hash=sha256:010f4333c96c9bb1a4516269e33cb5917b08ef2166d5556ca2fd9f082a9e6ea0 \
     --hash=sha256:02ae3b274fde71c5e92ac4d54bc06c42d80e399fec704383dcd99b301df37458 \
@@ -2546,6 +2555,10 @@ six==1.17.0 \
     # via
     #   python-dateutil
     #   rfc3339-validator
+skl2onnx==1.20.0 \
+    --hash=sha256:30cac34803d1776c14b336ae945e48ef28debfc339215acde1cc04b963ed3f7b \
+    --hash=sha256:c74ea827d92ba186fe659695e8fc989cd97bfc320edce3d32b9936a5878da10a
+    # via onnxmltools
 snowballstemmer==3.1.1 \
     --hash=sha256:7e207fa178741da09cdee59d3ecec3827ad5f92b1fc5c9ff3755b639f71f5752 \
     --hash=sha256:e07bbc54a0d798fe6010a12398422e62a8bfbba95c394fd0956ef58cb4d3e260

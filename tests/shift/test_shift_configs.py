@@ -18,6 +18,7 @@ from dataeval.shift import (
     OODKNeighbors,
     OODReconstruction,
 )
+from dataeval.shift._drift._known_domains import DriftKnownDomains
 from dataeval.types import EvaluatorConfig
 
 _ALL = [
@@ -26,6 +27,7 @@ _ALL = [
     DriftKNeighbors,
     DriftWasserstein,
     DriftDomainClassifier,
+    DriftKnownDomains,
     DriftReconstruction,
     OODKNeighbors,
     OODDomainClassifier,
@@ -42,6 +44,7 @@ _WRONG_TYPE = {
     DriftKNeighbors: ("k", "ten"),
     DriftWasserstein: ("ratio_threshold", "big"),
     DriftDomainClassifier: ("n_folds", "five"),
+    DriftKnownDomains: ("n_folds", "five"),
     DriftReconstruction: ("epochs", "twenty"),
     OODKNeighbors: ("k", "ten"),
     OODDomainClassifier: ("n_repeats", "five"),
@@ -129,7 +132,10 @@ class TestShiftReprs:
             ),
             (
                 DriftDomainClassifier(),
-                "DriftDomainClassifier(n_folds=5, threshold=0.55, extractor=None, update_strategy=None, fitted=False)",
+                (
+                    "DriftDomainClassifier(n_folds=5, threshold=0.55, extractor=None, update_strategy=None, "
+                    "hyperparameters=None, fitted=False)"
+                ),
             ),
             (
                 OODKNeighbors(),

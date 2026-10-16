@@ -19,7 +19,13 @@ from pydantic import PositiveInt
 
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array, FeatureExtractor, Threshold, UpdateStrategy
-from dataeval.shift._drift._base import BaseDrift, ChunkableMixin, DriftAdaptiveMixin, DriftOutput
+from dataeval.shift._drift._base import (
+    BaseDrift,
+    ChunkableMixin,
+    DriftAdaptiveMixin,
+    DriftOutput,
+    apply_correction,
+)
 from dataeval.types import EvaluatorConfig, set_metadata
 from dataeval.types._config import OpenUnitInterval
 from dataeval.utils.scipy.stats import anderson_ksamp, bws_test, cramervonmises_2samp, ks_2samp, mannwhitneyu
@@ -456,49 +462,6 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
         x_np = self._encode(data)
         return self._score_against(self.reference_data, x_np)
 
-    def _apply_correction(self, p_vals: NDArray[np.float32]) -> tuple[bool, float]:
-        """
-        Apply multiple testing correction to feature-wise p-values.
-
-        Corrects for multiple comparisons across features to control
-        false positive rates. Bonferroni correction divides the significance
-        threshold by the number of features. FDR correction uses the
-        Benjamini-Hochberg procedure for less conservative control.
-
-        Parameters
-        ----------
-        p_vals : NDArray[np.float32]
-            Array of p-values from univariate tests for each feature.
-            All values should be between 0 and 1.
-
-        Returns
-        -------
-        tuple[bool, float]
-            Boolean indicating whether drift was detected after correction.
-            Float is the effective threshold used for detection.
-
-        Notes
-        -----
-        Bonferroni correction: threshold = p_val / n_features
-        FDR correction: Uses Benjamini-Hochberg step-up procedure
-        """
-        if self.correction == "bonferroni":
-            threshold = self.p_val / self.n_features
-            drift_pred = bool((p_vals < threshold).any())
-            return drift_pred, threshold
-        if self.correction == "fdr":
-            n = p_vals.shape[0]
-            i = np.arange(n) + np.intp(1)
-            p_sorted = np.sort(p_vals)
-            q_threshold = self.p_val * i / n
-            below_threshold = p_sorted < q_threshold
-            try:
-                idx_threshold = int(np.where(below_threshold)[0].max())
-            except ValueError:  # sorted p-values not below thresholds
-                return bool(below_threshold.any()), q_threshold.min()
-            return bool(below_threshold.any()), q_threshold[idx_threshold]
-        raise ValueError("`correction` needs to be either `bonferroni` or `fdr`.")
-
     def _compute_chunk_metric(self, chunk_data: NDArray[np.float32]) -> float:
         """Compute mean distance: chunk vs full reference."""
         _, dist = self._score_against(self.reference_data, chunk_data)
@@ -543,7 +506,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
         p_vals, dist = self.score(data)
 
         feature_drift = (p_vals < self.p_val).astype(np.bool_)
-        drift_pred, threshold = self._apply_correction(p_vals)
+        drift_pred, threshold = apply_correction(p_vals, self.p_val, self.correction, n_tests=self.n_features)
 
         result = DriftOutput(
             drifted=drift_pred,
