@@ -46,6 +46,7 @@ from dataeval._metadata._input import (
     unpack_stats_result,
 )
 from dataeval._metadata._keyed import resolve_keyed
+from dataeval._metadata._known import hold_back_invalid_known, known_violation, reject_invalid_known
 from dataeval._metadata._links import to_series
 from dataeval._metadata._loading import _load_factors
 from dataeval._metadata._reductions import (
@@ -2889,7 +2890,10 @@ class Metadata(Array, FeatureExtractor):
         records: list[AggregationRecord] = []
         for source, destination, how, via, batch, declared in batches:
             outputs: list[str] = []
-            for series in batch.columns:
+            # Positions of the columns written, so a record's per-column coverage stays
+            # aligned with its outputs when a replay leaves one out.
+            kept: list[int] = []
+            for position, series in enumerate(batch.columns):
                 name = self._resolve_factor_name(
                     series.name,
                     taken,
@@ -2897,6 +2901,9 @@ class Metadata(Array, FeatureExtractor):
                     append_string="_agg",
                     qualifier=source,
                 )
+                if not rolled._admits_rolled(name, destination, series, replay=target is not None):
+                    continue
+                kept.append(position)
                 taken.add(name)
                 store = store.with_column(destination, series.rename(name))
                 rolled._aggregated_from[name] = source
@@ -2919,8 +2926,8 @@ class Metadata(Array, FeatureExtractor):
                     took_part=batch.took_part,
                     no_ancestor=batch.no_ancestor,
                     childless=batch.childless,
-                    coverage=batch.coverage,
-                    uncovered=batch.uncovered,
+                    coverage=tuple(batch.coverage[i] for i in kept),
+                    uncovered=tuple(batch.uncovered[i] for i in kept),
                     gaps=batch.gaps,
                 ),
             )
@@ -2931,6 +2938,24 @@ class Metadata(Array, FeatureExtractor):
         rolled._is_binned = False
         rolled._build_factors()
         return rolled
+
+    def _admits_rolled(self, name: str, level: FactorLevel, series: pl.Series, replay: bool) -> bool:
+        """Say whether a rolled-up column may be written under ``name``, held to its known definition.
+
+        Asked for, a roll-up is refused like any other write under a known name. Replayed,
+        the walk is finishing and nobody is asking, so the column is left out and recorded
+        as dropped rather than sinking the build.
+
+        Raises
+        ------
+        ValueError
+            When not replaying and the column breaks the definition of the known factor it
+            is named after.
+        """
+        if not replay:
+            reject_invalid_known([(name, level, series)])
+            return True
+        return not self._breaks_known(name, level, series, record=True)
 
     @property
     def last_aggregation(self) -> Sequence[AggregationRecord]:
@@ -3580,6 +3605,12 @@ class Metadata(Array, FeatureExtractor):
           ``<level>_<name>``, and the factor's other level(s) were kept. A factor whose
           every level came back empty is kept whole rather than recorded here.
 
+        One is recorded by the walk, by a :meth:`repair` that leaves a held-back column
+        still breaking it, and by a replayed roll-up:
+
+        - ``"invalid_known_factor"`` — named as a known factor (see
+          :data:`~dataeval.types.KNOWN_FACTORS`) with data that breaks its definition.
+
         One more is recorded while the factor set is built:
 
         - ``"cardinality_over_budget"`` — nearly every row of a non-numeric column held a
@@ -3749,9 +3780,13 @@ class Metadata(Array, FeatureExtractor):
         # so. Only a reading that introduces the mixture is refused, so a category column
         # that always spelled some of its values as numerals is rewritten as before.
         lossy = promotion_is_lossy(corrected) and (held or not promotion_is_lossy(list(values)))
+        # A known factor is held to its definition under every reading, the same way: a
+        # held-back column the reading leaves breaking it is not repaired, and a factor the
+        # reading would make break it keeps the values the dataset wrote.
+        refused = lossy or self._breaks_known(factor, level, corrected, record=held)
         self._store = self._store.without_columns({factor} & set(self._store.columns))
         self._reset_bins([factor])
-        if lossy and held:
+        if refused and held:
             # Still disagreeing with itself, so still not a factor. Left where it was
             # rather than written as something no reading supports.
             self._factors.discard(factor)
@@ -3761,7 +3796,7 @@ class Metadata(Array, FeatureExtractor):
         # A reading that took a type away from a column that had one is not applied: the
         # column goes back exactly as the dataset wrote it, and whatever it was before --
         # a factor, or a name for its rows -- it still is.
-        written = values if lossy else corrected
+        written = values if refused else corrected
         self._store = self._store.with_column(level, to_series(factor, np.asarray(simplify_type(written))))
         self._factors_by_level.setdefault(level, set()).add(factor)
         # The column holds different values now, so whether it names its rows or groups them
@@ -3778,6 +3813,20 @@ class Metadata(Array, FeatureExtractor):
         self._factors.add(factor)
         if held or "cardinality_over_budget" in self._dropped_factors.get(factor, ()):
             self._repaired.add(factor)
+
+    def _breaks_known(self, factor: str, level: FactorLevel, values: Any, *, record: bool) -> bool:
+        """Say whether values break the known definition of the factor they are read under.
+
+        A break is warned about either way. With ``record``, it is also why the column is
+        left out -- held back, or skipped on replay -- so the reason is recorded once,
+        beside any it had.
+        """
+        if (violation := known_violation(factor, level, values)) is None:
+            return False
+        _logger.warning(violation)
+        if record and "invalid_known_factor" not in (reasons := self._dropped_factors.setdefault(factor, [])):
+            reasons.append("invalid_known_factor")
+        return True
 
     def _kept_values(self, factor: str) -> tuple[FactorLevel, list[Any]]:
         """One factor's values as the dataset wrote them, and the level they sit at.
@@ -3839,8 +3888,16 @@ class Metadata(Array, FeatureExtractor):
         entries: dict[str, Unusable] = {
             # No cap: these values are exactly what a repair has to name, and a column held
             # back for mixing types has as many of them as it has spellings, not as it has
-            # rows.
-            name: Unusable(("mixed_types",), level, True, *_kinds(values))
+            # rows. The reasons are the ones recorded: mixed types, a broken known definition,
+            # or both when a reading resolved the one and caused the other. A known factor
+            # at a level it is not defined at is not repairable: a reading changes values,
+            # never the level they sit at.
+            name: Unusable(
+                tuple(self._dropped_factors.get(name, ("mixed_types",))),
+                level,
+                known_violation(name, level, ()) is None,
+                *_kinds(values),
+            )
             for level, columns in self._unusable_values.items()
             for name, values in columns.items()
             if name not in self._repaired
@@ -4745,6 +4802,9 @@ class Metadata(Array, FeatureExtractor):
         _logger.info("Processing metadata for %d dataset items using %r", datum_count, structurer)
 
         data = structurer.build(dataset, progress_callback=progress_callback)
+        # Held back rather than refused: nobody asked for the walk's columns, so one whose data
+        # breaks its known definition waits in `unusable` for a repair, as a mixed one does.
+        data = hold_back_invalid_known(data)
 
         unique_labels = np.unique(data.class_labels) if len(data.class_labels) else np.array([], dtype=np.intp)
         self._index2label = build_index2label(self._dataset.metadata.get("index2label", None), unique_labels)
@@ -5693,6 +5753,9 @@ class Metadata(Array, FeatureExtractor):
             # the store's gather, so there is no expanded copy to build and no dtype to
             # infer off one leading with nulls.
             resolved.append(_ResolvedFactor(col_name, factor_level, to_series(col_name, values)))
+        # Checked under the final names: a known name renamed to ``*_added`` on its way in
+        # no longer claims the definition, so it is not held to it.
+        reject_invalid_known(resolved)
 
         self._record_multidimensional(skipped)
         self._record_vacuous(vacuous)

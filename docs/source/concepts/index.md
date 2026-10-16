@@ -10,6 +10,7 @@ Each page may cover several evaluators that work together to answer questions ab
 - [Ontology](Ontology.md)
 - [Metadata Levels](MetadataLevels.md)
 - [Binning](Binning.md)
+- [Recommended Extrinsic Metadata Factors](ExtrinsicFactors.md)
 - [Embeddings](Embeddings.md)
 - [Clustering](Clustering.md)
 - [Dataset Bias and Coverage](DatasetBias.md)
@@ -28,6 +29,7 @@ ImageStatistics
 Ontology
 MetadataLevels
 Binning
+ExtrinsicFactors
 Embeddings
 Clustering
 DatasetBias

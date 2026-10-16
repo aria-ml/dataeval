@@ -556,6 +556,7 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
         cast("FactorLevel", level): {name: list(values) for name, values in columns.items()}
         for level, columns in manifest.get("pristine", {}).items()
     }
+    _hold_back_invalid_known(md)
     # Derived rather than written: a held-back name can only be a column of the store if a
     # repair put it there, so the store already says which repairs landed. The other
     # repairable drop -- a column that named its rows -- is settled below, once the factor
@@ -582,6 +583,31 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     md._repaired |= {
         name for name, reasons in md._dropped_factors.items() if "cardinality_over_budget" in reasons
     } & md._factors
+
+
+def _hold_back_invalid_known(md: "Metadata") -> None:
+    """Hold back restored columns that break their known factor's definition.
+
+    An archive written before a known factor was checked can hold a column the walk would
+    now hold back. It is checked again here with the same helper and the same outcome: the
+    values move to ``_unusable_values``, the reason is recorded and the column leaves the
+    store. Nothing is written for it, as the check is a function of the stored values.
+    """
+    for level, names in md._factors_by_level.items():
+        for name in sorted(names & set(md._store.columns)):
+            values = md._store.column(level, name).to_list()
+            if md._breaks_known(name, level, values, record=True):
+                # Held as the dataset wrote them, as a refused reading holds them live: what
+                # is already held, else what a correction snapshotted, else the stored column.
+                original = md._pristine_values.get(level, {}).get(name, values)
+                md._unusable_values.setdefault(level, {}).setdefault(name, list(original))
+                md._store = md._store.without_columns({name})
+                # A derived encoding was cut from the values now held back: kept, it warns
+                # that a non-factor was given one, and a later repair grows it rather than
+                # deriving levels from the repaired values. A declared one is the reader's.
+                if name in md._encoding and md._encoding[name].provenance == "derived":
+                    del md._encoding[name]
+                names.discard(name)
 
 
 def _reject_dataset_mismatch(md: "Metadata", manifest: Mapping[str, Any]) -> None:

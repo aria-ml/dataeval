@@ -316,9 +316,12 @@ for name, held in metadata.unusable.items():
 # You will use {meth}`~.Metadata.repair` to declare the reading that turns a held-back column into a
 # factor. Two kinds of record cover everything this dataset needs:
 #
-# - {class}`~dataeval.types.Remap` replaces named values. You will use it to replace the sentinels: "N"
-#   and "E" become `-2`, which keeps the two kinds of missing reading, the string and the numeric `-1`,
-#   separate from each other and from a real coordinate.
+# - {class}`~dataeval.types.Remap` replaces named values. You will use it to mark the missing
+#   coordinates as missing. The dataset falls back to the hemisphere letter "N" or "E" when it has no
+#   coordinate, so those mean the same as its `-1`: no reading. _Latitude_ and _longitude_ are
+#   [known factors](../concepts/ExtrinsicFactors.md#known-factor-names), which DataEval checks as real
+#   coordinates, so a sentinel such as `-1` or `-2` would pass as a real position. Map both to NaN
+#   instead, which DataEval reads as a missing value and bins in a group of its own.
 # - {class}`~dataeval.types.ParseDateTime` reads text as a time. With `every="hour_of_day"` it labels
 #   each row with the hour it was collected in, which gives *date_time* the vocabulary it needs. This
 #   dataset was collected over a couple of days, so time of day is the most useful period to group by.
@@ -344,9 +347,9 @@ for name, held in metadata.unusable.items():
 metadata.exclude = ["object_id"]
 
 metadata = metadata.repair([
-    # Replace the string sentinels, keeping them distinct from the numeric -1
-    Remap("latitude", {"N": -2.0}),
-    Remap("longitude", {"E": -2.0}),
+    # Mark the missing coordinates, spelled as a letter or as -1, as missing
+    Remap("latitude", {"N": np.nan, -1: np.nan}),
+    Remap("longitude", {"E": np.nan, -1: np.nan}),
     # Give date_time a vocabulary: the hour of the day each frame was collected in
     Remap("date_time", {"": -1}),
     ParseDateTime("date_time", every="hour_of_day"),
@@ -371,7 +374,8 @@ print("still dropped:", dict(metadata.dropped_factors))
 # - *gimbal_pitch* is similar but over [0,90], so 7 bins - every 15 degrees, plus the -1s.
 # - _Altitude_ has a decent spread and maxes out at ~260, so 11 bins - multiples of 26, plus the -1s.
 # - _Frame_ and *object_size* use their own percentiles, every 20% and every 5%.
-# - _Latitude_ and _longitude_ need three groups each: the two sentinels and the real coordinates.
+# - _Latitude_ and _longitude_ need one range each for the real coordinates. The missing readings get a
+#   group of their own without a cut.
 # - _Xspeed_ and _yspeed_ get a bin below `-99` to hold the missing readings you moved there.
 
 # %%
@@ -386,9 +390,9 @@ metadata.continuous_factor_bins = {
     "xspeed": [-99, -15, -5, 0, 5, 15],
     "yspeed": [-99, -15, -5, 0, 5, 15],
     "zspeed": [-5, -0.0001, 0.0001, 5],
-    # Two sentinels and the real coordinates: three groups each
-    "latitude": [-2, -1, 0, 90],
-    "longitude": [-2, -1, 0, 90],
+    # The real coordinates; missing readings are grouped separately
+    "latitude": [0, 90],
+    "longitude": [0, 90],
     "object_size": np.quantile(raw_obj_size, np.linspace(0, 1, 21)).tolist(),
 }
 
@@ -436,20 +440,20 @@ dep.plot(bal, figsize=(10, 10))
 # %% [markdown]
 # The heatmap has one large block in it. The flight telemetry - *gimbal_pitch*, *gimbal_heading*,
 # *compass_heading*, _altitude_, _latitude_, _longitude_ and _speed_ - is correlated with almost
-# everything, at 0.94 to 0.99 within the block. Nothing else comes close, and *object_size* is
-# correlated with nothing at all.
+# everything, at 0.79 to 1.00 within the block, and highest wherever _latitude_ or _longitude_ is one of
+# the pair. Nothing else comes close, and *object_size* is correlated with nothing at all.
 #
 # You should not read that block as physics. Those columns share their **missing rows**: the same 454
 # frames, 29% of the dataset, record no altitude, no gimbal pitch and no coordinates, and *compass_heading*,
 # *gimbal_heading* and _speed_ are unrecorded on almost exactly the same rows. A factor that is
 # "unrecorded here, unrecorded there" tracks every other factor with the same gaps, so `altitude` at 0.99
 # with `latitude` mostly says the telemetry failed together, not that altitude predicts position. You can
-# see this because you gave the sentinels their own bins; left as ordinary numbers they would have been
-# mixed in with real readings and this structure would not have been visible.
+# see this because the missing readings have bins of their own; left as ordinary numbers they would have
+# been mixed in with real readings and this structure would not have been visible.
 #
-# _Latitude_ and _longitude_ sit at 1.00 for a related reason. You cut each into three groups - two kinds
-# of missing reading and one group holding every real coordinate - so both columns now carry the same
-# information, which is whether a position was recorded and how it failed. They are one column twice.
+# _Latitude_ and _longitude_ sit at 1.00 for a related reason. Each has one group holding every real
+# coordinate and one holding the missing readings, so both columns carry the same information, which is
+# whether a position was recorded. They are one column twice.
 #
 # _Drone_ and *storage* are also at 1.00, and *storage* and *date_time* at 0.99. *Storage* names the folder
 # a clip came from, so it is standing in for the collection session: which airframe flew, and when.
@@ -526,11 +530,6 @@ dep.plot(div, figsize=(10, 6))
 # - _altitude_
 # - _height_
 # - _width_
-# - _xspeed_
-# - _latitude_ and _longitude_
-#
-# The last three appear because of how you repaired them. Each is mostly one value with a small sentinel
-# group beside it, which is a skewed distribution, so the evaluator reports it as one.
 #
 # These factors contain sampling bias which means that there is significantly more of one value in that category than others.
 # For instance, the *class_label* factor highlights that there is unevenness in the number of data points per class.

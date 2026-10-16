@@ -458,13 +458,15 @@ class TestPredictDeclaredDomains:
         with pytest.warns(UserWarning, match="matched no sample"):
             fitted.predict(_domain(0.0, 10, 21), metadata=_metadata(time=[1, 2, 3, 4, 5] * 2))
 
-    def test_int_spec_does_not_match_a_float_column(self, labeled):
+    def test_int_spec_matches_a_float_column(self, labeled):
         x, time = labeled
         cam = {"morning": 1, "noon": 1, "dusk": 2, "night": 3}
         spec = {"cam": {"one": 1, "two": 2, "three": 3}}
         d = DriftKnownDomains(n_folds=3, domains=spec).fit(x, metadata=_metadata(cam=[cam[t] for t in time]))
-        with pytest.warns(UserWarning, match="matched no sample"):
-            d.predict(_domain(4.0, 10, 33), metadata=_metadata(cam=[2.0] * 10))
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            table = d.predict(_domain(4.0, 10, 33), metadata=_metadata(cam=[2.0] * 10)).details["domains"]
+        assert table["domain"].to_list() == ["two"]
 
     def test_metadata_and_labels_together_raise(self, fitted):
         with pytest.raises(ValueError, match="not both"):

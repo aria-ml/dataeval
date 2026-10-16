@@ -22,6 +22,7 @@ __all__ = []
 
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, date, datetime
+from numbers import Real
 from types import MappingProxyType
 from typing import Any
 
@@ -226,16 +227,30 @@ def _remapped(value: Any, remap: Remap) -> Any:
     outright should not be answered by a range that happens to contain it.
     """
     mapping = remap.mapping
-    # ``type(...) is type(...)`` alongside equality, because ``True == 1`` and ``1 == 1.0``
-    # in Python: a mapping keyed on the number 1 must not answer for a boolean, and a
-    # caller who wrote both keys means both.
     for key, replacement in mapping.items():
-        if not isinstance(key, tuple) and key is not None and type(key) is type(value) and key == value:
+        if not isinstance(key, tuple) and key is not None and _names(key, value):
             return replacement
     for key, replacement in mapping.items():
         if isinstance(key, tuple) and _within(value, key):
             return replacement
     return mapping.get(None, value) if None in mapping else value
+
+
+def _names(key: Any, value: Any) -> bool:
+    """Whether a mapping key names this value.
+
+    Equality alone is not enough, because ``True == 1`` in Python: a mapping keyed on the
+    number 1 must not answer for a boolean. Numbers are one kind however they are stored,
+    though -- a float column holds the dataset's ``-1`` as ``-1.0``, and a dict cannot
+    carry both keys, since ``{-1: a, -1.0: b}`` is one entry.
+    """
+    if type(key) is type(value):
+        return key == value
+    return _is_number(key) and _is_number(value) and key == value
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, Real) and not isinstance(value, bool | np.bool_)
 
 
 def _within(value: Any, over: tuple[float | None, float | None]) -> bool:

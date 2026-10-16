@@ -46,7 +46,7 @@ class TestParse:
         assert groups["b"] == [2, 3]
         assert all(type(v) is int for v in groups["b"])
         assert type(groups["c"][0]) is float
-        assert spec.assign([1, 3, 4.5, 3.0]) == ["a", "b", "c", None]
+        assert spec.assign([1, 3, 4.5, 3.0, True]) == ["a", "b", "c", "b", None]
 
     def test_canonical_round_trips(self):
         spec = DomainSpec.parse({"alt": [(None, 100), (100, 1000), None]})
@@ -93,8 +93,8 @@ class TestAssign:
     def test_unmatched_without_catch_all_is_none(self):
         assert DomainSpec.parse({"f": {"a": "x"}}).assign(["x", "y"]) == ["a", None]
 
-    def test_exact_match_is_type_sensitive(self):
-        assert DomainSpec.parse({"f": {"a": 1}}).assign([1, 1.0]) == ["a", None]
+    def test_a_number_matches_however_it_is_stored_but_not_a_boolean(self):
+        assert DomainSpec.parse({"f": {"a": 1}}).assign([1, 1.0, True]) == ["a", "a", None]
 
     def test_str_form_names_values(self):
         assert DomainSpec.parse("f").assign([1, None, 2]) == ["1", None, "2"]
