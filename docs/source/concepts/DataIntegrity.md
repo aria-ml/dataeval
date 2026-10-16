@@ -996,6 +996,7 @@ it, and reads a run of more than five departing frames as a segment.
 
 - [How to detect and remove duplicates](../notebooks/h2_deduplicate.py)
 - [How to find outliers in metadata factors](../notebooks/h2_find_factor_outliers.py)
+- [How to find outliers that depend on their context](../notebooks/h2_find_conditional_outliers.py)
 - [How to visualize data cleaning issues](../notebooks/h2_visualize_cleaning_issues.py)
 - [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
 
