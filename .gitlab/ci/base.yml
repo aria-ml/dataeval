@@ -59,8 +59,6 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'web'
     # Commit Main Branch Workflow
     - if: $CI_COMMIT_BRANCH == 'main'
-      variables:
-        DOCS_RUNNER_TAG: 'k8s-multi-gpu'
     # Commit Release Branch Workflow
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
 
