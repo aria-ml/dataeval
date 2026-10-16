@@ -276,6 +276,8 @@ assert "labels" not in set(result.data()["metric_name"].cast(pl.Utf8))
 #
 # - [Data Integrity](../concepts/DataIntegrity.md) — What makes a factor thresholdable, and why bins are never read.
 # - [Metadata Levels](../concepts/MetadataLevels.md) — Levels, keys, and the built-in track statistics.
+# - [How to find outliers that depend on their context](./h2_find_conditional_outliers.py) — Judge factors within
+#   strata, by rarity, given another factor, and in combination.
 # - [How to find duplicate video](./h2_deduplicate_video.py) — Duplicates and redundancy in the same kind of dataset.
 # - [How to trace findings to their source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or detection a
 #   `SourceIndex` names.
