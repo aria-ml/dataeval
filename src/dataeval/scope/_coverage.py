@@ -293,6 +293,15 @@ class Coverage(Evaluator):
             raise ValueError("Provide pre-computed embeddings, or configure an extractor to compute them.")
         from dataeval._embeddings import Embeddings as _Embeddings
 
+        # A Metadata holds factors, not images: embed the dataset it describes. Checked by type,
+        # not by probing for `.dataset`, which a torch Subset also has and which names its parent.
+        if isinstance(dataset, Metadata):
+            if dataset.dataset is None:
+                raise ValueError(
+                    "This Metadata has no dataset bound (as after Metadata.load), so there are no images "
+                    "to embed. Pass embeddings=..., or the dataset it was built from."
+                )
+            dataset = dataset.dataset
         # Reached only when no embeddings were supplied, i.e. ``dataset`` is a real image
         # dataset (raw labels / LabelsLike are rejected upstream unless embeddings are given).
         image_source = cast("AnnotatedDataset[Any]", dataset)
@@ -421,7 +430,10 @@ class Coverage(Evaluator):
             * a full :class:`~dataeval.protocols.AnnotatedDataset` — class labels and their
               ``index2label`` names are read from it, and embeddings are computed from it via
               the configured extractor unless ``embeddings`` is passed;
-            * a :class:`~dataeval.Metadata` — same, but labels/names come straight from it;
+            * a :class:`~dataeval.Metadata` — labels/names come straight from it, and
+              embeddings are computed from the dataset it describes
+              (:attr:`~dataeval.Metadata.dataset`) unless ``embeddings`` is passed. A
+              Metadata with no dataset bound needs ``embeddings``;
             * any :class:`~dataeval.protocols.LabelsLike` object (e.g. a custom lightweight
               metadata container) — its ``class_labels`` are used, and ``index2label`` if it
               exposes one;
@@ -431,7 +443,7 @@ class Coverage(Evaluator):
               index. Only valid when ``embeddings`` is provided.
         embeddings : Array or None, default None
             Pre-computed embeddings, one per label. When omitted, ``dataset`` must be a full
-            dataset/Metadata and an extractor must be configured so embeddings can be computed
+            dataset or a Metadata bound to one, and an extractor must be configured so embeddings can be computed
             from it. Required when ``dataset`` is a raw label array.
 
         Returns

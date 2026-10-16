@@ -48,6 +48,34 @@ class TestMetadataFeatureExtractor:
         assert result is metadata
         assert metadata.is_bound
 
+    def test_dataset_unbound_is_none(self):
+        """An unbound Metadata references no dataset."""
+        assert Metadata().dataset is None
+
+    def test_dataset_returns_bound_dataset(self, mock_ds):
+        """The bound dataset comes back by identity, not a copy."""
+        assert Metadata(mock_ds).dataset is mock_ds
+
+    def test_dataset_follows_bind(self, mock_ds, mock_ds2):
+        """Rebinding swaps the referenced dataset."""
+        metadata = Metadata(mock_ds).bind(mock_ds2)
+        assert metadata.dataset is mock_ds2
+
+    def test_dataset_on_new_instance(self, mock_ds, mock_ds2):
+        """new() binds the derived instance to the new dataset and leaves the original alone."""
+        metadata = Metadata(mock_ds)
+        assert metadata.new(mock_ds2).dataset is mock_ds2
+        assert metadata.dataset is mock_ds
+
+    def test_dataset_from_factors_is_none(self):
+        """Metadata built straight from factors has no dataset behind it."""
+        assert Metadata.from_factors({"a": np.array([1.0, 2.0])}).dataset is None
+
+    def test_dataset_is_read_only(self, mock_ds):
+        """dataset is a reference, not a setter; bind() is the way to change it."""
+        with pytest.raises(AttributeError):
+            Metadata(mock_ds).dataset = mock_ds  # type: ignore[misc]
+
     def test_len_unbound_raises(self):
         """Test __len__ raises ValueError when no dataset is bound."""
         metadata = Metadata()

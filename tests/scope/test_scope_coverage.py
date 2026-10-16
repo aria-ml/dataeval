@@ -3,9 +3,10 @@ import polars as pl
 import pytest
 import torch
 
+from dataeval import Metadata
 from dataeval.exceptions import ShapeMismatchError
-from dataeval.extractors import TorchExtractor
-from dataeval.protocols import DatasetMetadata
+from dataeval.extractors import FlattenExtractor, TorchExtractor
+from dataeval.protocols import DatasetMetadata, DatumMetadata
 from dataeval.scope._coverage import _PER_CLASS_SCHEMA, Coverage, CoverageOutput
 
 
@@ -23,8 +24,8 @@ class ClassificationDataset:
         self._data = np.random.default_rng(0).random((len(targets), *shape)).astype(np.float32)
         self.metadata = DatasetMetadata(id="d", index2label=dict(enumerate(class_names)))
 
-    def __getitem__(self, i):
-        return self._data[i], self._targets[i], {"id": i}
+    def __getitem__(self, i: int) -> tuple[np.ndarray, np.ndarray, DatumMetadata]:
+        return self._data[i], self._targets[i], DatumMetadata(id=i)
 
     def __len__(self) -> int:
         return len(self._targets)
@@ -187,3 +188,67 @@ class TestEmbeddingsResolution:
 class TestNearDuplicateFraction:
     def test_empty_distances_return_none(self):
         assert Coverage()._near_duplicate_fraction([]) is None
+
+
+class _SpyExtractor(FlattenExtractor):
+    """Records the per-item shape the extractor was handed."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.shapes: list[tuple[int, ...]] = []
+
+    def __call__(self, data):
+        self.shapes.extend(np.asarray(item).shape for item in data)
+        return super().__call__(data)
+
+
+@pytest.mark.required
+def test_bound_metadata_embeds_images_not_factor_rows():
+    """A bound Metadata is embedded through its dataset, identically to passing the dataset."""
+    ds = ClassificationDataset(["a", "b"], per_class=10)
+    spy = _SpyExtractor()
+    from_metadata = Coverage(spy, num_observations=5, min_class_samples=5, batch_size=8).evaluate(Metadata(ds))
+    assert set(spy.shapes) == {(3, 4, 4)}
+    from_dataset = Coverage(FlattenExtractor(), num_observations=5, min_class_samples=5, batch_size=8).evaluate(ds)
+    assert from_metadata.coverage_radius == pytest.approx(from_dataset.coverage_radius)
+    assert from_metadata.data().equals(from_dataset.data())
+
+
+@pytest.mark.required
+def test_unbound_metadata_without_embeddings_raises():
+    """No dataset behind the Metadata means no images to embed: say so instead of embedding factors."""
+    md = Metadata.from_factors({"w": np.arange(20.0)}, class_labels=np.repeat([0, 1], 10))
+    with pytest.raises(ValueError, match="embeddings=") as excinfo:
+        Coverage(FlattenExtractor(), num_observations=5, min_class_samples=5, batch_size=8).evaluate(md)
+    assert "the dataset it was built from" in str(excinfo.value)
+
+
+@pytest.mark.required
+def test_unbound_metadata_with_embeddings_still_works():
+    """The documented notebook path (Metadata plus precomputed embeddings) is unaffected."""
+    md = Metadata.from_factors({"w": np.arange(20.0)}, class_labels=np.repeat([0, 1], 10))
+    embeddings = np.random.default_rng(0).random((20, 8))
+    result = Coverage(num_observations=5, min_class_samples=5).evaluate(md, embeddings=embeddings)
+    assert result.data()["count"].sum() == 20
+
+
+@pytest.mark.required
+def test_subset_like_dataset_is_not_unwrapped():
+    """A dataset carrying its own `.dataset` (torch Subset style) is embedded as itself, not its parent."""
+    parent = ClassificationDataset(["a", "b"], per_class=10)
+
+    class _Subset:
+        def __init__(self, dataset, indices):
+            self.dataset, self.indices = dataset, indices
+            self.metadata = dataset.metadata
+
+        def __getitem__(self, i):
+            return self.dataset[self.indices[i]]
+
+        def __len__(self):
+            return len(self.indices)
+
+    subset = _Subset(parent, list(range(0, 20, 2)) + list(range(1, 20, 2))[:6])
+    spy = _SpyExtractor()
+    Coverage(spy, num_observations=5, min_class_samples=5, batch_size=8).evaluate(subset)
+    assert len(spy.shapes) == len(subset)

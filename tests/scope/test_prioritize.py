@@ -6,6 +6,7 @@ import torch
 
 from dataeval._embeddings import Embeddings
 from dataeval.core._rank import RankResult
+from dataeval.exceptions import MaiteShapeError
 from dataeval.extractors import TorchExtractor
 from dataeval.protocols import AnnotatedDataset
 from dataeval.scope._prioritize import Prioritize, PrioritizeOutput
@@ -408,3 +409,30 @@ class TestPrioritizeEvaluateRejections:
         prioritize = Prioritize(method="knn", policy="class_balanced")
         with pytest.raises(ValueError, match="requires class labels"):
             prioritize.evaluate(np.zeros((8, 4), dtype=np.float32))
+
+
+class TestPrioritizeRejectsMetadata:
+    """Metadata is an Array of factor rows; ranking on it would silently ignore the images."""
+
+    @staticmethod
+    def _metadata():
+        from dataeval import Metadata
+
+        rng = np.random.default_rng(0)
+        return Metadata.from_factors({"a": rng.random(20), "b": rng.random(20)})
+
+    def test_metadata_as_dataset_is_rejected(self):
+        with pytest.raises(MaiteShapeError, match="no dataset bound"):
+            Prioritize(method="knn", k=3).evaluate(self._metadata())
+
+    def test_metadata_as_reference_is_rejected(self):
+        prioritize = Prioritize(method="knn", k=3, reference=self._metadata())
+        with pytest.raises(MaiteShapeError, match="no dataset bound"):
+            prioritize.evaluate(np.zeros((8, 4), dtype=np.float32))
+
+    def test_bound_metadata_points_to_its_dataset(self):
+        from dataeval import Metadata
+        from tests.utils.test_validate import _ICDataset
+
+        with pytest.raises(MaiteShapeError, match=r"Pass its \.dataset"):
+            Prioritize(method="knn", k=3).evaluate(Metadata(_ICDataset()))

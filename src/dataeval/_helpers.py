@@ -1035,6 +1035,21 @@ def reject_derived_axis(candidate: Any, caller: str) -> None:
     )
 
 
+def metadata_is_not_images(where: str, arg_name: str, metadata: Any) -> str:
+    """Message for a :class:`~dataeval.Metadata` handed in where images are expected.
+
+    Points at :attr:`~dataeval.Metadata.dataset` when there is one to pass, and at the original
+    dataset when there is not -- an unbound instance, such as one read back with ``load``.
+    """
+    stem = f"{where}: argument {arg_name!r} is a Metadata, which holds factors about a dataset rather than its images"
+    if metadata.dataset is not None:
+        return f"{stem}. Pass its .dataset instead."
+    return (
+        f"{stem}, and it has no dataset bound (as after Metadata.load). Pass the dataset it was built from, "
+        f"or pre-computed embeddings where they are accepted."
+    )
+
+
 def reject_filtered_metadata(candidate: Any, caller: str) -> None:
     """Refuse a filtered :class:`~dataeval.Metadata` wherever embeddings are involved.
 
