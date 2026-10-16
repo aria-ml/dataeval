@@ -151,9 +151,13 @@ print(Metadata(reference, view="unit", exclude=EXCLUDE).dropped_factors)
 # reference reads those columns as numbers, and so does every stream you measure against it.
 
 # %%
-# The letters mean "no reading was taken", which is what `-1` means in the numeric telemetry
-# columns of this dataset, so you can map them to the same value.
-COORDINATES = [Remap("latitude", {"N": -1.0}), Remap("longitude", {"E": -1.0})]
+# The letters mean "no reading was taken", as `-1` does in this dataset's numeric columns.
+# Latitude and longitude are known factors, checked as real coordinates, so a sentinel would
+# pass as a real position: map both spellings to NaN, which DataEval reads as missing.
+COORDINATES = [
+    Remap("latitude", {"N": np.nan, -1: np.nan}),
+    Remap("longitude", {"E": np.nan, -1: np.nan}),
+]
 
 print(Metadata(reference, view="unit", exclude=EXCLUDE).repair(COORDINATES).dropped_factors)
 

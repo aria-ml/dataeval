@@ -736,7 +736,8 @@ class Remap:
     mapping : Mapping
         What each value becomes. A key is one of three things:
 
-        - **a value**, matched exactly as the dataset wrote it;
+        - **a value**, matched exactly as the dataset wrote it, except that a number matches
+          however it is stored (``-1`` matches ``-1.0``) and never matches a boolean;
         - **a ``(low, high)`` range**, half-open ``[low, high)``, matching any number in
           it — which is how a sentinel band is retired to one value, and the thing
           :class:`Rescale` cannot express, since it transforms values rather than

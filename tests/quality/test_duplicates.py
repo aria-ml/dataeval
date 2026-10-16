@@ -3134,7 +3134,7 @@ class TestNarrowedRedetection:
         images = [image, image.copy(), rng.random((3, 16, 16))]
         boxes = [[[0, 0, 8, 8]]] * 3
         dataset = get_mock_od_dataset(
-            images, [[0], [0], [0]], boxes, [{"timestamp": stamp} for stamp in ("a", "a", "b")]
+            images, [[0], [0], [0]], boxes, [{"capture_time": stamp} for stamp in ("a", "a", "b")]
         )
         return dataset, Metadata(dataset, exclude=["id"])
 
@@ -3147,7 +3147,7 @@ class TestNarrowedRedetection:
 
     def test_a_target_view_re_detects_no_factor_rows(self, annotated_and_labeled):
         data, md = annotated_and_labeled
-        result = Duplicates().evaluate(data, per_target=True, metadata=md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(data, per_target=True, metadata=md, duplicate_factors=["capture_time"])
         assert not result.data().filter(pl.col("methods").list.contains("factors")).is_empty()
         assert result.targets.with_radius(4).data()["level"].unique().to_list() == ["target"]
 
@@ -3155,7 +3155,7 @@ class TestNarrowedRedetection:
         """The other half of the same rule: `.items` is at the level the factor row sits at, so
         the row was never filtered out and a re-detection must still return it."""
         data, md = annotated_and_labeled
-        result = Duplicates().evaluate(data, per_target=True, metadata=md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(data, per_target=True, metadata=md, duplicate_factors=["capture_time"])
         rows = result.items.with_radius(4).data().filter(pl.col("methods").list.contains("factors"))
         assert rows["item_indices"].item().to_list() == [0, 1]
 
@@ -3207,7 +3207,7 @@ class TestAnnotationRelationsForVideo:
 def dataset_with_metadata(get_ic_dataset):
     """Four images, no two alike in pixels, whose factors collide on one identifying pair.
 
-    ``timestamp`` is near-unique -- the kind of factor a collision on actually means something.
+    ``capture_time`` is near-unique -- the kind of factor a collision on actually means something.
     ``weather`` is the counter-example the axis is opt-in for: everything shares a value.
     """
     rng = np.random.default_rng(11)
@@ -3215,10 +3215,10 @@ def dataset_with_metadata(get_ic_dataset):
     dataset = get_ic_dataset(
         images,
         metadata=[
-            {"timestamp": "2024-01-01T00:00:00", "weather": "rain"},
-            {"timestamp": "2024-01-01T00:00:00", "weather": "rain"},
-            {"timestamp": "2024-01-02T00:00:00", "weather": "rain"},
-            {"timestamp": "2024-01-03T00:00:00", "weather": "rain"},
+            {"capture_time": "2024-01-01T00:00:00", "weather": "rain"},
+            {"capture_time": "2024-01-01T00:00:00", "weather": "rain"},
+            {"capture_time": "2024-01-02T00:00:00", "weather": "rain"},
+            {"capture_time": "2024-01-03T00:00:00", "weather": "rain"},
         ],
     )
     return dataset, Metadata(dataset, exclude=["id"])
@@ -3235,7 +3235,7 @@ class TestFactorAxis:
 
     def test_identical_factor_rows_group(self, dataset_with_metadata):
         data, md = dataset_with_metadata
-        frame = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"]).data()
+        frame = Duplicates().evaluate(data, metadata=md, duplicate_factors=["capture_time"]).data()
         rows = frame.filter(pl.col("methods").list.contains("factors"))
         assert len(rows) == 1
         assert rows["item_indices"].item().to_list() == [0, 1]
@@ -3244,7 +3244,7 @@ class TestFactorAxis:
 
     def test_result_is_attributed_to_the_encoding(self, dataset_with_metadata):
         data, md = dataset_with_metadata
-        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["capture_time"])
         assert result.meta().state["encoding_digest"] == md.encoding_digest
 
     def test_unknown_factor_is_refused(self, dataset_with_metadata):
@@ -3255,7 +3255,7 @@ class TestFactorAxis:
         # error that does not say what was on offer leaves a typo indistinguishable from a
         # factor the container never carried.
         assert "not_a_factor" in str(excinfo.value)
-        assert "timestamp" in str(excinfo.value)
+        assert "capture_time" in str(excinfo.value)
 
     def test_a_factor_below_the_item_level_is_refused(self, get_mock_od_dataset):
         """A per-detection factor is null on the item rows, so reading it there would call every
@@ -3285,8 +3285,8 @@ class TestFactorAxis:
 
     def test_cardinality_is_reported_for_every_named_factor(self, dataset_with_metadata):
         data, md = dataset_with_metadata
-        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp", "weather"])
-        assert result.factor_cardinality == {"timestamp": 3, "weather": 1}
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["capture_time", "weather"])
+        assert result.factor_cardinality == {"capture_time": 3, "weather": 1}
         # Both factors have to agree, so the collision survives the second column.
         rows = result.data().filter(pl.col("methods").list.contains("factors"))
         assert rows["item_indices"].item().to_list() == [0, 1]
@@ -3298,25 +3298,25 @@ class TestFactorAxis:
     def test_a_factor_group_makes_no_claim_about_pixels_or_annotation(self, dataset_with_metadata):
         """`differs_on` is three-state, and a factor collision checks neither other axis."""
         data, md = dataset_with_metadata
-        frame = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"]).data()
+        frame = Duplicates().evaluate(data, metadata=md, duplicate_factors=["capture_time"]).data()
         rows = frame.filter(pl.col("methods").list.contains("factors"))
         assert rows["differs_on"].item() is None
 
     def test_naming_factors_without_metadata_is_refused(self, dataset_with_metadata):
         data, _ = dataset_with_metadata
         with pytest.raises(ValueError, match="metadata"):
-            Duplicates().evaluate(data, duplicate_factors=["timestamp"])
+            Duplicates().evaluate(data, duplicate_factors=["capture_time"])
 
     def test_the_axis_refuses_a_cross_dataset_call(self, dataset_with_metadata):
         """One metadata's item indices address one dataset; read as positions in the
         concatenation they would name the wrong items."""
         data, md = dataset_with_metadata
         with pytest.raises(ValueError, match="one dataset"):
-            Duplicates().evaluate(data, data, metadata=md, duplicate_factors=["timestamp"])
+            Duplicates().evaluate(data, data, metadata=md, duplicate_factors=["capture_time"])
 
     def test_factor_rows_survive_a_re_detection(self, dataset_with_metadata):
         data, md = dataset_with_metadata
-        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["capture_time"])
         rows = result.with_radius(4).data().filter(pl.col("methods").list.contains("factors"))
         assert rows["item_indices"].item().to_list() == [0, 1]
 
@@ -3324,9 +3324,9 @@ class TestFactorAxis:
         """`factor_cardinality` is None for "the axis did not run", so a view whose frame still
         holds the axis's rows must not report None -- that describes a pass that never happened."""
         data, md = dataset_with_metadata
-        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(data, metadata=md, duplicate_factors=["capture_time"])
         for view in (result.items, result.crossing, result.divergent()):
-            assert view.factor_cardinality == {"timestamp": 3}
+            assert view.factor_cardinality == {"capture_time": 3}
             assert view.factor_groups == [([0, 1], "factors")]
         # `items` keeps the factor rows, so the two agree about that view rather than one of them
         # claiming an axis the other's rows deny.
@@ -3342,7 +3342,7 @@ class TestFactorAxis:
         """Factor collision reads no pixels, so it is available to a run that hashes nothing."""
         data, md = dataset_with_metadata
         result = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0).evaluate(
-            data, metadata=md, duplicate_factors=["timestamp"]
+            data, metadata=md, duplicate_factors=["capture_time"]
         )
         rows = result.data().filter(pl.col("methods").list.contains("factors"))
         assert rows["item_indices"].item().to_list() == [0, 1]
@@ -3447,28 +3447,28 @@ class TestMetadataOnly:
 
     def test_metadata_alone_finds_factor_groups(self, dataset_with_metadata):
         _, md = dataset_with_metadata
-        result = Duplicates().evaluate(md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(md, duplicate_factors=["capture_time"])
         assert result.factor_groups == [([0, 1], "factors")]
-        assert result.factor_cardinality == {"timestamp": 3}
+        assert result.factor_cardinality == {"capture_time": 3}
 
     def test_metadata_alone_makes_no_pixel_claim(self, dataset_with_metadata):
         """Verifies that evaluating metadata alone reports only factor methods."""
         _, md = dataset_with_metadata
-        frame = Duplicates().evaluate(md, duplicate_factors=["timestamp"]).data()
+        frame = Duplicates().evaluate(md, duplicate_factors=["capture_time"]).data()
         assert frame["methods"].explode().unique().to_list() == ["factors"]
         assert frame["dup_type"].unique().to_list() == ["factors"]
 
     def test_the_result_records_no_statistics(self, dataset_with_metadata):
         """Verifies that no calculation or cluster results are recorded."""
         _, md = dataset_with_metadata
-        result = Duplicates().evaluate(md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(md, duplicate_factors=["capture_time"])
         assert result.calculation_results is None
         assert result.cluster_result is None
 
     def test_the_result_is_attributed_to_the_encoding(self, dataset_with_metadata):
         """Verifies that the result records the metadata encoding digest."""
         _, md = dataset_with_metadata
-        result = Duplicates().evaluate(md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(md, duplicate_factors=["capture_time"])
         assert result.meta().state["encoding_digest"] == md.encoding_digest
 
     def test_naming_no_factors_is_refused(self, dataset_with_metadata):
@@ -3480,38 +3480,38 @@ class TestMetadataOnly:
     def test_a_second_input_is_refused(self, dataset_with_metadata):
         _, md = dataset_with_metadata
         with pytest.raises(ValueError, match="one dataset"):
-            Duplicates().evaluate(md, md, duplicate_factors=["timestamp"])
+            Duplicates().evaluate(md, md, duplicate_factors=["capture_time"])
 
     def test_a_conflicting_metadata_is_refused(self, dataset_with_metadata, metadata_agreeing_on_one_factor):
         """Verifies that passing different metadata objects to data and metadata raises ValueError."""
         _, md = dataset_with_metadata
         _, other = metadata_agreeing_on_one_factor
         with pytest.raises(ValueError, match="two different"):
-            Duplicates().evaluate(md, metadata=other, duplicate_factors=["timestamp"])
+            Duplicates().evaluate(md, metadata=other, duplicate_factors=["capture_time"])
 
     def test_passing_the_same_metadata_twice_is_allowed(self, dataset_with_metadata):
         """Verifies that passing the same metadata instance to data and metadata is accepted."""
         _, md = dataset_with_metadata
-        result = Duplicates().evaluate(md, metadata=md, duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(md, metadata=md, duplicate_factors=["capture_time"])
         assert result.factor_groups == [([0, 1], "factors")]
 
     def test_a_target_level_is_refused(self, dataset_with_metadata):
         """Verifies that requesting non-item levels for metadata evaluation raises ValueError."""
         _, md = dataset_with_metadata
         with pytest.raises(ValueError, match="item"):
-            Duplicates().evaluate(md, per_target=True, duplicate_factors=["timestamp"])
+            Duplicates().evaluate(md, per_target=True, duplicate_factors=["capture_time"])
         with pytest.raises(ValueError, match="item"):
-            Duplicates().evaluate(md, levels="target", duplicate_factors=["timestamp"])
+            Duplicates().evaluate(md, levels="target", duplicate_factors=["capture_time"])
 
     def test_the_item_level_may_be_asked_for(self, dataset_with_metadata):
         _, md = dataset_with_metadata
-        result = Duplicates().evaluate(md, levels="item", duplicate_factors=["timestamp"])
+        result = Duplicates().evaluate(md, levels="item", duplicate_factors=["capture_time"])
         assert result.factor_groups == [([0, 1], "factors")]
 
     def test_deduplicate_plans_from_metadata_alone(self, dataset_with_metadata):
         """Verifies that deduplicate plans from a metadata-only result."""
         _, md = dataset_with_metadata
-        plan = Duplicates().evaluate(md, duplicate_factors=["timestamp"]).deduplicate(dup_types="factors")
+        plan = Duplicates().evaluate(md, duplicate_factors=["capture_time"]).deduplicate(dup_types="factors")
         assert plan == RemovalPlan([1])
 
     def test_no_hash_radius_warning_is_raised(self, dataset_with_metadata):
@@ -3519,17 +3519,17 @@ class TestMetadataOnly:
         _, md = dataset_with_metadata
         with warnings.catch_warnings():
             warnings.simplefilter("error", FutureWarning)
-            Duplicates().evaluate(md, duplicate_factors=["timestamp"])
+            Duplicates().evaluate(md, duplicate_factors=["capture_time"])
 
     def test_a_metadata_without_a_level_schema_is_refused(self, dataset_with_metadata):
         """Verifies that metadata lacking an item-level schema raises TypeError."""
         _, md = dataset_with_metadata
 
         class BareMetadata:
-            factor_names = ["timestamp"]
+            factor_names = ["capture_time"]
             factor_data = np.zeros((4, 1), dtype=np.intp)
             class_labels = np.zeros(4, dtype=np.intp)
             is_binned = [False]
 
         with pytest.raises(TypeError, match="dataeval.Metadata"):
-            Duplicates().evaluate(cast(Any, BareMetadata()), duplicate_factors=["timestamp"])
+            Duplicates().evaluate(cast(Any, BareMetadata()), duplicate_factors=["capture_time"])

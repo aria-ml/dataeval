@@ -370,6 +370,7 @@ locale = "en-us"
 extend-ignore-re = [
   "`[0-9a-fA-F]{7,40}`",
   "get_cluster_labelling_at_cut",  # vendored fast_hdbscan API name
+  "MISPmicrosectime",  # MISB ST 0604 timestamp identifier
 ]
 
 [tool.typos.default.extend-words]

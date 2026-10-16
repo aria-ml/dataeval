@@ -53,6 +53,14 @@ class TestApplyingCorrections:
     def test_a_boolean_is_not_the_number_one(self):
         assert apply([True, 1], [Remap("d", {1: "one"})]) == [True, "one"]
 
+    def test_a_number_key_matches_the_same_number_stored_either_way(self):
+        """A float column holds the dataset's ``-1`` as ``-1.0``, and a key can't be written twice."""
+        assert apply([-1, -1.0, np.float64(-1.0), np.int64(-1)], [Remap("d", {-1: "none"})]) == ["none"] * 4
+        assert apply([-1, -1.0], [Remap("d", {-1.0: "none"})]) == ["none", "none"]
+
+    def test_a_number_key_does_not_match_a_boolean(self):
+        assert apply([False, 0.0], [Remap("d", {0.0: "zero"})]) == [False, "zero"]
+
     def test_a_rescale_converts_the_values_in_its_range(self):
         assert apply([500, 1500], [Rescale("d", over=(0, 1000), multiply=0.3048)]) == [152.4, 1500]
 

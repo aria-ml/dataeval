@@ -201,9 +201,8 @@ class DriftKnownDomains(ChunkableMixin, BaseDrift[_DriftKnownDomainsStats]):
 
     In ``domains=``, a tuple is always a range and a list is a group of values, as in
     :class:`~dataeval.types.Remap`: ``(1, 2)`` is ``1 <= x < 2``, so write ``[1, 2]`` for
-    two camera IDs. Exact values match the factor's type, and a factor holds one type: in
-    a column of ``[1.0, 2.5, 3]`` every value is a float, so ``3`` does not match and
-    ``3.0`` does.
+    two camera IDs. A number matches however the factor stores it, so ``3`` matches ``3.0``
+    in a float column, but a number never matches a boolean.
 
     Examples
     --------

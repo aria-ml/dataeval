@@ -21,6 +21,7 @@ from numpy.typing import NDArray
 
 from dataeval._metadata._columns import split_by_dimensionality
 from dataeval._metadata._input import build_index2label, reject_length_mismatch
+from dataeval._metadata._known import reject_invalid_known
 from dataeval._metadata._structurers import FactorsStructurer, SourceIndexRows
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import Array1D, FactorLevel, SourceIndex
@@ -134,6 +135,7 @@ def _load_factors_by_length(  # noqa: C901
     # classification one — counted as rows, a table of detections never reaches the
     # grouped split and two detections of one image can land in different folds.
     md._count = int(len(np.unique(srcidx)))
+    reject_invalid_known((n, lvl, v) for lvl, cols in data.factors.items() for n, v in cols.items())
     md._adopt(structurer, data)
 
 
@@ -185,4 +187,5 @@ def _load_factors_by_source_index(
     # rather than np.unique, which would re-sort what parse already left sorted.
     named_items = rows.item_ids if len(rows.item_positions) else rows.label_items
     md._count = int(np.count_nonzero(np.diff(named_items))) + 1 if len(named_items) else 0
+    reject_invalid_known((n, lvl, v) for lvl, cols in data.factors.items() for n, v in cols.items())
     md._adopt(structurer, data)

@@ -28,6 +28,8 @@ __all__ = [
     "FactorInfo",
     "FactorLevel",
     "FactorLevelSchema",
+    "KNOWN_FACTORS",
+    "KnownFactor",
     "LevelSpec",
     "MappingOutput",
     "MetadataJson",
@@ -80,6 +82,7 @@ from dataeval.types._factors import (
     Unusable,
 )
 from dataeval.types._index import SourceIndex
+from dataeval.types._known_factors import KNOWN_FACTORS, KnownFactor
 from dataeval.types._ontology import AlignmentRelation, Correspondence, OntologyConcept
 from dataeval.types._output import (
     BaseCollectionMixin,
