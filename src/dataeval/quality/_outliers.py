@@ -20,8 +20,17 @@ from dataeval.core import (
     compute_cluster_stats,
 )
 from dataeval.core._combination_scores import _named_groups
+from dataeval.exceptions import MaiteShapeError
 from dataeval.flags import ImageStats
-from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, MetadataLike, Threshold, ThresholdLike
+from dataeval.protocols import (
+    AnnotatedDataset,
+    ArrayLike,
+    Dataset,
+    FeatureExtractor,
+    MetadataLike,
+    Threshold,
+    ThresholdLike,
+)
 from dataeval.quality._factor_stats import eligible_factors, factor_kind, factor_levels, factor_stats
 from dataeval.quality._outliers_neighbors import neighbor_checks, restratified, score_neighbors
 from dataeval.quality._outliers_rows import (
@@ -675,23 +684,24 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         >>> results = outliers.evaluate(dataset, per_target=True)
         >>> summary = results.aggregate_by_item()
         >>> summary.head(10)
-        shape: (10, 14)
-        ┌────────────┬──────────────┬────────────┬──────────┬───┬─────┬─────┬───────┬───────┐
-        │ item_index ┆ target_index ┆ brightness ┆ contrast ┆ … ┆ std ┆ var ┆ zeros ┆ Total │
-        │ ---        ┆ ---          ┆ ---        ┆ ---      ┆   ┆ --- ┆ --- ┆ ---   ┆ ---   │
-        │ i64        ┆ i64          ┆ u32        ┆ u32      ┆   ┆ u32 ┆ u32 ┆ u32   ┆ u32   │
-        ╞════════════╪══════════════╪════════════╪══════════╪═══╪═════╪═════╪═══════╪═══════╡
-        │ 0          ┆ null         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
-        │ 2          ┆ null         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
-        │ 7          ┆ null         ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 7          ┆ 0            ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 11         ┆ null         ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 11         ┆ 0            ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 18         ┆ null         ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 18         ┆ 0            ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 18         ┆ 1            ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
-        │ 19         ┆ 0            ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 2     │
-        └────────────┴──────────────┴────────────┴──────────┴───┴─────┴─────┴───────┴───────┘
+        shape: (10, 22)
+        ┌────────────┬────────────┬────────────┬────────────┬───┬──────────┬──────────┬────────────┬───────┐
+        │ item_index ┆ target_ind ┆ instance_b ┆ instance_c ┆ … ┆ unit_std ┆ unit_var ┆ unit_zeros ┆ Total │
+        │ ---        ┆ ex         ┆ rightness  ┆ ontrast    ┆   ┆ ---      ┆ ---      ┆ ---        ┆ ---   │
+        │ i64        ┆ ---        ┆ ---        ┆ ---        ┆   ┆ u32      ┆ u32      ┆ u32        ┆ u32   │
+        │            ┆ i64        ┆ u32        ┆ u32        ┆   ┆          ┆          ┆            ┆       │
+        ╞════════════╪════════════╪════════════╪════════════╪═══╪══════════╪══════════╪════════════╪═══════╡
+        │ 0          ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 1          ┆ 1     │
+        │ 2          ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 1          ┆ 1     │
+        │ 7          ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 1        ┆ 1        ┆ 0          ┆ 8     │
+        │ 7          ┆ 0          ┆ 1          ┆ 1          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 8     │
+        │ 11         ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 1        ┆ 1        ┆ 0          ┆ 8     │
+        │ 11         ┆ 0          ┆ 1          ┆ 1          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 8     │
+        │ 18         ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 1        ┆ 1        ┆ 0          ┆ 8     │
+        │ 18         ┆ 0          ┆ 1          ┆ 1          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 8     │
+        │ 18         ┆ 1          ┆ 1          ┆ 1          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 8     │
+        │ 19         ┆ 0          ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 2     │
+        └────────────┴────────────┴────────────┴────────────┴───┴──────────┴──────────┴────────────┴───────┘
         """
         if "dataset_index" in self.data().columns:
             raise ValueError("Aggregation by item only works with output from a single dataset.")
@@ -856,7 +866,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             rarity=rarity,
             scored=scored,
             order=order,
-        )
+        )._attach(self._dataset, self._metadata)
 
     def _flag_scored(
         self, scored: Sequence[_ScoredCheck], threshold: Any
@@ -1127,7 +1137,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
             rarity=_narrowed(self._rarity, restricted),
             scored=_kept_checks(self.scored, restricted),
             order=_narrowed_rows(self._order, restricted),
-        )
+        )._attach(self._dataset, self._metadata)
 
     def _tracking_level(self, kind: FactorLevel | None) -> Self:
         """Return the view of one tracking level, which is empty on a result that is not tracking."""
@@ -1763,6 +1773,16 @@ def _detect_outliers(  # noqa: C901
     # Level sits between the key and the metric: it is part of which row this is, so two
     # readings of one item at different levels are ordered rather than left tied.
     return df.sort(["item_index", "target_index", "level", "metric_name"]), populations
+
+
+def _annotated_metadata(data: Any) -> Metadata | None:
+    """Build the metadata of a dataset with labels and datum metadata; None for images alone, which have none."""
+    if not isinstance(data, AnnotatedDataset):
+        return None
+    try:
+        return Metadata(data)
+    except MaiteShapeError:
+        return None
 
 
 def _check_metadata_evaluate_preconditions(data: Any, other: Sequence[Any], has_extractor: bool) -> None:
@@ -3229,6 +3249,7 @@ class Outliers(Evaluator):
         factors: Sequence[str] | None,
         strata: Sequence[str] | None,
         checks: "_Requested",
+        built: bool = False,
     ) -> OutliersOutput[Any]:
         """Threshold a metadata's ordered factors, each against the rows at its own level.
 
@@ -3237,7 +3258,7 @@ class Outliers(Evaluator):
         statistics. Which levels are judged is decided by the plan `levels=` or the flags resolve to.
         """
         labels = checked_sole_metadata(data, metadata, "Outliers")
-        _check_metadata_evaluate_preconditions(data, other, self.extractor is not None)
+        _check_metadata_evaluate_preconditions(data, other, self.extractor is not None and not built)
         tracking = "sequence" in data.levels
         _refuse_no_flag(levels, per_image, per_target)
         plan = _plan_for(levels, per_image, per_target, tracking, "metadata")
@@ -3258,6 +3279,7 @@ class Outliers(Evaluator):
             others=rarity or scores,
         )
         result = self.from_stats(factor_stats(data, chosen), per_image=True, per_target=True)
+        result._attach(metadata=data)
         result.tracking = tracking
         result.score_input = read_score_input(data, categorical, groups, given, checks.kinds, neighbors)
         _attach_neighbors(result, neighbors)
@@ -3266,6 +3288,60 @@ class Outliers(Evaluator):
         if per_class:
             return result.classwise(labels)
         return result._redetect(scored=result._rescored({})) if scores else result
+
+    def _evaluate_annotated(
+        self,
+        data: Any,
+        built: Metadata,
+        *,
+        per_image: bool,
+        per_target: bool,
+        per_class: bool,
+        metadata: MetadataLike | None,
+        strata: Sequence[str] | None,
+    ) -> OutliersOutput[Any]:
+        """Judge a dataset through the metadata a user would have built for it, and attach that metadata.
+
+        Equivalent to ``Metadata(data)`` with ``add_factors`` of the dataset's statistics, then
+        :meth:`evaluate` of that metadata, so a dataset can never be judged in a way the metadata could not.
+        `metadata` supplies the classes and strata, as it does for any dataset.
+        """
+        self.stats = checked_compute_stats(
+            [data],
+            stats=self.flags,
+            caller=type(self).__name__,
+            per_image=per_image,
+            per_target=per_target,
+            normalize_pixel_values=False,
+        )[0]
+        before = set(built.factor_names)
+        # A factor is one value per row; the vector-valued statistics (histogram, percentiles) are not thresholded.
+        scalar = {name: values for name, values in self.stats["stats"].items() if np.ndim(values) == 1}
+        built.add_factors(cast(Any, {**self.stats, "stats": scalar}))
+        # A stat that is a flag rather than a quantity, such as an invalid box, is not thresholded.
+        added = [name for name in built.factor_names if name not in before and factor_kind(built, name) == "ordered"]
+        result = self._evaluate_metadata(
+            built,
+            (),
+            levels=None,
+            per_image=per_image,
+            per_target=per_target,
+            per_class=False,
+            metadata=None,
+            factors=added,
+            strata=None,
+            checks=_Requested(None, None, None, None),
+            built=True,
+        )
+        if strata is not None:
+            result = result.stratified(cast(Metadata, metadata), *strata)
+        elif per_class:
+            result = result.classwise(cast(MetadataLike, metadata))
+        if self.extractor is not None:
+            result.cluster_stats = self._get_cluster_outliers(data)[1]
+            result.cluster_threshold = self.cluster_threshold
+            result = result._redetect()
+        return result._attach(data, built)
 
     def _evaluate_single(
         self,
@@ -3279,6 +3355,17 @@ class Outliers(Evaluator):
     ) -> SingleOutliersOutput:
         """Single-dataset evaluate implementation."""
         self._validate_evaluate_inputs(per_image, per_target, per_class, metadata, strata)
+
+        if self.flags != ImageStats.NONE and (built := _annotated_metadata(data)) is not None:
+            return self._evaluate_annotated(
+                data,
+                built,
+                per_image=per_image,
+                per_target=per_target,
+                per_class=per_class,
+                metadata=metadata,
+                strata=strata,
+            )
 
         outliers_dfs: list[pl.DataFrame] = []
         stats_result: StatsResult | None = None
@@ -3313,7 +3400,7 @@ class Outliers(Evaluator):
             cluster_threshold=self.cluster_threshold,
             strata=row_strata,
             populations=populations,
-        )
+        )._attach(data)
 
     def _evaluate_multi(
         self,

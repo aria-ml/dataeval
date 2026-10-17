@@ -15,7 +15,7 @@ import logging
 from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import partial, wraps
-from typing import Any, Generic, ParamSpec, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, ParamSpec, Self, TypeVar, overload
 
 import numpy as np
 import polars as pl
@@ -23,17 +23,60 @@ import polars as pl
 from dataeval._log import get_logger
 from dataeval.types._execution import ExecutionMetadata, __version__
 
+if TYPE_CHECKING:
+    from dataeval import Metadata
+    from dataeval.protocols import Dataset
+
 _T = TypeVar("_T", covariant=True)
+
+# Instance attributes that hold what an evaluator ran over, not what it found. Never pickled, never part of `data()`.
+_SOURCE_ATTRS = ("_dataset", "_metadata")
 
 
 class Output(Generic[_T]):
     """Base class for all evaluator output types."""
 
     _meta: ExecutionMetadata | None = None
+    _dataset: "Dataset[Any] | None" = None
+    _metadata: "Metadata | None" = None
 
     def data(self) -> _T:
         """Return the output data."""
         ...
+
+    @property
+    def dataset(self) -> "Dataset[Any] | None":
+        """The dataset the evaluator ran over, or None when it did not keep one.
+
+        Falls back to :attr:`~dataeval.Metadata.dataset` of :attr:`metadata`. Holding it keeps the dataset
+        alive for as long as this output lives. It is not pickled, so it is None on an unpickled or deep-copied
+        output.
+        """
+        if self._dataset is not None:
+            return self._dataset
+        return None if self._metadata is None else self._metadata.dataset
+
+    @property
+    def metadata(self) -> "Metadata | None":
+        """The :class:`~dataeval.Metadata` the evaluator built or was given, or None when there was none.
+
+        Hand it to another evaluator, or add factors to it and judge it again. An evaluator of images alone or of
+        several datasets has none.
+
+        Not to be confused with :meth:`meta`, which records how the evaluator was run. It is not pickled, so it
+        is None on an unpickled or deep-copied output.
+        """
+        return self._metadata
+
+    def _attach(self, dataset: "Dataset[Any] | None" = None, metadata: "Metadata | None" = None) -> Self:
+        """Record what the evaluator ran over; returns self."""
+        object.__setattr__(self, "_dataset", dataset)
+        object.__setattr__(self, "_metadata", metadata)
+        return self
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Drop the dataset and metadata, which are a reference to the caller's data and not a result."""
+        return {k: v for k, v in self.__dict__.items() if k not in _SOURCE_ATTRS}
 
     def meta(self) -> ExecutionMetadata:
         """
@@ -136,7 +179,7 @@ class DictOutput(Output[dict[str, Any]]):
         -------
         dict[str, Any]
         """
-        return {k: v for k, v in self.__dict__.items() if k != "_meta"}
+        return {k: v for k, v in self.__dict__.items() if k != "_meta" and k not in _SOURCE_ATTRS}
 
     @staticmethod
     def _format_value(v: Any) -> str:
@@ -227,6 +270,24 @@ _P = ParamSpec("_P")
 _R = TypeVar("_R", bound=Output)
 
 
+def _record_source(result: Output[Any], values: Sequence[Any]) -> None:
+    """Attach what an evaluator was handed, where the evaluator did not attach what it built.
+
+    A :class:`~dataeval.Metadata` among `values` is the output's metadata. The one
+    :class:`~dataeval.protocols.AnnotatedDataset` among them is its dataset; two or more are ambiguous
+    and none is attached. Arrays, labels and embeddings are inputs, not a dataset.
+    """
+    from dataeval import Metadata
+    from dataeval.protocols import AnnotatedDataset
+
+    if result._metadata is None:
+        metadata = next((v for v in values if isinstance(v, Metadata)), None)
+        object.__setattr__(result, "_metadata", metadata)
+    if result._dataset is None:
+        datasets = [v for v in values if not isinstance(v, Metadata) and isinstance(v, AnnotatedDataset)]
+        object.__setattr__(result, "_dataset", datasets[0] if len(datasets) == 1 else None)
+
+
 def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | None = None) -> Callable[_P, _R]:  # noqa: C901
     """Stamp Output classes with runtime metadata."""
     if fn is None:
@@ -287,6 +348,7 @@ def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | N
         # Update output with recorded metadata
         metadata = ExecutionMetadata(name, time, duration, arguments, state_attrs, __version__)
         object.__setattr__(result, "_meta", metadata)
+        _record_source(result, [*(args[1:] if is_method else args), *kwargs.values()])
         return result
 
     return wrapper

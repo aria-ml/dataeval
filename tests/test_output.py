@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -185,3 +186,101 @@ class TestCollectionOutput:
         assert t.meta() != {}
         assert len(t) == 1
         assert t.data() == self.list_data
+
+
+@pytest.mark.required
+class TestOutputSource:
+    def test_defaults_to_none(self):
+        out = MockOutput(1, True, "a")
+        assert out.dataset is None
+        assert out.metadata is None
+
+    def test_attach_sets_both_and_dataset_falls_back_to_metadata(self):
+        ds: Any = object()
+        md: Any = type("Md", (), {"dataset": "from-metadata"})()
+        assert MockOutput(1, True, "a")._attach(dataset=ds, metadata=md).dataset is ds
+        assert MockOutput(1, True, "a")._attach(metadata=md).dataset == "from-metadata"
+
+    def test_source_is_not_data_and_is_not_pickled(self):
+        import copy
+        import pickle
+
+        md: Any = type("Md", (), {"dataset": None})()
+        out = MockOutput(1, True, "a")._attach(dataset=cast(Any, [1, 2]), metadata=md)
+        assert set(out.data()) == {"test1", "test2", "test3"}
+        for clone in (pickle.loads(pickle.dumps(out)), copy.deepcopy(out)):
+            assert clone.dataset is None
+            assert clone.metadata is None
+            assert clone.test1 == 1
+
+
+class _Annotated:
+    """The smallest thing `AnnotatedDataset` accepts."""
+
+    metadata = {"id": "d"}
+
+    def __len__(self) -> int:
+        return 0
+
+    def __getitem__(self, i: int):
+        raise IndexError(i)
+
+
+class _Evaluator:
+    @set_metadata
+    def evaluate(self, *inputs: Any, **named: Any) -> MockOutput:
+        return MockOutput(1, True, "a")
+
+
+@pytest.mark.required
+class TestSetMetadataRecordsSource:
+    def test_the_one_annotated_dataset_handed_in_is_attached(self):
+        ds = _Annotated()
+        out = _Evaluator().evaluate(ds, np.zeros(3), [1, 2])
+        assert out.dataset is ds
+        assert out.metadata is None
+
+    def test_two_datasets_are_ambiguous_and_attach_nothing(self):
+        assert _Evaluator().evaluate(_Annotated(), _Annotated()).dataset is None
+
+    def test_a_metadata_is_attached_and_names_its_dataset(self, get_ic_dataset):
+        from dataeval import Metadata
+
+        ds = get_ic_dataset(5)
+        md = Metadata(ds)
+        out = _Evaluator().evaluate(data=md)
+        assert out.metadata is md
+        assert out.dataset is ds
+
+    def test_what_the_evaluator_attached_is_kept(self):
+        class Keeps:
+            @set_metadata
+            def evaluate(self, data: Any) -> MockOutput:
+                return MockOutput(1, True, "a")._attach(dataset=cast(Any, "mine"))
+
+        assert Keeps().evaluate(_Annotated()).dataset == "mine"
+
+
+@pytest.mark.required
+class TestEvaluatorsRecordSource:
+    @pytest.mark.parametrize("name", ["Balance", "Diversity", "Parity", "Coverage", "Duplicates"])
+    def test_a_dataset_rides_on_the_output_of_each_evaluator(self, name, get_ic_dataset):
+        from dataeval import Metadata
+        from dataeval.bias import Balance, Diversity, Parity
+        from dataeval.quality import Duplicates
+        from dataeval.scope import Coverage
+
+        rng = np.random.default_rng(0)
+        ds = get_ic_dataset(
+            list(rng.random((30, 3, 8, 8))), None, metadata=[{"a": i % 3, "b": i % 5} for i in range(30)]
+        )
+        evaluators = {
+            "Balance": lambda: Balance().evaluate(ds),
+            "Diversity": lambda: Diversity().evaluate(ds),
+            "Parity": lambda: Parity().evaluate(ds),
+            "Coverage": lambda: Coverage().evaluate(ds, embeddings=rng.random((30, 4))),
+            "Duplicates": lambda: Duplicates().evaluate(ds),
+        }
+        out = evaluators[name]()
+        assert out.dataset is ds
+        assert isinstance(out.metadata, Metadata) is (name != "Duplicates")
