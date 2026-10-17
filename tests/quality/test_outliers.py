@@ -194,7 +194,7 @@ class TestOutliers:
         """Test that per_image and per_target parameters are properly passed to calculate."""
         images = np.random.random((10, 3, 64, 64))
         # Create dataset with some bounding boxes
-        dataset = get_od_dataset(images, 2, True, {0: [(10, 10, 30, 30)], 5: [(20, 20, 40, 40)]})
+        dataset = get_od_dataset(images, 2, True, {0: [(10, 10, 30, 30)] * 2, 5: [(20, 20, 40, 40)] * 2})
 
         # Test with per_image=True, per_target=True (default)
         outliers1 = Outliers(flags=ImageStats.DIMENSION)
@@ -290,7 +290,7 @@ class TestOutliers:
         """Test that target_id column is kept when there are target-level outliers."""
         images = np.random.random((10, 3, 64, 64))
         # Create dataset with bounding boxes
-        dataset = get_od_dataset(images, 2, True, {0: [(0, 0, 64, 64)], 5: [(0, 0, 64, 64)]})
+        dataset = get_od_dataset(images, 2, True, {0: [(0, 0, 64, 64)] * 2, 5: [(0, 0, 64, 64)] * 2})
 
         # A constant threshold flags the full-image boxes whatever the population size
         outliers = Outliers(flags=ImageStats.DIMENSION, outlier_threshold=ConstantThreshold(upper=63.0))
@@ -2117,3 +2117,86 @@ class TestOutliersOverMetadata:
             warnings.simplefilter("always")
             Outliers().evaluate(md)
         assert not [w for w in caught if "binned automatically" in str(w.message)]
+
+
+@pytest.mark.required
+class TestOutliersAttachesItsSource:
+    """What the evaluator ran over rides on the output as `dataset` and `metadata`, and never in a pickle."""
+
+    @staticmethod
+    def _od(get_od_dataset):
+        images = np.random.default_rng(0).random((20, 3, 16, 16))
+        images[7] = 5.0
+        return get_od_dataset(list(images), 2, True)
+
+    def test_an_annotated_dataset_attaches_the_metadata_it_was_judged_through(self, get_od_dataset):
+        ds = self._od(get_od_dataset)
+        result = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(ds)
+        assert result.dataset is ds
+        assert isinstance(result.metadata, Metadata)
+        assert result.metadata.dataset is ds
+
+    def test_the_metadata_holds_the_statistics_add_factors_would_have_stored(self, get_od_dataset):
+        ds = self._od(get_od_dataset)
+        by_hand = Metadata(ds)
+        by_hand.add_factors(
+            compute_stats(
+                ds, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, normalize_pixel_values=False
+            )
+        )
+        result = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(ds, per_target=True)
+        assert result.metadata is not None
+        assert set(result.metadata.factor_names) == set(by_hand.factor_names)
+        assert set(result.data()["metric_name"].cast(pl.String)) <= {"unit_mean", "instance_mean"}
+
+    def test_a_dataset_is_judged_as_the_metadata_is(self, get_od_dataset):
+        ds = self._od(get_od_dataset)
+        result = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(ds, per_target=True)
+        assert result.metadata is not None
+        again = Outliers().evaluate(result.metadata, factors=["unit_mean", "instance_mean"], per_target=True)
+        assert result.data().to_dicts() == again.data().to_dicts()
+
+    def test_redetection_keeps_the_attachment(self, get_od_dataset):
+        ds = self._od(get_od_dataset)
+        result = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(ds)
+        for derived in (result.with_threshold(("zscore", 1.0)), result.itemwise()):
+            assert derived.dataset is ds
+            assert derived.metadata is result.metadata
+
+    def test_a_pickle_drops_the_attachment_and_still_redetects(self, get_od_dataset):
+        import pickle
+
+        result = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(self._od(get_od_dataset))
+        loaded = pickle.loads(pickle.dumps(result))
+        assert loaded.dataset is None
+        assert loaded.metadata is None
+        assert (
+            loaded.with_threshold(("zscore", 1.0)).data().to_dicts()
+            == result.with_threshold(("zscore", 1.0)).data().to_dicts()
+        )
+
+    def test_images_alone_attach_a_dataset_and_no_metadata(self):
+        images = list(np.random.default_rng(0).random((20, 3, 16, 16)))
+        result = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(images)
+        assert result.dataset is images
+        assert result.metadata is None
+
+    def test_several_datasets_attach_nothing(self, get_od_dataset):
+        a, b = self._od(get_od_dataset), self._od(get_od_dataset)
+        result = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(a, b)
+        assert result.dataset is None
+        assert result.metadata is None
+
+    def test_a_metadata_passed_in_is_the_one_attached(self, get_od_dataset):
+        ds = self._od(get_od_dataset)
+        md = Metadata(ds)
+        md.add_factors(compute_stats(ds, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=False))
+        result = Outliers().evaluate(md, factors=["mean"])
+        assert result.metadata is md
+        assert result.dataset is ds
+
+
+@pytest.mark.required
+def test_an_empty_array_is_judged_as_images_and_attaches_no_metadata():
+    result = Outliers().evaluate(np.array([]))
+    assert result.metadata is None

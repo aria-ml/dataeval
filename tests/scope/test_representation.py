@@ -139,3 +139,14 @@ class TestInternalEdges:
         assert len(rows) == 1
         assert rows[0]["actual"] == 0.0
         assert rows[0]["concept"] == "owl"
+
+
+@pytest.mark.required
+class TestSource:
+    def test_a_dataset_and_the_metadata_built_for_it_ride_on_the_output(self):
+        from dataeval import Metadata
+
+        ds = ClassificationDataset({"cat": 8, "dog": 2, "owl": 1}, ANIMAL_LEAVES)
+        res = Representation(animal_ontology()).evaluate(ds)
+        assert res.dataset is ds
+        assert isinstance(res.metadata, Metadata)
