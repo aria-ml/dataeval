@@ -181,6 +181,7 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
         "factors_by_level": {level: sorted(names) for level, names in md._factors_by_level.items()},
         "index2label": {str(index): label for index, label in md._index2label.items()},
         "count": int(md._count),
+        "has_class_labels": md._has_class_labels,
         "dropped_factors": {name: list(reasons) for name, reasons in md._dropped_factors.items()},
         # The roll-ups, keyed on the column each produced and in the order they ran. The
         # columns themselves are already in the store; this is what says *how* they were
@@ -507,6 +508,9 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
         md._factors_by_level.setdefault(level, set())
     md._index2label = {int(index): label for index, label in manifest["index2label"].items()}
     md._count = int(manifest["count"])
+    # Optional, so an archive written before this existed restores as labeled, which is
+    # what every such archive was.
+    md._has_class_labels = bool(manifest.get("has_class_labels", True))
     md._dropped_factors = {name: list(reasons) for name, reasons in manifest["dropped_factors"].items()}
     md._aggregated_from = dict(manifest["aggregated_from"])
     md._aggregations = aggregations_from_list(manifest.get("aggregations", []))

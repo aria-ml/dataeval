@@ -148,14 +148,14 @@ class ClassBalance(Operation):
         # Use core label_stats function
         stats = label_stats(class_labels, item_indices, index2label, image_count=self._num_images)
 
-        # Convert image_indices_per_class to the format we need
-        images_per_class = {k: list(v) for k, v in stats["image_indices_per_class"].items()}
+        # label_stats reports every class in index2label; balancing only sees classes present in this view
+        images_per_class = {k: list(v) for k, v in stats["image_indices_per_class"].items() if v}
 
         # Get classes_per_image directly from stats - convert to dict for backwards compatibility
         classes_per_image = {i: list(classes) for i, classes in enumerate(stats["classes_per_image"]) if classes}
 
         # Compute class frequencies from image counts
-        class_freqs = {k: v / self._num_images for k, v in stats["image_counts_per_class"].items()}
+        class_freqs = {k: v / self._num_images for k, v in stats["image_counts_per_class"].items() if v}
 
         # Get empty image indices
         empty_image_indices = list(stats["empty_image_indices"])

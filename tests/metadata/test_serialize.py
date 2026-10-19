@@ -250,6 +250,14 @@ class TestFieldCoverage:
             else:
                 assert mine == theirs, name
 
+    @pytest.mark.parametrize("labels", [None, [0, 1, 1]])
+    def test_round_trip_keeps_whether_class_labels_were_supplied(self, tmp_path, labels):
+        original = Metadata.from_factors({"x": np.array([1.0, 2.0, 3.0])}, class_labels=labels)
+
+        back = _round_trip(original, None, tmp_path)
+
+        assert back._has_class_labels is (labels is not None)
+
     def test_the_store_matches_field_by_field(self, tmp_path):
         """Same, one level down: the store is compared by value, so its fields must line up."""
         dataset = _od_dataset()

@@ -730,3 +730,165 @@ class TestProducerDeclaredCategorical:
             encoding = md.factor_info[name].encoding
             assert isinstance(encoding, LevelSpec)
             assert encoding.provenance == "declared"
+
+
+@pytest.mark.required
+class TestFactorStats:
+    def test_factor_stats_basic(self):
+        """Basic factor_stats computes polars describe on original factors."""
+        md = Metadata.from_factors({
+            "temp": np.array([10.0, 20.0, 30.0]),
+            "brightness": np.array([0.1, 0.5, 0.9]),
+        })
+        desc = md.factor_stats()
+
+        assert isinstance(desc, pl.DataFrame)
+        # Column names: statistic and the factor columns (no reserved columns)
+        assert desc.columns == ["statistic", "brightness", "temp"]
+
+        # Check statistics values
+        means = desc.filter(pl.col("statistic") == "mean")
+        assert float(means["temp"][0]) == 20.0
+        assert float(means["brightness"][0]) == pytest.approx(0.5)
+
+        counts = desc.filter(pl.col("statistic") == "count")
+        assert float(counts["temp"][0]) == 3.0
+
+    def test_factor_stats_excludes_companion_and_reserved_columns(self):
+        """Binned/digitized companion columns and reserved columns are strictly excluded."""
+        md = Metadata.from_factors({
+            "temp": np.linspace(10, 50, 25),
+        })
+        # Force binning by accessing factor_data
+        _ = md.factor_data
+
+        desc = md.factor_stats()
+        assert isinstance(desc, pl.DataFrame)
+        assert desc.columns == ["statistic", "temp"]
+
+        # Ensure companion and reserved columns are not present
+        for col in ("temp↕", "temp#", "item_index", "level"):
+            assert col not in desc.columns
+
+    def test_factor_stats_named_factors(self):
+        """Selecting specific factors by name."""
+        md = Metadata.from_factors({
+            "a": np.array([1.0, 2.0, 3.0]),
+            "b": np.array([10.0, 20.0, 30.0]),
+        })
+        desc = md.factor_stats(factors=["a"])
+        assert desc.columns == ["statistic", "a"]  # type: ignore
+
+        # Passing bare string raises TypeError
+        with pytest.raises(TypeError, match="factors"):
+            md.factor_stats(factors="a")
+
+        # Passing unknown factor raises KeyError
+        with pytest.raises(KeyError, match="unknown"):
+            md.factor_stats(factors=["unknown"])
+
+    def test_factor_stats_per_class(self, mock_ds):
+        """Test per_class=True groups describe by class label."""
+        md = Metadata(mock_ds)
+        md.add_factors({"val": np.arange(len(mock_ds), dtype=float)}, level="unit")
+
+        desc = md.factor_stats(per_class=True)
+        assert isinstance(desc, pl.DataFrame)
+        assert "class_label" in desc.columns
+        assert "class_name" in desc.columns
+        assert "statistic" in desc.columns
+        assert "val" in desc.columns
+
+        # Verify each class has its describe statistics
+        distinct_classes = desc["class_label"].unique().to_list()
+        assert len(distinct_classes) == len(md.index2label)
+
+        # Filter by specific class
+        class_0_stats = desc.filter(pl.col("class_label") == 0)
+        assert class_0_stats.height > 0
+        assert "count" in class_0_stats["statistic"].to_list()
+        assert "mean" in class_0_stats["statistic"].to_list()
+
+    def test_factor_stats_per_class_with_level_raises(self):
+        """per_class=True raises ValueError if also given level."""
+        md = Metadata.from_factors({"x": np.array([1.0, 2.0, 3.0])}, class_labels=[0, 1, 1])
+        with pytest.raises(ValueError, match="cannot be specified"):
+            md.factor_stats(per_class=True, level="unit")
+
+    def test_factor_stats_per_class_no_labels_raises(self):
+        """per_class=True raises ValueError when the metadata was built without class labels."""
+        md = Metadata.from_factors({"x": np.array([1.0, 2.0, 3.0])})
+        with pytest.raises(ValueError, match="without any"):
+            md.factor_stats(per_class=True)
+
+    def test_factor_stats_per_class_single_labeled_class_is_allowed(self):
+        """Explicit labels that happen to be one class are not the same as no labels."""
+        md = Metadata.from_factors({"x": np.array([1.0, 2.0, 3.0])}, class_labels=[0, 0, 0])
+        desc = md.factor_stats(per_class=True)
+        assert isinstance(desc, pl.DataFrame)
+        assert desc["class_label"].unique().to_list() == [0]
+
+    def test_factor_stats_counts_nan_as_null(self):
+        md = Metadata.from_factors({"x": np.array([1.0, np.nan, 3.0, np.nan])})
+        desc = md.factor_stats()
+        assert isinstance(desc, pl.DataFrame)
+        stat = dict(zip(desc["statistic"], desc["x"], strict=True))
+        assert float(stat["count"]) == 2.0
+        assert float(stat["null_count"]) == 2.0
+        assert float(stat["mean"]) == 2.0
+
+    def test_factor_stats_named_factor_unreadable_at_level_raises(self, get_od_dataset):
+        """A named factor the level cannot supply is an error, not a column of nulls."""
+        md = Metadata(get_od_dataset(5, targets_per_image=2))
+        md.add_factors({"img_metric": np.arange(5, dtype=float)}, level="unit")
+        md.add_factors({"box_metric": np.arange(10, dtype=float)}, level="instance")
+
+        with pytest.raises(ValueError, match="not readable at level 'unit'"):
+            md.factor_stats(factors=["box_metric"], level="unit")
+
+        # Unnamed factors that the level cannot supply are skipped rather than raised on
+        unit_stats = md.factor_stats(level="unit")
+        assert isinstance(unit_stats, pl.DataFrame)
+        assert "box_metric" not in unit_stats.columns
+
+    def test_factor_stats_per_class_reads_ancestor_factors(self, get_od_dataset):
+        """Per-class stats at the label level include factors defined on its ancestors."""
+        md = Metadata(get_od_dataset(5, targets_per_image=2))
+        md.add_factors({"img_metric": np.arange(5, dtype=float)}, level="unit")
+
+        desc = md.factor_stats(factors=["img_metric"], per_class=True)
+
+        assert isinstance(desc, pl.DataFrame)
+        assert desc.columns == ["class_label", "class_name", "statistic", "img_metric"]
+
+    def test_factor_stats_specific_level(self, get_od_dataset):
+        """Specifying level reads factors for that level."""
+        ds = get_od_dataset(5, targets_per_image=2)
+        md = Metadata(ds)
+        md.add_factors({"img_metric": np.arange(5, dtype=float)}, level="unit")
+        md.add_factors({"box_metric": np.arange(10, dtype=float)}, level="instance")
+
+        unit_stats = md.factor_stats(level="unit")
+        assert isinstance(unit_stats, pl.DataFrame)
+        assert "img_metric" in unit_stats.columns
+        assert "box_metric" not in unit_stats.columns
+
+        instance_stats = md.factor_stats(level="instance")
+        assert isinstance(instance_stats, pl.DataFrame)
+        assert "box_metric" in instance_stats.columns
+
+    def test_factor_stats_multi_level_dict(self, get_od_dataset):
+        """When factors span multiple levels natively, level=None returns a dict."""
+        ds = get_od_dataset(5, targets_per_image=2)
+        md = Metadata(ds)
+        md.add_factors({"img_metric": np.arange(5, dtype=float)}, level="unit")
+        md.add_factors({"box_metric": np.arange(10, dtype=float)}, level="instance")
+
+        stats_dict = md.factor_stats()
+        assert isinstance(stats_dict, dict)
+        assert "unit" in stats_dict
+        assert "instance" in stats_dict
+        assert isinstance(stats_dict["unit"], pl.DataFrame)
+        assert isinstance(stats_dict["instance"], pl.DataFrame)
+        assert stats_dict["unit"].columns == ["statistic", "img_metric"]
+        assert stats_dict["instance"].columns == ["statistic", "box_metric"]
