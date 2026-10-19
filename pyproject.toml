@@ -392,7 +392,7 @@ extend-exclude = [
 [tool.codespell]
 skip = 'pyproject.toml,./*env*,./specs,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.*.txt,*.html,*.lock,*.ipynb,./graphify-out,cosign.pub'
 builtin = "clear,rare,en-GB_to_en-US"
-ignore-words-list = ["Hart","FPR", "MOT", "mot", "reencode", "writeable"]
+ignore-words-list = ["Hart","FPR", "MOT", "mot", "reencode", "writeable", "coo"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

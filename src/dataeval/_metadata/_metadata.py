@@ -23,6 +23,7 @@ from dataeval._metadata._columns import (
     digitized,
     drop_vacuous_splits,
     float_col,
+    is_companion_name,
     missing_mask,
     reject_mixed_values,
     split_by_dimensionality,
@@ -63,6 +64,7 @@ from dataeval._metadata._serialize import save as _save
 from dataeval._metadata._store import LevelStore
 from dataeval._metadata._structurers import (
     LEVEL_KEY_COLUMNS,
+    RESERVED_COLUMNS,
     LevelRows,
     RowLayout,
     SourceIndexRows,
@@ -479,6 +481,11 @@ def _caller_stacklevel() -> int:
     return 2
 
 
+def _describe(df: pl.DataFrame) -> pl.DataFrame:
+    """Polars ``describe`` with NaN counted as null, so ``null_count`` and ``count`` agree with the data."""
+    return df.with_columns(pl.col(pl.Float32, pl.Float64).fill_nan(None)).describe()
+
+
 class Metadata(Array, FeatureExtractor):
     """Collection of binned metadata using Polars DataFrames.
 
@@ -738,6 +745,9 @@ class Metadata(Array, FeatureExtractor):
         # filter cannot re-answer it against the rows it happened to keep. Cleared wherever
         # a column's contents change, which is `add_factors` and a fresh structuring.
         self._identifier_cache: dict[str, bool] = {}
+        # False only for from_factors called without class_labels, where every row is
+        # given class 0 so the rest of the pipeline has something to read.
+        self._has_class_labels = True
         self._is_structured = False
         self._is_binned = False
         # Set by where()/having() and never cleared: a filtered instance still holds its
@@ -4182,6 +4192,150 @@ class Metadata(Array, FeatureExtractor):
         Only includes factors that survived preprocessing and filtering.
         """
         return self._factor_info
+
+    def factor_stats(
+        self,
+        factors: Sequence[str] | None = None,
+        *,
+        per_class: bool = False,
+        level: FactorLevel | None = None,
+    ) -> pl.DataFrame | dict[FactorLevel, pl.DataFrame]:
+        """Summary statistics for original metadata factors.
+
+        Uses Polars' :meth:`~polars.DataFrame.describe` to compute descriptive
+        statistics (count, null_count, mean, std, min, 25%, 50%, 75%, max) on the
+        original measured factor columns. Binned or discretized companion columns
+        and structural/reserved metadata columns (such as ``item_index``, ``class_label``,
+        ``box``, etc.) are excluded.
+
+        Parameters
+        ----------
+        factors : Sequence[str] or None, default None
+            Names of specific factors to describe. If None, all visible original factors
+            are included.
+        per_class : bool, default False
+            Whether to group statistics by class label. When True, reads factors at
+            :attr:`label_level` and outputs a DataFrame with ``class_label`` and
+            ``class_name`` columns alongside each factor's statistics.
+        level : str or None, default None
+            Level to compute statistics at. When None and ``per_class=False``, computes
+            statistics at each factor's native level. When specified, reads the selected
+            factors at that level.
+
+        Returns
+        -------
+        pl.DataFrame or dict[FactorLevel, pl.DataFrame]
+            When ``per_class=True``, returns a Polars DataFrame with class-grouped statistics.
+            When ``per_class=False`` and a single level is involved, returns a Polars DataFrame.
+            When ``per_class=False``, ``level=None``, and factors reside at multiple levels,
+            returns a dictionary mapping each level to its corresponding statistics DataFrame.
+
+        Raises
+        ------
+        ValueError
+            If no factors are available to describe, if ``per_class=True`` is requested
+            on metadata built without class labels, if a factor named in ``factors`` is
+            not readable at the requested level, or if `level` is invalid.
+        KeyError
+            If any factor named in ``factors`` is not recognized as a factor of this metadata.
+
+        Notes
+        -----
+        NaN in a float factor is counted as null, matching how missing values are
+        read everywhere else in the metadata.
+        """
+        self._structure()
+        targets = self._stats_targets(factors)
+
+        if per_class:
+            if level is not None:
+                raise ValueError("factor_stats: `level` cannot be specified when `per_class=True`.")
+            return self._stats_per_class(targets, explicit=factors is not None)
+
+        if level is not None:
+            resolved = self._resolve_level(level)
+            cols = self._readable_at(resolved, targets, explicit=factors is not None)
+            return _describe(self._store.select(resolved, cols))
+
+        return self._stats_by_native_level(targets)
+
+    def _stats_by_native_level(self, targets: Sequence[str]) -> pl.DataFrame | dict[FactorLevel, pl.DataFrame]:
+        """Describe each target at the level it is defined at: one frame, or a dict when several levels are involved."""
+        by_level: dict[FactorLevel, list[str]] = {}
+        for name in targets:
+            by_level.setdefault(self._factor_level(name), []).append(name)
+        ordered: list[tuple[FactorLevel, list[str]]] = [(lvl, by_level[lvl]) for lvl in self.levels if lvl in by_level]
+
+        if len(ordered) == 1:
+            only_level, cols = ordered[0]
+            return _describe(self._store.select(only_level, cols))
+        return {lvl: _describe(self._store.select(lvl, cols)) for lvl, cols in ordered}
+
+    def _stats_targets(self, factors: Sequence[str] | None) -> list[str]:
+        """Validate the factors ``factor_stats`` was asked about, or default to every original one."""
+        if factors is not None:
+            return self._named_stats_targets(factors)
+        targets = [
+            name
+            for name in sorted(self._visible_factors())
+            if name not in RESERVED_COLUMNS and not is_companion_name(name)
+        ]
+        if not targets:
+            raise ValueError("factor_stats: no factors available to compute statistics.")
+        return targets
+
+    def _named_stats_targets(self, factors: Sequence[str]) -> list[str]:
+        """Reject a bare string, an empty list, unknown names and reserved or companion columns."""
+        if isinstance(factors, str):
+            raise TypeError(f"factor_stats: `factors` takes a list of factor names; pass [{factors!r}].")
+        if not factors:
+            raise ValueError("factor_stats: `factors` is empty; pass None to include all factors.")
+        unknown = [name for name in factors if name not in self._factors]
+        if unknown:
+            raise KeyError(
+                f"factor_stats: {unknown} are not factors of this metadata. "
+                f"Available factors: {sorted(self._visible_factors())}"
+            )
+        invalid = [name for name in factors if name in RESERVED_COLUMNS or is_companion_name(name)]
+        if invalid:
+            raise ValueError(f"factor_stats: {invalid} are reserved or companion columns, not original factors.")
+        return list(factors)
+
+    def _readable_at(self, level: FactorLevel, targets: Sequence[str], *, explicit: bool) -> list[str]:
+        """Targets some level supplies to ``level``'s rows.
+
+        Raises when none are readable, and, if the caller named them, when any are not:
+        a column the store cannot supply would otherwise come back as typed nulls.
+        """
+        readable = [name for name in targets if self._store.source_of(level, name) is not None]
+        missing = [name for name in targets if name not in readable]
+        if not readable or (explicit and missing):
+            raise ValueError(
+                f"factor_stats: {missing if explicit else list(targets)} "
+                f"{'are' if explicit and len(missing) > 1 else 'is'} not readable at level {level!r}."
+            )
+        return readable
+
+    def _stats_per_class(self, targets: Sequence[str], *, explicit: bool) -> pl.DataFrame:
+        """Describe ``targets`` once per class, read at :attr:`label_level`."""
+        if not self._has_class_labels:
+            raise ValueError(
+                "factor_stats: `per_class=True` needs class labels, but this metadata was built without any."
+            )
+        cols = self._readable_at(self._label_level, targets, explicit=explicit)
+        df = self._store.select(self._label_level, ["class_label", *cols])
+
+        index2label = self.index2label
+        class_ids = sorted(index2label) if index2label else sorted(df["class_label"].drop_nulls().unique().to_list())
+        frames = [
+            _describe(df.filter(pl.col("class_label") == cls_id).select(cols))
+            .with_columns(
+                pl.lit(cls_id).alias("class_label"), pl.lit(index2label.get(cls_id, str(cls_id))).alias("class_name")
+            )
+            .select(["class_label", "class_name", "statistic", *cols])
+            for cls_id in class_ids
+        ]
+        return pl.concat(frames) if frames else pl.DataFrame()
 
     @property
     def is_binned(self) -> Sequence[bool]:

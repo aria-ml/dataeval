@@ -300,6 +300,15 @@ class TestClassBalanceEdgeCases:
         # depending on num_empty setting
         assert len(select) == 0  # No classes to balance
 
+    @pytest.mark.parametrize("method", ["global", "interclass"])
+    def test_class_in_index2label_absent_from_view(self, classification_dataset, method):
+        """A class named in index2label but missing from the data must not break balancing."""
+        classification_dataset.metadata = {"id": "mock", "index2label": {0: "a", 1: "b", 2: "c", 3: "unused"}}
+
+        select = View(classification_dataset, operations=[ClassBalance(method=method)])
+
+        assert len(select) == 12
+
     def test_single_class(self):
         """Test with dataset containing only one class."""
         mock_dataset = MagicMock()

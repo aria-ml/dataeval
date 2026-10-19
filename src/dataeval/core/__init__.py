@@ -16,6 +16,7 @@ __all__ = [
     "HashGroupResult",
     "HashNeighborResult",
     "LabelAlignmentResult",
+    "LabelCooccurrenceResult",
     "LabelCoverageResult",
     "LabelErrorResult",
     "LabelParityResult",
@@ -64,6 +65,7 @@ __all__ = [
     "hash_neighbors",
     "is_continuous",
     "label_alignment",
+    "label_cooccurrence",
     "label_coverage",
     "label_errors",
     "label_parity",
@@ -126,6 +128,7 @@ from dataeval.core._hash_index import (
     pack_hashes,
 )
 from dataeval.core._label_alignment import LabelAlignmentResult, label_alignment
+from dataeval.core._label_cooccurrence import LabelCooccurrenceResult, label_cooccurrence
 from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
 from dataeval.core._label_errors import LabelErrorResult, label_errors
 from dataeval.core._label_parity import LabelParityResult, label_parity

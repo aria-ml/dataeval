@@ -286,7 +286,7 @@ class Representation(Evaluator):
         """Count integer labels and name each class via ``index2label`` (or its own string index)."""
         stats = label_stats(np.asarray(labels).reshape(-1), index2label=index2label)
         i2l = stats["index2label"]
-        return {i2l[idx]: count for idx, count in stats["label_counts_per_class"].items()}
+        return {i2l[idx]: count for idx, count in stats["label_counts_per_class"].items() if count}
 
     @set_metadata
     def evaluate(

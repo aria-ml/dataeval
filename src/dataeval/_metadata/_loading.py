@@ -71,6 +71,7 @@ def _load_factors(
     # passed: recording is a mutation, and a rejected call must leave no trace of itself
     # behind.
     md._record_multidimensional(skipped)
+    md._has_class_labels = class_labels is not None
 
 
 def _load_factors_by_length(  # noqa: C901
