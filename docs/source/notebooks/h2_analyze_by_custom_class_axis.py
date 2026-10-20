@@ -311,7 +311,7 @@ for code, name in sorted(cells.index2label.items(), key=lambda item: item[1]):
 print(f"\ncells present: {len(cells.index2label)} of {3 * 3} possible")
 
 # %% [markdown]
-# ## Detect undersampled combinations with Parity and Diversity
+# ## Test the observed combinations with Parity and Diversity
 #
 # In this dataset, only 5 of 9 possible weather and altitude combinations are present: there is no low-altitude fog and no high-altitude clear weather.
 #
@@ -320,12 +320,33 @@ print(f"\ncells present: {len(cells.index2label)} of {3 * 3} possible")
 # - The data gap is a specific factor combination (`foggy × low altitude`) rather than a missing class.
 # - As long as these cells remain empty, model performance under foggy conditions cannot be separated from model performance at high altitude.
 #
-# You should use {class}`.Parity` to detect factor combinations with insufficient sample sizes:
+# The listing above is how you find absent combinations. {class}`.Parity` cannot: it tests the combinations that occur in the data, so a combination with no images has no cell to test. Parity answers a different question about the combinations that do exist. Once `weather` and `altitude_m` form the class axis, the remaining image-level factor is `time_of_day`. Parity tests whether it is spread across the five present cells as independence predicts, and which of those cells hold too few images to judge:
 
 # %%
 parity = Parity().evaluate(cells)
-print(parity.factors)
-print(f"\nthin cells: {parity.insufficient_data}")
+print(parity.factors.select("factor_name", "status", "score", "p_value_adjusted", "has_insufficient_data"))
+print(f"\ngrouping: {parity.group_source} ({parity.n_rows} rows, {parity.n_groups} groups, {parity.test} test)")
+
+findings = parity.cells.filter(pl.col("is_actionable") | (pl.col("status") == "too_thin"))
+print(f"\nactionable cells: {parity.cells['is_actionable'].sum()}")
+print(findings.select("level", "class_name", "status", "observed", "expected", "p_value_adjusted"))
+
+# %% [markdown]
+# Each row of {attr}`.ParityOutput.cells` is one `time_of_day` level in one weather and altitude cell, with its `status`:
+#
+# - The factor test is `inconclusive`: it finds no association between `time_of_day` and the cells (adjusted p-value of 0.63, score 0.0), but part of its table is too thin to count that as a negative result.
+# - Four cells are `too_thin`: day and night in the two mid-altitude cells, which hold only 5 and 7 images. They are not findings, however small their p-values. Collect more images there to find out.
+# - No cell is `underrepresented` or `overrepresented`, so no cell is actionable. The other six cells are `no_finding`.
+# - The images are the independent unit here, so `group_source` is `rows` and the ungrouped Pearson test runs. On a detection-level view, Parity groups detections by image instead.
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Lock the claims made in the prose above about the Parity cells.
+assert parity.factors["status"].to_list() == ["inconclusive"]
+assert parity.cells.filter(pl.col("status") == "too_thin").height == 4
+assert parity.cells.filter(pl.col("status") == "no_finding").height == 6
+assert not parity.cells["is_actionable"].any()
+assert (parity.group_source, parity.test) == ("rows", "pearson")
 
 # %% [markdown]
 # Similarly, you can evaluate {class}`.Diversity` across categorical factor combinations such as `weather` and `time_of_day`:

@@ -336,7 +336,7 @@ class TestStructuringAnnouncesItself:
 
         The level budget would drop this — ``max(20, sqrt(100))`` is 20 — and dropping it
         forecloses the mechanism that exists to report thin levels:
-        :attr:`~dataeval.bias.ParityOutput.insufficient_data` says a cell is under-sampled,
+        :attr:`~dataeval.bias.ParityOutput.cells` says a cell is too thin,
         which is the honest answer for a factor this wide on a sample this size.
         """
         cities = [f"city_{i % 25}" for i in range(100)]

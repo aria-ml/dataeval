@@ -45,7 +45,7 @@ for not used.
 | ------ | --------- | ------------- | ------ | -------- | --------- | ----- | -------------- |
 | `bias` | {class}`.Balance` | Metadata factors{sup}`1` | ***Required***{sup}`2` | ***Required*** | | | |
 | `bias` | {class}`.Diversity` | Metadata factors{sup}`1` | ***Required***{sup}`2` | ***Required*** | | | |
-| `bias` | {class}`.Parity` | Metadata factors{sup}`1` | ***Required***{sup}`2` | ***Required*** | | | |
+| `bias` | {class}`.Parity` | Metadata factors{sup}`1` | ***Required***{sup}`2` | ***Required***{sup}`9` | | | |
 | `quality` | {class}`.Duplicates` | Raw images{sup}`3` | | | *Optional* (cluster mode) | | |
 | `quality` | {class}`.Outliers` | Raw images{sup}`3` | | *Optional* (`per_class`) | *Optional* (cluster mode) | | |
 | `scope` | {class}`.Coverage` | Embeddings | ***Required*** | | ***Required***{sup}`4` | | |
@@ -84,7 +84,12 @@ scores new data, so two datasets are needed.
 requirements are whatever the wrapped detector needs.  
 {sup}`8` {class}`.Sufficiency` retrains the model repeatedly, so it also needs a
 {class}`.TrainingStrategy` and an {class}`.EvaluationStrategy`. Bounding boxes
-are required for object-detection tasks.
+are required for object-detection tasks.  
+{sup}`9` {class}`.Parity` groups rows by the image or sequence they came from.
+A {class}`.Metadata` built from a dataset records that itself. A custom
+{class}`.MetadataLike` container must carry `item_indices` (label → item), or
+the call raises unless `assume_independent=True` declares every row its own
+item.
 ```
 
 Two shortcuts are worth knowing. {class}`.Duplicates` and {class}`.Outliers`
@@ -110,10 +115,10 @@ directly. This table covers the primary analysis entry points; see the
 | {func}`.factor_predictors` | | | | ***Required***{sup}`c` | ***Required***{sup}`e` |
 | {func}`.feature_distance` | ***Required***{sup}`a` | | | | |
 | {func}`.label_errors` | ***Required***{sup}`a` | ***Required*** | | | |
-| {func}`.label_parity` | | ***Required*** | | | |
+| {func}`.label_parity` | | ***Required***{sup}`f` | | | |
 | {func}`.label_stats` | | ***Required*** | | | |
 | {func}`.nullmodel_metrics` | | ***Required*** | | | |
-| {func}`.parity` | | ***Required*** | | ***Required*** | |
+| {func}`.parity` | | ***Required*** | | ***Required***{sup}`g` | |
 | {func}`.uap` | | ***Required*** | | | ***Required***{sup}`d` |
 
 ## Data selection
@@ -130,4 +135,9 @@ over raw images using {class}`.Embeddings`.
 {sup}`c` When using only metadata, it must be wrapped in DataEval's {class}`.Metadata` class.  
 {sup}`d` These scores are the raw outputs of a model.  
 {sup}`e` These scores are retrieved by DataEval's Out Of Distribution (OOD) functions.  
+{sup}`f` Two label samples, a reference and a comparison: {func}`.label_parity` is a
+label-shift test (see [Distribution Shift](../concepts/DistributionShift.md#label-parity)). For
+detection or tracking labels, also pass one group id per label (the image or sequence it came from).  
+{sup}`g` Binned factor codes, plus `groups` (one independent group id per row) or
+`assume_independent=True`.  
 ```

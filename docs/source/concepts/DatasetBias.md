@@ -37,7 +37,8 @@ to its known factors:
   that introduce class structure the model should not learn.
 
 The tools described in this page address each of these properties directly.
-Balance and Diversity assess whether the dataset is balanced. Coverage and
+Balance and Diversity assess whether the dataset is balanced, and
+[Parity](Parity.md) tests it for each factor level and class. Coverage and
 Completeness assess whether it is covered and complete. Representativeness and
 relevance are assessed through the combination of metadata analysis and the
 domain context the practitioner brings to interpreting the results.
@@ -55,7 +56,7 @@ does not — it pushes the model's decision boundaries in a consistent direction
 producing a model that performs well on data that resembles the training set and
 fails on data that does not.
 
-[Friedman & Nissenbaum (1996)](#ref3) grouped bias into: pre-existing bias
+[Friedman & Nissenbaum (1996)](#ref2) grouped bias into: pre-existing bias
 (inherited from social or institutional practice), technical bias (introduced by
 design choices in the system), and emergent bias (arising from deployment in a
 context the system was not designed for) — a useful framework for understanding
@@ -67,7 +68,7 @@ favors certain conditions over others. A dataset assembled from a single proving
 ground, a single sensor platform, or a single collection window will oversample
 those conditions and undersample everything else — not because of any flaw in
 what was labeled, but because of what was collected in the first place.
-[Torralba & Efros (2011)](#ref12) showed that this effect is pervasive across
+[Torralba & Efros (2011)](#ref11) showed that this effect is pervasive across
 widely used benchmark datasets — classifiers trained on one dataset perform well
 within it but transfer poorly to others, because the collection conditions
 themselves are a latent variable the model has learned to exploit.
@@ -79,9 +80,9 @@ under-represented because the target phenomenon is genuinely rare, because
 collection constraints limited access, or because systematic gaps in what was
 deemed worth collecting were never recognized as gaps. A dataset can be sampled
 correctly from a convenience population and still be unrepresentative of the
-operational distribution. [Fabbrizzi et al. (2022)](#ref2) survey the full
+operational distribution. [Fabbrizzi et al. (2022)](#ref1) survey the full
 taxonomy of representation gaps in visual datasets and document how frequently
-they appear even in widely used benchmarks. [Merler et al. (2019)](#ref8)
+they appear even in widely used benchmarks. [Merler et al. (2019)](#ref7)
 illustrate the downstream consequences in face recognition, where representation
 gaps across demographic groups produced systematic performance disparities
 invisible to aggregate accuracy metrics.
@@ -98,7 +99,7 @@ Any form or combination of bias can produce **shortcut learning** in the trained
 model. When a metadata factor — background environment, sensor platform, weather
 condition, time of day — is consistently associated with a class label in
 training data, the model can achieve low training loss by learning the metadata
-correlation rather than the intended feature. [Geirhos et al. (2020)](#ref4)
+correlation rather than the intended feature. [Geirhos et al. (2020)](#ref3)
 provide the canonical treatment of this failure mode in computer vision, with
 the well-known example of models that classify "cow" by detecting grass rather
 than the animal. In real world datasets, analogous shortcuts are common: target
@@ -147,7 +148,7 @@ would surface.
 
 ## Theory
 
-### Measuring bias: normalized mutual information
+### Measuring bias: mutual information and evenness
 
 {class}`.Balance` and {class}`.Diversity` both measure bias through the lens of
 metadata — the contextual variables attached to each sample (sensor platform,
@@ -185,7 +186,7 @@ If neither variable is unbinned discrete &emdash i.e., if both are continuous or
 binned discrete or one of each &emdash the mutual information is not bounded and
 cannot be normalized, so DataEval returns a transformation of the MI onto the
 interval [0, 1]. (In the case of two random normal variables, this transformed MI
-is their correlation coefficient. See [Linfoot (1957)](#ref14))
+is their correlation coefficient. See [Linfoot (1957)](#ref13))
 
 Between the class label and a factor the question is directed — how much of the
 class label does this factor account for — and every factor is measured against
@@ -217,7 +218,7 @@ near zero whatever its cardinality, while a genuinely informative one is barely
 touched. The same correction is applied between two metadata factors, over the
 smaller of their two entropies rather than the class entropy — without it, a
 factor binned finely enough reports a correlation with everything it is measured
-against. [Vinh et al. (2010)](#ref13) provide a comprehensive analysis of
+against. [Vinh et al. (2010)](#ref12) provide a comprehensive analysis of
 normalization schemes for information-theoretic association measures, including
 their behavior under chance and the conditions under which each is most
 appropriate.
@@ -243,8 +244,8 @@ information and complicate the interpretation of individual factor effects.
 MI is computed differently depending on whether variables are discrete or
 continuous. For categorical class labels, DataEval uses `mutual_info_classif`
 from scikit-learn for both discrete and continuous metadata factors, falling
-back to KNN-based estimation ([Kraskov et al., 2004](#ref7);
-[Ross, 2014](#ref9)) for continuous variables. DataEval infers discreteness from
+back to KNN-based estimation ([Kraskov et al., 2004](#ref6);
+[Ross, 2014](#ref8)) for continuous variables. DataEval infers discreteness from
 the proportion of unique values in a factor. Discreteness is a statement about a
 factor's support rather than a promise that the support is small, so a numeric
 factor that reads as discrete but takes more distinct values than the sample can
@@ -272,7 +273,7 @@ with this factor?", Diversity asks "are samples spread uniformly across this
 factor's values?"
 
 DataEval supports two diversity indices, both drawn from ecological diversity
-measurement ([Hill, 1973](#ref6); [Heip et al., 1998](#ref5)). The **inverse
+measurement ([Hill, 1973](#ref5); [Heip et al., 1998](#ref4)). The **inverse
 Simpson index** is:
 
 $$d = \frac{1}{N \sum_i p_i^2}$$
@@ -299,31 +300,16 @@ each class. Low classwise diversity for a particular class and factor — for
 example, all "aircraft" samples collected at the same location — is a direct
 indicator of collection bias for that class.
 
-**Parity** takes a complementary approach to balance, using Bias-Corrected
-Cramér's V rather than mutual information to measure association between
-metadata factors and class labels. This is an experimental evaluator.
+### Testing association: Parity
 
-Cramér's V is derived from the chi-squared statistic on a contingency table of
-factor values against class labels:
-
-$$V = \sqrt{\frac{\chi^2 / n}{\min(r-1, c-1)}}$$
-
-where $n$ is the number of samples and $r$, $c$ are the number of rows and
-columns in the contingency table. DataEval applies the [Bergsma (2013)](#ref1)
-bias correction, which provides a more accurate estimate of association strength
-for large contingency tables and finite samples than the standard Cramér's V
-correction.
-
-Statistical significance is assessed with Pearson's chi-squared test of
-independence. Both a score threshold (default: 0.3) and a p-value threshold
-(default: 0.05) must be exceeded before a factor is flagged as correlated.
-
-```{important}
-Parity requires a minimum of 5 samples per cell in the contingency table
-(factor value × class label combination) for reliable chi-squared
-approximations. Factors with insufficient cell counts are flagged in the
-output. Results for those factors should be treated as indicative only.
-```
+{class}`.Parity` ⚠️ tests the factor–class dependence that Balance measures.
+For each factor it tests association with the class labels, and for each
+combination of a factor level and a class it tests whether the cell holds more
+or fewer rows than independence predicts. Its p-values account for rows grouped
+into images or sequences. Its `underrepresented` cells are collection
+candidates, and its `overrepresented` cells point to possible shortcuts. It
+does not measure coverage. The method, its assumptions and its calibration are
+described on the [Parity](Parity.md) page.
 
 ### Measuring coverage: geometry in embedding space
 
@@ -356,7 +342,7 @@ hypercube, which is almost always the case in practice. The adaptive method
 identifies the most isolated samples relative to the actual distribution of the
 data, rather than against a theoretical uniform baseline.
 
-Both methods are based on [Ting et al. (2022)](#ref11).
+Both methods are based on [Ting et al. (2022)](#ref10).
 
 **Completeness** measures dimensional utilization of the embedding space using
 eigenvalue entropy. The embedding matrix is rank-normalized before
@@ -420,16 +406,16 @@ many dimensions but with variance concentrated in a few).
 dimensionality $d_\text{eff} = e^H$, where $H$ is the Shannon entropy of the
 covariance eigenvalues normalized to sum to one. This estimator is novel in this
 exact form but not unprecedented: it is closely related to the **effective
-rank** of [Roy & Vetterli (2007)](#ref15), which applies the same $e^H$
+rank** of [Roy & Vetterli (2007)](#ref14), which applies the same $e^H$
 construction to the normalized *singular* values. Taking the entropy over *eigenvalues* instead
 makes $d_\text{eff}$ the exponential of the von Neumann entropy of the
 trace-normalized covariance matrix — the form
-[Kim et al. (2023)](#ref17) use to regularize representation rank and isotropy,
-and [Zhuo et al. (2023)](#ref18) apply to feature-correlation eigenvalues. It is
+[Kim et al. (2023)](#ref16) use to regularize representation rank and isotropy,
+and [Zhuo et al. (2023)](#ref17) apply to feature-correlation eigenvalues. It is
 the entropy-based sibling of the **participation ratio**
 $\left(\sum_i \lambda_i\right)^2 / \sum_i \lambda_i^2$ commonly used for the
 effective dimensionality of neural representations
-([Gao et al., 2017](#ref16)); both summarize a spectrum by how evenly its mass
+([Gao et al., 2017](#ref15)); both summarize a spectrum by how evenly its mass
 is spread, the participation ratio through a second-moment ratio and
 $d_\text{eff}$ through entropy, which weights the long tail of small
 eigenvalues more heavily.
@@ -498,10 +484,9 @@ class correlations. They are also useful before constructing train/validation/
 test splits, since split quality depends on metadata distributions being
 comparable across splits.
 
-**Parity** is most appropriate when the metadata factors are categorical and the
-dataset is large enough to meet the minimum cell-count requirement. It provides
-a statistically grounded p-value alongside the association score, which is
-useful when a formal threshold is required for a test report.
+**Parity** applies when you need to know where a factor and the class depart
+from independence, cell by cell, with p-values that account for grouped rows.
+See [When to use it](Parity.md#when-to-use-it) on the Parity page.
 
 **Coverage** should be run when you have a feature extractor available and want
 to understand where the dataset is thin relative to the operational
@@ -544,7 +529,7 @@ page). An additional concern is that pretrained feature extractors can
 themselves carry biases absorbed during pretraining — systematic geometric
 distortions that cause certain groups or conditions to cluster more tightly or
 more loosely than their true diversity warrants.
-[Steed & Caliskan (2021)](#ref10) demonstrate that representations learned
+[Steed & Caliskan (2021)](#ref9) demonstrate that representations learned
 through unsupervised pretraining encode human-like social biases, which can
 propagate silently into coverage and completeness assessments downstream.
 
@@ -555,12 +540,14 @@ investigate — not a guarantee that the model will exploit the correlation.
 Conversely, a low NMI does not rule out shortcuts that operate below the
 resolution of the available metadata.
 
-Parity is marked experimental and may change in future releases. Results should
-be treated with caution when cell counts are below 5, which the output flags
-explicitly.
+Parity is experimental. Its p-values depend on independent groups and enough
+effective groups at each level; see
+[Assumptions and their limits](Parity.md#assumptions-and-their-limits).
 
 ## Related concept pages
 
+- [Parity](Parity.md) — the hypothesis test of factor–class association, with
+  results for each factor level and class
 - [Binning](Binning.md) — Balance, Diversity and Parity all read binned factors,
   so the cut points decide what these evaluators can see
 - [Embeddings](Embeddings.md) — understanding the representation space that
@@ -591,82 +578,78 @@ explicitly.
 
 ## References
 
-1. [Bergsma, W. (2013). A bias-correction for Cramér's V and Tschuprow's T.
-   *Journal of the Korean Statistical Society*, 42(3), 323–328.
-   [paper](https://www.sciencedirect.com/science/article/abs/pii/S1226319212001032)]{#ref1}
-
-2. [Fabbrizzi, S., Papadopoulos, S., Ntoutsi, E., & Kompatsiaris, I. (2022). A
+1. [Fabbrizzi, S., Papadopoulos, S., Ntoutsi, E., & Kompatsiaris, I. (2022). A
    survey on bias in visual datasets. *Computer Vision and Image Understanding*,
 
-   223, 103552. [paper](https://doi.org/10.1016/j.cviu.2022.103552)]{#ref2}
+   223, 103552. [paper](https://doi.org/10.1016/j.cviu.2022.103552)]{#ref1}
 
-3. [Friedman, B., & Nissenbaum, H. (1996). Bias in computer systems. *ACM
-   Transactions on Information Systems*, 14(3), 330–347.]{#ref3}
+2. [Friedman, B., & Nissenbaum, H. (1996). Bias in computer systems. *ACM
+   Transactions on Information Systems*, 14(3), 330–347.]{#ref2}
 
-4. [Geirhos, R., Jacobsen, J.-H., Michaelis, C., Zemel, R., Brendel, W., Bethge,
+3. [Geirhos, R., Jacobsen, J.-H., Michaelis, C., Zemel, R., Brendel, W., Bethge,
    M., & Wichmann, F. A. (2020). Shortcut learning in deep neural networks.
    *Nature Machine Intelligence*, 2(11), 665–673.
-   [paper](https://arxiv.org/abs/2004.07780)]{#ref4}
+   [paper](https://arxiv.org/abs/2004.07780)]{#ref3}
 
-5. [Heip, C. H. R., Herman, P. M. J., & Soetaert, K. (1998). Indices of
-   diversity and evenness. *Océanis*, 24(4), 61–87.]{#ref5}
+4. [Heip, C. H. R., Herman, P. M. J., & Soetaert, K. (1998). Indices of
+   diversity and evenness. *Océanis*, 24(4), 61–87.]{#ref4}
 
-6. [Hill, M. O. (1973). Diversity and evenness: A unifying notation and its
-   consequences. *Ecology*, 54(2), 427–432.]{#ref6}
+5. [Hill, M. O. (1973). Diversity and evenness: A unifying notation and its
+   consequences. *Ecology*, 54(2), 427–432.]{#ref5}
 
-7. [Kraskov, A., Stögbauer, H., & Grassberger, P. (2004). Estimating mutual
+6. [Kraskov, A., Stögbauer, H., & Grassberger, P. (2004). Estimating mutual
    information. *Physical Review E*, 69(6), 066138.
-   [paper](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.69.066138)]{#ref7}
+   [paper](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.69.066138)]{#ref6}
 
-8. [Merler, M., Ratha, N., Feris, R. S., & Smith, J. R. (2019). Diversity in
+7. [Merler, M., Ratha, N., Feris, R. S., & Smith, J. R. (2019). Diversity in
    faces. *arXiv preprint arXiv:1901.10436*.
-   [paper](https://arxiv.org/abs/1901.10436)]{#ref8}
+   [paper](https://arxiv.org/abs/1901.10436)]{#ref7}
 
-9. [Ross, B. C. (2014). Mutual information between discrete and continuous data
+8. [Ross, B. C. (2014). Mutual information between discrete and continuous data
    sets. *PLOS ONE*, 9(2), e87357.
-   [paper](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0087357)]{#ref9}
+   [paper](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0087357)]{#ref8}
 
-10. [Steed, R., & Caliskan, A. (2021). Image representations learned with
+9. [Steed, R., & Caliskan, A. (2021). Image representations learned with
     unsupervised pretraining contain human-like biases. In *Proceedings of the
     2021 ACM Conference on Fairness, Accountability, and Transparency* (pp.
-    701–713). ACM. [paper](https://doi.org/10.1145/3442188.3445932)]{#ref10}
+    701–713). ACM. [paper](https://doi.org/10.1145/3442188.3445932)]{#ref9}
 
-11. [Ting, K. M., Wells, J. R., & Washio, T. (2022). Isolation kernel: The X
+10. [Ting, K. M., Wells, J. R., & Washio, T. (2022). Isolation kernel: The X
     factor in efficient and effective large scale online kernel learning.
     *Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and
-    Data Mining*, 1775–1784. [paper](https://arxiv.org/abs/1907.01104)]{#ref11}
+    Data Mining*, 1775–1784. [paper](https://arxiv.org/abs/1907.01104)]{#ref10}
 
-12. [Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. In
+11. [Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. In
     *Proceedings of the IEEE Conference on Computer Vision and Pattern
     Recognition* (pp. 1521–1528).
-    [paper](https://ieeexplore.ieee.org/document/5995347)]{#ref12}
+    [paper](https://ieeexplore.ieee.org/document/5995347)]{#ref11}
 
-13. [Vinh, N. X., Epps, J., & Bailey, J. (2010). Information theoretic measures
+12. [Vinh, N. X., Epps, J., & Bailey, J. (2010). Information theoretic measures
     for clusterings comparison: Variants, properties, normalization and
     correction for chance. *Journal of Machine Learning Research*, 11,
-    2837–2854. [paper](https://jmlr.org/papers/v11/vinh10a.html)]{#ref13}
+    2837–2854. [paper](https://jmlr.org/papers/v11/vinh10a.html)]{#ref12}
 
-14. [Linfoot, E.H. (1957). "An Informational Measure of Correlation."
+13. [Linfoot, E.H. (1957). "An Informational Measure of Correlation."
     Information and Control, 1(1), 85-89.
-    [paper]<https://www.sciencedirect.com/science/article/pii/S001999585790116X>]{#ref14}
+    [paper]<https://www.sciencedirect.com/science/article/pii/S001999585790116X>]{#ref13}
 
-15. [Roy, O., & Vetterli, M. (2007). The effective rank: A measure of effective
+14. [Roy, O., & Vetterli, M. (2007). The effective rank: A measure of effective
     dimensionality. *Proceedings of the 15th European Signal Processing
     Conference (EUSIPCO)*, 606–610.
-    [paper](https://www.eurasip.org/Proceedings/Eusipco/Eusipco2007/Papers/a5p-h05.pdf)]{#ref15}
+    [paper](https://www.eurasip.org/Proceedings/Eusipco/Eusipco2007/Papers/a5p-h05.pdf)]{#ref14}
 
-16. [Gao, P., Trautmann, E., Yu, B., Santhanam, G., Ryu, S., Shenoy, K., &
+15. [Gao, P., Trautmann, E., Yu, B., Santhanam, G., Ryu, S., Shenoy, K., &
     Ganguli, S. (2017). A theory of multineuronal dimensionality, dynamics and
     measurement. *bioRxiv*, 214262.
-    [paper](https://doi.org/10.1101/214262)]{#ref16}
+    [paper](https://doi.org/10.1101/214262)]{#ref15}
 
-17. [Kim, J., Kang, S., Hwang, D., Shin, J., & Rhee, W. (2023). VNE: An effective
+16. [Kim, J., Kang, S., Hwang, D., Shin, J., & Rhee, W. (2023). VNE: An effective
     method for improving deep representation by manipulating eigenvalue
     distribution. *Proceedings of the IEEE/CVF Conference on Computer Vision and
     Pattern Recognition (CVPR)*, 3799–3810.
-    [paper](https://openaccess.thecvf.com/content/CVPR2023/html/Kim_VNE_An_Effective_Method_for_Improving_Deep_Representation_by_Manipulating_CVPR_2023_paper.html)]{#ref17}
+    [paper](https://openaccess.thecvf.com/content/CVPR2023/html/Kim_VNE_An_Effective_Method_for_Improving_Deep_Representation_by_Manipulating_CVPR_2023_paper.html)]{#ref16}
 
-18. [Zhuo, Z., Wang, Y., Ma, J., & Wang, Y. (2023). Towards a unified theoretical
+17. [Zhuo, Z., Wang, Y., Ma, J., & Wang, Y. (2023). Towards a unified theoretical
     understanding of non-contrastive learning via rank differential mechanism.
     *International Conference on Learning Representations (ICLR)*.
-    [paper](https://arxiv.org/abs/2303.02387)]{#ref18}
+    [paper](https://arxiv.org/abs/2303.02387)]{#ref17}

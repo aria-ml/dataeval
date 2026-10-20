@@ -65,7 +65,7 @@ def _digitize_with_missing(data: NDArray[Any], spec: BinSpec) -> NDArray[np.intp
 
     The cost is a gap, where the reserved codes below it went unused. Everything
     downstream counts the levels it actually sees — ``Diversity`` over the non-zero bins,
-    ``Parity`` after dropping all-zero rows, ``mutual_info`` off the observed uniques — so
+    ``Parity`` over the observed levels, ``mutual_info`` off the observed uniques — so
     an empty code is skipped rather than scored.
 
     Takes the whole :class:`~dataeval.types.BinSpec` rather than the edges, so that the

@@ -87,6 +87,7 @@ _BOUNDS = [
     (Parity.Config, "score_threshold", 0.0, -0.01),
     (Parity.Config, "p_value_threshold", 0.99, 1.0),
     (Parity.Config, "p_value_threshold", 0.01, 0.0),
+    (Parity.Config, "lift_threshold", 1.0, 0.99),
     (Duplicates.Config, "n_clusters", 1, 0),
     (Duplicates.Config, "batch_size", 1, 0),
     (Duplicates.Config, "cluster_sensitivity", 0.01, 0.0),

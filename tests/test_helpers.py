@@ -1,9 +1,15 @@
 """Tests for dataeval._helpers config utilities."""
 
+from types import SimpleNamespace
+
+import numpy as np
 import pytest
 from pydantic import BaseModel
 
-from dataeval._helpers import apply_config, axis_vocabulary, get_overrides
+from dataeval import Metadata
+from dataeval._helpers import apply_config, axis_vocabulary, get_overrides, independence_groups
+from tests.bias.test_balance import _sequences
+from tests.conftest import MockMetadata, to_metadata
 
 
 class _Config(BaseModel):
@@ -120,3 +126,131 @@ class TestEffectiveEntityCounts:
             factor_info={"w": SimpleNamespace(level=None)},
         )
         assert effective_entity_counts(metadata, SimpleNamespace(level="unit"), ["w"]) is None  # type: ignore[arg-type]
+
+
+def _bare(item_indices=None, n=5):
+    """A container with no levels of its own, optionally declaring ``item_indices``."""
+    return MockMetadata(
+        class_labels=np.zeros(n, dtype=np.intp),
+        factor_data=np.zeros((n, 1), dtype=np.int64),
+        factor_names=["a"],
+        is_binned=[False],
+        index2label={0: "x"},
+        item_indices=None if item_indices is None else np.asarray(item_indices),
+    )
+
+
+@pytest.mark.required
+class TestIndependenceGroups:
+    """Parity's independent sampling unit: recorded structure first, the caller's word last."""
+
+    def test_od_groups_by_image(self, get_od_dataset):
+        md = Metadata(get_od_dataset(6, targets_per_image=3))
+        result = independence_groups(md, assume_independent=False)
+        assert result.source == "level"
+        assert result.level == "unit"
+        assert result.groups is not None
+        np.testing.assert_array_equal(result.groups, md.item_indices)
+        assert len(np.unique(result.groups)) == 6
+
+    def test_tracking_groups_by_sequence(self):
+        md = Metadata(_sequences(4, 5))
+        md._structure()
+        result = independence_groups(md, assume_independent=False)
+        assert result.source == "level"
+        assert result.level == "sequence"
+        assert result.groups is not None
+        assert len(result.groups) == len(md.item_indices)
+        assert sorted(np.bincount(result.groups)) == [5, 5, 5, 5]
+
+    def test_frame_view_groups_by_sequence(self):
+        """A view between the rows and the sequences is still clustered by sequence."""
+        md = Metadata(_sequences(4, 5))
+        md._structure()
+        frames = md.at("unit")
+        result = independence_groups(frames, assume_independent=False)
+        assert result.source == "level"
+        assert result.level == "sequence"
+        assert result.groups is not None
+        assert len(result.groups) == len(frames.item_indices) == md.level_counts["unit"]
+        assert len(np.unique(result.groups)) == 4
+
+    def test_ic_and_item_view_are_rows(self, get_od_dataset):
+        ic = to_metadata({"a": [0, 1, 0, 1]}, [0, 1, 0, 1])
+        od = Metadata(get_od_dataset(6, targets_per_image=3))
+        od._structure()
+        for md in (ic, od.at(od.item_level)):
+            result = independence_groups(md, assume_independent=False)
+            assert result.source == "rows"
+            assert result.groups is None
+            assert result.level is None
+
+    def test_from_factors_with_repeated_item_ids_groups_by_item(self):
+        """A Metadata at its item-level view still groups by item ids that repeat across rows."""
+        factors, labels = {"a": [0, 1, 0, 1, 0]}, [0, 1, 0, 1, 1]
+        md = Metadata.from_factors(factors, class_labels=labels, item_indices=np.array([0, 0, 1, 1, 2]))
+        result = independence_groups(md, assume_independent=False)
+        assert result.source == "level"
+        assert result.level == md.item_level
+        assert result.groups is not None
+        np.testing.assert_array_equal(result.groups, [0, 0, 1, 1, 2])
+
+        unique = Metadata.from_factors(factors, class_labels=labels, item_indices=np.arange(5))
+        assert independence_groups(unique, assume_independent=False).source == "rows"
+
+    def test_custom_item_indices(self):
+        result = independence_groups(_bare([0, 0, 1, 1, 2]), assume_independent=False)
+        assert result.source == "item"
+        assert result.level is None
+        assert result.groups is not None
+        np.testing.assert_array_equal(result.groups, [0, 0, 1, 1, 2])
+
+        one_to_one = independence_groups(_bare([4, 2, 0, 1, 3]), assume_independent=False)
+        assert one_to_one.source == "rows"
+        assert one_to_one.groups is None
+
+    def test_bare_container_refuses_with_the_fix(self):
+        with pytest.raises(ValueError, match="assume_independent=True"):
+            independence_groups(_bare(), assume_independent=False)
+
+    def test_declared_only_when_nothing_is_recorded(self, get_od_dataset):
+        declared = independence_groups(_bare(), assume_independent=True)
+        assert (declared.source, declared.groups, declared.level) == ("declared", None, None)
+
+        # The recorded structure wins over the caller's word, for a Metadata and for item_indices.
+        od = Metadata(get_od_dataset(6, targets_per_image=3))
+        assert independence_groups(od, assume_independent=True).source == "level"
+        assert independence_groups(_bare([0, 0, 1, 1, 2]), assume_independent=True).source == "item"
+        assert independence_groups(_bare([0, 1, 2, 3, 4]), assume_independent=True).source == "rows"
+
+    @pytest.mark.parametrize("indices", [[0, 1, 2], [], [0, 0, 1], [0, 1, 2, 3, 4, 5]])
+    def test_item_indices_not_matching_the_rows_are_refused(self, indices):
+        """A malformed record must refuse, not read as unique and so certify independence."""
+        with pytest.raises(ValueError, match=f"{len(indices)} entries for 5 rows"):
+            independence_groups(_bare(indices), assume_independent=True)
+
+    def test_metadata_item_indices_not_matching_the_rows_are_refused(self):
+        class Stub:
+            item_level = "unit"
+            view = "instance"
+            item_indices = np.array([0, 1, 2])
+            _levels = SimpleNamespace(parents_of=lambda level: ())
+
+            def __len__(self):
+                return 5
+
+        with pytest.raises(ValueError, match="3 entries for 5 rows"):
+            independence_groups(Stub(), assume_independent=True)
+
+    def test_item_level_with_parents_raises(self, get_od_dataset):
+        """No structurer builds a level above the items; one that did would be guessed at."""
+        md = Metadata(get_od_dataset(6, targets_per_image=3))
+        md._structure()
+        stub = SimpleNamespace(
+            item_level=md.item_level,
+            view=md.view,
+            item_indices=md.item_indices,
+            _levels=SimpleNamespace(parents_of=lambda level: ("above",)),
+        )
+        with pytest.raises(ValueError, match="a level above the item level"):
+            independence_groups(stub, assume_independent=True)

@@ -614,7 +614,10 @@ class CodedMetadataLike(LabelsLike, Protocol):
         Optional mapping from class label indices to human-readable names.
     item_indices : NotRequired[NDArray[np.intp]]
         Optional array mapping each label back to its source item/image.
-        If not provided, a 1:1 mapping is assumed (one label per image).
+        If not provided, a 1:1 mapping is assumed (one label per image). Parity does not
+        apply that default: it tests association over independent items, so it groups by
+        ``item_indices`` when given and refuses a custom container without them unless the
+        caller passes ``assume_independent=True``.
 
     Example
     -------

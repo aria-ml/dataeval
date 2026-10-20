@@ -387,6 +387,7 @@ aeroplane = "aeroplane"  # Pascal VOC class label
 extend-exclude = [
   "requirements.*.txt",
   "uv.lock",
+  "*.svg",  # generated figures: path data and random element ids
 ]
 
 [tool.codespell]

@@ -3,22 +3,49 @@
 import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal
+from scipy.stats import hypergeom
 
+from dataeval.core._association import benjamini_hochberg
 from dataeval.core._parity import parity
+from dataeval.core._rao_scott import grouped_table
+from dataeval.utils.scipy.stats import chi2_contingency, crosstab
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
 
+def expand(table):
+    """Raw rows reproducing a contingency table (level i, class j), so `parity` builds it back."""
+    table = np.asarray(table)
+    levels, classes = np.indices(table.shape)
+    counts = table.ravel()
+    rows = np.repeat(levels.ravel(), counts).astype(np.intp)
+    return rows[:, None], np.repeat(classes.ravel(), counts).astype(np.intp)
+
+
+def cell(cells, level, cls, factor=0):
+    """Position of one (factor, level, class) cell in the flat `cells` arrays."""
+    match = (cells["factor"] == factor) & (cells["level"] == level) & (cells["class_label"] == cls)
+    (index,) = np.flatnonzero(match)
+    return index
+
+
+def _sequences(seed=0, count=40, length=25):
+    """A sequence-level factor over `count` sequences, each showing one class drawn independently of it."""
+    rng = np.random.default_rng(seed)
+    groups = np.repeat(np.arange(count), length)
+    return (groups % 2)[:, None].astype(np.intp), rng.integers(0, 3, count)[groups].astype(np.intp), groups
+
+
 @pytest.mark.required
 class TestParity:
-    """Test cases for the parity function."""
+    """Test cases for the parity function on independent rows."""
 
     def test_basic_functionality(self):
         """Test basic parity calculation with valid inputs."""
         binned_data = np.array([[0, 1], [1, 0], [0, 1], [1, 0]], dtype=np.intp)
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
         chi_scores = result["scores"]
         p_values = result["p_values"]
 
@@ -34,7 +61,7 @@ class TestParity:
         binned_data = np.array([[0], [1], [0], [1]], dtype=np.intp)
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
         assert result["scores"].shape == (1,)
         assert result["p_values"].shape == (1,)
@@ -52,87 +79,106 @@ class TestParity:
         binned_data = np.array([data], dtype=np.intp).T
         class_labels = np.array(data, dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
         assert result["scores"][0] == pytest.approx(1.0)
         assert result["p_values"][0] < 0.05
 
     def test_no_correlation(self):
-        """Test with uncorrelated factor and labels."""
-        binned_data = np.array([[0], [0], [0], [0]], dtype=np.intp)
+        """A factor whose levels hold the same class mix is independent of the labels."""
+        binned_data = np.array([[0], [1], [0], [1]], dtype=np.intp)
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
         assert_array_almost_equal(result["scores"], [0.0])
         assert_array_almost_equal(result["p_values"], [1.0])
 
     def test_return_types(self):
-        """Test return types."""
+        """Every key of the result, with the per-factor arrays one entry per factor."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
         class_labels = np.array([0, 1], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
-        assert len(result) == 3
-        chi_scores = result["scores"]
-        p_values = result["p_values"]
-        insufficient_data = result["insufficient_data"]
-        assert isinstance(chi_scores, np.ndarray)
-        assert isinstance(p_values, np.ndarray)
-        assert isinstance(insufficient_data, dict)
+        per_factor = (
+            "scores",
+            "chi_squared",
+            "df_num",
+            "df_den",
+            "p_values",
+            "p_values_adjusted",
+            "design_effects",
+            "effective_groups",
+            "insufficient",
+            "testable",
+        )
+        assert set(result) == {*per_factor, "cells", "test", "n_rows", "n_groups"}
+        for key in per_factor:
+            assert isinstance(result[key], np.ndarray)
+            assert result[key].shape == (1,)
+        assert (result["test"], result["n_rows"], result["n_groups"]) == ("pearson", 2, 2)
+        assert set(result["cells"]) == {
+            "factor",
+            "level",
+            "class_label",
+            "observed",
+            "expected",
+            "deficit",
+            "lift",
+            "p_values",
+            "p_values_adjusted",
+            "sparse",
+            "testable",
+        }
 
     def test_insufficient_data_detection(self):
-        """Test detection of cells with counts < 5."""
+        """Test detection of tables with expected counts below Cochran's minimum."""
         binned_data = np.array([[0], [1], [0]], dtype=np.intp)
         class_labels = np.array([0, 1, 0], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
-        insufficient_data = result["insufficient_data"]
+        result = parity(binned_data, class_labels, assume_independent=True)
 
-        assert 0 in insufficient_data
-        assert len(insufficient_data[0]) > 0
+        assert result["insufficient"][0]
+        assert result["cells"]["sparse"].all()
 
     def test_multiple_factors(self):
         """Test with multiple factors."""
         binned_data = np.array([[0, 0, 1], [1, 1, 0], [0, 1, 1], [1, 0, 0]], dtype=np.intp)
         class_labels = np.array([0, 1, 0, 1], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
         assert result["scores"].shape == (3,)
         assert result["p_values"].shape == (3,)
 
     def test_zero_row_removal(self):
-        """Test that zero-only rows are properly handled."""
-        # Create data where one factor value never appears
+        """A factor with a single observed level does not raise."""
         binned_data = np.array([[0], [0], [0], [0]], dtype=np.intp)
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
-        # Should not raise error despite having only one factor value
         assert len(result["scores"]) == 1
         assert len(result["p_values"]) == 1
 
-    def test_single_sample_zero_score(self):
-        """A single sample yields a contingency total of 1 (n <= 1), giving a 0.0 score."""
-        binned_data = np.array([[0]], dtype=np.intp)
-        class_labels = np.array([0], dtype=np.intp)
+    def test_single_sample_is_untestable(self):
+        """A single sample holds one level and one class, so nothing can be tested."""
+        result = parity(np.array([[0]], dtype=np.intp), np.array([0], dtype=np.intp), assume_independent=True)
 
-        result = parity(binned_data, class_labels)
-
-        assert result["scores"][0] == 0.0
+        assert np.isnan(result["scores"][0])
+        assert not result["testable"][0]
 
     def test_single_class(self):
-        """Test with only one class label."""
+        """With one class, every level has the same class mix by construction: untestable, not independent."""
         binned_data = np.array([[0], [1], [0], [1]], dtype=np.intp)
         class_labels = np.array([0, 0, 0, 0], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
-        assert_array_almost_equal(result["scores"], [0.0])
-        assert_array_almost_equal(result["p_values"], [1.0])
+        assert np.isnan(result["scores"][0])
+        assert np.isnan(result["p_values"][0])
+        assert not result["testable"][0]
 
     def test_empty_arrays(self):
         """Test behavior with empty arrays."""
@@ -140,7 +186,7 @@ class TestParity:
         class_labels = np.array([], dtype=np.intp)
 
         with pytest.raises((ValueError, IndexError)):
-            parity(binned_data, class_labels)
+            parity(binned_data, class_labels, assume_independent=True)
 
     def test_mismatched_lengths(self):
         """Test error handling for mismatched input lengths."""
@@ -148,7 +194,11 @@ class TestParity:
         class_labels = np.array([0, 1, 2], dtype=np.intp)  # Different length
 
         with pytest.raises((ValueError, IndexError)):
-            parity(binned_data, class_labels)
+            parity(binned_data, class_labels, assume_independent=True)
+
+    def test_mismatched_groups(self):
+        with pytest.raises(ValueError, match="groups"):
+            parity(np.zeros((4, 1), np.intp), np.arange(4) % 2, np.arange(3))
 
     def test_large_factor_values(self):
         """Test with large factor values.
@@ -156,37 +206,34 @@ class TestParity:
         Note: Uses larger sample size (n=20) to avoid bias correction
         reducing the score to 0 in very small samples.
         """
-        # Increase sample size to avoid bias correction zeroing out the score
         binned_data = np.array([[100] * 5 + [200] * 5], dtype=np.intp).T
         class_labels = np.array([0] * 5 + [1] * 5, dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
         assert result["scores"][0] > 0
         assert 0 <= result["p_values"][0] <= 1
+        assert set(result["cells"]["level"].tolist()) == {100, 200}
 
     def test_dtype_consistency(self):
         """Test that output arrays have correct dtypes."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
         class_labels = np.array([0, 1], dtype=np.intp)
 
-        result = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels, assume_independent=True)
 
         assert result["scores"].dtype == np.float64
         assert result["p_values"].dtype == np.float64
+        assert result["insufficient"].dtype == np.bool_
+        assert result["cells"]["observed"].dtype == np.intp
 
     def test_class_labels_as_list(self):
         """Test with class_labels as different sequence types."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
 
-        # Test with list
-        result1 = parity(binned_data, [0, 1])  # type: ignore
-
-        # Test with tuple
-        result2 = parity(binned_data, (0, 1))  # type: ignore
-
-        # Test with numpy array
-        result3 = parity(binned_data, np.array([0, 1]))
+        result1 = parity(binned_data, [0, 1], assume_independent=True)  # type: ignore
+        result2 = parity(binned_data, (0, 1), assume_independent=True)  # type: ignore
+        result3 = parity(binned_data, np.array([0, 1]), assume_independent=True)
 
         assert_array_almost_equal(result1["scores"], result2["scores"])
         assert_array_almost_equal(result2["scores"], result3["scores"])
@@ -195,73 +242,141 @@ class TestParity:
 
 
 @pytest.mark.required
-class TestParityEffectiveN:
-    """Verify parity calculation with effective entity counts."""
+class TestSamplingUnit:
+    """D2: the caller must say what the independent unit is, and say it once."""
 
-    @staticmethod
-    def _replicated(seed, entities=60, fan_out=40):
-        """One factor and a label axis, independent, each value repeated `fan_out` times."""
-        rng = np.random.default_rng(seed)
-        factor = rng.integers(0, 3, entities)
-        labels = rng.integers(0, 3, entities)
-        return (
-            np.repeat(factor, fan_out)[:, None].astype(np.intp),
-            np.repeat(labels, fan_out).astype(np.intp),
-            factor[:, None].astype(np.intp),
-            labels.astype(np.intp),
-            entities,
+    def test_none_groups_without_declaration_raises(self):
+        with pytest.raises(ValueError, match="Cannot establish independent sampling units"):
+            parity(np.zeros((10, 1), int), np.arange(10) % 2)
+
+    def test_groups_and_declaration_together_raise(self):
+        with pytest.raises(ValueError, match="both"):
+            parity(np.zeros((10, 1), int), np.arange(10) % 2, np.arange(10), assume_independent=True)
+
+    def test_one_row_per_group_is_the_ungrouped_test(self):
+        """Singleton groups are the rows being independent, so the exact Pearson path runs."""
+        rng = np.random.default_rng(0)
+        f, y = rng.integers(0, 3, (200, 1)), rng.integers(0, 2, 200)
+        grouped = parity(f, y, rng.permutation(200))
+        ungrouped = parity(f, y, assume_independent=True)
+        assert grouped["test"] == "pearson"
+        assert grouped["n_groups"] == 200
+        assert grouped["p_values"][0] == ungrouped["p_values"][0]
+        np.testing.assert_array_equal(grouped["cells"]["p_values"], ungrouped["cells"]["p_values"])
+
+
+@pytest.mark.required
+class TestUngrouped:
+    def test_ungrouped_matches_scipy(self):
+        rng = np.random.default_rng(1)
+        f, y = rng.integers(0, 3, (300, 1)), rng.integers(0, 4, 300)
+        table = crosstab(f[:, 0], y).count
+
+        r = parity(f, y, assume_independent=True)
+        ref = chi2_contingency(table, correction=False)
+        assert r["chi_squared"][0] == pytest.approx(ref.statistic)
+        assert r["p_values"][0] == pytest.approx(ref.pvalue)
+        assert r["test"] == "pearson"
+        assert r["design_effects"][0] == 1.0
+        assert np.isinf(r["df_den"][0])
+        assert r["df_num"][0] == 6
+        assert r["effective_groups"][0] == 300
+
+        # Each cell is the exact hypergeometric test of its 2x2 collapse.
+        c = r["cells"]
+        i = cell(c, level=2, cls=1)
+        o, row, col = table[2, 1], table[2].sum(), table[:, 1].sum()
+        dist = hypergeom(300, row, col)
+        assert c["p_values"][i] == pytest.approx(min(1.0, 2 * min(dist.cdf(o), dist.sf(o - 1))))
+        assert c["expected"][i] == pytest.approx(ref.expected_freq[2, 1])
+
+    def test_cells_include_observed_zeros_and_deficit(self):
+        """The reviewer's table: 0 of 30 expected is a deficit, whatever the factor's V."""
+        r = parity(*expand([[0, 60], [1500, 1440]]), assume_independent=True)
+        c = r["cells"]
+        i = cell(c, level=0, cls=0)
+        assert c["observed"][i] == 0
+        assert c["expected"][i] == pytest.approx(30)
+        assert c["deficit"][i] == pytest.approx(30)
+        assert c["lift"][i] == 0.0
+        assert c["p_values_adjusted"][i] < 1e-15
+        assert r["scores"][0] < 0.3
+        assert c["observed"].size == 4
+
+    def test_untestable_factor_is_nan_not_independent(self):
+        r = parity(np.zeros((50, 1), int), np.arange(50) % 2, assume_independent=True)
+        assert np.isnan(r["scores"][0])
+        assert np.isnan(r["p_values"][0])
+        assert not r["testable"][0]
+
+        single_class = parity(np.arange(50)[:, None] % 2, np.zeros(50, int), assume_independent=True)
+        assert np.isnan(single_class["scores"][0])
+        assert not single_class["testable"][0]
+        assert not single_class["cells"]["testable"].any()
+
+    def test_all_factors_untestable_returns_nan(self):
+        r = parity(np.zeros((50, 3), int), np.arange(50) % 2, assume_independent=True)
+        assert np.isnan(r["p_values_adjusted"]).all()
+        assert np.isnan(r["cells"]["p_values_adjusted"]).all()
+
+    def test_bh_runs_over_testable_factors_and_cells_only(self):
+        rng = np.random.default_rng(2)
+        y = rng.integers(0, 2, 120)
+        f = np.column_stack([y ^ (rng.random(120) < 0.3), np.zeros(120, int), rng.integers(0, 3, 120)])
+        r = parity(f, y, assume_independent=True)
+
+        assert r["testable"].tolist() == [True, False, True]
+        assert np.isnan(r["p_values_adjusted"][1])
+        np.testing.assert_allclose(r["p_values_adjusted"][[0, 2]], benjamini_hochberg(r["p_values"][[0, 2]]))
+
+        c = r["cells"]
+        assert not c["testable"][c["factor"] == 1].any()
+        assert np.isnan(c["p_values_adjusted"][~c["testable"]]).all()
+        np.testing.assert_allclose(
+            c["p_values_adjusted"][c["testable"]], benjamini_hochberg(c["p_values"][c["testable"]])
         )
 
-    def test_replication_alone_rejects_independence_without_it(self):
-        """Verify that replicated rows without effective_n artificially inflate significance."""
-        wide, wide_labels, _, _, _ = self._replicated(0)
-        assert float(parity(wide, wide_labels)["p_values"][0]) < 1e-20
 
-    def test_scaling_to_the_entities_restores_the_honest_test(self):
-        """Verify scaling to effective entities matches un-replicated results."""
-        for seed in range(6):
-            wide, wide_labels, narrow, narrow_labels, entities = self._replicated(seed)
-            scaled = parity(wide, wide_labels, [entities, entities])
-            honest = parity(narrow, narrow_labels)
-            assert float(scaled["p_values"][0]) == pytest.approx(float(honest["p_values"][0]), abs=1e-12)
-            assert float(scaled["scores"][0]) == pytest.approx(float(honest["scores"][0]), abs=1e-12)
+@pytest.mark.required
+class TestGrouped:
+    def test_grouped_path_reports_rao_scott(self):
+        f, y, groups = _sequences()
+        r = parity(f, y, groups)
+        table = grouped_table(f[:, 0], y, groups)
 
-    def test_none_leaves_every_output_where_it_was(self):
-        """Verify effective_n=None preserves default row-based behavior."""
-        rng = np.random.default_rng(0)
-        factors = rng.integers(0, 3, (500, 2)).astype(np.intp)
-        labels = rng.integers(0, 2, 500).astype(np.intp)
-        without, with_none = parity(factors, labels), parity(factors, labels, None)
-        assert_array_almost_equal(without["p_values"], with_none["p_values"])
-        assert_array_almost_equal(without["scores"], with_none["scores"])
+        assert r["test"] == "rao_scott_f"
+        assert np.isfinite(r["df_den"][0])
+        assert r["n_groups"] == 40
+        assert r["n_rows"] == 1000
+        assert r["chi_squared"][0] == pytest.approx(table.chi_squared / table.design_effect)
+        assert r["p_values"][0] == pytest.approx(table.p_value)
+        assert r["design_effects"][0] == pytest.approx(table.design_effect)
+        assert r["effective_groups"][0] == pytest.approx(table.effective_groups)
+        np.testing.assert_allclose(r["cells"]["p_values"], table.cell_p_values.ravel())
+        np.testing.assert_array_equal(r["cells"]["sparse"], table.cell_sparse.ravel())
 
-    def test_counts_at_or_above_the_rows_change_nothing(self):
-        """Verify counts at or above row count do not change results."""
-        rng = np.random.default_rng(0)
-        factors = rng.integers(0, 3, (200, 1)).astype(np.intp)
-        labels = rng.integers(0, 2, 200).astype(np.intp)
-        assert float(parity(factors, labels, [200, 900])["p_values"][0]) == pytest.approx(
-            float(parity(factors, labels)["p_values"][0])
-        )
+    def test_a_class_seen_in_one_group_has_untestable_cells(self):
+        """The Korn-Graubard cell has no design df there, so the cell drops out of BH."""
+        rng = np.random.default_rng(3)
+        groups = np.repeat(np.arange(30), 20)
+        f = (groups % 2)[:, None]
+        y = rng.integers(0, 2, groups.size)
+        y[groups == 0] = 2  # class 2 only ever appears in group 0
+        r = parity(f, y, groups)
+        c = r["cells"]
 
-    def test_a_thin_cell_stays_flagged_once_it_is_scaled(self):
-        """Verify insufficient data flags operate on scaled contingency tables."""
-        factor = np.repeat(np.array([0, 0, 1, 1, 1, 1]), 40)[:, None].astype(np.intp)
-        labels = np.repeat(np.array([0, 1, 0, 1, 0, 1]), 40).astype(np.intp)
-        # Unscaled, every cell holds 40 or 80 and nothing is flagged.
-        assert not parity(factor, labels)["insufficient_data"]
-        flagged = parity(factor, labels, [6, 6])["insufficient_data"]
-        assert flagged, "the six entities behind this table leave cells below five"
-        counts = [c for cats in flagged.values() for classes in cats.values() for c in classes.values()]
-        assert all(isinstance(count, float) for count in counts), "scaled counts are entities, not rows"
+        assert r["testable"][0]
+        rare = c["class_label"] == 2
+        assert not c["testable"][rare].any()
+        assert c["testable"][~rare].all()
+        assert np.isnan(c["p_values_adjusted"][rare]).all()
+        np.testing.assert_allclose(c["p_values_adjusted"][~rare], benjamini_hochberg(c["p_values"][~rare]))
 
-    def test_the_length_must_match_the_columns_plus_the_axis(self):
-        """Verify effective_n length matches factor columns plus class labels."""
-        rng = np.random.default_rng(0)
-        factors = rng.integers(0, 3, (50, 2)).astype(np.intp)
-        labels = rng.integers(0, 2, 50).astype(np.intp)
-        with pytest.raises(ValueError, match="2 entries for 3 columns"):
-            parity(factors, labels, [50, 50])
+    def test_one_group_is_untestable(self):
+        r = parity(np.arange(20)[:, None] % 2, np.arange(20) % 3, np.zeros(20, int))
+        assert not r["testable"][0]
+        assert np.isnan(r["p_values"][0])
+        assert r["insufficient"][0]
 
 
 @pytest.mark.required
@@ -275,7 +390,7 @@ class TestPearsonRatherThanG:
         for _ in range(trials):
             factor = rng.integers(0, r, n).astype(np.intp)[:, None]
             labels = rng.integers(0, k, n).astype(np.intp)
-            rejected += float(parity(factor, labels)["p_values"][0]) <= 0.05
+            rejected += float(parity(factor, labels, assume_independent=True)["p_values"][0]) <= 0.05
         return rejected / trials
 
     def test_the_test_holds_its_level_on_a_thin_table(self):
@@ -290,7 +405,7 @@ class TestPearsonRatherThanG:
         """Verify Cramér's V reaches 1.0 for perfect association."""
         for categories, n in [(2, 10), (3, 30), (5, 20)]:
             values = (np.arange(n) % categories).astype(np.intp)
-            score = float(parity(values[:, None], values)["scores"][0])
+            score = float(parity(values[:, None], values, assume_independent=True)["scores"][0])
             assert score == pytest.approx(1.0), f"{categories} categories at n={n}"
 
     def test_the_score_never_exceeds_one(self):
@@ -300,42 +415,31 @@ class TestPearsonRatherThanG:
             n = int(rng.integers(8, 60))
             factor = rng.integers(0, 5, n).astype(np.intp)[:, None]
             labels = rng.integers(0, 5, n).astype(np.intp)
-            assert 0.0 <= float(parity(factor, labels)["scores"][0]) <= 1.0
+            score = float(parity(factor, labels, assume_independent=True)["scores"][0])
+            assert np.isnan(score) or 0.0 <= score <= 1.0
 
 
 @pytest.mark.required
 class TestCochranCriterion:
     """Verify Cochran sufficiency criterion based on expected counts."""
 
-    @staticmethod
-    def _from_table(table):
-        """Raw rows reproducing a contingency table, so `parity` builds it back."""
-        factor, labels = [], []
-        for i, row in enumerate(table):
-            for j, count in enumerate(row):
-                factor.extend([i] * int(count))
-                labels.extend([j] * int(count))
-        return np.array(factor, dtype=np.intp)[:, None], np.array(labels, dtype=np.intp)
-
     def test_a_table_the_observed_rule_could_not_see_is_flagged(self):
         """Verify tables with low expected counts are flagged even if observed counts are zero."""
-        factor, labels = self._from_table([[100, 0, 0], [0, 100, 0], [0, 0, 6]])
-        flagged = parity(factor, labels)["insufficient_data"]
-        assert flagged, "Cochran is breached here and the old observed-count rule was silent"
-        smallest = min(c for cats in flagged.values() for cls in cats.values() for c in cls.values())
-        assert smallest == pytest.approx(0.175, abs=1e-3)
+        r = parity(*expand([[100, 0, 0], [0, 100, 0], [0, 0, 6]]), assume_independent=True)
+        assert r["insufficient"][0], "Cochran is breached here and the old observed-count rule was silent"
+        c = r["cells"]
+        assert c["expected"][c["sparse"]].min() == pytest.approx(0.175, abs=1e-3)
 
     def test_a_table_with_small_observed_counts_but_ample_expected_is_not_flagged(self):
         """Verify tables with small observed counts but sufficient expected counts are not flagged."""
-        factor, labels = self._from_table([[47, 3], [3, 47]])
-        assert not parity(factor, labels)["insufficient_data"]
+        r = parity(*expand([[47, 3], [3, 47]]), assume_independent=True)
+        assert not r["insufficient"][0]
+        assert not r["cells"]["sparse"].any()
 
     def test_a_single_expected_count_below_one_is_enough(self):
         """Verify table is flagged if any expected count is below 1.0."""
-        factor, labels = self._from_table([[235, 235, 24], [235, 235, 24], [5, 5, 2]])
-        assert parity(factor, labels)["insufficient_data"]
+        assert parity(*expand([[235, 235, 24], [235, 235, 24], [5, 5, 2]]), assume_independent=True)["insufficient"][0]
 
     def test_a_fifth_of_cells_below_five_is_tolerated(self):
         """Verify table is not flagged when at most 20% of expected counts are below 5.0."""
-        factor, labels = self._from_table([[40, 40, 40], [40, 40, 40]])
-        assert not parity(factor, labels)["insufficient_data"]
+        assert not parity(*expand([[40, 40, 40], [40, 40, 40]]), assume_independent=True)["insufficient"][0]

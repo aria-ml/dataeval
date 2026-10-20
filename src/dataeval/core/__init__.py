@@ -27,6 +27,7 @@ __all__ = [
     "NullModelMetrics",
     "NullModelMetricsResult",
     "OntologyValidationResult",
+    "ParityCells",
     "ParityResult",
     "RankResult",
     "RedundantRunResult",
@@ -147,7 +148,7 @@ from dataeval.core._nullmodel import (
     nullmodel_recall,
 )
 from dataeval.core._ontology_validation import OntologyValidationResult, ontology_validation
-from dataeval.core._parity import ParityResult, parity
+from dataeval.core._parity import ParityCells, ParityResult, parity
 from dataeval.core._rank import (
     RankResult,
     rank_hdbscan_complexity,

@@ -249,10 +249,12 @@ bear on trusting a result:
 - **Missing values get a bin above the observed ones**, whose position is an
   artifact of keeping the codes contiguous rather than a statement that missing
   is large. Anything treating a binned factor as ordinal reads that position as
-  a value; {class}`.Balance` does not, since it declares every column discrete,
-  but {class}`.Parity` and anything reading the codes as magnitudes do. Where
-  the missing rate is material, check whether a finding is about the factor or
-  about its absence.
+  a value. {class}`.Balance` does not, since it declares every column discrete,
+  and neither does {class}`.Parity`, whose test is nominal: it reads each code as
+  an unordered category, never as a magnitude. For Parity the missing bin is
+  still a level, so a factor whose missingness goes with the class shows up as
+  an associated missing-value level. Where the missing rate is material, check
+  whether a finding is about the factor or about its absence.
 - **An explicit `continuous_factor_bins` entry marks a factor continuous**
   downstream regardless of what it actually contains.
 
@@ -271,8 +273,8 @@ bear on trusting a result:
     discrete categories, so a continuous factor must be cut somewhere. Changing
     the cut changes the score, and no setting is correct independent of the
     question being asked. For `parity` the cut also decides cell occupancy —
-    coarser bins avoid the sparse cells reported in `insufficient_data`, at the
-    cost of resolution.
+    coarser bins avoid the sparse cells reported as `too_thin` in
+    {attr}`.ParityOutput.cells`, at the cost of resolution.
 - - {class}`.Balance`
   - **Required in practice**
   - It passes `Metadata.factor_data`, which is bin and category indices
@@ -465,17 +467,63 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for what these measure.
     score measures the binning as much as the data — see
     [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
 - - {class}`.Parity` ⚠️
-  - Pearson's chi-squared with Bergsma (2013) bias correction for Cramér's V, and
-    Cochran (1954) for data sufficiency; all cited in the docstring.
-  - Anchored
-  - `score_threshold=0.3` (Cramér's V) and `p_value_threshold=0.05` decide which
-    factors are reported as associated with the label.
-  - **Experimental — the API may change or be removed.** Cells with fewer than
-    5 samples break the asymptotic approximation; they are listed in
-    `insufficient_data`, which **must** be checked before the score is used.
-    Categorical factors only — continuous factors reach it already binned, and
-    the binning decides cell occupancy. See
+  - Pearson's chi-squared on independent rows; the second-order Rao–Scott F
+    with Kish effective groups on grouped rows ([Rao & Scott, 1984](Parity.md#references);
+    [Thomas & Rao, 1987](Parity.md#references)). Exact hypergeometric and
+    Korn–Graubard cell tests, the grouped cells' variance bounded below by a
+    Kish cluster-model variance whose within-group correlation for each group
+    is the largest of the class's correlation pooled over the other levels, its
+    largest at another single level, the level's correlation in the other
+    classes, and the level's largest correlation in another single class (the
+    model is Kish's; how its correlation is estimated is this package's choice,
+    not a cited method), Bergsma's V with its null bias
+    matched to the design effect,
+    Cochran's screen, Benjamini–Hochberg adjustment; all cited in the
+    docstrings. See
+    [Parity](Parity.md).
+  - Cross-checked (statistic, p-value and cell p-values on independent rows
+    against SciPy); Anchored (grouped: sandwich covariance against a dense
+    implementation of its definition, the cluster-model cell variance against a
+    dense implementation of its definition, calibration under the null in eight
+    simulated designs within three Monte Carlo standard errors, and no cell
+    flagged beyond that bound in eleven null designs with bursty classes: up to
+    40 × 40 and 100 classes, two and three classes, group sizes and burst
+    patterns that differ by level, classes bursting in blocks of levels at
+    20 × 20 and 40 × 40; one further test holds the known limit below at its
+    measured rate)
+  - `score_threshold=0.3` (Cramér's V) and `p_value_threshold=0.05` (on
+    BH-adjusted p-values) decide which factors are `associated`.
+    `lift_threshold=1.25` decides which significant cells are actionable; 1
+    disables the band. `assume_independent=True`: set it only for a custom
+    container that records no sampling unit.
+  - **Experimental — the API may change or be removed.** Dependence *between*
+    groups, such as consecutive sequences from one flight, is not corrected and
+    makes p-values too small. With `group_source="declared"`, the p-values hold
+    only if the declaration is true. The reference distribution is asymptotic in
+    effective groups: calibration was measured in the scenarios on the concept
+    page, not proven in general, and power is low with few groups. A grouped
+    cell's variance is never below the cluster-model one, which does not shrink
+    when the cell is short. In two- and three-level tables of four classes this
+    cut the power to find a planted deficit by three quarters to nine tenths
+    at 60 to 100 groups (none lost at 200 to 300). In a 20 × 20 table of
+    bursty classes over 2,000 images, about five bursts per cell, a class at a
+    tenth of its share was never found; over 20,000 images a class at 30% of
+    its share always was. A deficit held by few groups is therefore often
+    reported as not significant rather than `underrepresented`. **Contraindication:** a class that comes in bursts at
+    one level of the factor only, while that level's other classes do not burst
+    (with two classes there are no others), such as a rare class seen in one or
+    a few crowded images at one level. A cell of that class at that level that
+    holds none of its bursts looks like a real shortage, and no variance
+    estimated from the data tells them apart; Parity does not detect it. In
+    simulated nulls, 11–17% of tables had a falsely flagged cell with two
+    classes and about two bursty images at one of 3 to 10 levels, 3–10% for one
+    such cell in a 2 × 2 to 3 × 4 table, and 26–33% and 49–54% when each of 20
+    or 40 levels burst in its own class, against the nominal 5%. The
+    contraindication is repeated in the `Parity` and `parity` docstrings.
+    `inconclusive` and `untestable` are not passes. Nominal: ordered bins are
+    read as unordered, and the binning decides cell occupancy. See
     [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
+    Measures association, not coverage against a mission.
 
 :::
 
@@ -883,16 +931,30 @@ statistical and computational.
   - Validation evidence
   - Contraindications
 - - {func}`.parity` ⚠️
-  - Bergsma (2013), cited in the docstring. See
-    {doc}`Dataset Bias and Coverage <DatasetBias>`.
-  - Anchored
-  - **Experimental.** Same sparse-cell and binning caveats as
-    {class}`.Parity` ⚠️; check `insufficient_data` before using the score.
+  - Pearson's chi-squared, or the second-order Rao–Scott F over `groups`, with
+    exact cell tests; Bergsma, Cochran, Rao & Scott, Thomas & Rao, Korn &
+    Graubard, Kish and Benjamini & Hochberg are cited in the docstrings. See
+    [Parity](Parity.md).
+  - Cross-checked (independent rows, against SciPy); Anchored (grouped)
+  - **Experimental.** Needs `groups` or `assume_independent=True`, and raises
+    without one. Same grouping, calibration and binning caveats as
+    {class}`.Parity` ⚠️. An untestable factor or cell is NaN, not independent:
+    read `testable` and `insufficient` before using a score.
 - - {func}`.label_parity`
-  - Chi-square test of label distribution parity.
-  - Anchored
-  - Compares label distributions only. Says nothing about feature-space
-    differences between the two sets.
+  - Pearson's chi-squared test of homogeneity on the 2 × K table of class
+    counts; the second-order Rao–Scott F when groups are given. See
+    [Label parity](DistributionShift.md#label-parity).
+  - Cross-checked (statistic and p-value without groups against
+    `scipy.stats.chi2_contingency`); Anchored (calibration at unequal sample
+    sizes, grouped calibration with unequal detections per image, symmetry)
+  - Detection and tracking labels need `expected_groups` and `observed_groups`:
+    read as independent labels, two detection datasets with one class
+    distribution were declared different 84–91% of the time in simulation.
+    Calling without groups or `assume_independent=True` warns in 1.2 and raises
+    from 2.0. Detection-label frequency only, not image-level class presence.
+    Both inputs need one class vocabulary. "No shift observed" is not evidence
+    of parity. Says nothing about feature-space differences between the two
+    sets.
 - - {func}`.mutual_info`, {func}`.mutual_info_classwise`
   - [Linfoot (1957)](https://www.sciencedirect.com/science/article/pii/S001999585790116X),
     cited in the docstring.
@@ -1058,9 +1120,9 @@ As of v{{ release }}:
 - {func}`.parity`, {class}`.Parity`, {func}`.uap` and `ParityOutput` raise
   {class}`~dataeval.exceptions.ExperimentalWarning` on first call or
   instantiation.
-- `ParityResult` carries the same experimental status but raises nothing on its
-  own — it is a `TypedDict` describing {func}`.parity`'s return value, and the
-  warning comes from the call that produced it.
+- `ParityResult` and `ParityCells` carry the same experimental status but raise
+  nothing on their own — they are `TypedDict`s describing {func}`.parity`'s
+  return value, and the warning comes from the call that produced it.
 
 **Changed defaults** (the symbol is not deprecated; only the transitional
 warning goes away):

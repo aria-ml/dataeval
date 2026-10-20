@@ -8,6 +8,7 @@ multiple-testing adjustment are each defined exactly once.
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
+from scipy.stats import hypergeom
 
 # Cochran's criterion for chi-square validity: no expected count below 1,
 # and no more than 20% of expected counts below 5.
@@ -103,6 +104,7 @@ def bias_corrected_cramers_v(
     n: ArrayLike,
     r: ArrayLike,
     k: ArrayLike,
+    design_effect: ArrayLike = 1.0,
 ) -> NDArray[np.float64] | np.float64:
     """
     Compute Cramér's V with the Bergsma (2013) bias correction.
@@ -120,6 +122,9 @@ def bias_corrected_cramers_v(
         Total count of the table (the effective count, if the table was rescaled).
     r, k : ArrayLike
         Number of rows and columns of the table.
+    design_effect : ArrayLike, default 1.0
+        Mean generalized design effect of the statistic, broadcast against the other
+        inputs. 1 for independent rows, which gives the plain Bergsma correction.
 
     Returns
     -------
@@ -140,16 +145,24 @@ def bias_corrected_cramers_v(
     0.0
     >>> float(bias_corrected_cramers_v(5.0, 1, 2, 2))
     0.0
+
+    Clustered rows carry less information, so the same statistic scores lower:
+
+    >>> round(float(bias_corrected_cramers_v(30.0, 200, 3, 4)), 4)
+    0.246
+    >>> round(float(bias_corrected_cramers_v(30.0, 200, 3, 4, design_effect=2.0)), 4)
+    0.2128
     """
     chi = np.asarray(chi_stat, dtype=np.float64)
     n_ = np.asarray(n, dtype=np.float64)
     r_ = np.asarray(r, dtype=np.float64)
     k_ = np.asarray(k, dtype=np.float64)
+    deff = np.asarray(design_effect, dtype=np.float64)
 
     with np.errstate(divide="ignore", invalid="ignore"):
         n_less_one = n_ - 1
         # 1. phi-squared, corrected for the expected value under independence
-        phi2_corr = np.maximum(0.0, chi / n_ - ((k_ - 1) * (r_ - 1)) / n_less_one)
+        phi2_corr = np.maximum(0.0, chi / n_ - deff * ((k_ - 1) * (r_ - 1)) / n_less_one)
         # 2. dimensions, corrected for the same bias
         r_corr = r_ - ((r_ - 1) ** 2) / n_less_one
         k_corr = k_ - ((k_ - 1) ** 2) / n_less_one
@@ -159,6 +172,42 @@ def bias_corrected_cramers_v(
     defined = (n_ > 1) & (min_dim_corr > 0)
     # ``[()]`` turns a 0-d result into a scalar and leaves arrays as they are
     return np.where(defined, score, 0.0)[()]
+
+
+def hypergeometric_cell_pvalues(table: NDArray[np.float64]) -> NDArray[np.float64]:
+    """
+    Exact two-sided p-value for every cell of a contingency table, given its margins.
+
+    Each cell is collapsed against the rest of the table. Under independence its count is
+    hypergeometric with the table total as the population, its row total as the number of
+    successes and its column total as the number of draws. The test is exact at any
+    expected count, unlike the normal approximation to a standardized residual.
+
+    The two-sided p-value is twice the smaller tail, capped at 1.
+
+    Parameters
+    ----------
+    table : NDArray[np.float64]
+        Integer-valued counts, shape (rows, columns), with no zero margins.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        p-values in [0, 1], the same shape as ``table``.
+
+    Examples
+    --------
+    >>> np.round(hypergeometric_cell_pvalues(np.array([[10.0, 0.0], [0.0, 10.0]])), 6).tolist()
+    [[1.1e-05, 1.1e-05], [1.1e-05, 1.1e-05]]
+    >>> hypergeometric_cell_pvalues(np.array([[10.0, 20.0], [20.0, 40.0]])).tolist()
+    [[1.0, 1.0], [1.0, 1.0]]
+    """
+    rows = table.sum(axis=1, keepdims=True)
+    cols = table.sum(axis=0, keepdims=True)
+    dist = hypergeom(M=table.sum(), n=rows, N=cols)
+    lower = dist.cdf(table)
+    upper = dist.sf(table - 1)
+    return np.minimum(1.0, 2.0 * np.minimum(lower, upper))
 
 
 def benjamini_hochberg(p_values: ArrayLike, n_tests: int | None = None) -> NDArray[np.float64]:

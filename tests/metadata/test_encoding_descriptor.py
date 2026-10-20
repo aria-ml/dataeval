@@ -69,7 +69,7 @@ class TestEncodingAccessor:
 class TestCodeNames:
     """Asking the record what a code means, without going through an evaluator.
 
-    The lookup existed and had no public door: :attr:`ParityOutput.insufficient_data` and
+    The lookup existed and had no public door: :attr:`ParityOutput.cells` and
     the ``label=`` axis groups are named through it, so anything rendering the same factor
     itself either got the same strings or approximated them.
     """
@@ -858,7 +858,7 @@ class TestARestoredInstanceIsStillConfigurable:
 
 @pytest.mark.required
 class TestALargeMagnitudeCutIsStillReadable:
-    """The labels key ``insufficient_data`` and name a ``label=`` axis's groups.
+    """The labels name the levels of Parity's ``cells`` and a ``label=`` axis's groups.
 
     Six significant figures is right for the factors most people have, and at 1.8e12 it
     rendered every bound of every bin identically — so the output that exists to say which
