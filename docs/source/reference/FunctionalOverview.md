@@ -75,7 +75,7 @@ DataEval's public API.
   - ✔
   - 
 * - {func}`Label parity <.label_parity>`
-  - Assesses equivalence in label frequency between datasets
+  - Tests whether two datasets share one class distribution (label shift), with detections grouped by image
   - ✔
   - ✔
   - 
@@ -90,7 +90,7 @@ DataEval's public API.
   - ✔
   - 
 * - {func}`Parity <.parity>`
-  - Detects if there is a significant relationship between the factor values and class labels
+  - Tests each factor, and each factor-level and class cell, for association with the class labels over independent groups
   - ✔
   - ✔
   - 
@@ -164,7 +164,8 @@ DataEval's public API.
   - ✔
   - ✔
 * - {class}`.Parity`
-  - Detects if there is a significant relationship between the factor values and class labels
+  - Tests each factor, and each factor-level and class cell, for association with the class labels
+  over independent images or sequences; a custom metadata container needs `item_indices`
   - ✔
   - ✔
   - 

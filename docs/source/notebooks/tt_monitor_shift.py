@@ -451,19 +451,38 @@ for name, detector in chunked_detectors.items():
 # [label parity](../concepts/DistributionShift.md#label-parity).\
 # There is parity between two sets of labels if the label frequencies are approximately equal.
 #
-# You will now compare the label distributions using the `label_parity` function.
+# You will now compare the label distributions using the `label_parity` function. It is a symmetric two-sample test: the
+# null hypothesis is that both datasets draw their labels from one class distribution, and neither is treated as the
+# known population.
+#
+# A VOC image can hold several boxes, and the boxes in one image resemble each other, so the labels are not independent
+# draws. Pass the item each label came from as `expected_groups` and `observed_groups`, here `Metadata.item_indices`, and
+# the test counts images rather than boxes as its independent unit. Without them, the test would treat every box as its
+# own independent item and can report p-values that are too small. See
+# [label parity](../concepts/DistributionShift.md#label-parity) for details.
 
 # %%
 # Get the metadata for each view
 train_md = Metadata(train_view)
 operational_md = Metadata(operational_view)
 
-# The views expose the four monitored classes
-label_parity(train_md.class_labels, operational_md.class_labels, num_classes=len(FURNITURE))["p_value"]
+# One image holds several boxes, so group the labels by the image each came from
+label_parity(
+    train_md.class_labels,
+    operational_md.class_labels,
+    expected_groups=train_md.item_indices,
+    observed_groups=operational_md.item_indices,
+)
 
 # %% [markdown]
-# From the {func}`.label_parity` function, you can see that it calculated a p_value of ~**0.96**. Since this is close to
-# 1.0, it can be said that the two distributions **have** class label parity, or similar distributions.
+# From the {func}`.label_parity` function, you can see that it calculated a p_value of ~**0.98** from a chi-squared of
+# ~**0.07**. Since this is close to 1.0, the test observed no difference between the two class distributions, and the
+# `score`, the effect size, is **0.0**. Because groups were given, `test` is `rao_scott_f`, which accounts for the boxes
+# inside an image resembling each other.
+#
+# Read this as *no shift observed*, not as proof of identical distributions: a non-significant result says only that the
+# samples did not show a shift at the power they had. Here `insufficient` is False, so the table is not too thin to
+# trust, and the test observed no shift in the monitored slice.
 
 # %% [markdown]
 # ### What a parity failure looks like
@@ -499,11 +518,16 @@ print(f"train label counts:       {train_label_counts}")
 print(f"poor parity label counts: {poor_parity_label_counts}")
 
 # %%
-label_parity(train_md.class_labels, poor_parity_md.class_labels, num_classes=len(FURNITURE))["p_value"]
+label_parity(
+    train_md.class_labels,
+    poor_parity_md.class_labels,
+    expected_groups=train_md.item_indices,
+    observed_groups=poor_parity_md.item_indices,
+)
 
 # %% [markdown]
-# The p_value is now effectively **zero**. Every `sofa` has been counted as a `chair`, so one class is empty while
-# another is inflated, and the two distributions **lack** parity.
+# The p_value is now effectively **zero** (~3e-32), and the `score` has risen from 0.0 to ~**0.29**. Every `sofa` has
+# been counted as a `chair`, so one class is empty while another is inflated, and the two distributions **lack** parity.
 #
 # In a real deployment this is the signal to go looking for a cause before retraining on the operational data: an
 # annotation policy that changed underneath you, a class your model never sees anymore, or an operational mix that has
@@ -535,14 +559,27 @@ for name, result in chunked_results.items():
         f"{name} chunk pattern changed: {list(result.details['drifted'])}"
     )
 
-# "a p_value of ~0.96 ... close to 1.0"
-parity_p_value = label_parity(train_md.class_labels, operational_md.class_labels, num_classes=len(FURNITURE))["p_value"]
+# "a p_value of ~0.98 ... close to 1.0", from the grouped Rao-Scott test
+parity_result = label_parity(
+    train_md.class_labels,
+    operational_md.class_labels,
+    expected_groups=train_md.item_indices,
+    observed_groups=operational_md.item_indices,
+)
+assert parity_result["test"] == "rao_scott_f"
+assert not parity_result["insufficient"]
+parity_p_value = parity_result["p_value"]
 assert parity_p_value > 0.9, f"label parity dropped to {parity_p_value}"
 
 # "The p_value is now effectively zero" -- and the contrived set must change labels only
 assert len(poor_parity_view) == len(operational_view), "the policy change should not drop images"
 assert len(poor_parity_md.class_labels) == len(operational_md.class_labels), "it should not drop annotations"
-poor_parity_result = label_parity(train_md.class_labels, poor_parity_md.class_labels, num_classes=len(FURNITURE))
+poor_parity_result = label_parity(
+    train_md.class_labels,
+    poor_parity_md.class_labels,
+    expected_groups=train_md.item_indices,
+    observed_groups=poor_parity_md.item_indices,
+)
 poor_parity_p_value = poor_parity_result["p_value"]
 assert poor_parity_p_value < 0.01, f"contrived poor-parity set no longer trips the check: {poor_parity_p_value}"
 

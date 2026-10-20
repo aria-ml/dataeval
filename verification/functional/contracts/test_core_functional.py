@@ -107,15 +107,19 @@ class TestCoreFunctional:
     def test_label_parity_and_factor_parity(self):
         from dataeval.core import label_parity, parity
 
-        same = label_parity(np.array([0, 0, 1, 1, 2, 2] * 10), np.array([0, 0, 1, 1, 2, 2] * 10))
+        # one label per item, so each row is its own independent sampling unit
+        same = label_parity(
+            np.array([0, 0, 1, 1, 2, 2] * 10), np.array([0, 0, 1, 1, 2, 2] * 10), assume_independent=True
+        )
         assert same["p_value"] == pytest.approx(1.0)
-        flipped = label_parity(np.array([0] * 50 + [1] * 10), np.array([1] * 50 + [0] * 10))
+        flipped = label_parity(np.array([0] * 50 + [1] * 10), np.array([1] * 50 + [0] * 10), assume_independent=True)
         assert flipped["p_value"] < 0.01
         assert flipped["chi_squared"] > same["chi_squared"]
 
         rng = np.random.default_rng(0)
-        result = parity(rng.integers(0, 3, (200, 2)), rng.integers(0, 2, 200))
+        result = parity(rng.integers(0, 3, (200, 2)), rng.integers(0, 2, 200), assume_independent=True)
         assert len(result["scores"]) == len(result["p_values"]) == 2
+        assert result["test"] == "pearson"
 
     def test_rank_functions_return_full_ranking(self):
         from dataeval.core import rank_hdbscan_distance, rank_kmeans_distance, rank_knn

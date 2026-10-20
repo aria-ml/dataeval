@@ -578,8 +578,11 @@ Kolmogorov-Smirnov (K-S) test
 
 ```{glossary}
 Label Parity
-    Label parity is a means for assessing equivalence in label frequency between datasets.
-    Label parity informs the user if the distribution of labels is different.
+    Label parity tests whether two datasets share one class distribution: a two-sample test of
+    homogeneity on their class counts, which detects {term}`label shift<Label Shift>`. Detection and
+    tracking labels need the image or sequence each label came from, so that labels from one image are
+    not counted as independent. A non-significant result means no shift was observed, not that the
+    distributions match. See {func}`.label_parity`.
 
 Label Shift
     In many real-world applications, the target (testing) distribution of a model can differ from the
@@ -756,9 +759,13 @@ P-Value
     occurred under the {term}`null hypothesis<Null Hypothesis>` of your statistical test.
 
 Parity
-    Parity, in data analysis, measures the {term}`statistical independence<Statistical Independence>`
-    between class labels and metadata factors using a {term}`Chi-Square Test of Independence`.
-    A lack of independence indicates bias. See {term}`bias<Bias>`.
+    Parity, in data analysis, tests the {term}`statistical independence<Statistical Independence>`
+    between class labels and a metadata factor: whether the class distribution is the same at every
+    level of the factor. DataEval uses a {term}`Chi-Square Test of Independence` when samples are
+    independent, and a version corrected for grouping when samples share an image or sequence, and
+    reports which (level, class) combinations hold more or fewer samples than independence predicts.
+    A lack of independence can indicate {term}`bias<Bias>`. Parity measures association, not
+    coverage: a condition rare for every class shows no association. See {class}`.Parity`.
 
 Perception-based Hash
     Hashing algorithms designed to remain unchanged on very similar inputs. They are designed to detect

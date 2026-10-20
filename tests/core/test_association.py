@@ -7,6 +7,7 @@ from dataeval.core._association import (
     bias_corrected_cramers_v,
     cochran_breach,
     cochran_breach_2x2,
+    hypergeometric_cell_pvalues,
 )
 
 
@@ -111,6 +112,49 @@ class TestBiasCorrectedCramersV:
             table = rng.integers(1, 30, (int(rng.integers(2, 5)), int(rng.integers(2, 5))))
             res = chi2_contingency(table, correction=False)
             assert float(bias_corrected_cramers_v(res.statistic, table.sum(), *table.shape)) >= 0.0  # type: ignore
+
+    @pytest.mark.required
+    def test_design_effect_one_is_bergsma(self):
+        assert float(bias_corrected_cramers_v(10.0, 200, 3, 4, design_effect=1.0)) == float(
+            bias_corrected_cramers_v(10.0, 200, 3, 4)
+        )
+
+    @pytest.mark.required
+    def test_design_effect_scales_only_the_null_mean(self):
+        # phi2 = 30/200 = 0.15; null mean at delta=2 is 2*6/199
+        expected = np.sqrt(max(0, 0.15 - 2 * 6 / 199) / min(3 - 1 - 4 / 199, 4 - 1 - 9 / 199))
+        assert float(bias_corrected_cramers_v(30.0, 200, 3, 4, design_effect=2.0)) == pytest.approx(expected)
+
+    @pytest.mark.required
+    def test_design_effect_broadcasts_against_arrays(self):
+        out = np.asarray(bias_corrected_cramers_v([30.0, 30.0], 200, 3, 4, design_effect=[1.0, 2.0]))
+        assert out.shape == (2,)
+        assert out[0] > out[1]
+
+
+class TestHypergeometricCellPvalues:
+    @pytest.mark.required
+    def test_hypergeometric_matches_reviewer_tables(self):
+        p = hypergeometric_cell_pvalues(np.array([[0.0, 60.0], [1500.0, 1440.0]]))
+        assert p[0, 0] < 1e-15
+        p4 = hypergeometric_cell_pvalues(np.array([[4.0, 0.0], [0.0, 36.0]]))
+        assert p4[0, 0] == pytest.approx(2 / 91390, rel=1e-6)  # 2 * P(X = 4), X ~ Hypergeom(40, 4, 4)
+
+    @pytest.mark.required
+    def test_hypergeometric_empty_cell_is_more_significant_than_normal_says(self):
+        # E = 5 at O = 0 (n=2000, margins 100/100): exact two-sided 0.0103, normal 0.0186
+        t = np.array([[0.0, 100.0], [100.0, 1800.0]])
+        assert hypergeometric_cell_pvalues(t)[0, 0] == pytest.approx(0.0103, abs=5e-4)
+
+    @pytest.mark.required
+    def test_shape_bounds_and_independence(self):
+        rng = np.random.default_rng(3)
+        table = rng.integers(0, 30, (3, 4)).astype(np.float64)
+        p = hypergeometric_cell_pvalues(table)
+        assert p.shape == table.shape
+        assert ((p >= 0.0) & (p <= 1.0)).all()
+        # A table at exactly its expected counts has no deviation to find
+        assert (hypergeometric_cell_pvalues(np.array([[10.0, 20.0], [20.0, 40.0]])) == 1.0).all()
 
 
 def _reference_bh(p):

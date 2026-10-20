@@ -262,7 +262,10 @@ class TestAggregateByClassJoin:
     def test_a_class_axis_read_per_image_counts_every_box_under_its_image(self, get_od_dataset):
         weather = ["rain" if i % 3 else "sun" for i in range(20)]
         factors = [{"weather": name, "hour": float(i)} for i, name in enumerate(weather)]
-        ds = get_od_dataset(list(np.random.default_rng(0).random((20, 3, 16, 16))), 2, True, metadata=factors)
+        images = list(np.random.default_rng(0).random((20, 3, 16, 16)))
+        # Fixed in-bounds boxes: the fixture's random ones are mostly invalid on a 16x16 image and depend on test order.
+        boxes = {i: [[0, 0, 8, 8], [6, 6, 14, 14]] for i in range(20)}
+        ds = get_od_dataset(images, 2, True, override=boxes, metadata=factors)
         result = Outliers(flags=ImageStats.PIXEL, outlier_threshold=("zscore", 0.5)).evaluate(ds, per_target=True)
         frame = result.data()
         assert frame["target_index"].drop_nulls().n_unique() == 2

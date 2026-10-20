@@ -297,7 +297,8 @@ handed.
 - - {func}`.parity` ⚠️, {class}`.Parity` ⚠️
   - **Required**
   - A contingency table needs cells to count into. Coarser bins avoid the sparse
-    cells reported in `insufficient_data`, at the cost of resolution.
+    cells reported as `too_thin` in {attr}`.ParityOutput.cells`, at the cost of
+    resolution.
 - - {func}`.split_dataset` with `split_on`
   - **Required**
   - Grouping needs discrete group identities. Note that `split_on` is ignored
@@ -449,7 +450,7 @@ vocabulary — a coarser taxonomy, a prefix, a lookup — to keep a column that 
 meant to be categorical.
 
 A merely *wide* vocabulary is not dropped. A factor whose levels are thin for the
-sample is what {attr}`.ParityOutput.insufficient_data` exists to report, and
+sample is what {attr}`.ParityOutput.cells` exists to report, and
 removing the factor would foreclose the mechanism that says so.
 
 That report names its levels rather than numbering them, and
@@ -516,7 +517,7 @@ the reason given [below](#missing-values-get-a-bin-with-a-position-but-no-meanin
 
 Those trade-offs line up with particular consumers. `"uniform_count"` is the one
 that matches what {func}`.parity` wants, since equal occupancy is what keeps
-cells out of `insufficient_data`. `"clusters"` is the only one that will not cut
+cells from being too sparse to test. `"clusters"` is the only one that will not cut
 through a mode on a visibly multimodal factor. The default trades both for a
 result that reads back as a histogram of the data.
 
@@ -589,6 +590,18 @@ Two bins, cut in the one place that carries meaning, and the `Parity` test now
 answers the question that was asked. A longer edge list adds resolution —
 `[-np.inf, -5, 0, 5, np.inf]` separates hard freeze from marginal freeze — but
 the edge at zero is the one doing the work.
+
+The answer is read from a cell rather than from the factor. The
+pedestrians-below-freezing row of {attr}`.ParityOutput.cells` gives the
+pedestrian images observed below 0 °C, the number expected if pedestrians were
+as common there as in the dataset as a whole, the `deficit` between the two,
+and a `status`: `underrepresented` when the shortfall is significant and at
+least the lift band (lift 0.80 or less by default), `too_thin` when there are
+too few freezing images to tell. The factor's overall Cramér's V does not enter
+that judgment, so a clear shortfall in one cell is reported even when the
+factor as a whole is only weakly associated. The
+[Parity page](Parity.md#the-table-observed-expected-lift-and-deficit)
+works this table through.
 
 ### A second collection
 

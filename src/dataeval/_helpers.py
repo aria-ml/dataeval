@@ -226,8 +226,8 @@ def _edge_format(edges: Sequence[float]) -> str:
     ``%g`` alone carries six significant figures, which suits most factors and leaves
     too little for the ones with large magnitudes. A capture time in epoch
     milliseconds sits near 1.787e12, so every bound of every bin rendered ``1.78711e+12``
-    and an eight-bin cut produced labels a reader cannot tell apart -- and those labels key
-    :attr:`~dataeval.bias.ParityOutput.insufficient_data` and name the groups of a ``label=``
+    and an eight-bin cut produced labels a reader cannot tell apart -- and those labels name
+    the ``cells`` of :class:`~dataeval.bias.ParityOutput` and the groups of a ``label=``
     axis, so the output that exists to say *which subset to collect more of* said nothing.
 
     Two regimes:
@@ -639,8 +639,8 @@ def _distinguish(names: dict[int, str]) -> dict[int, str]:
     Names are rendered with ``%g``, which carries six significant figures, so two genuinely
     different cutoffs can print identically -- ``1000000.4`` and ``1000000.6`` are both
     ``1e+06``, and the bin between them reads ``[1e+06, 1e+06)`` exactly like its neighbor.
-    A caller keying a dict by these names then loses one of the two entries outright:
-    :attr:`~dataeval.bias.ParityOutput.insufficient_data` reported one under-sampled level
+    A caller keying a dict by these names then loses one of the two entries outright, and
+    the ``level`` column of :attr:`~dataeval.bias.ParityOutput.cells` would show one level
     where the statistic had found two.
 
     The colliding names take their code alongside; the ones that were already unique are
@@ -986,6 +986,108 @@ def effective_entity_counts(metadata: Any, axis: LabelAxis, names: Sequence[str]
     counts = np.asarray(counter(levels), dtype=np.intp)
     # Return None if all factors have at least as many entities as rows.
     return None if bool(np.all(counts >= len(axis.values))) else counts
+
+
+class IndependenceGroups(NamedTuple):
+    """The independent sampling unit :func:`independence_groups` resolved.
+
+    Attributes
+    ----------
+    groups : NDArray[np.intp] or None
+        One group id per row, or None when each row is its own unit.
+    source : {"level", "item", "rows", "declared"}
+        Where the unit came from: the metadata's item level, declared ``item_indices``,
+        rows the recorded structure establishes as independent, or the caller's word.
+    level : str or None
+        The item level for ``"level"``, None otherwise.
+    """
+
+    groups: NDArray[np.intp] | None
+    source: Literal["level", "item", "rows", "declared"]
+    level: str | None
+
+
+def independence_groups(metadata: Any, assume_independent: bool) -> IndependenceGroups:
+    """Resolve which rows are independent of each other, failing closed when nothing says.
+
+    The recorded structure always wins; ``assume_independent`` is consulted only when
+    nothing records one. In order:
+
+    1. A :class:`~dataeval.Metadata` groups by its ``item_indices`` at the current view
+       (``"level"``), the item-level view included: rows that share an item id are one unit,
+       and ids that are one-to-one with the rows leave each row its own item (``"rows"``).
+    2. Any other container with ``item_indices`` groups by them (``"item"``). The protocol's
+       default of one label per item is *not* applied to a container that lacks them.
+    3. ``item_indices`` that are one-to-one from either source make the rows the unit
+       (``"rows"``): there is nothing to cluster.
+    4. ``assume_independent`` declares the rows independent (``"declared"``).
+
+    Parameters
+    ----------
+    metadata : Any
+        A :class:`~dataeval.Metadata` or any container that may carry ``item_indices``.
+    assume_independent : bool
+        The caller's declaration that each row is its own independent item.
+
+    Returns
+    -------
+    IndependenceGroups
+        The group ids (None when rows are the unit), their source and the level.
+
+    Raises
+    ------
+    ValueError
+        When the metadata has a level above its item level, when ``item_indices`` does not
+        have one entry per row, or when nothing establishes the unit and
+        ``assume_independent`` is False.
+    """
+    # Local: dataeval.core imports dataeval.types, which imports this module.
+    from dataeval.core._parity import NO_SAMPLING_UNIT
+
+    recorded = _recorded_groups(metadata)
+    if recorded is not None:
+        return recorded
+    if assume_independent:
+        return IndependenceGroups(None, "declared", None)
+    raise ValueError(NO_SAMPLING_UNIT)
+
+
+def _recorded_groups(metadata: Any) -> IndependenceGroups | None:
+    """Read the unit the metadata records for itself, or None when it records none."""
+    item_level = getattr(metadata, "item_level", None)
+    if item_level is None:
+        return _grouped_by("item", None, metadata)
+    parents = metadata._levels.parents_of(item_level)
+    if parents:
+        raise ValueError(
+            f"This metadata has a level above the item level ({item_level!r} sits under "
+            f"{list(parents)}), so the dataset item is not the coarsest grouping and the "
+            "independent sampling unit cannot be inferred from it."
+        )
+    # Read at every view, the item level included: `Metadata.from_factors` can record
+    # repeated item ids at a view that equals its item level.
+    return _grouped_by("level", item_level, metadata)
+
+
+def _grouped_by(source: Literal["level", "item"], level: str | None, metadata: Any) -> IndependenceGroups | None:
+    indices = metadata.item_indices if source == "level" else getattr(metadata, "item_indices", None)
+    if indices is None:
+        return None
+    groups = np.asarray(indices, dtype=np.intp)
+    # A `Metadata` counts its rows at the view; class_labels is undefined above its label level.
+    rows = len(metadata) if source == "level" else len(metadata.class_labels)
+    if len(groups) != rows:
+        # Refused rather than read as unique: a record that does not cover the rows says
+        # nothing about which are independent, and 1:1 would certify all of them.
+        raise ValueError(
+            f"`item_indices` has {len(groups)} entries for {rows} rows, so it does not record "
+            "which item each row came from."
+        )
+    # One row per item (an image classification view, a detection per image) is the rows
+    # being independent, however it was recorded.
+    if len(np.unique(groups)) == len(groups):
+        return IndependenceGroups(None, "rows", None)
+    return IndependenceGroups(groups, source, level)
 
 
 def factors_excluding(metadata: MetadataLike, excluded: Sequence[int]) -> tuple[NDArray[Any], list[str], list[int]]:

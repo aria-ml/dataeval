@@ -75,9 +75,14 @@ See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md).
 
 ### Are label distributions inconsistent across subgroups?
 
-Use {class}`.Parity` or {func}`.label_parity` to test for statistical
-disparities in labeling across groups.
-See the [identify bias tutorial](../notebooks/tt_identify_bias.py).
+Use {class}`.Parity` ⚠️ to test whether the class mix differs across the levels
+of a metadata factor, and which (level, class) combinations hold more or fewer
+samples than independence predicts. Its `underrepresented` cells are collection
+candidates. Parity measures association, not coverage: a condition that is rare
+for every class, such as 1% night images, shows no association, so a shortfall
+against a mission's needs is not something Parity reports.
+See the [Parity concept page](../concepts/Parity.md)
+and the [identify bias tutorial](../notebooks/tt_identify_bias.py).
 
 ### Does my dataset cover the range of conditions the model will encounter in deployment?
 
@@ -169,6 +174,15 @@ to choose the right detector for your data characteristics:
 | Needs reconstruction-based detection or streaming support | {class}`.DriftReconstruction`                           |
 
 See the [monitor shift tutorial](../notebooks/tt_monitor_shift.py).
+
+### Has the class mix shifted between two datasets?
+
+Use {func}`.label_parity` to test whether two label samples, such as training
+and operational, or two collection periods, share one class distribution. For
+detection or tracking labels, pass the image or sequence each label came from as
+`expected_groups` and `observed_groups`: labels from one image are not
+independent, and without groups the test reports shifts that are not there.
+See [Label parity](../concepts/DistributionShift.md#label-parity).
 
 ### How far has my operational data shifted from training, quantitatively?
 

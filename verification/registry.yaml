@@ -93,7 +93,9 @@ requirements:
     with an `is_imbalanced` flag on `classwise`.'
   - '`Diversity` (Simpson or Shannon) returns `factors` and `classwise` diversity, with an `is_low_diversity` flag
     on `factors`.'
-  - '`Parity` returns bias-corrected Cramér''s V per factor with `is_significant` and `insufficient_data` diagnostics.'
+  - '`Parity` tests factors against class labels over independent sampling units and returns bias-corrected Cramér''s
+    V per factor with a `status`, an `is_associated` flag and an insufficiency flag, plus per-cell `status` and
+    `is_actionable` findings.'
   - All three accept a `Metadata` object or an annotated dataset and handle categorical and continuous factors.
   - Outputs extend `DictOutput` and support `.data()` and `.meta()`.
 - id: FR-6
@@ -436,11 +438,12 @@ test_cases:
     - bias::test_diversity_factors_has_low_diversity_flag
     - bias::test_diversity_supports_shannon_method
   - do: Run `Parity` on the dataset.
-    expect: A `ParityOutput` with a `factors` frame, an `is_significant` column, and `insufficient_data` diagnostics.
+    expect: A `ParityOutput` with a `factors` frame with `status` and `is_associated` columns and a `cells` frame
+      with an `is_actionable` column.
     tests:
     - bias::test_parity_returns_output
-    - bias::test_parity_output_has_factors_and_insufficient_data
-    - bias::test_parity_factors_has_correlation_flag
+    - bias::test_parity_output_has_factors_and_cells
+    - bias::test_parity_factors_has_association_flag
   - do: Run each evaluator on a `Metadata` object with a continuous factor.
     expect: Continuous factors are handled and appear in the results.
     tests:

@@ -335,20 +335,84 @@ operational, or one collection period vs. another. This is label shift in its
 simplest measurable form, and it is the specific question that
 {func}`.label_parity` addresses.
 
-Label parity compares label frequency distributions between two datasets using
-a chi-squared test. When the test returns a significant result, the class prior
-$P(Y)$ has shifted: certain classes appear more or less frequently in the
-operational data than in the reference. A model calibrated on training class
-frequencies will be miscalibrated for the new distribution — it will
-over-predict previously common classes and under-predict now-more-common ones.
+**A two-sample test of homogeneity.** The labels of both datasets form a
+2 × K table of class counts, K being the classes that occur in either. The null
+hypothesis is that both samples were drawn from one class distribution. Without
+groups the test is Pearson's chi-squared test of homogeneity without continuity
+correction, identical to `scipy.stats.chi2_contingency(table, correction=False)`.
+It is symmetric: swapping the two datasets gives the same result, and neither is
+treated as the known population. Before v1.2, `label_parity` treated the
+expected sample as the exact population, which with both samples drawn from one
+distribution rejected 27–87% of the time at α = 0.05 (see
+[the migration notes](../migration/v1.2.md#label_parity-tests-homogeneity)).
 
-Label parity is particularly useful as a lightweight, human-interpretable
-complement to feature-based drift detection. It requires only class labels,
-not embeddings or a trained model, and its output is immediately actionable:
-if class frequencies have shifted, rebalancing training data or adjusting
-decision thresholds is a concrete response. If feature drift is detected but
-label parity holds, the shift is in the input distribution without a change in
-class prevalence — characteristic of covariate shift rather than label shift.
+When the test returns a significant result, the class prior $P(Y)$ has shifted:
+certain classes appear more or less frequently in the operational data than in
+the reference. A model calibrated on training class frequencies will be
+miscalibrated for the new distribution — it will over-predict previously common
+classes and under-predict now-more-common ones.
+
+**Detections and tracks need groups.** One image contributes many detection
+labels, and one sequence many frames of the same tracks. Labels from one image
+share its scene and resemble each other, so they are not independent draws.
+Pass one group id per label, the item index for detections or the sequence id
+for tracks, as `expected_groups` and `observed_groups`. Give both or neither:
+one dataset's labels cannot be clustered while the other's are assumed
+independent. The two datasets' groups are always kept distinct, however they
+are numbered. With groups the test is the second-order Rao–Scott F that
+{class}`.Parity` ⚠️ uses, with dataset membership as a two-level factor;
+[the Parity page](Parity.md#the-factor-test) explains
+the design effect and effective groups. Dependence between groups is not
+corrected.
+
+The groups matter. Two detection datasets were drawn from one class
+distribution but differed in image count and in detections per image: 500
+images of about 3 detections against 100 images with log-normal counts, and
+1,000 single-detection images against 50 crowded ones, each simulated 1,000
+times. Read as independent labels, the pairs were declared different 84–91% of
+the time at α = 0.05. Grouped by image, 4.4–4.7%.
+
+Without groups, pass `assume_independent=True` when each label is a whole item,
+as in image classification. A call with neither groups nor
+`assume_independent=True` still runs as if every label were independent, but
+warns with `DeprecatedWarning`; from 2.0 it raises. `assume_independent=False`
+without groups raises now. The `num_classes` argument is ignored, since the
+classes are the ones that occur in either sample; passing it warns with
+`DeprecatedWarning`, and it is removed in 2.0.
+
+**The population and the vocabulary.** The test is about the frequency of
+detection labels. Images with no detections contribute no labels and are
+outside it. Whether a class is *present* in an image is a different question,
+answered by `image_counts_per_class` from {func}`.label_stats`. Both inputs must
+use one class vocabulary, because equal integer codes do not make equal
+classes. Use {class}`.Relabel` to conform two datasets first.
+
+**The effect size.** Besides `chi_squared` and `p_value`, the result carries
+`score`: the bias-corrected Cramér's V between dataset membership and class,
+with its null bias matched to the design effect when groups are given, from 0
+(one shared class distribution) to 1 (no class in common). On a large sample a
+trivially small shift is significant, so read `score` beside `p_value`. The
+result also carries `insufficient`, the same Cochran and effective-groups screen
+as {class}`.Parity`'s `has_insufficient_data`; the degrees of freedom `df_num`
+and `df_den`; and `test`, `"pearson"` or `"rao_scott_f"`.
+
+**No shift observed is not parity.** A non-significant result says the samples
+did not show a shift at the power they had. It is not evidence that the two
+distributions match. With a single class across both inputs, `label_parity`
+returns a chi-squared of 0, a p-value of 1 and a score of 0, flagged
+`insufficient`: no shift was observed in the sampled labels, and the test cannot
+speak to classes neither sample showed. A grouped table with fewer than two
+groups, or too few effective groups, is untestable and returns NaN rather than a
+verdict.
+
+Label parity is a lightweight, human-interpretable complement to feature-based
+drift detection. It requires only class labels, plus the item each label came
+from for detections, not embeddings or a trained model. If class frequencies
+have shifted, rebalancing training data or adjusting decision thresholds is a
+concrete response. If feature drift is detected but label parity observes no
+shift, the shift may be in the input distribution without a detectable change in
+class prevalence, which is characteristic of covariate shift rather than label
+shift.
 
 ## Out-of-distribution detection
 

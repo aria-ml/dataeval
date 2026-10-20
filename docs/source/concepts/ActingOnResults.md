@@ -280,21 +280,54 @@ real risk.
 
 ### Parity
 
-{class}`.Parity` (experimental) measures statistical dependence between metadata
-factors and labels using bias-corrected Cramér's V, with Pearson's chi-squared
-test for significance. It sets `has_insufficient_data` when the contingency table
-fails Cochran's criterion on expected cell counts (< 5).
+{class}`.Parity` ⚠️ (experimental) tests each metadata factor for association
+with the class labels over independent images or sequences, and reports every
+combination of a factor level and a class as a row of `cells`. See
+[Parity](Parity.md)
+for the method and its assumptions. Act on each cell's `status` and `deficit`
+(expected minus observed rows):
 
-The `insufficient_data` flag in the output identifies factor-label combinations
-where the sample count requirement was not met. These combinations cannot be
-assessed for parity — the absence of a flag does not mean parity exists, it
-means the data was too sparse to test. This is itself actionable: it identifies
-collection targets where the current dataset has gaps too large to characterize.
+- **`underrepresented`** cells are collection candidates: the cell holds reliably
+  fewer rows than independence predicts, by at least the lift band. Rank them by
+  `deficit`. The deficit is measured against independence, not against a
+  mission, and neither it nor the p-value measures collection cost or mission
+  value. On grouped data it counts rows, so a deficit of 30 detections may be a
+  few crowded images.
+- **`overrepresented`** cells are shortcut evidence. The interpretation is the
+  same as for Balance: decide whether the association is a collection artifact
+  (addressable by collecting the under-represented combinations) or an intrinsic
+  property of the task (documentable as a limitation).
+- **`too_thin`** cells have too little expected data, or too few independent
+  groups, to judge. Collect to find out. A small p-value on a thin cell is still
+  not a finding.
+- **`no_finding`** includes cells that are significant but whose lift is inside
+  the band (`lift_threshold`, 1.25 by default). They stay visible through
+  `is_deviant`.
 
-Where Parity flags significant dependence, the interpretation is the same as for
-Balance: determine whether the dependence is a collection artifact (addressable
-by rebalancing data) or an intrinsic property of the task (documentable as a
-limitation).
+```python
+result = Parity().evaluate(dataset)
+gaps = result.cells.filter(pl.col("status") == "underrepresented").sort("deficit", descending=True)
+thin = result.cells.filter(pl.col("status") == "too_thin")
+```
+
+At the factor level, `inconclusive` and `untestable` are never passes. An
+`inconclusive` factor was not significant on a table too thin to call that a
+negative (`has_insufficient_data`), and an `untestable` factor has NaN results
+because the design cannot answer the question at all, for example a single
+level, a single class or a single group. Neither says the factor is independent
+of the class.
+
+Parity cannot point at a combination the dataset never contains. A level that
+never occurs, or a class absent from the whole dataset, has no row in any table
+and so no cell. A level and a class that both occur, but never together, do
+appear: as a cell with `observed` 0. Finding conditions the dataset lacks
+entirely is a coverage question.
+
+Check `group_source` before citing a p-value. `"level"`, `"item"` and `"rows"`
+mean the independent unit came from the dataset's own structure. `"declared"`
+means the caller passed `assume_independent=True`, and the p-values hold only if
+that declaration is true. Dependence between groups, such as consecutive
+sequences from one flight, is not corrected in any case.
 
 ### Coverage and completeness
 

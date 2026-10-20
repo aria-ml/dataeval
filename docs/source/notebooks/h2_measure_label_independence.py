@@ -29,7 +29,8 @@
 # ### When to use
 #
 # DataEval provides a {func}`.label_parity` function to use when you would like to determine if two datasets have
-# statistically independent labels.
+# statistically independent labels. It is a symmetric two-sample test of homogeneity: the null hypothesis is that both
+# datasets draw their labels from one class distribution.
 
 # %% [markdown]
 # ### What you will need
@@ -81,15 +82,29 @@ test_labels = test_md.class_labels
 # ## Evaluate label statistical independence
 #
 # Now, let's look at how to use DataEval's label statistics analyzer. Using the {func}`.label_parity` function, compute
-# the chi-squared value of hypothesis that test_ds has the same class distribution as train_ds by specifying the labels of
-# the two datasets to be compared. It also returns the p-value of the test.
+# the chi-squared value of the hypothesis that test_ds has the same class distribution as train_ds by specifying the
+# labels of the two datasets to be compared. It also returns the p-value of the test.
+#
+# The test needs to know which labels are independent of each other. In `MNIST` every image carries exactly one label,
+# so each label is its own independent item, and you declare that with `assume_independent=True`. For object detection
+# or tracking datasets, where one image or sequence contributes many labels, you would instead pass the item each label
+# came from as `expected_groups` and `observed_groups`, for example `Metadata.item_indices`. See
+# [label parity](../concepts/DistributionShift.md#label-parity) for details.
 
 # %%
-results = label_parity(train_labels, test_labels)
+results = label_parity(train_labels, test_labels, assume_independent=True)
 print(
     f"The chi-squared value for the two label distributions is {results['chi_squared']}, "
     f"with p-value {results['p_value']}"
 )
+
+# %% [markdown]
+# The chi-squared value is about **2.93** and the p-value is about **0.97**. A p-value this close to 1.0 means the test
+# observed no difference between the `MNIST` train and test class distributions. That is the absence of an observed
+# shift, not proof that the distributions match: it says the samples did not show a shift at the power they had. The
+# result also carries a `score`, the effect size, which is 0.0 here because the bias-corrected measure finds no
+# association between dataset and class. `insufficient` is False because the table is not too thin to trust, and `test`
+# reads `pearson` because no groups were given.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###

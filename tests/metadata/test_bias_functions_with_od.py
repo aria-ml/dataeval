@@ -250,12 +250,12 @@ class TestBiasFunctionsWithOD:
         # parity() uses binned_data and class_labels
         result = Parity().evaluate(md)
 
-        # result.factors is a DataFrame with factor_name, score, p_value, is_significant, has_insufficient_data
+        # result.factors is a DataFrame with factor_name, status, score, p_value, is_associated, has_insufficient_data
         assert result.factors.height == len(md.factor_names)
         assert "factor_name" in result.factors.columns
         assert "score" in result.factors.columns
         assert "p_value" in result.factors.columns
-        assert "is_significant" in result.factors.columns
+        assert "is_associated" in result.factors.columns
         assert "has_insufficient_data" in result.factors.columns
 
         # Verify factor names match

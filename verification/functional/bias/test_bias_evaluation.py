@@ -61,28 +61,31 @@ class TestBiasEvaluation:
     def test_parity_returns_output(self):
         from dataeval.bias import Parity, ParityOutput
 
-        result = Parity().evaluate(make_metadata())
+        # make_metadata has one row per item, so each row is its own independent sampling unit
+        result = Parity(assume_independent=True).evaluate(make_metadata())
         assert isinstance(result, ParityOutput)
 
-    def test_parity_output_has_factors_and_insufficient_data(self):
+    def test_parity_output_has_factors_and_cells(self):
         from dataeval.bias import Parity
 
-        result = Parity().evaluate(make_metadata())
+        result = Parity(assume_independent=True).evaluate(make_metadata())
         assert isinstance(result.factors, pl.DataFrame)
-        assert isinstance(result.insufficient_data, dict)
+        assert isinstance(result.cells, pl.DataFrame)
 
-    def test_parity_factors_has_correlation_flag(self):
+    def test_parity_factors_has_association_flag(self):
         from dataeval.bias import Parity
 
-        result = Parity().evaluate(make_metadata())
-        assert "is_significant" in result.factors.columns
+        result = Parity(assume_independent=True).evaluate(make_metadata())
+        assert "is_associated" in result.factors.columns
+        assert "status" in result.factors.columns
+        assert "is_actionable" in result.cells.columns
 
     def test_all_bias_outputs_support_meta(self):
         from dataeval.bias import Balance, Diversity, Parity
 
         metadata = make_metadata()
-        for cls in (Balance, Diversity, Parity):
-            result = cls().evaluate(metadata)
+        for evaluator in (Balance(), Diversity(), Parity(assume_independent=True)):
+            result = evaluator.evaluate(metadata)
             meta = result.meta()
             assert meta is not None
 

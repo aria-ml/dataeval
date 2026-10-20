@@ -16,8 +16,8 @@
 # %% [markdown]
 # # Identify bias and correlations
 #
-# This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/DatasetBias.md#measuring-bias-normalized-mutual-information)
-# and [diversity](../concepts/DatasetBias.md#measuring-bias-normalized-mutual-information).
+# This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/DatasetBias.md#measuring-bias-mutual-information-and-evenness)
+# and [diversity](../concepts/DatasetBias.md#measuring-bias-mutual-information-and-evenness).
 #
 # Estimated time to complete: 15 minutes
 #

@@ -3386,10 +3386,9 @@ class Metadata(Array, FeatureExtractor):
 
         A code is opaque on its own -- ``illum_lux = 3`` says nothing -- and the encoding
         record is what turns it back into ``[0, 12.4)`` or ``rain``. This is that lookup,
-        asked directly. It is what :attr:`~dataeval.bias.ParityOutput.insufficient_data`
-        reports its levels through and what names the groups of a ``label=`` axis, so a
-        caller rendering the same factor themselves gets the same strings those outputs
-        use rather than approximating them.
+        asked directly. It is what names the levels in :attr:`~dataeval.bias.ParityOutput.cells`
+        and the groups of a ``label=`` axis, so a caller rendering the same factor themselves
+        gets the same strings those outputs use rather than approximating them.
 
         Names come from the **record**, not from the rows. A bin is named for the interval
         its edges describe, so the same policy reads the same way over a different draw and
@@ -3630,7 +3629,7 @@ class Metadata(Array, FeatureExtractor):
           vocabulary — a coarser taxonomy, a prefix, a lookup — if the factor is meant to
           be categorical. A merely *wide* vocabulary is kept: a factor whose levels are
           thin for the sample is reported by
-          :attr:`~dataeval.bias.ParityOutput.insufficient_data`, not removed.
+          :attr:`~dataeval.bias.ParityOutput.cells` (``too_thin``), not removed.
           :meth:`repair` is where that smaller vocabulary is declared, and for the usual
           case of a timestamp :class:`~dataeval.types.ParseDateTime` supplies one.
 
@@ -4905,7 +4904,7 @@ class Metadata(Array, FeatureExtractor):
         cells can this sample fill", which is the right question for choosing a *bin count*
         and the wrong one for deciding whether a column is a factor at all — twenty-five
         cities over a hundred images overruns it and is a perfectly good factor.
-        :attr:`~dataeval.bias.ParityOutput.insufficient_data` is what reports a thin level;
+        :attr:`~dataeval.bias.ParityOutput.cells` is what reports a thin level;
         deleting the factor forecloses the mechanism that exists to say so.
 
         Answered once per column and remembered, because it is a question about the column

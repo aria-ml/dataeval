@@ -20,7 +20,7 @@
 # ## Problem statement
 #
 # When performing analysis on datasets,
-# [metadata](../concepts/DatasetBias.md#measuring-bias-normalized-mutual-information) may
+# [metadata](../concepts/DatasetBias.md#measuring-bias-mutual-information-and-evenness) may
 # sometimes be sparse or unavailable. Adding metadata to a dataset for analysis
 # may be necessary at times, and can come in the forms of calculated intrinsic
 # values or additional information originally unavailable on the source dataset.

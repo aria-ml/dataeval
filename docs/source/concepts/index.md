@@ -14,6 +14,7 @@ Each page may cover several evaluators that work together to answer questions ab
 - [Embeddings](Embeddings.md)
 - [Clustering](Clustering.md)
 - [Dataset Bias and Coverage](DatasetBias.md)
+- [Parity](Parity.md)
 - [Performance Limits](PerformanceLimits.md)
 - [Distribution Shift](DistributionShift.md)
 - [Divergence](Divergence.md)
@@ -33,6 +34,7 @@ ExtrinsicFactors
 Embeddings
 Clustering
 DatasetBias
+Parity
 PerformanceLimits
 DistributionShift
 Divergence
