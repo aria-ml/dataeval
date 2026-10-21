@@ -33,7 +33,7 @@ class HashStatCalculator(Calculator):
         """Return which flags this calculator handles."""
         return ImageStats.HASH
 
-    def _collect(self, digest: Callable[[NDArray[Any]], tuple[str, str | None]]) -> list[str]:
+    def _collect(self, digest: Callable[[NDArray[Any]], tuple[str, str | None]], *, anchor: bool) -> list[str]:
         """Hash the view, or report its absence.
 
         Data that is entirely NaN was not measured — an out-of-bounds box, or a band group
@@ -44,13 +44,15 @@ class HashStatCalculator(Calculator):
         """
         if self.cache.is_all_nan:
             return [""]
-        # float64 explicitly, not whatever dtype the view happens to carry. `xxhash`
-        # digests the raw bytes, so an 8-bit view and a float64 one of the same pixels
-        # hash differently — and which of the two a row gets would otherwise depend on
-        # whether its window needed padding. Anchoring here keeps a digest comparable
-        # across rows, across runs and across releases; the perceptual hashes are
-        # unaffected either way, since they resample before they read anything.
-        hash_value, warning = digest(np.asarray(self.cache.image, dtype=np.float64))
+        # `xxhash` digests the raw bytes, so an 8-bit view and a float64 one of the same
+        # pixels hash differently, and which of the two a row gets would otherwise depend
+        # on whether its window needed padding. It therefore takes a float64 anchor, which
+        # keeps its digest comparable across rows, runs and releases. The perceptual hashes
+        # must not be given one: `to_canonical_grayscale` reads float data with a maximum
+        # of at most 1 as [0, 1] and stretches it to full contrast, so a near-black integer
+        # frame would hash as if it were full contrast.
+        image = np.asarray(self.cache.image, dtype=np.float64) if anchor else self.cache.image
+        hash_value, warning = digest(image)
         if warning:
             self.warnings.append(warning)
         return [hash_value]
@@ -58,27 +60,27 @@ class HashStatCalculator(Calculator):
     def _compute_xxhash(self) -> list[str]:
         from dataeval.core._hash import _xxhash
 
-        return self._collect(_xxhash)
+        return self._collect(_xxhash, anchor=True)
 
     def _compute_phash(self) -> list[str]:
         from dataeval.core._hash import _phash
 
-        return self._collect(_phash)
+        return self._collect(_phash, anchor=False)
 
     def _compute_phash_d4(self) -> list[str]:
         from dataeval.core._hash import _phash_d4
 
-        return self._collect(_phash_d4)
+        return self._collect(_phash_d4, anchor=False)
 
     def _compute_dhash(self) -> list[str]:
         from dataeval.core._hash import _dhash
 
-        return self._collect(_dhash)
+        return self._collect(_dhash, anchor=False)
 
     def _compute_dhash_d4(self) -> list[str]:
         from dataeval.core._hash import _dhash_d4
 
-        return self._collect(_dhash_d4)
+        return self._collect(_dhash_d4, anchor=False)
 
     def get_empty_values(self) -> dict[str, Any]:
         """Return empty values for hash statistics."""

@@ -167,8 +167,15 @@ class PoolWrapper:
         """Enter the runtime context related to this object."""
         return self
 
-    def __exit__(self, *args: object) -> None:
-        """Exit the runtime context and clean up the pool if it was created."""
+    def __exit__(self, exc_type: type[BaseException] | None, *args: object) -> None:
+        """Exit the runtime context and clean up the pool if it was created.
+
+        On an error, including an interrupt, queued work is dropped rather than run, so the
+        error surfaces once the tasks already in flight finish.
+        """
         if self._pool is not None:
-            self._pool.close()
+            if exc_type is None:
+                self._pool.close()
+            else:
+                self._pool.terminate()
             self._pool.join()

@@ -1,6 +1,7 @@
 """Core stateless functions for performing dataset, metadata and model evaluation."""
 
 __all__ = [
+    "AddressedResult",
     "AnnotationDivergence",
     "BERResult",
     "ClusterResult",
@@ -101,6 +102,7 @@ __all__ = [
     "track_stats",
     "xxhash",
     "uap",
+    "video_stats",
 ]
 
 from dataeval.core._alignment import SubsequenceAlignment, align_subsequence
@@ -117,6 +119,7 @@ from dataeval.core._combination_scores import ColumnKind, CombinationScoresResul
 from dataeval.core._completeness import CompletenessResult, completeness
 from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._compute_stats import (
+    AddressedResult,
     FactorResult,
     StatsResult,
     combine_stats_results,
@@ -177,3 +180,4 @@ from dataeval.core._sequence_residuals import SequenceResidualsResult, sequence_
 from dataeval.core._temporal import RedundantRunResult, redundant_runs
 from dataeval.core._track_stats import TrackStatsResult, track_stats
 from dataeval.core._uap import uap
+from dataeval.core._video_stats import video_stats

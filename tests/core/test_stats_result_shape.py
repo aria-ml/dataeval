@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any, get_type_hints
 
+import numpy as np
 import pytest
 
-from dataeval.core import FactorResult, StatsResult
-from dataeval.types import Aggregator
+from dataeval.core import AddressedResult, FactorResult, StatsResult, combine_stats_results
+from dataeval.types import Aggregator, SourceIndex
 
 
 @pytest.mark.required
@@ -62,3 +63,17 @@ class TestStatsResultShape:
 
     def test_still_carries_declarations(self):
         assert "aggregations" in StatsResult.__optional_keys__
+
+
+@pytest.mark.required
+class TestAddressedResult:
+    def test_stats_result_extends_it(self):
+        assert {"stats", "source_index"} <= StatsResult.__required_keys__
+        assert set(AddressedResult.__required_keys__) == {"stats", "source_index"}
+
+    def test_combine_accepts_results_without_image_bookkeeping(self):
+        one = AddressedResult(stats={"n": np.array([1, 2])}, source_index=[SourceIndex(0), SourceIndex(1)])
+        two = AddressedResult(stats={"n": np.array([3])}, source_index=[SourceIndex(0)])
+        stats, index, _ = combine_stats_results([one, two])
+        assert stats["n"].tolist() == [1, 2, 3]
+        assert [si.item for si in index] == [0, 1, 2]

@@ -1,6 +1,6 @@
 """Module for flag enums that control function behavior."""
 
-__all__ = ["ImageStats"]
+__all__ = ["ImageStats", "VideoStats"]
 
 from enum import Flag, auto
 
@@ -244,3 +244,121 @@ class ImageStats(Flag):
 
     # Ultimate convenience
     ALL = NO_HASH | HASH
+
+
+class VideoStats(Flag):
+    """
+    Flag enumeration for controlling per-video statistics computation.
+
+    Each statistic describes one whole video, so a result has one row per video. Every
+    selected statistic is computed in a single walk of each video's frames. Flags can be
+    combined using bitwise OR (|) to select multiple statistics.
+
+    Individual Stats
+    ----------------
+    Descriptive Statistics (computed from frame timestamps, never from pixels):
+
+    - `DESCRIPTIVE_FRAME_COUNT` : Frames the stream yielded (``n_frames``)
+    - `DESCRIPTIVE_DURATION` : Seconds from the first frame to the end of the last
+      (``video_duration``)
+    - `DESCRIPTIVE_FRAME_RATE` : Frames per second, ``n_frames / video_duration``
+      (``frame_rate``)
+
+    Redundancy Statistics (perceptual hash of each frame, compared with its predecessor):
+
+    - `REDUNDANCY_FRACTION` : Share of frames that carry nothing new over the frame before
+      (``redundant_fraction``)
+    - `REDUNDANCY_LONGEST_RUN` : Frames in the longest stretch of such frames
+      (``longest_run``)
+
+    Ego-motion Statistics (the per-frame camera motion of :func:`~dataeval.core.ego_stats`,
+    summarized over the video; need OpenCV, from the ``dataeval[opencv]`` extra):
+
+    - `EGO_PAN_SPEED` : Median pan/tilt speed (``pan_speed_median``)
+    - `EGO_ZOOM_RATE` : Median zoom rate (``zoom_rate_median``)
+    - `EGO_ROLL_RATE` : Median roll rate (``roll_rate_median``)
+    - `EGO_SHEAR_RATE` : Median shear rate (``shear_rate_median``)
+    - `EGO_MOVER_FRAC` : Median share of flow the camera does not explain
+      (``mover_frac_median``)
+    - `EGO_MOVER_SPEED` : Median speed of that independent motion (``mover_speed_median``)
+    - `EGO_PAN_X_VARIABILITY` : Mean absolute rate of change of horizontal pan
+      (``pan_x_variability``)
+    - `EGO_PAN_Y_VARIABILITY` : Mean absolute rate of change of vertical pan
+      (``pan_y_variability``)
+    - `EGO_ZOOM_EXCURSION` : Total absolute zoom (``zoom_rate_excursion``)
+    - `EGO_ROLL_EXCURSION` : Total absolute roll (``roll_rate_excursion``)
+    - `EGO_MOTION` : Most common per-frame motion label (``motion_mode``)
+
+    Convenience Groups
+    ------------------
+    - `NONE` : No statistics
+    - `DESCRIPTIVE` : All descriptive statistics
+    - `REDUNDANCY` : All redundancy statistics
+    - `EGO` : All ego-motion statistics
+    - `NO_EGO` : All statistics that do not need camera ego-motion. The default for
+      :func:`~dataeval.core.video_stats`
+    - `ALL` : All available statistics
+
+    Notes
+    -----
+    Every `EGO` statistic comes out of one optical-flow fit per frame pair, and the flow fit
+    dominates the cost. Selecting any one `EGO` flag pays for the whole fit; the rest only
+    choose which columns come back.
+
+    Examples
+    --------
+    Select specific statistics:
+
+    >>> stats = VideoStats.DESCRIPTIVE_FRAME_COUNT | VideoStats.DESCRIPTIVE_DURATION
+
+    Use convenience groups:
+
+    >>> stats = VideoStats.DESCRIPTIVE
+    """
+
+    # ===== NONE (no stats) =====
+    NONE = 0
+
+    # ===== DESCRIPTIVE STATS =====
+    DESCRIPTIVE_FRAME_COUNT = auto()
+    DESCRIPTIVE_DURATION = auto()
+    DESCRIPTIVE_FRAME_RATE = auto()
+
+    # ===== REDUNDANCY STATS =====
+    REDUNDANCY_FRACTION = auto()
+    REDUNDANCY_LONGEST_RUN = auto()
+
+    # ===== EGO STATS =====
+    EGO_PAN_SPEED = auto()
+    EGO_ZOOM_RATE = auto()
+    EGO_ROLL_RATE = auto()
+    EGO_SHEAR_RATE = auto()
+    EGO_MOVER_FRAC = auto()
+    EGO_MOVER_SPEED = auto()
+    EGO_PAN_X_VARIABILITY = auto()
+    EGO_PAN_Y_VARIABILITY = auto()
+    EGO_ZOOM_EXCURSION = auto()
+    EGO_ROLL_EXCURSION = auto()
+    EGO_MOTION = auto()
+
+    # ===== GROUPS =====
+    DESCRIPTIVE = DESCRIPTIVE_FRAME_COUNT | DESCRIPTIVE_DURATION | DESCRIPTIVE_FRAME_RATE
+    REDUNDANCY = REDUNDANCY_FRACTION | REDUNDANCY_LONGEST_RUN
+    EGO = (
+        EGO_PAN_SPEED
+        | EGO_ZOOM_RATE
+        | EGO_ROLL_RATE
+        | EGO_SHEAR_RATE
+        | EGO_MOVER_FRAC
+        | EGO_MOVER_SPEED
+        | EGO_PAN_X_VARIABILITY
+        | EGO_PAN_Y_VARIABILITY
+        | EGO_ZOOM_EXCURSION
+        | EGO_ROLL_EXCURSION
+        | EGO_MOTION
+    )
+
+    NO_EGO = DESCRIPTIVE | REDUNDANCY
+
+    # Ultimate convenience
+    ALL = NO_EGO | EGO

@@ -19,6 +19,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+from dataeval.config import use_max_processes
 from dataeval.core import ego_stats
 from dataeval.core._ego_stats import (
     EGO_AGGREGATIONS,
@@ -834,3 +835,54 @@ class TestRealVideo:
         result = ego_stats(cast("VideoStream", self._stream(video_path(control_clean_clip))))
         fracs = np.asarray(result["stats"]["mover_frac"], dtype=float)
         assert np.nanmax(fracs) > 0.0
+
+
+# ============================== per-video runner ==============================
+
+
+class TestRunner:
+    """ego_stats runs through the shared per-video runner, one video per worker."""
+
+    def test_parallel_output_is_bit_identical(self):
+        ds = cast("MultiobjectTrackingDataset", FakeDataset([panning_stream(seed=s) for s in range(3)]))
+        serial = ego_stats(ds)
+        with use_max_processes(2):
+            parallel = ego_stats(ds)
+        # assert_equal walks the lists exactly, treating NaN as equal, where an object-array
+        # comparison would fail on every leading-gap NaN.
+        for name in serial["stats"]:
+            np.testing.assert_equal(serial["stats"][name], parallel["stats"][name], err_msg=name)
+
+    def test_max_frames_stops_pulling_frames(self):
+        pulled = []
+
+        def frames():
+            for f in panning_stream(n_frames=10):
+                pulled.append(f.frame_index)
+                yield f
+
+        ego_stats(cast("VideoStream", frames()), max_frames=4)
+        assert pulled == [0, 1, 2, 3]
+
+    def test_opencv_is_imported_before_the_runner_starts(self, monkeypatch: pytest.MonkeyPatch):
+        """run_videos caps OpenCV's threads only when cv2 is already imported.
+
+        Importing it first in the workers would skip the cap on a process's first parallel call.
+        """
+        from dataeval.core import _ego_stats as ego
+
+        calls: list[str] = []
+        require, run = ego._require_cv2, ego.run_videos
+
+        def recording_require() -> Any:
+            calls.append("cv2")
+            return require()
+
+        def recording_run(*args: Any, **kwargs: Any) -> Any:
+            calls.append("run")
+            return run(*args, **kwargs)
+
+        monkeypatch.setattr(ego, "_require_cv2", recording_require)
+        monkeypatch.setattr(ego, "run_videos", recording_run)
+        ego_stats(cast("VideoStream", panning_stream(n_frames=3)))
+        assert calls[:2] == ["cv2", "run"]

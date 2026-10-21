@@ -122,8 +122,12 @@ def _ordered(column: str, order: str) -> pl.Expr:
     Reporting over the readings that do have a position is the same answer
     :attr:`Reduction.gap_sensitive` already gives for a reading that was never taken: the
     reduction cannot place it, so it does not pretend to.
+
+    Sorted first and filtered after, by a mask sorted the same way: filtering both sides
+    first made polars 1.0 refuse a group whose every key is missing, since its two empty
+    sides "produced a different number of groups".
     """
-    return pl.col(column).filter(pl.col(order).is_not_null()).sort_by(_positioned(order))
+    return pl.col(column).sort_by(pl.col(order)).filter(pl.col(order).sort().is_not_null())
 
 
 def _variability(column: str, order: str) -> pl.Expr:

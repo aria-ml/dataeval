@@ -879,6 +879,61 @@ track and detection row beneath them — so a per-detection analysis can already
 see the sequence's camera summary without running any aggregation itself. See
 [Propagation](#propagation-values-move-down-never-up).
 
+### Volatility and drift of a per-frame statistic
+
+Brightness, blur and every other {func}`.image_stats` value are measured on one
+frame, so they belong at the `unit` level. Two questions about a video then ask
+for more than the mean of that column: how much the value *jumps around* from
+frame to frame, and whether it *moves steadily* in one direction. Both depend on
+the order of the frames, so they are the temporal reductions `variability` and
+`trend` from [Reading a level as a series](#reading-a-level-as-a-series).
+
+{class}`.SequenceFrames` presents a video dataset as a dataset of frames, so
+{func}`.image_stats` measures every frame. The values come back in frame order,
+one per `unit` row, and `per_target=False` leaves out the per-detection rows:
+
+```python
+from dataeval import Metadata
+from dataeval.core import image_stats
+from dataeval.data import SequenceFrames
+from dataeval.flags import ImageStats
+
+md = Metadata(dataset)  # a multi-object tracking dataset
+stats = image_stats(SequenceFrames(dataset), stats=ImageStats.VISUAL_BRIGHTNESS, per_target=False)
+md.add_factors(stats["stats"], level="unit")
+```
+
+Passing the whole result with `level="unit"` is refused, because the result
+already addresses each value as a frame of a video. Pass its `["stats"]` mapping
+to place the values by position, which matches when every frame takes part.
+
+Then roll the column up to each video:
+
+```python
+rolled = md.aggregate("brightness", level="sequence", how="variability")
+rolled = rolled.aggregate("brightness", level="sequence", how="trend")
+# adds `brightness_variability` and `brightness_trend`, one value per video
+```
+
+- `variability` answers *how unsteady is this video?* It is the mean absolute
+  change in brightness per second, so a flickering or strobing feed scores high
+  and a steady one scores near zero, whatever its average brightness.
+- `trend` answers *is this video drifting?* It is the least-squares slope of
+  brightness against time, in brightness units per second. A sunset or an
+  auto-exposure ramp has a trend far from zero; a stable shot does not.
+
+Both read the frames in time order, taken from `time_s` where the level holds
+it. Each is null for a video with a single frame.
+
+{func}`.video_stats` answers a neighboring question with one row per video, and
+the two split the work. A per-video summary *screens the dataset*: attach it with
+`md.add_factors(video_stats(dataset))` and rank or filter the videos worth a look.
+The per-frame values *localize the problem inside one video*: once a video is
+flagged, plot its `brightness` column against `time_s` to see which frames flicker
+or where the drift starts. `video_stats` computes its own summaries from a single
+walk of each video; for a per-frame statistic of your own, such as the brightness
+above, the roll-up through {meth}`.Metadata.aggregate` is the route.
+
 ## Saving and reading Metadata
 
 Building metadata reads every item of the dataset — decoding images, unpacking
