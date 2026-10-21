@@ -124,7 +124,6 @@ from dataeval.core._compute_stats import (
     StatsResult,
     combine_stats_results,
     compute_stats,
-    image_stats,
 )
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
@@ -138,6 +137,7 @@ from dataeval.core._hash_index import (
     hash_neighbors,
     pack_hashes,
 )
+from dataeval.core._image_stats import image_stats
 from dataeval.core._label_alignment import LabelAlignmentResult, label_alignment
 from dataeval.core._label_cooccurrence import LabelCooccurrenceResult, label_cooccurrence
 from dataeval.core._label_coverage import LabelCoverageResult, label_coverage
