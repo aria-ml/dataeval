@@ -467,7 +467,7 @@ class SourceLocator:
     way from that coordinate back to the data it was measured over.
 
     **Give it the same object you computed the statistics over.** An address's ``item`` is
-    a position in whatever :func:`~dataeval.core.compute_stats` walked, so a locator over
+    a position in whatever :func:`~dataeval.core.image_stats` walked, so a locator over
     a different object resolves it to different data. Where that object is a
     :class:`View`, :attr:`SourceItem.source_item_index` reports the position in the
     dataset underneath.
@@ -498,7 +498,7 @@ class SourceLocator:
     Notes
     -----
     One datum is held at a time, so addresses *read* in item order — which is the order
-    :func:`~dataeval.core.compute_stats` emits and evaluators preserve — read each item
+    :func:`~dataeval.core.image_stats` emits and evaluators preserve — read each item
     once, while a shuffled batch re-reads. Where a batch is not already in that order,
     ``sorted(addresses, key=lambda address: address.sort_key)`` puts it there; the frames
     and tracks of one video are held alongside its datum, so the saving compounds.
@@ -604,7 +604,7 @@ class SourceLocator:
             raise TypeError(
                 f"{type(self._dataset).__name__} yields {type(datum).__name__} rather than a MAITE "
                 "(image, target, metadata) datum, so there is no target to read a task from and no "
-                "metadata to trace a finding by. `compute_stats` accepts a bare iterable of arrays; "
+                "metadata to trace a finding by. `image_stats` accepts a bare iterable of arrays; "
                 "retrieving what its addresses name needs the dataset those arrays came from.",
             )
         target = datum[1]

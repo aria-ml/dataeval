@@ -186,7 +186,7 @@ evidence of model failure.
 
 ### Image statistics
 
-{func}`.compute_stats` computes statistics (mean, standard deviation,
+{func}`.image_stats` computes statistics (mean, standard deviation,
 entropy, sharpness, and others) for whole images, for bounding boxes, and — with
 `channels=` — for named groups of bands, with {class}`.ImageStats` flags
 controlling which statistics are calculated. These are diagnostic inputs

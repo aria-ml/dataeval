@@ -1,6 +1,6 @@
 # Image Statistics
 
-`compute_stats` measures four families of statistics about an image (pixel, visual,
+`image_stats` measures four families of statistics about an image (pixel, visual,
 dimension, and hash), and two of them—pixel and visual—answer fundamentally different
 kinds of questions. Knowing which is which is the difference between a number you can
 compare across a dataset and one you cannot.
@@ -74,7 +74,7 @@ because the mean of a temperature band is a perfectly good mean.
 Declare the interval to get a reading back:
 
 ```python
-compute_stats(elevation_data, stats=ImageStats.VISUAL, value_range=(-2000.0, 2000.0))
+image_stats(elevation_data, stats=ImageStats.VISUAL, value_range=(-2000.0, 2000.0))
 ```
 
 A declaration says *these are physical values spanning this range*. It implies no bit
@@ -122,5 +122,5 @@ is often a less direct route to the same question.
 ## See also
 
 - {doc}`DataIntegrity` — the evaluators these statistics feed
-- {func}`~dataeval.core.compute_stats` — the flags and their parameters
+- {func}`~dataeval.core.image_stats` — the flags and their parameters
 - {class}`~dataeval.flags.ImageStats` — the full statistic list

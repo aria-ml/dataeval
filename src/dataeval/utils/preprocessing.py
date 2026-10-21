@@ -389,7 +389,7 @@ def boxes_to_mask(image_shape: tuple[int, ...], boxes: Iterable[BoxLike]) -> NDA
     That choice is not shared by :class:`~dataeval.data.DetectionCrops`, whose
     ``region="surround"`` masks the object out with round-to-nearest instead, matching
     the crop window it is masking within. The two therefore disagree by up to a
-    one-pixel ring: a background measured by ``compute_stats(per_background=True)`` and
+    one-pixel ring: a background measured by ``image_stats(per_background=True)`` and
     one embedded from ``DetectionCrops(region="surround")`` are not the same region, and
     a comparison between them carries that difference.
 
@@ -673,7 +673,7 @@ class ChannelGroup:
     it scale: a 224-band cube is asked about as three band groups, not 224 columns.
 
     Most callers never construct one. A bare index, sequence or range passed to
-    :func:`~dataeval.core.compute_stats`'s ``channels`` is converted automatically;
+    :func:`~dataeval.core.image_stats`'s ``channels`` is converted automatically;
     reach for the class when a group needs `value_range`.
 
     Parameters

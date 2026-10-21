@@ -1,6 +1,6 @@
-"""End-to-end import of real ``compute_stats`` output into ``Metadata``.
+"""End-to-end import of real ``image_stats`` output into ``Metadata``.
 
-Every test here starts from an actual :func:`~dataeval.core.compute_stats` call on a mock
+Every test here starts from an actual :func:`~dataeval.core.image_stats` call on a mock
 dataset and finishes by checking where the values landed. That combination is the point:
 unit tests that hand-build a factor array agree with whatever convention the code under
 test currently implements, so they keep passing when the convention and the producer drift
@@ -16,7 +16,7 @@ import pytest
 
 from dataeval import Metadata
 from dataeval._metadata._input import _is_stats_result
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.flags import ImageStats
 from dataeval.types import SourceIndex
 from tests.conftest import _get_mock_ic_dataset, _get_mock_od_dataset
@@ -60,7 +60,7 @@ def ic_dataset():
 
 
 def _stats(dataset, **kwargs):
-    return compute_stats(dataset, stats=SCALAR_STATS, normalize_pixel_values=False, **kwargs)
+    return image_stats(dataset, stats=SCALAR_STATS, normalize_pixel_values=False, **kwargs)
 
 
 def _distinct(values) -> bool:
@@ -139,7 +139,7 @@ class TestAddFactorsFromComputeStats:
 
     def test_vector_valued_stats_are_skipped_not_fatal(self, od_dataset):
         """ImageStats.ALL includes histogram/percentiles/center, which have no column form."""
-        result = compute_stats(od_dataset, normalize_pixel_values=False)
+        result = image_stats(od_dataset, normalize_pixel_values=False)
 
         md = Metadata(od_dataset)
         md.add_factors(dict(result["stats"]), source_index=result.get("source_index", []))
@@ -195,7 +195,7 @@ class TestFromFactorsFromComputeStats:
 
     def test_vector_valued_stats_are_skipped_not_fatal(self, od_dataset):
         """Without a filter these flatten to a wrong length and abort the whole call."""
-        result = compute_stats(od_dataset, normalize_pixel_values=False)
+        result = image_stats(od_dataset, normalize_pixel_values=False)
 
         md = Metadata.from_factors(dict(result["stats"]), source_index=result.get("source_index", []))
 
@@ -301,14 +301,14 @@ class TestFromFactorsFromComputeStats:
         assert sorted(md.dropped_factors) == ["center", "histogram"]
 
     def test_single_row_stats_result_splits_the_right_way(self):
-        """The same edge against real compute_stats output, where these shapes actually arise.
+        """The same edge against real image_stats output, where these shapes actually arise.
 
         One image and one row of output is the only shape that produces ``mean`` as ``(1,)``
         alongside ``histogram`` as ``(1, 256)`` and ``center`` as ``(1, 2)`` — the three
         arrays whose classification a squeeze inverts.
         """
         dataset = _get_mock_od_dataset(_images(1), [[0]], _boxes([[0]]))
-        result = compute_stats(dataset, normalize_pixel_values=False, per_target=False)
+        result = image_stats(dataset, normalize_pixel_values=False, per_target=False)
         assert np.asarray(result["stats"]["mean"]).shape == (1,)
         assert np.asarray(result["stats"]["histogram"]).shape == (1, 256)
 
@@ -422,7 +422,7 @@ class TestBackgroundStatsImport:
     """``per_background`` output through ``add_factors``, which is how it gets analyzed."""
 
     def test_background_lands_at_the_unit_level(self, od_dataset):
-        result = compute_stats(od_dataset, stats=SCALAR_STATS, per_background=True, normalize_pixel_values=False)
+        result = image_stats(od_dataset, stats=SCALAR_STATS, per_background=True, normalize_pixel_values=False)
 
         md = Metadata(od_dataset)
         md.add_factors(result)
@@ -440,9 +440,7 @@ class TestBackgroundStatsImport:
 
     def test_background_matches_the_source_index_row_for_row(self, od_dataset):
         """The stored values are the computed ones, on the rows the source index named."""
-        result = compute_stats(
-            od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False
-        )
+        result = image_stats(od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False)
         expected = {
             source: value
             for source, value in zip(result.get("source_index", []), result["stats"]["background_mean"], strict=True)
@@ -465,7 +463,7 @@ class TestBackgroundStatsImport:
 
     def test_instance_level_split_is_not_created(self, od_dataset):
         """Background has no value on an instance row, so it gets no instance column."""
-        result = compute_stats(od_dataset, stats=SCALAR_STATS, per_background=True, normalize_pixel_values=False)
+        result = image_stats(od_dataset, stats=SCALAR_STATS, per_background=True, normalize_pixel_values=False)
 
         md = Metadata(od_dataset)
         md.add_factors(result)
@@ -479,9 +477,7 @@ class TestBackgroundStatsImport:
 
     def test_fraction_is_stored_alongside(self, od_dataset):
         """The coverage each background was measured over travels with it."""
-        result = compute_stats(
-            od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False
-        )
+        result = image_stats(od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False)
 
         md = Metadata(od_dataset)
         md.add_factors(result)
@@ -494,9 +490,7 @@ class TestVacuousSplitsAreReported:
     """A level split that holds nothing is dropped, but never silently."""
 
     def test_background_split_is_recorded_as_dropped(self, od_dataset):
-        result = compute_stats(
-            od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False
-        )
+        result = image_stats(od_dataset, stats=ImageStats.PIXEL_MEAN, per_background=True, normalize_pixel_values=False)
 
         md = Metadata(od_dataset)
         md.add_factors(result)
@@ -512,7 +506,7 @@ class TestVacuousSplitsAreReported:
         expecting both halves of the split can find out where the other one went.
         """
         dataset = _od_dataset([[0], [1], [0]], [[[100, 100, 110, 110]]] * 3)
-        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        result = image_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
 
         md = Metadata(dataset)
         md.add_factors(result)
@@ -524,7 +518,7 @@ class TestVacuousSplitsAreReported:
     def test_a_factor_empty_at_every_level_is_kept_whole(self):
         """Dropping every half would make the factor vanish, which is never the answer."""
         dataset = _od_dataset([[0], [1], [0]])
-        result = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        result = image_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
 
         md = Metadata(dataset)
         md.add_factors(

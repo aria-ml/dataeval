@@ -105,7 +105,7 @@ def drop_vacuous_splits(
 
     A statistic that only applies to some of the levels a source index spans still has
     to be as long as the index to be placed at all, so it arrives padded with nulls at
-    the levels it does not describe — ``compute_stats(per_background=True)`` measures the
+    the levels it does not describe — ``image_stats(per_background=True)`` measures the
     scene behind an image's annotations, which is a property of the image and of nothing
     inside it, and so has nulls on every instance row. Splitting that array by level
     yields one real column and one holding nothing. The empty one is not a factor: it
@@ -142,7 +142,7 @@ def split_by_dimensionality(
     A *leading* singleton axis is left alone rather than flattened, and a 1-D array is
     passed through untouched however short it is. Both guard the same edge: on a
     one-row dataset ``(1, K)`` reads equally as one row of K values and as K rows of
-    one value, and the first is what :func:`~dataeval.core.compute_stats` emits — so
+    one value, and the first is what :func:`~dataeval.core.image_stats` emits — so
     flattening would import ``center`` and ``histogram`` as K rows of data on the very
     dataset shape where they least resemble a real factor, while a blanket squeeze
     would additionally collapse a legitimate one-row ``mean`` to a scalar and drop it.

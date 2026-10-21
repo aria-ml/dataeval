@@ -67,7 +67,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     One frame becomes one datum. :class:`~dataeval.data.DetectionCrops` does the same job one
     level down -- object detection presented as image classification -- and this is its analog
     one level up, so every per-image tool reaches video frames unchanged:
-    :func:`~dataeval.core.compute_stats` and everything built on it,
+    :func:`~dataeval.core.image_stats` and everything built on it,
     :class:`~dataeval.Embeddings`, :class:`~dataeval.data.View`.
 
     A frame's target is its own :obj:`~dataeval.protocols.SingleFrameObjectTrackingTarget`, passed
@@ -149,7 +149,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
     >>> from dataeval.data import SequenceFrames, Stride
     >>> frames = SequenceFrames(mot_dataset, Stride(5))  # doctest: +SKIP
-    >>> stats = compute_stats(frames, stats=ImageStats.HASH)  # doctest: +SKIP
+    >>> stats = image_stats(frames, stats=ImageStats.HASH)  # doctest: +SKIP
     """
 
     @requires_maite_dataset("dataset", expected="multiobject_tracking")
@@ -279,7 +279,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         """Decode every selected frame of every sequence, once, in order.
 
         The primary interface. Splitting it with :func:`itertools.tee` gives
-        :func:`~dataeval.core.compute_stats` the pixel and box iterators it takes, the way
+        :func:`~dataeval.core.image_stats` the pixel and box iterators it takes, the way
         :func:`~dataeval.data.unzip_dataset` does for object detection.
 
         Yields
@@ -299,7 +299,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     def boxes(frame: ArrayLike, target: ObjectDetectionTarget) -> list[BoundingBox]:
         """Convert one frame's detections into :class:`~dataeval.utils.preprocessing.BoundingBox`.
 
-        The box iterator :func:`~dataeval.core.compute_stats` takes beside its images, built from
+        The box iterator :func:`~dataeval.core.image_stats` takes beside its images, built from
         what :meth:`stream` yields.
 
         Parameters
@@ -318,7 +318,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         --------
         >>> from itertools import tee
         >>> pixels, targets = tee(frames.stream(), 2)  # doctest: +SKIP
-        >>> stats = compute_stats(  # doctest: +SKIP
+        >>> stats = image_stats(  # doctest: +SKIP
         ...     (item[0] for item in pixels),
         ...     boxes=(SequenceFrames.boxes(item[0], item[1]) for item in targets),
         ... )
@@ -339,7 +339,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     def track_map(self) -> NDArray[np.intp]:
         """Shape ``(D, 2)`` -- the ``(view position, track id)`` behind each detection presented.
 
-        Rows run in the order :func:`~dataeval.core.compute_stats` measures detections: every
+        Rows run in the order :func:`~dataeval.core.image_stats` measures detections: every
         detection of view position 0, then of view position 1, and so on. A detection MAITE marks
         as unlinked carries its ``-1`` through rather than being dropped, so a row here lines up
         with a per-target statistic row whether or not the detection belongs to a track.

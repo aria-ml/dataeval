@@ -63,7 +63,7 @@ DataEval has two input paths depending on which part of the library you are usin
 **`dataeval.core`** provides stateless functions that operate directly on NumPy
 arrays — embeddings, labels, image hashes, and statistics. No dataset object is
 required. Call these functions with arrays and get results back directly. Examples
-include {func}`.compute_stats`, {func}`.label_errors`, {func}`.divergence_mst`,
+include {func}`.image_stats`, {func}`.label_errors`, {func}`.divergence_mst`,
 and {func}`.ber_knn`.
 
 **`dataeval.quality`, `dataeval.bias`, `dataeval.scope`, `dataeval.shift`, and `dataeval.performance`**

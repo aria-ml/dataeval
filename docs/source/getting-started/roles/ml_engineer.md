@@ -126,7 +126,7 @@ Go beyond top-line metrics to perform detailed error analysis. Visualize the
 false positives and false negatives to understand why the model is failing
 (e.g., it confuses similar objects, fails on small objects, or struggles in low light).
 
-By combining multiple DataEval functions -- {class}`.View` class, {func}`.compute_stats`,
+By combining multiple DataEval functions -- {class}`.View` class, {func}`.image_stats`,
 {func}`.label_stats`, {func}`.cluster`, {class}`.Balance`, and {class}`.Diversity`
 -- model failures can be investigated at the image level.
 

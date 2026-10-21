@@ -876,14 +876,13 @@ statistical and computational.
   - Evidence basis
   - Validation evidence
   - Contraindications
-- - {func}`.compute_stats`, {func}`.combine_stats_results`,
+- - {func}`.image_stats`, {func}`.combine_stats_results`,
     {func}`.compute_ratios`
   - Image statistics vocabulary. See
     [Image statistics as a linting vocabulary](DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
   - Cross-checked (skew, kurtosis, and entropy verified against SciPy in CI)
   - Descriptive only. A statistic being unusual is not evidence a sample is
-    bad. Note `compute_stats` carries a deprecation notice on a parameter
-    default that changed in v1.1.
+    bad.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored
@@ -1106,8 +1105,10 @@ Two mechanisms make stability observable rather than a matter of trust:
   used, and a dedicated CI test (`tests/test_deprecated_docs.py`) fails the build
   if any deprecated public object lacks a `.. deprecated::` directive in its
   docstring. A deprecated symbol cannot ship silently. The symbols deprecated in
-  v1.1 (notably `ClassifierUncertaintyExtractor`) were removed in v1.2, so as of
-  this release no deprecated symbol remains. Transitional warnings for changed
+  v1.1 (notably `ClassifierUncertaintyExtractor`) were removed in v1.2. Deprecated
+  in v1.2 and removed in v2.0: `compute_stats` (renamed {func}`.image_stats`),
+  {func}`.compute_ratios` and `ClassFilter` — see the
+  [v1.2 migration guide](../migration/v1.2.md). Transitional warnings for changed
   *parameter defaults* are a separate mechanism and use a plain `FutureWarning`
   — see [Changed defaults](#stability-status) below.
 
@@ -1127,11 +1128,12 @@ As of v{{ release }}:
 **Changed defaults** (the symbol is not deprecated; only the transitional
 warning goes away):
 
-- {func}`.compute_stats` — the `normalize_pixel_values` default changed to
-  `False` in v1.1. Calling without it raises a plain `FutureWarning`, not
+- {class}`.Duplicates` — the `hash_radius` default of `0` will change in a
+  future major release, so that it finds perceptual near-duplicates rather than
+  only bit-identical images. Leaving it unset raises a plain `FutureWarning`, not
   {class}`~dataeval.exceptions.DeprecatedWarning`, so a warning filter narrowed
   to that class will not catch it. Pass the argument explicitly to silence it.
-  The function itself is stable and is not scheduled for removal.
+  The class itself is stable and is not scheduled for removal.
 
 Everything else in the public API is considered stable for the v1.x series.
 

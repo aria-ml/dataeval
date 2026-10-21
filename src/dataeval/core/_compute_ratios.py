@@ -163,7 +163,7 @@ def _build_image_lookup(source_indices: Sequence[SourceIndex]) -> dict[int, int]
     Parameters
     ----------
     source_indices : Sequence[SourceIndex]
-        Sequence of source indices from compute_stats() output
+        Sequence of source indices from image_stats() output
 
     Returns
     -------
@@ -274,7 +274,7 @@ def _paired_image_counts(stats_output: StatsResult, target_stats_output: StatsRe
     """
     if "image_count" not in stats_output or "image_count" not in target_stats_output:
         raise KeyError(
-            "stats_output and target_stats_output must each contain an 'image_count' key from compute_stats() output",
+            "stats_output and target_stats_output must each contain an 'image_count' key from image_stats() output",
         )
     return stats_output["image_count"], target_stats_output["image_count"]
 
@@ -395,7 +395,7 @@ def _validate_unified_input(source_indices: Sequence[SourceIndex], stats: Mappin
     if has_image_entries and not any(_measured_anywhere(stats[name], image_positions) for name in ratio_keys):
         raise ValueError(
             "stats_output has image-level entries, but every statistic on them is null — the rows "
-            "carry background values only. This is what compute_stats(per_image=False, "
+            "carry background values only. This is what image_stats(per_image=False, "
             "per_background=True) produces: the background needs an image-level row to live on, but "
             "no image-level statistics were computed to fill it. A ratio needs an image-level value "
             "to divide each box's value by, so pass per_image=True as well.",
@@ -404,13 +404,13 @@ def _validate_unified_input(source_indices: Sequence[SourceIndex], stats: Mappin
     if not has_image_entries:
         raise ValueError(
             "stats_output must contain image-level statistics (entries with box=None). "
-            "Ensure per_image=True when calling compute_stats(), or provide target_stats_output parameter.",
+            "Ensure per_image=True when calling image_stats(), or provide target_stats_output parameter.",
         )
 
     if not has_target_entries:
         raise ValueError(
             "stats_output must contain box-level statistics (entries with box!=None). "
-            "Ensure per_target=True and boxes are provided when calling compute_stats(), "
+            "Ensure per_target=True and boxes are provided when calling image_stats(), "
             "or provide target_stats_output parameter.",
         )
 
@@ -430,7 +430,7 @@ def compute_ratios(  # noqa: C901
     override_map: OverrideFunctionMap | None = None,
 ) -> StatsResult:
     """
-    Compute box-to-image ratios from compute_stats() output.
+    Compute box-to-image ratios from image_stats() output.
 
     .. deprecated:: 1.2
         Removed in v1.3. For box geometry relative to its image, compute the ``rel_*`` dimension statistics
@@ -441,7 +441,7 @@ def compute_ratios(  # noqa: C901
     This function supports two usage patterns:
 
     1. **Unified input**: Pass a single stats_output containing both
-    image and box statistics (from compute_stats() with per_image=True, per_target=True).
+    image and box statistics (from image_stats() with per_image=True, per_target=True).
 
     2. **Separate inputs**: Pass image stats as stats_output and box
     stats as target_stats_output (useful when migrating from boxratiostats()).
@@ -451,10 +451,10 @@ def compute_ratios(  # noqa: C901
     stats_output : StatsResult
         Either:
 
-        - Output from compute_stats() with both per_image=True and per_target=True (unified), OR
-        - Output from compute_stats() with per_image=True, per_target=False (if target_stats_output provided)
+        - Output from image_stats() with both per_image=True and per_target=True (unified), OR
+        - Output from image_stats() with per_image=True, per_target=False (if target_stats_output provided)
     target_stats_output : StatsResult | None, optional
-        Output from compute_stats() with per_image=False and per_target=True.
+        Output from image_stats() with per_image=False and per_target=True.
         When provided, stats_output is treated as image-only stats.
         Default is None (use unified input from stats_output).
     override_map : OverrideFunctionMap | None, optional
@@ -467,7 +467,7 @@ def compute_ratios(  # noqa: C901
     Returns
     -------
     StatsResult
-        Dictionary with same structure as compute_stats() output, including:
+        Dictionary with same structure as image_stats() output, including:
 
         - source_index: Sequence[SourceIndex] - SourceIndex objects with image/box info
         - object_count: Sequence[int] - Object counts per image
@@ -499,11 +499,11 @@ def compute_ratios(  # noqa: C901
     --------
     **Pattern 1: Unified input (recommended)**
 
-    >>> from dataeval.core import compute_stats, compute_ratios
+    >>> from dataeval.core import image_stats, compute_ratios
     >>> from dataeval.flags import ImageStats
     >>>
     >>> # Single call gets both image and target stats
-    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
+    >>> stats = image_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
     >>> ratios = compute_ratios(stats)
     >>> ratios["stats"]["width"][:12]
     array([0.25 , 0.203, 0.328, 0.266, 0.234, 0.297, 0.25 , 0.359, 0.297,
@@ -512,8 +512,8 @@ def compute_ratios(  # noqa: C901
     **Pattern 2: Separate inputs (backward compatibility)**
 
     >>> # Separate calls for image and box stats
-    >>> img_stats = compute_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
-    >>> tgt_stats = compute_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
+    >>> img_stats = image_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
+    >>> tgt_stats = image_stats(images, boxes=boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
     >>> ratios = compute_ratios(img_stats, target_stats_output=tgt_stats)
 
     **Custom override map:**
@@ -525,7 +525,7 @@ def compute_ratios(  # noqa: C901
 
     **Band group statistics:**
 
-    >>> stats = compute_stats(
+    >>> stats = image_stats(
     ...     images,
     ...     boxes=boxes,
     ...     stats=ImageStats.PIXEL_MEAN,
@@ -545,13 +545,13 @@ def compute_ratios(  # noqa: C901
 
     # Validate input
     if SOURCE_INDEX_KEY not in stats_output:
-        raise KeyError(f"stats_output must contain '{SOURCE_INDEX_KEY}' key from compute_stats() output")
+        raise KeyError(f"stats_output must contain '{SOURCE_INDEX_KEY}' key from image_stats() output")
 
     # Determine which pattern we're using and validate
     if target_stats_output is not None:
         # Pattern 2: Separate image and box stats
         if SOURCE_INDEX_KEY not in target_stats_output:
-            raise KeyError(f"target_stats_output must contain '{SOURCE_INDEX_KEY}' key from compute_stats() output")
+            raise KeyError(f"target_stats_output must contain '{SOURCE_INDEX_KEY}' key from image_stats() output")
 
         img_source_indices, box_source_indices = _validate_separate_inputs(stats_output, target_stats_output)
         _logger.debug(
@@ -580,7 +580,7 @@ def compute_ratios(  # noqa: C901
     ):
         raise KeyError(
             "stats_output must contain 'object_count', 'invalid_box_count' and 'image_count' "
-            "keys from compute_stats() output",
+            "keys from image_stats() output",
         )
 
     ratio_map = dict(_default_ratio_map())

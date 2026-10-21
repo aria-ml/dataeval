@@ -48,7 +48,7 @@ class TestStatsResultShape:
         assert "stats" in get_type_hints(StatsResult, include_extras=True)
 
     def test_requires_its_address_keys(self):
-        """`compute_stats` and `compute_ratios` always set these, and everything that
+        """`image_stats` and `compute_ratios` always set these, and everything that
         offsets or concatenates results reads them -- so the type promises them rather
         than making each consumer re-check.
         """

@@ -27,7 +27,7 @@ without caring whether Sphinx would have parsed it.
 Only the two reference forms whose resolution does not depend on context are checked:
 
 * absolute -- ``:class:`~dataeval.data.Embeddings```
-* project-relative -- ``{func}`.compute_stats```, the leading dot being Sphinx's
+* project-relative -- ``{func}`.image_stats```, the leading dot being Sphinx's
   "search the whole project" marker, and the dominant form in these docs.
 
 A bare ``:class:`Ontology``` is skipped. Sphinx resolves those against the surrounding
@@ -209,7 +209,7 @@ MALFORMED = _collect_malformed()
 @pytest.mark.required
 def test_malformed_detector_is_wired_up():
     """Guard against the patterns silently matching nothing, as the collector above does."""
-    sample = "See {meth}`.Metadata.agg` and `{meth}`.Metadata.at` and {func} `.compute_stats`."
+    sample = "See {meth}`.Metadata.agg` and `{meth}`.Metadata.at` and {func} `.image_stats`."
     assert len(WRAPPED_ROLE.findall(sample)) == 1, "the wrapped-role pattern stopped matching"
     assert len(SPACED_ROLE.findall(sample)) == 1, "the spaced-role pattern stopped matching"
     assert not WRAPPED_ROLE.search("{meth}`.Metadata.agg`"), "a well-formed role must not match"

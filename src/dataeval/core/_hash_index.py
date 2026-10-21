@@ -658,7 +658,7 @@ def pack_hashes(hashes: Sequence[str]) -> tuple[NDArray[np.uint64], NDArray[np.b
 
     Notes
     -----
-    The empty string is how :func:`~dataeval.core.compute_stats` reports a region it could not
+    The empty string is how :func:`~dataeval.core.image_stats` reports a region it could not
     measure — an out-of-bounds box, an image its boxes cover completely, or a band group the
     datum cannot supply. Those must never be compared to one another: they would all pack
     identically and so read as mutual duplicates, which is a claim about regions there was no

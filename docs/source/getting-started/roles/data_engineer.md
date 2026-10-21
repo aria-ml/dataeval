@@ -62,7 +62,7 @@ Ensure that raw datasets — whether image collections, text embeddings, or tabu
 to the structural requirements of DataEval's evaluation tools before they reach downstream analysis.
 
 Use `dataeval.protocols` to verify that datasets meet the interface contracts expected by drift
-detection and out-of-distribution (OOD) engines. Use {func}`.compute_stats` with {class}`.ImageStats`
+detection and out-of-distribution (OOD) engines. Use {func}`.image_stats` with {class}`.ImageStats`
 flags to run a fast linting pass over incoming images, catching schema violations, unexpected
 channel counts, and dimension inconsistencies before they propagate through the pipeline.
 
@@ -96,7 +96,7 @@ they reach the higher-level analysis tools used by data scientists and ML engine
 preprocessing across collection events is a common source of spurious drift signals.
 
 Use `dataeval.utils.preprocessing` to apply consistent normalization across batches and
-`dataeval.utils.arrays` to handle format conversions. Use {func}`.compute_stats` with
+`dataeval.utils.arrays` to handle format conversions. Use {func}`.image_stats` with
 `channels={"r": 0, "g": 1, "b": 2}` — or whichever band groups your sensor produces — to
 verify that band-level statistics are consistent before and after normalization passes.
 

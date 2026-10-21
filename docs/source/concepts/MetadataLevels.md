@@ -103,7 +103,7 @@ edges through whatever it omits — so an image-based task, which has neither
 The `factors` row describes the bare-array form. A `from_factors` call given a
 `source_index` that names both items and labels has a shape to copy after all, and
 takes object detection's exactly — `unit`, `instance`, labels at `instance` — which is
-what lets {func}`.compute_stats` output be reimported without its dataset.
+what lets {func}`.image_stats` output be reimported without its dataset.
 
 {attr}`.Metadata.levels` enumerates the names an instance accepts, in this order —
 coarsest first. {data}`.FactorLevel` types them, and {class}`.FactorLevelSchema`
@@ -147,7 +147,7 @@ Downward propagation is not only a storage economy — it is what makes a factor
 one level comparable against a factor at another, because both are readable from
 the finer level's rows.
 
-Background statistics are the clearest case. `compute_stats(per_background=True)`
+Background statistics are the clearest case. `image_stats(per_background=True)`
 measures each image's pixels *outside* its bounding boxes: the scene an image was
 captured in. That is a property of the image and of nothing inside it, so
 {meth}`.Metadata.add_factors` reads the `source_index` those values arrive with
@@ -272,7 +272,7 @@ its own, plus everything propagated down from more granular levels. With `inheri
 analyzes only the factors defined **at** the view itself.
 
 On an object detection dataset with image metadata plus per-image and
-per-detection brightness from {func}`.compute_stats`:
+per-detection brightness from {func}`.image_stats`:
 
 | view                       | `inherited=True` (default)                                       | `inherited=False`     |
 | -------------------------- | ---------------------------------------------------------------- | --------------------- |
@@ -751,7 +751,7 @@ An address that states no level is the **task-generic** reading: the item level
 with no key, the label level under one. `SourceIndex(3)` names image 3 on an
 image dataset and video 3 on a tracking one, and `SourceIndex(3, 7)` names
 detection 7 of item 3 on either. That is what every producer emits, and it is why
-{func}`.compute_stats` output places correctly without knowing which kind of
+{func}`.image_stats` output places correctly without knowing which kind of
 dataset it measured.
 
 State a level only where an unstated one would resolve to a different one — for a

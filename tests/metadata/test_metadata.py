@@ -8,7 +8,7 @@ import pytest
 
 from dataeval import Metadata
 from dataeval._metadata._columns import binned
-from dataeval.core import FactorResult, compute_stats
+from dataeval.core import FactorResult, image_stats
 from dataeval.core._compute_ratios import compute_ratios
 from dataeval.core._label_stats import label_stats
 from dataeval.data import unzip_dataset
@@ -100,7 +100,7 @@ class TestMetadata:
         assert stats["label_counts_per_image"] == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
 
         _img, _box = unzip_dataset(mock_ds, False)
-        imgstats = compute_stats(
+        imgstats = image_stats(
             _img,
             boxes=_box,
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
@@ -108,7 +108,7 @@ class TestMetadata:
             per_target=False,
         )
         _img, _box = unzip_dataset(mock_ds, True)
-        boxstats = compute_stats(
+        boxstats = image_stats(
             _img,
             boxes=_box,
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
@@ -722,7 +722,7 @@ class TestProducerDeclaredCategorical:
         """A source_index spanning two levels makes `_place` prefix the name -- `unit_cls`,
         `instance_cls` -- rather than storing `cls` bare. The declaration has to follow it."""
         dataset = get_od_dataset(4, targets_per_image=2)
-        stats = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        stats = image_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
         cls = np.arange(len(stats["source_index"])) % 2
         md = Metadata(dataset)
         md.add_factors(FactorResult(stats={"cls": cls}, categorical=("cls",)), source_index=stats["source_index"])

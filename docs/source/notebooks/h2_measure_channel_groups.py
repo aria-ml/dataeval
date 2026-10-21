@@ -21,7 +21,7 @@
 #
 # When analyzing multispectral, hyperspectral, or augmented imagery (such as RGB with
 # near-infrared or LIDAR), you should measure statistics on specific band groups rather
-# than averaging all channels together. By default, `{func}.compute_stats` averages all
+# than averaging all channels together. By default, `{func}.image_stats` averages all
 # bands, which can obscure critical channel-specific characteristics (e.g., fusing
 # near-infrared and visible ranges).
 #
@@ -41,7 +41,7 @@
 #   insufficient.
 #
 # You do not need this for standard 1-channel or 3-channel imagery, where
-# `{func}.compute_stats` measures the image correctly without additional configuration.
+# `{func}.image_stats` measures the image correctly without additional configuration.
 
 # %% [markdown]
 # ### What you will need
@@ -73,7 +73,7 @@ import polars as pl
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.flags import ImageStats
 from dataeval.protocols import DatasetMetadata, DatumMetadata
 from dataeval.utils.preprocessing import ChannelGroup
@@ -138,13 +138,13 @@ print(f"{len(dataset)} scenes, each {dataset[0][0].shape} of dtype {dataset[0][0
 # %% [markdown]
 # ## What the unnamed measurement tells you
 #
-# First, you will execute `{func}.compute_stats` without the `channels` argument to see the
+# First, you will execute `{func}.image_stats` without the `channels` argument to see the
 # default behavior, which averages all bands together into a single measurement.
 
 # %%
 stats = ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS | ImageStats.DIMENSION_DEPTH
 
-whole = compute_stats(dataset, stats=stats, normalize_pixel_values=False)
+whole = image_stats(dataset, stats=stats, normalize_pixel_values=False)
 
 for name, values in sorted(whole["stats"].items()):
     print(f"{name:12} first scene: {float(values[0]):10.2f}")
@@ -174,7 +174,7 @@ for name, values in sorted(whole["stats"].items()):
 # and the resulting columns will be prefixed with the group's name.
 
 # %%
-grouped = compute_stats(
+grouped = image_stats(
     dataset,
     stats=stats,
     normalize_pixel_values=False,
@@ -269,7 +269,7 @@ print(
 # %%
 ragged = [dataset[0][0], dataset[1][0][:3]]
 
-patchy = compute_stats(
+patchy = image_stats(
     ragged,
     stats=ImageStats.PIXEL_MEAN | ImageStats.PIXEL_MISSING,
     normalize_pixel_values=False,
@@ -302,7 +302,7 @@ print(pl.DataFrame({name: np.asarray(values, dtype=float) for name, values in so
 # %%
 boxed = [(cube, [(4, 4, 16, 16)]) for cube in (dataset[0][0], dataset[1][0])]
 
-composed = compute_stats(
+composed = image_stats(
     [image for image, _ in boxed],
     boxes=[boxes for _, boxes in boxed],
     stats=ImageStats.PIXEL_MEAN,
@@ -338,7 +338,7 @@ physical = np.stack([
     rng.normal(0.0, 50.0, (32, 32)),  # a tighter instrument on the same scene
 ])
 
-declared = compute_stats(
+declared = image_stats(
     [physical],
     stats=ImageStats.PIXEL_ENTROPY,
     normalize_pixel_values=False,
@@ -363,7 +363,7 @@ for name, values in sorted(declared.items()):
 # channel group because channel subsetting does not modify the image dimensions.
 
 # %%
-geometry = compute_stats(
+geometry = image_stats(
     dataset,
     stats=ImageStats.DIMENSION_WIDTH | ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH,
     normalize_pixel_values=False,
@@ -389,7 +389,7 @@ print(sorted(geometry))
 # `None` for image-wide statistics) and values specify the desired metrics.
 
 # %%
-per_group = compute_stats(
+per_group = image_stats(
     dataset,
     stats={
         None: ImageStats.DIMENSION_WIDTH | ImageStats.DIMENSION_CHANNELS,

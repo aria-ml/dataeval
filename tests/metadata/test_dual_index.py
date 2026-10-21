@@ -12,7 +12,7 @@ from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import SourceIndex
 from tests.embeddings.test_embeddings import MockDataset
 
-# compute_stats order for the 3-image / 2-1-3-detection fixture, both levels enabled.
+# image_stats order for the 3-image / 2-1-3-detection fixture, both levels enabled.
 SOURCE_INDEX_3_IMAGES_6_CROPS = [
     SourceIndex(0, None),
     SourceIndex(0, 0),
@@ -302,7 +302,7 @@ class TestDualKeyIndexing:
         """A source index spanning two levels yields one factor per level, placed by label."""
         md = Metadata(od_dataset_with_metadata)
 
-        # compute_stats order for 3 images with 2/1/3 detections:
+        # image_stats order for 3 images with 2/1/3 detections:
         #   (0,-) (0,0) (0,1) (1,-) (1,0) (2,-) (2,0) (2,1) (2,2)
         source_index = [
             SourceIndex(0, None),
@@ -441,14 +441,14 @@ class TestDualKeyIndexing:
             )
 
     def test_add_factors_from_compute_stats_and_ratios(self, od_dataset_varied_pixels):
-        """Outputs of compute_stats and compute_ratios wire into Metadata with values on the right rows."""
-        from dataeval.core import compute_ratios, compute_stats
+        """Outputs of image_stats and compute_ratios wire into Metadata with values on the right rows."""
+        from dataeval.core import compute_ratios, image_stats
         from dataeval.flags import ImageStats
 
         md = Metadata(od_dataset_varied_pixels)
 
         # 1. Image-level stats only -> one value per image
-        img_stats = compute_stats(
+        img_stats = image_stats(
             od_dataset_varied_pixels,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
@@ -458,7 +458,7 @@ class TestDualKeyIndexing:
         mean_img = img_stats["stats"]["mean"]
 
         # 2. Target-level stats only -> one value per detection
-        tgt_stats = compute_stats(
+        tgt_stats = image_stats(
             od_dataset_varied_pixels,
             stats=ImageStats.PIXEL_MEAN | ImageStats.DIMENSION,
             per_image=False,
@@ -470,7 +470,7 @@ class TestDualKeyIndexing:
 
         # 3. Both levels at once -> one array spanning image and target rows, labeled
         #    by the accompanying source index
-        both_stats = compute_stats(
+        both_stats = image_stats(
             od_dataset_varied_pixels,
             stats=ImageStats.PIXEL_MEAN,
             per_image=True,
@@ -644,12 +644,12 @@ class TestAddFactorsRobustness:
         assert "ok" in md.factor_names
 
     def test_compute_stats_output_with_vector_stats_adds_the_scalar_ones(self, od_dataset_varied_pixels):
-        """The h2_add_intrinsic_factors pattern: pipe compute_stats["stats"] straight in."""
-        from dataeval.core import compute_stats
+        """The h2_add_intrinsic_factors pattern: pipe image_stats["stats"] straight in."""
+        from dataeval.core import image_stats
         from dataeval.flags import ImageStats
 
         md = Metadata(od_dataset_varied_pixels)
-        results = compute_stats(
+        results = image_stats(
             od_dataset_varied_pixels,
             stats=ImageStats.PIXEL | ImageStats.VISUAL,
             normalize_pixel_values=False,

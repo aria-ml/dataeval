@@ -8,7 +8,7 @@ from typing import Any, NamedTuple
 
 import polars as pl
 
-from dataeval.core import StatsResult, compute_stats
+from dataeval.core import StatsResult, image_stats
 from dataeval.data._invalidates import invalidating_sources
 from dataeval.exceptions import StatsInvalidatedWarning
 from dataeval.flags import ImageStats
@@ -175,14 +175,14 @@ def checked_compute_stats(
         indexable. Single-dataset callers pass ``[data]`` and take ``[0]``.
     stats : ImageStats
         The statistics to compute. This must be the *effective* flags — what actually
-        reaches :func:`~dataeval.core.compute_stats` — not what the evaluator was
+        reaches :func:`~dataeval.core.image_stats` — not what the evaluator was
         configured with. ``Duplicates`` computes ``flags & ImageStats.HASH``, so
         intersecting the invalidation against ``self.flags`` would warn about dimension
         stats it never computes.
     caller : str
         Name of the evaluator, used in the warning message.
     **kwargs : Any
-        Forwarded to :func:`~dataeval.core.compute_stats` unchanged.
+        Forwarded to :func:`~dataeval.core.image_stats` unchanged.
 
     Returns
     -------
@@ -216,7 +216,7 @@ def checked_compute_stats(
             stacklevel=5,
         )
 
-    return [compute_stats(ds, stats=stats, **kwargs) for ds in datasets]
+    return [image_stats(ds, stats=stats, **kwargs) for ds in datasets]
 
 
 def get_dataset_step_from_idx(idx: int, dataset_steps: Sequence[int]) -> tuple[int, int]:

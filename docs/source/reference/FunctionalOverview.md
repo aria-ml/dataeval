@@ -64,7 +64,7 @@ DataEval's public API.
   - ✔
   - ✔
   - ✔
-* - {func}`Image and Target statistics <.compute_stats>`
+* - {func}`Image and Target statistics <.image_stats>`
   - Computes statistical summaries of images and/or targets in a dataset
   - ✔
   - ✔

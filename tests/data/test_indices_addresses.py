@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 
 from dataeval import Metadata
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.data import Indices, View
 from dataeval.exceptions import MaiteShapeError
 from dataeval.flags import ImageStats
@@ -112,8 +112,8 @@ class TestDetectionAddresses:
 
 
 def _detections_measured(dataset: Any) -> dict[int, int]:
-    """How many detections compute_stats measured in each item."""
-    stats = compute_stats(dataset, stats=ImageStats.DIMENSION_WIDTH, per_target=True)
+    """How many detections image_stats measured in each item."""
+    stats = image_stats(dataset, stats=ImageStats.DIMENSION_WIDTH, per_target=True)
     return dict(Counter(index.item for index in stats["source_index"] if index.key is not None))
 
 

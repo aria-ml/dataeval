@@ -8,7 +8,7 @@ import pytest
 from dataeval import Metadata
 from dataeval._helpers import lexical_categorical
 from dataeval.config import use_max_processes
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
 from dataeval.data import unzip_dataset
@@ -102,7 +102,7 @@ class TestOutliers:
 
     def test_outliers_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
-        stats = compute_stats(data, stats=ImageStats.PIXEL)
+        stats = image_stats(data, stats=ImageStats.PIXEL)
         outliers = Outliers()
         results = outliers.from_stats(stats)
         assert results is not None
@@ -115,7 +115,7 @@ class TestOutliers:
 
         with use_max_processes(1):
             _images, _boxes = unzip_dataset(dataset, True)
-            stats = compute_stats(
+            stats = image_stats(
                 _images,
                 boxes=_boxes,
                 stats=ImageStats.PIXEL | ImageStats.VISUAL,
@@ -134,8 +134,8 @@ class TestOutliers:
         dataset1 = np.zeros((50, 3, 16, 16))
         dataset2 = np.zeros((50, 3, 16, 16))
         dataset2[0] = 1
-        stats1 = compute_stats(dataset1, stats=ImageStats.PIXEL)
-        stats2 = compute_stats(dataset2, stats=ImageStats.PIXEL)
+        stats1 = image_stats(dataset1, stats=ImageStats.PIXEL)
+        stats2 = image_stats(dataset2, stats=ImageStats.PIXEL)
         outliers = Outliers()
         results = outliers.from_stats((stats1, stats2))
         assert results is not None
@@ -151,8 +151,8 @@ class TestOutliers:
         outlier search over zero statistics, reported as a normal empty result.
         """
         dataset = np.zeros((50, 3, 16, 16))
-        pixel = compute_stats(dataset, stats=ImageStats.PIXEL)
-        dimension = compute_stats(dataset, stats=ImageStats.DIMENSION)
+        pixel = image_stats(dataset, stats=ImageStats.PIXEL)
+        dimension = image_stats(dataset, stats=ImageStats.DIMENSION)
 
         with pytest.raises(ValueError, match="different statistics"):
             Outliers().from_stats((pixel, dimension))
@@ -166,7 +166,7 @@ class TestOutliers:
 
     def test_outliers_with_metric_thresholds(self):
         data = np.random.random((20, 3, 16, 16))
-        stats = compute_stats(data, stats=ImageStats.VISUAL)
+        stats = image_stats(data, stats=ImageStats.VISUAL)
         outliers = Outliers(outlier_threshold={"contrast": 2.0, "brightness": ("zscore", 2.0), "sharpness": "iqr"})
         results = outliers.from_stats(stats)
         assert results is not None
@@ -792,8 +792,8 @@ class TestOutliersCoverageImprovements:
         images1 += np.random.random(images1.shape) * 0.001
         images2 += np.random.random(images2.shape) * 0.001
 
-        stats1 = compute_stats(images1, stats=ImageStats.PIXEL)
-        stats2 = compute_stats(images2, stats=ImageStats.PIXEL)
+        stats1 = image_stats(images1, stats=ImageStats.PIXEL)
+        stats2 = image_stats(images2, stats=ImageStats.PIXEL)
 
         outliers = Outliers(outlier_threshold=ZScoreThreshold(5.0))  # Very high threshold
         result = outliers.from_stats([stats1, stats2])
@@ -1026,7 +1026,7 @@ class TestOutliersNaNColumns:
     def test_unsatisfiable_band_group_yields_no_outliers(self):
         """End to end: a band group no datum can satisfy contributes no flags."""
         images = [np.random.default_rng(i).random((3, 32, 32)) for i in range(24)]
-        stats = compute_stats(
+        stats = image_stats(
             images,
             stats=ImageStats.PIXEL,
             normalize_pixel_values=False,
@@ -1042,7 +1042,7 @@ class TestOutliersNaNColumns:
 
 @pytest.mark.required
 class TestOutliersPixelUnits:
-    """evaluate measures pixel statistics as compute_stats does by default: in the image's own units."""
+    """evaluate measures pixel statistics as image_stats does by default: in the image's own units."""
 
     def test_evaluate_agrees_with_from_stats_on_default_stats(self):
         images = np.full((10, 1, 8, 8), 100, dtype=np.uint8)
@@ -1050,9 +1050,7 @@ class TestOutliersPixelUnits:
         outliers = Outliers(flags=ImageStats.PIXEL_MEAN, outlier_threshold=("constant", (None, 200.0)))
 
         via_evaluate = outliers.evaluate(images)
-        via_stats = outliers.from_stats(
-            compute_stats(images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
-        )
+        via_stats = outliers.from_stats(image_stats(images, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False))
 
         assert via_evaluate.data()["item_index"].to_list() == [0]
         assert via_stats.data()["item_index"].to_list() == [0]
@@ -1306,7 +1304,7 @@ class TestOutliersPerClass:
         """classwise() works on output from from_stats()."""
         images, metadata = _bright_and_dark()
 
-        stats = compute_stats(images, stats=ImageStats.PIXEL)
+        stats = image_stats(images, stats=ImageStats.PIXEL)
         outliers = Outliers(flags=ImageStats.PIXEL)
         result = outliers.from_stats(stats)
         classwise_result = result.classwise(metadata)
@@ -1746,8 +1744,8 @@ class TestOutliersPropertyMultiDataset:
         data2 = np.zeros((50, 3, 16, 16))
         data2[0] = 1.0
 
-        stats1 = compute_stats(data1, stats=ImageStats.PIXEL)
-        stats2 = compute_stats(data2, stats=ImageStats.PIXEL)
+        stats1 = image_stats(data1, stats=ImageStats.PIXEL)
+        stats2 = image_stats(data2, stats=ImageStats.PIXEL)
 
         detector = Outliers()
         result = detector.from_stats([stats1, stats2])
@@ -1769,7 +1767,7 @@ class TestOutliersPerTargetKeying:
         images[10] = 1.0
         dataset = _get_dataset(list(images), 2, True, {10: [(-5, -5, -1, -1), (1, 1, 5, 5)]})
         image_iter, box_iter = unzip_dataset(dataset, True)
-        return compute_stats(image_iter, boxes=box_iter, stats=ImageStats.PIXEL | ImageStats.VISUAL, per_target=True)
+        return image_stats(image_iter, boxes=box_iter, stats=ImageStats.PIXEL | ImageStats.VISUAL, per_target=True)
 
     def test_a_single_dataset_is_keyed_by_source_index(self):
         outliers = Outliers().from_stats(self._stats(), per_target=True).outliers
@@ -1971,14 +1969,14 @@ class TestPrune:
         from dataeval.types import RemovalPlan
 
         images = np.random.default_rng(0).random((16, 3, 16, 16))
-        stats = compute_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS | ImageStats.VISUAL_CONTRAST)
+        stats = image_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS | ImageStats.VISUAL_CONTRAST)
         flagged, quiet = sorted(stats["stats"])[:2]
         output = OutliersOutput(_flags([{"item_index": 1, "metric_name": flagged}]), calculation_results=stats)
         assert output.prune(metrics=quiet) == RemovalPlan()
 
     def test_a_metric_the_result_never_measured_is_refused(self):
         images = np.random.default_rng(0).random((16, 3, 16, 16))
-        stats = compute_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS)
+        stats = image_stats(images, stats=ImageStats.VISUAL_BRIGHTNESS)
         output = OutliersOutput(_flags(self.ROWS), calculation_results=stats)
         with pytest.raises(ValueError, match="not metrics"):
             output.prune(metrics="no_such_metric")
@@ -2099,7 +2097,7 @@ class TestOutliersOverMetadata:
     def test_box_stats_do_not_trouble_the_default_flags(self, get_od_dataset):
         ds = get_od_dataset(list(np.random.default_rng(0).random((10, 3, 16, 16))), 2, True)
         md = Metadata(ds)
-        md.add_factors(compute_stats(ds, stats=ImageStats.PIXEL_MEAN, per_target=True, normalize_pixel_values=False))
+        md.add_factors(image_stats(ds, stats=ImageStats.PIXEL_MEAN, per_target=True, normalize_pixel_values=False))
         # Ten items are under the floor, so read what was asked to be judged rather than what was flagged.
         assert set(Outliers().evaluate(md).populations["metric_name"].cast(pl.Utf8)) == {"unit_mean"}
         assert set(Outliers().evaluate(md, per_target=True).populations["metric_name"].cast(pl.Utf8)) == {
@@ -2150,9 +2148,7 @@ class TestOutliersAttachesItsSource:
         ds = self._od(get_od_dataset)
         by_hand = Metadata(ds)
         by_hand.add_factors(
-            compute_stats(
-                ds, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, normalize_pixel_values=False
-            )
+            image_stats(ds, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, normalize_pixel_values=False)
         )
         result = Outliers(flags=ImageStats.PIXEL_MEAN).evaluate(ds, per_target=True)
         assert result.metadata is not None
@@ -2200,7 +2196,7 @@ class TestOutliersAttachesItsSource:
     def test_a_metadata_passed_in_is_the_one_attached(self, get_od_dataset):
         ds = self._od(get_od_dataset)
         md = Metadata(ds)
-        md.add_factors(compute_stats(ds, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=False))
+        md.add_factors(image_stats(ds, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=False))
         result = Outliers().evaluate(md, factors=["mean"])
         assert result.metadata is md
         assert result.dataset is ds

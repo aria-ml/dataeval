@@ -44,7 +44,7 @@ def _load_factors(
     """Populate structured state directly from raw factor arrays (see ``from_factors``)."""
     # Vector-valued statistics have no single-column form. Dropping them here rather
     # than letting a flatten silently produce a wrong-length column keeps a mapping
-    # straight from compute_stats usable, and reports the same way add_factors reports
+    # straight from image_stats usable, and reports the same way add_factors reports
     # it. Column vectors keep working: _split_by_dimensionality flattens them.
     factor_arrays, skipped = split_by_dimensionality({str(k): v for k, v in factors.items()})
 

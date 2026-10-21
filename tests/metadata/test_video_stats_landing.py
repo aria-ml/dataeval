@@ -1,6 +1,6 @@
 """Where video statistics land, and how they say which row they belong to — FE-9 issue 9.2.
 
-There is no MOT statistics path today: ``compute_stats`` treats a dataset item as one
+There is no MOT statistics path today: ``image_stats`` treats a dataset item as one
 image, and a video item is a sequence of frames, so nothing produces a ``StatsResult`` for
 video. That producer is the statistics workstream's. What metadata owns is the other end —
 the landing contract — and these tests stand in for the producer so that contract is pinned

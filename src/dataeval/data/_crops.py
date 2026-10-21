@@ -239,7 +239,7 @@ class CropPolicy:
         :func:`~dataeval.utils.preprocessing.boxes_to_mask`, which rounds outwards to
         guarantee it covers every pixel a box touches. The two therefore disagree by up
         to a one-pixel ring, so a ``region="surround"`` crop and a
-        ``compute_stats(per_background=True)`` background are near but not identical
+        ``image_stats(per_background=True)`` background are near but not identical
         regions.
         """
         ox, oy = origin

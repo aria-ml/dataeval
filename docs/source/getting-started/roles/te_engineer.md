@@ -61,7 +61,7 @@ such as blurry or corrupt images, and annotation errors like misaligned bounding
 boxes, incorrect class labels, or inconsistent labeling standards.
 
 Use DataEval's {func}`.label_stats` function to provide the necessary label
-distributions and counts as well as DataEval's {func}`.compute_stats` function to
+distributions and counts as well as DataEval's {func}`.image_stats` function to
 identify any loading or annotation errors. DataEval also includes a
 {class}`.Outliers` class and a {class}`.Duplicates` class to identify anomaly
 and redundant images.
@@ -96,7 +96,7 @@ misclassifications). Visualize these errors to identify patterns, such as the
 model consistently confusing two similar-looking objects or failing to detect
 objects at a distance.
 
-By combining multiple DataEval functions -- {class}`.View` class, {func}`.compute_stats`,
+By combining multiple DataEval functions -- {class}`.View` class, {func}`.image_stats`,
 {func}`.label_stats`, {func}`.cluster`, {class}`.Balance`, and {class}`.Diversity`
 -- model failures can be investigated at the image level.
 
