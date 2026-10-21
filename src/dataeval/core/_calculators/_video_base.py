@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from typing import Any, ClassVar
 
 from dataeval.core._calculators._base import Calculator, Handler
-from dataeval.core._video_runner import FrameConsumer, VideoOptions
+from dataeval.core._video_runner import FrameConsumer, FrameView, VideoClock, VideoOptions
 from dataeval.flags import VideoStats
 from dataeval.types import Aggregator
 
@@ -20,6 +20,16 @@ class VideoCalculator(Calculator[VideoStats], FrameConsumer):
     def __init__(self, options: VideoOptions) -> None:
         self.options = options
         self.warnings: list[str] = []
+
+    # Redeclared so a subclass that forgets one fails at construction, not by inheriting the
+    # protocol's empty body.
+    @abstractmethod
+    def update(self, view: FrameView) -> None:
+        """Take in one frame."""
+
+    @abstractmethod
+    def finish(self, clock: VideoClock) -> None:
+        """Close out the video, once every frame has been seen."""
 
 
 class ReadingCalculator(VideoCalculator):

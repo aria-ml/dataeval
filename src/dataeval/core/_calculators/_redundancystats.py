@@ -25,6 +25,9 @@ class RedundancyStatCalculator(VideoCalculator):
     def update(self, view: FrameView) -> None:
         """Hash one frame."""
         self.hashes.append(view.phash)
+        # Once per message per video, so a video of tiny frames warns once with one index.
+        if view.phash_warning and view.phash_warning not in self.warnings:
+            self.warnings.append(view.phash_warning)
 
     def finish(self, clock: VideoClock) -> None:  # noqa: ARG002
         """Find the redundant runs among the video's hashes, in stream order."""

@@ -771,6 +771,15 @@ def ego_stats(
 ) -> EgoStatsResult: ...
 @overload
 def ego_stats(
+    source: Sequence[VideoStream],
+    gap: int = 1,
+    proc_short_side: int = 360,
+    flow: FlowMethod = "dis",
+    grid_target: int = 40,
+    max_frames: int | None = None,
+) -> EgoStatsResult: ...
+@overload
+def ego_stats(
     source: MultiobjectTrackingDataset,
     gap: int = 1,
     proc_short_side: int = 360,
@@ -781,7 +790,7 @@ def ego_stats(
 
 
 def ego_stats(
-    source: VideoStream | MultiobjectTrackingDataset,
+    source: VideoStream | Sequence[VideoStream] | MultiobjectTrackingDataset,
     gap: int = 1,
     proc_short_side: int = 360,
     flow: FlowMethod = "dis",
@@ -803,9 +812,9 @@ def ego_stats(
 
     Parameters
     ----------
-    source : VideoStream or MultiobjectTrackingDataset
-        One sequence's frames, or a dataset of them. A dataset produces rows for every
-        sequence, concatenated in item order; a single sequence is treated as item 0.
+    source : VideoStream, Sequence[VideoStream] or MultiobjectTrackingDataset
+        One sequence's frames (item 0), a sequence of streams (one video each), or a
+        tracking dataset of them. Rows for every sequence are concatenated in item order.
     gap : int, default 1
         Frames between the two frames of each measured pair. Larger values give a bigger
         baseline, which helps on slow motion that a single frame step leaves in the noise.

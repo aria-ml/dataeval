@@ -83,9 +83,13 @@ def _check_options(stats: VideoStats, options: VideoOptions) -> None:
         raise ValueError(f"redundancy_radius must be non-negative; got {options.redundancy_radius}.")
     if not stats & VideoStats.EGO:
         return
-    _ego_stats._reject_bad_params(
-        options.ego_gap, options.ego_proc_short_side, options.ego_flow, options.ego_grid_target, None
-    )
+    bad = {
+        name: value
+        for name, value in (("ego_gap", options.ego_gap), ("ego_proc_short_side", options.ego_proc_short_side))
+        if value < 1
+    }
+    if bad:
+        raise ValueError(f"Parameters must be positive integers; got {bad}.")
     # Imported here, on the caller's thread: a missing extra fails up front, and run_videos
     # caps OpenCV's threads only once cv2 is imported.
     _ego_stats._require_cv2()

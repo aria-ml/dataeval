@@ -70,10 +70,10 @@ class TestResultsEdgeCases:
         # cast past it to prove the runtime says so as well, for callers who are untyped.
         unaddressed = cast("Any", by_level_and_key)
 
-        with pytest.raises(TypeError, match="source_index"):
+        with pytest.raises(TypeError, match="Cannot combine a result that carries no 'source_index'"):
             combine_stats_results(unaddressed)
 
-        with pytest.raises(TypeError, match="source_index"):
+        with pytest.raises(TypeError, match="Cannot combine a result .*no 'source_index'"):
             combine_stats_results([unaddressed])
 
         with pytest.raises(TypeError, match="source_index"):

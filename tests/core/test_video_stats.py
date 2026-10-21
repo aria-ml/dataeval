@@ -250,3 +250,69 @@ def test_the_radius_is_shared_with_duplicates():
     from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
 
     assert Duplicates().redundancy_radius == DEFAULT_REDUNDANCY_RADIUS == 4
+
+
+@pytest.mark.parametrize("missing", ["update", "finish"])
+def test_a_calculator_missing_update_or_finish_cannot_be_built(missing):
+    from dataeval.core._calculators._video_base import VideoCalculator
+    from dataeval.core._video_runner import VideoOptions
+
+    body = {
+        "get_applicable_flags": lambda self: VideoStats.DESCRIPTIVE,
+        "get_handlers": lambda self: {},
+        "update": lambda self, view: None,
+        "finish": lambda self, clock: None,
+    }
+    del body[missing]
+    incomplete = type("Incomplete", (VideoCalculator,), body)
+    with pytest.raises(TypeError, match=missing):
+        incomplete(VideoOptions())
+
+
+def test_too_small_frames_log_one_grouped_warning(caplog):
+    caplog.set_level("WARNING", logger="dataeval.core")
+    video_stats([_stream(5, shape=(3, 8, 8))], stats=VideoStats.REDUNDANCY)
+    assert sum("too small" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_a_bad_ego_gap_names_the_video_stats_keyword():
+    with pytest.raises(ValueError, match="ego_gap"):
+        video_stats(cast(Any, _Unreadable()), stats=VideoStats.EGO, ego_gap=0)
+
+
+def test_progress_is_reported_once_per_video():
+    calls: list[tuple[int, int | None]] = []
+
+    def record(step: int, *, total: int | None = None, desc: str | None = None, extra_info: Any = None) -> None:
+        calls.append((step, total))
+
+    with use_max_processes(1):
+        video_stats(
+            [_stream(2), _stream(3), _stream(4)],
+            stats=VideoStats.DESCRIPTIVE_FRAME_COUNT,
+            progress_callback=record,
+        )
+    assert calls == [(1, 3), (2, 3), (3, 3)]
+
+
+class _Slow:
+    """A stream that sleeps while iterating and notes when it finished."""
+
+    def __init__(self, frames: Sequence[_Frame], finished: list[int], name: int, delay: float) -> None:
+        self._frames, self._finished, self._name, self._delay = frames, finished, name, delay
+
+    def __iter__(self):
+        time.sleep(self._delay)
+        yield from self._frames
+        self._finished.append(self._name)
+
+
+def test_rows_stay_in_item_order_when_videos_finish_out_of_order():
+    finished: list[int] = []
+    sizes = [3, 5, 7]
+    streams = [_Slow(_stream(n), finished, i, 0.3 if i == 0 else 0.0) for i, n in enumerate(sizes)]
+    with use_max_processes(2):
+        result = video_stats(cast(Any, streams), stats=VideoStats.DESCRIPTIVE_FRAME_COUNT)
+    assert finished[-1] == 0, "the first video must finish last for this test to mean anything"
+    assert result["stats"]["n_frames"].tolist() == sizes
+    assert [s.item for s in result["source_index"]] == [0, 1, 2]

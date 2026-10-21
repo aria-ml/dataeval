@@ -182,12 +182,12 @@ def compute_stats(
     Compute specified statistics on a set of images, optionally within bounding boxes.
 
     .. deprecated:: 1.2
-        Renamed to :func:`image_stats`; removed in 2.0. The parameters and the result are
-        unchanged.
+        Renamed to :func:`~dataeval.core.image_stats`; removed in 2.0. The parameters and the
+        result are unchanged.
 
     See Also
     --------
-    :func:`image_stats` : The same function under its current name
+    :func:`~dataeval.core.image_stats` : The same function under its current name
     """
     # Imported here: `_image_stats` builds on this module's shared types and helpers.
     from dataeval.core._image_stats import image_stats
@@ -255,7 +255,7 @@ def _reject_unaddressable(result: FactorResult, position: int | None = None) -> 
         return
     where = "" if position is None else f" (result {position} of the sequence)"
     raise TypeError(
-        f"Cannot combine a StatsResult{where} that carries no 'source_index': it places its "
+        f"Cannot combine a result{where} that carries no 'source_index': it places its "
         "values by level and key rather than by address, as ego_stats and track_stats do, so "
         "there is no address to offset or concatenate here. Attach it directly with "
         "Metadata.add_factors(result, level=..., key=...) instead of combining it.",
@@ -311,14 +311,14 @@ def combine_stats_results(  # noqa: C901
     """
     if isinstance(results, dict):
         _reject_unaddressable(results)
-        return results["stats"], list(results.get("source_index", [])), []
+        return results["stats"], list(results["source_index"]), []
 
     if len(results) == 0:
         raise TypeError("Cannot combine empty sequence of stats.")
 
     if len(results) == 1:
         _reject_unaddressable(results[0])
-        return results[0]["stats"], list(results[0].get("source_index", [])), []
+        return results[0]["stats"], list(results[0]["source_index"]), []
 
     combined_stats: StatsMap | None = None
     combined_source_index: list[SourceIndex] = []
@@ -328,7 +328,7 @@ def combine_stats_results(  # noqa: C901
     for position, r in enumerate(results):
         _reject_unaddressable(r, position)
         stats = r["stats"]
-        source_index = r.get("source_index", [])
+        source_index = r["source_index"]
         if not source_index:
             # A result with no rows has no values to concatenate and no name set worth
             # comparing. An empty split — a filter or a selection that matched nothing —

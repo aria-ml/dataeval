@@ -44,3 +44,17 @@ def test_undefined_time_reads_nan(t):
 
 def test_a_missing_timestamp_leaves_no_order():
     assert video_clock([0.0, None, 2 * F]).order is None
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
+def test_a_non_finite_timestamp_reads_as_missing(bad):
+    clock = video_clock([0.0, bad, 2 * F])
+    assert clock.order is None
+    assert np.isnan(clock.duration)
+
+
+def test_a_single_frame_orders_by_its_own_time():
+    clock = video_clock([2.5])
+    assert clock.order is not None
+    assert clock.order.tolist() == [2.5]
+    assert np.isnan(clock.duration)
