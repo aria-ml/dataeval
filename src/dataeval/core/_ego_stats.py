@@ -39,9 +39,9 @@ from __future__ import annotations
 
 __all__ = []
 
+from collections import deque
 from collections.abc import Iterable, Iterator, Sequence
-from inspect import getattr_static
-from itertools import chain
+from functools import partial
 from types import ModuleType
 from typing import Any, Literal, NamedTuple, TypeAlias, TypedDict, cast, overload
 
@@ -50,10 +50,9 @@ from numpy.typing import NDArray
 
 from dataeval._log import get_logger
 from dataeval.core._compute_stats import FactorResult
-from dataeval.protocols import Dataset, MultiobjectTrackingDataset, VideoStream
+from dataeval.core._video_runner import FrameView, VideoClock, VideoOptions, run_videos, walk
+from dataeval.protocols import MultiobjectTrackingDataset, VideoStream
 from dataeval.types import Aggregator
-from dataeval.utils._array import as_numpy
-from dataeval.utils.preprocessing import to_canonical_grayscale
 
 _logger = get_logger(__name__)
 
@@ -480,10 +479,9 @@ def _grid_flow_lk(
 # ============================== sequence walk ==============================
 
 
-def _to_gray(pixels: NDArray[Any], proc_short_side: int) -> NDArray[np.uint8]:
-    """Convert one frame's ``(C, H, W)`` pixels to a downscaled 2D uint8 grayscale image."""
+def _downscale(gray: NDArray[np.uint8], proc_short_side: int) -> NDArray[np.uint8]:
+    """Shrink a 2D grayscale frame to `proc_short_side` on its short side, never enlarging it."""
     cv2 = _require_cv2()
-    gray = to_canonical_grayscale(pixels)
     height, width = gray.shape[:2]
     short = min(width, height)
     if short <= proc_short_side:
@@ -492,45 +490,32 @@ def _to_gray(pixels: NDArray[Any], proc_short_side: int) -> NDArray[np.uint8]:
     return cv2.resize(gray, (round(width * factor), round(height * factor)), interpolation=cv2.INTER_AREA)
 
 
+class _PairBuffer:
+    """Hold the last `gap` + 1 frames, so each new frame can be paired with the one `gap` back.
+
+    Forward streaming only, so a long sequence never has to be decoded into memory at once.
+    """
+
+    def __init__(self, gap: int) -> None:
+        self._gap = gap
+        self._frames: deque[NDArray[np.uint8]] = deque(maxlen=gap + 1)
+
+    def push(self, frame: NDArray[np.uint8]) -> NDArray[np.uint8] | None:
+        """Take in the next frame and return the frame `gap` before it, or None until one is held."""
+        self._frames.append(frame)
+        return self._frames[0] if len(self._frames) > self._gap else None
+
+
 def _stream_pairs(
     frames: Iterable[NDArray[np.uint8]],
     gap: int,
 ) -> Iterator[tuple[NDArray[np.uint8], NDArray[np.uint8]]]:
-    """Yield every frame pair `gap` apart, holding at most `gap` + 1 frames.
-
-    Forward streaming only, so a long sequence never has to be decoded into memory at once.
-    """
-    buffer: dict[int, NDArray[np.uint8]] = {}
-    for index, frame in enumerate(frames):
-        buffer[index] = frame
-        base = index - gap
-        if base >= 0:
-            yield buffer[base], frame
-        buffer = {k: v for k, v in buffer.items() if k > index - gap}
-
-
-def _pair_egos(
-    frames: Iterable[NDArray[np.uint8]],
-    full_wh: tuple[int, int],
-    gap: int,
-    flow: FlowMethod,
-    grid_target: int,
-) -> Iterator[_PairReading | None]:
-    """Yield one reading per frame pair, None where the pair could not be measured.
-
-    Keeping the None lets the caller count refusals against the number of pairs actually
-    attempted.
-    """
-    cv2 = _require_cv2()
-    dis = cv2.DISOpticalFlow.create(cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST) if flow == "dis" else None
-    for previous, current in _stream_pairs(frames, gap):
-        pts, vectors = (
-            _grid_flow_dis(dis, previous, current, grid_target)
-            if dis is not None
-            else _grid_flow_lk(previous, current, grid_target)
-        )
-        height, width = previous.shape[:2]
-        yield _pair_ego(pts, vectors, (width, height), full_wh, gap) if len(pts) >= _MIN_SAMPLES else None
+    """Yield every frame pair `gap` apart, holding at most `gap` + 1 frames."""
+    buffer = _PairBuffer(gap)
+    for frame in frames:
+        previous = buffer.push(frame)
+        if previous is not None:
+            yield previous, frame
 
 
 def _trimmed_center(state: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -719,52 +704,60 @@ def _frame_rows(
 # ============================== public API ==============================
 
 
-class _GrayFrames:
-    """Decode a sequence to downscaled grayscale, recording its native size and length.
+class _EgoEngine:
+    """Measure one video's camera ego-motion as a frame consumer, one frame pair at a time.
 
-    The first frame is pulled eagerly because the caller needs the sequence's full
-    resolution before the walk starts. Every reported pixel quantity is scaled back to that
-    resolution, and a generator cannot report it without being consumed first. The frame
-    count is only known after the walk, so for the same reason it lives on the instance
-    and is read off once the walk is done.
+    Holds one DIS estimator for the video, the frames still waiting for their pair, and one
+    reading per pair, so a long video never has to be decoded into memory at once. Every
+    reported pixel quantity is scaled back to the full resolution of the video's first frame.
     """
 
-    def __init__(self, stream: VideoStream, proc_short_side: int, max_frames: int | None) -> None:
-        self._frames = iter(stream)
-        self._proc_short_side = proc_short_side
-        self._max_frames = max_frames
-        first = next(self._frames, None)
-        self._first: NDArray[Any] | None = None if first is None else as_numpy(first.pixels)
-        # MAITE declares frame pixels as (C, H, W), which is where the trailing axes come from.
-        self.full_wh: tuple[int, int] | None = (
-            None if self._first is None else (int(self._first.shape[-1]), int(self._first.shape[-2]))
+    def __init__(self, options: VideoOptions) -> None:
+        cv2 = _require_cv2()
+        self._options = options
+        self._dis = (
+            cv2.DISOpticalFlow.create(cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST) if options.ego_flow == "dis" else None
         )
-        self.count = 0
+        self._pairs = _PairBuffer(options.ego_gap)
+        # Kept None where a pair could not be measured, so refusals count against the pairs attempted.
+        self._readings: list[_PairReading | None] = []
+        self._full_wh: tuple[int, int] | None = None
+        self._n_frames = 0
 
-    def __iter__(self) -> Iterator[NDArray[np.uint8]]:
-        if self._first is None:
+    def update(self, view: FrameView) -> None:
+        """Measure the pair the frame closes, if any."""
+        if self._full_wh is None:
+            # MAITE declares frame pixels as (C, H, W), which is where the trailing axes come from.
+            self._full_wh = (int(view.pixels.shape[-1]), int(view.pixels.shape[-2]))
+        self._n_frames += 1
+        current = view.gray_small
+        previous = self._pairs.push(current)
+        if previous is None:
             return
-        for pixels in chain([self._first], (as_numpy(frame.pixels) for frame in self._frames)):
-            if self._max_frames is not None and self.count >= self._max_frames:
-                return
-            self.count += 1
-            yield _to_gray(pixels, self._proc_short_side)
+        grid_target, gap = self._options.ego_grid_target, self._options.ego_gap
+        pts, vectors = (
+            _grid_flow_dis(self._dis, previous, current, grid_target)
+            if self._dis is not None
+            else _grid_flow_lk(previous, current, grid_target)
+        )
+        height, width = previous.shape[:2]
+        reading = _pair_ego(pts, vectors, (width, height), self._full_wh, gap) if len(pts) >= _MIN_SAMPLES else None
+        self._readings.append(reading)
+
+    def finish(self, clock: VideoClock) -> None:
+        """Nothing to close. The temporal gate needs the whole video, so it runs in :meth:`frame_rows`."""
+
+    def frame_rows(self) -> dict[str, list[Any]]:
+        """Lay the video's pair readings out as one row per frame."""
+        half_diagonal = 0.0 if self._full_wh is None else 0.5 * float(np.hypot(*self._full_wh))
+        return _frame_rows(self._readings, self._n_frames, self._options.ego_gap, half_diagonal)
 
 
-def _measure_stream(
-    stream: VideoStream,
-    gap: int,
-    proc_short_side: int,
-    flow: FlowMethod,
-    grid_target: int,
-    max_frames: int | None,
-) -> dict[str, list[Any]]:
-    """Decode one sequence and lay its pair readings out as one row per frame."""
-    frames = _GrayFrames(stream, proc_short_side, max_frames)
-    if frames.full_wh is None:
-        return _frame_rows([], 0, gap, 0.0)
-    readings = list(_pair_egos(frames, frames.full_wh, gap, flow, grid_target))
-    return _frame_rows(readings, frames.count, gap, 0.5 * float(np.hypot(*frames.full_wh)))
+def _measure_video(options: VideoOptions, max_frames: int | None, stream: VideoStream) -> dict[str, list[Any]]:
+    """Walk one video through an ego engine and lay its readings out as one row per frame."""
+    engine = _EgoEngine(options)
+    walk(stream, [engine], options, stop_after=max_frames)
+    return engine.frame_rows()
 
 
 @overload
@@ -849,6 +842,11 @@ def ego_stats(
         If `gap`, `proc_short_side`, `grid_target` or `max_frames` is not positive, or if
         `flow` is not one of the supported estimators.
 
+    See Also
+    --------
+    :func:`~dataeval.core.video_stats` : With ``stats=VideoStats.EGO``, one row of these
+        summaries per video
+
     Notes
     -----
     **Reading the result.** Check `ego_trusted` first. Where it is False, the kinematic
@@ -873,6 +871,11 @@ def ego_stats(
     linear in pixels at `proc_short_side`. Lower `proc_short_side` before lowering
     `grid_target`.
 
+    **Parallelism.** Sequences are measured concurrently, one per worker thread, when
+    :func:`~dataeval.config.set_max_processes` allows more than one worker. Each worker
+    fetches and decodes its own sequence, so a dataset whose items share one open decoder is
+    not safe to measure this way. Set ``max_processes`` to 1 for such a dataset.
+
     Examples
     --------
     Measure a dataset and attach the result as unit-level metadata:
@@ -885,46 +888,13 @@ def ego_stats(
     filtering to `ego_trusted`.
     """
     _reject_bad_params(gap, proc_short_side, flow, grid_target, max_frames)
-    walk = (gap, proc_short_side, flow, grid_target, max_frames)
-
-    if not _is_dataset(source):
-        _logger.info("Computing ego stats for one sequence.")
-        item_rows = [_measure_stream(cast("VideoStream", source), *walk)]
-    else:
-        dataset = cast("MultiobjectTrackingDataset", source)
-        item_rows = [_measure_stream(dataset[item][0], *walk) for item in range(len(dataset))]
-        _logger.info("Ego stats complete for %d item(s).", len(item_rows))
-
+    # Imported here, on the caller's thread, because run_videos caps OpenCV's threads only
+    # when cv2 is already imported, and the workers would otherwise import it first.
+    _require_cv2()
+    options = VideoOptions(ego_gap=gap, ego_proc_short_side=proc_short_side, ego_flow=flow, ego_grid_target=grid_target)
+    item_rows = run_videos(source, partial(_measure_video, options, max_frames))
+    _logger.info("Ego stats complete for %d video(s).", len(item_rows))
     return EgoStatsResult(stats=_concat_items(item_rows), aggregations=EGO_AGGREGATIONS)
-
-
-def _is_dataset(source: Any) -> bool:
-    """Whether this is a dataset of sequences rather than a single sequence.
-
-    Both forms are commonly lists, so neither indexability nor iterability separates them.
-    A list of frames is a valid :obj:`~dataeval.protocols.VideoStream`. What separates them
-    is the element type, so the element is what gets inspected. A dataset yields
-    ``(stream, target, metadata)`` triples, and a stream yields frames.
-
-    The check asks only for ``pixels``, the one member this module reads, and not for the
-    whole frame protocol. A stream that carries pixels but no presentation timestamps is
-    still measurable here, so refusing it would fail a usable stream on a dispatch
-    technicality. The lookup is static so that a frame which decodes lazily on attribute
-    access is not decoded merely to determine its type.
-
-    Only an indexable source is peeked at, because peeking at a generator would consume the
-    frame it returned. That costs nothing, since a dataset is required to be indexable and
-    anything that is not can only be a stream.
-    """
-    if not isinstance(source, Dataset):
-        return False
-    try:
-        first = source[0]
-    except (IndexError, KeyError):
-        # Empty and indexable. Nothing to measure either way, so read it as an empty
-        # sequence, which reports a row rather than silently returning no rows at all.
-        return False
-    return getattr_static(first, "pixels", None) is None
 
 
 def _reject_bad_params(

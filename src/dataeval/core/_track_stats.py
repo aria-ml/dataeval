@@ -379,7 +379,7 @@ def _jitter_sparc(
     return max(0.0, arc_length - 1.0)
 
 
-def _sequence_stats(
+def _track_stats_for_sequence(
     tracks: Mapping[int, Track],
     frame_width: int | None = None,
     frame_height: int | None = None,
@@ -530,7 +530,7 @@ def _dataset_stats(
         video_stream, target, _ = dataset[item]
         tracks = build_tracks(target)
         width, height = (frame_width, frame_height) if stated else frame_size(next(iter(video_stream), None))
-        stats = _sequence_stats(tracks, width, height, edge_threshold, jitter_min_frames, jitter_fc)["stats"]
+        stats = _track_stats_for_sequence(tracks, width, height, edge_threshold, jitter_min_frames, jitter_fc)["stats"]
         # Read as a plain mapping: a TypedDict types its values field by field, and this
         # walks them uniformly without caring which field it is holding.
         for name, values in cast("Mapping[str, Sequence[Any]]", stats).items():
@@ -651,7 +651,9 @@ def track_stats(
     # Mapping first: a Mapping satisfies the Dataset protocol's __len__/__getitem__ too,
     # so checking the dataset side first would swallow the single-sequence form.
     if isinstance(source, Mapping):
-        return _sequence_stats(source, frame_width, frame_height, edge_threshold, jitter_min_frames, jitter_fc)
+        return _track_stats_for_sequence(
+            source, frame_width, frame_height, edge_threshold, jitter_min_frames, jitter_fc
+        )
     if isinstance(source, Dataset):
         return _dataset_stats(
             cast("MultiobjectTrackingDataset", source),

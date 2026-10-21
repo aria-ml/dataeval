@@ -182,19 +182,33 @@ class FactorResult(TypedDict, Generic[TFactors]):
     categorical: NotRequired[tuple[str, ...]]
 
 
-class StatsResult(FactorResult[TFactors]):
+class AddressedResult(FactorResult[TFactors]):
     """
     A :class:`FactorResult` that also carries an address for every value.
 
-    What ``image_stats`` and ``compute_ratios`` return, and what combining or offsetting
-    results needs. Producers that place their values by level and key instead
-    (``track_stats``) return a bare :class:`FactorResult`, with no address to offset or
-    concatenate against.
+    Rows placed by address, for producers with no image bookkeeping (``video_stats``
+    places one row per video). What combining or offsetting results needs, so
+    :func:`combine_stats_results` accepts any of these. Producers that place their values
+    by level and key instead (``track_stats``) return a bare :class:`FactorResult`, with no
+    address to offset or concatenate against.
 
     Attributes
     ----------
     source_index : Sequence[SourceIndex]
         An address per value, saying which row of which level it belongs to.
+    """
+
+    source_index: Sequence[SourceIndex]
+
+
+class StatsResult(AddressedResult[TFactors]):
+    """
+    An :class:`AddressedResult` with image bookkeeping.
+
+    What ``image_stats`` and ``compute_ratios`` return.
+
+    Attributes
+    ----------
     object_count : Sequence[int]
         Objects per image. Bookkeeping about the run, not a factor.
     invalid_box_count : Sequence[int]
@@ -203,7 +217,6 @@ class StatsResult(FactorResult[TFactors]):
         Total images processed. Bookkeeping about the run, not a factor.
     """
 
-    source_index: Sequence[SourceIndex]
     object_count: Sequence[int]
     invalid_box_count: Sequence[int]
     image_count: int
@@ -1639,11 +1652,11 @@ def _reject_stat_name_mismatch(combined: StatsMap, stats: StatsMap, position: in
 
 
 def combine_stats_results(  # noqa: C901
-    results: StatsResult | Sequence[StatsResult],
+    results: AddressedResult | Sequence[AddressedResult],
 ) -> tuple[StatsMap, list[SourceIndex], list[int]]:
-    """Combine one or more StatsResults into unified stats, source_index, and dataset_steps.
+    """Combine one or more addressed results into unified stats, source_index, and dataset_steps.
 
-    For a single StatsResult, returns its stats and source_index directly
+    For a single result, returns its stats and source_index directly
     with empty dataset_steps.
 
     For multiple results, concatenates stats arrays by key, applies cumulative
@@ -1652,7 +1665,7 @@ def combine_stats_results(  # noqa: C901
 
     Parameters
     ----------
-    results : StatsResult or Sequence[StatsResult]
+    results : AddressedResult or Sequence[AddressedResult]
         A single result or sequence of results to combine.
 
     Returns

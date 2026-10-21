@@ -32,6 +32,7 @@ from dataeval.core import (
     sequence_containment,
     sequence_fingerprint,
 )
+from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
 from dataeval.data import AllFrames, FrameRate, FrameSelector, SequenceFrames, Stride
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
@@ -79,7 +80,7 @@ DEFAULT_DUPLICATES_FLAGS = ImageStats.HASH_DUPLICATES_BASIC
 DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR: float | None = None
 DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES = True
 DEFAULT_DUPLICATES_HASH_RADIUS = 0
-DEFAULT_DUPLICATES_REDUNDANCY_RADIUS = 4
+DEFAULT_DUPLICATES_REDUNDANCY_RADIUS = DEFAULT_REDUNDANCY_RADIUS
 DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES = 30
 DEFAULT_DUPLICATES_MAX_SEGMENT_GAP = 5
 DEFAULT_DUPLICATES_SEGMENT_OFFSET_TOLERANCE = 0

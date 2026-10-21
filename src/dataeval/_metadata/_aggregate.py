@@ -315,10 +315,8 @@ def _as_missing(frame: pl.DataFrame) -> pl.DataFrame:
     return frame.with_columns(pl.col(name).fill_nan(None) for name in floats) if floats else frame
 
 
-def _working_frame(
-    store: LevelStore, from_level: FactorLevel, exprs: Sequence[pl.Expr], group: pl.Series
-) -> pl.DataFrame:
-    """Build the narrowest frame the expressions can be evaluated over, plus the group key.
+def _working_frame(store: LevelStore, from_level: FactorLevel, exprs: Sequence[pl.Expr]) -> pl.DataFrame:
+    """Build the narrowest frame the expressions can be evaluated over.
 
     Only the columns the expressions actually read, resolved one at a time the way
     :meth:`LevelStore.select` does. Routing this through :meth:`LevelStore.resolve` instead
@@ -335,8 +333,8 @@ def _working_frame(
     """
     names = _read_names(exprs)
     if any(store.source_of(from_level, name) is None for name in names):
-        return _as_missing(store.resolve(from_level)).with_columns(group)
-    return _as_missing(pl.DataFrame([store.column(from_level, name) for name in names] + [group]))
+        return store.resolve(from_level)
+    return pl.DataFrame([store.column(from_level, name) for name in names])
 
 
 def _report_participation(
@@ -430,22 +428,72 @@ def aggregate(
         the answer covers.
     """
     groups = store.link(from_level, to_level, via).positions()
-    frame = _working_frame(store, from_level, exprs, pl.Series(_GROUP, groups))
-    if unique_by is not None:
-        frame = frame.with_columns(pl.Series(_UNIQUE, _unique_keys(store, from_level, unique_by)))
+    n_targets = store.height(to_level)
+    unique = None if unique_by is None else pl.Series(_UNIQUE, _unique_keys(store, from_level, unique_by))
+    rolled = roll_up(
+        _working_frame(store, from_level, exprs),
+        groups,
+        n_targets,
+        exprs,
+        empty=empty,
+        min_coverage=min_coverage,
+        order=order,
+        unique=unique,
+    )
+    _report_participation(store, from_level, to_level, via, groups, n_targets - rolled.childless)
+    return rolled
+
+
+def roll_up(
+    frame: pl.DataFrame,
+    groups: NDArray[np.intp],
+    n_targets: int,
+    exprs: Sequence[pl.Expr],
+    *,
+    empty: Any = None,
+    min_coverage: float = 0.0,
+    order: str | None = None,
+    unique: pl.Series | None = None,
+) -> Rolled:
+    """Evaluate ``exprs`` per target over the rows of ``frame`` that ``groups`` assigns to it.
+
+    The store-free core of :func:`aggregate`, for a producer whose rows never enter a
+    :class:`LevelStore` but whose reductions must agree with the ones that do.
+
+    ``frame`` has one row per source row and holds the columns ``exprs`` read, plus ``order``
+    when it is given. ``groups`` gives each row's target position, or a negative number for a
+    row with no target, which takes no part and is counted in ``Rolled.no_ancestor``. ``unique``
+    holds one key per row, and rows sharing a group and a key count once, the first kept.
+    ``NaN`` is read as missing, and the remaining arguments are as in :func:`aggregate`.
+
+    Returns
+    -------
+    Rolled
+        One series per expression, each of length ``n_targets``, named by the expression's
+        output name, together with how much of each level the answer covers.
+    """
+    # Built from the group key outward so a frame that reads no column, as ``pl.len()`` does,
+    # still has one row per source row.
+    frame = pl.DataFrame(pl.Series(_GROUP, groups)).hstack(_as_missing(frame).get_columns())
+    if unique is not None:
+        frame = frame.with_columns(unique.alias(_UNIQUE))
     frame = frame.filter(pl.col(_GROUP) >= 0)
-    if unique_by is not None:
+    if unique is not None:
         frame = frame.unique(subset=[_GROUP, _UNIQUE], keep="first", maintain_order=True)
 
     measured = [*_coverage_exprs(exprs), *_gap_exprs(order)]
-    rolled = frame.group_by(_GROUP, maintain_order=True).agg(*exprs, *measured)
-    # The scatter, without a scatter: each ``to_level`` row records which result row is its
-    # own, and a level with no rows beneath it keeps the -1 that ``gather_nulling`` turns
-    # into a null. ``Series.scatter`` is unimplemented for nested dtypes, and an expression
-    # is free to return one.
-    slot = np.full(store.height(to_level), -1, dtype=np.intp)
+    if frame.height:
+        rolled = frame.group_by(_GROUP, maintain_order=True).agg(*exprs, *measured)
+    else:
+        # polars 1.0 fails some reductions over no rows at all (``variability``, ``longest_run``),
+        # so the empty result takes its column types from one row of nulls instead.
+        rolled = frame.clear(1).group_by(_GROUP).agg(*exprs, *measured).clear()
+    # The scatter, without a scatter: each target records which result row is its own, and a
+    # target with no rows beneath it keeps the -1 that ``gather_nulling`` turns into a null.
+    # ``Series.scatter`` is unimplemented for nested dtypes, and an expression is free to
+    # return one.
+    slot = np.full(n_targets, -1, dtype=np.intp)
     slot[rolled[_GROUP].to_numpy()] = np.arange(rolled.height, dtype=np.intp)
-    _report_participation(store, from_level, to_level, via, groups, rolled.height)
 
     filled = rolled[_GROUP].to_numpy()
     columns: list[pl.Series] = []
@@ -456,15 +504,14 @@ def aggregate(
         name = expr.meta.output_name()
         columns.append(_filled(gather_nulling(name, rolled[name], covered), slot, empty))
         uncovered.append(int(below.sum()))
-    no_ancestor = int(np.count_nonzero(groups < 0))
     return Rolled(
         columns=columns,
-        # Counted after the de-duplication rather than before it, since ``unique_by`` drops
+        # Counted after the de-duplication rather than before it, since ``unique`` drops
         # rows precisely so they are *not* summarized twice, and a count that included them
         # would sit on a different denominator from the coverage measured in the same pass.
         took_part=frame.height,
-        no_ancestor=no_ancestor,
-        childless=store.height(to_level) - rolled.height,
+        no_ancestor=int(np.count_nonzero(groups < 0)),
+        childless=n_targets - rolled.height,
         coverage=tuple(_lowest(rolled, position) for position in range(len(exprs))),
         uncovered=tuple(uncovered),
         gaps=int(rolled[_GAPS].sum()) if order is not None and rolled.height else 0,
