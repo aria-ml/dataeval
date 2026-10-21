@@ -97,7 +97,7 @@ class TestQualityEvaluation:
 
     def test_duplicates_from_stats_across_datasets(self):
         """Duplicates.from_stats compares precomputed hashes from two datasets."""
-        from dataeval.core import compute_stats
+        from dataeval.core import image_stats
         from dataeval.flags import ImageStats
         from dataeval.quality import Duplicates
 
@@ -105,7 +105,7 @@ class TestQualityEvaluation:
         first = rng.random((10, 3, 16, 16)).astype(np.float32)
         second = np.concatenate([rng.random((5, 3, 16, 16)).astype(np.float32), first[:3]])
         stats = [
-            compute_stats(d, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
+            image_stats(d, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
             for d in (first, second)
         ]
 

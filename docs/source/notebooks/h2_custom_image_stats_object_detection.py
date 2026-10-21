@@ -26,7 +26,7 @@
 # - Target-level statistics: Properties of individual bounding boxes within images
 # - Background-level statistics: Properties of the pixels no bounding box covers
 #
-# This guide will show you how to use {func}`.compute_stats` with custom {class}`.ImageStats` flags to capture statistics
+# This guide will show you how to use {func}`.image_stats` with custom {class}`.ImageStats` flags to capture statistics
 # on each of those three regions, and how to hand the result to {class}`.Metadata` so every value lands on the row it
 # describes.
 
@@ -68,7 +68,7 @@ from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.data import Limit, View
 from dataeval.flags import ImageStats
 
@@ -109,7 +109,7 @@ print(f"Sample targets (boxes): {len(dataset[0][1].boxes)} boxes in first image"
 
 # %%
 # Calculate custom individual statistics for full images only (per_image=True, per_target=False)
-results_image_only = compute_stats(
+results_image_only = image_stats(
     data=dataset,
     stats=ImageStats.PIXEL_MEAN | ImageStats.DIMENSION_ASPECT_RATIO | ImageStats.VISUAL_SHARPNESS,
     per_image=True,
@@ -128,7 +128,7 @@ print(f"Total images processed: {results_image_only['image_count']}")
 #
 # - `item`: The item index in the dataset
 # - `key`: The bounding box index (None for full images). `target` is its retired spelling.
-# - `level`: Which level `key` addresses, left unstated by `compute_stats` — an unkeyed address is then the
+# - `level`: Which level `key` addresses, left unstated by `image_stats` — an unkeyed address is then the
 #   item level and a keyed one the label level
 #
 # That address is what lets a single result carry values measured over different regions without ever confusing
@@ -150,7 +150,7 @@ print(f"\nAll entries have key=None: {all(src.key is None for src in results_ima
 
 # %%
 # Calculate basic pixel statistics for targets only (per_image=False, per_target=True)
-results_target_only = compute_stats(
+results_target_only = image_stats(
     data=dataset,
     stats=ImageStats.PIXEL_BASIC,
     per_image=False,
@@ -174,7 +174,7 @@ for i, src in enumerate(results_target_only["source_index"][:5]):
 
 # %%
 # Calculate basic dimension statistics for full images and boxes (per_image=True, per_target=True)
-results_both = compute_stats(
+results_both = image_stats(
     data=dataset,
     stats=ImageStats.DIMENSION_BASIC,
     per_image=True,
@@ -205,7 +205,7 @@ print(f"Target-level results: {len(target_indices)}")
 # `background_`. They are per-image values — the background is a property of the frame, not of anything inside it.
 
 # %%
-results_background = compute_stats(
+results_background = image_stats(
     data=dataset,
     stats=ImageStats.VISUAL_SHARPNESS,
     per_image=True,
@@ -318,7 +318,7 @@ print(f"                back  ={units['unit_background_sharpness'].mean():.1f}")
 # %% [markdown]
 # ## Conclusion
 #
-# This notebook demonstrated how to use {func}`.compute_stats` with custom {class}`.ImageStats` flags to perform flexible,
+# This notebook demonstrated how to use {func}`.image_stats` with custom {class}`.ImageStats` flags to perform flexible,
 # efficient analysis on object detection datasets, over whole images, individual boxes, and the background behind them.
 #
 # These techniques are valuable for:

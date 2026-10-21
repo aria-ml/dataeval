@@ -61,7 +61,7 @@ Compute statistics on image properties like brightness, contrast, sharpness,
 and color distributions. For object detection, analyze the distributions of
 bounding box sizes, aspect ratios, and locations.
 
-Use DataEval's {func}`.compute_stats` to provide the necessary image statistics
+Use DataEval's {func}`.image_stats` to provide the necessary image statistics
 on both the image and any bounding boxes.
 
 ### Identify data quality issues
@@ -90,7 +90,7 @@ characteristics between data subsets (e.g., comparing the average bounding box
 in 'day' vs. 'night' images).
 
 Use DataEval's {class}`.View` class to create different subsets of the dataset
-that can then be compared using the results of DataEval's {func}`.compute_stats`
+that can then be compared using the results of DataEval's {func}`.image_stats`
 function.
 
 ### Quantify bias and representativeness
@@ -140,7 +140,7 @@ Go beyond top-line metrics to perform detailed error analysis. Visualize the
 false positives and false negatives to understand why the model is failing
 (e.g., it confuses similar objects, fails on small objects, or struggles in low light).
 
-By combining multiple DataEval functions -- {class}`.View` class, {func}`.compute_stats`,
+By combining multiple DataEval functions -- {class}`.View` class, {func}`.image_stats`,
 {func}`.label_stats`, {func}`.cluster`, {class}`.Balance`, and {class}`.Diversity`
 -- false positives and false negatives can be further analyzed.
 

@@ -34,7 +34,7 @@ class FactorsStructurer(PropagationMixin, Structurer):
     arrays describe a single level, since nothing in them distinguishes an item from a
     label. A source index does distinguish them, and when it carries both kinds this
     builds the same two-block ``unit``/``instance`` shape :class:`ODImageStructurer`
-    produces — which is what lets :func:`~dataeval.core.compute_stats` output over an
+    produces — which is what lets :func:`~dataeval.core.image_stats` output over an
     object detection dataset be imported without the dataset itself.
 
     Parameters

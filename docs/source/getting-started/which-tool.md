@@ -37,7 +37,7 @@ See the [deduplication how-to guide](../notebooks/h2_deduplicate.py).
 
 ### Are there images that look visually corrupted, blurry, or otherwise anomalous?
 
-Use {func}`.compute_stats` to compute per-image statistics (brightness,
+Use {func}`.image_stats` to compute per-image statistics (brightness,
 contrast, sharpness, aspect ratio, entropy), then {class}`.Outliers` to flag
 images at the extremes of those distributions.
 See the [visualizing cleaning issues how-to guide](../notebooks/h2_visualize_cleaning_issues.py).
@@ -211,7 +211,7 @@ the [identify OOD samples tutorial](../notebooks/tt_identify_ood_samples.py).
 
 ### Are sensor inputs degrading in quality during operation?
 
-Use {func}`.compute_stats` on incoming data to track per-image quality metrics
+Use {func}`.image_stats` on incoming data to track per-image quality metrics
 over time. Systematic shifts in brightness, contrast, or sharpness distributions
 indicate sensor degradation or environmental change before they manifest as model
 performance drops.

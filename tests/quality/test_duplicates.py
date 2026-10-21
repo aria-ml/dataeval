@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 from dataeval import Metadata
 from dataeval.core import align_subsequence, pack_hashes
 from dataeval.core._clusterer import ClusterResult
-from dataeval.core._compute_stats import compute_stats
+from dataeval.core._compute_stats import image_stats
 from dataeval.data import FrameIndices, SequenceFrames, Stride
 from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
@@ -116,7 +116,7 @@ class TestDuplicates:
         data = np.random.random((20, 3, 16, 16))
         data = np.concatenate((data, data, data + 0.001))
         # Stats computed with full HASH (includes both xxhash and phash)
-        stats = compute_stats(data, stats=ImageStats.HASH, per_image=True, per_target=False)
+        stats = image_stats(data, stats=ImageStats.HASH, per_image=True, per_target=False)
         # Detector configured for exact only - but from_stats uses what's in the stats
         dupes = Duplicates(ImageStats.HASH_XXHASH)
         results = dupes.from_stats(stats)
@@ -139,9 +139,9 @@ class TestDuplicates:
         data1 = np.concatenate((ones, zeros, ones, zeros, ones))
         data2 = np.concatenate((zeros, ones, zeros))
         data3 = np.concatenate((zeros + 0.001, ones - 0.001))
-        dupes1 = compute_stats(data1, stats=ImageStats.HASH, per_image=True, per_target=False)
-        dupes2 = compute_stats(data2, stats=ImageStats.HASH, per_image=True, per_target=False)
-        dupes3 = compute_stats(data3, stats=ImageStats.HASH, per_image=True, per_target=False)
+        dupes1 = image_stats(data1, stats=ImageStats.HASH, per_image=True, per_target=False)
+        dupes2 = image_stats(data2, stats=ImageStats.HASH, per_image=True, per_target=False)
+        dupes3 = image_stats(data3, stats=ImageStats.HASH, per_image=True, per_target=False)
 
         dupes = Duplicates()
         results = dupes.from_stats([dupes1, dupes2, dupes3])
@@ -323,7 +323,7 @@ class TestDuplicates:
         bboxes = [[[0, 0, 50, 50], [50, 50, 100, 100]]]
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
-        result = compute_stats(dataset, stats=ImageStats.HASH, per_image=True, per_target=True)
+        result = image_stats(dataset, stats=ImageStats.HASH, per_image=True, per_target=True)
 
         assert len(result.get("source_index", [])) == 3
 
@@ -434,8 +434,8 @@ class TestDuplicates:
         dataset1 = get_mock_od_dataset([image1], [[0]], [[[0, 0, 50, 50]]])
         dataset2 = get_mock_od_dataset([image2], [[0, 1]], [[[0, 0, 50, 50], [50, 50, 100, 100]]])
 
-        stats1 = compute_stats(dataset1, stats=ImageStats.HASH, per_image=True, per_target=True)
-        stats2 = compute_stats(dataset2, stats=ImageStats.HASH, per_image=True, per_target=True)
+        stats1 = image_stats(dataset1, stats=ImageStats.HASH, per_image=True, per_target=True)
+        stats2 = image_stats(dataset2, stats=ImageStats.HASH, per_image=True, per_target=True)
 
         detector = Duplicates()
         result = detector.from_stats([stats1, stats2], per_target=True)
@@ -848,8 +848,8 @@ class TestDuplicatesOutputAPI:
         zeros = np.zeros((1, 16, 16))
         data1 = np.concatenate((ones, zeros, ones))
         data2 = np.concatenate((zeros, ones))
-        dupes1 = compute_stats(data1, stats=ImageStats.HASH, per_image=True, per_target=False)
-        dupes2 = compute_stats(data2, stats=ImageStats.HASH, per_image=True, per_target=False)
+        dupes1 = image_stats(data1, stats=ImageStats.HASH, per_image=True, per_target=False)
+        dupes2 = image_stats(data2, stats=ImageStats.HASH, per_image=True, per_target=False)
 
         dupes = Duplicates()
         result = dupes.from_stats([dupes1, dupes2])
@@ -935,7 +935,7 @@ class TestUnmeasuredRegionsAreNotDuplicates:
         images = [rng.integers(0, 255, (3, 16, 16), dtype=np.uint8) for _ in range(4)]
         boxes = [[[100, 100, 110, 110]] for _ in range(4)]
 
-        stats = compute_stats(
+        stats = image_stats(
             images,
             boxes=boxes,
             stats=ImageStats.HASH_DUPLICATES_BASIC,
@@ -956,7 +956,7 @@ class TestUnmeasuredRegionsAreNotDuplicates:
         images = [image, image.copy(), rng.integers(0, 255, (3, 16, 16), dtype=np.uint8)]
 
         result = Duplicates().from_stats(
-            compute_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
+            image_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
         )
 
         assert result.data()["item_indices"].to_list() == [[0, 1]]
@@ -970,7 +970,7 @@ class TestDuplicatesLevelViews:
     def _results() -> DuplicatesOutput:
         data = np.random.random((6, 3, 16, 16))
         data = np.concatenate((data, data))
-        stats = compute_stats(data, stats=ImageStats.HASH, per_image=True, per_target=False)
+        stats = image_stats(data, stats=ImageStats.HASH, per_image=True, per_target=False)
         return Duplicates(ImageStats.HASH_XXHASH).from_stats(stats)
 
     def test_items_keeps_only_item_level_rows(self):
@@ -1088,7 +1088,7 @@ class TestHashRadius:
 
     def test_from_stats_honors_the_radius(self):
         images = _near_variants()
-        stats = compute_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
+        stats = image_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
         assert Duplicates(hash_radius=0).from_stats(stats).near == []
         assert len(Duplicates(hash_radius=4).from_stats(stats).near) == 1
 

@@ -49,13 +49,13 @@ class TestFrameViewProvenance:
         ]
 
     def test_statistics_over_the_frame_view_address_one_frame_each(self):
-        from dataeval.core import compute_stats
+        from dataeval.core import image_stats
         from dataeval.data import Stride
         from dataeval.flags import ImageStats
         from verification.helpers import make_tracking_dataset
 
         frames = SequenceFrames(make_tracking_dataset((6, 5)), Stride(2))
-        result = compute_stats(frames, stats=ImageStats.DIMENSION_WIDTH, per_target=False)
+        result = image_stats(frames, stats=ImageStats.DIMENSION_WIDTH, per_target=False)
         addresses = [index.item for index in result["source_index"]]
         assert addresses == list(range(len(frames)))
         assert frames.frame_map.tolist() == [[0, 0], [0, 2], [0, 4], [1, 0], [1, 2], [1, 4]]

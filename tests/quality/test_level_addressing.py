@@ -4,7 +4,7 @@ An evaluator holds statistics, not metadata, so it cannot resolve an unstated le
 it can do is not *lose* a stated one: read the level off each address, keep readings of one
 kind of row apart from readings of another, and hand back the addresses that went in.
 
-There is no video statistics producer yet — ``compute_stats`` treats a dataset item as one
+There is no video statistics producer yet — ``image_stats`` treats a dataset item as one
 image — so these tests relevel an image-task result, exactly as
 ``tests/metadata/test_video_stats_landing.py`` stands in for the same missing producer on
 the metadata side. What is being pinned is that a level survives the round trip, not any
@@ -19,7 +19,7 @@ appears.
 import numpy as np
 import pytest
 
-from dataeval.core import StatsResult, compute_stats
+from dataeval.core import StatsResult, image_stats
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, Outliers
 from dataeval.types import SourceIndex
@@ -38,7 +38,7 @@ def _outlier_stats(n=12):
     rng = np.random.default_rng(0)
     images = [rng.integers(0, 256, (3, 16, 16), dtype=np.uint8) for _ in range(n)]
     images[3][:] = 255
-    return compute_stats(
+    return image_stats(
         images,
         stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS,
         normalize_pixel_values=False,
@@ -50,7 +50,7 @@ def _duplicate_stats():
     rng = np.random.default_rng(0)
     base = rng.integers(0, 256, (3, 32, 32), dtype=np.uint8)
     images = [base, base.copy(), rng.integers(0, 256, (3, 32, 32), dtype=np.uint8), base.copy()]
-    return compute_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
+    return image_stats(images, stats=ImageStats.HASH_DUPLICATES_BASIC, normalize_pixel_values=False)
 
 
 def _releveled(stats: StatsResult, address) -> StatsResult:

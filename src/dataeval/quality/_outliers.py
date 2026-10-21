@@ -233,7 +233,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
     Attributes
     ----------
     calculation_results : StatsResult or Sequence[StatsResult] or None
-        The original calculation result(s) from :func:`compute_stats`. Used internally
+        The original calculation result(s) from :func:`image_stats`. Used internally
         for re-detection via :meth:`classwise`, :meth:`itemwise`, and :meth:`with_threshold`.
     outlier_threshold : ThresholdLike or dict or None
         Threshold configuration used to detect outliers. Preserved across
@@ -1458,7 +1458,7 @@ def _build_class_ids(  # noqa: C901
     Parameters
     ----------
     source_index : Sequence[SourceIndex]
-        List of source index entries from compute_stats.
+        List of source index entries from image_stats.
     metadata : MetadataLike
         Metadata object with class_labels and optional item_indices.
 
@@ -1645,7 +1645,7 @@ def _masks_by_level(source_index: Sequence[SourceIndex]) -> list[NDArray[np.bool
     per level, so each is thresholded against its own distribution.
     """
     # Insertion-ordered, so the item level keeps coming first on the two-way split, which
-    # is the order compute_stats emits and the order the rows are already in. Numbered as
+    # is the order image_stats emits and the order the rows are already in. Numbered as
     # the kinds are seen rather than by looking each up in a list of the distinct ones,
     # which is a linear scan per entry over a source index holding one entry per detection.
     codes: dict[FactorLevel | None, int] = {}
@@ -1694,7 +1694,7 @@ def _detect_outliers(  # noqa: C901
 
     - **Entirely NaN** — no outliers. Named band groups make this ordinary rather than
       pathological: a group no datum can satisfy is measured over an all-NaN slice, so
-      ``compute_stats(channels={"nir": 3})`` against 3-channel data yields a full
+      ``image_stats(channels={"nir": 3})`` against 3-channel data yields a full
       ``nir_mean`` column of NaN.
     - **Partly NaN** — thresholded over the values it does have. Every statistical
       threshold reduces NaN-aware, so the surviving values set the bounds and the NaN
@@ -2251,8 +2251,8 @@ class Outliers(Evaluator):
     **Pixel Units:**
 
     ``PIXEL`` statistics are measured in the units the data is stored in, as
-    :func:`~dataeval.core.compute_stats` measures them by default, so :meth:`evaluate` and
-    :meth:`from_stats` given statistics from ``compute_stats`` agree. Only a
+    :func:`~dataeval.core.image_stats` measures them by default, so :meth:`evaluate` and
+    :meth:`from_stats` given statistics from ``image_stats`` agree. Only a
     ``ConstantThreshold`` depends on the unit. To compare images stored at different bit
     depths on one scale, compute the statistics with ``normalize_pixel_values=True`` and
     pass them to :meth:`from_stats`.
@@ -2436,7 +2436,7 @@ class Outliers(Evaluator):
         Parameters
         ----------
         stats : StatsResult | Sequence[StatsResult]
-            The output(s) from compute_stats() with ImageStats.DIMENSION, PIXEL, or VISUAL flags
+            The output(s) from image_stats() with ImageStats.DIMENSION, PIXEL, or VISUAL flags
         per_image : bool, default True
             Whether to include item-level (image) outliers in the results.
         per_target : bool, default False
@@ -2467,11 +2467,11 @@ class Outliers(Evaluator):
         -------
         Evaluate the dataset using pre-computed stats:
 
-        >>> from dataeval.core import compute_stats
+        >>> from dataeval.core import image_stats
         >>> from dataeval.flags import ImageStats
         >>> from dataeval.utils.thresholds import ZScoreThreshold
 
-        >>> stats = compute_stats(images, stats=ImageStats.PIXEL)
+        >>> stats = image_stats(images, stats=ImageStats.PIXEL)
         >>> outliers = Outliers(outlier_threshold=ZScoreThreshold(2.5))
         >>> results = outliers.from_stats(stats)
         >>> results.head(10).select("item_index", "metric_name", "metric_value")

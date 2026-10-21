@@ -15,7 +15,7 @@ from dataeval.types._factors import _FACTOR_LEVEL_HIERARCHY
 
 # Stands in for the ``None`` of an address that carries no key. It is both the flag that
 # tells an item's own row from a row within that item and, sorting below every real key,
-# what puts an item's value ahead of its labels' — the order ``compute_stats`` emits.
+# what puts an item's value ahead of its labels' — the order ``image_stats`` emits.
 _UNKEYED = -1
 
 # Levels as small integers, coarsest first, so that grouping and ordering are numpy work
@@ -124,7 +124,7 @@ class SourceIndexRows:
             When two entries name the same row.
         """
         # Transposed in one C-level step and carried as arrays from there on. A source
-        # index from compute_stats holds one entry per detection, so every Python-level
+        # index from image_stats holds one entry per detection, so every Python-level
         # pass over it is paid per detection.
         #
         # The transposed columns are then taken by field *name*. Unpacking them
@@ -142,7 +142,7 @@ class SourceIndexRows:
         # Resolving here rather than per consumer is what makes the two spellings of one
         # address the same group. Whether any entry states a level at all is settled by one
         # C-level pass over the column, because the answer is no for everything
-        # ``compute_stats`` emits and reading the levels one at a time to learn that is a
+        # ``image_stats`` emits and reading the levels one at a time to learn that is a
         # third Python-level pass over a source index holding one entry per detection.
         item_code = np.int8(_LEVEL_CODES[item_level])
         label_code = np.int8(_LEVEL_CODES[label_level])

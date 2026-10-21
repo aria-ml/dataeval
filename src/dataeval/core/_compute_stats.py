@@ -15,6 +15,7 @@ from typing_extensions import TypedDict, TypeVar
 
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
+from dataeval._experimental import deprecated
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._base import Calculator, ViewKind
@@ -164,7 +165,7 @@ class FactorResult(TypedDict, Generic[TFactors]):
         per producer: ``FactorResult[TrackFactors]`` narrows this to the factors
         ``track_stats`` measures, so ``result["stats"]["mean_speed"]`` is checked rather
         than ``Any``. Bare, it defaults to :data:`~dataeval.types.StatsMap`
-        (``Mapping[str, NDArray[Any]]``). ``compute_stats`` and ``compute_ratios`` return
+        (``Mapping[str, NDArray[Any]]``). ``image_stats`` and ``compute_ratios`` return
         one NumPy array per statistic, object dtype for string-valued ones such as hashes.
     aggregations : tuple[Aggregator, ...], optional
         How these factors roll up to a coarser level, declared by the producer.
@@ -185,7 +186,7 @@ class StatsResult(FactorResult[TFactors]):
     """
     A :class:`FactorResult` that also carries an address for every value.
 
-    What ``compute_stats`` and ``compute_ratios`` return, and what combining or offsetting
+    What ``image_stats`` and ``compute_ratios`` return, and what combining or offsetting
     results needs. Producers that place their values by level and key instead
     (``track_stats``) return a bare :class:`FactorResult`, with no address to offset or
     concatenate against.
@@ -244,7 +245,7 @@ class BandPlan:
 
 @dataclass(frozen=True)
 class BatchPlan:
-    """Everything about a `compute_stats` call that is the same for every datum.
+    """Everything about an `image_stats` call that is the same for every datum.
 
     Each field is a pure function of the call's arguments, resolved once before any image
     is read. Threading them individually left `_compute_batch` with thirteen parameters,
@@ -849,7 +850,7 @@ def _resolve_stat_flags(
     Deliberately not defaulted to anything derived from the group entries — not their
     union, and not the statistics no group can answer. Either would make a caller's column
     set depend on a per-statistic table they cannot see from the call site. The cost is
-    that a mapping stating only groups silently drops geometry, which `compute_stats`
+    that a mapping stating only groups silently drops geometry, which `image_stats`
     warns about where it can see that nothing else asks for it.
 
     Its named keys must be exactly `channels`' keys — see `_check_stats_mapping`. Two
@@ -893,7 +894,7 @@ def _sort(
 ) -> tuple[list[SourceIndex], dict[str, NDArray[Any]]]:
     """Sort results by (item_index, box_index) with None < 0 and convert to numpy arrays.
 
-    No level term: every address ``compute_stats`` emits leaves the level unstated, since
+    No level term: every address ``image_stats`` emits leaves the level unstated, since
     it measures a datum and a box without knowing whether the datum is an image or a
     frame. Two rows therefore never tie on ``(item, key)`` here, and a level a caller
     states afterwards is theirs to order by — ``SourceIndexRows.parse`` groups by level
@@ -945,10 +946,7 @@ def _aggregate_batch(
     warning_list.extend(result.warnings_list)
 
 
-_UNSET = object()
-
-
-def compute_stats(  # noqa: C901
+def image_stats(  # noqa: C901
     data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
@@ -957,7 +955,7 @@ def compute_stats(  # noqa: C901
     per_target: bool = True,
     per_background: bool = False,
     channels: Mapping[str, ChannelGroupLike] | None = None,
-    normalize_pixel_values: bool = _UNSET,  # type: ignore
+    normalize_pixel_values: bool = False,
     value_range: tuple[float, float] | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> StatsResult:
@@ -1093,9 +1091,8 @@ def compute_stats(  # noqa: C901
         either way. Prefer `VISUAL_BRIGHTNESS` over a normalized `PIXEL_MEAN` when the
         question is how an image looks rather than how its values are distributed.
 
-        .. deprecated:: 1.0
-            The default changed to False in v1.1. Pass explicitly to silence
-            the deprecation warning. This warning will be removed in v1.2.0.
+        .. versionchanged:: 1.2
+            The warning issued when this was left unset is removed; the default stays False.
     value_range : tuple[float, float] or None, default None
         The interval every image's values should be measured against, as ``(low, high)``.
 
@@ -1209,25 +1206,25 @@ def compute_stats(  # noqa: C901
     Compute all statistics:
 
     >>> from dataeval.flags import ImageStats
-    >>> stats = compute_stats(images, boxes=boxes)
+    >>> stats = image_stats(images, boxes=boxes)
 
     Compute specific statistics:
 
-    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
+    >>> stats = image_stats(images, boxes=boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
 
     Use convenience groups:
 
-    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
+    >>> stats = image_stats(images, boxes=boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
 
     Measure named groups of bands as their own columns:
 
-    >>> stats = compute_stats(images, boxes=boxes, stats=ImageStats.PIXEL_BASIC, channels={"rgb": [0, 1, 2]})
+    >>> stats = image_stats(images, boxes=boxes, stats=ImageStats.PIXEL_BASIC, channels={"rgb": [0, 1, 2]})
 
     Ask a different question of each group, and of the image itself. Four-band cubes,
     since ``ir`` names a band that three-channel imagery does not carry:
 
     >>> cubes = [np.concatenate([image, image[:1]]) for image in images]
-    >>> stats = compute_stats(
+    >>> stats = image_stats(
     ...     cubes,
     ...     stats={None: ImageStats.DIMENSION_WIDTH, "rgb": ImageStats.HASH_XXHASH, "ir": ImageStats.PIXEL_MEAN},
     ...     channels={"rgb": [0, 1, 2], "ir": 3},
@@ -1238,31 +1235,21 @@ def compute_stats(  # noqa: C901
 
     Compute statistics only for bounding boxes (not full images):
 
-    >>> stats = compute_stats(images, boxes=boxes, per_image=False, per_target=True)
+    >>> stats = image_stats(images, boxes=boxes, per_image=False, per_target=True)
 
     Compute statistics for full images only (ignore boxes):
 
-    >>> stats = compute_stats(images, boxes=boxes, per_image=True, per_target=False)
+    >>> stats = image_stats(images, boxes=boxes, per_image=True, per_target=False)
 
     Compute background statistics — the scene behind the annotations — alongside the
     whole-image ones:
 
-    >>> stats = compute_stats(
+    >>> stats = image_stats(
     ...     images, boxes=boxes, stats=ImageStats.VISUAL_BRIGHTNESS, per_background=True, normalize_pixel_values=False
     ... )
     >>> sorted(stats["stats"])
     ['background_brightness', 'background_fraction', 'brightness']
     """
-    if normalize_pixel_values is _UNSET:
-        warnings.warn(
-            "The default value of normalize_pixel_values changed to False in v1.1. "
-            "Pass normalize_pixel_values explicitly to silence this warning. "
-            "This warning will be removed in v1.2.0.",
-            FutureWarning,
-            stacklevel=2,
-        )
-        normalize_pixel_values = False
-
     # Checked here rather than in a worker: a malformed declaration is a mistake in the
     # call, and surfacing it out of a pool process names the wrong frame.
     if value_range is not None:
@@ -1324,7 +1311,7 @@ def compute_stats(  # noqa: C901
         warnings.warn(
             "stats requests no statistics, so every row will be returned with no columns. "
             "ImageStats.NONE, an empty mapping and {None: ImageStats.NONE} all mean this — "
-            "name the statistics you want, or drop the compute_stats call.",
+            "name the statistics you want, or drop the image_stats call.",
             UserWarning,
             stacklevel=2,
         )
@@ -1457,7 +1444,7 @@ def compute_stats(  # noqa: C901
     # Log the individual flags that will be computed
     resolved_names = _flag_list(requested)
     _logger.info(
-        "Starting compute_stats: %d stats [%s], per_image=%s, per_target=%s, per_background=%s",
+        "Starting image_stats: %d stats [%s], per_image=%s, per_target=%s, per_background=%s",
         len(resolved_names),
         ", ".join(resolved_names),
         per_image,
@@ -1524,7 +1511,7 @@ def compute_stats(  # noqa: C901
     total_boxes = sum(object_count.values())
     total_invalid = sum(invalid_box_count.values())
     _logger.info(
-        "compute_stats complete: %d images processed, %d total boxes (%d invalid), %d stats computed",
+        "image_stats complete: %d images processed, %d total boxes (%d invalid), %d stats computed",
         image_count,
         total_boxes,
         total_invalid,
@@ -1537,6 +1524,45 @@ def compute_stats(  # noqa: C901
         invalid_box_count=[invalid_box_count.get(i, 0) for i in range(image_count)],
         image_count=image_count,
         stats=sorted_aggregated_stats,
+    )
+
+
+@deprecated(since="1.2", removal="2.0", alternative="image_stats")
+def compute_stats(
+    data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    *,
+    boxes: Iterable[Iterable[BoxLike] | None] | None = None,
+    stats: StatsRequest = ImageStats.ALL,
+    per_image: bool = True,
+    per_target: bool = True,
+    per_background: bool = False,
+    channels: Mapping[str, ChannelGroupLike] | None = None,
+    normalize_pixel_values: bool = False,
+    value_range: tuple[float, float] | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> StatsResult:
+    """
+    Compute specified statistics on a set of images, optionally within bounding boxes.
+
+    .. deprecated:: 1.2
+        Renamed to :func:`image_stats`; removed in 2.0. The parameters and the result are
+        unchanged.
+
+    See Also
+    --------
+    :func:`image_stats` : The same function under its current name
+    """
+    return image_stats(
+        data,
+        boxes=boxes,
+        stats=stats,
+        per_image=per_image,
+        per_target=per_target,
+        per_background=per_background,
+        channels=channels,
+        normalize_pixel_values=normalize_pixel_values,
+        value_range=value_range,
+        progress_callback=progress_callback,
     )
 
 

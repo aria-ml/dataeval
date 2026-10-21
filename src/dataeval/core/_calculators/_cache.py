@@ -70,7 +70,7 @@ class CalculatorCache:
     value_range : ValueRange or None, default None
         The datum's value range, if the caller already established it. Every view of one
         datum shares the interval and establishing it costs a scan of the whole datum, so
-        a caller building one cache per row — as :func:`~dataeval.core.compute_stats`
+        a caller building one cache per row — as :func:`~dataeval.core.image_stats`
         does, once per box — should read it once and pass it here. Also how a caller
         passes a *declared* range down, which is the only way float data outside the two
         conventional image spellings gets one at all. Found on demand when None.

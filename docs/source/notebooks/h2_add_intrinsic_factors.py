@@ -26,7 +26,7 @@
 # values or additional information originally unavailable on the source dataset.
 #
 # This guide will show you how to add in the calculated statistics from DataEval's
-# {func}`.compute_stats` function to the metadata for bias analysis.
+# {func}`.image_stats` function to the metadata for bias analysis.
 
 # %% [markdown]
 # ### When to use
@@ -65,7 +65,7 @@ from maite_datasets.image_classification import CIFAR10
 
 from dataeval import Metadata
 from dataeval.bias import Balance, Diversity
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.data import Limit, Shuffle, View
 from dataeval.flags import ImageStats
 
@@ -110,14 +110,14 @@ Balance().evaluate(metadata).balance[1]
 # ## Add image statistics to the metadata
 #
 # In order to perform additional bias analysis on the dataset when no meaningful metadata are provided, you will augment
-# the metadata with statistics of the images using the {func}`.compute_stats` function.
+# the metadata with statistics of the images using the {func}`.image_stats` function.
 #
-# Begin by running `compute_stats` for the `PIXEL` and `VISUAL` image stats for the dataset and adding the stats factors
+# Begin by running `image_stats` for the `PIXEL` and `VISUAL` image stats for the dataset and adding the stats factors
 # to the `Metadata`.
 
 # %%
 # Calculate pixel and visual statistics
-calc_results = compute_stats(cifar10, stats=ImageStats.PIXEL | ImageStats.VISUAL)
+calc_results = image_stats(cifar10, stats=ImageStats.PIXEL | ImageStats.VISUAL)
 
 # Append the factors to the metadata. Handing over the whole result rather than its
 # "stats" mapping also hands over its source index, which places each value on the row
@@ -126,7 +126,7 @@ calc_results = compute_stats(cifar10, stats=ImageStats.PIXEL | ImageStats.VISUAL
 metadata.add_factors(calc_results)
 
 # %% [markdown]
-# Next you will add the `compute_stats` output to the metadata as factors, and exclude factors that are uniform or without
+# Next you will add the `image_stats` output to the metadata as factors, and exclude factors that are uniform or without
 # significance.
 #
 # Additionally, you will specify a binning strategy for continuous statistical factors, which are, for our purposes,

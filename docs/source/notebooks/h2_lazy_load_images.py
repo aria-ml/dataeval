@@ -28,7 +28,7 @@
 #
 # The fix is to return a lightweight, file-backed proxy from `__getitem__` that
 # only decodes the image on first array access. Analyses that ignore the image run
-# far faster, while analyses that do need pixels (such as {func}`.compute_stats`)
+# far faster, while analyses that do need pixels (such as {func}`.image_stats`)
 # transparently trigger the decode when they read the array.
 #
 # This guide shows you how to build such a proxy and measure the speedup. It
@@ -80,7 +80,7 @@ from PIL import Image
 
 from dataeval import Metadata
 from dataeval.bias import Balance
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.flags import ImageStats
 from dataeval.protocols import DatasetMetadata, DatumMetadata
 
@@ -308,12 +308,12 @@ print(f"After access:  {image!r}")
 print(f"Decoded array: {decoded.shape} ({decoded.dtype})")
 
 # %% [markdown]
-# Because of this, image-based analyses such as {func}`.compute_stats` work on the
+# Because of this, image-based analyses such as {func}`.image_stats` work on the
 # lazy dataset without any changes - they simply pay the decode cost they actually
 # need.
 
 # %%
-stats_result = compute_stats(dataset, stats=ImageStats.PIXEL, normalize_pixel_values=False)
+stats_result = image_stats(dataset, stats=ImageStats.PIXEL, normalize_pixel_values=False)
 print(f"Computed stats over {stats_result['image_count']} images")
 
 # %% [markdown]

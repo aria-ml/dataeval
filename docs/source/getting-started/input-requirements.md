@@ -94,7 +94,7 @@ item.
 
 Two shortcuts are worth knowing. {class}`.Duplicates` and {class}`.Outliers`
 can skip images entirely — `from_stats()` takes a pre-computed `StatsResult`
-from {func}`.compute_stats` in their place. Both also accept `per_target=True`
+from {func}`.image_stats` in their place. Both also accept `per_target=True`
 to score individual detections rather than whole images.
 
 ## Core functions
@@ -108,7 +108,7 @@ directly. This table covers the primary analysis entry points; see the
 | {func}`.ber_knn` / {func}`.ber_mst` | ***Required***{sup}`a` | ***Required*** | | | |
 | {func}`.completeness` | ***Required***{sup}`a` | | | | |
 | {func}`.compute_ratios` | ***Required***{sup}`b` | | ***Required*** | | |
-| {func}`.compute_stats` | ***Required***{sup}`b` | | | | |
+| {func}`.image_stats` | ***Required***{sup}`b` | | | | |
 | {func}`.coverage_adaptive` / {func}`.coverage_naive` | ***Required***{sup}`a` | | | | |
 | {func}`.divergence_fnn` / {func}`.divergence_mst` | ***Required***{sup}`a` | | | | |
 | {func}`.factor_deviation` | | | | ***Required***{sup}`c` | ***Required***{sup}`e` |

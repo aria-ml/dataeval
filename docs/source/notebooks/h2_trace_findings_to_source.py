@@ -65,7 +65,7 @@ from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.data import Limit, Resize, SourceLocator, View
 from dataeval.flags import ImageStats
 from dataeval.quality import Outliers
@@ -85,7 +85,7 @@ print(dataset)
 # several.
 
 # %%
-stats = compute_stats(
+stats = image_stats(
     dataset, stats=ImageStats.DIMENSION | ImageStats.VISUAL, per_target=True, normalize_pixel_values=False
 )
 outliers = Outliers().from_stats(stats, per_target=True)
@@ -96,7 +96,7 @@ for address, metrics in list(outliers.outliers.items())[:5]:
 # %% [markdown]
 # Each address has three fields — `item`, `key` and `level` — and here only the first two are set. That is the
 # **task-generic** spelling: an address with a key names one of its item's labels, whatever level that turns out to be.
-# {func}`.compute_stats` emits it because it does not need to know whether it measured an image or a video.
+# {func}`.image_stats` emits it because it does not need to know whether it measured an image or a video.
 #
 # See [Metadata levels](../concepts/MetadataLevels.md#naming-a-row-keys-or-addresses) for the whole vocabulary.
 
@@ -127,7 +127,7 @@ print(f"str   = {address}")
 # ## Following one address
 #
 # {class}`.SourceLocator` binds a dataset once and resolves addresses against it. **Hand it the same object you
-# computed the statistics over** — an address's `item` is a position in whatever {func}`.compute_stats` walked, so a
+# computed the statistics over** — an address's `item` is a position in whatever {func}`.image_stats` walked, so a
 # locator over something else resolves it to different data.
 
 # %%

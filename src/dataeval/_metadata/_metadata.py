@@ -839,7 +839,7 @@ class Metadata(Array, FeatureExtractor):
             target/detection, or one per `source_index` entry when one is given.
 
             A whole :class:`~dataeval.core.StatsResult` — the return of
-            :func:`~dataeval.core.compute_stats` or
+            :func:`~dataeval.core.image_stats` or
             :func:`~dataeval.core.compute_ratios` — may be passed here directly, in
             which case its ``stats`` and ``source_index`` are used and its bookkeeping
             keys ignored.
@@ -866,7 +866,7 @@ class Metadata(Array, FeatureExtractor):
             the level of each value itself.
         source_index : Sequence[SourceIndex] or None, default None
             Labels describing what each value in every factor array refers to, as
-            returned by :func:`~dataeval.core.compute_stats`. This is how object
+            returned by :func:`~dataeval.core.image_stats`. This is how object
             detection statistics are imported without the dataset: an index carrying both
             per-item entries (``target`` is None) and per-label entries builds two levels,
             ``unit`` and ``instance``, and splits each factor into ``unit_<name>`` and
@@ -939,9 +939,9 @@ class Metadata(Array, FeatureExtractor):
         Import object detection statistics with no dataset bound. The source index the
         stats carry splits them across the two levels it describes:
 
-        >>> from dataeval.core import compute_stats
+        >>> from dataeval.core import image_stats
         >>> from dataeval.flags import ImageStats
-        >>> stats = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        >>> stats = image_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
         >>> md = Metadata.from_factors(stats)
         >>> md.levels
         ('unit', 'instance')
@@ -5693,7 +5693,7 @@ class Metadata(Array, FeatureExtractor):
             length of `source_index` when one is given.
 
             A whole :class:`~dataeval.core.FactorResult` — the return of
-            :func:`~dataeval.core.compute_stats`, :func:`~dataeval.core.compute_ratios`,
+            :func:`~dataeval.core.image_stats`, :func:`~dataeval.core.compute_ratios`,
             or :func:`~dataeval.core.track_stats` — may be passed here directly, in
             which case its ``stats`` become the factors and its ``source_index``, when
             it carries one, the placement (see `key` below for the alternative
@@ -5718,7 +5718,7 @@ class Metadata(Array, FeatureExtractor):
             counter is appended (``brightness_added``, ``brightness_added_2``, ...).
         source_index : Sequence[SourceIndex] or None, default None
             An address per value, saying which row of which level it belongs to, as
-            returned by :func:`~dataeval.core.compute_stats`. Mutually exclusive with
+            returned by :func:`~dataeval.core.image_stats`. Mutually exclusive with
             `level`, which it replaces: each value is placed by its address rather than by
             its position (see Notes).
         key : str or None, default None
@@ -5796,12 +5796,12 @@ class Metadata(Array, FeatureExtractor):
         .. versionchanged:: 1.1
             The media-unit level was renamed from ``image`` to ``unit``, so a factor that
             `source_index` splits across levels is now generated as ``unit_<name>`` where it
-            was ``image_<name>`` — ``compute_stats`` output piped through here yields
+            was ``image_<name>`` — ``image_stats`` output piped through here yields
             ``unit_brightness`` rather than ``image_brightness``. Unlike the level name
             itself, the old generated name is not aliased: code that reads such a column by
             name has to be updated.
 
-        `source_index` is the way to pass :func:`~dataeval.core.compute_stats` output
+        `source_index` is the way to pass :func:`~dataeval.core.image_stats` output
         straight through. When it spans several levels — ``per_image`` and ``per_target``
         both enabled — each factor is split into one factor per level, named
         ``<level>_<name>`` (``unit_brightness``, ``instance_brightness``). Both halves stay
@@ -5818,7 +5818,7 @@ class Metadata(Array, FeatureExtractor):
 
         An address that states no level is the **task-generic** reading: :attr:`item_level`
         with no key, :attr:`label_level` under one. That is what every producer emits, and
-        it is why ``compute_stats`` output places correctly without knowing whether it
+        it is why ``image_stats`` output places correctly without knowing whether it
         measured an image or a video frame. State a level only where an unstated one would
         resolve to a different one — for a frame or a track — since two spellings of one
         address are not equal to each other and a result keyed on addresses would hold both.
@@ -5857,10 +5857,10 @@ class Metadata(Array, FeatureExtractor):
         ... }
         >>> metadata.add_factors(target_factors, level="instance")
         >>>
-        >>> # Or hand the whole compute_stats result over, source index included
-        >>> from dataeval.core import compute_stats
+        >>> # Or hand the whole image_stats result over, source index included
+        >>> from dataeval.core import image_stats
         >>> from dataeval.flags import ImageStats
-        >>> stats = compute_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
+        >>> stats = image_stats(dataset, stats=ImageStats.PIXEL_MEAN, normalize_pixel_values=False)
         >>> metadata.add_factors(stats)
         >>> sorted(n for n in metadata.factor_names if n.endswith("mean"))
         ['instance_mean', 'unit_mean']

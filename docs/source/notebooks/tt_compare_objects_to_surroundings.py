@@ -56,7 +56,7 @@
 # per-target number rarely answers the question you actually have.
 #
 # Two reference points make those questions answerable, and
-# {func}`.compute_stats` produces both in one pass:
+# {func}`.image_stats` produces both in one pass:
 #
 # - **The background** - every pixel the image's boxes do *not* cover, which is the
 #   scene the objects were found in. Comparing a target against it asks
@@ -93,7 +93,7 @@ from maite_datasets.object_detection import SeaDrone
 from dataeval import Metadata
 from dataeval.bias import Balance
 from dataeval.config import set_max_processes
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.data import Limit, View
 from dataeval.flags import ImageStats
 
@@ -129,7 +129,7 @@ print(f"Image shape: {dataset[0][0].shape}")
 # statistic describes - the image.
 
 # %%
-stats = compute_stats(
+stats = image_stats(
     dataset,
     stats=ImageStats.VISUAL_BRIGHTNESS
     | ImageStats.VISUAL_CONTRAST
@@ -493,6 +493,6 @@ print(classwise)
 #
 # Try applying these scene-relative analysis techniques to your own dataset:
 #
-# - Test `compute_stats` with `per_background=True` on a dataset with larger or more frequent target objects to see how `background_fraction` behaves when targets occupy a larger portion of the frame.
+# - Test `image_stats` with `per_background=True` on a dataset with larger or more frequent target objects to see how `background_fraction` behaves when targets occupy a larger portion of the frame.
 # - Divide `instance_` statistics by their `unit_` counterparts to compare targets across scenes captured under varying environmental conditions (e.g. lighting or weather).
 # - Run {class}`.Balance` on your own dataset to verify whether background factors correlate with target class labels.

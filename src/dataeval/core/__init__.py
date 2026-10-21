@@ -64,6 +64,7 @@ __all__ = [
     "hamming_distance",
     "hash_groups",
     "hash_neighbors",
+    "image_stats",
     "is_continuous",
     "label_alignment",
     "label_cooccurrence",
@@ -115,7 +116,13 @@ from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compu
 from dataeval.core._combination_scores import ColumnKind, CombinationScoresResult, combination_scores
 from dataeval.core._completeness import CompletenessResult, completeness
 from dataeval.core._compute_ratios import compute_ratios
-from dataeval.core._compute_stats import FactorResult, StatsResult, combine_stats_results, compute_stats
+from dataeval.core._compute_stats import (
+    FactorResult,
+    StatsResult,
+    combine_stats_results,
+    compute_stats,
+    image_stats,
+)
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
 from dataeval.core._ego_stats import EgoStatsResult, ego_stats

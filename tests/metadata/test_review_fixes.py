@@ -251,7 +251,7 @@ class TestUnlabeledClassificationItems:
         from dataeval.types import SourceIndex
 
         md = Metadata(self._partially_labeled())
-        # compute_stats labels one entry per dataset item, including the unlabeled one.
+        # image_stats labels one entry per dataset item, including the unlabeled one.
         source_index = [SourceIndex(i, None) for i in range(3)]
         md.add_factors({"sharpness": np.array([10.0, 20.0, 30.0])}, source_index=source_index)
 

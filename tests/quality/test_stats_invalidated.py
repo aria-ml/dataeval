@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dataeval.core import compute_stats
+from dataeval.core import image_stats
 from dataeval.data import View
 from dataeval.data._view import Operation
 from dataeval.exceptions import StatsInvalidatedWarning
@@ -140,5 +140,5 @@ class TestEvaluatorIntegration:
         assert not caught(lambda: Duplicates(flags=ImageStats.ALL).evaluate(resized_view(3), resized_view(3)))
 
     def test_from_stats_is_unchanged_and_unwarned(self):
-        stats = compute_stats(resized_view(), stats=ImageStats.DIMENSION, per_target=False)
+        stats = image_stats(resized_view(), stats=ImageStats.DIMENSION, per_target=False)
         assert not caught(lambda: Outliers(flags=ImageStats.DIMENSION).from_stats(stats))

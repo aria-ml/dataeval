@@ -184,7 +184,7 @@ print(metadata.level_counts)
 #   - the car in video 6, frame 60, track 1, sits near the horizon at the size of a car near the bottom.
 #
 # `box_y` and `box_size` are fractions of the frame, so boxes from frames of different resolutions compare. For an
-# object detection dataset, {func}`~dataeval.core.compute_stats` with `stats=ImageStats.DIMENSION_RELATIVE` and
+# object detection dataset, {func}`~dataeval.core.image_stats` with `stats=ImageStats.DIMENSION_RELATIVE` and
 # `per_target=True` computes them from the boxes as `rel_offset_y` and `rel_size`. Attach its result with
 # `Metadata.add_factors`.
 

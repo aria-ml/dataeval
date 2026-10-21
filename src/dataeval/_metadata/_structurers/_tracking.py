@@ -226,7 +226,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         ever holds a decoded frame. They are what
         :func:`~dataeval.core.track_stats` needs to decide whether a track enters or leaves
         at the frame border, and they carry the same names
-        :func:`~dataeval.core.compute_stats` gives the same two quantities.
+        :func:`~dataeval.core.image_stats` gives the same two quantities.
         """
         factors: dict[str, NDArray[Any]] = {}
         for name, values, dtype in (

@@ -4337,7 +4337,7 @@ class Duplicates(Evaluator):
         Find duplicates from pre-computed hash statistics.
 
         Use this method when hash statistics have already been computed
-        via :func:`~dataeval.core.compute_stats` to avoid redundant computation.
+        via :func:`~dataeval.core.image_stats` to avoid redundant computation.
 
         Parameters
         ----------

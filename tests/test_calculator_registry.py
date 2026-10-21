@@ -65,7 +65,7 @@ class TestCalculatorRegistry:
         """Give each test an empty registry, remembering the real one."""
         # The registry is process-global and holds every real calculator, registered at
         # import. Clearing without restoring leaves it empty for whatever runs next in the
-        # same process, so `compute_stats` silently returns no statistics at all — masked
+        # same process, so `image_stats` silently returns no statistics at all — masked
         # only by this file sorting after `tests/core/` in pytest's default order.
         self._registry = {flag_type: list(entries) for flag_type, entries in CalculatorRegistry._registry.items()}
         CalculatorRegistry.clear()

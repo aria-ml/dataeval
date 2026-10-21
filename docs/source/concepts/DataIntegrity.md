@@ -298,7 +298,7 @@ produces large groups that obscure actual duplicates.
 that can be used separately or together.
 
 **Image statistics-based detection** computes pixel, visual, and dimension
-statistics for each image using {func}`.compute_stats` with
+statistics for each image using {func}`.image_stats` with
 {class}`.ImageStats` flags, then applies a statistical threshold test to each
 metric distribution to flag samples at the extremes. Three tests are available:
 
@@ -810,12 +810,12 @@ backwards throughout flags every frame but the first. A video that is noisy thro
 
 ### Image statistics as a linting vocabulary
 
-{func}`.compute_stats` is the underlying computation engine for image
+{func}`.image_stats` is the underlying computation engine for image
 statistics in DataEval. It accepts any iterable of images or a MAITE-compliant
 `Dataset` and computes whichever statistics are requested via the
 {class}`.ImageStats` flag parameter. `ImageStats` is a selector, not a
 processor â€” it is a `Flag` enum whose values you combine with bitwise OR to
-specify which statistics you want, and `compute_stats` handles the rest.
+specify which statistics you want, and `image_stats` handles the rest.
 
 The four flag categories and their integrity signals:
 
@@ -831,7 +831,7 @@ Some flags have dependencies that are resolved automatically: requesting
 requesting `VISUAL_BRIGHTNESS`, `VISUAL_CONTRAST`, or `VISUAL_DARKNESS`
 also enables `VISUAL_PERCENTILES`.
 
-For **object detection** datasets, `compute_stats` can compute statistics
+For **object detection** datasets, `image_stats` can compute statistics
 separately for each bounding box (`per_target=True`, the default when boxes are
 present) and for the full image (`per_image=True`). The `source_index` field in
 the output identifies whether each row corresponds to a full image or to a
@@ -851,7 +851,7 @@ excludes those pixels, and reduces the requested statistics over what is left â€
 the scene an image was captured in, rather than the things annotated inside it:
 
 ```python
-stats = compute_stats(
+stats = image_stats(
     dataset,
     stats=ImageStats.PIXEL | ImageStats.VISUAL,
     per_background=True,

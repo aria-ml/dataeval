@@ -1284,7 +1284,7 @@ class TestAddressingTheFrameView:
         Over the frame view a frame is an *item*: `SourceIndex(4)`, flat across every
         sequence. Over the tracking dataset underneath it is a keyed `unit` row of one
         sequence: `SourceIndex(1, 0, "unit")`. `Duplicates` reports frame duplicates in the
-        second space (it reads `frame_map`) while `Outliers` and `compute_stats` address the
+        second space (it reads `frame_map`) while `Outliers` and `image_stats` address the
         first, so which locator resolves a finding depends on which produced it.
         """
         dataset, _ = make_dataset((4, 3))

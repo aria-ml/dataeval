@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 
 from dataeval import Metadata
-from dataeval.core import compute_stats, track_stats
+from dataeval.core import image_stats, track_stats
 from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Outliers, OutliersOutput
@@ -25,7 +25,7 @@ def _od(get_od_dataset, n=20, seed=0):
 
 
 def _od_stats(ds):
-    return compute_stats(ds, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, normalize_pixel_values=False)
+    return image_stats(ds, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, normalize_pixel_values=False)
 
 
 def _columns(result):
