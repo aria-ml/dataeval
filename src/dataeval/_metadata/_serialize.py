@@ -213,6 +213,12 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
             for level, columns in md._pristine_values.items()
         },
         "aggregated_from": dict(md._aggregated_from),
+        # The name each renamed column had in its source. Optional on the way back in: a
+        # file from before this existed restores every column as its own source name.
+        "source_names": dict(md._source_names),
+        # The columns an overwrite moved aside, so `new()` from a restored instance still
+        # leaves their copied declarations behind. Optional on the way in, like the above.
+        "moved_aside": sorted(md._moved_aside),
         # The applied encodings. Companion columns are stripped on the way in and rebuilt on
         # load, so without this a restored instance re-derives its cuts — which loses
         # `accept()` outright, and reproduces the old codes only for as long as the binning
@@ -513,6 +519,8 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     md._has_class_labels = bool(manifest.get("has_class_labels", True))
     md._dropped_factors = {name: list(reasons) for name, reasons in manifest["dropped_factors"].items()}
     md._aggregated_from = dict(manifest["aggregated_from"])
+    md._source_names = dict(manifest.get("source_names", {}))
+    md._moved_aside = set(manifest.get("moved_aside", []))
     md._aggregations = aggregations_from_list(manifest.get("aggregations", []))
     # Optional, so an archive written before this existed restores with none rather than
     # failing -- which is what an absent diagnostic meant anyway.

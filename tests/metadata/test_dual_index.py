@@ -609,7 +609,7 @@ class TestAddFactorsRobustness:
         assert images["b_added_added"].to_list() == [7.0, 8.0, 9.0]
 
     def test_overwrite_reuses_the_same_column(self, od_dataset_with_metadata):
-        """overwrite=True replaces in place instead of accumulating suffixed columns."""
+        """overwrite=True gives the name to the incoming values and keeps the old ones as `b_original`."""
         md = Metadata(od_dataset_with_metadata)
 
         md.add_factors({"b": [1.0, 2.0, 3.0]}, level="unit")
@@ -617,6 +617,7 @@ class TestAddFactorsRobustness:
 
         assert "b_added" not in md.dataframe.columns
         assert md.rows_at("unit")["b"].to_list() == [4.0, 5.0, 6.0]
+        assert md.rows_at("unit")["b_original"].to_list() == [1.0, 2.0, 3.0]
 
     def test_levels_outside_the_schema_rejected(self):
         """A name that is not a level must fail loudly and early, not deep inside polars."""

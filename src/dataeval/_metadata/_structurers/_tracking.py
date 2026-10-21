@@ -367,10 +367,10 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         # coincide, and dropping it — which is what expanding across detections does
         # whenever they disagree — loses the per-frame factors entirely.
         frames_per_item = np.bincount(sequence_of_frame, minlength=count).astype(int).tolist()
-        unit_factors, dropped, unit_unusable = self._merge_factors(
+        unit_factors, dropped, unit_unusable, fine_renamed = self._merge_factors(
             raw, ignore_lists=False, targets_per_item=frames_per_item
         )
-        sequence_factors, _, sequence_unusable = self._merge_factors(raw, ignore_lists=True)
+        sequence_factors, _, sequence_unusable, coarse_renamed = self._merge_factors(raw, ignore_lists=True)
         unit_unusable = {name: v for name, v in unit_unusable.items() if name not in sequence_unusable}
         # Same rule as the image-based tasks: a name both merges produced is item metadata
         # replicated onto the frame rows, so keep it once at the sequence level and let
@@ -487,4 +487,5 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
             class_labels,
             sequence_of_instance,
             unusable={"sequence": sequence_unusable, "unit": unit_unusable},
+            source_names={**fine_renamed, **coarse_renamed},
         )

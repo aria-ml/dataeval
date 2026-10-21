@@ -98,6 +98,17 @@ class TestDeclarationsApply:
         assert md.rows_at("sequence")["pan_speed_median"].to_list() == [300.0, 300.0]
         assert [n for n in md.factor_names if n.startswith("pan_speed_median")] == ["pan_speed_median"]
 
+    def test_a_refused_replay_leaves_no_factor_without_a_column(self):
+        # A source rewritten as text can no longer be rolled up by median, so the replay is
+        # refused and its stale output dropped. The output must leave the factor set with
+        # its column, or every read of factor_data looks for a column that is gone.
+        md = _video()
+        md.add_factors(cast("Any", _result([10.0, 12.0, 14.0, 16.0, 18.0] * 2, [MEDIAN])), level="unit")
+        md.add_factors({"pan_speed": np.array(list("abcde") * 2)}, level="unit", overwrite=True)
+
+        assert "pan_speed_median" not in md.factor_names
+        assert md.factor_data.shape[1] == len(md.factor_names)
+
 
 @pytest.mark.required
 class TestCoverageGate:

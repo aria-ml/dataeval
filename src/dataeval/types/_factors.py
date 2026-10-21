@@ -5,6 +5,8 @@ __all__ = [
     "Aggregator",
     "BinSpec",
     "ClassAxis",
+    "FactorCollision",
+    "FactorCollisions",
     "FactorInfo",
     "FactorLevel",
     "FactorLevelSchema",
@@ -22,6 +24,8 @@ from dataclasses import dataclass, field
 from numbers import Real
 from types import MappingProxyType
 from typing import Any, Literal, TypeAlias, get_args
+
+import polars as pl
 
 # Every level name the schema recognizes.
 #
@@ -708,6 +712,14 @@ class FactorInfo:
         honest default -- dropping them would quietly change the population a result
         describes -- but it is only honest if the number is available, and it is the one
         thing neither the vocabulary nor the edges say.
+    source_name : str, default ""
+        The name the factor had in its source, before DataEval renamed the column: the
+        metadata key as the dataset spelled it (flattened, for a nested key), the name
+        passed to :meth:`~dataeval.Metadata.add_factors` (``<level>_<name>`` where a
+        `source_index` split it), or the name a roll-up asked for. So ``metadata_level``
+        records ``level``, ``brightness_added`` and ``brightness_original`` record
+        ``brightness``, and a factor nothing renamed records its own name. Every factor
+        :class:`~dataeval.Metadata` reports has one; empty only on an info built by hand.
     """
 
     factor_type: Literal["categorical", "continuous", "discrete"]
@@ -717,6 +729,7 @@ class FactorInfo:
     aggregated_from: FactorLevel | None = None
     encoding: BinSpec | LevelSpec | None = None
     missing: int = 0
+    source_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -1300,6 +1313,55 @@ class Unusable:
             f"Unusable(reasons={self.reasons!r}, level={self.level!r}, "
             f"repairable={self.repairable!r}, counts={dict(self.counts)!r}, distinct={shown!r}{sampled})"
         )
+
+
+# ``eq=False`` keeps identity equality and hashing: generated ones would compare and hash the
+# frame, and ``pl.DataFrame`` answers ``==`` with a frame and cannot be hashed at all.
+@dataclass(frozen=True, eq=False)
+class FactorCollision:
+    """Where an added factor's values disagree with a factor of the same name already present.
+
+    Returned by :meth:`~dataeval.Metadata.add_factors` under ``return_collisions=True``, one
+    per incoming column that met an existing factor and disagreed with it on at least one row.
+
+    Attributes
+    ----------
+    factor : str
+        The incoming column's name before any collision rename: the name as passed, or
+        ``<level>_<name>`` where a `source_index` split one factor across levels.
+    column : str
+        The column the incoming values were written to: the name itself under
+        ``overwrite=True``, or the renamed column (``video_duration_added``) under
+        ``overwrite=False``.
+    existing_column : str
+        The column holding the existing values after the write: the name itself under
+        ``overwrite=False``, or the column they were moved to (``video_duration_original``,
+        or a counter form such as ``video_duration_original_2``) under ``overwrite=True``.
+    level : str
+        The level the incoming values were written at, and the rows they were compared on.
+    compared : int
+        Rows compared: those where both the existing and the incoming value are present.
+        A row missing on either side (None, or NaN in a float column) is not compared.
+    differing : pl.DataFrame
+        Only the rows that differ, with ``item_index``, the level's key column where it has
+        one (``unit_index``, ``track_id`` or ``target_index``), ``existing``, ``incoming`` and
+        ``relative_difference``. The last is
+        ``abs(existing - incoming) / max(abs(existing), abs(incoming))`` for numeric values,
+        exact for integers of any size. It is null where an infinity leaves the ratio
+        undefined, which still differs, and for any non-numeric pair, which differs when
+        unequal.
+    """
+
+    factor: str
+    column: str
+    existing_column: str
+    level: FactorLevel
+    compared: int
+    differing: pl.DataFrame
+
+
+# Keyed by `FactorCollision.factor`, in the order the factors were passed.
+FactorCollisions: TypeAlias = Mapping[str, FactorCollision]
 
 
 @dataclass(frozen=True)

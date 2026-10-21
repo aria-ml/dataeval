@@ -74,12 +74,12 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
         instances = len(unit_of_instance)
 
         instances_per_item = np.bincount(unit_of_instance, minlength=count).astype(int).tolist()
-        instance_factors, dropped, instance_unusable = self._merge_factors(
+        instance_factors, dropped, instance_unusable, fine_renamed = self._merge_factors(
             raw,
             ignore_lists=False,
             targets_per_item=instances_per_item,
         )
-        unit_factors, _, unit_unusable = self._merge_factors(raw, ignore_lists=True)
+        unit_factors, _, unit_unusable, coarse_renamed = self._merge_factors(raw, ignore_lists=True)
         # Anything the target-level merge produced that the item-level merge also
         # produced is item metadata replicated across instances; keep it at the ``unit``
         # level and let propagation replicate it instead of storing it twice.
@@ -129,4 +129,5 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
             class_labels,
             unit_of_instance,
             unusable={"unit": unit_unusable, "instance": instance_unusable},
+            source_names={**fine_renamed, **coarse_renamed},
         )

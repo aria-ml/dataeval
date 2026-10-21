@@ -2,7 +2,7 @@
 
 __all__ = []
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
@@ -19,6 +19,11 @@ from dataeval._metadata._structurers._reserved import reserved_block_columns, sa
 from dataeval._metadata._structurers._source_index import SourceIndexRows
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import FactorLevel, FactorLevelSchema
+
+
+def _renamed(names: Iterable[str]) -> dict[str, str]:
+    """Map each column ``safe_column_name`` renamed to the name it had before."""
+    return {safe_column_name(name): name for name in names if safe_column_name(name) != name}
 
 
 class FactorsStructurer(PropagationMixin, Structurer):
@@ -185,7 +190,9 @@ class FactorsStructurer(PropagationMixin, Structurer):
         block = RowBlock(level, size, columns, {level: self._own_positions(size)})
         reject_mixed_values(factors)
         named = {safe_column_name(str(name)): values for name, values in factors.items()}
-        return StructuredData([block], {level: named}, {}, [], class_labels, item_indices)
+        return StructuredData(
+            [block], {level: named}, {}, [], class_labels, item_indices, source_names=_renamed(map(str, factors))
+        )
 
     def build_from_source_index(
         self,
@@ -292,7 +299,10 @@ class FactorsStructurer(PropagationMixin, Structurer):
                 safe_column_name(f"instance_{name}"): values[rows.label_positions] for name, values in factors.items()
             },
         }
-        return StructuredData([unit_block, instance_block], leveled, {}, [], labels, rows.label_items)
+        placed = [f"{level}_{name}" for level in ("unit", "instance") for name in factors]
+        return StructuredData(
+            [unit_block, instance_block], leveled, {}, [], labels, rows.label_items, source_names=_renamed(placed)
+        )
 
     @staticmethod
     def _checked_labels(class_labels: NDArray[np.intp] | None, size: int, level: FactorLevel) -> NDArray[np.intp]:

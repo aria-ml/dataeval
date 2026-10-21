@@ -85,7 +85,7 @@ class DatasetStructurer(Structurer, ABC):
         *,
         ignore_lists: bool,
         targets_per_item: Sequence[int] | None = None,
-    ) -> tuple[Mapping[str, Any], Mapping[str, Sequence[str]], Mapping[str, list[Any]]]:
+    ) -> tuple[Mapping[str, Any], Mapping[str, Sequence[str]], Mapping[str, list[Any]], Mapping[str, str]]:
         """Merge per-item metadata dictionaries into flat factor arrays.
 
         Parameters
@@ -102,10 +102,11 @@ class DatasetStructurer(Structurer, ABC):
 
         Returns
         -------
-        tuple[Mapping[str, Any], Mapping[str, Sequence[str]], Mapping[str, list[Any]]]
-            The merged factors, the factors that were dropped, and the values of the
-            columns held back because they mix numbers, text or booleans — kept as the dataset
-            wrote them, since nobody has yet said how they should be read.
+        tuple[Mapping[str, Any], Mapping[str, Sequence[str]], Mapping[str, list[Any]], Mapping[str, str]]
+            The merged factors, the factors that were dropped, the values of the columns
+            held back because they mix numbers, text or booleans — kept as the dataset
+            wrote them, since nobody has yet said how they should be read — and the
+            flattened key each renamed column had, keyed by column.
         """
         merged, dropped, unusable = _merge(
             list(raw),
@@ -122,7 +123,8 @@ class DatasetStructurer(Structurer, ABC):
         # here would delete it with no entry in ``dropped`` to say where it went.
         own_id = any(ID_KEY in mapping for mapping in raw)
         factors = {safe_column_name(k): v for k, v in merged.items() if not (own_id and k == ID_KEY)}
-        return factors, sorted_drop_reasons(dropped), {safe_column_name(k): v for k, v in unusable.items()}
+        renamed = {safe_column_name(k): k for k in (*merged, *unusable) if safe_column_name(k) != k}
+        return factors, sorted_drop_reasons(dropped), {safe_column_name(k): v for k, v in unusable.items()}, renamed
 
     def _item_ids(self, raw: Sequence[Mapping[str, Any]]) -> Sequence[Any] | NDArray[Any]:
         """Return the datum's own ``id`` per item: reserved identity, not a factor.
