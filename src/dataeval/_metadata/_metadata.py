@@ -9,7 +9,7 @@ import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Literal, NamedTuple, Self, cast
+from typing import Any, Literal, NamedTuple, Self, cast, overload
 
 import numpy as np
 import polars as pl
@@ -18,6 +18,12 @@ from numpy.typing import NDArray
 from dataeval._log import get_logger
 from dataeval._metadata import _corrections as corrections
 from dataeval._metadata._aggregate import Rolled, aggregate, successive_differences, validate
+from dataeval._metadata._collisions import (
+    differing_rows,
+    loses_values,
+    reject_invalid_tolerance,
+    tolerance_for,
+)
 from dataeval._metadata._columns import (
     binned,
     digitized,
@@ -98,6 +104,8 @@ from dataeval.types import (
     Array1D,
     BinSpec,
     ClassAxis,
+    FactorCollision,
+    FactorCollisions,
     FactorInfo,
     FactorLevel,
     FactorLevelSchema,
@@ -759,6 +767,12 @@ class Metadata(Array, FeatureExtractor):
         # Which factors came from agg(), and the level each was rolled up from. Describes
         # the factor rather than the column, so it survives a re-bin.
         self._aggregated_from: dict[str, FactorLevel] = {}
+        # The name each column had in its source, where DataEval renamed it; a column absent
+        # here kept its name. Feeds FactorInfo.source_name and, like the above, survives a re-bin.
+        self._source_names: dict[str, str] = {}
+        # Columns an overwrite moved aside. They are snapshots of this instance, so the
+        # declarations copied onto them stay here rather than reaching `new()`.
+        self._moved_aside: set[str] = set()
         # Set by load(): distinguishes "the dataset carried no metadata" from "this
         # instance cannot say", since a saved file does not hold the raw dicts.
         self._raw_omitted = False
@@ -1510,12 +1524,21 @@ class Metadata(Array, FeatureExtractor):
         # constructor refuses the pair. That pair is not hypothetical — an archive stores
         # the declared count *and* the BinSpec it resolved to, and `load` restores both, so
         # `md.save(); Metadata.load(...).new(...)` raised on every declared cut.
-        bins = {name: spec for name, spec in self._continuous_factor_bins.items() if name not in self._encoding}
+        #
+        # A column an overwrite moved aside is a snapshot of this instance that the next dataset
+        # does not produce, so the declarations copied onto it stay behind.
+        moved = self._moved_aside
+        encoding = {name: spec for name, spec in self._encoding.items() if name not in moved}
+        bins = {
+            name: spec
+            for name, spec in self._continuous_factor_bins.items()
+            if name not in self._encoding and name not in moved
+        }
         fresh = self.__class__(
             dataset,
             task=self._task,
             continuous_factor_bins=bins or None,
-            encoding=self._encoding or None,
+            encoding=encoding or None,
             strict=self._strict,
             auto_bin_method=self._auto_bin_method,
             exclude=list(self._exclude) if self._exclude else None,
@@ -2033,7 +2056,12 @@ class Metadata(Array, FeatureExtractor):
         """
         detail = ""
         defined = [name for name in unknown if any(name in names for names in self._factors_by_level.values())]
-        if defined and not self._inherited:
+        if moved := [name for name in unknown if name in self._moved_aside]:
+            detail = (
+                f" {moved} {'is a column' if len(moved) == 1 else 'are columns'} an overwrite moved aside, "
+                "which are kept but not analyzed. Name one in `include` to analyze it."
+            )
+        elif defined and not self._inherited:
             detail = (
                 f" {defined} {'is' if len(defined) == 1 else 'are'} defined above the view "
                 f"{self._view_level!r} and this metadata was built with inherited=False, which is "
@@ -2648,7 +2676,7 @@ class Metadata(Array, FeatureExtractor):
         # name taken and rename into a duplicate `_agg` column. An entry untouched by
         # `changed` stays recorded as it is.
         self._aggregations = {name: agg for name, agg in self._aggregations.items() if name not in stale_names}
-        self._store = self._store.without_columns(stale_names)
+        self._drop_factors(stale_names)
         for aggregator in declared:
             try:
                 batches = self._rolled_batches([aggregator])
@@ -2851,6 +2879,8 @@ class Metadata(Array, FeatureExtractor):
         derived._factors_by_level = {name: set(names) for name, names in self._factors_by_level.items()}
         derived._dropped_factors = {name: list(reasons) for name, reasons in self._dropped_factors.items()}
         derived._aggregated_from = dict(self._aggregated_from)
+        derived._source_names = dict(self._source_names)
+        derived._moved_aside = set(self._moved_aside)
         derived._identifier_cache = dict(self._identifier_cache)
         derived._encoding = dict(self._encoding)
         derived._exclude = set(self._exclude)
@@ -2917,6 +2947,7 @@ class Metadata(Array, FeatureExtractor):
                 taken.add(name)
                 store = store.with_column(destination, series.rename(name))
                 rolled._aggregated_from[name] = source
+                rolled._source_names[name] = series.name
                 added.append((name, destination))
                 outputs.append(name)
                 if declared is not None:
@@ -3149,6 +3180,12 @@ class Metadata(Array, FeatureExtractor):
         -------
         set[str]
             Set of factor names that are processed during analysis. Empty set when no inclusion filter is active.
+
+        Notes
+        -----
+        This is how a column an ``add_factors(..., overwrite=True)`` moved aside to
+        ``<name>_original`` is analyzed: it is left out otherwise, whatever :attr:`exclude`
+        holds.
         """
         return self._include
 
@@ -4184,13 +4221,47 @@ class Metadata(Array, FeatureExtractor):
         Mapping[str, FactorInfo]
             Mapping of factor names to FactorInfo objects containing
             data type classification, processing flags (binned, digitized),
-            and the level the factor is defined at.
+            the level the factor is defined at, and the name it had in its source.
 
         Notes
         -----
-        Only includes factors that survived preprocessing and filtering.
+        Includes the factors that survived preprocessing and filtering, which are the ones
+        :attr:`factor_names` lists, and the columns an ``add_factors(..., overwrite=True)``
+        moved aside to ``<name>_original``. Those are described here and readable from
+        :meth:`rows_at`, but not analyzed unless :attr:`include` names them. Describing one
+        never raises or warns: a strict vocabulary that refuses one of its values is shown
+        grown to hold it, and a copied declaration that cannot apply to its values at all is
+        set aside. Named in :attr:`include`, it is analyzed like any factor, checks and
+        warnings included.
         """
-        return self._factor_info
+        info = dict(self._factor_info)
+        # ponytail: described afresh on each read, a classification per moved column; cache if that shows.
+        for name in (self._moved_aside & self._factors) - info.keys():
+            info[name] = self._describe_moved(name)
+        return dict(sorted(info.items()))
+
+    def _describe_moved(self, name: str) -> FactorInfo:
+        """Describe a column an overwrite moved aside, without binning it and without a word.
+
+        Kept apart from :meth:`_bin`, which every analysis runs, so a column nobody analyzes
+        can neither fail an analysis nor warn through one. It is a snapshot of values the
+        store already holds, so it is not held to a strict vocabulary: one that refuses a
+        value is described grown to hold it, as ``strict=False`` would grow it, and nothing
+        is written back. A copied declaration that cannot describe the values at all -- bins
+        copied onto text -- is set aside, and the column described from its values alone.
+        """
+        level = self._factor_level(name)
+        data = self._store.frame(level)[name].to_numpy()
+        strict, encoding = self._strict, self._encoding
+        # A copy takes any write-back, and lifting `strict` admits what the vocabulary lacks.
+        self._strict, self._encoding = False, dict(encoding)
+        try:
+            return self._process_factor(name, data, self._continuous_factor_bins, level)[1]
+        except (TypeError, ValueError):
+            self._encoding.pop(name, None)
+            return self._process_factor(name, data, {}, level)[1]
+        finally:
+            self._strict, self._encoding = strict, encoding
 
     def factor_stats(
         self,
@@ -4555,7 +4626,11 @@ class Metadata(Array, FeatureExtractor):
 
     def _filter(self, factor: str | tuple[str, Any]) -> bool:
         factor = factor[0] if isinstance(factor, tuple) else factor
-        return factor in self.include if self.include else factor not in self.exclude
+        if self.include:
+            return factor in self.include
+        # A column an overwrite moved aside is kept but not analyzed until `include` names it.
+        # Held apart from `exclude`, so setting or clearing that does not bring it in.
+        return factor not in self.exclude and factor not in self._moved_aside
 
     def _reset_bins(self, cols: Iterable[str] | None = None) -> None:
         """Drop the companion columns of ``cols`` (or of every factor) and their info.
@@ -4576,6 +4651,40 @@ class Metadata(Array, FeatureExtractor):
                 self._factor_cache.pop(col, None)
         self._store = self._store.without_columns(companions)
         self._is_binned = False
+
+    def _drop_factors(self, names: Sequence[str]) -> None:
+        """Remove factors whole: their columns, their companions and the records naming them.
+
+        A column dropped while its name stays registered is a factor with nothing to read,
+        and the next binning pass raises looking for it. A roll-up replay is where that
+        happens: one that is refused, or that recomputes its output under another name,
+        drops the stale output and never writes it back.
+        """
+        if not names:
+            return
+        self._reset_bins(names)
+        self._store = self._store.without_columns(names)
+        unregistered = self._unregister(names)
+        for name in names:
+            self._aggregated_from.pop(name, None)
+            self._source_names.pop(name, None)
+            self._identifier_cache.pop(name, None)
+            # Copied onto a moved column for it alone, so they go with it. Anyone else's
+            # declarations name a column the replay is about to write back.
+            if name in self._moved_aside:
+                self._encoding.pop(name, None)
+                self._continuous_factor_bins.pop(name, None)
+        self._moved_aside.difference_update(names)
+        if unregistered:
+            self._build_factors()
+
+    def _unregister(self, names: Sequence[str]) -> bool:
+        """Take `names` out of every level's factor set, and say whether any was in one."""
+        dropped = set(names)
+        found = any(registered & dropped for registered in self._factors_by_level.values())
+        for registered in self._factors_by_level.values():
+            registered -= dropped
+        return found
 
     def _unreadable_at(self, level: FactorLevel, view: FactorLevel) -> str | None:
         """Why a factor defined at ``level`` cannot be read from ``view``'s rows, or None.
@@ -4995,6 +5104,7 @@ class Metadata(Array, FeatureExtractor):
             self._view = self._resolve_level(self._view)
 
         self._raw = data.raw
+        self._source_names = dict(data.source_names)
         # A fresh set of columns, so no verdict carried from a previous structuring holds.
         self._identifier_cache = {}
         # ``class_labels`` and ``item_indices`` are deliberately not stored: both are
@@ -5207,6 +5317,7 @@ class Metadata(Array, FeatureExtractor):
         values, info = self._classify_factor(col, data, factor_bins)
         info.level = level
         info.aggregated_from = self._aggregated_from.get(col)
+        info.source_name = self._source_names.get(col, col)
         return pl.Series(name=to_col(col, info), values=values, dtype=pl.Int64), info
 
     def _warn_unknown_factor_keys(self, factor_bins: Mapping[str, int | Sequence[float]]) -> None:
@@ -5666,6 +5777,7 @@ class Metadata(Array, FeatureExtractor):
         self._validate_factor_lengths(factors, named_level)
         return [(name, named_level, values) for name, values in factors.items()], []
 
+    @overload
     def add_factors(
         self,
         factors: Mapping[str, Array1D[Any]] | FactorResult[Any],
@@ -5677,7 +5789,43 @@ class Metadata(Array, FeatureExtractor):
         aggregate: bool = True,
         how: Mapping[str, str] | None = None,
         aggregations: Sequence[Aggregator] | None = None,
-    ) -> None:
+        *,
+        return_collisions: Literal[False] = False,
+        collision_tolerance: float | Mapping[str, float] = 0.0,
+    ) -> None: ...
+
+    @overload
+    def add_factors(
+        self,
+        factors: Mapping[str, Array1D[Any]] | FactorResult[Any],
+        level: FactorLevel | None = None,
+        overwrite: bool = False,
+        append_string: str = "_added",
+        source_index: Sequence[SourceIndex] | None = None,
+        key: str | None = None,
+        aggregate: bool = True,
+        how: Mapping[str, str] | None = None,
+        aggregations: Sequence[Aggregator] | None = None,
+        *,
+        return_collisions: Literal[True],
+        collision_tolerance: float | Mapping[str, float] = 0.0,
+    ) -> FactorCollisions: ...
+
+    def add_factors(
+        self,
+        factors: Mapping[str, Array1D[Any]] | FactorResult[Any],
+        level: FactorLevel | None = None,
+        overwrite: bool = False,
+        append_string: str = "_added",
+        source_index: Sequence[SourceIndex] | None = None,
+        key: str | None = None,
+        aggregate: bool = True,
+        how: Mapping[str, str] | None = None,
+        aggregations: Sequence[Aggregator] | None = None,
+        *,
+        return_collisions: bool = False,
+        collision_tolerance: float | Mapping[str, float] = 0.0,
+    ) -> FactorCollisions | None:
         """Add additional factors to metadata collection.
 
         Extend the current metadata with new factors at any level of the bound
@@ -5707,8 +5855,22 @@ class Metadata(Array, FeatureExtractor):
             level the factor is binned at, so a factor stored at the ``unit`` level
             is discretized over one value per unit (see :ref:`binning-levels`).
         overwrite : bool, default False
-            Whether to overwrite factors of the same name already present in the metadata.
-            When False, a colliding factor is stored under a new name instead (see `append_string`).
+            Whether the incoming values take the name of a factor already present in the
+            metadata. When True, they do. A write that would lose a value the factor holds,
+            by changing a row's value or making it missing or by moving the factor to another
+            level, does not discard the column it replaces: the column moves to
+            ``<name>_original`` (``<name>_original_2``, ... when that is taken), keeping its
+            level, its source name and any encoding that described its values. The moved
+            column is readable from :meth:`rows_at` and described in :attr:`factor_info`,
+            but left out of :attr:`factor_names`, :attr:`factor_data` and every analysis
+            unless :attr:`include` names it. A write that
+            only fills empty rows, or writes back the values already there, loses nothing,
+            so it moves nothing aside and re-running it adds no columns. A moved column a
+            roll-up produced keeps the roll-up's record too, so when one of
+            the roll-up's sources later changes, the stale moved column is dropped and the
+            roll-up is recomputed under the name it asks for, renamed if that is taken.
+            When False, the existing factor keeps the name and a colliding factor is stored
+            under a new name instead (see `append_string`).
 
             Under `key` a collision is decided per row rather than per name, since a keyed
             write names rows: see the `key` description below.
@@ -5759,7 +5921,9 @@ class Metadata(Array, FeatureExtractor):
             just as the one-call form does. A name collision is reported only when a row
             that already holds a value is named again, and `overwrite` then decides it as
             it does anywhere else — replacing just the named rows rather than the whole
-            column.
+            column, and keeping the whole prior column as ``<name>_original`` when that
+            replaces a value. A keyed write that only fills rows no earlier write reached
+            replaces nothing, so it moves nothing aside.
         aggregate : bool, default True
             Whether to apply the roll-up recipes the result declares. A producer knows how
             its factors summarize and how much of a group must be present for a summary to
@@ -5775,6 +5939,34 @@ class Metadata(Array, FeatureExtractor):
             Replace the result's declarations entirely. Mutually exclusive with `how`. For
             a roll-up no named reduction expresses, use :meth:`agg`, which takes an
             expression.
+        return_collisions : bool, default False
+            Whether to compare each incoming factor with a factor of the same name already
+            present, and return where they disagree. The comparison is made before anything
+            is written, on the rows the incoming values are written to, so under `overwrite`
+            it sees the values being replaced. Only rows where both sides hold a value are
+            compared: a row missing on either side (None, or NaN in a float column) is not a
+            disagreement, so filling rows a keyed write left empty is not one either. An
+            existing factor that the incoming level's rows cannot read, such as one defined
+            at a level below, is not compared, and an info line says so.
+        collision_tolerance : float or Mapping[str, float], default 0.0
+            Relative tolerance for numeric values, which differ when
+            ``abs(existing - incoming) > tolerance * max(abs(existing), abs(incoming))``. One
+            number for every factor, or a mapping from incoming factor name to its own; a
+            factor the mapping does not name is compared exactly. A name `source_index`
+            split across levels is covered by the name as passed (``mean`` for
+            ``unit_mean``), and an entry for the split name takes precedence. Values that
+            are not both numeric differ when unequal. Ignored unless `return_collisions` is
+            True.
+
+        Returns
+        -------
+        FactorCollisions or None
+            None unless `return_collisions` is True. Otherwise a mapping from incoming factor
+            name to a :class:`~dataeval.types.FactorCollision` for each factor that disagrees
+            with an existing one on at least one row, in the order the factors were passed.
+            It is empty when nothing collides or every collision agrees within tolerance. A
+            factor `source_index` split across levels is reported under each split name,
+            such as ``unit_mean``.
 
         Raises
         ------
@@ -5789,7 +5981,8 @@ class Metadata(Array, FeatureExtractor):
             when it is not a column of that level's rows, when that column does not name
             one row each, when no values for it were supplied, when the keys are not
             unique, or when the dataset holds several items and the values do not say
-            which they belong to.
+            which they belong to. Under `return_collisions`: when `collision_tolerance` is
+            negative or not finite, or names a factor the call does not add.
 
         Notes
         -----
@@ -5841,6 +6034,14 @@ class Metadata(Array, FeatureExtractor):
             `aggregate`, `how` and `aggregations`, letting a caller suppress, swap or
             replace the roll-up recipes a stats result declares alongside its values.
 
+        .. versionadded:: 1.2
+            `return_collisions` and `collision_tolerance`, reporting where incoming values
+            disagree with a factor of the same name already present.
+
+        .. versionchanged:: 1.2
+            `overwrite` keeps the column it replaces as ``<name>_original`` rather than
+            discarding it, whenever the write would lose a value.
+
         Examples
         --------
         >>> metadata = Metadata(dataset)
@@ -5864,6 +6065,18 @@ class Metadata(Array, FeatureExtractor):
         >>> metadata.add_factors(stats)
         >>> sorted(n for n in metadata.factor_names if n.endswith("mean"))
         ['instance_mean', 'unit_mean']
+        >>>
+        >>> # Compare measured values with the ones already reported, within 5%
+        >>> metadata.add_factors({"exposure": np.full(50, 2.0)}, level="unit")
+        >>> measured = np.full(50, 2.0)
+        >>> measured[3] = 2.5
+        >>> collisions = metadata.add_factors(
+        ...     {"exposure": measured}, level="unit", return_collisions=True, collision_tolerance=0.05
+        ... )
+        >>> collisions["exposure"].column
+        'exposure_added'
+        >>> collisions["exposure"].differing.rows()
+        [(3, 2.0, 2.5, 0.2)]
         """
         self._structure()
         categorical = declared_categorical(factors)
@@ -5871,10 +6084,12 @@ class Metadata(Array, FeatureExtractor):
         rollups = resolve_aggregations(declared, aggregate, how, aggregations)
 
         if not factors:
+            # Nothing to compare, but a tolerance naming a factor is still refused first.
+            collisions = self._collisions([], [], {}, collision_tolerance, {}) if return_collisions else None
             # No new values, but a declaration naming an already-stored factor is still
             # work to do, not a no-op to discard.
             self._register_rollups(rollups)
-            return
+            return collisions
 
         _reject_unusable_key(key, level, source_index)
 
@@ -5886,8 +6101,6 @@ class Metadata(Array, FeatureExtractor):
         kept, skipped = split_by_dimensionality(factors)
         reject_mixed_values(kept)
 
-        taken = set(self._store.columns)
-        resolved: list[_ResolvedFactor] = []
         named: NDArray[np.bool_] | None = None
         if key is not None:
             # _reject_unusable_key has already forced a named level here and
@@ -5895,28 +6108,70 @@ class Metadata(Array, FeatureExtractor):
             (placed, named), vacuous = resolve_keyed(self, kept, cast("FactorLevel", resolved_level), key), []
         else:
             placed, vacuous = self._resolve_factor_levels(kept, resolved_level, source_index)
-        for name, factor_level, values in placed:
-            merged = None if named is None else self._merge_keyed(name, factor_level, values, named, overwrite)
-            if merged is not None:
-                col_name, values = merged
-            else:
-                col_name = self._resolve_factor_name(name, taken, overwrite, append_string)
-            taken.add(col_name)
-            # One value per entity at the factor's own level: descendant rows read them by
-            # the store's gather, so there is no expanded copy to build and no dtype to
-            # infer off one leading with nulls.
-            resolved.append(_ResolvedFactor(col_name, factor_level, to_series(col_name, values)))
+        resolved, moved = self._resolve_columns(placed, named, overwrite, append_string)
         # Checked under the final names: a known name renamed to ``*_added`` on its way in
-        # no longer claims the definition, so it is not held to it.
+        # no longer claims the definition, so it is not held to it. A column moved aside to
+        # ``*_original`` is not checked either: it keeps values that were already admitted.
         reject_invalid_known(resolved)
+        # Still before the commit, so an overwritten column is read as it was.
+        collisions = (
+            self._collisions(placed, resolved, factors, collision_tolerance, moved) if return_collisions else None
+        )
 
         self._record_multidimensional(skipped)
         self._record_vacuous(vacuous)
-        self._commit_factors(resolved)
+        self._commit_factors(resolved, moved, [name for name, _, _ in placed])
         # After the commit: binning is lazy, so the vocabulary must be recorded before any
         # factor read.
         self._declare_categorical_levels(placed, resolved, categorical, kept)
         self._register_rollups(rollups, changed=frozenset(factor.name for factor in resolved))
+        return collisions
+
+    def _collisions(
+        self,
+        placed: Sequence[tuple[str, FactorLevel, Any]],
+        resolved: Sequence[_ResolvedFactor],
+        passed: Mapping[str, Any],
+        tolerance: float | Mapping[str, float],
+        moved: Mapping[str, str],
+    ) -> dict[str, FactorCollision]:
+        """Compare each incoming column with the factor of the same name already present.
+
+        Read-only, and run before the commit, so ``existing`` holds the values an overwrite
+        replaces. `placed` holds each column's values as they arrived, and `resolved` the
+        column each went to, in the same order. Only rows where both sides hold a value are
+        compared, so the rows a keyed write leaves null are never compared, and filling a
+        row that was empty is not a collision.
+        """
+        reject_invalid_tolerance(tolerance, set(passed) | {name for name, _, _ in placed})
+        factors = {name for names in self._factors_by_level.values() for name in names}
+        report: dict[str, FactorCollision] = {}
+        for (name, level, values), factor in zip(placed, resolved, strict=True):
+            safe = safe_column_name(name)
+            if safe not in factors:
+                continue
+            if self._store.source_of(level, safe) is None:
+                _logger.info(
+                    "Factor %r is already defined at the %r level, which %r rows cannot read, so its "
+                    "incoming values were not compared with it.",
+                    safe,
+                    self._factor_level(safe),
+                    level,
+                )
+                continue
+            frame = self._store.frame(level)
+            rows = frame.select("item_index", *[c for c in (LEVEL_KEY_COLUMNS[level],) if c in frame.columns])
+            # A name `_place` prefixed with its level is not one the caller passed.
+            as_passed = name if name in passed else name.removeprefix(f"{level}_")
+            compared, differing = differing_rows(
+                rows,
+                self._store.column(level, safe),
+                to_series(name, values),
+                tolerance_for(tolerance, as_passed, name),
+            )
+            if differing.height:
+                report[name] = FactorCollision(name, factor.name, moved.get(safe, safe), level, compared, differing)
+        return report
 
     def _register_rollups(self, rollups: tuple[Aggregator, ...], changed: frozenset[str] = frozenset()) -> None:
         """Run newly-resolved roll-ups, and re-run any carried one a just-landed factor feeds.
@@ -5959,21 +6214,112 @@ class Metadata(Array, FeatureExtractor):
                 values = sorted(factor.native.drop_nulls().unique().to_list())
                 self._encoding.update(declared_levels({factor.name: values}))
 
-    def _commit_factors(self, resolved: Sequence[_ResolvedFactor]) -> None:
+    def _resolve_columns(
+        self,
+        placed: Sequence[tuple[str, FactorLevel, Any]],
+        named: NDArray[np.bool_] | None,
+        overwrite: bool,
+        append_string: str,
+    ) -> tuple[list[_ResolvedFactor], dict[str, str]]:
+        """Name the column each placed factor goes to, and where any column it replaces moves.
+
+        Under `overwrite`, an existing factor the write would lose a value of moves aside to
+        ``<name>_original``, or ``_original_2`` and on where that is taken. A write that only
+        fills rows nothing held, or writes back the values already there, loses nothing and
+        moves nothing, so re-running one does not pile up copies. Pure, like the rest of the
+        resolve phase.
+
+        Returns
+        -------
+        tuple[list[_ResolvedFactor], dict[str, str]]
+            One column per placed factor, in order, and the columns moved aside, from their
+            name to the one they move to.
+        """
+        taken = set(self._store.columns)
+        factors = {name for names in self._factors_by_level.values() for name in names}
+        resolved: list[_ResolvedFactor] = []
+        replaced: list[str] = []
+        for name, factor_level, values in placed:
+            merged = None if named is None else self._merge_keyed(name, factor_level, values, named, overwrite)
+            if merged is not None:
+                col_name, values = merged
+            else:
+                col_name = self._resolve_factor_name(name, taken, overwrite, append_string)
+            taken.add(col_name)
+            # One value per entity at the factor's own level: descendant rows read them by
+            # the store's gather, so there is no expanded copy to build and no dtype to
+            # infer off one leading with nulls.
+            column = to_series(col_name, values)
+            replaces = overwrite and col_name in factors and col_name not in replaced
+            if replaces and self._loses(col_name, factor_level, column):
+                replaced.append(col_name)
+            resolved.append(_ResolvedFactor(col_name, factor_level, column))
+        # Named only once every incoming column holds its name, so a moved column cannot
+        # take one an incoming column is about to be written to.
+        moved: dict[str, str] = {}
+        for col_name in replaced:
+            moved[col_name] = self._resolve_factor_name(col_name, taken, False, "_original")
+            taken.add(moved[col_name])
+        return resolved, moved
+
+    def _loses(self, name: str, level: FactorLevel, result: pl.Series) -> bool:
+        """Whether writing `result` at `level` over factor `name` would lose a value it holds.
+
+        Moving to another level always does, since the factor's rows change. At the same
+        level the values are compared row for row.
+        """
+        held = self._factor_level(name)
+        return held != level or loses_values(self._store.frame(level)[name], result)
+
+    def _move_aside(self, moved: Mapping[str, str]) -> list[_ResolvedFactor]:
+        """Copy each column an overwrite replaces to its new name, with what describes its values.
+
+        The moved column keeps what described its values: the level it was defined at, its
+        source name, the level a roll-up built it from and the roll-up's record, and any
+        declared or recorded encoding. The name, about to hold the incoming values, keeps
+        only what a fresh write of it would get. Declarations made *by name* -- an encoding,
+        a cut, a correction, an exclusion -- stay with it, so the encoding is copied rather
+        than moved, and corrections stay: :meth:`new` replays them by the dataset's name.
+        """
+        aside: list[_ResolvedFactor] = []
+        for old, new in moved.items():
+            level = self._factor_level(old)
+            aside.append(_ResolvedFactor(new, level, self._store.frame(level)[old].rename(new)))
+            self._moved_aside.add(new)
+            self._source_names[new] = self._source_names.get(old, old)
+            if old in self._aggregated_from:
+                self._aggregated_from[new] = self._aggregated_from.pop(old)
+            # Rebuilt rather than popped and reinserted: the order is the replay order.
+            self._aggregations = {new if name == old else name: agg for name, agg in self._aggregations.items()}
+            if old in self._encoding:
+                self._encoding[new] = self._encoding[old]
+            if old in self._continuous_factor_bins:
+                self._continuous_factor_bins[new] = self._continuous_factor_bins[old]
+        return aside
+
+    def _commit_factors(
+        self, resolved: Sequence[_ResolvedFactor], moved: Mapping[str, str], sources: Sequence[str]
+    ) -> None:
         """Write resolved columns to the dataframe and register their levels.
 
         The half of :meth:`add_factors` that mutates. Its all-or-nothing guarantee holds
-        only while the two halves stay separated.
+        only while the two halves stay separated. Columns being replaced are moved aside
+        first, so the incoming values never land on a column that has not been kept.
+        `sources` names each resolved column's source, in the same order.
         """
         if not resolved:
             return
 
+        written = [*self._move_aside(moved), *resolved]
+        self._source_names.update(zip((factor.name for factor in resolved), sources, strict=True))
+        # A name that takes incoming values is no longer a snapshot, whatever it held before.
+        self._moved_aside.difference_update(factor.name for factor in resolved)
         # Stale companion columns of the factors being replaced, otherwise _bin() skips
         # them and they disappear from factor_info.
-        self._reset_bins([factor.name for factor in resolved])
+        self._reset_bins([factor.name for factor in written])
 
-        self._store_native_factors(resolved)
-        self._register_factor_levels([(factor.name, factor.level) for factor in resolved])
+        self._store_native_factors(written)
+        self._register_factor_levels([(factor.name, factor.level) for factor in written])
         # A replaced column holds different values, so its remembered verdict is stale.
         for factor in resolved:
             self._identifier_cache.pop(factor.name, None)

@@ -510,10 +510,11 @@ class TestResetBinsIsNotGuarded:
 
         md.add_factors({"hour": np.array([100.0, 200.0, 300.0])}, level="unit", overwrite=True)
 
+        # The replaced values are kept as `hour_original`, described but not analyzed.
         assert list(md.factor_names) == ["hour"]
         assert md.shape == (6, 1)
         assert md.factor_data.shape == (6, 1)
-        assert "hour" in md.factor_info
+        assert {"hour", "hour_original"} <= set(md.factor_info)
 
     def test_continuous_factor_bins_after_exclude_takes_effect(self):
         md = Metadata(_od_dataset(counts=(1, 1, 1)))

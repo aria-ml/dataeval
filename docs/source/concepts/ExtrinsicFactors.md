@@ -334,6 +334,17 @@ Using a known name is a promise that the data follows the definition above. The 
 `timestamp` in milliseconds since the stream started passes them. If a factor means something else, give it a
 different name.
 
+A dataset's reported `video_duration` and `frame_rate` can be checked against the frames themselves.
+{func}`.video_stats` measures both from frame timestamps, and
+`md.add_factors(video_stats(ds), return_collisions=True, collision_tolerance={"video_duration": 0.01})` attaches the
+measured values and returns a report of where they disagree with the reported ones. With the default
+`overwrite=False`, a measured factor whose name the dataset already reports is stored under a new name, such as
+`video_duration_added`. The report holds a {class}`.FactorCollision` for each factor that disagrees on at least one
+video. Here `video_duration` differs when the two values are more than 1% apart, and a reported `frame_rate`, which the
+tolerance doesn't name, differs on any difference. Each entry's `differing` frame lists those videos by `item_index`,
+with the `existing` value, the `incoming` one and their `relative_difference`. A video without a reported value, or one
+that couldn't be measured, isn't compared.
+
 A `timestamp` column of ISO 8601 text or of datetimes is held back, and `repair([ParseDateTime("timestamp")])` reads it
 as seconds since the Unix epoch, which passes. A period such as `every="hour"` isn't a capture time, and its text labels
 keep the column held back. Give a column you mean to read as periods a different name, such as `capture_time`. With

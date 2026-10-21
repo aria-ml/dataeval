@@ -37,6 +37,10 @@ class StructuredData:
         column, so a column nobody has said how to read waits here instead of entering it.
     raw : Sequence[Mapping[str, Any]]
         Untouched per-item metadata dictionaries.
+    source_names : Mapping[str, str]
+        The key each renamed factor column had in its source, keyed by column, for the
+        columns ``safe_column_name`` moved out of a reserved namespace. A column absent
+        here kept its source name.
     class_labels : NDArray[np.intp]
         One label per target-level row.
     item_indices : NDArray[np.intp]
@@ -50,6 +54,7 @@ class StructuredData:
     class_labels: NDArray[np.intp] = field(default_factory=lambda: np.empty(0, dtype=np.intp))
     item_indices: NDArray[np.intp] = field(default_factory=lambda: np.empty(0, dtype=np.intp))
     unusable: Mapping[FactorLevel, Mapping[str, list[Any]]] = field(default_factory=dict)
+    source_names: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate the bundle before anything reads it."""
