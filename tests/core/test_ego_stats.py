@@ -596,6 +596,10 @@ class TestMetadataIntegration:
         targets = [_MOTTarget([_FrameTracks([0]) for _ in stream]) for stream in streams]
         return MockDataset(streams, targets, None)
 
+    def test_a_sequence_of_streams_is_one_video_each(self):
+        result = ego_stats([panning_stream(n_frames=4), panning_stream(n_frames=6)])
+        assert list(result["stats"]["item_index"]) == [0] * 4 + [1] * 6
+
     def test_every_field_is_a_flat_column_of_scalars(self):
         result = ego_stats(cast("MultiobjectTrackingDataset", FakeDataset([panning_stream(), panning_stream()])))
         for name, values in result["stats"].items():

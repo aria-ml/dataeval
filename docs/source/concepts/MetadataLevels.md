@@ -905,7 +905,9 @@ md.add_factors(stats["stats"], level="unit")
 
 Passing the whole result with `level="unit"` is refused, because the result
 already addresses each value as a frame of a video. Pass its `["stats"]` mapping
-to place the values by position, which matches when every frame takes part.
+to place the values by position. That matches only when every frame takes part: a
+selector that drops frames makes `add_factors` raise `ShapeMismatchError`, so use
+the default `SequenceFrames(dataset)`.
 
 Then roll the column up to each video:
 

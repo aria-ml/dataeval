@@ -18,7 +18,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.config import get_max_processes
-from dataeval.core._hash import phash
+from dataeval.core._hash import _phash
 from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
 from dataeval.protocols import AnnotatedDataset, Dataset, ProgressCallback, VideoStream
 from dataeval.utils._array import as_numpy
@@ -127,9 +127,18 @@ class FrameView:
         return _downscale(self.gray, self.options.ego_proc_short_side)
 
     @cached_property
+    def _hashed(self) -> tuple[str, str | None]:
+        return _phash(self.gray[None])
+
+    @property
     def phash(self) -> str:
         """The perceptual hash of :attr:`gray`, the same hash Duplicates compares."""
-        return phash(self.gray[None])
+        return self._hashed[0]
+
+    @property
+    def phash_warning(self) -> str | None:
+        """Why :attr:`phash` is empty, or None when it hashed. Left for the caller to log, once per video."""
+        return self._hashed[1]
 
 
 class FrameConsumer(Protocol):

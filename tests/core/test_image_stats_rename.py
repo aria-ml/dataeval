@@ -19,8 +19,12 @@ def test_compute_stats_matches_image_stats(images):
     # The decorator warns once per process. This is the suite's only call to `compute_stats`,
     # so the warning is still unspent here whatever order tests run in.
     expected = image_stats(images, stats=ImageStats.PIXEL_MEAN | ImageStats.HASH_XXHASH)
-    with pytest.warns(DeprecatedWarning, match="image_stats"):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
         got = compute_stats(images, stats=ImageStats.PIXEL_MEAN | ImageStats.HASH_XXHASH)
+    deprecations = [w for w in caught if issubclass(w.category, DeprecatedWarning)]
+    assert len(deprecations) == 1
+    assert "image_stats" in str(deprecations[0].message)
     np.testing.assert_array_equal(got["stats"]["mean"], expected["stats"]["mean"])
     assert list(got["stats"]["xxhash"]) == list(expected["stats"]["xxhash"])
     assert got["source_index"] == expected["source_index"]

@@ -834,6 +834,9 @@ def image_stats(  # noqa: C901
     """
     Compute specified statistics on a set of images, optionally within bounding boxes.
 
+    .. versionchanged:: 1.2
+        Renamed from ``compute_stats``, which remains as a deprecated alias until 2.0.
+
     Parameters
     ----------
     data : Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
