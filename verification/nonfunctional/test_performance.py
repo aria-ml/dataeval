@@ -112,18 +112,18 @@ class TestPerformance:
 
     def test_max_processes_bounds_workers(self, monkeypatch):
         """The worker pool never exceeds ``max_processes``; timings per setting are recorded."""
-        import dataeval.core._compute_stats as compute_stats_module
+        import dataeval.core._image_stats as image_stats_module
         from dataeval.quality import Duplicates, Outliers
 
         observed: list[int] = []
-        original = compute_stats_module.PoolWrapper
+        original = image_stats_module.PoolWrapper
 
         class RecordingPool(original):
             def __init__(self, processes, *args, **kwargs):
                 super().__init__(processes, *args, **kwargs)
                 observed.append(getattr(self._pool, "_processes", 1) if self._pool is not None else 1)
 
-        monkeypatch.setattr(compute_stats_module, "PoolWrapper", RecordingPool)
+        monkeypatch.setattr(image_stats_module, "PoolWrapper", RecordingPool)
 
         dataset = LazyImages(2000)
         timings: dict[tuple[str, int], float] = {}

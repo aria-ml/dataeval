@@ -2018,7 +2018,7 @@ class TestValueRangeAnchor:
         """
         signed = np.random.default_rng(0).normal(0, 10, (1, 16, 16))
 
-        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
             result = image_stats([signed], stats=stats, normalize_pixel_values=normalize)["stats"]
 
         assert np.all(np.isnan(result[name][0]))
@@ -2739,7 +2739,7 @@ class TestPerGroupStatsValidation:
         # Band 0 decodes as 8-bit data; band 1 holds negatives, which carry no encoding.
         cube = np.stack([rng.uniform(0, 255, (8, 8)), rng.uniform(-100, 100, (8, 8))])
 
-        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
             image_stats(
                 [cube],
                 stats={"vis": ImageStats.PIXEL_ENTROPY, "elev": ImageStats.PIXEL_ENTROPY},
@@ -2870,7 +2870,7 @@ class TestWideBandWarning:
     def test_visual_statistics_on_a_wide_datum_warn(self, caplog):
         image = np.zeros((6, 8, 8), np.uint8)
 
-        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
             image_stats([image], stats=ImageStats.VISUAL_BRIGHTNESS, normalize_pixel_values=False)
 
         assert self._warned(caplog)
@@ -2879,7 +2879,7 @@ class TestWideBandWarning:
         """A caller who named their groups has already said which bands are a picture."""
         image = np.zeros((6, 8, 8), np.uint8)
 
-        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
             image_stats(
                 [image],
                 stats=ImageStats.VISUAL_BRIGHTNESS,
@@ -2898,7 +2898,7 @@ class TestWideBandWarning:
         """
         image = np.zeros((6, 8, 8), np.uint8)
 
-        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
             image_stats(
                 [image],
                 stats={None: ImageStats.VISUAL_BRIGHTNESS, "ir": ImageStats.PIXEL_MEAN},
@@ -2912,7 +2912,7 @@ class TestWideBandWarning:
         """The group produces `ir_brightness`, which is a reading of one band rather than six."""
         image = np.zeros((6, 8, 8), np.uint8)
 
-        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
             image_stats(
                 [image],
                 stats={None: ImageStats.VISUAL_BRIGHTNESS, "ir": ImageStats.VISUAL_BRIGHTNESS},
@@ -2925,7 +2925,7 @@ class TestWideBandWarning:
     def test_three_band_data_never_warns(self, caplog):
         image = np.zeros((3, 8, 8), np.uint8)
 
-        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
             image_stats([image], stats=ImageStats.VISUAL | ImageStats.HASH, normalize_pixel_values=False)
 
         assert not self._warned(caplog)
@@ -2934,7 +2934,7 @@ class TestWideBandWarning:
         """Warn, do not cap — a cap would take geometry down with the visual statistics."""
         image = np.zeros((6, 8, 8), np.uint8)
 
-        with caplog.at_level(logging.WARNING, logger="dataeval.core._compute_stats"):
+        with caplog.at_level(logging.WARNING, logger="dataeval.core"):
             result = image_stats([image], stats=ImageStats.DIMENSION_WIDTH, normalize_pixel_values=False)
 
         assert result["stats"]["width"][0] == 8.0

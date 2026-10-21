@@ -16,7 +16,7 @@ from typing import Any
 from dataeval.flags import ImageStats
 
 # NOTE: never import from dataeval.core in this module. core imports data
-# (core/_compute_stats.py) and data imports core (data/_classbalance.py); that cycle
+# (core/_image_stats.py) and data imports core (data/_classbalance.py); that cycle
 # holds only by import ordering. ImageStats comes from dataeval.flags, which is
 # standalone, so this module stays importable from either side.
 

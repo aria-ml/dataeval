@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 from dataeval import Metadata
 from dataeval.core import align_subsequence, pack_hashes
 from dataeval.core._clusterer import ClusterResult
-from dataeval.core._compute_stats import image_stats
+from dataeval.core._image_stats import image_stats
 from dataeval.data import FrameIndices, SequenceFrames, Stride
 from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
