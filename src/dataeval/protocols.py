@@ -823,12 +823,22 @@ Type alias for a multi-object tracking datum tuple.
 - :obj:`VideoStream` - An iterable of :obj:`VideoFrame` for a single video.
 - :obj:`MultiobjectTrackingTarget` - Tracked objects across the sequence of frames.
 - :obj:`DatumMetadata` - Datum level metadata.
+
+The stream must be walkable from its first frame, independently of any stream returned earlier
+for the same index -- the replay contract on :obj:`MultiobjectTrackingDataset`.
 """
 
 
 MultiobjectTrackingDataset: TypeAlias = AnnotatedDataset[MultiobjectTrackingDatum]
 """
 Type alias for an :class:`AnnotatedDataset` of :obj:`MultiobjectTrackingDatum` elements.
+
+**Replay contract.** Each ``dataset[i]`` must return a stream walkable from its first frame,
+independently of any earlier stream for the same index. :class:`~dataeval.data.SequenceFrames`
+fetches ``dataset[i]`` again for every walk of a video -- a second
+:meth:`~dataeval.data.SequenceFrames.stream`, a two-pass selector's second pass, random access --
+and refuses a stream that yields nothing because an earlier walk spent it -- this view's, or
+another reader's such as :class:`~dataeval.Metadata` -- with an error naming this contract.
 """
 
 

@@ -543,6 +543,15 @@ display(
 # duplicated frames, pull out a sequence, or build a split without them, pass those coordinates to
 # :class:`~dataeval.data.FrameIndices`, which `frame_sample` accepts.
 #
+# ```{note}
+# `Duplicates` reports frame numbers (each frame's `frame_index`), while `FrameIndices` takes stream positions. A
+# MAITE-conforming stream numbers its frames from zero in the order it yields them, so a frame's number is its
+# position, which is why the recipes below work on this notebook's data. If your dataset numbers its frames
+# otherwise, say from one, map the frame numbers to positions before building `FrameIndices`.
+# `SequenceFrames(dataset).source_indices` gives the sequence and frame number of each frame in the view, and
+# `frame_map` gives its sequence and position, in the same order.
+# ```
+#
 # To pull the leaked stretch, frames 30-49 of training sequence 0:
 #
 

@@ -889,8 +889,12 @@ the order of the frames, so they are the temporal reductions `variability` and
 `trend` from [Reading a level as a series](#reading-a-level-as-a-series).
 
 {class}`.SequenceFrames` presents a video dataset as a dataset of frames, so
-{func}`.image_stats` measures every frame. The values come back in frame order,
-one per `unit` row, and `per_target=False` leaves out the per-detection rows:
+{func}`.image_stats` measures each frame it presents, and `per_target=False`
+leaves out the per-detection rows. The result addresses each value in the frame
+view's own coordinates, `SourceIndex(i)` for the `i`-th frame presented, and
+{meth}`.SequenceFrames.to_source` translates those addresses into the video's
+own, `SourceIndex(video, frame_index, "unit")`, which name the `unit` rows of
+`md`:
 
 ```python
 from dataeval import Metadata
@@ -899,15 +903,15 @@ from dataeval.data import SequenceFrames
 from dataeval.flags import ImageStats
 
 md = Metadata(dataset)  # a multi-object tracking dataset
-stats = image_stats(SequenceFrames(dataset), stats=ImageStats.VISUAL_BRIGHTNESS, per_target=False)
-md.add_factors(stats["stats"], level="unit")
+frames = SequenceFrames(dataset)
+stats = image_stats(frames, stats=ImageStats.VISUAL_BRIGHTNESS, per_target=False)
+md.add_factors(stats, source_index=frames.to_source(stats["source_index"]))
 ```
 
-Passing the whole result with `level="unit"` is refused, because the result
-already addresses each value as a frame of a video. Pass its `["stats"]` mapping
-to place the values by position. That matches only when every frame takes part: a
-selector that drops frames makes `add_factors` raise `ShapeMismatchError`, so use
-the default `SequenceFrames(dataset)`.
+The translation works under any selector. `SequenceFrames(dataset, Stride(5))`
+measures every fifth frame, and the frames it skipped hold null. The roll-ups
+below answer null for a video with any frame unmeasured, though, so keep every
+frame for them.
 
 Then roll the column up to each video:
 

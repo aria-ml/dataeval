@@ -34,6 +34,7 @@ from dataeval.core import (
 )
 from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
 from dataeval.data import AllFrames, FrameRate, FrameSelector, SequenceFrames, Stride
+from dataeval.data._frames import frame_numbers_at
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     ArrayLike,
@@ -145,8 +146,8 @@ class SegmentMatch(NamedTuple):
     method : str
         The hash the frames were matched by.
     query_frames, candidate_frames : NDArray[np.intp]
-        Each measured frame's position in its source video, so a segment's bounds can be reported
-        in the coordinates a reader can find the frames again by.
+        Each measured frame's number in its source video (its ``frame_index``), so a segment's
+        bounds can be reported in the coordinates a reader can find the frames again by.
     keys : tuple[int, int]
         Which two runs this is a match between. Carried because ``query`` and ``candidate`` name a
         *frame*, which identifies a sequence but not a track -- two tracks share a frame whenever
@@ -180,7 +181,8 @@ class AlignmentMatch(NamedTuple):
         A representative frame of each sequence, as a combined item index. The query is the
         shorter of the two, since it is aligned in its entirety.
     query_span, candidate_span : tuple[int, int]
-        First and last frame of each side's aligned stretch, in source-video positions.
+        First and last frame of each side's aligned stretch, as frame numbers in the source video
+        (``frame_index``).
     containment : tuple[float, float]
         How much of the query the candidate accounts for, and the reverse. The query is aligned
         whole, so its own figure is 1.0 by construction and the candidate's is the informative one.
@@ -286,7 +288,7 @@ _IMAGE_LEVELS = {"item": "item", "target": "target"}
 _TRACKING_LEVELS = {"item": "unit", "target": "instance", "sequence": "sequence", "track": "track"}
 
 # The result levels `deduplicate` turns into addresses: whole items (an image, or a video's sequence) and an
-# image's targets. A video's frame, track and detection rows name their members by position within a sequence
+# image's targets. A video's frame, track and detection rows name their members by frame number within a sequence
 # and a frame, not by the keys an address uses, so they are not planned yet.
 _PLANNED_LEVELS = frozenset({"item", "sequence", "target"})
 
@@ -651,7 +653,7 @@ def _make_row(
     unit_ids: list[int] | None = None
     if frame_map is not None:
         # A frame view's item index is a position in the flattened walk. Split it back into the
-        # sequence it came from and its position inside that sequence, which is what a reader
+        # sequence it came from and the frame's own number in that sequence, which is what a reader
         # needs to find the frame again in the source video.
         #
         # Looked up by the *combined* index rather than the per-dataset one `item_ids` already
@@ -886,7 +888,7 @@ def _build_duplicates_dataframe(  # noqa: C901
     Each row represents one duplicate group with columns defined by ``_EMPTY_DUPS_SCHEMA``.
 
     ``frame_map`` marks the results as coming from a frame view of a tracking dataset: it splits
-    each flattened frame position back into ``(sequence, frame)`` and renames the levels to the
+    each flattened frame position back into ``(sequence, frame_index)`` and renames the levels to the
     ones :class:`~dataeval.Metadata` gives a tracking dataset.
 
     ``annotation_digests`` is what the two axes are compared through. It fills ``differs_on`` on
@@ -1861,8 +1863,8 @@ def _shared_stretches(runs: _HashedRuns, frame_map: NDArray[np.intp], policy: _S
                 containment=sequence_containment(crossed, len(left), len(right)),
                 method=runs.method,
                 # The matcher works in positions among the rows actually measured, which frame
-                # sampling divorces from the frames of the source video. Carried back to source
-                # positions here so a span reads in the same coordinates as `unit_indices`.
+                # sampling divorces from the frames of the source video. Carried back to frame
+                # numbers here so a span reads in the same coordinates as `unit_indices`.
                 query_frames=frame_map[runs.items[left], 1],
                 candidate_frames=frame_map[runs.items[right], 1],
                 keys=(first, second),
@@ -2079,7 +2081,9 @@ class _FrameView(NamedTuple):
         The dataset to measure -- a :class:`~dataeval.data.SequenceFrames` for tracking input,
         and the original object untouched for anything else.
     frame_map : NDArray[np.intp] or None
-        Shape ``(F, 2)``, the ``(sequence, frame)`` behind each measured frame. None for images.
+        Shape ``(F, 2)``, the ``(sequence, position)`` behind each measured frame. None for
+        images. Positional from :func:`_as_frames`; :func:`_numbered` swaps the second column for
+        the frame's ``frame_index`` before any result is built.
     track_map : NDArray[np.intp] or None
         Shape ``(D, 2)``, the ``(frame, track id)`` behind each measured detection. None for
         images, and unused unless detections were measured.
@@ -2356,7 +2360,10 @@ def _as_frames(
     """Present a tracking dataset as its frames, leaving anything else alone.
 
     Returns the dataset to measure and, for a tracking dataset, the maps from each flattened frame
-    position back to ``(sequence, frame)`` and from each detection to the track holding it. Image
+    position back to ``(sequence, position)`` and from each detection to the track holding it. The
+    position is the frame's place in its sequence, which costs no decode to know. A result names a
+    frame by its ``frame_index`` instead, which only a walk of the stream can tell; :func:`_numbered`
+    renames the map once measurement has made that walk. Image
     datasets are returned untouched with no maps, which is what keeps every existing call path
     byte-identical.
     """
@@ -2385,13 +2392,42 @@ def _as_frames(
         _logger.info(
             "%s: measuring %d of %d frame(s); %r dropped the rest. Every unweighted statistic "
             "downstream therefore describes the frames kept rather than the source stream -- "
-            "each row's 'frames_represented' records what it stands for.",
+            "the frame view's datum metadata records what each kept frame stands for as "
+            "'frames_represented'.",
             caller,
             len(frames),
             frames.n_source_frames,
             frames.selector,
         )
     return _FrameView(frames, frame_map, frames.track_map)
+
+
+def _numbered(frame_map: NDArray[np.intp] | None, views: Sequence[Any]) -> NDArray[np.intp] | None:
+    """Rename a frame map's second column from stream positions to frame numbers.
+
+    Results name a frame by its own ``frame_index``, the ``unit_index`` the source dataset's
+    :class:`~dataeval.Metadata` keys its frame rows by. A frame's position in its sequence and its
+    number agree only for a video numbered from zero without gaps, and only a walk of the stream
+    tells them apart. Call this once measurement is done: hashing and embedding both walk every
+    sequence, so each view already holds its record and this decodes nothing. Every run that
+    reaches a result measures, so there is no run left to pay for a walk of its own.
+
+    Parameters
+    ----------
+    frame_map : NDArray[np.intp] or None
+        The ``(sequence, position)`` map, its rows laid end to end across ``views``.
+    views : Sequence[Any]
+        The frame views the map was built from, in order. Unused when ``frame_map`` is None.
+    """
+    if frame_map is None:
+        return None
+    numbered = frame_map.copy()
+    start = 0
+    for view in views:
+        rows = slice(start, start + len(view))
+        numbered[rows, 1] = frame_numbers_at(view, frame_map[rows, 0], frame_map[rows, 1])
+        start += len(view)
+    return numbered
 
 
 def _as_frames_multi(
@@ -3293,7 +3329,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             DataFrame with columns:
 
             - item_index: int - The image index, or the sequence index for a video dataset
-            - unit_index: int - Video datasets only: the frame's position in its sequence
+            - unit_index: int - Video datasets only: the frame's ``frame_index`` in its sequence
             - group_count: int - Number of duplicate groups this image appears in
             - dup_types: list[str] - Unique duplicate types for this image
             - methods: list[str] - All unique methods that detected this image
@@ -3307,7 +3343,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         if "dataset_indices" in self.data().columns:
             raise ValueError("aggregate_by_image only works with output from a single dataset.")
 
-        # A frame is addressed by its sequence *and* its position within it, so both columns key
+        # A frame is addressed by its sequence *and* its frame number within it, so both columns key
         # the grouping when they are there.
         has_units = "unit_indices" in self.data().columns
         keys = ["item_index", "unit_index"] if has_units else ["item_index"]
@@ -4819,6 +4855,8 @@ class Duplicates(Evaluator):
                 normalize_pixel_values=False,
             )[0]
             source_index = self.stats["source_index"]
+            # Measuring has walked every sequence, so naming the frames costs no further decode.
+            frame_map = _numbered(frame_map, [measured])
             found = _find_relations(
                 self.stats["stats"],
                 source_index,
@@ -4846,6 +4884,9 @@ class Duplicates(Evaluator):
             )
             found = found._replace(item_near=found.item_near + [(group, "cluster") for group in cluster_dupes])
 
+        if not self.flags & ImageStats.HASH:
+            # A cluster-only run has walked every sequence through its embeddings.
+            frame_map = _numbered(frame_map, [measured])
         available_stats = set(self.stats["stats"].keys()) if self.flags & ImageStats.HASH else set()
         df, divergences = _relations_frame(
             found,
@@ -4909,12 +4950,38 @@ class Duplicates(Evaluator):
         hash_stats, source_index, available_stats, dataset_steps = (
             _prepare_hash_inputs(calc_results) if calc_results else ({}, [], set(), None)
         )
+
+        # Cluster-based: combine all images, extract, cluster together
+        stored_cluster_result: ClusterResult | None = None
+        cluster_near: MethodGroups = []
+        if has_cluster_detection:
+            all_images = [img for ds in measured for img in iter_images(ds)]
+            embeddings = self.extractor(all_images)  # type: ignore[union-attr]
+            embeddings_array = flatten_samples(to_numpy(embeddings))
+
+            stored_cluster_result = cluster(
+                embeddings_array,
+                algorithm=self.cluster_algorithm,
+                n_clusters=self.n_clusters,
+            )
+
+            factor = self.cluster_sensitivity if self.cluster_sensitivity is not None else 1.0
+            cluster_dupes = _find_cluster_duplicates(
+                mst=stored_cluster_result["mst"],
+                clusters=stored_cluster_result["clusters"],
+                cluster_sensitivity=factor,
+            )
+            cluster_near = [(group, "cluster") for group in cluster_dupes]
+
+        # Hashing and embedding have each walked every sequence of every dataset, so naming the
+        # frames costs no further decode. Done before the map is re-laid, while its rows still run
+        # dataset by dataset.
+        frame_map = _numbered(frame_map, measured)
         # Item indices are combined across the datasets; the frame map has to be addressable the
         # same way before anything reads a frame's sequence out of it.
         frame_map = _aligned_frame_map(source_index, frame_map)
         track_map = _aligned_track_map(source_index, track_map)
 
-        stored_cluster_result: ClusterResult | None = None
         found = _Relations.empty()
         # Ungated, for the reason `_evaluate_single` gives.
         annotation_sources: Mapping[int, _AnnotationSource] = (
@@ -4940,25 +5007,7 @@ class Duplicates(Evaluator):
                 annotation_digests=annotation_digests,
             )
 
-        # Cluster-based: combine all images, extract, cluster together
-        if has_cluster_detection:
-            all_images = [img for ds in measured for img in iter_images(ds)]
-            embeddings = self.extractor(all_images)  # type: ignore[union-attr]
-            embeddings_array = flatten_samples(to_numpy(embeddings))
-
-            stored_cluster_result = cluster(
-                embeddings_array,
-                algorithm=self.cluster_algorithm,
-                n_clusters=self.n_clusters,
-            )
-
-            factor = self.cluster_sensitivity if self.cluster_sensitivity is not None else 1.0
-            cluster_dupes = _find_cluster_duplicates(
-                mst=stored_cluster_result["mst"],
-                clusters=stored_cluster_result["clusters"],
-                cluster_sensitivity=factor,
-            )
-            found = found._replace(item_near=found.item_near + [(group, "cluster") for group in cluster_dupes])
+        found = found._replace(item_near=found.item_near + cluster_near)
 
         df, divergences = _relations_frame(
             found,

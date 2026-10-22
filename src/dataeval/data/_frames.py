@@ -2,7 +2,9 @@
 
 __all__ = []
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, cast
 
 import numpy as np
@@ -30,7 +32,8 @@ from dataeval.protocols import (
     ObjectDetectionTarget,
     SingleFrameObjectTrackingTarget,
 )
-from dataeval.types import FactorLevel
+from dataeval.types import FactorLevel, SourceIndex
+from dataeval.types._track import frame_number
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data import requires_maite_dataset
 from dataeval.utils.preprocessing import BoundingBox, normalize_image_shape
@@ -61,6 +64,44 @@ _Selected = tuple[int, Any, SingleFrameObjectTrackingTarget, float | None, int |
 """One kept frame: position, raw frame, target, timings, factors, and any declared weight."""
 
 
+def _same_selection(first: Sequence[dict[str, Any]], second: Sequence[dict[str, Any]]) -> bool:
+    """Whether two walks kept the same positions with the same metadata (NaN equals NaN)."""
+
+    def same(a: Any, b: Any) -> bool:
+        return bool(a == b or (a != a and b != b))
+
+    return len(first) == len(second) and all(
+        a["position"] == b["position"]
+        and a["metadata"].keys() == b["metadata"].keys()
+        and all(same(a["metadata"][key], b["metadata"][key]) for key in a["metadata"])
+        for a, b in zip(first, second, strict=True)
+    )
+
+
+@dataclass(frozen=True, eq=False)
+class _SequenceRecord:
+    """What the first complete walk of one sequence decided, so every later walk replays it.
+
+    Attributes
+    ----------
+    entries : tuple[dict[str, Any], ...]
+        One record per kept frame, in order: its sequence, position and metadata. No pixels and no
+        target.
+    frame_numbers : NDArray[np.intp]
+        The number of the frame at every position of the sequence, kept or not, which a later walk
+        checks its own frames against.
+    """
+
+    entries: tuple[dict[str, Any], ...]
+    frame_numbers: NDArray[np.intp]
+
+    @cached_property
+    def repeated(self) -> frozenset[int]:
+        """Frame numbers held at more than one position, which no ``unit`` address names alone."""
+        numbers, counts = np.unique(self.frame_numbers, return_counts=True)
+        return frozenset(numbers[counts > 1].tolist())
+
+
 class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     """Present a multi-object-tracking dataset as an object-detection dataset of frames.
 
@@ -89,8 +130,8 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     n_source_frames : int
         Total frames across every sequence, read from the targets and so known without decoding.
     n_dropped : int
-        Frames the selector did not keep. Only known once the view has been walked; ``0`` until
-        then for a selector that cannot plan.
+        Frames the selector did not keep. Only known once every sequence has been walked; ``0``
+        until then for a selector that cannot plan.
 
     Raises
     ------
@@ -98,8 +139,9 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         If ``dataset`` is not a multi-object-tracking dataset.
     ValueError
         If a selector names a reserved factor, if a sequence's stream disagrees with its target on
-        frame count, or if a selector yields a verdict out of order without declaring
-        ``two_pass``.
+        frame count, comes back already spent on a later walk, or numbers its frames differently
+        from the walk that recorded it, or if a selector yields a verdict out of order without
+        declaring ``two_pass``.
 
     See Also
     --------
@@ -114,6 +156,20 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     ``__getitem__`` exists so this genuinely satisfies :obj:`~dataeval.protocols.Dataset` -- it
     keeps a one-sequence cursor, making forward access amortized constant and backward access
     proportional to the frames before it.
+
+    **The selection is fixed by the first walk.** The first complete walk of a sequence -- by
+    :meth:`stream`, iteration, ``len()`` or ``__getitem__`` -- records which frames were kept and
+    their metadata, and every later walk replays that record without consulting the selector
+    again. Every consumer of one view therefore sees the same frames, even under a stateful
+    selector, and a ``two_pass`` selector pays its second pass once. A replay checks each frame's
+    number against the record and raises if the source changed in between. A walk abandoned
+    partway records nothing for the sequence it left. Across separate views, reproducibility is
+    the selector's own (a seed, say).
+
+    Replaying needs each ``dataset[i]`` to return a stream that can be walked from its first
+    frame, independently of any earlier stream for the same index. A walk that finds the
+    stream already spent, by an earlier walk of this view or by another reader such as
+    :class:`~dataeval.Metadata`, raises an error naming that contract.
 
     Each frame's metadata is a plain ``dict`` conforming to
     :obj:`~dataeval.protocols.DatumMetadata`, carrying:
@@ -180,7 +236,11 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 for positions, info in zip(planned, self._sequences, strict=True)
             ]
         )
+        # The execution record: each sequence's selection, fixed by its first complete walk.
+        self._records: dict[int, _SequenceRecord] = {}
         self._realized: list[dict[str, Any]] | None = None
+        # Per sequence, how many detections precede each frame position, read from the targets.
+        self._detection_offsets: dict[int, NDArray[np.intp]] = {}
         self.n_dropped: int = 0
         if self._planned is not None:
             self.n_dropped = self.n_source_frames - sum(len(positions) for positions in self._planned)
@@ -237,8 +297,8 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     def __len__(self) -> int:
         """Return how many frames the view presents.
 
-        Free for a selector that plans; otherwise this walks every sequence once to find out, and
-        says so in the log. :meth:`stream` never triggers that walk.
+        Free for a selector that plans; otherwise this walks every sequence not yet recorded, and
+        says so in the log. After a full :meth:`stream` it walks nothing.
         """
         if self._planned is not None:
             return sum(len(positions) for positions in self._planned)
@@ -246,7 +306,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
     def __getitem__(self, index: int) -> ObjectDetectionDatum:
         """Return one frame as an object-detection datum."""
-        entries = self._entries()
+        entries = self._realize()
         index = checked_index(index, len(entries), "SequenceFrames", "frame(s)")
         entry = entries[index]
         frame, target = self._seek(entry["sequence"], entry["position"])
@@ -264,7 +324,8 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     def __str__(self) -> str:
         title = "SequenceFrames Dataset"
         sep = "-" * len(title)
-        length = len(self) if self._planned is not None or self._realized is not None else "unrealized"
+        recorded = len(self._records) == len(self._sequences)
+        length = len(self) if self._planned is not None or recorded else "unrealized"
         return (
             f"{title}\n{sep}\n    sequences: {len(self._sequences)}\n"
             f"    source frames: {self.n_source_frames}\n    selected: {length}\n"
@@ -290,9 +351,9 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         """
         position = 0
         for info in self._sequences:
-            for entry, frame in self._walk(info, emit=True):
+            for entry, frame, target in self._walk(info):
                 pixels = normalize_image_shape(as_numpy(frame.pixels))
-                yield pixels, entry["target"], cast(DatumMetadata, {**entry["metadata"], "id": position})
+                yield pixels, target, cast(DatumMetadata, {**entry["metadata"], "id": position})
                 position += 1
 
     @staticmethod
@@ -369,6 +430,136 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
             counts[sequence] += 1
         return np.concatenate(([0], np.cumsum(counts))).astype(np.intp)
 
+    @property
+    def source_indices(self) -> tuple[SourceIndex, ...]:
+        """The source address of each frame this view presents.
+
+        Returns
+        -------
+        tuple of SourceIndex
+            One ``SourceIndex(sequence, frame_index, "unit")`` per view position, in view order,
+            in the coordinates of :attr:`source`: the frame's own ``frame_index`` is the
+            ``unit_index`` that ``Metadata(frames.source)`` names its frame rows by.
+
+        See Also
+        --------
+        to_source : Translate any frame-view address, a detection's included.
+        frame_map : The same frames as ``(sequence index, frame position)`` pairs.
+
+        Notes
+        -----
+        The frame view's analog of :attr:`~dataeval.data.DetectionCrops.source_indices`. Read
+        from the execution record, so it walks only the sequences no walk has recorded yet. Unlike
+        :meth:`to_source` it does not refuse a frame number its sequence repeats;
+        :class:`~dataeval.Metadata` refuses such an address when it is attached.
+
+        Examples
+        --------
+        Attach what a selector recorded about each frame to the source dataset's frame rows:
+
+        >>> frames = SequenceFrames(mot_dataset, Stride(5))  # doctest: +SKIP
+        >>> represented = [meta["frames_represented"] for _, _, meta in frames.stream()]  # doctest: +SKIP
+        >>> md = Metadata(frames.source)  # doctest: +SKIP
+        >>> md.add_factors({"frames_represented": represented}, source_index=frames.source_indices)  # doctest: +SKIP
+        """
+        return tuple(SourceIndex(entry["sequence"], entry["metadata"]["frame"], "unit") for entry in self._realize())
+
+    def to_source(self, addresses: Iterable[SourceIndex]) -> list[SourceIndex]:  # noqa: C901
+        """Translate frame-view addresses to the source addresses of the same frames and detections.
+
+        :func:`~dataeval.core.image_stats`, :class:`~dataeval.quality.Outliers` and every other
+        tool run over this view address their results in its coordinates. This is the explicit
+        step back to the coordinates of :attr:`source`, whose :class:`~dataeval.Metadata` the
+        results belong on.
+
+        Parameters
+        ----------
+        addresses : Iterable[SourceIndex]
+            Frame-view addresses: ``SourceIndex(i)`` for the frame at view position ``i``, and
+            ``SourceIndex(i, k)`` for that frame's ``k``-th detection.
+
+        Returns
+        -------
+        list[SourceIndex]
+            One address per input, in order, in the coordinates of :attr:`source`:
+
+            - ``SourceIndex(i)`` becomes ``SourceIndex(sequence, frame_index, "unit")``.
+            - ``SourceIndex(i, k)`` becomes ``SourceIndex(sequence, target_index, "instance")``,
+              where ``target_index`` counts detections across the whole sequence, as
+              :class:`~dataeval.Metadata` does.
+
+        Raises
+        ------
+        ValueError
+            If an address already names a level, if ``k`` is beyond the frame's detections, or if
+            the frame's ``frame_index`` appears at another position of its sequence, which leaves
+            its ``unit`` address naming more than one row.
+        IndexError
+            If ``i`` is out of range for this view.
+
+        See Also
+        --------
+        source_indices : Every frame's source address at once.
+
+        Notes
+        -----
+        Answered from the execution record and the targets, so nothing is decoded for a sequence
+        some walk has recorded, and a sequence none has is walked once, with a log line. Under a
+        selector that plans, only the sequences the addresses name are walked. Under one that
+        cannot, every sequence is, because where a view position falls depends on how many frames
+        each earlier sequence kept and its range on how many all of them did.
+
+        Examples
+        --------
+        Attach per-frame statistics to the source dataset's frame and detection rows:
+
+        >>> frames = SequenceFrames(mot_dataset, Stride(5))  # doctest: +SKIP
+        >>> stats = image_stats(frames, stats=ImageStats.VISUAL_BRIGHTNESS)  # doctest: +SKIP
+        >>> md = Metadata(frames.source)  # doctest: +SKIP
+        >>> md.add_factors(stats, source_index=frames.to_source(stats["source_index"]))  # doctest: +SKIP
+        """
+        addresses = list(addresses)
+        if not addresses:
+            return []
+        starts = self.sequence_offsets
+        translated: list[SourceIndex] = []
+        for address in addresses:
+            if address.level is not None:
+                raise ValueError(
+                    f"SequenceFrames: {address!r} already names a level, so it is not a frame-view "
+                    "address. to_source translates SourceIndex(i), the frame at view position i, and "
+                    "SourceIndex(i, k), that frame's k-th detection."
+                )
+            if address.item < 0:
+                raise IndexError(
+                    f"SequenceFrames: {address!r} is negative. An address is never negative; "
+                    "to_source takes the view positions a statistic was measured at."
+                )
+            index = checked_index(address.item, int(starts[-1]), "SequenceFrames", "frame(s)")
+            sequence = int(np.searchsorted(starts, index, side="right")) - 1
+            record = self._record_of(sequence)
+            entry = record.entries[index - starts[sequence]]
+            number = entry["metadata"]["frame"]
+            if address.key is None:
+                if number in record.repeated:
+                    raise ValueError(
+                        f"SequenceFrames: {address!r} is ambiguous: sequence {sequence} holds frame "
+                        f"{number} at more than one position, so SourceIndex({sequence}, {number}, "
+                        "'unit') names more than one row."
+                    )
+                translated.append(SourceIndex(sequence, number, "unit"))
+                continue
+            offsets = self._offsets_of(sequence)
+            first, after = int(offsets[entry["position"]]), int(offsets[entry["position"] + 1])
+            if not 0 <= address.key < after - first:
+                raise ValueError(
+                    f"SequenceFrames: {address!r} names detection {address.key} of view frame "
+                    f"{index}, but that frame (frame {number} of sequence {sequence}) has "
+                    f"{after - first} detection(s)."
+                )
+            translated.append(SourceIndex(sequence, first + address.key, "instance"))
+        return translated
+
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
@@ -383,64 +574,106 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         """Return the ``(sequence, position)`` behind each view position, in view order.
 
         Answered from the plan where there is one, so asking a planned view where its frames came
-        from costs no decode. Only a selector that decides from the frames forces the walk.
+        from costs no decode; a planned sequence's record holds the same positions. Otherwise
+        from the records, so only a sequence no walk has finished yet is walked.
         """
-        if self._realized is None and self._planned is not None:
+        if self._planned is not None:
             return [
                 (info.index, int(position))
                 for info, positions in zip(self._sequences, self._planned, strict=True)
                 for position in positions
             ]
-        return [(entry["sequence"], entry["position"]) for entry in self._entries()]
-
-    def _entries(self) -> list[dict[str, Any]]:
-        """Return the realized per-frame record, computing it once if it is not already known."""
-        if self._realized is None:
-            self._realize()
-        return cast(list[dict[str, Any]], self._realized)
+        return [(entry["sequence"], entry["position"]) for entry in self._realize()]
 
     def _realize(self) -> list[dict[str, Any]]:
-        """Walk every sequence once, recording positions, weights and factors but no pixels."""
-        if self._realized is not None:
-            return self._realized
-        if self._planned is None:
+        """Return every kept frame's record in view order, recording any sequence that has none."""
+        if self._realized is None:
+            self._realized = [entry for record in self._recorded() for entry in record.entries]
+        return self._realized
+
+    def _recorded(self) -> list[_SequenceRecord]:
+        """Return every sequence's execution record, in order, walking those not yet recorded."""
+        return [self._record_of(info.index) for info in self._sequences]
+
+    def _record_of(self, sequence: int) -> _SequenceRecord:
+        """Return one sequence's execution record, walking that sequence first if it has none."""
+        if sequence not in self._records:
             _logger.info(
-                "SequenceFrames: %r cannot plan its selection, so sizing it decodes every "
-                "sequence once. Use stream() to avoid this where the frames are only being "
-                "read in order.",
+                "SequenceFrames: walking sequence %d to record which frames %r keeps. Use "
+                "stream() to avoid this where the frames are only being read in order.",
+                sequence,
                 self._selector,
             )
-        entries: list[dict[str, Any]] = []
-        for info in self._sequences:
-            entries.extend(entry for entry, _ in self._walk(info, emit=False))
-        self._realized = entries
-        self.n_dropped = self.n_source_frames - len(entries)
-        return entries
+            for _ in self._walk(self._sequences[sequence]):
+                pass
+        return self._records[sequence]
 
-    def _frames_of(self, info: SequenceInfo) -> Iterator[tuple[int, Any, SingleFrameObjectTrackingTarget]]:
+    def _offsets_of(self, sequence: int) -> NDArray[np.intp]:
+        """Return how many detections precede each position of one sequence, then the total.
+
+        Counted from each frame target's ``labels``, which establish the detection count for every
+        reader, so nothing is decoded. These are the running ``target_index`` values the tracking
+        structurer behind :class:`~dataeval.Metadata` assigns within a sequence.
+        """
+        if sequence not in self._detection_offsets:
+            counts = [as_numpy(target.labels).size for target in self._dataset[sequence][1].frame_tracks]
+            self._detection_offsets[sequence] = np.concatenate(([0], np.cumsum(counts, dtype=np.intp)))
+        return self._detection_offsets[sequence]
+
+    def _frames_of(self, info: SequenceInfo) -> Iterator[tuple[int, Any, SingleFrameObjectTrackingTarget]]:  # noqa: C901
         """Pair each decoded frame of one sequence with its target, in order.
 
         A frame count that disagrees with the target count is a dataset defect and is raised
         rather than absorbed: pairing up to the shorter of the two would either drop real
         detections or annotate frames with another frame's boxes, and would signal neither.
+
+        A walk of a recorded sequence checks every frame's number against the record, so a source
+        that changed under the view raises rather than presenting other frames under the recorded
+        metadata.
         """
         stream, target, _ = self._dataset[info.index]
         targets = target.frame_tracks
         frames = iter(stream)
+        record = self._records.get(info.index)
+        if record is not None and len(targets) != len(record.frame_numbers):
+            raise ValueError(
+                f"SequenceFrames: sequence {info.index} changed between walks: its target now "
+                f"declares {len(targets)} frame(s) where the walk that recorded it found "
+                f"{len(record.frame_numbers)}. Build a new SequenceFrames over the changed source."
+            )
         exhausted = object()
         for position in range(len(targets)):
             frame = next(frames, exhausted)
             if frame is exhausted:
+                if position == 0:
+                    raise ValueError(
+                        f"SequenceFrames: sequence {info.index}'s video stream yielded no frames, "
+                        f"though its target declares {len(targets)}: the stream was already consumed "
+                        "by an earlier walk, this view's or another reader's such as Metadata. "
+                        "dataset[i] must return a stream walkable from its first frame, "
+                        "independently of any earlier stream for the same index."
+                    )
                 raise ValueError(
                     f"SequenceFrames: sequence {info.index} declares {len(targets)} frame "
                     f"target(s) but its video stream yielded only {position}."
                 )
+            if record is not None and (number := frame_number(frame, position)) != record.frame_numbers[position]:
+                raise self._renumbered(info, position, number, int(record.frame_numbers[position]))
             yield position, frame, targets[position]
         if next(frames, exhausted) is not exhausted:
             raise ValueError(
                 f"SequenceFrames: sequence {info.index}'s video stream yields more frames than "
                 f"its {len(targets)} frame target(s)."
             )
+
+    @staticmethod
+    def _renumbered(info: SequenceInfo, position: int, number: int, earlier: int) -> ValueError:
+        """Build the error for a source that numbers one position differently on two walks."""
+        return ValueError(
+            f"SequenceFrames: sequence {info.index} changed between walks: position {position} now "
+            f"holds frame {number} where an earlier walk found frame {earlier}. Build a new "
+            "SequenceFrames over the changed source."
+        )
 
     def _candidates(
         self,
@@ -455,7 +688,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
             yield FrameCandidate(
                 sequence=info,
                 position=position,
-                frame_index=int(getattr(frame, "frame_index", position)),
+                frame_index=frame_number(frame, position),
                 time_s=getattr(frame, "time_s", None),
                 pts=getattr(frame, "pts", None),
                 target=target,
@@ -468,14 +701,21 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         info: SequenceInfo,
         trailer: dict[str, Any],
     ) -> Iterator[tuple[int, Any, SingleFrameObjectTrackingTarget]]:
-        """Walk a sequence's frames, remembering the last timestamp seen.
+        """Walk a sequence's frames, remembering the last timestamp seen and every frame's number.
 
         The final kept frame's span runs to the end of the sequence, not to a successor it does
         not have, so the walk has to carry that endpoint forward. Without it
         ``seconds_represented`` is null on one row per sequence — and a partially populated
         factor is dropped from factor analysis entirely, which loses it everywhere.
+
+        The numbers are keyed by position, so the second walk of a two-pass selector checks them
+        rather than repeating them: its first pass's verdicts must not be applied to other frames.
         """
+        numbers = trailer.setdefault("numbers", {})
         for position, frame, target in self._frames_of(info):
+            number = frame_number(frame, position)
+            if numbers.setdefault(position, number) != number:
+                raise self._renumbered(info, position, number, numbers[position])
             time_s = getattr(frame, "time_s", None)
             if time_s is not None:
                 trailer["time_s"] = float(time_s)
@@ -519,7 +759,8 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     def _single_pass(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:
         """Drive the selector, holding exactly one frame and refusing a verdict for a released one."""
         held: list[Any] = []
-        for verdict in self._selector.select(self._candidates(info, held, trailer)):
+        candidates = self._candidates(info, held, trailer)
+        for verdict in self._selector.select(candidates):
             if not held or verdict.position != held[0][0]:
                 reached = held[0][0] if held else "no frame"
                 raise ValueError(
@@ -530,6 +771,9 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 )
             position, frame, target = held[0]
             yield self._selected(position, frame, target, self._checked_factors(verdict), verdict.weight)
+        # A selector may stop reading before the sequence ends; the record numbers every frame.
+        for _ in candidates:
+            pass
 
     def _two_pass(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:
         """Drive the selector over a whole sequence, then walk it again to emit what it chose."""
@@ -553,23 +797,67 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
             )
         return verdict.factors
 
-    def _walk(self, info: SequenceInfo, emit: bool) -> Iterator[tuple[dict[str, Any], Any]]:
-        """Yield each kept frame of one sequence with its metadata, one frame behind.
+    def _walk(self, info: SequenceInfo) -> Iterator[tuple[dict[str, Any], Any, SingleFrameObjectTrackingTarget]]:  # noqa: C901
+        """Yield each kept frame of one sequence with its record and target, one frame behind.
 
         The lag is what makes the weights answerable: a frame's ``frames_represented`` is the gap
         to the *next* kept frame, so it cannot be written until that frame is known. Exactly one
         kept frame is held back, which is the same discipline the single-pass contract already
         requires.
+
+        The first complete walk records the selection, and every later one replays it. The record
+        is stored before the last kept frame is yielded, so a consumer that stops right after that
+        frame still leaves the sequence recorded; a walk abandoned earlier records nothing.
         """
+        record = self._records.get(info.index)
+        if record is not None:
+            yield from self._replayed(info, record)
+            return
         previous: _Selected | None = None
         span = float(max(info.n_frames - 1, 1))
         trailer: dict[str, Any] = {}
+        entries: list[dict[str, Any]] = []
         for current in self._verdicts(info, trailer):
             if previous is not None:
-                yield self._record(info, previous, current, span, emit, trailer), previous[1]
+                entries.append(self._record(info, previous, current, span, trailer))
+                yield entries[-1], previous[1], previous[2]
             previous = current
         if previous is not None:
-            yield self._record(info, previous, None, span, emit, trailer), previous[1]
+            entries.append(self._record(info, previous, None, span, trailer))
+        numbers = np.fromiter(trailer.get("numbers", {}).values(), dtype=np.intp)
+        # Another walk of this sequence may have finished while this one was paused; the first to
+        # finish fixed the selection, so this one has to agree with it.
+        recorded = self._records.setdefault(info.index, _SequenceRecord(tuple(entries), numbers))
+        if not _same_selection(recorded.entries, entries):
+            raise ValueError(
+                f"SequenceFrames: {self._selector!r} chose different frames on two walks of sequence "
+                f"{info.index}, or the same frames with different weights or factors. The first "
+                "walk to finish fixed this view's selection, and a walk started before it "
+                "finished disagrees. Finish one walk of a sequence, such as a "
+                "stream(), before starting another, such as len() or frame_map, or use a selector "
+                "that gives the same answer each time it is asked."
+            )
+        if len(self._records) == len(self._sequences):
+            self.n_dropped = self.n_source_frames - sum(len(kept.entries) for kept in self._records.values())
+        if previous is not None:
+            yield entries[-1], previous[1], previous[2]
+
+    def _replayed(
+        self, info: SequenceInfo, record: _SequenceRecord
+    ) -> Iterator[tuple[dict[str, Any], Any, SingleFrameObjectTrackingTarget]]:
+        """Walk a recorded sequence again, yielding the frames its record kept, with their entries as stored.
+
+        The selector is not consulted, so a stateful one cannot change its answer, and a
+        ``two_pass`` one is not paid for twice. :meth:`_frames_of` checks every frame's number
+        against the record on the way.
+        """
+        kept = iter(record.entries)
+        entry = next(kept, None)
+        for position, frame, target in self._frames_of(info):
+            # `while`, not `if`: a single-pass selector may keep one position more than once.
+            while entry is not None and entry["position"] == position:
+                yield entry, frame, target
+                entry = next(kept, None)
 
     def _record(
         self,
@@ -577,16 +865,15 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         selected: _Selected,
         following: _Selected | None,
         span: float,
-        emit: bool,
         trailer: dict[str, Any],
     ) -> dict[str, Any]:
         """Build one kept frame's record, with the weight its successor determines."""
-        position, frame, target, time_s, pts, factors, weight = selected
+        position, frame, _, time_s, pts, factors, weight = selected
         next_position = following[0] if following is not None else info.n_frames
         metadata: dict[str, Any] = {
             "source_id": info.source_id,
             "sequence": info.index,
-            "frame": int(getattr(frame, "frame_index", position)),
+            "frame": frame_number(frame, position),
             # The gap to the next kept frame, unless the selector declared what this frame stands
             # for -- which it does when its representatives are not contiguous.
             "frames_represented": float(next_position - position) if weight is None else float(weight),
@@ -603,10 +890,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         if pts is not None:
             metadata["pts"] = int(pts)
         metadata.update(factors)
-        record = {"sequence": info.index, "position": position, "metadata": metadata}
-        if emit:
-            record["target"] = target
-        return record
+        return {"sequence": info.index, "position": position, "metadata": metadata}
 
     def _seek(self, sequence: int, position: int) -> tuple[Any, SingleFrameObjectTrackingTarget]:
         """Decode up to one frame of one sequence, reusing the cursor when moving forward.
@@ -646,3 +930,20 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         self._cursor_position = -1
         self._cursor_frame = None
         self._cursor_target = None
+
+
+def frame_numbers_at(
+    frames: SequenceFrames,
+    sequences: NDArray[np.intp],
+    positions: NDArray[np.intp],
+) -> NDArray[np.intp]:
+    """Return the ``frame_index`` of the frame at each ``(sequence, position)``.
+
+    Read from each sequence's execution record, so only the sequences named here that no walk has
+    recorded yet are walked, and none at all once the view has been measured.
+    """
+    numbers = np.empty(len(positions), dtype=np.intp)
+    for sequence in np.unique(sequences):
+        where = sequences == sequence
+        numbers[where] = frames._record_of(int(sequence)).frame_numbers[positions[where]]  # pyright: ignore[reportPrivateUsage]
+    return numbers

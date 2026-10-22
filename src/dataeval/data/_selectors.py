@@ -200,7 +200,10 @@ class FrameSelector(ReprMixin, ABC):
         Whether verdicts can only be produced after the whole sequence has been seen. A selector
         that buffers -- clustering a sequence's descriptors before choosing medoids, say -- sets
         this, and :class:`~dataeval.data.SequenceFrames` then walks each sequence twice: once to
-        drive :meth:`select` to exhaustion, once to emit. A buffering selector must buffer
+        drive :meth:`select` to exhaustion, once to emit. The second walk fetches ``dataset[i]``
+        again, so it relies on the replay contract stated on
+        :obj:`~dataeval.protocols.MultiobjectTrackingDataset`. Both walks happen once per view;
+        later walks replay the recorded selection. A buffering selector must buffer
         *descriptors and positions, never pixels*: one sequence of 1080p frames is tens of
         gigabytes.
     invalidates : ImageStats
