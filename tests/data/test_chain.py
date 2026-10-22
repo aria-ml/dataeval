@@ -16,6 +16,7 @@ from dataeval.data import (
     FrameCandidate,
     FrameIndices,
     FrameInput,
+    FrameRate,
     FrameSelector,
     FrameVerdict,
     Redundancy,
@@ -24,7 +25,7 @@ from dataeval.data import (
     SequenceInfo,
     Stride,
 )
-from dataeval.data._selectors import _projected, sequence_infos
+from dataeval.data._selectors import _Planned, _projected, sequence_infos
 from tests.data.test_frames import (
     _Buffering,
     _Declares,
@@ -74,7 +75,7 @@ class _Disordered(FrameSelector):
     needs: FrameInput = FrameInput.STRUCTURE
 
     def _plan_weighted(self, info):
-        return np.array([4, 0], dtype=np.intp), np.array([2.0, 4.0])
+        return _Planned(np.array([4, 0], dtype=np.intp), np.array([2.0, 4.0]))
 
     def select(self, frames):
         return (FrameVerdict(frame.position) for frame in frames if frame.position in (0, 4))
@@ -330,7 +331,8 @@ class TestPlanningChains:
         empty = next(sequence_infos(dataset))[0]
         weighted = chain._plan_weighted(empty)
         assert weighted is not None
-        assert [part.tolist() for part in weighted] == [[], []]
+        assert weighted.weights is not None
+        assert (weighted.positions.tolist(), weighted.weights.tolist()) == ([], [])
 
     def test_a_chain_never_reads_labels_it_does_not_plan_from(self):
         """Review Focus 3: the second sequence's frame targets carry no ``labels`` at all.
@@ -487,6 +489,29 @@ class TestStreamingChains:
         with pytest.raises(ValueError, match=r"stage 2, _FirstAndLast\(\).*after its input ended"):
             emit(SequenceFrames(dataset, Chain(_EveryOther(), _FirstAndLast())))
         assert SequenceFrames(dataset, Chain(_FirstAndLast())).frame_map[:, 1].tolist() == [0, n - 1]
+
+    def test_a_chain_marks_a_frame_any_stage_kept_without_evidence(self):
+        dataset, _ = make_dataset((6,), timed=False)
+        frames = SequenceFrames(dataset, Chain(FrameRate(10.0), _EveryOther()))
+        assert [e["unmeasured"] for e in frames._record_of(0).entries] == [True, True, True]
+
+    @pytest.mark.parametrize(
+        "chain",
+        [
+            Chain(_EveryOther(), FrameRate(10.0)),  # a later stage marks
+            Chain(FrameRate(10.0), _KeepTopTwo()),  # a whole-input stage replays the mark
+            Chain(FrameRate(10.0), Stride(2), _EveryOther()),  # the mark is carried into the second walk
+        ],
+    )
+    def test_the_mark_reaches_the_frame_on_every_path_through_a_chain(self, chain):
+        untimed, _ = make_dataset((6,), timed=False)
+        timed, _ = make_dataset((6,))
+        marked = [e["unmeasured"] for e in SequenceFrames(untimed, chain)._record_of(0).entries]
+        unmarked = [e["unmeasured"] for e in SequenceFrames(timed, chain)._record_of(0).entries]
+        assert marked
+        assert all(marked)
+        assert unmarked
+        assert not any(unmarked)
 
 
 @pytest.mark.required

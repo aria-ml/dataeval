@@ -5,9 +5,10 @@ __all__ = []
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
 
 from dataeval._log import get_logger
@@ -18,6 +19,8 @@ from dataeval.data._selectors import (
     FrameSelector,
     FrameVerdict,
     SequenceInfo,
+    _Planned,
+    _StageTrace,
     sequence_infos,
 )
 from dataeval.data._video_proxies import checked_index, inherited_metadata
@@ -28,11 +31,13 @@ from dataeval.protocols import (
     DatasetMetadata,
     DatumMetadata,
     MultiobjectTrackingDataset,
+    MultiobjectTrackingTarget,
     ObjectDetectionDatum,
     ObjectDetectionTarget,
     SingleFrameObjectTrackingTarget,
 )
 from dataeval.types import FactorLevel, SourceIndex
+from dataeval.types._target import instance_arrays
 from dataeval.types._track import frame_number
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data import requires_maite_dataset
@@ -60,18 +65,21 @@ than silently overwritten -- the same rule the metadata structurers apply to a d
 collides with a derived one.
 """
 
-_Selected = tuple[int, Any, SingleFrameObjectTrackingTarget, float | None, int | None, Mapping[str, Any], float | None]
-"""One kept frame: position, raw frame, target, timings, factors, and any declared weight."""
+_Selected = tuple[
+    int, Any, SingleFrameObjectTrackingTarget, float | None, int | None, Mapping[str, Any], float | None, bool
+]
+"""One kept frame: position, raw frame, target, timings, factors, any declared weight, and its unmeasured mark."""
 
 
 def _same_selection(first: Sequence[dict[str, Any]], second: Sequence[dict[str, Any]]) -> bool:
-    """Whether two walks kept the same positions with the same metadata (NaN equals NaN)."""
+    """Whether two walks kept the same positions with the same metadata and marks (NaN equals NaN)."""
 
     def same(a: Any, b: Any) -> bool:
         return bool(a == b or (a != a and b != b))
 
     return len(first) == len(second) and all(
         a["position"] == b["position"]
+        and a["unmeasured"] == b["unmeasured"]
         and a["metadata"].keys() == b["metadata"].keys()
         and all(same(a["metadata"][key], b["metadata"][key]) for key in a["metadata"])
         for a, b in zip(first, second, strict=True)
@@ -85,21 +93,94 @@ class _SequenceRecord:
     Attributes
     ----------
     entries : tuple[dict[str, Any], ...]
-        One record per kept frame, in order: its sequence, position and metadata. No pixels and no
-        target.
+        One record per kept frame, in order: its sequence, position, metadata, and whether the
+        selector kept it unmeasured (:attr:`~dataeval.data.FrameVerdict.unmeasured`). No pixels
+        and no target.
     frame_numbers : NDArray[np.intp]
         The number of the frame at every position of the sequence, kept or not, which a later walk
         checks its own frames against.
+    trace : tuple[_StageTrace, ...]
+        What each stage of the selection decided, one per stage, for
+        :meth:`SequenceFrames.selection_report`.
     """
 
     entries: tuple[dict[str, Any], ...]
     frame_numbers: NDArray[np.intp]
+    trace: tuple[_StageTrace, ...]
 
     @cached_property
     def repeated(self) -> frozenset[int]:
         """Frame numbers held at more than one position, which no ``unit`` address names alone."""
         numbers, counts = np.unique(self.frame_numbers, return_counts=True)
         return frozenset(numbers[counts > 1].tolist())
+
+
+class SelectionReport(NamedTuple):
+    """What each stage of a frame selection did, per video and per class.
+
+    Returned by :meth:`SequenceFrames.selection_report`. A selector is one stage, and a
+    :class:`~dataeval.data.Chain` one per stage. This is an account of what each stage did, not a
+    test of whether the selection is representative.
+
+    Attributes
+    ----------
+    stages : pl.DataFrame
+        One row per ``(sequence, stage)``. ``offered``, ``kept``, ``represented`` and ``excluded``
+        count frames of the stage's own input, which are source frames only for stage 0: inside a
+        :class:`~dataeval.data.Chain`, a frame a later stage drops may stand for several source
+        frames. ``source_frames_excluded`` is in source frames.
+
+        - ``sequence`` (*Int64*) -- the sequence's index in the source dataset.
+        - ``source_id`` (*String*) -- the sequence datum's own ``id``, as a string.
+        - ``stage`` (*Int64*) -- the stage's place in the selection, from 0.
+        - ``selector`` (*String*) -- the stage's repr.
+        - ``offered`` (*Int64*) -- the frames reaching the stage: every frame of the sequence for
+          stage 0, and otherwise each the stage before kept, a frame it kept twice counting twice.
+        - ``kept`` (*Int64*) -- the frames the stage kept, a frame it kept twice counting twice.
+        - ``represented``, ``excluded`` (*Int64*) -- the frames offered that the stage never kept:
+          ``excluded`` under a stage that excludes (:attr:`~dataeval.data.FrameSelector.excludes`),
+          ``represented`` otherwise, and the other 0.
+        - ``unmeasured`` (*Int64*) -- the frames the stage itself kept without measuring them
+          (:attr:`~dataeval.data.FrameVerdict.unmeasured`). A presented frame is marked when any
+          stage marked it (:attr:`SequenceFrames.unmeasured`), so a later stage's count here
+          leaves out frames an earlier one marked.
+        - ``source_frames_excluded`` (*Float64*) -- the source frames the stage excluded: the
+          source frames the frames reaching it stood for (the sequence's frame count for stage 0)
+          less those its kept frames stand for. A thinning stage that keeps any frame and declares
+          no weight passes them all on, so reads 0. Per sequence these sum to the sequence's frame
+          count less the ``frames_represented`` of the frames presented.
+
+    labels : pl.DataFrame
+        One row per ``(sequence, stage, label)``, for each label that some frame offered to the
+        stage holds:
+
+        - ``sequence``, ``source_id``, ``stage``, ``selector`` -- as in ``stages``.
+        - ``label`` (*Int64*) -- the class label.
+        - ``frames_offered``, ``frames_kept`` (*Int64*) -- the frames offered and kept holding at
+          least one detection of the label, a frame offered or kept twice counting twice.
+        - ``detections_offered``, ``detections_kept`` (*Int64*) -- the label's detections in them.
+
+    Examples
+    --------
+    How much of class 7 survives each stage:
+
+    >>> import polars as pl
+    >>> from dataeval.data import Chain, Redundancy, SequenceFrames, Stride
+    >>> frames = SequenceFrames(mot_dataset, Chain(Redundancy(), Stride(5)))  # doctest: +SKIP
+    >>> frames.selection_report().labels.filter(pl.col("label") == 7)  # doctest: +SKIP
+    """
+
+    stages: pl.DataFrame
+    labels: pl.DataFrame
+
+
+def _label_counts(target: MultiobjectTrackingTarget) -> tuple[NDArray[np.intp], NDArray[np.int64]]:
+    """Return the labels a sequence holds, and how many detections of each every frame holds."""
+    labels = [instance_arrays(frame)[0] for frame in target.frame_tracks]
+    classes, column = np.unique(np.concatenate([np.empty(0, dtype=np.intp), *labels]), return_inverse=True)
+    counts = np.zeros((len(labels), len(classes)), dtype=np.int64)
+    np.add.at(counts, (np.repeat(np.arange(len(labels)), [len(held) for held in labels]), column), 1)
+    return classes, counts
 
 
 class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
@@ -246,13 +327,16 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         planned = [self._selector._plan_weighted(info) for info in self._sequences]
         self._planned: list[NDArray[np.intp]] | None = None
         self._planned_weights: list[NDArray[np.float64] | None] = []
+        # Kept so a planned view reports its selection without walking anything.
+        self._planned_traces: list[tuple[_StageTrace, ...]] = []
         if all(plan is not None for plan in planned):
             normalized = [
-                self._normalized_plan(cast(tuple[NDArray[np.intp], NDArray[np.float64] | None], plan), info)
+                self._normalized_plan(cast(_Planned, plan), info)
                 for plan, info in zip(planned, self._sequences, strict=True)
             ]
-            self._planned = [positions for positions, _ in normalized]
-            self._planned_weights = [weights for _, weights in normalized]
+            self._planned = [positions for positions, _, _ in normalized]
+            self._planned_weights = [weights for _, weights, _ in normalized]
+            self._planned_traces = [trace for _, _, trace in normalized]
         # The execution record: each sequence's selection, fixed by its first complete walk.
         self._records: dict[int, _SequenceRecord] = {}
         self._realized: list[dict[str, Any]] | None = None
@@ -412,6 +496,30 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         if not located:
             return np.empty((0, 2), dtype=np.intp)
         return np.array(located, dtype=np.intp)
+
+    @property
+    def unmeasured(self) -> NDArray[np.bool_]:
+        """Shape ``(F,)`` -- whether the frame behind each view position was kept without evidence.
+
+        Aligned with :attr:`frame_map`. True where any stage of the selector kept the frame because
+        it could not measure it (:attr:`~dataeval.data.FrameVerdict.unmeasured`), so it is
+        cumulative across a :class:`~dataeval.data.Chain`. The ``unmeasured`` column of
+        :meth:`selection_report` is per stage, counting the frames each stage itself marked.
+
+        A selector that plans decides from structure alone and marks nothing, so a planned view
+        answers without decoding. Otherwise this is read from the execution record, as
+        :attr:`frame_map` is.
+
+        Examples
+        --------
+        The frames a selection kept without judging them:
+
+        >>> frames = SequenceFrames(mot_dataset, FrameRate(5.0))  # doctest: +SKIP
+        >>> frames.frame_map[frames.unmeasured]  # doctest: +SKIP
+        """
+        if self._planned is not None:
+            return np.zeros(sum(len(positions) for positions in self._planned), dtype=np.bool_)
+        return np.array([entry["unmeasured"] for entry in self._realize()], dtype=np.bool_)
 
     @property
     def track_map(self) -> NDArray[np.intp]:
@@ -577,6 +685,71 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
             translated.append(SourceIndex(sequence, first + address.key, "instance"))
         return translated
 
+    def selection_report(self) -> SelectionReport:
+        """Account for what each stage of the selection did, per video and per class.
+
+        For each sequence and stage: the frames it was offered and kept, those it dropped as
+        represented or excluded, and those it kept unmeasured; and per class label, the frames
+        holding it and its detections, offered and kept. A selection that quietly removed a class,
+        or kept most of a video without judging it, shows here. This is an account of what each
+        stage did, not a test of whether the selection is representative.
+
+        Returns
+        -------
+        SelectionReport
+            The per-stage and per-label tables, described on
+            :class:`~dataeval.data.SelectionReport`.
+
+        Notes
+        -----
+        Built from the execution record and the targets, never from pixels. A view whose selector
+        plans reports without walking anything. Otherwise each sequence no walk has recorded yet
+        is walked once, with a log line, as for ``len()``; after a full :meth:`stream` nothing is.
+
+        Examples
+        --------
+        >>> from dataeval.data import Chain, HasLabels, SequenceFrames, Stride
+        >>> frames = SequenceFrames(mot_dataset, Chain(HasLabels([7]), Stride(5)))  # doctest: +SKIP
+        >>> frames.selection_report().stages  # doctest: +SKIP
+        """
+        stage_rows: list[tuple[Any, ...]] = []
+        label_rows: list[tuple[Any, ...]] = []
+        for info in self._sequences:
+            trace = self._planned_traces[info.index] if self._planned is not None else self._record_of(info.index).trace
+            classes, counts = _label_counts(cast(MultiobjectTrackingTarget, info.target))
+            offered, mass_in = np.arange(info.n_frames, dtype=np.intp), float(info.n_frames)
+            for number, stage in enumerate(trace):
+                head = (info.index, str(info.source_id), number, repr(stage.selector))
+                dropped = len(offered) - len(np.unique(stage.ordinals))
+                excluded = dropped if stage.selector.excludes else 0
+                counted = (
+                    len(offered),
+                    len(stage.positions),
+                    dropped - excluded,
+                    excluded,
+                    int(stage.unmeasured.sum()),
+                    mass_in - stage.mass_out,
+                )
+                stage_rows.append((*head, *counted))
+                # A frame offered or kept twice counts twice, as indexing by position repeats its row.
+                into, out = counts[offered], counts[stage.positions]
+                columns = np.stack(
+                    ((into > 0).sum(axis=0), (out > 0).sum(axis=0), into.sum(axis=0), out.sum(axis=0)), 1
+                )
+                label_rows.extend((*head, int(classes[j]), *columns[j].tolist()) for j in np.flatnonzero(columns[:, 0]))
+                offered, mass_in = stage.positions, stage.mass_out
+        key_schema = {"sequence": pl.Int64, "source_id": pl.String, "stage": pl.Int64, "selector": pl.String}
+        count_schema = dict.fromkeys(("offered", "kept", "represented", "excluded", "unmeasured"), pl.Int64)
+        label_schema = dict.fromkeys(
+            ("label", "frames_offered", "frames_kept", "detections_offered", "detections_kept"), pl.Int64
+        )
+        return SelectionReport(
+            pl.DataFrame(
+                stage_rows, schema={**key_schema, **count_schema, "source_frames_excluded": pl.Float64}, orient="row"
+            ),
+            pl.DataFrame(label_rows, schema={**key_schema, **label_schema}, orient="row"),
+        )
+
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
@@ -588,10 +761,14 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         return wanted[(wanted >= 0) & (wanted < info.n_frames)]
 
     def _normalized_plan(
-        self, plan: tuple[NDArray[np.intp], NDArray[np.float64] | None], info: SequenceInfo
-    ) -> tuple[NDArray[np.intp], NDArray[np.float64] | None]:
-        """Normalize a plan's positions, refusing a plan whose weights normalizing would misalign."""
-        positions, weights = plan
+        self, plan: _Planned, info: SequenceInfo
+    ) -> tuple[NDArray[np.intp], NDArray[np.float64] | None, tuple[_StageTrace, ...]]:
+        """Normalize a plan's positions, refusing a plan whose weights normalizing would misalign.
+
+        A plan without a trace is a lone selector's: one stage over the source frames, so each
+        position is also its ordinal, and decided from structure alone, so none goes unmeasured.
+        """
+        positions, weights, trace = plan
         normalized = self._normalized(positions, info)
         if weights is not None and (len(weights) != len(positions) or not np.array_equal(normalized, positions)):
             raise ValueError(
@@ -599,7 +776,15 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 "positions that are not ascending, unique and in range, or not one weight per position. "
                 "Normalizing them would leave the weights describing other frames."
             )
-        return normalized, weights
+        if trace is None:
+            from dataeval.data._chain import _stage_masses  # here, as _chain imports this module
+
+            # The mass `_record` will give its frames: as declared, or by the default rule.
+            masses = _stage_masses(np.ones(info.n_frames), normalized, self._selector.excludes)
+            mass = float((masses if weights is None else weights).sum())
+            unmeasured = np.zeros(len(normalized), dtype=np.bool_)
+            trace = (_StageTrace(self._selector, normalized, normalized, unmeasured, mass),)
+        return normalized, weights, trace
 
     def _located(self) -> list[tuple[int, int]]:
         """Return the ``(sequence, position)`` behind each view position, in view order.
@@ -770,6 +955,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         target: Any,
         factors: Mapping[str, Any],
         weight: float | None = None,
+        unmeasured: bool = False,
     ) -> _Selected:
         """Package one kept frame with the timings its stream declares."""
         return (
@@ -780,16 +966,19 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
             getattr(frame, "pts", None),
             factors,
             weight,
+            unmeasured,
         )
 
     def _replay(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:
         """Emit the positions a planning selector named, without consulting `select`.
 
         Each carries the weight the selector declared for it when it planned, or None for
-        :meth:`_record` to apply the default rule. Nothing is planned again here.
+        :meth:`_record` to apply the default rule. A plan decides from structure alone, so no
+        frame it names goes unmeasured. Nothing is planned again here.
         """
         planned = self._planned[info.index] if self._planned is not None else np.empty(0, dtype=np.intp)
         weights = self._planned_weights[info.index]
+        trailer["trace"] = self._planned_traces[info.index]
         declared = [None] * len(planned) if weights is None else weights.tolist()
         wanted = dict(zip(planned.tolist(), declared, strict=True))
         for position, frame, target in self._observed(info, trailer):
@@ -808,7 +997,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         """
         held: list[Any] = []
         candidates = self._candidates(info, held, trailer)
-        for verdict in (self._selector.select if select is None else select)(candidates):
+        for verdict in self._returned((self._selector.select if select is None else select)(candidates), trailer):
             if not held or verdict.position != held[0][0]:
                 reached = held[0][0] if held else "no frame"
                 raise ValueError(
@@ -818,36 +1007,60 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                     "must declare two_pass = True, so each sequence is walked twice."
                 )
             position, frame, target = held[0]
-            yield self._selected(position, frame, target, self._checked_factors(verdict), verdict.weight)
+            yield self._selected(
+                position, frame, target, self._checked_factors(verdict), verdict.weight, verdict.unmeasured
+            )
         # A selector may stop reading before the sequence ends; the record numbers every frame.
         for _ in candidates:
             pass
 
-    def _two_pass(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:  # noqa: C901
+    def _returned(self, verdicts: Iterable[FrameVerdict], trailer: dict[str, Any]) -> Iterator[FrameVerdict]:
+        """Yield a selector's verdicts, then keep in ``trailer`` what a ``Chain``'s ``select`` generator returned.
+
+        A private protocol whose only user is ``Chain``, read here because a ``for`` loop discards
+        a generator's return value. Any other selector's return value is ignored, as a chain's
+        stage run ignores its stages': a lone selector's trace is built from its recorded entries.
+        A callable is the continuation :meth:`_two_pass` runs over the second walk. A tuple of
+        ``_StageTrace``, one per stage, is the selection's trace, which :meth:`_walk` records; a
+        continuation's own generator returns the trace in turn. A ``Chain`` always returns one of
+        the two, so anything else is a bug in it, and is refused.
+        """
+        from dataeval.data._chain import Chain  # here, as _chain imports this module
+
+        returned = yield from verdicts
+        if not isinstance(self._selector, Chain):
+            return
+        if callable(returned):
+            trailer["continuation"] = returned
+        elif isinstance(returned, tuple) and all(isinstance(stage, _StageTrace) for stage in returned):
+            trailer["trace"] = returned
+        else:
+            raise TypeError(
+                f"SequenceFrames: {self._selector!r}'s select returned {returned!r}, which is neither a "
+                "continuation nor a trace. A Chain's select always returns one of the two, so this is "
+                "a bug in Chain."
+            )
+
+    def _two_pass(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:
         """Drive the selector over a whole sequence, then walk it again to emit what it chose.
 
-        A private protocol whose only user is ``Chain``: a ``select`` generator may return a
+        A private protocol whose only user is ``Chain``: a chain's ``select`` generator may return a
         callable, which then decides the second walk frame by frame, under the single-pass
         discipline :meth:`_single_pass` keeps, in place of emitting what the first walk chose.
+        See :meth:`_returned`.
         """
-        chosen: dict[int, FrameVerdict] = {}
-        continuation: Callable[[Iterator[FrameCandidate]], Iterable[FrameVerdict]] | None
-        # Advanced by hand, since a `for` loop discards what the generator returns.
-        verdicts = iter(self._selector.select(self._candidates(info, [], trailer)))
-        while True:
-            try:
-                verdict = next(verdicts)
-            except StopIteration as stop:
-                continuation = stop.value
-                break
-            chosen[verdict.position] = verdict
-        if callable(continuation):
+        verdicts = self._returned(self._selector.select(self._candidates(info, [], trailer)), trailer)
+        chosen = {verdict.position: verdict for verdict in verdicts}
+        continuation = trailer.pop("continuation", None)
+        if continuation is not None:
             yield from self._single_pass(info, trailer, continuation)
             return
         for position, frame, target in self._observed(info, trailer):
             verdict = chosen.get(position)
             if verdict is not None:
-                yield self._selected(position, frame, target, self._checked_factors(verdict), verdict.weight)
+                yield self._selected(
+                    position, frame, target, self._checked_factors(verdict), verdict.weight, verdict.unmeasured
+                )
 
     def _checked_factors(self, verdict: FrameVerdict) -> Mapping[str, Any]:
         """Reject a selector factor that would displace one this view writes itself."""
@@ -896,9 +1109,16 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 "sequence's weights cannot total more than its frames."
             )
         numbers = np.fromiter(trailer.get("numbers", {}).values(), dtype=np.intp)
+        trace = trailer.get("trace")
+        if trace is None:
+            # A lone selector is one stage over the source frames, so each position is also its
+            # ordinal, and each frame's mark the one that stage set.
+            positions = np.array([entry["position"] for entry in entries], dtype=np.intp)
+            marks = np.array([entry["unmeasured"] for entry in entries], dtype=np.bool_)
+            trace = (_StageTrace(self._selector, positions, positions, marks, float(total)),)
         # Another walk of this sequence may have finished while this one was paused; the first to
         # finish fixed the selection, so this one has to agree with it.
-        recorded = self._records.setdefault(info.index, _SequenceRecord(tuple(entries), numbers))
+        recorded = self._records.setdefault(info.index, _SequenceRecord(tuple(entries), numbers, trace))
         if not _same_selection(recorded.entries, entries):
             raise ValueError(
                 f"SequenceFrames: {self._selector!r} chose different frames on two walks of sequence "
@@ -945,7 +1165,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         weight as declared; under a selector that excludes, the frame's own mass; otherwise the
         gap to the next kept frame, the first kept frame also taking every frame before it.
         """
-        position, frame, _, time_s, pts, factors, weight = selected
+        position, frame, _, time_s, pts, factors, weight, unmeasured = selected
         next_position = following[0] if following is not None else info.n_frames
         if weight is not None:
             # Converted here and nowhere sooner: a Chain declares a pending weight with its verdict
@@ -980,7 +1200,8 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         if pts is not None:
             metadata["pts"] = int(pts)
         metadata.update(factors)
-        return {"sequence": info.index, "position": position, "metadata": metadata}
+        # Beside the metadata, not in it: whether a frame was judged is no factor of the data.
+        return {"sequence": info.index, "position": position, "metadata": metadata, "unmeasured": unmeasured}
 
     def _seek(self, sequence: int, position: int) -> tuple[Any, SingleFrameObjectTrackingTarget]:
         """Decode up to one frame of one sequence, reusing the cursor when moving forward.

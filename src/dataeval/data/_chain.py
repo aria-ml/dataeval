@@ -2,7 +2,7 @@
 
 __all__ = []
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator
 from dataclasses import replace
 from functools import reduce
 from operator import or_
@@ -19,7 +19,9 @@ from dataeval.data._selectors import (
     FrameSelector,
     FrameVerdict,
     SequenceInfo,
+    _Planned,
     _projected,
+    _StageTrace,
 )
 
 
@@ -48,14 +50,14 @@ def _composed(
     stages: tuple[FrameSelector, ...],
     info: SequenceInfo,
     start: tuple[NDArray[np.intp], NDArray[np.float64]] | None = None,
-) -> tuple[NDArray[np.intp], NDArray[np.float64]] | None:
+) -> tuple[NDArray[np.intp], NDArray[np.float64], tuple[_StageTrace, ...]] | None:
     """Plan each stage over the survivors of the one before, carrying their masses.
 
     The first stage plans over the source frames at the positions ``start`` names, at the masses
     it gives, or over every source frame at mass 1. Returns the frames the last stage keeps, as
-    indices into those, and the mass of each; with no ``start`` the indices are source positions.
-    Indices, so a frame ``start`` names twice stays two frames. With no stages, every frame. None
-    when some stage returns no plan.
+    indices into those, the mass of each, and each stage's trace; with no ``start`` the indices
+    are source positions. Indices, so a frame ``start`` names twice stays two frames. With no
+    stages, every frame. None when some stage returns no plan.
     """
     if start is None:
         positions = np.arange(info.n_frames, dtype=np.intp)
@@ -65,6 +67,7 @@ def _composed(
         positions, masses = start
         stage_info = _survivors(info, positions)
     taken = np.arange(len(positions), dtype=np.intp)
+    trace: list[_StageTrace] = []
     for stage in stages:
         planned = stage.plan(stage_info)
         if planned is None:
@@ -72,7 +75,10 @@ def _composed(
         kept = SequenceFrames._normalized(planned, stage_info)
         taken, masses = taken[kept], _stage_masses(masses, kept, stage.excludes)
         stage_info = _survivors(info, positions[taken])
-    return taken, masses
+        # A plan decides from structure alone, so nothing it keeps goes unmeasured.
+        unmeasured = np.zeros(len(kept), dtype=np.bool_)
+        trace.append(_StageTrace(stage, kept, positions[taken], unmeasured, float(masses.sum())))
+    return taken, masses, tuple(trace)
 
 
 class _Mass:
@@ -112,16 +118,19 @@ class _Survivor(NamedTuple):
     """Its mass as the last stage left it, which is the next stage's ``FrameCandidate.weight``."""
     factors: dict[str, tuple[FrameSelector, Any]]
     """Every factor a stage set on it, beside the stage that set it."""
+    unmeasured: bool
+    """Whether any stage so far kept it with ``FrameVerdict.unmeasured`` set."""
 
 
 class _StageRun:
     """One streaming stage's walk over one sequence, settling the masses of the frames it keeps.
 
-    ``Chain.select`` builds one per stage per sequence, so nothing about a sequence outlives its
-    walk or lands on the chain. A frame's mass is final once the frame after it reaches the stage,
-    or the stage's input ends: the stage before has then kept that next frame, which closes every
-    run up to it. So each kept frame's run is complete when the stage keeps the next one, and the
-    last one's when its input ends, which is before the last frame is recorded.
+    ``Chain.select`` builds one per stage per sequence, so nothing about a sequence but the
+    stage's trace outlives its walk, and nothing lands on the chain. A frame's mass is final once
+    the frame after it reaches the stage, or the stage's input ends: the stage before has then
+    kept that next frame, which closes every run up to it. So each kept frame's run is complete
+    when the stage keeps the next one, and the last one's when its input ends, which is before
+    the last frame is recorded.
     """
 
     def __init__(self, number: int, stage: FrameSelector, info: SequenceInfo) -> None:
@@ -146,6 +155,8 @@ class _StageRun:
         self.open: _Mass | None = None  # the last kept frame's mass, closed when the next is kept
         self.mass_in = 0.0
         self.mass_out = 0.0
+        # Each verdict's ordinal, source position and own unmeasured mark, for the stage's trace.
+        self.decided: list[tuple[int, int, bool]] = []
 
     def kept(  # noqa: C901
         self,
@@ -172,7 +183,14 @@ class _StageRun:
                     f"{reached}. A stage that decides a frame only after seeing later ones, or "
                     "after the end of its input behind another stage, must declare two_pass = True."
                 )
-            yield _Survivor(held.position, held.candidate, self._keep(verdict), self._merged(held, verdict))
+            self.decided.append((self.ordinal, held.position, verdict.unmeasured))
+            yield _Survivor(
+                held.position,
+                held.candidate,
+                self._keep(verdict),
+                self._merged(held, verdict),
+                held.unmeasured or verdict.unmeasured,
+            )
         # A stage may stop reading early. The frames it never saw run to the last frame it kept.
         for _ in offered:
             pass
@@ -192,6 +210,11 @@ class _StageRun:
             self.held, self.into = survivor._replace(candidate=candidate), self.run
             yield candidate
         self.ended = self.number > 1
+
+    def trace(self) -> _StageTrace:
+        """Return what the stage decided, verdict by verdict, each with the mark it set rather than the frame's."""
+        rows = np.array(self.decided, dtype=np.intp).reshape(-1, 3)
+        return _StageTrace(self.stage, rows[:, 0], rows[:, 1], rows[:, 2].astype(np.bool_), self.mass_out)
 
     def _settle(self) -> None:
         """Count the held frame's mass, final now that the next frame has arrived or the input has ended."""
@@ -234,6 +257,8 @@ class _StageRun:
     def _finish(self) -> None:
         """Settle the last frame's mass, and refuse a stage whose masses total more than its input."""
         self._settle()
+        # Only the trace is read after the walk, so the last frame's handle is not kept alive.
+        self.held = None
         if self.open is not None:
             self._close(self.open)
         if self.mass_out > self.mass_in * (1 + 1e-9):
@@ -266,9 +291,9 @@ def _prepended(first: FrameCandidate, rest: Iterator[FrameCandidate]) -> Iterato
 
 def _arriving(
     frames: Iterator[FrameCandidate],
-    kept: Iterable[tuple[int, float, dict[str, tuple[FrameSelector, Any]]]],
+    kept: Iterable[tuple[int, float, dict[str, tuple[FrameSelector, Any]], bool]],
 ) -> Iterator[_Survivor]:
-    """Yield a survivor for each of ``kept``, as its source frame arrives, with its mass and any factors set so far.
+    """Yield a survivor for each of ``kept``, as its source frame arrives, with its mass, factors and mark so far.
 
     ``kept`` holds source positions in non-decreasing order, and one it holds twice arrives twice,
     as a stage may keep a frame more than once.
@@ -277,7 +302,7 @@ def _arriving(
     entry = next(pending, None)
     for frame in frames:
         while entry is not None and entry[0] == frame.position:
-            yield _Survivor(frame.position, frame, entry[1], entry[2])
+            yield _Survivor(frame.position, frame, *entry[1:])
             entry = next(pending, None)
 
 
@@ -298,10 +323,10 @@ def _released(survivor: _Survivor) -> _Survivor:
 
 
 def _verdicts(survivors: Iterator[_Survivor]) -> Iterator[FrameVerdict]:
-    """Report each survivor of the last stage at its source position, with its weight and every stage's factors."""
+    """Report each survivor of the last stage at its source position, with its weight, factors and mark."""
     for survivor in survivors:
         factors = {name: value for name, (_, value) in survivor.factors.items()}
-        yield FrameVerdict(survivor.position, cast(float, survivor.weight), factors)
+        yield FrameVerdict(survivor.position, cast(float, survivor.weight), factors, survivor.unmeasured)
 
 
 def _refuse_misplaced_adjacency(stages: tuple[FrameSelector, ...]) -> None:
@@ -395,7 +420,8 @@ class Chain(FrameSelector):
     only once its input ends must declare ``two_pass``, or it raises :class:`ValueError` on every
     video. A stage reads pixels only when its own ``needs`` declares them. The factors every
     stage records on a frame are merged onto it, and two stages naming the same factor raise
-    :class:`ValueError`.
+    :class:`ValueError`. A frame any stage kept without evidence stays marked
+    :attr:`~dataeval.data.FrameVerdict.unmeasured`.
 
     **Weights compose exactly.** Each frame reaching a stage carries the source frames it already
     stands for, and each stage applies the rule :class:`~dataeval.data.SequenceFrames` applies to
@@ -453,21 +479,22 @@ class Chain(FrameSelector):
     def __repr__(self) -> str:
         return f"Chain({', '.join(repr(stage) for stage in self.stages)})"
 
-    def _plan_weighted(self, info: SequenceInfo) -> tuple[NDArray[np.intp], NDArray[np.float64]] | None:
-        """Plan each stage over the survivors of the one before, carrying their source positions and masses."""
-        return _composed(self.stages, info) if all(self._planning) else None
+    def _plan_weighted(self, info: SequenceInfo) -> _Planned | None:
+        """Plan each stage over the survivors of the one before, carrying their source positions, masses and trace."""
+        composed = _composed(self.stages, info) if all(self._planning) else None
+        return None if composed is None else _Planned(*composed)
 
     def plan(self, info: SequenceInfo) -> NDArray[np.intp] | None:
         """Return the source positions the last stage keeps, when every stage plans."""
         weighted = self._plan_weighted(info)
-        return None if weighted is None else weighted[0]
+        return None if weighted is None else weighted.positions
 
     def _resolved(
         self,
         stages: tuple[FrameSelector, ...],
         info: SequenceInfo,
         start: tuple[NDArray[np.intp], NDArray[np.float64]] | None = None,
-    ) -> tuple[list[int], list[float]]:
+    ) -> tuple[list[int], list[float], tuple[_StageTrace, ...]]:
         """Plan ``stages`` as :func:`_composed` does, refusing a stage that returns no plan."""
         planned = _composed(stages, info, start)
         if planned is None:
@@ -475,30 +502,37 @@ class Chain(FrameSelector):
                 f"Chain: a stage of {self!r} that plans returned no plan for sequence {info.index}. A "
                 "chain applies a stage that implements plan through it, so it must plan every sequence."
             )
-        return planned[0].tolist(), planned[1].tolist()
+        taken, masses, trace = planned
+        return taken.tolist(), masses.tolist(), trace
 
     def _streaming(self, start: int, stop: int) -> int:
         """Return the first stage from ``start`` that does not plan, or ``stop``."""
         return next((k for k in range(start, stop) if not self._planning[k]), stop)
 
     def _streamed(
-        self, start: int, stop: int, survivors: Iterator[_Survivor], info: SequenceInfo
+        self, start: int, stop: int, survivors: Iterator[_Survivor], info: SequenceInfo, runs: list[_StageRun]
     ) -> Iterator[_Survivor]:
-        """Run the stages from ``start`` up to ``stop`` frame by frame, each over what the one before keeps."""
+        """Run the stages from ``start`` up to ``stop`` frame by frame, each over what the one before keeps.
+
+        Each stage's run is added to ``runs``, whose traces are complete once the survivors are.
+        """
         # A streaming stage starts before its input count is known, so it is handed the source
         # sequence without its targets, and decides from neither. Each stage holds one frame, so
         # the chain holds at most one per stage.
         streamed = replace(info, target=None)
         for number, stage in enumerate(self.stages[start:stop], start=start + 1):
-            survivors = _StageRun(number, stage, streamed).kept(survivors)
+            runs.append(_StageRun(number, stage, streamed))
+            survivors = runs[-1].kept(survivors)
         return survivors
 
-    def _driven(self, boundary: int, survivors: Iterator[_Survivor], info: SequenceInfo) -> list[_Survivor]:
+    def _driven(
+        self, boundary: int, survivors: Iterator[_Survivor], info: SequenceInfo, runs: list[_StageRun]
+    ) -> list[_Survivor]:
         """Drive a ``two_pass`` stage over every survivor, then apply its verdicts as a stage run would.
 
         Each survivor is held without its frame once offered, so only positions, masses and
         factors outlive the walk. The verdicts are replayed in order through a stage run, which
-        composes masses and merges factors as it does for a streaming stage.
+        composes masses and merges factors as it does for a streaming stage, and is added to ``runs``.
         """
         stage = self.stages[boundary]
         streamed = replace(info, target=None)
@@ -521,32 +555,50 @@ class Chain(FrameSelector):
         # A stage may stop reading early. The frames it never saw still run to the last frame it kept.
         for _ in candidates:
             pass
-        replayed = _StageRun(boundary + 1, stage, streamed).kept(
+        runs.append(_StageRun(boundary + 1, stage, streamed))
+        replayed = runs[-1].kept(
             iter(held), lambda frames: (chosen[frame.position] for frame in frames if frame.position in chosen)
         )
         return list(replayed)
 
     def _second_pass(
-        self, survivors: Iterator[_Survivor], info: SequenceInfo
-    ) -> Callable[[Iterator[FrameCandidate]], Iterator[FrameVerdict]]:
+        self,
+        survivors: Iterator[_Survivor],
+        info: SequenceInfo,
+        trace: tuple[_StageTrace, ...],
+        runs: list[_StageRun],
+    ) -> Callable[[Iterator[FrameCandidate]], Generator[FrameVerdict, None, tuple[_StageTrace, ...]]]:
         """End the first pass at the boundary stage, and return what runs the stages after it on the second.
 
         Planning stages after the boundary resolve here from its survivors. The rest stream over
         the second walk's source frames, which the returned callable narrows to those survivors.
+        ``trace`` and ``runs`` hold the stages before the boundary, and the callable's generator
+        returns the whole chain's trace.
         """
         boundary = cast(int, self._boundary)
         if self._planning[boundary]:
             # Its input count and its survivors' targets are known only now, so it plans over them.
             kept, after = [_released(survivor) for survivor in _settled(survivors)], boundary
         else:
-            kept, after = self._driven(boundary, survivors, info), boundary + 1
+            kept, after = self._driven(boundary, survivors, info, runs), boundary + 1
         start, stop = self._streaming(after, len(self.stages)), len(self.stages)
         positions = np.array([survivor.position for survivor in kept], dtype=np.intp)
         masses = np.array([float(survivor.weight) for survivor in kept], dtype=np.float64)
-        taken, resolved = self._resolved(self.stages[after:start], info, (positions, masses))
-        # By index into what reached here, so each keep of a frame kept twice carries its own mass and factors.
-        carried = [(kept[k].position, mass, kept[k].factors) for k, mass in zip(taken, resolved, strict=True)]
-        return lambda frames: _verdicts(self._streamed(start, stop, _arriving(frames, carried), info))
+        taken, resolved, planned = self._resolved(self.stages[after:start], info, (positions, masses))
+        # The first pass is over, so every stage up to here has its trace.
+        trace = (*trace, *(run.trace() for run in runs), *planned)
+        # By index into what reached here, so each keep of a frame kept twice carries its own mass, factors and mark.
+        carried = [
+            (kept[k].position, mass, kept[k].factors, kept[k].unmeasured)
+            for k, mass in zip(taken, resolved, strict=True)
+        ]
+
+        def continuation(frames: Iterator[FrameCandidate]) -> Generator[FrameVerdict, None, tuple[_StageTrace, ...]]:
+            after_runs: list[_StageRun] = []
+            yield from _verdicts(self._streamed(start, stop, _arriving(frames, carried), info, after_runs))
+            return (*trace, *(run.trace() for run in after_runs))  # noqa: B901
+
+        return continuation
 
     def select(self, frames: Iterator[FrameCandidate]) -> Iterator[FrameVerdict]:
         """Plan the stages that plan ahead of the first that does not, then run the rest frame by frame.
@@ -555,22 +607,35 @@ class Chain(FrameSelector):
         weight, which the streaming stages finish settling before
         :class:`~dataeval.data.SequenceFrames` records the frame.
 
-        A chain with a stage that needs its whole input runs only up to that stage here, and
-        yields nothing. What this generator returns runs the rest over the second walk: a private
-        protocol with :class:`~dataeval.data.SequenceFrames`, whose only user is ``Chain``.
+        What this generator returns is a private protocol with
+        :class:`~dataeval.data.SequenceFrames`, whose only user is ``Chain``: the view reads it
+        from a chain alone, and ignores what any other selector's ``select`` returns. It is the
+        selection's trace: one ``_StageTrace`` per stage, recording each verdict the stage yielded
+        with its index in the stage's input, its source position and the ``unmeasured`` mark the
+        stage itself set, which the view reports through its ``selection_report``. A chain with a
+        stage that needs its whole input runs only up to that stage here, and yields nothing; it
+        returns instead what runs the rest over the second walk, a callable whose generator
+        returns the trace in turn.
         """
         first = next(frames, None)
         if first is None:
-            return None
+            # Nothing reached any stage, so each kept nothing.
+            empty = np.empty(0, dtype=np.intp)
+            return tuple(_StageTrace(stage, empty, empty, empty.astype(np.bool_), 0.0) for stage in self.stages)
         info = first.sequence
         frames = _prepended(first, frames)
         del first  # peeked only for the sequence, so not held past the stages' use of it
         end = len(self.stages) if self._boundary is None else self._boundary
         split = self._streaming(0, end)
-        positions, masses = self._resolved(self.stages[:split], info)
-        arriving = _arriving(frames, ((position, mass, {}) for position, mass in zip(positions, masses, strict=True)))
-        survivors = self._streamed(split, end, arriving, info)
+        positions, masses, trace = self._resolved(self.stages[:split], info)
+        # A planning stage decides from structure alone, so nothing it keeps goes unmeasured.
+        arriving = _arriving(
+            frames, ((position, mass, {}, False) for position, mass in zip(positions, masses, strict=True))
+        )
+        runs: list[_StageRun] = []
+        survivors = self._streamed(split, end, arriving, info, runs)
         if self._boundary is not None:
             # Returning a value from a generator is the protocol: SequenceFrames reads it off StopIteration.
-            return self._second_pass(survivors, info)  # noqa: B901
+            return self._second_pass(survivors, info, trace, runs)
         yield from _verdicts(survivors)
+        return (*trace, *(run.trace() for run in runs))  # noqa: B901
