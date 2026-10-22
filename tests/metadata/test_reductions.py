@@ -756,7 +756,7 @@ class TestAKeyThatRepeatsIsNotAnInfinitelyFastSeries:
 
 @pytest.mark.required
 class TestAMissingValueIsReadTheSameWayByEveryReduction:
-    """``changes`` and ``longest_run`` both read the values that were recorded."""
+    """Every temporal reduction reads the values that were recorded."""
 
     @staticmethod
     def _gapped(values):
@@ -793,6 +793,16 @@ class TestAMissingValueIsReadTheSameWayByEveryReduction:
         expected = np.polyfit(times[recorded], np.asarray(values)[recorded], 1)[0]
         rolled = metadata.aggregate(Aggregator("trend", "unit", "sequence", ("b",), min_coverage=0.0))
         assert rolled.at("sequence").rows_at("sequence")["b_trend"].to_list() == pytest.approx([expected])
+
+    def test_variability_reads_the_rate_between_the_readings_that_were_recorded(self):
+        """Every difference touching a missing reading answered null, so a series measured
+        every other frame -- the shape a thinned frame view attaches -- had no variability at all."""
+        values = [0.0, np.nan, 2.0, np.nan, 0.0]
+        metadata = self._gapped(values)
+        times = np.asarray(metadata.rows_at("unit")["time_s"].to_list(), dtype=np.float64)
+        recorded = ~np.isnan(np.asarray(values))
+        expected = np.mean(np.abs(np.diff(np.asarray(values)[recorded]) / np.diff(times[recorded])))
+        assert self._roll(values, "variability") == pytest.approx([expected])
 
 
 @pytest.mark.required

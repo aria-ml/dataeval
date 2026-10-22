@@ -104,11 +104,6 @@ class Reduction:
         return self.expr(column, order, **dict(options))
 
 
-def _positioned(order: str) -> pl.Expr:
-    """Read the ordering key, restricted to the rows that recorded one."""
-    return pl.col(order).filter(pl.col(order).is_not_null())
-
-
 def _ordered(column: str, order: str) -> pl.Expr:
     """Read a group's values in the order its ordering column puts them in.
 
@@ -149,9 +144,22 @@ def _variability(column: str, order: str) -> pl.Expr:
     coarse clock -- have no time between them, so there is no rate to read off the pair;
     dividing by the zero step instead answered ``inf``, and one such pair made the whole
     destination's answer ``inf`` however many real pairs it had.
+
+    Values and keys read the **same** rows -- those where both were recorded -- as
+    :func:`_trend` does. Differencing the values with their missing readings still in place
+    made every difference that touched one null, so a series measured every other frame,
+    which is what a thinned frame view attaches, answered null outright. Reading across the
+    missing reading and dividing by the wider key step is the answer :attr:`Reduction.gap_sensitive`
+    already promises for a reading that was never taken.
+
+    Sorted first and filtered after, by a mask sorted the same way, for the polars 1.0
+    reason :func:`_ordered` gives.
     """
-    steps = _positioned(order).sort().diff()
-    return (_ordered(column, order).diff() / pl.when(steps != 0).then(steps)).abs().mean()
+    by_order = pl.col(order)
+    recorded = (pl.col(column).is_not_null() & by_order.is_not_null()).sort_by(by_order)
+    values = pl.col(column).sort_by(by_order).filter(recorded)
+    steps = by_order.sort_by(by_order).filter(recorded).diff()
+    return (values.diff() / pl.when(steps != 0).then(steps)).abs().mean()
 
 
 def _trend(column: str, order: str) -> pl.Expr:

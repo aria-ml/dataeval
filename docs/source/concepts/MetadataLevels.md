@@ -909,9 +909,12 @@ md.add_factors(stats, source_index=frames.to_source(stats["source_index"]))
 ```
 
 The translation works under any selector. `SequenceFrames(dataset, Stride(5))`
-measures every fifth frame, and the frames it skipped hold null. The roll-ups
-below answer null for a video with any frame unmeasured, though, so keep every
-frame for them.
+measures every fifth frame, and the frames it skipped hold null. A roll-up
+answers null for a video with any frame unmeasured unless you lower its
+`min_coverage`, which defaults to `1.0`. Both roll-ups below place the frames
+they do read by time, so on a thinned view pass
+`Aggregator("variability", "unit", "sequence", ("brightness",), min_coverage=0.0)`
+to read them over the measured frames.
 
 Then roll the column up to each video:
 
