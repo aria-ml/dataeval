@@ -28,7 +28,6 @@ import pytest
 
 from dataeval import Metadata
 from dataeval._metadata._structurers import LEVEL_KEY_COLUMNS
-from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import SourceIndex
 from tests.metadata.test_structurers import _mot_dataset
 
@@ -498,14 +497,20 @@ class TestAddressesThisMetadataCannotHonor:
                 + [SourceIndex(1, 99, "track"), SourceIndex(1, 7, "track")],
             )
 
-    def test_the_wrong_number_of_addresses_is_a_shape_error(self):
+    def test_a_partial_track_index_lands_with_nulls(self):
+        """A key names one row, so keyed addresses may name some of a level's rows.
+
+        The every-row rule now applies to unkeyed addresses only. A track row no address
+        names is null, as it is under ``key=``.
+        """
         md = _video()
 
-        with pytest.raises(ShapeMismatchError, match="2 track-level values but the metadata has 4"):
-            md.add_factors(
-                {"speed": [0.5, 0.9]},
-                source_index=[SourceIndex(0, 5, "track"), SourceIndex(0, 9, "track")],
-            )
+        md.add_factors(
+            {"speed": [0.5, 0.9]},
+            source_index=[SourceIndex(0, 5, "track"), SourceIndex(0, 9, "track")],
+        )
+        rows = md._store.frame("track").select("item_index", "track_id", "speed").rows()
+        assert rows == [(0, 5, 0.5), (0, 9, 0.9), (1, 7, None), (1, 3, None)]
 
     def test_nothing_is_written_when_the_addresses_are_refused(self):
         md = _video()

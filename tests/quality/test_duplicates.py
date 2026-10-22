@@ -1154,16 +1154,18 @@ class _ReplayFrame:
 class _ReplayStream:
     """A VideoStream replaying a fixed list of per-frame fill values or arrays."""
 
-    def __init__(self, values, shape=(3, 24, 32), timed=True):
-        self._values, self._shape, self._timed = values, shape, timed
+    def __init__(self, values, shape=(3, 24, 32), timed=True, frame_offset=0):
+        self._values, self._shape, self._timed, self._offset = values, shape, timed, frame_offset
+        self.walks = 0
 
     def __iter__(self):
+        self.walks += 1
         for index, value in enumerate(self._values):
             pixels = value if isinstance(value, np.ndarray) else np.full(self._shape, value, dtype=np.uint8)
-            yield _ReplayFrame(index, pixels, self._timed)
+            yield _ReplayFrame(self._offset + index, pixels, self._timed)
 
 
-def make_tracking_dataset(sequences, shape=(3, 24, 32), timed=True, annotate=None) -> Any:
+def make_tracking_dataset(sequences, shape=(3, 24, 32), timed=True, annotate=None, frame_offset=0) -> Any:
     """A MAITE-shaped tracking dataset whose frames replay the given fill values.
 
     ``annotate`` gives the per-frame values each sequence's annotation is derived from, and
@@ -1172,6 +1174,9 @@ def make_tracking_dataset(sequences, shape=(3, 24, 32), timed=True, annotate=Non
     make every video an annotation duplicate of every other video of the same length. Pass it to
     annotate one video as though it held another's frames -- the augmented copy, whose annotation
     matches and whose pixels do not.
+
+    ``frame_offset`` numbers each video's frames from there instead of zero, so a frame's
+    ``frame_index`` and its position in the stream disagree.
     """
     from dataclasses import dataclass
     from typing import Any as _Any
@@ -1211,11 +1216,63 @@ def make_tracking_dataset(sequences, shape=(3, 24, 32), timed=True, annotate=Non
     annotate = sequences if annotate is None else annotate
     for index, (values, annotation) in enumerate(zip(sequences, annotate, strict=True)):
         data.append((
-            _ReplayStream(values, shape, timed),
+            _ReplayStream(values, shape, timed, frame_offset),
             _VideoTarget(frame_tracks=[target(value) for value in annotation]),
             {"id": f"v{index}"},
         ))
     return _Dataset(data)
+
+
+@pytest.mark.required
+class TestFrameViewsAreNumberedByFrameIndex:
+    def test_exact_frame_duplicates(self):
+        dataset = make_tracking_dataset([[10, 20, 10]], frame_offset=100)
+        result = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(SequenceFrames(dataset), levels="unit")
+        assert result.exact == [[(0, 100), (0, 102)]]
+
+    def test_several_datasets_keep_their_own_numbers(self):
+        """Each dataset is numbered by its own frame_index, so equal-looking frames in two datasets stay apart."""
+        first = make_tracking_dataset([[10, 20, 10]], frame_offset=100)
+        second = make_tracking_dataset([[30, 40, 30]], frame_offset=500)
+        result = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(first, second, levels="unit")
+        exact = result.data().filter(pl.col("dup_type") == "exact").select("dataset_indices", "unit_indices").rows()
+        assert sorted(exact) == [([0, 0], [100, 102]), ([1, 1], [500, 502])]
+
+    def test_a_sampled_view_names_the_frames_it_kept(self):
+        """Positions 0, 2 and 4 of the source are frames 100, 102 and 104."""
+        dataset = make_tracking_dataset([[10, 20, 10, 20, 10]], frame_offset=100)
+        result = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(SequenceFrames(dataset, Stride(2)), levels="unit")
+        assert result.exact == [[(0, 100), (0, 102), (0, 104)]]
+
+    def test_a_cluster_only_run_names_frames_the_same_way(self):
+        dataset = make_tracking_dataset([[10, 20, 10]], frame_offset=100)
+        result = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0).evaluate(
+            SequenceFrames(dataset), levels="unit"
+        )
+        named = {unit for units in result.data()["unit_indices"].drop_nulls().to_list() for unit in units}
+        assert named <= {100, 101, 102}
+
+    def test_a_cluster_only_run_over_several_datasets_names_frames_the_same_way(self):
+        first = make_tracking_dataset([[10, 20, 10]], frame_offset=100)
+        second = make_tracking_dataset([[30, 40, 30]], frame_offset=500)
+        result = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0).evaluate(
+            first, second, levels="unit"
+        )
+        assert sorted(result.data()["unit_indices"].drop_nulls().to_list()) == [[100, 102], [500, 502]]
+
+    def test_naming_the_frames_adds_no_walk(self, monkeypatch):
+        """Measuring records every sequence, so the frame numbers are read off the record."""
+        from dataeval.quality import _duplicates
+
+        def walks(*, label: bool) -> list[int]:
+            if not label:
+                monkeypatch.setattr(_duplicates, "_numbered", lambda frame_map, views: frame_map)
+            dataset = make_tracking_dataset([[10, 20, 10], [30, 40, 30]], frame_offset=100)
+            Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(dataset, levels="unit")
+            monkeypatch.undo()
+            return [dataset[sequence][0].walks for sequence in range(len(dataset))]
+
+        assert walks(label=True) == walks(label=False)
 
 
 class _DeterministicResizeImage:
@@ -1545,9 +1602,10 @@ class TestSequenceRelations:
         )
         assert segment.row(0, named=True)["containment"] == pytest.approx([1.0, 1.0])
 
-    def test_two_clips_overlapping_in_the_middle(self):
+    @pytest.mark.parametrize("frame_offset", [0, 100])
+    def test_two_clips_overlapping_in_the_middle(self, frame_offset):
         source = _fills(10, 60)
-        dataset = make_tracking_dataset([source[0:30], source[20:50]])
+        dataset = make_tracking_dataset([source[0:30], source[20:50]], frame_offset=frame_offset)
         segment = (
             Duplicates(flags=ImageStats.HASH_XXHASH, min_segment_frames=5)
             .evaluate(dataset)
@@ -1555,8 +1613,8 @@ class TestSequenceRelations:
             .filter(pl.col("dup_type") == "segment")
         )
         row = segment.row(0, named=True)
-        assert row["span_start"] == [20, 0]
-        assert row["span_end"] == [29, 9]
+        assert row["span_start"] == [20 + frame_offset, frame_offset]
+        assert row["span_end"] == [29 + frame_offset, 9 + frame_offset]
 
     def test_unrelated_videos_share_nothing(self):
         dataset = make_tracking_dataset([_fills(10, 30), _fills(11, 30)])

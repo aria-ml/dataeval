@@ -3,11 +3,13 @@
 import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from itertools import islice
 from typing import Any, cast
 
 import numpy as np
 import pytest
 
+from dataeval import Metadata
 from dataeval.data import (
     AllFrames,
     Crop,
@@ -87,8 +89,9 @@ class _FakeFrame:
 class _CountingStream:
     """A VideoStream that records how many times it is iterated and how far."""
 
-    def __init__(self, n_frames, shape, counter, timed=True, index=0, extra=0, still_until=None):
+    def __init__(self, n_frames, shape, counter, timed=True, index=0, extra=0, still_until=None, numbering=None):
         self._still_until = still_until
+        self._numbering = numbering
         self._n = n_frames
         self._shape = shape
         self._counter = counter
@@ -101,7 +104,7 @@ class _CountingStream:
         for i in range(self._n + self._extra):
             self._counter["frames"] += 1
             yield _FakeFrame(
-                i,
+                i if self._numbering is None else self._numbering(i),
                 self._shape,
                 (i / 30.0) if self._timed else None,
                 (i * 1001) if self._timed else None,
@@ -136,15 +139,27 @@ def make_target(n_dets: int = 2) -> SingleFrameObjectTrackingTarget:
     )
 
 
-def make_dataset(frame_counts=(6, 4), shape=(3, 12, 14), timed=True, extra=0, counters=None, still_until=None):
-    """A tracking dataset whose streams report how often they are walked."""
+def make_dataset(
+    frame_counts=(6, 4), shape=(3, 12, 14), timed=True, extra=0, counters=None, still_until=None, numbering=None
+):
+    """A tracking dataset whose streams report how often they are walked.
+
+    ``numbering`` maps a frame's position to the ``frame_index`` it declares; by default the two agree.
+    """
     counters = [] if counters is None else counters
     data: list[MultiobjectTrackingDatum] = []
     for seq, n in enumerate(frame_counts):
         counter = {"iterations": 0, "frames": 0, "pixels": 0}
         counters.append(counter)
         stream = _CountingStream(
-            n, shape, counter, timed=timed, index=seq, extra=extra if seq == 0 else 0, still_until=still_until
+            n,
+            shape,
+            counter,
+            timed=timed,
+            index=seq,
+            extra=extra if seq == 0 else 0,
+            still_until=still_until,
+            numbering=numbering,
         )
         target = _FakeVideoTarget(frame_tracks=[make_target() for _ in range(n)])
         data.append((
@@ -194,6 +209,61 @@ class _ReservedName(FrameSelector):
 
     def select(self, frames):
         return (FrameVerdict(frame.position, factors={"sequence": 99}) for frame in frames)
+
+
+class _Fickle(FrameSelector):
+    """A stateful selector that changes its answer every time it is asked."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def __init__(self):
+        self.calls = 0
+
+    def select(self, frames):
+        self.calls += 1
+        return (FrameVerdict(frame.position) for frame in frames if (frame.position + self.calls) % 2 == 0)
+
+
+class _FickleFactors(FrameSelector):
+    """Keeps the same frames every time it is asked, but labels them differently each time."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def __init__(self):
+        self.calls = 0
+
+    def select(self, frames):
+        self.calls += 1
+        return (
+            FrameVerdict(frame.position, factors={"call": self.calls}) for frame in frames if frame.position % 2 == 0
+        )
+
+
+class _EveryOther(FrameSelector):
+    """Keeps even positions, deciding frame by frame rather than planning."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def select(self, frames):
+        return (FrameVerdict(frame.position) for frame in frames if frame.position % 2 == 0)
+
+
+class _KeepsNothing(FrameSelector):
+    """Reads every frame and keeps none."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def select(self, frames):
+        return (FrameVerdict(frame.position) for frame in frames if False)
+
+
+class _FirstTwo(FrameSelector):
+    """Keeps the first two frames and stops reading the sequence there."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def select(self, frames):
+        return (FrameVerdict(frame.position) for frame in islice(frames, 2))
 
 
 # --------------------------------------------------------------------------------------
@@ -779,16 +849,31 @@ class _Prepared:
     pts: int
 
 
-def image_dataset(images):
+class _UnnumberedStream(_ImageStream):
+    """A VideoStream whose frames carry pixels and nothing else: no frame_index, time_s or pts."""
+
+    def __iter__(self):
+        for pixels in self._images:
+            frame = _Prepared()
+            frame.pixels = pixels
+            yield frame
+
+
+def image_dataset(images, stream=_ImageStream):
     """A single-sequence tracking dataset replaying prepared frames."""
     data = [
         (
-            cast(Any, _ImageStream(images)),
+            cast(Any, stream(images)),
             cast(Any, _FakeVideoTarget(frame_tracks=[make_target() for _ in images])),
             cast(DatumMetadata, {"id": "vid0"}),
         )
     ]
     return _FakeDataset(data, DatasetMetadata({"id": "videos"}))
+
+
+def unnumbered_dataset(n_frames):
+    """A single-sequence tracking dataset whose frames declare no number, so position numbers them."""
+    return image_dataset(constant_frames(range(n_frames)), _UnnumberedStream)
 
 
 def constant_frames(fills, shape=(3, 12, 14)):
@@ -1026,6 +1111,133 @@ class TestTrackMap:
         frames = SequenceFrames(make_dataset((4,))[0], FrameIndices({0: []}))
         assert frames.frame_map.shape == (0, 2)
         assert frames.track_map.shape == (0, 2)
+
+
+@pytest.mark.required
+class TestTheSelectionIsFixedByTheFirstWalk:
+    def test_a_stateful_selector_is_consulted_once_per_sequence(self):
+        dataset, _ = make_dataset((6, 4))
+        selector = _Fickle()
+        frames = SequenceFrames(dataset, selector)
+        first = [m["frame"] for _, _, m in emit(frames)]
+        second = [m["frame"] for _, _, m in emit(frames)]
+        assert first == second
+        assert frames.frame_map[:, 1].tolist() == first
+        assert selector.calls == 2
+
+    def test_a_two_pass_selector_pays_its_second_pass_once(self):
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _Buffering(two_pass=True))
+        list(frames.stream())
+        assert [c["iterations"] for c in counters] == [2, 2]
+        list(frames.stream())
+        assert [c["iterations"] for c in counters] == [3, 3]
+
+    def test_reading_the_map_after_streaming_walks_nothing(self):
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _EveryOther())
+        list(frames.stream())
+        walked = [c["iterations"] for c in counters]
+        _ = frames.frame_map, len(frames), frames.n_dropped
+        assert [c["iterations"] for c in counters] == walked
+        assert frames.n_dropped == 5
+
+    def test_stopping_right_after_the_last_frame_still_records(self):
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _EveryOther())
+        stream = frames.stream()
+        _ = [next(stream) for _ in range(5)]  # 3 + 2 kept, never pulled past the last
+        walked = [c["iterations"] for c in counters]
+        _ = frames.frame_map
+        assert [c["iterations"] for c in counters] == walked
+
+    def test_an_abandoned_walk_records_only_finished_sequences(self):
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _EveryOther())
+        stream = frames.stream()
+        next(stream)
+        _ = frames.frame_map
+        assert counters[0]["iterations"] == 2
+        assert counters[1]["iterations"] == 1
+
+    def test_random_access_after_a_partial_stream_matches_the_stream(self):
+        dataset, _ = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _EveryOther())
+        streamed = list(frames.stream())
+        partial = SequenceFrames(dataset, _EveryOther())
+        next(partial.stream())
+        assert {k: v for k, v in partial[3][2].items() if k != "id"} == {
+            k: v for k, v in streamed[3][2].items() if k != "id"
+        }
+
+    def test_frames_without_a_frame_index_replay(self):
+        """Frames carrying pixels but no frame_index are numbered by position on both walks."""
+        frames = SequenceFrames(unnumbered_dataset(5), _EveryOther())
+        first = [m for _, _, m in emit(frames)]
+        assert [m["frame"] for m in first] == [0, 2, 4]
+        assert [m for _, _, m in frames.stream()] == first
+
+    def test_a_selector_that_stops_reading_early_still_replays(self):
+        """The record numbers every frame, so the first walk reads past where the selector stopped."""
+        dataset, _ = make_dataset((6,))
+        frames = SequenceFrames(dataset, _FirstTwo())
+        first = [m for _, _, m in emit(frames)]
+        assert [m["frame"] for m in first] == [0, 1]
+        assert [m for _, _, m in frames.stream()] == first
+        assert frames._record_of(0).frame_numbers.tolist() == list(range(6))
+
+
+@pytest.mark.required
+class TestTheReplayContract:
+    def test_a_source_that_changes_between_walks_is_refused(self):
+        dataset, _ = make_dataset((4,), numbering=lambda i: i)
+        frames = SequenceFrames(dataset, _EveryOther())
+        list(frames.stream())
+        dataset[0][0]._numbering = lambda i: i + 50  # the source now numbers its frames differently
+        with pytest.raises(ValueError, match="changed between walks"):
+            list(frames.stream())
+
+    def test_a_selector_that_answers_differently_on_two_walks_of_a_sequence_is_refused(self):
+        dataset, _ = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _Fickle())
+        stream = frames.stream()
+        next(stream)  # paused inside sequence 0
+        _ = frames.frame_map  # walks and records every sequence while the stream is paused
+        with pytest.raises(ValueError, match="chose different frames on two walks of sequence 0"):
+            list(stream)
+
+    def test_a_selector_that_labels_the_same_frames_differently_on_two_walks_is_refused(self):
+        dataset, _ = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _FickleFactors())
+        stream = frames.stream()
+        next(stream)  # paused inside sequence 0
+        _ = frames.frame_map  # records every sequence with the second call's factors
+        with pytest.raises(ValueError, match="chose different frames on two walks of sequence 0"):
+            list(stream)
+
+    def test_a_source_that_renumbers_between_two_passes_is_refused(self):
+        counters: list[dict] = []
+        # Each iteration of the stream numbers its frames differently.
+        dataset, _ = make_dataset((4,), counters=counters, numbering=lambda i: i + 50 * counters[0]["iterations"])
+        with pytest.raises(ValueError, match="changed between walks"):
+            list(SequenceFrames(dataset, _Buffering(two_pass=True)).stream())
+
+    def test_a_one_shot_stream_names_the_contract(self):
+        dataset, _ = make_dataset((4,))
+        stream, target, meta = dataset[0]
+        one_shot = iter(list(stream))
+        dataset._data[0] = (one_shot, target, meta)  # every dataset[0] now hands back the same iterator
+        with pytest.raises(ValueError, match="already consumed"):
+            list(SequenceFrames(dataset, _Buffering(two_pass=True)).stream())
+
+    def test_a_stream_spent_by_another_reader_names_the_contract(self):
+        dataset, _ = make_dataset((4,))
+        stream, target, meta = dataset[0]
+        one_shot = iter(list(stream))
+        dataset._data[0] = (one_shot, target, meta)
+        list(one_shot)  # another reader, such as Metadata, got there first
+        with pytest.raises(ValueError, match="already consumed"):
+            list(SequenceFrames(dataset, _EveryOther()).stream())
 
 
 # --------------------------------------------------------------------------------------
@@ -1310,3 +1522,143 @@ class TestAddressingTheFrameView:
 def test_representative_on_an_empty_sequence_yields_nothing():
     """No frames, no sequence: the walk finds nothing to be representative of."""
     assert list(Representative(3, batch_size=2).select(iter([]))) == []
+
+
+@pytest.mark.required
+class TestTranslatingToTheSource:
+    def test_source_indices_name_kept_frames_by_their_own_number(self):
+        dataset, _ = make_dataset((6, 4), numbering=lambda i: 100 + 3 * i)
+        frames = SequenceFrames(dataset, Stride(2))
+        assert frames.source_indices[:4] == (
+            SourceIndex(0, 100, "unit"),
+            SourceIndex(0, 106, "unit"),
+            SourceIndex(0, 112, "unit"),
+            SourceIndex(1, 100, "unit"),
+        )
+
+    def test_frames_and_detections(self):
+        dataset, _ = make_dataset((6, 4), numbering=lambda i: 100 + 3 * i)  # 2 detections per frame
+        frames = SequenceFrames(dataset, Stride(2))
+        assert frames.to_source([SourceIndex(1), SourceIndex(1, 1)]) == [
+            SourceIndex(0, 106, "unit"),
+            SourceIndex(0, 5, "instance"),
+        ]
+
+    def test_a_level_stated_address_is_refused(self):
+        dataset, _ = make_dataset((6, 4))
+        with pytest.raises(ValueError, match="already names a level"):
+            SequenceFrames(dataset).to_source([SourceIndex(0, 1, "unit")])
+
+    def test_a_detection_the_frame_lacks_is_refused(self):
+        dataset, _ = make_dataset((6, 4))
+        with pytest.raises(ValueError, match=r"has 2 detection\(s\)"):
+            SequenceFrames(dataset).to_source([SourceIndex(0, 2)])
+
+    def test_an_ambiguous_frame_number_is_refused(self):
+        dataset, _ = make_dataset((6,), numbering=lambda i: i // 2)
+        with pytest.raises(ValueError, match="ambiguous"):
+            SequenceFrames(dataset).to_source([SourceIndex(0)])
+
+    def test_a_negative_address_is_refused(self):
+        dataset, _ = make_dataset((6, 4))
+        with pytest.raises(IndexError, match="-1"):
+            SequenceFrames(dataset).to_source([SourceIndex(-1)])
+
+    def test_translating_after_streaming_walks_nothing(self):
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _EveryOther())
+        list(frames.stream())
+        walked = [c["iterations"] for c in counters]
+        frames.to_source([SourceIndex(0), SourceIndex(4, 1)])
+        assert [c["iterations"] for c in counters] == walked
+
+    def test_an_unwalked_view_walks_once_and_says_so(self, caplog):
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, Stride(2))
+        with caplog.at_level(logging.INFO):
+            frames.to_source([SourceIndex(0)])
+        assert "walking" in caplog.text
+        assert [c["iterations"] for c in counters] == [1, 0]  # only the sequence the address names
+
+    def test_a_stateful_selector_translates_the_frames_it_streamed(self):
+        dataset, _ = make_dataset((6, 4), numbering=lambda i: 100 + i)
+        frames = SequenceFrames(dataset, _Fickle())
+        streamed = [cast(dict[str, Any], m) for _, _, m in frames.stream()]
+        got = frames.to_source([SourceIndex(i) for i in range(len(streamed))])
+        assert got == [SourceIndex(m["sequence"], m["frame"], "unit") for m in streamed]
+
+    def test_a_selector_that_keeps_nothing(self):
+        from dataeval.quality import Duplicates
+
+        dataset, _ = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _KeepsNothing())
+        assert frames.source_indices == ()
+        assert frames.to_source([]) == []
+        result = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(frames, levels="unit")
+        assert result.exact == []
+
+    def test_empty_and_zero_frame(self):
+        dataset, _ = make_dataset((0, 3))
+        frames = SequenceFrames(dataset, _EveryOther())
+        assert frames.to_source([]) == []
+        assert frames.source_indices == (SourceIndex(1, 0, "unit"), SourceIndex(1, 2, "unit"))
+
+
+@pytest.mark.required
+class TestFindingsLandOnTheSourceRows:
+    """The design's headline: a thinned, non-planning view, frame numbers that are not positions."""
+
+    def _setup(self):
+        dataset, _ = make_dataset((6, 4), numbering=lambda i: 100 + 3 * i)
+        return dataset, SequenceFrames(dataset, _EveryOther()), Metadata(dataset)
+
+    def test_frame_values(self):
+        _, frames, md = self._setup()
+        n = len(frames)
+        md.add_factors(
+            {"rating": np.arange(n, dtype=float)}, source_index=frames.to_source([SourceIndex(i) for i in range(n)])
+        )
+        rows = md.rows_at("unit")
+        got = dict(zip(zip(rows["item_index"], rows["unit_index"], strict=True), rows["rating"], strict=True))
+        assert got[(0, 100)] == 0.0
+        assert got[(0, 106)] == 1.0
+        assert got[(1, 100)] == 3.0
+        assert got[(0, 103)] is None
+
+    def test_detection_values(self):
+        _, frames, md = self._setup()
+        addresses = [SourceIndex(1, 0), SourceIndex(1, 1)]  # view frame 1 is source position 2
+        md.add_factors({"iou": [0.3, 0.4]}, source_index=frames.to_source(addresses))
+        rows = md.rows_at("instance")
+        got = dict(zip(zip(rows["item_index"], rows["target_index"], strict=True), rows["iou"], strict=True))
+        assert got[(0, 4)] == 0.3
+        assert got[(0, 5)] == 0.4
+        assert sum(v is not None for v in got.values()) == 2
+
+    def test_detection_values_with_uneven_counts_per_frame(self):
+        """Detections are numbered by a running count across a sequence's frames, not by a stride."""
+        counts = [[3, 0, 1, 4, 2], [1, 2]]
+        dataset = make_dataset_of([[make_target(n) for n in sequence] for sequence in counts])
+        frames = SequenceFrames(dataset, _EveryOther())  # keeps positions 0, 2 and 4, then 0
+        md = Metadata(dataset)
+        # View frame 1 is position 2 (one detection), 2 is position 4 (two), and 3 is sequence 1's first.
+        addresses = [SourceIndex(1, 0), SourceIndex(2, 0), SourceIndex(2, 1), SourceIndex(3, 0)]
+        md.add_factors({"iou": [0.1, 0.2, 0.3, 0.4]}, source_index=frames.to_source(addresses))
+        rows = md.rows_at("instance")
+        got = dict(zip(zip(rows["item_index"], rows["target_index"], strict=True), rows["iou"], strict=True))
+        landed = {key: v for key, v in got.items() if v is not None}
+        assert landed == {(0, 3): 0.1, (0, 8): 0.2, (0, 9): 0.3, (1, 0): 0.4}
+
+    def test_the_documented_image_stats_recipe(self):
+        from dataeval.core import image_stats
+
+        _, frames, md = self._setup()
+        stats = image_stats(frames, stats=ImageStats.VISUAL_BRIGHTNESS)
+        md.add_factors(stats, source_index=frames.to_source(stats["source_index"]))
+        assert md.rows_at("unit")["unit_brightness"].is_not_null().sum() == len(frames)
+
+    def test_selector_values_ride_back_the_same_way(self):
+        _, frames, md = self._setup()
+        represented = [cast(dict[str, Any], m)["frames_represented"] for _, _, m in frames.stream()]
+        md.add_factors({"frames_represented": represented}, source_index=frames.source_indices)
+        assert md.rows_at("unit")["frames_represented"].drop_nulls().sum() == 10

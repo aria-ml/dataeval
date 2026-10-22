@@ -52,9 +52,9 @@ from dataeval._metadata._input import (
     resolve_aggregations,
     unpack_stats_result,
 )
-from dataeval._metadata._keyed import resolve_keyed
+from dataeval._metadata._keyed import _reject_ambiguous_key, resolve_keyed
 from dataeval._metadata._known import hold_back_invalid_known, known_violation, reject_invalid_known
-from dataeval._metadata._links import to_series
+from dataeval._metadata._links import gather_nulling, to_series
 from dataeval._metadata._loading import _load_factors
 from dataeval._metadata._reductions import (
     coverage_for,
@@ -4758,7 +4758,9 @@ class Metadata(Array, FeatureExtractor):
                 f"All {level}-level factors must have length {expected_len} ({level} row count); got {mismatched}.",
             )
 
-    def _split_source_index(self, source_index: Sequence[SourceIndex]) -> dict[FactorLevel, NDArray[np.intp]]:
+    def _split_source_index(
+        self, source_index: Sequence[SourceIndex]
+    ) -> tuple[dict[FactorLevel, NDArray[np.intp]], dict[FactorLevel, NDArray[np.bool_]]]:
         """Group source-index positions by the level each entry addresses.
 
         A :class:`~dataeval.types.SourceIndex` addresses any level this metadata has. An
@@ -4766,6 +4768,12 @@ class Metadata(Array, FeatureExtractor):
         task-generic reading — :attr:`item_level` unkeyed, :attr:`label_level` under a key
         — which is what every producer emits and what the two-level spelling has always
         meant.
+
+        Returns each level's gather and, for each level whose addresses carry a key, which
+        of its rows they name. A keyed write names rows, so the second is what lets it fold
+        into a column of the same name as a ``key=`` write does. It is returned for a level
+        named in full too, so that the fold rule does not depend on how many rows one call
+        happened to name.
 
         Rejects a source index carrying both kinds where this metadata's items and labels
         share a level, since the two cannot be told apart there.
@@ -4788,12 +4796,15 @@ class Metadata(Array, FeatureExtractor):
             )
 
         order: dict[FactorLevel, NDArray[np.intp]] = {}
+        named: dict[FactorLevel, NDArray[np.bool_]] = {}
         for level, level_rows in rows.by_level.items():
             if not len(level_rows):
                 continue
             self._reject_unknown_level(level)
             order[level] = self._match_rows(level, level_rows)
-        return order
+            if level_rows.is_keyed:
+                named[level] = order[level] >= 0
+        return order, named
 
     def _reject_unknown_level(self, level: FactorLevel) -> None:
         """Reject an address at a level this metadata's task does not have.
@@ -4839,7 +4850,7 @@ class Metadata(Array, FeatureExtractor):
             )
         return LEVEL_KEY_COLUMNS[level]
 
-    def _match_rows(self, level: FactorLevel, rows: LevelRows) -> NDArray[np.intp]:
+    def _match_rows(self, level: FactorLevel, rows: LevelRows) -> NDArray[np.intp]:  # noqa: C901
         """Match a level's addresses against its rows, and say where each row's value is.
 
         Returns the source-index position supplying each row of the level frame, in frame
@@ -4859,12 +4870,21 @@ class Metadata(Array, FeatureExtractor):
         this metadata's schema. A level the item alone names has no key column, and only
         the items are compared.
 
-        Raises `ShapeMismatchError` when the source index does not describe one value per
-        row at `level`, and `ValueError` when it describes the right number but names rows
-        this metadata does not have.
+        Keyed addresses need not name every row, since a key names its own row: they are
+        matched by :meth:`_match_named_rows`, which reads ``-1`` for a row none names.
+        Only when they name as many rows as the level has do they take the comparison
+        above, which is the one sized for a million-row index.
+
+        Raises `ShapeMismatchError` when unkeyed addresses do not describe one value per
+        row at `level`, and `ValueError` when addresses name rows this metadata does not
+        have.
         """
         counts = self._store.counts
         expected_len = counts.get(level, 0)
+        key_column = self._address_key_column(level, rows.is_keyed)
+        keyed = rows.is_keyed and key_column is not None
+        if keyed and len(rows) != expected_len:
+            return self._match_named_rows(level, rows, cast("str", key_column))
         if len(rows) != expected_len:
             raise ShapeMismatchError(
                 f"source_index describes {len(rows)} {level}-level values but the "
@@ -4873,11 +4893,15 @@ class Metadata(Array, FeatureExtractor):
                 "Metadata.item_indices, not range(item_count), lists the items that have them.",
             )
 
-        key_column = self._address_key_column(level, rows.is_keyed)
         sorted_items, sorted_keys, order = self._sorted_row_keys(level, key_column)
         mismatched = sorted_items != rows.items
         if sorted_keys is not None:
             mismatched |= sorted_keys != rows.keys
+        if np.any(mismatched) and keyed:
+            # As many addresses as rows, yet not the same rows, so one of them names a row
+            # this metadata lacks. Compared pairwise, the wrong row would be blamed on its
+            # sorted neighbors; the join names the address itself, and raises.
+            return self._match_named_rows(level, rows, cast("str", key_column))
         if np.any(mismatched):
             # First few only: a rejected million-row index must not spend longer building
             # its error than the call would have taken to succeed.
@@ -4900,6 +4924,41 @@ class Metadata(Array, FeatureExtractor):
 
         gather = np.empty(expected_len, dtype=np.intp)
         gather[order] = rows.positions
+        return gather
+
+    def _match_named_rows(self, level: FactorLevel, rows: LevelRows, key_column: str) -> NDArray[np.intp]:
+        """Match keyed addresses to the rows they name, and read ``-1`` for every other row.
+
+        A key names one row, so keyed addresses may name only some of a level's rows: a
+        thinned view of a video holds some of its frames, and findings measured on it name
+        only those. A row none names reads ``-1``, which :meth:`_place` gathers as null,
+        the same answer ``resolve_keyed`` gives under ``key=``.
+
+        A join rather than :meth:`_match_rows`'s sorted comparison, since the two sides no
+        longer pair off one for one, and a dict join like ``key=``'s: it is paid once, at
+        write time. An address naming one row twice never reaches here, because
+        :meth:`SourceIndexRows.parse` refuses it first.
+
+        Raises `ValueError` when the key column does not name one row each, or when an
+        address names a row this metadata does not have.
+        """
+        frame = self._store.frame(level)
+        _reject_ambiguous_key(frame, level, key_column)
+
+        # A null key reads as the sentinel an unkeyed address carries, as in _sorted_row_keys.
+        keys = frame[key_column].fill_null(_UNKEYED).to_list()
+        addresses = zip(rows.items.tolist(), rows.keys.tolist(), strict=True)
+        source = dict(zip(addresses, rows.positions.tolist(), strict=True))
+        wanted = zip(frame["item_index"].to_list(), keys, strict=True)
+        # Popped as they match, so what is left over is exactly the addresses naming no row.
+        gather = np.fromiter((source.pop(pair, -1) for pair in wanted), dtype=np.intp, count=frame.height)
+        if source:
+            # First few only, as in _match_rows: the error must not outlast the call.
+            unknown = [(item, None if key < 0 else key) for item, key in [*source][:5]]
+            raise ValueError(
+                f"source_index names {level}-level rows this metadata does not have, such as {unknown} "
+                f"({len(source)} in all). Rows are named (item_index, {key_column}).",
+            )
         return gather
 
     def _sorted_row_keys(
@@ -5577,7 +5636,8 @@ class Metadata(Array, FeatureExtractor):
 
         Under ``overwrite=True`` the named rows are replaced and the rest are kept, rather
         than the whole column being replaced. Rows this write does not name are not rows
-        it says anything about.
+        it says anything about. A write naming every row keeps none of them, so it takes
+        its own values whole rather than a merge typed by the column it replaces.
         """
         safe = safe_column_name(name)
         if safe not in self._factors_by_level.get(level, ()):
@@ -5586,6 +5646,10 @@ class Metadata(Array, FeatureExtractor):
         written = pl.Series(named)
         if not overwrite and existing.filter(written).is_not_null().any():
             return None
+        if named.all():
+            # zip_with would promote to the supertype of the two, so a float overwrite of a
+            # string column would land as strings although no old value survives.
+            return safe, to_series(safe, values)
         return safe, to_series(safe, values).zip_with(written, existing)
 
     def _resolve_factor_name(  # noqa: C901
@@ -5701,35 +5765,51 @@ class Metadata(Array, FeatureExtractor):
         self,
         factors: Mapping[str, NDArray[Any]],
         source_index: Sequence[SourceIndex],
-    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
+    ) -> tuple[
+        list[tuple[str, FactorLevel, NDArray[Any] | pl.Series]], list[str], dict[FactorLevel, NDArray[np.bool_]]
+    ]:
         """Place every value by its source-index label rather than by its position.
 
-        Returns the columns to write, and any level splits discarded for holding no values.
+        Returns the columns to write, any level splits discarded for holding no values, and
+        which rows the keyed addresses at each level name.
         """
         reject_length_mismatch(factors, source_index)
-        return self._place(factors, self._split_source_index(source_index))
+        positions_by_level, named = self._split_source_index(source_index)
+        return *self._place(factors, positions_by_level), named
 
     def _place(
         self,
         factors: Mapping[str, NDArray[Any]],
         positions_by_level: Mapping[FactorLevel, NDArray[np.intp]],
-    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
+    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any] | pl.Series]], list[str]]:
         """Gather each factor onto the rows its positions name, and name the columns.
 
         Sole producer of the ``<level>_<name>`` rule. Values spanning several levels are
         always prefixed; a single level keeps the bare name. Returns the columns to write
         plus any discarded splits, staying pure.
+
+        A position of ``-1`` is a row no address names, and gathers as null.
         """
         prefixed = len(positions_by_level) > 1
-        placed: list[tuple[str, FactorLevel, NDArray[Any]]] = []
+        placed: list[tuple[str, FactorLevel, NDArray[Any] | pl.Series]] = []
         vacuous: list[str] = []
         for name, values in factors.items():
+            # Judged on the values the addresses name: a row none names is null whatever
+            # the factor holds, so it says nothing about whether the factor has values there.
             columns: list[tuple[str, FactorLevel, NDArray[Any]]] = [
-                (f"{factor_level}_{name}" if prefixed else name, factor_level, values[positions])
+                (f"{factor_level}_{name}" if prefixed else name, factor_level, values[positions[positions >= 0]])
                 for factor_level, positions in positions_by_level.items()
             ]
             kept, dropped = drop_vacuous_splits(columns)
-            placed.extend(kept)
+            for column, factor_level, named_values in kept:
+                positions = positions_by_level[factor_level]
+                # Indexed with -1, numpy would read the last value rather than none.
+                partial = len(named_values) < len(positions)
+                placed.append((
+                    column,
+                    factor_level,
+                    gather_nulling(column, values, positions) if partial else named_values,
+                ))
             vacuous.extend(dropped)
         return placed, vacuous
 
@@ -5758,12 +5838,16 @@ class Metadata(Array, FeatureExtractor):
         factors: Mapping[str, NDArray[Any]],
         level: FactorLevel | None,
         source_index: Sequence[SourceIndex] | None,
-    ) -> tuple[list[tuple[str, FactorLevel, NDArray[Any]]], list[str]]:
+    ) -> tuple[
+        list[tuple[str, FactorLevel, NDArray[Any] | pl.Series]], list[str], dict[FactorLevel, NDArray[np.bool_]] | None
+    ]:
         """Work out the level and values of every column ``add_factors`` is about to write.
 
         Returns one ``(name, level, values)`` per column, plus the names of any level
         splits discarded for holding no values. With a source index each factor can
-        yield several columns, one per level, named ``<level>_<name>``.
+        yield several columns, one per level, named ``<level>_<name>``, and the third
+        element says which rows the keyed addresses at each level name; it is None for
+        a write by `level`, which names every row.
 
         Exactly one destination is set by the time this runs: :meth:`_resolve_requested_level`
         has already refused the call naming neither and the call naming both, so ``level``
@@ -5775,7 +5859,7 @@ class Metadata(Array, FeatureExtractor):
 
         named_level = cast("FactorLevel", level)
         self._validate_factor_lengths(factors, named_level)
-        return [(name, named_level, values) for name, values in factors.items()], []
+        return [(name, named_level, values) for name, values in factors.items()], [], None
 
     @overload
     def add_factors(
@@ -5872,8 +5956,9 @@ class Metadata(Array, FeatureExtractor):
             When False, the existing factor keeps the name and a colliding factor is stored
             under a new name instead (see `append_string`).
 
-            Under `key` a collision is decided per row rather than per name, since a keyed
-            write names rows: see the `key` description below.
+            Under `key`, or `source_index` addresses carrying a key, a collision is decided
+            per row rather than per name, since a keyed write names rows: see the `key`
+            description below.
         append_string : str, default "_added"
             Suffix appended to a factor name that collides with an existing column when
             `overwrite` is False. If the suffixed name is also taken, an incrementing
@@ -5883,6 +5968,14 @@ class Metadata(Array, FeatureExtractor):
             returned by :func:`~dataeval.core.image_stats`. Mutually exclusive with
             `level`, which it replaces: each value is placed by its address rather than by
             its position (see Notes).
+
+            Addresses carrying a key, such as ``SourceIndex(0, 12, "unit")``, may name
+            only some of a level's rows, since a key names one row. This is how findings
+            from a thinned view of a video, which holds only some of its frames, attach
+            to the full dataset. A row no address names is null, and such a write folds
+            into a factor of the same name and collides with it exactly as a `key` write
+            does (see `key` below). Addresses without a key name a row by its item alone,
+            and still have to name every row at their level.
         key : str or None, default None
             Column of the named level's rows to match values against, instead of taking
             them in that level's row order. Requires `level`, and is mutually exclusive
@@ -5972,12 +6065,13 @@ class Metadata(Array, FeatureExtractor):
         ------
         ShapeMismatchError
             When factor lengths do not match the specified level's row count, the
-            length of `source_index`, or the row counts `source_index` implies; or, under
-            `key`, when they do not match the number of keys.
+            length of `source_index`, or the row counts addresses without a key imply;
+            or, under `key`, when they do not match the number of keys.
         ValueError
             When neither `level` nor `source_index` is given, when the level is not part
             of the dataset's schema, when both `level` and `source_index` are given, or
-            when `source_index` names a level this metadata does not have. Under `key`:
+            when `source_index` names a row twice, or a level or row this metadata does
+            not have. Under `key`:
             when it is not a column of that level's rows, when that column does not name
             one row each, when no values for it were supplied, when the keys are not
             unique, or when the dataset holds several items and the values do not say
@@ -6101,13 +6195,15 @@ class Metadata(Array, FeatureExtractor):
         kept, skipped = split_by_dimensionality(factors)
         reject_mixed_values(kept)
 
-        named: NDArray[np.bool_] | None = None
+        named: Mapping[FactorLevel, NDArray[np.bool_]] | None
         if key is not None:
             # _reject_unusable_key has already forced a named level here and
             # _resolve_requested_level resolved it against the schema, so this is one.
-            (placed, named), vacuous = resolve_keyed(self, kept, cast("FactorLevel", resolved_level), key), []
+            keyed_level = cast("FactorLevel", resolved_level)
+            (placed, mask), vacuous = resolve_keyed(self, kept, keyed_level, key), []
+            named = {keyed_level: mask}
         else:
-            placed, vacuous = self._resolve_factor_levels(kept, resolved_level, source_index)
+            placed, vacuous, named = self._resolve_factor_levels(kept, resolved_level, source_index)
         resolved, moved = self._resolve_columns(placed, named, overwrite, append_string)
         # Checked under the final names: a known name renamed to ``*_added`` on its way in
         # no longer claims the definition, so it is not held to it. A column moved aside to
@@ -6217,7 +6313,7 @@ class Metadata(Array, FeatureExtractor):
     def _resolve_columns(
         self,
         placed: Sequence[tuple[str, FactorLevel, Any]],
-        named: NDArray[np.bool_] | None,
+        named: Mapping[FactorLevel, NDArray[np.bool_]] | None,
         overwrite: bool,
         append_string: str,
     ) -> tuple[list[_ResolvedFactor], dict[str, str]]:
@@ -6228,6 +6324,10 @@ class Metadata(Array, FeatureExtractor):
         fills rows nothing held, or writes back the values already there, loses nothing and
         moves nothing, so re-running one does not pile up copies. Pure, like the rest of the
         resolve phase.
+
+        `named` holds, for each level a keyed write addresses, which of its rows it names.
+        A column at such a level folds into one of the same name as :meth:`_merge_keyed`
+        describes, whether the keys came by ``key=`` or by `source_index`.
 
         Returns
         -------
@@ -6240,7 +6340,8 @@ class Metadata(Array, FeatureExtractor):
         resolved: list[_ResolvedFactor] = []
         replaced: list[str] = []
         for name, factor_level, values in placed:
-            merged = None if named is None else self._merge_keyed(name, factor_level, values, named, overwrite)
+            mask = None if named is None else named.get(factor_level)
+            merged = None if mask is None else self._merge_keyed(name, factor_level, values, mask, overwrite)
             if merged is not None:
                 col_name, values = merged
             else:
