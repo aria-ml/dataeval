@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Flag, auto
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 import xxhash as xxh
@@ -231,11 +231,48 @@ class FrameVerdict:
         a factor on the frame's datum metadata, and so a ``unit``-level factor in
         :class:`~dataeval.Metadata`. Names reserved by
         :class:`~dataeval.data.SequenceFrames` are rejected rather than silently overwritten.
+    unmeasured : bool, default False
+        Whether the selector kept the frame because it could not measure it -- no digest, no
+        ``time_s``, a NaN statistic. A selector never drops a frame on an assumption: what it
+        cannot judge it keeps, and says so here, so a selection can report how much of it went
+        unjudged. Recorded beside the frame's metadata rather than in it, so it is no datum
+        factor. Inside a :class:`~dataeval.data.Chain`, a frame is marked when any stage that
+        kept it marked it.
     """
 
     position: int
     weight: float | None = None
     factors: Mapping[str, Any] = field(default_factory=dict)
+    unmeasured: bool = False
+
+
+class _StageTrace(NamedTuple):
+    """What one stage of a selection decided for one sequence: one entry per verdict it yielded, in order.
+
+    A private protocol between ``Chain`` and :class:`~dataeval.data.SequenceFrames`, which reports
+    it through :meth:`~dataeval.data.SequenceFrames.selection_report`. Positions alone cannot
+    count a selection: a stage may keep one frame more than once, so one source position can be
+    several inputs to the next stage, and ordinals tell them apart.
+    """
+
+    selector: "FrameSelector"
+    ordinals: NDArray[np.intp]
+    """Each verdict's index in the stage's input: the stage before's verdicts in order, or the source frames."""
+    positions: NDArray[np.intp]
+    """Each verdict's source position."""
+    unmeasured: NDArray[np.bool_]
+    """Each verdict's own :attr:`FrameVerdict.unmeasured`, as this stage set it rather than any stage before it."""
+    mass_out: float
+    """The source frames the stage's verdicts stand for, settled: what it passes on to the next stage."""
+
+
+class _Planned(NamedTuple):
+    """What :meth:`FrameSelector._plan_weighted` returns: the planned positions, and any weights and trace."""
+
+    positions: NDArray[np.intp]
+    weights: NDArray[np.float64] | None = None
+    trace: tuple[_StageTrace, ...] | None = None
+    """One per stage, for a selector that plans in stages; None for a selector that is one stage."""
 
 
 class FrameSelector(ReprMixin, ABC):
@@ -330,7 +367,7 @@ class FrameSelector(ReprMixin, ABC):
         """
         return None
 
-    def _plan_weighted(self, info: SequenceInfo) -> tuple[NDArray[np.intp], NDArray[np.float64] | None] | None:
+    def _plan_weighted(self, info: SequenceInfo) -> _Planned | None:
         """Return :meth:`plan`'s positions with the weight of each, or None when the frames decide.
 
         A private protocol between ``Chain`` and :class:`~dataeval.data.SequenceFrames`, which
@@ -338,10 +375,11 @@ class FrameSelector(ReprMixin, ABC):
         weight on, so its weights are None and the default rule applies; a chain, whose planned
         frames stand for what every stage dropped, declares them here, with its positions already
         ascending, unique and in range, and from the same call, so a stage that plans differently
-        each time it is asked cannot weight frames the view does not hold.
+        each time it is asked cannot weight frames the view does not hold. A chain also returns
+        its trace here, one :class:`_StageTrace` per stage.
         """
         positions = self.plan(info)
-        return None if positions is None else (positions, None)
+        return None if positions is None else _Planned(positions)
 
     @abstractmethod
     def select(self, frames: Iterator[FrameCandidate]) -> Iterator[FrameVerdict]:
@@ -746,8 +784,8 @@ class Redundancy(FrameSelector):
             current = digest(frame.pixels)
             if not current:
                 # No digest is no evidence that nothing changed, so the frame is kept rather than
-                # dropped on an assumption.
-                yield FrameVerdict(frame.position)
+                # dropped on an assumption, and marked as kept unmeasured.
+                yield FrameVerdict(frame.position, unmeasured=True)
                 continue
             if kept is None or hamming_distance(kept, current) > self.radius:
                 kept = current
@@ -783,8 +821,9 @@ class FrameRate(FrameSelector):
     against each frame's own ``time_s``, which requires the walk. Guessing a rate would make every
     derived timing quietly wrong.
 
-    A sequence whose frames declare no ``time_s`` is kept in full, with a log line saying so.
-    Silently thinning on an assumed frame rate is the one outcome worth ruling out.
+    A sequence whose frames declare no ``time_s`` is kept in full, each such frame marked
+    :attr:`FrameVerdict.unmeasured`, with a log line saying so. Silently thinning on an assumed
+    frame rate is the one outcome worth ruling out.
 
     Examples
     --------
@@ -809,9 +848,10 @@ class FrameRate(FrameSelector):
             sequence = frame.sequence
             if frame.time_s is None:
                 # No timestamp is no basis for thinning, so the frame is kept rather than
-                # dropped on an assumption. Reported once per sequence, below.
+                # dropped on an assumption, and marked as kept unmeasured. Logged once per
+                # sequence, below.
                 untimed += 1
-                yield FrameVerdict(frame.position)
+                yield FrameVerdict(frame.position, unmeasured=True)
                 continue
             if last_kept is None or frame.time_s - last_kept >= interval:
                 last_kept = frame.time_s

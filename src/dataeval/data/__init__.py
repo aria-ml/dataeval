@@ -2,6 +2,7 @@
 
 __all__ = [
     "AllFrames",
+    "BestPerTrack",
     "Chain",
     "ClassBalance",
     "ClassFilter",
@@ -17,9 +18,11 @@ __all__ = [
     "FrameRate",
     "FrameSelector",
     "FrameVerdict",
+    "HasLabels",
     "Indices",
     "Limit",
     "Operation",
+    "QualityGate",
     "Redundancy",
     "Relabel",
     "Representative",
@@ -27,6 +30,7 @@ __all__ = [
     "Reverse",
     "SegmentPlanner",
     "SelectChannels",
+    "SelectionReport",
     "SequenceFrames",
     "SequenceInfo",
     "Shuffle",
@@ -34,6 +38,7 @@ __all__ = [
     "SourceLocator",
     "Stride",
     "TorchvisionTransform",
+    "TrackEvents",
     "TrainValSplit",
     "VideoSegments",
     "VideoStitch",
@@ -51,12 +56,14 @@ from dataeval.data._classfilter import ClassFilter
 from dataeval.data._crop import Crop
 from dataeval.data._crops import DetectionCrops
 from dataeval.data._filter import Filter
-from dataeval.data._frames import SequenceFrames
+from dataeval.data._frames import SelectionReport, SequenceFrames
 from dataeval.data._indices import Indices
+from dataeval.data._label_selectors import BestPerTrack, HasLabels, TrackEvents
 from dataeval.data._limit import Limit
 from dataeval.data._locate import SourceItem, SourceLocator
 from dataeval.data._merge import merge_datasets
 from dataeval.data._planners import Cuts, SegmentPlanner, Window
+from dataeval.data._quality_gate import QualityGate
 from dataeval.data._relabel import Relabel
 from dataeval.data._resize import Resize
 from dataeval.data._reverse import Reverse

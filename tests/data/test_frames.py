@@ -239,6 +239,21 @@ class _FickleFactors(FrameSelector):
         )
 
 
+class _FickleEvidence(FrameSelector):
+    """Keeps the same frames every time it is asked, but says each time whether it measured them."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def __init__(self):
+        self.calls = 0
+
+    def select(self, frames):
+        self.calls += 1
+        return (
+            FrameVerdict(frame.position, unmeasured=self.calls % 2 == 0) for frame in frames if frame.position % 2 == 0
+        )
+
+
 class _EveryOther(FrameSelector):
     """Keeps even positions, deciding frame by frame rather than planning."""
 
@@ -1066,6 +1081,61 @@ class TestRedundancySelector:
 
         # Frame 0 is kept, Frame 1 is dropped (dist <= radius), Frame 2 is dropped (dist <= radius to 0)
         assert kept == [0]
+
+
+@pytest.mark.required
+class TestAFrameKeptWithoutEvidenceIsMarked:
+    def test_frame_rate_marks_untimed_frames(self):
+        dataset, _ = make_dataset((4,), timed=False)
+        frames = SequenceFrames(dataset, FrameRate(10.0))
+        entries = frames._record_of(0).entries
+        assert [e["unmeasured"] for e in entries] == [True, True, True, True]
+
+    def test_frame_rate_marks_nothing_on_timed_frames(self):
+        dataset, _ = make_dataset((4,))
+        assert not any(e["unmeasured"] for e in SequenceFrames(dataset, FrameRate(10.0))._record_of(0).entries)
+
+    def test_redundancy_marks_a_frame_it_has_no_digest_for(self):
+        """A frame too small to hash has no digest, and the next one, which hashes, is kept as measured."""
+        dataset = image_dataset([np.zeros((3, 4, 4), dtype=np.uint8), *constant_frames([90, 90])])
+        frames = SequenceFrames(dataset, Redundancy(radius=0, method="phash"))
+        entries = frames._record_of(0).entries
+        assert [e["position"] for e in entries] == [0, 1]
+        assert [e["unmeasured"] for e in entries] == [True, False]
+
+    def test_the_view_lists_which_frames_were_kept_unmeasured(self):
+        untimed, _ = make_dataset((4, 3), timed=False)
+        frames = SequenceFrames(untimed, FrameRate(10.0))
+        assert frames.unmeasured.tolist() == [True] * len(frames.frame_map)
+        timed, _ = make_dataset((4, 3))
+        frames = SequenceFrames(timed, FrameRate(10.0))
+        assert frames.unmeasured.tolist() == [False] * len(frames.frame_map)
+
+    def test_a_planned_view_marks_nothing_without_decoding(self):
+        dataset, counters = make_dataset((6, 4))
+        assert SequenceFrames(dataset, Stride(2)).unmeasured.tolist() == [False] * 5
+        assert [c["iterations"] for c in counters] == [0, 0]
+
+    def test_the_flag_is_not_a_datum_factor(self):
+        dataset, _ = make_dataset((4,), timed=False)
+        assert "unmeasured" not in emit(SequenceFrames(dataset, FrameRate(10.0)))[0][2]
+
+    def test_a_replay_of_a_recorded_sequence_keeps_the_flags(self):
+        dataset, counters = make_dataset((4,), timed=False)
+        frames = SequenceFrames(dataset, FrameRate(10.0))
+        list(frames.stream())  # records the sequence
+        replayed = [entry["unmeasured"] for entry, _, _ in frames._walk(frames._sequences[0])]
+        assert counters[0]["iterations"] == 2  # the second walk replayed the record
+        assert replayed == [True, True, True, True]
+
+    def test_a_selector_that_marks_the_same_frames_differently_on_two_walks_is_refused(self):
+        dataset, _ = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, _FickleEvidence())
+        stream = frames.stream()
+        next(stream)  # paused inside sequence 0
+        _ = frames.frame_map  # records every sequence with the second call's flags
+        with pytest.raises(ValueError, match="chose different frames on two walks of sequence 0"):
+            list(stream)
 
 
 class _Medoid(FrameSelector):
