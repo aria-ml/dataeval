@@ -2,7 +2,7 @@
 
 __all__ = []
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, cast
@@ -140,8 +140,9 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     ValueError
         If a selector names a reserved factor, if a sequence's stream disagrees with its target on
         frame count, comes back already spent on a later walk, or numbers its frames differently
-        from the walk that recorded it, or if a selector yields a verdict out of order without
-        declaring ``two_pass``.
+        from the walk that recorded it, if a selector yields a verdict out of order without
+        declaring ``two_pass``, or if a selector's weights for a sequence total more than the
+        frames it holds.
 
     See Also
     --------
@@ -181,7 +182,10 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     - ``frame`` (*int*) -- the frame's own ``frame_index`` in the source video.
     - ``time_s``, ``pts`` -- the frame's own timings, where it declares them.
     - ``frames_represented`` (*float*) -- how many source frames this one stands for.
-    - ``seconds_represented`` (*float*) -- the same span in seconds, where timings allow.
+    - ``seconds_represented`` (*float*) -- where timings allow, the span of the timeline from this
+      kept frame to the next, the first starting at the sequence's first timestamp and the last
+      running to its final one. A span of the timeline, not a mass: it does not leave out the
+      time an excluded frame covers.
     - ``sequence_position`` (*float*) -- position within the sequence, normalized to ``[0, 1]``.
     - ``sequence_n_frames`` (*int*) -- how many frames the source sequence holds.
     - anything a selector put in :attr:`~dataeval.data.FrameVerdict.factors`.
@@ -194,8 +198,18 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     **Weights matter more than they look.** A frame kept out of 300 near-identical ones is not one
     observation. ``frames_represented`` records what it stands for so a reader can weight by it;
     nothing in DataEval consumes a sample weight yet, so an unweighted read of a thinned view
-    describes *distinct content* rather than the source stream. Per-sequence aggregates are a
-    group-by away and are deliberately not denormalized onto every row::
+    describes *distinct content* rather than the source stream.
+
+    ``frames_represented`` is exact source-frame mass. Every frame a selector drops is either
+    *represented* by a kept frame, as a thinning selector's are, or *excluded*, as a filter's are
+    (:attr:`~dataeval.data.FrameSelector.excludes`). Per sequence, the kept frames'
+    ``frames_represented`` therefore sum to its frame count less the frames excluded. Under a
+    thinning selector the first kept frame also stands for every frame before it, so a selection
+    that skips a sequence's opening frames still accounts for them. A sequence whose weights total
+    more than its frame count raises.
+
+    Per-sequence aggregates are a group-by away and are deliberately not denormalized onto every
+    row::
 
         md.dataframe.group_by("sequence").agg(pl.len().alias("sequence_n_selected"))
 
@@ -227,15 +241,18 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         # here without decoding anything and `__len__` is free. Normalized to ascending, unique,
         # in-range positions -- which is what the replay walk emits -- so the length promised here
         # is the length the walk delivers even for a plan that repeats or overruns a sequence.
-        planned = [self._selector.plan(info) for info in self._sequences]
-        self._planned: list[NDArray[np.intp]] | None = (
-            None
-            if any(positions is None for positions in planned)
-            else [
-                self._normalized(cast(NDArray[np.intp], positions), info)
-                for positions, info in zip(planned, self._sequences, strict=True)
+        # Planned once per sequence, through the private `_plan_weighted`, so any weights the
+        # selector declares belong to these very positions even if it plans differently each time.
+        planned = [self._selector._plan_weighted(info) for info in self._sequences]
+        self._planned: list[NDArray[np.intp]] | None = None
+        self._planned_weights: list[NDArray[np.float64] | None] = []
+        if all(plan is not None for plan in planned):
+            normalized = [
+                self._normalized_plan(cast(tuple[NDArray[np.intp], NDArray[np.float64] | None], plan), info)
+                for plan, info in zip(planned, self._sequences, strict=True)
             ]
-        )
+            self._planned = [positions for positions, _ in normalized]
+            self._planned_weights = [weights for _, weights in normalized]
         # The execution record: each sequence's selection, fixed by its first complete walk.
         self._records: dict[int, _SequenceRecord] = {}
         self._realized: list[dict[str, Any]] | None = None
@@ -570,6 +587,20 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         wanted = np.unique(np.asarray(positions, dtype=np.intp))
         return wanted[(wanted >= 0) & (wanted < info.n_frames)]
 
+    def _normalized_plan(
+        self, plan: tuple[NDArray[np.intp], NDArray[np.float64] | None], info: SequenceInfo
+    ) -> tuple[NDArray[np.intp], NDArray[np.float64] | None]:
+        """Normalize a plan's positions, refusing a plan whose weights normalizing would misalign."""
+        positions, weights = plan
+        normalized = self._normalized(positions, info)
+        if weights is not None and (len(weights) != len(positions) or not np.array_equal(normalized, positions)):
+            raise ValueError(
+                f"SequenceFrames: {self._selector!r} declared weights for sequence {info.index} beside "
+                "positions that are not ascending, unique and in range, or not one weight per position. "
+                "Normalizing them would leave the weights describing other frames."
+            )
+        return normalized, weights
+
     def _located(self) -> list[tuple[int, int]]:
         """Return the ``(sequence, position)`` behind each view position, in view order.
 
@@ -701,12 +732,13 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         info: SequenceInfo,
         trailer: dict[str, Any],
     ) -> Iterator[tuple[int, Any, SingleFrameObjectTrackingTarget]]:
-        """Walk a sequence's frames, remembering the last timestamp seen and every frame's number.
+        """Walk a sequence's frames, remembering the first and last timestamps and every frame's number.
 
-        The final kept frame's span runs to the end of the sequence, not to a successor it does
-        not have, so the walk has to carry that endpoint forward. Without it
-        ``seconds_represented`` is null on one row per sequence — and a partially populated
-        factor is dropped from factor analysis entirely, which loses it everywhere.
+        The first kept frame's span starts at the start of the sequence, and the final one's runs
+        to its end rather than to a successor it does not have, so the walk has to carry both
+        endpoints forward. Without the last one ``seconds_represented`` is null on one row per
+        sequence — and a partially populated factor is dropped from factor analysis entirely,
+        which loses it everywhere.
 
         The numbers are keyed by position, so the second walk of a two-pass selector checks them
         rather than repeating them: its first pass's verdicts must not be applied to other frames.
@@ -718,6 +750,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 raise self._renumbered(info, position, number, numbers[position])
             time_s = getattr(frame, "time_s", None)
             if time_s is not None:
+                trailer.setdefault("first_time_s", float(time_s))
                 trailer["time_s"] = float(time_s)
             yield position, frame, target
 
@@ -750,17 +783,32 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         )
 
     def _replay(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:
-        """Emit the positions a planning selector named, without consulting `select`."""
-        wanted = set(self._planned[info.index].tolist()) if self._planned is not None else set()
+        """Emit the positions a planning selector named, without consulting `select`.
+
+        Each carries the weight the selector declared for it when it planned, or None for
+        :meth:`_record` to apply the default rule. Nothing is planned again here.
+        """
+        planned = self._planned[info.index] if self._planned is not None else np.empty(0, dtype=np.intp)
+        weights = self._planned_weights[info.index]
+        declared = [None] * len(planned) if weights is None else weights.tolist()
+        wanted = dict(zip(planned.tolist(), declared, strict=True))
         for position, frame, target in self._observed(info, trailer):
             if position in wanted:
-                yield self._selected(position, frame, target, {})
+                yield self._selected(position, frame, target, {}, wanted[position])
 
-    def _single_pass(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:
-        """Drive the selector, holding exactly one frame and refusing a verdict for a released one."""
+    def _single_pass(
+        self,
+        info: SequenceInfo,
+        trailer: dict[str, Any],
+        select: Callable[[Iterator[FrameCandidate]], Iterable[FrameVerdict]] | None = None,
+    ) -> Iterator[_Selected]:
+        """Drive the selector, holding exactly one frame and refusing a verdict for a released one.
+
+        ``select`` drives the walk in place of the selector's own, for :meth:`_two_pass`.
+        """
         held: list[Any] = []
         candidates = self._candidates(info, held, trailer)
-        for verdict in self._selector.select(candidates):
+        for verdict in (self._selector.select if select is None else select)(candidates):
             if not held or verdict.position != held[0][0]:
                 reached = held[0][0] if held else "no frame"
                 raise ValueError(
@@ -775,12 +823,27 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         for _ in candidates:
             pass
 
-    def _two_pass(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:
-        """Drive the selector over a whole sequence, then walk it again to emit what it chose."""
-        held: list[Any] = []
+    def _two_pass(self, info: SequenceInfo, trailer: dict[str, Any]) -> Iterator[_Selected]:  # noqa: C901
+        """Drive the selector over a whole sequence, then walk it again to emit what it chose.
+
+        A private protocol whose only user is ``Chain``: a ``select`` generator may return a
+        callable, which then decides the second walk frame by frame, under the single-pass
+        discipline :meth:`_single_pass` keeps, in place of emitting what the first walk chose.
+        """
         chosen: dict[int, FrameVerdict] = {}
-        for verdict in self._selector.select(self._candidates(info, held, trailer)):
+        continuation: Callable[[Iterator[FrameCandidate]], Iterable[FrameVerdict]] | None
+        # Advanced by hand, since a `for` loop discards what the generator returns.
+        verdicts = iter(self._selector.select(self._candidates(info, [], trailer)))
+        while True:
+            try:
+                verdict = next(verdicts)
+            except StopIteration as stop:
+                continuation = stop.value
+                break
             chosen[verdict.position] = verdict
+        if callable(continuation):
+            yield from self._single_pass(info, trailer, continuation)
+            return
         for position, frame, target in self._observed(info, trailer):
             verdict = chosen.get(position)
             if verdict is not None:
@@ -819,11 +882,19 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         entries: list[dict[str, Any]] = []
         for current in self._verdicts(info, trailer):
             if previous is not None:
-                entries.append(self._record(info, previous, current, span, trailer))
+                entries.append(self._record(info, previous, current, span, trailer, first=not entries))
                 yield entries[-1], previous[1], previous[2]
             previous = current
         if previous is not None:
-            entries.append(self._record(info, previous, None, span, trailer))
+            entries.append(self._record(info, previous, None, span, trailer, first=not entries))
+        total = sum(entry["metadata"]["frames_represented"] for entry in entries)
+        if total > info.n_frames * (1 + 1e-9):
+            raise ValueError(
+                f"SequenceFrames: {self._selector!r} gave the kept frames of sequence {info.index} "
+                f"weights totaling {total:g} source frames, but the sequence holds {info.n_frames}. A "
+                "FrameVerdict.weight counts the source frames a kept frame stands for, so a "
+                "sequence's weights cannot total more than its frames."
+            )
         numbers = np.fromiter(trailer.get("numbers", {}).values(), dtype=np.intp)
         # Another walk of this sequence may have finished while this one was paused; the first to
         # finish fixed the selection, so this one has to agree with it.
@@ -859,34 +930,53 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 yield entry, frame, target
                 entry = next(kept, None)
 
-    def _record(
+    def _record(  # noqa: C901
         self,
         info: SequenceInfo,
         selected: _Selected,
         following: _Selected | None,
         span: float,
         trailer: dict[str, Any],
+        first: bool,
     ) -> dict[str, Any]:
-        """Build one kept frame's record, with the weight its successor determines."""
+        """Build one kept frame's record, with the weight its successor determines.
+
+        The weight follows the composition rule with every source frame of mass 1: a declared
+        weight as declared; under a selector that excludes, the frame's own mass; otherwise the
+        gap to the next kept frame, the first kept frame also taking every frame before it.
+        """
         position, frame, _, time_s, pts, factors, weight = selected
         next_position = following[0] if following is not None else info.n_frames
+        if weight is not None:
+            # Converted here and nowhere sooner: a Chain declares a pending weight with its verdict
+            # and settles it after, before this frame is recorded (the pending-weight protocol).
+            represented = float(weight)
+            if not 0 <= represented < np.inf:
+                raise ValueError(
+                    f"SequenceFrames: {self._selector!r} declared a weight of {represented:g} for "
+                    f"position {position} of sequence {info.index}. A FrameVerdict.weight counts the "
+                    "source frames a kept frame stands for, so it must be finite and not negative."
+                )
+        elif self._selector.excludes:
+            represented = 1.0
+        else:
+            represented = float(next_position - (0 if first else position))
         metadata: dict[str, Any] = {
             "source_id": info.source_id,
             "sequence": info.index,
             "frame": frame_number(frame, position),
-            # The gap to the next kept frame, unless the selector declared what this frame stands
-            # for -- which it does when its representatives are not contiguous.
-            "frames_represented": float(next_position - position) if weight is None else float(weight),
+            "frames_represented": represented,
             "sequence_position": position / span,
             "sequence_n_frames": info.n_frames,
         }
         if time_s is not None:
             metadata["time_s"] = float(time_s)
-            # The last kept frame's span runs to the sequence's end rather than to a successor,
-            # mirroring how frames_represented counts through to n_frames.
+            # A span of the timeline, not a mass: the first kept frame's starts at the sequence's
+            # first timestamp, and the last one's runs to its end rather than to a successor.
+            start = trailer["first_time_s"] if first else time_s
             next_time = following[3] if following is not None else trailer.get("time_s")
             if next_time is not None:
-                metadata["seconds_represented"] = float(next_time) - float(time_s)
+                metadata["seconds_represented"] = float(next_time) - float(start)
         if pts is not None:
             metadata["pts"] = int(pts)
         metadata.update(factors)

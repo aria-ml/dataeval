@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import islice
 from typing import Any, cast
 
@@ -264,6 +264,37 @@ class _FirstTwo(FrameSelector):
 
     def select(self, frames):
         return (FrameVerdict(frame.position) for frame in islice(frames, 2))
+
+
+class _ExcludeEven(FrameSelector):
+    """A filter: even positions do not belong, so no kept frame stands for them, not even frame 0."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+    excludes = True
+
+    def select(self, frames):
+        return (FrameVerdict(frame.position) for frame in frames if frame.position % 2 == 1)
+
+
+class _Overclaims(FrameSelector):
+    """Declares far more mass for its one kept frame than the sequence holds."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def select(self, frames):
+        return (FrameVerdict(frame.position, weight=1e6) for frame in frames if frame.position == 0)
+
+
+class _Declares(FrameSelector):
+    """Keeps every frame, declaring ``weight`` for each."""
+
+    needs: FrameInput = FrameInput.STRUCTURE
+
+    def __init__(self, weight: float):
+        self.weight = weight
+
+    def select(self, frames):
+        return (FrameVerdict(frame.position, weight=self.weight) for frame in frames)
 
 
 # --------------------------------------------------------------------------------------
@@ -737,6 +768,52 @@ class TestTemporalWeights:
         by_time = sum(meta.get("seconds_represented", 0.0) for _, _, meta in fast)
         assert by_count == 9
         assert by_time == pytest.approx(8 / 30)
+
+
+@pytest.mark.required
+class TestTheWeightContract:
+    @pytest.mark.parametrize(
+        "selector",
+        [Stride(3, jitter=True, seed=1), EvenlySpaced(2, jitter=True, seed=4), FrameIndices({0: [2, 4], 1: [3]})],
+    )
+    def test_a_thinning_selector_accounts_for_every_frame(self, selector):
+        dataset, _ = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, selector)
+        per_sequence: dict[int, float] = {}
+        for _, _, meta in emit(frames):
+            per_sequence[meta["sequence"]] = per_sequence.get(meta["sequence"], 0.0) + meta["frames_represented"]
+        assert per_sequence == {0: 6.0, 1: 4.0}
+
+    def test_the_first_kept_frame_stands_for_the_frames_before_it(self):
+        dataset, _ = make_dataset((6,))
+        rows = [m[2] for m in emit(SequenceFrames(dataset, FrameIndices({0: [2, 4]})))]
+        assert [r["frames_represented"] for r in rows] == [4.0, 2.0]
+        assert rows[0]["seconds_represented"] == pytest.approx(4 / 30.0)  # frames are 1/30 s apart
+
+    def test_an_excluding_selector_gives_each_kept_frame_its_own_mass(self):
+        """Its first kept frame is 1, which stands for itself and not for the excluded frame 0."""
+        dataset, _ = make_dataset((6,))
+        rows = [m[2] for m in emit(SequenceFrames(dataset, _ExcludeEven()))]
+        assert [r["frame"] for r in rows] == [1, 3, 5]
+        assert [r["frames_represented"] for r in rows] == [1.0, 1.0, 1.0]
+
+    def test_a_selector_claiming_more_mass_than_it_was_given_is_refused(self):
+        dataset, _ = make_dataset((6,))
+        with pytest.raises(ValueError, match="_Overclaims"):
+            emit(SequenceFrames(dataset, _Overclaims()))
+
+    @pytest.mark.parametrize("weight", [-1.0, float("nan"), float("inf")])
+    def test_a_negative_or_non_finite_weight_is_refused_by_name(self, weight):
+        dataset, _ = make_dataset((6,))
+        with pytest.raises(ValueError, match=r"_Declares.*finite and not negative"):
+            emit(SequenceFrames(dataset, _Declares(weight)))
+
+    def test_representative_counts_the_mass_each_candidate_carries(self):
+        from dataeval.data._selectors import _kernel_herd
+
+        points = np.array([[0.0], [0.1], [10.0]])
+        _, weights = _kernel_herd(points, 2, bandwidth=1.0, masses=np.array([1.0, 1.0, 5.0]))
+        assert sorted(weights.tolist()) == [2.0, 5.0]
 
 
 @pytest.mark.required
@@ -1662,3 +1739,39 @@ class TestFindingsLandOnTheSourceRows:
         represented = [cast(dict[str, Any], m)["frames_represented"] for _, _, m in frames.stream()]
         md.add_factors({"frames_represented": represented}, source_index=frames.source_indices)
         assert md.rows_at("unit")["frames_represented"].drop_nulls().sum() == 10
+
+
+@pytest.mark.required
+class TestASequenceCarriesItsTarget:
+    def test_sequence_infos_fill_the_target(self):
+        from dataeval.data._selectors import sequence_infos
+
+        dataset, _ = make_dataset((3, 2))
+        lengths = []
+        for info, _ in sequence_infos(dataset):
+            assert info.target is not None
+            lengths.append(len(info.target.frame_tracks))
+        assert lengths == [3, 2]
+
+    def test_the_target_stays_out_of_repr_and_equality(self):
+        """A real video's target is megabytes of annotations, and every candidate's repr embeds its sequence's."""
+        from dataeval.data._selectors import sequence_infos
+
+        dataset, _ = make_dataset((300,))
+        info = next(sequence_infos(dataset))[0]
+        assert repr(info) == repr(replace(info, target=None))
+        assert info == replace(info, target=None)
+
+    def test_a_projection_reads_the_survivors_own_targets(self):
+        from dataeval.data._selectors import _projected
+
+        dataset = make_dataset_of([[make_target(n) for n in (1, 2, 3, 4, 5)]])
+        target = dataset[0][1]
+        view = _projected(target, np.array([1, 4]))
+        assert len(view.frame_tracks) == 2
+        assert view.frame_tracks[0] is target.frame_tracks[1]
+        assert view.frame_tracks[1] is target.frame_tracks[4]
+        assert view.frame_tracks[-1] is target.frame_tracks[4]
+        assert list(view.frame_tracks[1:]) == [target.frame_tracks[4]]
+        with pytest.raises(IndexError):
+            view.frame_tracks[2]

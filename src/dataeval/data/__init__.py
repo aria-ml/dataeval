@@ -2,6 +2,7 @@
 
 __all__ = [
     "AllFrames",
+    "Chain",
     "ClassBalance",
     "ClassFilter",
     "Crop",
@@ -44,6 +45,7 @@ __all__ = [
     "unzip_dataset",
 ]
 
+from dataeval.data._chain import Chain
 from dataeval.data._classbalance import ClassBalance
 from dataeval.data._classfilter import ClassFilter
 from dataeval.data._crop import Crop

@@ -25,7 +25,12 @@ from numpy.typing import NDArray
 from dataeval._log import get_logger
 from dataeval.config import get_seed, resolve_batch_size
 from dataeval.flags import ImageStats
-from dataeval.protocols import DatumMetadata, FeatureExtractor, SingleFrameObjectTrackingTarget
+from dataeval.protocols import (
+    DatumMetadata,
+    FeatureExtractor,
+    MultiobjectTrackingTarget,
+    SingleFrameObjectTrackingTarget,
+)
 from dataeval.types import ReprMixin
 from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape
@@ -68,15 +73,49 @@ class SequenceInfo:
         filtering and reordering views as a positional index does not.
     n_frames : int
         How many frames the sequence holds, read from its target's ``frame_tracks`` and so known
-        without decoding anything. See :class:`~dataeval.data.SequenceFrames`.
+        without decoding anything. See :class:`~dataeval.data.SequenceFrames`. Inside a
+        :class:`~dataeval.data.Chain`, a stage that plans gets its input count here, and any other
+        stage the source count.
     metadata : DatumMetadata
         The sequence's own datum metadata: ``height``, ``width``, ``time_base``, ``size``.
+    target : MultiobjectTrackingTarget or None, default None
+        The sequence's tracking target, whose ``frame_tracks`` hold one detection set per frame.
+        Filled by the dataset walk; ``None`` for a sequence built by hand. Inside a ``Chain``, a
+        stage that plans gets only its input frames' targets here, and any other stage ``None``.
     """
 
     index: int
     source_id: int | str
     n_frames: int
     metadata: DatumMetadata
+    # A whole sequence's annotations: kept out of repr, which every FrameCandidate's embeds, and out of ==.
+    target: MultiobjectTrackingTarget | None = field(default=None, compare=False, repr=False)
+
+
+class _ProjectedTracks(Sequence[SingleFrameObjectTrackingTarget]):
+    """A read-only view of ``tracks`` at ``positions``; no detection array is copied."""
+
+    def __init__(self, tracks: Sequence[SingleFrameObjectTrackingTarget], positions: NDArray[np.intp]) -> None:
+        self._tracks = tracks
+        self._positions = positions
+
+    def __len__(self) -> int:
+        return len(self._positions)
+
+    def __getitem__(self, i: Any) -> Any:
+        if isinstance(i, slice):
+            return _ProjectedTracks(self._tracks, self._positions[i])
+        return self._tracks[int(self._positions[i])]  # numpy applies Python's negative-index rules
+
+
+@dataclass(frozen=True)
+class _ProjectedTarget:
+    frame_tracks: Sequence[SingleFrameObjectTrackingTarget]
+
+
+def _projected(target: MultiobjectTrackingTarget, positions: NDArray[np.intp]) -> MultiobjectTrackingTarget:
+    """Re-index ``target`` over the frames at ``positions``, so a later stage of a chain reads survivors' targets."""
+    return _ProjectedTarget(_ProjectedTracks(target.frame_tracks, positions))
 
 
 def sequence_infos(dataset: Any) -> Iterator[tuple[SequenceInfo, Any]]:
@@ -95,6 +134,7 @@ def sequence_infos(dataset: Any) -> Iterator[tuple[SequenceInfo, Any]]:
                 source_id=metadata.get("id", index),
                 n_frames=len(target.frame_tracks),
                 metadata=metadata,
+                target=target,
             ),
             target,
         )
@@ -107,10 +147,13 @@ class FrameCandidate:
     Attributes
     ----------
     sequence : SequenceInfo
-        The sequence this frame belongs to.
+        The sequence this frame belongs to. Inside a :class:`~dataeval.data.Chain`, which offers
+        candidates only to stages that do not plan, the source sequence's with ``target`` None:
+        see :class:`FrameSelector`.
     position : int
         Zero-based position within the sequence's stream, counting every frame whether kept or
-        not. This is the coordinate a :class:`FrameVerdict` reports.
+        not. Inside a ``Chain``, the position within the stage's input, the frames the stage
+        before it kept. This is the coordinate a :class:`FrameVerdict` reports.
     frame_index : int
         The frame's own ``frame_index``, or ``position`` for a stream that declares none.
     time_s : float or None
@@ -119,6 +162,12 @@ class FrameCandidate:
         Presentation timestamp, where the frame declares it.
     target : SingleFrameObjectTrackingTarget
         This frame's detections: ``boxes``, ``labels``, ``scores``, ``track_ids``.
+    weight : float, default 1.0
+        How many source frames this candidate already stands for. ``1.0`` for a frame offered
+        straight from the source, and more only inside a ``Chain``, where an earlier stage has
+        folded the frames it dropped into the ones it kept. There a streaming stage may be offered
+        a pending value, readable only through ``float()`` once settled, so its ``select`` must not
+        decide from it; a ``two_pass`` stage is offered settled floats.
 
     Notes
     -----
@@ -133,6 +182,7 @@ class FrameCandidate:
     time_s: float | None
     pts: int | None
     target: SingleFrameObjectTrackingTarget
+    weight: float = 1.0
     _frame: Any = field(repr=False, compare=False, default=None)
     _allow_pixels: bool = field(repr=False, compare=False, default=True)
     _cache: list[NDArray[Any]] = field(repr=False, compare=False, default_factory=list)
@@ -167,12 +217,15 @@ class FrameVerdict:
     position : int
         The :attr:`FrameCandidate.position` being kept.
     weight : float or None, default None
-        How many source frames this kept frame stands for. ``None`` -- the default -- lets
-        :class:`~dataeval.data.SequenceFrames` compute it as the gap to the next kept frame, which
-        is correct for any selector whose representatives are contiguous and makes the per-sequence
-        weights sum to the frame count by construction. Override it only when what a frame stands
-        for is *not* contiguous, such as a medoid standing for a scattered cluster; the sum still
-        has to come out right.
+        How many source frames this kept frame stands for. Every frame a selector drops is either
+        *represented* by a kept frame or *excluded* (see :attr:`FrameSelector.excludes`), so per
+        sequence the weights sum to the frame count less the frames excluded. ``None`` -- the
+        default -- lets :class:`~dataeval.data.SequenceFrames` compute it: the gap to the next kept
+        frame, with the first kept frame also standing for every frame before it, or the frame's
+        own mass under a selector that excludes. Override it only when what a frame stands for is
+        *not* contiguous, such as a medoid standing for a scattered cluster, and then sum the
+        :attr:`FrameCandidate.weight` of the frames it stands for. A sequence whose weights total
+        more than the frames it holds is refused.
     factors : Mapping[str, Any], default empty
         Anything the selector derived while deciding -- a shot index, a novelty score. Each becomes
         a factor on the frame's datum metadata, and so a ``unit``-level factor in
@@ -210,6 +263,13 @@ class FrameSelector(ReprMixin, ABC):
         Statistics this selector makes describe itself rather than the data. Selection alone
         invalidates nothing -- a kept frame is an unmodified image -- so this is
         :attr:`~dataeval.flags.ImageStats.NONE` unless a subclass also rewrites content.
+    excludes : bool
+        Whether a dropped frame is *excluded* rather than *represented*. A thinning selector, the
+        default, drops frames its kept frames stand for, so each kept frame's default weight runs
+        to the next kept frame. A filter -- keeping only the frames that show some label, say --
+        drops frames because they do not belong, and sets this so each kept frame stands only for
+        itself. A sequence's weights then sum to its frame count less the frames excluded. A
+        :attr:`FrameVerdict.weight` the selector declares overrides either.
 
     Notes
     -----
@@ -222,6 +282,15 @@ class FrameSelector(ReprMixin, ABC):
     :meth:`select` is abstract and :meth:`plan` is not, deliberately: every selector must be able
     to run streaming, and planning is a shortcut rather than an alternative. A selector that could
     only plan would break on the first sequence whose frame count it cannot learn.
+
+    **Inside a** :class:`~dataeval.data.Chain` **a stage sees only what the stage before it kept,**
+    numbered ``0`` to ``m - 1``. A stage that plans gets a :class:`SequenceInfo` whose ``n_frames``
+    is ``m`` and whose ``target`` lists only those frames' targets. Any other stage, a ``two_pass``
+    one included, starts before ``m`` is known, so it gets the source sequence's
+    :class:`SequenceInfo` with ``target`` None, and its :meth:`select` must not decide from
+    ``n_frames`` or ``sequence.target``. A streaming stage's :attr:`FrameCandidate.weight` may be
+    pending, readable only through ``float()`` once settled, so it must not decide from that
+    either; a ``two_pass`` stage gets settled floats.
 
     Examples
     --------
@@ -241,6 +310,10 @@ class FrameSelector(ReprMixin, ABC):
     needs: FrameInput = FrameInput.STRUCTURE
     two_pass: bool = False
     invalidates: ImageStats = ImageStats.NONE
+    excludes: bool = False
+    # Private: the selector reads the frames on either side of each one, so a Chain refuses it
+    # behind any stage that can drop frames, where its neighbors would no longer be adjacent.
+    _needs_adjacent_frames: bool = False
 
     def plan(self, info: SequenceInfo) -> NDArray[np.intp] | None:  # noqa: ARG002
         """Return the positions to keep from structure alone, or None when the frames decide.
@@ -257,6 +330,19 @@ class FrameSelector(ReprMixin, ABC):
         """
         return None
 
+    def _plan_weighted(self, info: SequenceInfo) -> tuple[NDArray[np.intp], NDArray[np.float64] | None] | None:
+        """Return :meth:`plan`'s positions with the weight of each, or None when the frames decide.
+
+        A private protocol between ``Chain`` and :class:`~dataeval.data.SequenceFrames`, which
+        plans through this once per sequence. A planning selector has no verdict to declare a
+        weight on, so its weights are None and the default rule applies; a chain, whose planned
+        frames stand for what every stage dropped, declares them here, with its positions already
+        ascending, unique and in range, and from the same call, so a stage that plans differently
+        each time it is asked cannot weight frames the view does not hold.
+        """
+        positions = self.plan(info)
+        return None if positions is None else (positions, None)
+
     @abstractmethod
     def select(self, frames: Iterator[FrameCandidate]) -> Iterator[FrameVerdict]:
         """Yield one verdict per kept frame, in non-decreasing position order.
@@ -264,7 +350,8 @@ class FrameSelector(ReprMixin, ABC):
         Parameters
         ----------
         frames : Iterator[FrameCandidate]
-            The sequence's frames, in order.
+            The sequence's frames, in order. Inside a :class:`~dataeval.data.Chain`, the frames
+            the stage before kept, renumbered from 0, as the class Notes describe.
 
         Yields
         ------
@@ -272,6 +359,8 @@ class FrameSelector(ReprMixin, ABC):
             One per kept frame. Unless :attr:`two_pass` is set, a verdict must be yielded before
             the walk moves past the frame it names; :class:`~dataeval.data.SequenceFrames` holds
             exactly one frame and raises if a verdict arrives for one it has already released.
+            Inside a ``Chain``, a stage after the first must decide each frame, its last included,
+            before it asks for the next.
         """
         ...
 
@@ -785,7 +874,12 @@ def _median_bandwidth(embeddings: NDArray[Any]) -> float:
     return median / np.sqrt(2.0)
 
 
-def _kernel_herd(embeddings: NDArray[Any], count: int, bandwidth: float) -> tuple[list[int], NDArray[Any]]:
+def _kernel_herd(
+    embeddings: NDArray[Any],
+    count: int,
+    bandwidth: float,
+    masses: NDArray[np.float64] | None = None,
+) -> tuple[list[int], NDArray[Any]]:
     """Greedily pick ``count`` rows whose kernel mean best matches that of the whole set.
 
     At each step the pick maximizes (mean similarity to every row) minus (mean similarity to what
@@ -797,8 +891,9 @@ def _kernel_herd(embeddings: NDArray[Any], count: int, bandwidth: float) -> tupl
     needed, and both can be accumulated a chunk at a time -- which is the difference between
     working and exhausting memory on a sequence of more than a few thousand frames.
 
-    Returns the chosen row indices, in selection order, and the weight of each: how many rows are
-    nearer to it than to any other pick. Those weights sum to the number of rows by construction.
+    Returns the chosen row indices, in selection order, and the weight of each: the total mass of
+    the rows nearer to it than to any other pick, each row weighing its entry in ``masses`` or 1
+    when there are none. Those weights sum to the total mass by construction.
     """
     n = len(embeddings)
     count = min(count, n)
@@ -824,7 +919,7 @@ def _kernel_herd(embeddings: NDArray[Any], count: int, bandwidth: float) -> tupl
         picked_similarity += np.exp(-gamma * columns[-1])
 
     owner = np.stack(columns, axis=1).argmin(axis=1)
-    return chosen, np.bincount(owner, minlength=count).astype(np.float64)
+    return chosen, np.bincount(owner, weights=masses, minlength=count).astype(np.float64)
 
 
 class Representative(FrameSelector):
@@ -841,9 +936,10 @@ class Representative(FrameSelector):
     deterministic -- the same sequence and ``count`` always give the same frames.
 
     Because a kept frame stands for others scattered through the sequence rather than for a
-    contiguous run, each verdict carries an explicit :attr:`FrameVerdict.weight`: the number of
-    frames nearer to it than to any other kept frame. Those weights still sum to the sequence's
-    frame count, so per-frame statistics stay correctly weighted.
+    contiguous run, each verdict carries an explicit :attr:`FrameVerdict.weight`: the
+    :attr:`FrameCandidate.weight` of the frames nearer to it than to any other kept frame, summed.
+    Those weights still sum to the mass the sequence offered, so per-frame statistics stay
+    correctly weighted.
 
     Parameters
     ----------
@@ -936,8 +1032,10 @@ class Representative(FrameSelector):
         """Describe one batch of frames, flattened to one row each."""
         return as_numpy(self.extractor(np.stack(batch))).reshape(len(batch), -1)
 
-    def _walk(self, frames: Iterator[FrameCandidate]) -> tuple[SequenceInfo | None, list[int], NDArray[Any]]:
-        """Describe every frame of a sequence, holding descriptors and positions but never pixels.
+    def _walk(
+        self, frames: Iterator[FrameCandidate]
+    ) -> tuple[SequenceInfo | None, list[int], NDArray[np.float64], NDArray[Any]]:
+        """Describe every frame of a sequence, holding descriptors, positions and masses but never pixels.
 
         The extractor is called a batch at a time rather than a frame at a time, so a model pays
         its per-call overhead once per batch; each batch's pixels are released as soon as it has
@@ -946,11 +1044,13 @@ class Representative(FrameSelector):
         size = resolve_batch_size(self.batch_size, getattr(self.extractor, "batch_size", None))
         sequence: SequenceInfo | None = None
         positions: list[int] = []
+        masses: list[float] = []
         described: list[NDArray[Any]] = []
         batch: list[NDArray[Any]] = []
         for frame in frames:
             sequence = frame.sequence
             positions.append(frame.position)
+            masses.append(frame.weight)
             batch.append(frame.pixels)
             if len(batch) == size:
                 described.append(self._describe(batch))
@@ -958,34 +1058,35 @@ class Representative(FrameSelector):
         if batch:
             described.append(self._describe(batch))
         embeddings = np.concatenate(described, dtype=np.float64) if described else np.empty((0, 0))
-        return sequence, positions, embeddings
+        return sequence, positions, np.asarray(masses, dtype=np.float64), embeddings
 
-    def _indistinguishable(self, sequence: SequenceInfo, n_frames: int) -> tuple[list[int], NDArray[Any]]:
+    def _indistinguishable(self, sequence: SequenceInfo, masses: NDArray[np.float64]) -> tuple[list[int], NDArray[Any]]:
         """Keep the first frames when every frame describes identically.
 
         A zero-width kernel makes every subset equally representative and every score NaN, so the
-        choice is made here rather than left to an argmax over undefined numbers.
+        choice is made here rather than left to an argmax over undefined numbers. The mass is
+        split evenly among the frames kept, unless every frame is kept, when each keeps its own.
         """
-        kept = list(range(min(self.count, n_frames)))
+        kept = list(range(min(self.count, len(masses))))
         _logger.info(
             "Representative: every frame of sequence %d describes identically; kept the first %d "
             "rather than choosing between indistinguishable frames.",
             sequence.index,
             len(kept),
         )
-        return kept, np.full(len(kept), n_frames / len(kept))
+        return kept, masses if len(kept) == len(masses) else np.full(len(kept), masses.sum() / len(kept))
 
     def select(self, frames: Iterator[FrameCandidate]) -> Iterator[FrameVerdict]:
         """Describe every frame of the sequence, then yield the representative subset in order."""
-        sequence, positions, embeddings = self._walk(frames)
+        sequence, positions, masses, embeddings = self._walk(frames)
         if sequence is None:
             return
 
         bandwidth = self.bandwidth if self.bandwidth is not None else _median_bandwidth(embeddings)
         kept, weights = (
-            _kernel_herd(embeddings, self.count, bandwidth)
+            _kernel_herd(embeddings, self.count, bandwidth, masses)
             if bandwidth > 0
-            else self._indistinguishable(sequence, len(positions))
+            else self._indistinguishable(sequence, masses)
         )
 
         weight_of = dict(zip(kept, weights, strict=True))
