@@ -524,6 +524,28 @@ class TestToCanonicalGrayscale:
         assert result.shape == (28, 28)
         assert result.dtype == np.uint8
 
+    @pytest.mark.parametrize(
+        "image",
+        [
+            # every red and green beside one blue: 23 of these pixels truncate differently in float32
+            np.stack([*np.meshgrid(np.arange(256), np.arange(256), indexing="ij"), np.full((256, 256), 2)]).astype(
+                np.uint8
+            ),
+            np.random.default_rng(1).integers(0, 4096, (3, 64, 48), dtype=np.uint16),
+            np.random.default_rng(2).integers(-300, 300, (3, 64, 48), dtype=np.int32),
+            np.random.default_rng(3).random((3, 64, 48), dtype=np.float32),
+            np.where(np.eye(64, 48, dtype=bool), np.nan, np.random.default_rng(4).random((3, 64, 48)) * 400 - 50),
+        ],
+        ids=["uint8 red-green plane", "uint16", "int32", "float32 in [0, 1]", "float64 with NaN"],
+    )
+    def test_rgb_matches_the_rec601_formula_bit_for_bit(self, image):
+        """Perceptual hashes digest this output, so a faster way of computing it must not change it."""
+        if np.issubdtype(image.dtype, np.floating) and np.nanmax(image) <= 1.0 and np.nanmin(image) >= 0.0:
+            image = image * 255.0
+        luma = np.sum(image.astype(float) * np.array([0.299, 0.587, 0.114]).reshape(3, 1, 1), axis=0)
+        expected = np.clip(np.nan_to_num(luma), 0, 255).astype(np.uint8)
+        np.testing.assert_array_equal(to_canonical_grayscale(image), expected)
+
     def test_rgba_to_grayscale(self):
         """Test conversion from 4-channel RGBA image (line 159-189)."""
         # Create RGBA image with mostly opaque pixels (high alpha)
