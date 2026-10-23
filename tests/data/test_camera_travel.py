@@ -188,6 +188,29 @@ class TestMeasured:  # real optical flow, unstubbed
         assert [p for p, u in zip(positions, unmeasured, strict=True) if u] == untrusted
 
 
+class TestCuts:  # real optical flow
+    def test_the_first_frame_of_a_new_shot_is_kept(self):
+        # still on texture(0) for 8 frames, then a cut to a still texture(1): before the guard, only [0] was kept
+        stream = [FakeFrame(texture(0), k) for k in range(8)] + [FakeFrame(texture(1), k) for k in range(8, 16)]
+        positions, _, unmeasured = _kept(SequenceFrames(_dataset_of([stream]), CameraTravel(0.1)))
+        assert positions == [0, 8]
+        assert unmeasured == [False, True]
+
+    def test_a_cut_at_the_first_pair_is_caught(self):  # Review Focus 4
+        stream = [FakeFrame(texture(0), 0)] + [FakeFrame(texture(1), k) for k in range(1, 6)]
+        positions, _, unmeasured = _kept(SequenceFrames(_dataset_of([stream]), CameraTravel(0.1)))
+        assert positions == [0, 1]
+        assert unmeasured == [False, True]
+
+    def test_a_field_of_view_switch_starts_a_new_anchor(self):
+        # still on texture(0), then its center at 2x: the same scene, but no motion explains the second frame
+        zoomed = cv2.resize(texture(0)[90:270, 160:480], (640, 360))
+        stream = [FakeFrame(texture(0), k) for k in range(6)] + [FakeFrame(zoomed, k) for k in range(6, 12)]
+        positions, _, unmeasured = _kept(SequenceFrames(_dataset_of([stream]), CameraTravel(0.1)))
+        assert positions == [0, 6]
+        assert unmeasured == [False, True]
+
+
 class TestUnreadable:  # Review Focus 1, real and unstubbed
     def test_a_change_of_frame_size_refuses_the_pair(self):
         stream = _pan(8, 3) + _pan(8, 3, size=(180, 320), start=3)

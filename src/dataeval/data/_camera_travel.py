@@ -90,16 +90,20 @@ class CameraTravel(FrameSelector):
     every pair to the whole video's readings. A single-pass selector cannot see the whole video without
     buffering it, so that gate is skipped here.
 
-    **A cut is not seen as one.** A hard cut or a switch of field of view can read as a trusted small
-    motion, which in ``ego_stats`` only the temporal gate can catch. The shot after it is then kept only
-    once the camera has moved ``distance`` within it, so a still shot after a cut can go unkept for its
-    whole length.
+    **A hard cut is refused, and the frame after it is kept.** A hard cut, or a large switch of field of view
+    (about 2x), is a pair whose fitted motion does not explain the new frame, so it has no trusted reading.
+    The first frame of the new shot is kept, marked unmeasured, as the new anchor, and the travel restarts
+    there. A still shot after a hard cut therefore has its first frame kept. A gradual transition, such as a
+    dissolve, is not refused, as the fitted motion explains each pair of it, so a still shot after one can
+    still go unkept for its whole length. A smaller switch of field of view, such as 1.5x, can read as a zoom.
 
     **No reading is no evidence of no motion.** These keep the frame, marked
     :attr:`~dataeval.data.FrameVerdict.unmeasured`, and restart the travel there:
 
     - a pair with no reading;
-    - a pair that ``ego_stats``' per-pair trust flags refuse;
+    - a pair that ``ego_stats``' per-pair trust flags refuse, including one whose fitted motion does not
+      explain the new frame, as at a hard cut or a large switch of field of view, or where nothing in the
+      frame confirms the fit, as on a nearly textureless noisy frame;
     - a pair whose frames differ in size, are too small for optical flow, hold a non-finite pixel, or
       include a flat frame, a single gray level such as a black dropout.
 
