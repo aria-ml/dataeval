@@ -25,7 +25,7 @@ whose parts name the physical motions::
 
 ``A`` is a ratio of pixels to pixels, so it is resolution-free. ``div``, ``curl`` and
 ``shear`` are per-frame rates that do not change when the frames are downscaled. ``t0`` and
-``FOE`` are lengths, reported in the sequence's own full-resolution pixels.
+``FOE`` are lengths, reported in the full-resolution pixels of the pair each was measured on.
 
 The fit excludes independent movers instead of modeling them. Rejection happens inside
 the robust fit itself, which is IRLS with Tukey biweight weights. That fit is deterministic
@@ -43,7 +43,7 @@ from collections import deque
 from collections.abc import Iterable, Iterator, Sequence
 from functools import partial
 from types import ModuleType
-from typing import Any, Literal, NamedTuple, TypeAlias, TypedDict, cast, overload
+from typing import Any, Generic, Literal, NamedTuple, TypeAlias, TypedDict, TypeVar, cast, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -68,6 +68,13 @@ _INLIER_WEIGHT = 0.05
 #: Smallest number of flow samples an affine fit is attempted on. A fit from 3 samples
 #: would be exactly determined.
 _MIN_SAMPLES = 12
+#: Smallest processed side, in pixels, that a frame pair is read at. Measured on OpenCV 4.11.0, DIS fails on
+#: some shapes with a side under 32 px, raising or crashing the process natively depending on the aspect ratio.
+#: As (height, width), (31, 640) raises and (10, 64) and (28, 512) crash, while (31, 31), (31, 55), (16, 28),
+#: (16, 64) and (28, 48) run. At 32 px or more nothing failed at any width up to 16384, or with the axes
+#: transposed. The rule covers both estimators, so there is one rule: Lucas-Kanade never failed, but a frame
+#: that small gives no reliable motion either way.
+_MIN_FLOW_SIDE = 32
 
 
 def _require_cv2() -> ModuleType:
@@ -490,7 +497,10 @@ def _downscale(gray: NDArray[np.uint8], proc_short_side: int) -> NDArray[np.uint
     return cv2.resize(gray, (round(width * factor), round(height * factor)), interpolation=cv2.INTER_AREA)
 
 
-class _PairBuffer:
+_T = TypeVar("_T")
+
+
+class _PairBuffer(Generic[_T]):
     """Hold the last `gap` + 1 frames, so each new frame can be paired with the one `gap` back.
 
     Forward streaming only, so a long sequence never has to be decoded into memory at once.
@@ -498,9 +508,9 @@ class _PairBuffer:
 
     def __init__(self, gap: int) -> None:
         self._gap = gap
-        self._frames: deque[NDArray[np.uint8]] = deque(maxlen=gap + 1)
+        self._frames: deque[_T] = deque(maxlen=gap + 1)
 
-    def push(self, frame: NDArray[np.uint8]) -> NDArray[np.uint8] | None:
+    def push(self, frame: _T) -> _T | None:
         """Take in the next frame and return the frame `gap` before it, or None until one is held."""
         self._frames.append(frame)
         return self._frames[0] if len(self._frames) > self._gap else None
@@ -511,7 +521,7 @@ def _stream_pairs(
     gap: int,
 ) -> Iterator[tuple[NDArray[np.uint8], NDArray[np.uint8]]]:
     """Yield every frame pair `gap` apart, holding at most `gap` + 1 frames."""
-    buffer = _PairBuffer(gap)
+    buffer: _PairBuffer[NDArray[np.uint8]] = _PairBuffer(gap)
     for frame in frames:
         previous = buffer.push(frame)
         if previous is not None:
@@ -536,23 +546,28 @@ def _trimmed_center(state: NDArray[np.float64]) -> NDArray[np.float64]:
 
 
 def _temporal_outliers(
-    readings: Sequence[_PairReading | None], half_diagonal: float, k: float = 5.0
+    readings: Sequence[_PairReading | None],
+    half_diagonal: float,
+    scales: Sequence[float],
+    k: float = 5.0,
 ) -> NDArray[np.bool_]:
     """Flag pairs whose camera state departs from what the sequence mostly agrees on.
 
     The camera is whatever most pairs agree about, so a burst of disagreement marks a burst
     of capture by something else. Two of the components are rates and two are speeds, which
     are not otherwise comparable, so all four are put in common units before distances are
-    taken. Those units are pixels per frame at the frame corner.
+    taken. Those units are the first frame's pixels per frame at the frame corner. `scales`
+    holds the factor that takes each pair's speeds from its own pixels into those, which is
+    not 1 only where the frame size changed mid-sequence.
 
     The test assumes a roughly steady camera state across the sequence. Time-varying
     camera motion would need a long window instead.
     """
     flags = np.zeros(len(readings), bool)
-    lever = np.array([1.0, 1.0, half_diagonal, half_diagonal])
     state = np.full((len(readings), 4), np.nan)
     for i, pair in enumerate(readings):
         if pair is not None:
+            lever = np.array([scales[i], scales[i], half_diagonal, half_diagonal])
             state[i] = np.array([pair.t0x, pair.t0y, pair.div, pair.curl]) * lever
 
     measured = ~np.isnan(state).any(axis=1)
@@ -613,7 +628,10 @@ class EgoFactors(TypedDict):
     mover_speed : Sequence[float]
         Median speed of those samples, full-resolution pixels per frame. NaN where none.
     ego_trusted : Sequence[bool]
-        Whether this frame's camera estimate could be told apart from a mover's.
+        Whether this frame's camera estimate could be told apart from a mover's. False as well
+        where the pair could not be read: the two frames differ in size, a processed side is under
+        32 px, a frame holds a non-finite pixel, or a frame is a single gray level once converted to
+        grayscale, as a black dropout or a frame whose values all saturate the conversion is.
     """
 
     item_index: Sequence[int]
@@ -666,6 +684,7 @@ EGO_AGGREGATIONS: tuple[Aggregator, ...] = (
 
 def _frame_rows(
     readings: Sequence[_PairReading | None],
+    scales: Sequence[float],
     n_frames: int,
     gap: int,
     half_diagonal: float,
@@ -676,8 +695,11 @@ def _frame_rows(
     pair straddling the cut produces a meaningless reading. Attributing it to the first
     frame of the new shot is accurate, because that frame is discontinuous from its
     predecessor. Attributing it to the last frame of the old shot would not be.
+
+    `scales` only puts each pair in the first frame's units for the temporal gate. The rows
+    report every pixel quantity in the pixels of the pair it was measured on.
     """
-    temporal = _temporal_outliers(readings, half_diagonal)
+    temporal = _temporal_outliers(readings, half_diagonal, scales)
     rows: dict[str, list[Any]] = {name: [] for name in EgoFactors.__annotations__ if name != "item_index"}
     for frame in range(n_frames):
         pair = readings[frame - gap] if frame >= gap else None
@@ -704,45 +726,103 @@ def _frame_rows(
 # ============================== public API ==============================
 
 
+class _FlowFrame(NamedTuple):
+    """One frame as a pair reads it: the downscaled grayscale and the original size it came from.
+
+    Two frames can share a processed shape but not an original size (640x360 and 1280x720 both
+    process to 640x360), so a pair compares both.
+    """
+
+    gray: NDArray[np.uint8]
+    full_wh: tuple[int, int]
+
+
+def _flow_frame(view: FrameView) -> _FlowFrame | None:
+    """Take a frame as a pair reads it, or None where it holds a non-finite pixel.
+
+    The check runs before the grayscale conversion, which would turn NaN into a flat field that
+    reads as a still camera.
+    """
+    if np.issubdtype(view.pixels.dtype, np.inexact) and not np.isfinite(view.pixels).all():
+        return None
+    # MAITE declares frame pixels as (C, H, W), which is where the trailing axes come from.
+    return _FlowFrame(view.gray_small, (int(view.pixels.shape[-1]), int(view.pixels.shape[-2])))
+
+
+def _flow_estimator(flow: FlowMethod) -> Any | None:
+    """Build the DIS estimator for a video, or None where Lucas-Kanade needs none."""
+    cv2 = _require_cv2()
+    return cv2.DISOpticalFlow.create(cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST) if flow == "dis" else None
+
+
+def _measure_pair(
+    estimator: Any | None,
+    previous: _FlowFrame,
+    current: _FlowFrame,
+    grid_target: int,
+    gap: int,
+) -> _PairReading | None:
+    """Read the camera motion between two frames, or None where the pair cannot be read.
+
+    A pair is refused before any flow is computed when the frames differ in original size or in
+    processed shape, when a processed side is under `_MIN_FLOW_SIDE`, or when either frame is a
+    single gray level, which holds no motion to read and would read as a still camera. Pixel
+    quantities are scaled by the pair's own full resolution.
+    """
+    height, width = previous.gray.shape[:2]
+    if previous.full_wh != current.full_wh or previous.gray.shape != current.gray.shape:
+        return None
+    if min(width, height) < _MIN_FLOW_SIDE:
+        return None
+    if np.ptp(previous.gray) == 0 or np.ptp(current.gray) == 0:
+        return None
+    pts, vectors = (
+        _grid_flow_dis(estimator, previous.gray, current.gray, grid_target)
+        if estimator is not None
+        else _grid_flow_lk(previous.gray, current.gray, grid_target)
+    )
+    return _pair_ego(pts, vectors, (width, height), current.full_wh, gap) if len(pts) >= _MIN_SAMPLES else None
+
+
 class _EgoEngine:
     """Measure one video's camera ego-motion as a frame consumer, one frame pair at a time.
 
     Holds one DIS estimator for the video, the frames still waiting for their pair, and one
     reading per pair, so a long video never has to be decoded into memory at once. Every
-    reported pixel quantity is scaled back to the full resolution of the video's first frame.
+    reported pixel quantity is scaled back to the original size of the pair it was measured on.
     """
 
     def __init__(self, options: VideoOptions) -> None:
-        cv2 = _require_cv2()
         self._options = options
-        self._dis = (
-            cv2.DISOpticalFlow.create(cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST) if options.ego_flow == "dis" else None
-        )
-        self._pairs = _PairBuffer(options.ego_gap)
+        self._estimator = _flow_estimator(options.ego_flow)
+        self._pairs: _PairBuffer[_FlowFrame | None] = _PairBuffer(options.ego_gap)
         # Kept None where a pair could not be measured, so refusals count against the pairs attempted.
         self._readings: list[_PairReading | None] = []
+        # Per pair, the first frame's diagonal over the pair's, so the temporal gate reads one unit.
+        self._scales: list[float] = []
         self._full_wh: tuple[int, int] | None = None
         self._n_frames = 0
 
     def update(self, view: FrameView) -> None:
         """Measure the pair the frame closes, if any."""
+        full_wh = (int(view.pixels.shape[-1]), int(view.pixels.shape[-2]))
         if self._full_wh is None:
-            # MAITE declares frame pixels as (C, H, W), which is where the trailing axes come from.
-            self._full_wh = (int(view.pixels.shape[-1]), int(view.pixels.shape[-2]))
+            self._full_wh = full_wh
         self._n_frames += 1
-        current = view.gray_small
+        current = _flow_frame(view)
         previous = self._pairs.push(current)
-        if previous is None:
+        gap = self._options.ego_gap
+        if self._n_frames <= gap:
             return
-        grid_target, gap = self._options.ego_grid_target, self._options.ego_gap
-        pts, vectors = (
-            _grid_flow_dis(self._dis, previous, current, grid_target)
-            if self._dis is not None
-            else _grid_flow_lk(previous, current, grid_target)
+        # An unreadable frame refuses both pairs it is in.
+        reading = (
+            None
+            if previous is None or current is None
+            else _measure_pair(self._estimator, previous, current, self._options.ego_grid_target, gap)
         )
-        height, width = previous.shape[:2]
-        reading = _pair_ego(pts, vectors, (width, height), self._full_wh, gap) if len(pts) >= _MIN_SAMPLES else None
         self._readings.append(reading)
+        # A measured pair shares one original size, which is this frame's.
+        self._scales.append(float(np.hypot(*self._full_wh) / np.hypot(*full_wh)))
 
     def finish(self, clock: VideoClock) -> None:
         """Nothing to close. The temporal gate needs the whole video, so it runs in :meth:`frame_rows`."""
@@ -750,7 +830,7 @@ class _EgoEngine:
     def frame_rows(self) -> dict[str, list[Any]]:
         """Lay the video's pair readings out as one row per frame."""
         half_diagonal = 0.0 if self._full_wh is None else 0.5 * float(np.hypot(*self._full_wh))
-        return _frame_rows(self._readings, self._n_frames, self._options.ego_gap, half_diagonal)
+        return _frame_rows(self._readings, self._scales, self._n_frames, self._options.ego_gap, half_diagonal)
 
 
 def _measure_video(options: VideoOptions, max_frames: int | None, stream: VideoStream) -> dict[str, list[Any]]:
@@ -824,8 +904,8 @@ def ego_stats(
         NaN.
     proc_short_side : int, default 360
         Frames are downscaled to this short side before flow is computed. Rates are
-        resolution-free and speeds are scaled back up, so results stay in the sequence's
-        own full-resolution pixels regardless.
+        resolution-free and speeds are scaled back up, so each speed is in the full-resolution
+        pixels of the pair it was measured on regardless.
     flow : {"dis", "lk"}, default "dis"
         Optical flow estimator: dense DIS at its ultrafast preset, or sparse Lucas-Kanade
         on the sampling lattice. DIS is more robust on weak texture. LK is cheaper and
@@ -848,8 +928,8 @@ def ego_stats(
     ImportError
         If OpenCV is not installed. Install it with the ``dataeval[opencv]`` extra.
     ValueError
-        If `gap`, `proc_short_side`, `grid_target` or `max_frames` is not positive, or if
-        `flow` is not one of the supported estimators.
+        If `gap`, `proc_short_side`, `grid_target` or `max_frames` is not positive, if
+        `proc_short_side` is under 32 px, or if `flow` is not one of the supported estimators.
 
     See Also
     --------
@@ -872,9 +952,10 @@ def ego_stats(
 
     **Units.** ``zoom_rate``, ``roll_rate`` and ``shear_rate`` are per-frame rates and do
     not change with resolution, so they are comparable across differently sized sequences.
-    ``pan_speed`` and ``mover_speed`` are pixels per frame in each sequence's own full
-    resolution, so they are not comparable that way. Normalize them by frame size before
-    comparing sequences shot at different resolutions.
+    ``pan_speed`` and ``mover_speed`` are pixels per frame in the full resolution of the pair
+    each was measured on, so they are not comparable that way, even within a sequence whose
+    frame size changes. Normalize them by frame size before comparing sequences shot at
+    different resolutions.
 
     **Cost.** Dominated by optical flow, which is linear in frames measured and roughly
     linear in pixels at `proc_short_side`. Lower `proc_short_side` before lowering
@@ -920,8 +1001,17 @@ def _reject_bad_params(
     bad = {name: value for name, value in positive.items() if value < 1}
     if bad:
         raise ValueError(f"Parameters must be positive integers; got {bad}.")
+    _check_proc_short_side(proc_short_side, "proc_short_side")
     if flow not in ("dis", "lk"):
         raise ValueError(f"Unknown flow estimator {flow!r}; expected one of 'dis', 'lk'.")
+
+
+def _check_proc_short_side(value: int, name: str) -> None:
+    """Refuse a processing size under the flow floor, naming the caller's keyword, as every pair would be refused."""
+    if value < _MIN_FLOW_SIDE:
+        raise ValueError(
+            f"{name} must be at least {_MIN_FLOW_SIDE} px, the smallest side optical flow reads; got {value}.",
+        )
 
 
 def _concat_items(item_rows: Sequence[dict[str, list[Any]]]) -> EgoFactors:

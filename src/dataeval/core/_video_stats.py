@@ -90,6 +90,7 @@ def _check_options(stats: VideoStats, options: VideoOptions) -> None:
     }
     if bad:
         raise ValueError(f"Parameters must be positive integers; got {bad}.")
+    _ego_stats._check_proc_short_side(options.ego_proc_short_side, "ego_proc_short_side")
     # Imported here, on the caller's thread: a missing extra fails up front, and run_videos
     # caps OpenCV's threads only once cv2 is imported.
     _ego_stats._require_cv2()
@@ -183,7 +184,8 @@ def video_stats(
         ``dataeval[opencv]`` extra.
     ValueError
         If `redundancy_radius` is negative, or if `stats` selects an `EGO` statistic and
-        `ego_gap` or `ego_proc_short_side` is not positive.
+        `ego_gap` or `ego_proc_short_side` is not positive or `ego_proc_short_side` is under
+        32 px.
 
     Warns
     -----

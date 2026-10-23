@@ -3,6 +3,7 @@
 __all__ = [
     "AllFrames",
     "BestPerTrack",
+    "CameraTravel",
     "Chain",
     "ClassBalance",
     "ClassFilter",
@@ -50,6 +51,7 @@ __all__ = [
     "unzip_dataset",
 ]
 
+from dataeval.data._camera_travel import CameraTravel
 from dataeval.data._chain import Chain
 from dataeval.data._classbalance import ClassBalance
 from dataeval.data._classfilter import ClassFilter
