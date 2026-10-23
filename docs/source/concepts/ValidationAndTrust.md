@@ -901,10 +901,10 @@ statistical and computational.
     than from too little evidence once fewer than a quarter of its frames were
     trusted. The affine model is first-order and carries no depth, so a camera
     translating through a scene with strong parallax is fitted only
-    approximately. `pan_speed` and `mover_speed` are in each sequence's own
-    pixels and are not comparable across resolutions without normalizing; the
-    rates are. The temporal trust gate assumes a roughly steady camera state
-    across the sequence. A reading is attributed to the *later* frame of the
+    approximately. `pan_speed` and `mover_speed` are in the pixels of the frames
+    they were measured on and are not comparable across resolutions without
+    normalizing; the rates are. The temporal trust gate assumes a roughly steady
+    camera state across the sequence. A reading is attributed to the *later* frame of the
     pair it was measured from, so the leading `gap` frames of every sequence
     carry no reading.
 - - {func}`.phash`, {func}`.phash_d4`, {func}`.dhash`, {func}`.dhash_d4`,

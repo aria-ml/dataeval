@@ -10,6 +10,8 @@ this module and a failure in the second might be OpenCV.
 from __future__ import annotations
 
 import gc
+import subprocess
+import sys
 import weakref
 from collections import Counter
 from collections.abc import Iterator, Sequence
@@ -27,12 +29,17 @@ from dataeval.core._ego_stats import (
     _biweight_weights,
     _classify_motion,
     _fit_irls,
+    _flow_estimator,
+    _flow_frame,
+    _FlowFrame,
     _is_ambiguous,
+    _measure_pair,
     _pair_ego,
     _seed_weights,
     _stream_pairs,
     _temporal_outliers,
 )
+from dataeval.core._video_runner import FrameView, VideoOptions
 from dataeval.protocols import MultiobjectTrackingDataset, VideoStream
 
 cv2 = pytest.importorskip("cv2", reason="ego_stats requires opencv")
@@ -82,7 +89,7 @@ def texture(seed: int = 0, size: tuple[int, int] = (HEIGHT, WIDTH), blur: float 
 class FakeFrame:
     """A decoded frame carrying ``(C, H, W)`` pixels, per the MAITE video protocol."""
 
-    def __init__(self, gray: NDArray[np.uint8], index: int, channels: int = 1) -> None:
+    def __init__(self, gray: NDArray[Any], index: int, channels: int = 1) -> None:
         self.pixels = np.repeat(gray[np.newaxis, :, :], channels, axis=0)
         self.frame_index = index
         self.time_s = index / 30.0
@@ -93,6 +100,32 @@ def panning_stream(shift: int = 3, n_frames: int = 10, seed: int = 0) -> list[Fa
     """A sequence whose content translates by a known number of pixels each frame."""
     base = texture(seed)
     return [FakeFrame(np.roll(base, k * shift, axis=1), k) for k in range(n_frames)]
+
+
+def _pan(
+    shift: int,
+    n: int,
+    size: tuple[int, int] = (HEIGHT, WIDTH),
+    dtype: type[np.uint8 | np.float32] = np.uint8,
+    start: int = 0,
+) -> list[FakeFrame]:
+    """Frames at indices ``start`` to ``start + n - 1``, each rolling one texture by ``shift`` px per index."""
+    base = texture(0, size)
+    frames = []
+    for k in range(start, start + n):
+        rolled = np.roll(base, k * shift, axis=1)
+        frames.append(FakeFrame(rolled if dtype is np.uint8 else rolled.astype(np.float32) / 255.0, k))
+    return frames
+
+
+def _unreadable(k: int) -> FakeFrame:
+    """A 640x360 frame of all-NaN float pixels at index ``k``."""
+    return FakeFrame(np.full((HEIGHT, WIDTH), np.nan, np.float32), k)
+
+
+def _blown_out(n: int) -> list[FakeFrame]:
+    """A stretch of frames overexposed to one white level, which DIS reads as a still camera."""
+    return [FakeFrame(np.full((HEIGHT, WIDTH), 255, dtype=np.uint8), k) for k in range(n)]
 
 
 def ambiguous_stream(n_frames: int = 8, seed: int = 0) -> list[FakeFrame]:
@@ -347,17 +380,17 @@ class TestTemporalGate:
         readings = [self._track(0.0) for _ in range(40)]
         for i in range(15, 33):
             readings[i] = self._track(75.0, div=0.3)
-        flags = _temporal_outliers(cast("Any", readings), half_diagonal=400.0)
+        flags = _temporal_outliers(cast("Any", readings), 400.0, [1.0] * 40)
         assert flags[15:33].all(), "a rolling baseline would track the burst and miss its core"
         assert not flags[:15].any()
         assert not flags[33:].any()
 
     def test_steady_real_motion_is_not_flagged(self):
         readings = [self._track(5.0) for _ in range(40)]
-        assert not _temporal_outliers(cast("Any", readings), half_diagonal=400.0).any()
+        assert not _temporal_outliers(cast("Any", readings), 400.0, [1.0] * 40).any()
 
     def test_too_few_measured_pairs_flags_nothing(self):
-        assert not _temporal_outliers(cast("Any", [None] * 40), half_diagonal=400.0).any()
+        assert not _temporal_outliers(cast("Any", [None] * 40), 400.0, [1.0] * 40).any()
 
 
 class _PairStub:
@@ -518,6 +551,12 @@ class TestParameterValidation:
         with pytest.raises(ValueError, match="must be positive"):
             ego_stats(cast("VideoStream", panning_stream()), **kwargs)
 
+    @pytest.mark.parametrize("proc_short_side", [1, 31])
+    def test_a_processing_size_below_the_flow_floor_is_rejected(self, proc_short_side: int):
+        """Below 32 px every pair would be refused, so the result would be silently all NaN."""
+        with pytest.raises(ValueError, match="32"):
+            ego_stats(cast("VideoStream", panning_stream()), proc_short_side=proc_short_side)
+
     def test_unknown_flow_estimator_is_rejected(self):
         """Regression test for an unrecognized estimator falling back to Lucas-Kanade.
 
@@ -578,6 +617,116 @@ class TestStreamPairs:
 
     def test_a_sequence_shorter_than_the_gap_yields_nothing(self):
         assert list(_stream_pairs(self._numbered(2), gap=5)) == []
+
+
+class TestMeasurePair:
+    def test_a_clean_pan_reads_its_shift(self):
+        first, second = (_FlowFrame(frame.pixels[0], FULL_WH) for frame in panning_stream(shift=8, n_frames=2))
+        reading = _measure_pair(_flow_estimator("dis"), first, second, grid_target=40, gap=1)
+        assert reading is not None
+        assert reading.trusted
+        assert abs(reading.t0x - 8.0) < 0.05
+        assert abs(reading.t0y) < 0.05
+
+    def test_lucas_kanade_needs_no_estimator(self):
+        assert _flow_estimator("lk") is None
+
+    def test_frames_of_different_sizes_are_not_paired(self):
+        large, small = _FlowFrame(texture(0), FULL_WH), _FlowFrame(texture(1, size=(180, 320)), (320, 180))
+        assert _measure_pair(_flow_estimator("dis"), large, small, grid_target=40, gap=1) is None
+
+    def test_frames_of_different_original_sizes_are_not_paired_though_they_process_alike(self):
+        gray = texture(0)  # 640x360 and 1280x720 both process to 640x360
+        first, second = _FlowFrame(gray, FULL_WH), _FlowFrame(gray, (1280, 720))
+        assert _measure_pair(_flow_estimator("dis"), first, second, grid_target=40, gap=1) is None
+
+    @pytest.mark.parametrize("shape", [(8, 8), (64, 7), (31, 640)])  # OpenCV raises at these
+    def test_a_side_too_short_for_flow_is_not_read(self, shape):
+        a = texture(0, size=shape)
+        first, second = _FlowFrame(a, shape[::-1]), _FlowFrame(np.roll(a, 1, axis=1), shape[::-1])
+        assert _measure_pair(_flow_estimator("dis"), first, second, grid_target=40, gap=1) is None
+
+    def test_a_side_too_short_for_flow_is_not_read_by_lucas_kanade_either(self):
+        a = texture(0, size=(31, 640))
+        first, second = _FlowFrame(a, (640, 31)), _FlowFrame(np.roll(a, 1, axis=1), (640, 31))
+        assert _measure_pair(_flow_estimator("lk"), first, second, grid_target=40, gap=1) is None
+
+    @pytest.mark.parametrize(("first", "second"), [(0, 0), (128, 128), (None, 0), (0, None)])
+    def test_a_flat_frame_is_not_read(self, first, second):
+        """A single gray level holds no motion to read, and DIS would report it as a still camera."""
+        grays = (texture(0) if v is None else np.full((HEIGHT, WIDTH), v, np.uint8) for v in (first, second))
+        a, b = (_FlowFrame(gray, FULL_WH) for gray in grays)
+        assert _measure_pair(_flow_estimator("dis"), a, b, grid_target=40, gap=1) is None
+
+    def test_a_short_height_that_would_crash_opencv_is_not_read(self):
+        # (10, 64) crashes DIS natively in OpenCV 4.11, so the call runs in its own process
+        code = """
+import numpy as np
+from dataeval.core._ego_stats import _FlowFrame, _flow_estimator, _measure_pair
+
+a = np.random.default_rng(0).integers(0, 255, (10, 64), dtype=np.uint8)
+first, second = _FlowFrame(a, (64, 10)), _FlowFrame(np.roll(a, 1, axis=1), (64, 10))
+print(_measure_pair(_flow_estimator("dis"), first, second, grid_target=40, gap=1))
+"""
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == "None"
+
+
+class TestFlowFrame:
+    @staticmethod
+    def _view(pixels: NDArray[np.float32]) -> FrameView:
+        return FrameView(FakeFrame(pixels, 0), 0, VideoOptions())
+
+    @pytest.mark.parametrize("bad", [np.nan, np.inf])
+    def test_a_single_non_finite_pixel_makes_the_frame_unreadable(self, bad: float):
+        pixels = np.full((HEIGHT, WIDTH), 0.5, np.float32)
+        pixels[100, 200] = bad
+        assert _flow_frame(self._view(pixels)) is None
+
+    def test_a_finite_float_frame_is_read_at_its_original_size(self):
+        frame = _flow_frame(self._view(np.full((HEIGHT, WIDTH), 0.5, np.float32)))
+        assert frame is not None
+        assert frame.full_wh == FULL_WH
+
+
+class TestUnreadablePairs:  # through ego_stats
+    def test_a_change_of_frame_size_is_a_refused_pair(self):
+        stream = _pan(8, 3) + _pan(8, 3, size=(180, 320), start=3)
+        assert ego_stats(cast("VideoStream", stream))["stats"]["ego_trusted"] == [False, True, True, False, True, True]
+
+    def test_a_change_of_size_that_processes_alike_is_a_refused_pair(self):
+        # frame 3 is frame 2 upscaled 2x (nearest): it processes to the identical 640x360 array, which would
+        # otherwise read as a trusted still camera
+        stream = _pan(8, 3)
+        stream.append(FakeFrame(cv2.resize(stream[2].pixels[0], (1280, 720), interpolation=cv2.INTER_NEAREST), 3))
+        assert ego_stats(cast("VideoStream", stream))["stats"]["ego_trusted"] == [False, True, True, False]
+
+    def test_frames_without_finite_pixels_are_never_a_still_camera(self):
+        stats = ego_stats(cast("VideoStream", [_unreadable(k) for k in range(3)]))["stats"]
+        assert stats["ego_trusted"] == [False] * 3
+        assert np.isnan(stats["pan_x"]).all()
+
+    def test_an_unreadable_frame_refuses_both_pairs_it_is_in(self):
+        stream = _pan(8, 3, dtype=np.float32) + [_unreadable(3)] + _pan(8, 2, dtype=np.float32, start=4)
+        assert ego_stats(cast("VideoStream", stream))["stats"]["ego_trusted"] == [False, True, True, False, False, True]
+
+    def test_the_temporal_gate_reads_a_same_aspect_size_switch_in_one_unit(self):
+        # one view panning 16 px a frame at 640x360, delivered at 640x360 for 20 frames and then at 1280x720 for
+        # 10, as adaptive bitrate switches; in its own pixels the later segment pans 32 px, but in the first
+        # frame's it pans alike, so the gate has no outlier to flag
+        view = [np.roll(texture(0, size=(720, 1280)), 32 * k, axis=1) for k in range(30)]
+        stream = [FakeFrame(cv2.resize(v, FULL_WH, interpolation=cv2.INTER_AREA), k) for k, v in enumerate(view[:20])]
+        stream += [FakeFrame(v, k) for k, v in enumerate(view[20:], start=20)]
+        stats = ego_stats(cast("VideoStream", stream))["stats"]
+        assert stats["ego_trusted"] == [False] + [True] * 19 + [False] + [True] * 9
+        np.testing.assert_allclose(stats["pan_x"][1:20], 16.0, atol=0.1)
+        np.testing.assert_allclose(stats["pan_x"][21:], 32.0, atol=0.2)
+
+    def test_a_blown_out_stretch_is_never_a_still_camera(self):
+        stats = ego_stats(cast("VideoStream", _blown_out(5)))["stats"]
+        assert stats["ego_trusted"] == [False] * 5
+        assert np.isnan(stats["pan_x"]).all()
 
 
 # ============================== metadata landing ==============================

@@ -280,6 +280,13 @@ def test_a_bad_ego_gap_names_the_video_stats_keyword():
         video_stats(cast(Any, _Unreadable()), stats=VideoStats.EGO, ego_gap=0)
 
 
+@pytest.mark.parametrize("ego_proc_short_side", [16, 31])
+def test_an_ego_processing_size_below_the_flow_floor_names_the_video_stats_keyword(ego_proc_short_side):
+    """Below 32 px every pair would be refused, so the EGO summaries would be silently NaN."""
+    with pytest.raises(ValueError, match="ego_proc_short_side must be at least 32 px"):
+        video_stats(cast(Any, _Unreadable()), stats=VideoStats.EGO, ego_proc_short_side=ego_proc_short_side)
+
+
 def test_progress_is_reported_once_per_video():
     calls: list[tuple[int, int | None]] = []
 
