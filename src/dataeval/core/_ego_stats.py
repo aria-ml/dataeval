@@ -75,6 +75,20 @@ _MIN_SAMPLES = 12
 #: transposed. The rule covers both estimators, so there is one rule: Lucas-Kanade never failed, but a frame
 #: that small gives no reliable motion either way.
 _MIN_FLOW_SIDE = 32
+#: Smallest inlier normalized cross-correlation, taken at half resolution, between the new frame and the previous frame
+#: warped by the fitted camera motion for a pair to be trusted. Measured on OpenCV 4.11.0 over 11 real photos:
+#: - motion under blur, JPEG q25, flicker, or noise sigma 10 on both frames scores 0.90 and up, and correct readings of
+#:   scenes cut to a tenth of their contrast (std 1.6 to 8) under noise sigma 1 to 4 on both frames 0.86 and up;
+#: - hard cuts score -0.18 to 0.24, fast pans misread by 17 px or more 0.53 at most, and 2x field-of-view switches
+#:   0.749 at most.
+#: So 0.80 sits about 0.05 from either side: above every switch, and below the lowest correct reading, 0.857.
+#: Noise on both frames is the hard case. A full-resolution check, calibrated with noise on one frame, refused 35 of 53
+#: of those low-contrast readings under noise sigma 2 to 4. What 0.80 still refuses wrongly is a large mover over
+#: repetitive texture, a scene whose contrast the noise matches (std 0.8 to 4 under noise sigma 4 refuses 11 of 11), and
+#: a fast pan at a wide field of view over fine texture, whose perspective the affine fit leaves out (9 of 70 pans at 60
+#: to 90 degrees and 1.5 to 4 degrees a frame, 4 of 10 at 90 degrees and 3). Each costs a frame left unmeasured, never a
+#: frame dropped. A pan read 4 px off has a median score of 0.86, so a mid-size misread can pass.
+_MIN_AGREEMENT = 0.80
 
 
 def _require_cv2() -> ModuleType:
@@ -252,6 +266,11 @@ class _PairReading(NamedTuple):
     mover_speed : float
         Median residual speed over those samples, full-resolution pixels per frame. NaN
         when there are none.
+    agreement : float
+        Normalized cross-correlation of the new frame with the previous frame warped by the fitted motion, over
+        the cells of the samples that fit, at half resolution unless the frame is too small to halve. NaN where
+        the check did not run, and 0.0 where the correlation is undefined: a flat inlier region, or fewer than
+        12 cells. Low across a hard cut, a large field-of-view switch, or a pan read wrongly.
     """
 
     div: float
@@ -268,6 +287,7 @@ class _PairReading(NamedTuple):
     ambiguous: bool
     mover_frac: float
     mover_speed: float
+    agreement: float = np.nan
 
     @property
     def foe_in_frame(self) -> bool:
@@ -276,8 +296,8 @@ class _PairReading(NamedTuple):
 
     @property
     def trusted(self) -> bool:
-        """Whether this pair's camera estimate can be told apart from a mover's."""
-        return not (self.ambiguous or self.border_capture or self.degenerate)
+        """Whether this pair's camera estimate can be told apart from a mover's, and explains the new frame."""
+        return not (self.ambiguous or self.border_capture or self.degenerate or self.agreement < _MIN_AGREEMENT)
 
 
 def _refit_on_border(
@@ -392,6 +412,76 @@ def _is_ambiguous(
     return second is not None and bool((second.weights > _INLIER_WEIGHT).mean() > 0.60)
 
 
+def _photometric_agreement(
+    fit: _AffineFit,
+    pts: NDArray[np.float64],
+    inlier: NDArray[np.bool_],
+    previous: NDArray[np.uint8],
+    current: NDArray[np.uint8],
+    step: int,
+) -> float:
+    """Correlate `current` with `previous` warped by the fit, over the inliers' cells, as a normalized value.
+
+    Each inlier sample stands for the ``step``-pixel lattice cell its fitted destination falls in, so a
+    mover outside the camera model does not count against the camera. The frames are correlated at half
+    resolution, where noise on both of them weighs less against the scene. A frame whose halved side would
+    be under `_MIN_FLOW_SIDE`, or whose halved cells cover less than `_MIN_SAMPLES` cells' area, is
+    correlated at full resolution instead. Returns 0.0 where fewer than `_MIN_SAMPLES` cells are covered or
+    either side is flat, as the correlation is then undefined and the motion explains nothing.
+    """
+    cv2 = _require_cv2()
+    height, width = previous.shape[:2]
+    forward = np.hstack([np.eye(2) + fit.matrix, (fit.offset - fit.matrix @ fit.centroid)[:, None]])
+    dest = (pts[inlier] @ forward[:, :2].T + forward[:, 2]) // step
+    col, row = dest[:, 0].astype(int), dest[:, 1].astype(int)
+    cells = np.zeros((-(-height // step), -(-width // step)), np.uint8)
+    inside = (col >= 0) & (row >= 0) & (col < cells.shape[1]) & (row < cells.shape[0])
+    cells[row[inside], col[inside]] = 1
+
+    half_previous, half_current = cv2.pyrDown(previous), cv2.pyrDown(current)
+    if min(half_previous.shape[:2]) >= _MIN_FLOW_SIDE:
+        # pyrDown centers half-scale pixel i on full-scale pixel 2i, so only the map's translation halves
+        half = np.hstack([forward[:, :2], forward[:, 2:] / 2])
+        score = _masked_correlation(half_previous, half_current, half, cells, step, 2)
+        if score is not None:
+            return score
+    score = _masked_correlation(previous, current, forward, cells, step, 1)
+    return 0.0 if score is None else score
+
+
+def _masked_correlation(
+    previous: NDArray[np.uint8],
+    current: NDArray[np.uint8],
+    forward: NDArray[np.float64],
+    cells: NDArray[np.uint8],
+    step: int,
+    factor: int,
+) -> float | None:
+    """Take `_photometric_agreement`'s correlation on frames shrunk by `factor`, or None under the cell floor."""
+    cv2 = _require_cv2()
+    height, width = previous.shape[:2]
+    # a border far below any pixel marks every output that read outside the frame, so one warp gives both
+    warped = cv2.warpAffine(previous.astype(np.float32), forward, (width, height), borderValue=-1e6)
+    covered = warped >= 0
+    # each pixel takes the cell of the full-scale pixel it is centered on
+    mask = cells.take(np.arange(height) * factor // step, axis=0).take(np.arange(width) * factor // step, axis=1)
+    if factor > 1:
+        # pyrDown reads two full-scale pixels either side, one half-scale pixel, so keep only pixels whose
+        # support lies wholly in inlier cells, or a flat inlier region would borrow texture from its neighbor
+        mask = cv2.erode(mask, np.ones((3, 3), np.uint8))
+    mask = mask * covered.view(np.uint8)
+
+    if cv2.countNonZero(mask) < _MIN_SAMPLES * (step / factor) ** 2:
+        return None
+    # moments over the mask in OpenCV, as this runs per pair
+    new = current.astype(np.float32)
+    mean_a, std_a = (float(v[0, 0]) for v in cv2.meanStdDev(warped, mask=mask))
+    mean_z, std_z = (float(v[0, 0]) for v in cv2.meanStdDev(new, mask=mask))
+    if std_a < 1e-3 or std_z < 1e-3:
+        return 0.0
+    return float((cv2.mean(warped * new, mask=mask)[0] - mean_a * mean_z) / (std_a * std_z))
+
+
 def _pair_ego(
     pts: NDArray[np.float64],
     flow: NDArray[np.float64],
@@ -402,8 +492,14 @@ def _pair_ego(
     capture_thresh: float = 0.45,
     foe_limit_mult: float = 8.0,
     static_px: float = 0.2,
+    frames: tuple[NDArray[np.uint8], NDArray[np.uint8], int] | None = None,
 ) -> _PairReading | None:
-    """Fit the camera motion for one frame pair, or None where no fit is possible."""
+    """Fit the camera motion for one frame pair, or None where no fit is possible.
+
+    With ``frames=(previous, current, step)``, the processed grays and the sampling lattice's step (see
+    `_lattice_step`), the fit is also checked against the pixels: see `_PairReading.agreement`. Without
+    them the check does not run.
+    """
     proc_w, proc_h = proc_wh
     full_w, full_h = full_wh
     scale = 0.5 * (full_w / proc_w + full_h / proc_h)
@@ -426,6 +522,9 @@ def _pair_ego(
     resid = fit.residuals(pts, flow)
     speed = np.hypot(resid[:, 0], resid[:, 1]) * scale / gap
     outlier = _biweight_weights(speed, _robust_cutoff(speed)) <= _INLIER_WEIGHT
+    agreement = np.nan
+    if frames is not None:
+        agreement = _photometric_agreement(fit, pts, ~outlier, *frames)
 
     return _PairReading(
         div=div,
@@ -442,16 +541,23 @@ def _pair_ego(
         ambiguous=_is_ambiguous(pts, flow, outlier),
         mover_frac=float(outlier.mean()),
         mover_speed=float(np.median(speed[outlier])) if outlier.any() else np.nan,
+        agreement=agreement,
     )
 
 
 # ============================== optical flow ==============================
 
 
+def _lattice_step(shape: tuple[int, ...], grid_target: int) -> int:
+    """Pixels between lattice samples, for a roughly ``grid_target``-square lattice."""
+    height, width = shape[:2]
+    return max(1, max(width, height) // grid_target)
+
+
 def _lattice(shape: tuple[int, ...], grid_target: int) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
     """Column and row indices of a roughly ``grid_target``-square sampling lattice."""
     height, width = shape[:2]
-    step = max(1, max(width, height) // grid_target)
+    step = _lattice_step(shape, grid_target)
     gx, gy = np.meshgrid(np.arange(step // 2, width, step), np.arange(step // 2, height, step))
     return gx.ravel(), gy.ravel()
 
@@ -629,9 +735,12 @@ class EgoFactors(TypedDict):
         Median speed of those samples, full-resolution pixels per frame. NaN where none.
     ego_trusted : Sequence[bool]
         Whether this frame's camera estimate could be told apart from a mover's. False as well
-        where the pair could not be read: the two frames differ in size, a processed side is under
-        32 px, a frame holds a non-finite pixel, or a frame is a single gray level once converted to
-        grayscale, as a black dropout or a frame whose values all saturate the conversion is.
+        where the fitted camera motion does not explain the new frame, as across a hard cut, a
+        large field-of-view switch or a misread fast pan, where nothing in the frame confirms the
+        fit, as on a nearly textureless noisy frame, or where the pair could not be read: the two
+        frames differ in size, a processed side is under 32 px, a frame holds a non-finite pixel,
+        or a frame is a single gray level once converted to grayscale, as a black dropout or a
+        frame whose values all saturate the conversion is.
     """
 
     item_index: Sequence[int]
@@ -781,7 +890,10 @@ def _measure_pair(
         if estimator is not None
         else _grid_flow_lk(previous.gray, current.gray, grid_target)
     )
-    return _pair_ego(pts, vectors, (width, height), current.full_wh, gap) if len(pts) >= _MIN_SAMPLES else None
+    if len(pts) < _MIN_SAMPLES:
+        return None
+    frames = (previous.gray, current.gray, _lattice_step(previous.gray.shape, grid_target))
+    return _pair_ego(pts, vectors, (width, height), current.full_wh, gap, frames=frames)
 
 
 class _EgoEngine:
@@ -939,9 +1051,9 @@ def ego_stats(
     Notes
     -----
     **Reading the result.** Check `ego_trusted` first. Where it is False, the kinematic
-    fields such as `pan_x` are NaN, because the camera could not be told apart from a mover
-    on that frame. `mover_frac` and `mover_speed` stay populated regardless. They are most
-    informative on the frames the ego fit refuses.
+    fields such as `pan_x` are NaN, because that frame's camera reading was refused. See
+    :class:`EgoFactors` for why a reading is refused. `mover_frac` and `mover_speed` stay
+    populated regardless. They are most informative on the frames the ego fit refuses.
 
     **Sequence-level trusted fraction.** The declared roll-ups (see `add_factors`) do not
     include one for `ego_trusted` itself. The named-reduction registry's ``mean`` accepts
@@ -957,9 +1069,10 @@ def ego_stats(
     frame size changes. Normalize them by frame size before comparing sequences shot at
     different resolutions.
 
-    **Cost.** Dominated by optical flow, which is linear in frames measured and roughly
-    linear in pixels at `proc_short_side`. Lower `proc_short_side` before lowering
-    `grid_target`.
+    **Cost.** Linear in frames measured. Per pair, optical flow takes a third to a half of the
+    time, and the robust fit and the check that it explains the new frame share the rest. Flow
+    and that check are roughly linear in pixels at `proc_short_side`, so lower `proc_short_side`
+    before lowering `grid_target`.
 
     **Parallelism.** Sequences are measured concurrently, one per worker thread, when
     :func:`~dataeval.config.set_max_processes` allows more than one worker. Each worker

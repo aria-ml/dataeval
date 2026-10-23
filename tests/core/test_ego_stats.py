@@ -12,6 +12,7 @@ from __future__ import annotations
 import gc
 import subprocess
 import sys
+import warnings
 import weakref
 from collections import Counter
 from collections.abc import Iterator, Sequence
@@ -24,8 +25,10 @@ from numpy.typing import NDArray
 from dataeval.config import use_max_processes
 from dataeval.core import ego_stats
 from dataeval.core._ego_stats import (
+    _MIN_AGREEMENT,
     EGO_AGGREGATIONS,
     EgoFactors,
+    _AffineFit,
     _biweight_weights,
     _classify_motion,
     _fit_irls,
@@ -33,8 +36,10 @@ from dataeval.core._ego_stats import (
     _flow_frame,
     _FlowFrame,
     _is_ambiguous,
+    _lattice,
     _measure_pair,
     _pair_ego,
+    _photometric_agreement,
     _seed_weights,
     _stream_pairs,
     _temporal_outliers,
@@ -625,6 +630,100 @@ class TestStreamPairs:
 
     def test_a_sequence_shorter_than_the_gap_yields_nothing(self):
         assert list(_stream_pairs(self._numbered(2), gap=5)) == []
+
+
+class TestAgreement:
+    def test_a_clean_pan_is_explained(self):
+        first, second = (_FlowFrame(f.pixels[0], FULL_WH) for f in panning_stream(shift=8, n_frames=2))
+        reading = _measure_pair(_flow_estimator("dis"), first, second, grid_target=40, gap=1)
+        assert reading is not None
+        assert reading.trusted
+        assert reading.agreement > 0.99
+
+    @pytest.mark.parametrize(
+        "current",
+        [lambda: texture(1), lambda: cv2.resize(texture(0)[90:270, 160:480], (640, 360))],
+        ids=["cut", "2x field-of-view switch"],
+    )
+    def test_a_frame_the_fitted_motion_does_not_explain_is_refused(self, current):
+        # without the check both read as trusted: the cut as a 5.6 px pan
+        first, second = _FlowFrame(texture(0), FULL_WH), _FlowFrame(current(), FULL_WH)
+        reading = _measure_pair(_flow_estimator("dis"), first, second, grid_target=40, gap=1)
+        assert reading is not None
+        assert reading.agreement < _MIN_AGREEMENT
+        assert not reading.trusted
+
+    def test_an_independent_mover_does_not_count_against_the_camera(self):
+        moved = np.roll(texture(0), 8, axis=1)
+        moved[216:360] = np.roll(texture(0)[216:360], 20, axis=1)  # a 40% band moving on its own
+        first, second = _FlowFrame(texture(0), FULL_WH), _FlowFrame(moved, FULL_WH)
+        reading = _measure_pair(_flow_estimator("dis"), first, second, grid_target=40, gap=1)
+        assert reading is not None
+        assert reading.agreement > 0.99
+
+    def test_without_frames_the_check_does_not_run(self):
+        reading = measure(affine_flow(lattice(), t0=(5.0, 3.0)))
+        assert np.isnan(reading.agreement)
+        assert reading.trusted
+
+    def test_an_undefined_correlation_is_unexplained(self):
+        # identical frames, flat on the left half and textured on the right; only the flat half is inlying
+        frame = texture(0)
+        frame[:, :320] = 100
+        pts = lattice()
+        still = _AffineFit(np.zeros(3), np.zeros(3), pts.mean(axis=0), np.ones(len(pts)), 1.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert _photometric_agreement(still, pts, pts[:, 0] < 320, frame, frame, 16) == 0.0
+            assert _photometric_agreement(still, pts, np.ones(len(pts), bool), frame, frame, 16) > 0.99
+
+    @pytest.mark.parametrize(("cells", "expected"), [(11, 0.0), (12, 1.0)])
+    def test_fewer_cells_than_a_fit_needs_are_unexplained(self, cells, expected):
+        frame = texture(0)  # identical frames under an identity fit, so any covered cell agrees perfectly
+        pts = lattice()  # one sample per 16 px cell
+        still = _AffineFit(np.zeros(3), np.zeros(3), pts.mean(axis=0), np.ones(len(pts)), 1.0)
+        inlier = np.arange(len(pts)) < cells
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert _photometric_agreement(still, pts, inlier, frame, frame, 16) == pytest.approx(expected)
+
+    @pytest.mark.parametrize(("height", "expected"), [(63, 0.0), (62, 1.0)], ids=["halved", "too small to halve"])
+    def test_a_frame_too_small_to_halve_is_checked_at_full_resolution(self, height, expected):
+        # stripes one pixel wide average flat at half resolution, so only a full-resolution check sees them
+        frame = np.tile(np.array([0, 255], np.uint8), (height, WIDTH // 2))
+        pts = np.column_stack(_lattice(frame.shape, 40)).astype(float)
+        still = _AffineFit(np.zeros(3), np.zeros(3), pts.mean(axis=0), np.ones(len(pts)), 1.0)
+        assert _photometric_agreement(still, pts, np.ones(len(pts), bool), frame, frame, 16) == pytest.approx(expected)
+
+    @pytest.mark.parametrize("shape", [(HEIGHT, WIDTH), (36, 36)])
+    def test_the_step_measured_is_the_lattices(self, monkeypatch, shape):
+        seen = []
+        real = _pair_ego
+
+        def spy(*args, **kwargs):
+            seen.append(kwargs["frames"][2])
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr("dataeval.core._ego_stats._pair_ego", spy)
+        a = texture(0, size=shape)
+        first, second = _FlowFrame(a, shape[::-1]), _FlowFrame(np.roll(a, 1, axis=1), shape[::-1])
+        _measure_pair(_flow_estimator("dis"), first, second, grid_target=40, gap=1)
+        gx, _ = _lattice(shape, 40)
+        assert seen == [gx[1] - gx[0]]
+
+
+class TestCuts:  # through ego_stats
+    def test_a_cut_is_an_untrusted_pair(self):
+        stream = _pan(8, 4) + [FakeFrame(np.roll(texture(1), 8 * k, axis=1), k) for k in range(4, 8)]
+        trusted = ego_stats(cast("VideoStream", stream))["stats"]["ego_trusted"]
+        assert trusted == [False, True, True, True, False, True, True, True]
+
+    def test_readings_on_explained_video_are_unchanged(self):
+        pan = ego_stats(cast("VideoStream", panning_stream(shift=8, n_frames=6)))["stats"]
+        assert pan["ego_trusted"] == [False, True, True, True, True, True]
+        assert np.allclose(pan["pan_x"], [np.nan, 8.0, 8.0, 8.0, 8.0, 8.0], atol=0.05, equal_nan=True)
+        ambiguous = ego_stats(cast("VideoStream", ambiguous_stream(8)))["stats"]
+        assert not any(ambiguous["ego_trusted"])
 
 
 class TestMeasurePair:
