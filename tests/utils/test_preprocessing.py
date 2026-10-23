@@ -531,7 +531,7 @@ class TestToCanonicalGrayscale:
             np.stack([*np.meshgrid(np.arange(256), np.arange(256), indexing="ij"), np.full((256, 256), 2)]).astype(
                 np.uint8
             ),
-            np.random.default_rng(1).integers(0, 4096, (3, 64, 48), dtype=np.uint16),
+            np.random.default_rng(1).integers(0, 256, (3, 64, 48), dtype=np.uint16),
             np.random.default_rng(2).integers(-300, 300, (3, 64, 48), dtype=np.int32),
             np.random.default_rng(3).random((3, 64, 48), dtype=np.float32),
             np.where(np.eye(64, 48, dtype=bool), np.nan, np.random.default_rng(4).random((3, 64, 48)) * 400 - 50),
@@ -545,6 +545,20 @@ class TestToCanonicalGrayscale:
         luma = np.sum(image.astype(float) * np.array([0.299, 0.587, 0.114]).reshape(3, 1, 1), axis=0)
         expected = np.clip(np.nan_to_num(luma), 0, 255).astype(np.uint8)
         np.testing.assert_array_equal(to_canonical_grayscale(image), expected)
+
+    @pytest.mark.parametrize(("high", "encoding"), [(3000, 4095), (16383, 65535)], ids=["12-bit", "14-bit in 16"])
+    def test_an_integer_image_deeper_than_8_bits_is_scaled_from_its_encoding(self, high, encoding):
+        """Clipping at 255 saturated 12- and 16-bit sensor data, IR among it, into a flat white frame."""
+        image = np.linspace(0, high, 64 * 48).reshape(1, 64, 48).astype(np.uint16)
+        np.testing.assert_array_equal(to_canonical_grayscale(image), (image[0] * (255 / encoding)).astype(np.uint8))
+
+    def test_an_integer_image_within_8_bits_is_not_scaled(self):
+        image = np.arange(256, dtype=np.uint16).reshape(1, 16, 16)
+        np.testing.assert_array_equal(to_canonical_grayscale(image), image[0].astype(np.uint8))
+
+    def test_a_signed_integer_image_is_clipped_as_before(self):
+        image = np.array([[[-5, 100, 300]]], dtype=np.int32)
+        np.testing.assert_array_equal(to_canonical_grayscale(image), [[0, 100, 255]])
 
     def test_rgba_to_grayscale(self):
         """Test conversion from 4-channel RGBA image (line 159-189)."""

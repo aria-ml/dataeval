@@ -1091,7 +1091,9 @@ def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:  # noqa: C
     """
     Convert an image of arbitrary channels (CHW) to a single-channel uint8 grayscale image (HW).
 
-    Uses color-space-aware heuristics.
+    Uses color-space-aware heuristics. A float image within [0, 1] is stretched to [0, 255]. An
+    integer image deeper than 8 bits, such as 12- or 16-bit sensor data, is scaled from the
+    encoding :func:`get_value_range` decodes for it, rather than clipped at 255.
 
     Parameters
     ----------
@@ -1108,6 +1110,13 @@ def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:  # noqa: C
         pmin, pmax = np.nanmin(image), np.nanmax(image)
         if pmax <= 1.0 and pmin >= 0.0:
             image = image * 255.0
+    # Scale an integer image deeper than 8 bits, 12- or 16-bit sensor data such as IR, from its
+    # decoded encoding, as get_value_range reads it. Clipping it at 255 saturated it into a flat
+    # white frame, which hashes as a duplicate of every other and reads as a still camera.
+    elif np.issubdtype(image.dtype, np.integer) and image.size > 0:
+        encoding = get_value_range(image)
+        if encoding.is_known and encoding.pmax > _EIGHT_BIT_MAX:
+            image = image * (_EIGHT_BIT_MAX / encoding.pmax)
 
     channels = image.shape[0]
 

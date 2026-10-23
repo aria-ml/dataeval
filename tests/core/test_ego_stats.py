@@ -508,6 +508,14 @@ class TestPerFrameOutput:
         result = ego_stats(cast("VideoStream", frames))
         assert result["stats"]["pan_speed"][1] == pytest.approx(3.0, abs=0.5)
 
+    def test_a_14_bit_infrared_pan_is_read(self):
+        # 14-bit IR stored in uint16 used to clip to a flat white field, which read as a still camera
+        base = texture(0).astype(np.uint16) * 64
+        frames = [FakeFrame(cast("Any", np.roll(base, 8 * k, axis=1)), k) for k in range(6)]
+        result = ego_stats(cast("VideoStream", frames))
+        assert result["stats"]["ego_trusted"] == [False] + [True] * 5
+        np.testing.assert_allclose(result["stats"]["pan_x"][1:], 8.0, atol=0.05)
+
 
 class TestTrustNulling:
     """An untrusted frame abstains rather than contributing a wrong number."""
