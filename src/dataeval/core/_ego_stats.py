@@ -51,8 +51,9 @@ from numpy.typing import NDArray
 from dataeval._log import get_logger
 from dataeval.core._compute_stats import FactorResult
 from dataeval.core._video_runner import FrameView, VideoClock, VideoOptions, run_videos, walk
-from dataeval.protocols import MultiobjectTrackingDataset, VideoStream
+from dataeval.protocols import ArrayLike, MultiobjectTrackingDataset, VideoStream
 from dataeval.types import Aggregator
+from dataeval.utils._array import as_numpy
 
 _logger = get_logger(__name__)
 
@@ -270,7 +271,8 @@ class _PairReading(NamedTuple):
         Normalized cross-correlation of the new frame with the previous frame warped by the fitted motion, over
         the cells of the samples that fit, at half resolution unless the frame is too small to halve. NaN where
         the check did not run, and 0.0 where the correlation is undefined: a flat inlier region, or fewer than
-        12 cells. Low across a hard cut, a large field-of-view switch, or a pan read wrongly.
+        12 cells. Low across a hard cut, a large field-of-view switch, or a pan read wrongly. With an overlay
+        mask, the pixels it covers in the new frame, and those the motion brings in from it, are left out.
     """
 
     div: float
@@ -419,6 +421,7 @@ def _photometric_agreement(
     previous: NDArray[np.uint8],
     current: NDArray[np.uint8],
     step: int,
+    overlay: NDArray[np.bool_] | None = None,
 ) -> float:
     """Correlate `current` with `previous` warped by the fit, over the inliers' cells, as a normalized value.
 
@@ -427,7 +430,8 @@ def _photometric_agreement(
     resolution, where noise on both of them weighs less against the scene. A frame whose halved side would
     be under `_MIN_FLOW_SIDE`, or whose halved cells cover less than `_MIN_SAMPLES` cells' area, is
     correlated at full resolution instead. Returns 0.0 where fewer than `_MIN_SAMPLES` cells are covered or
-    either side is flat, as the correlation is then undefined and the motion explains nothing.
+    either side is flat, as the correlation is then undefined and the motion explains nothing. Pixels in
+    `overlay`, and pixels the fit warps in from it, are left out.
     """
     cv2 = _require_cv2()
     height, width = previous.shape[:2]
@@ -442,10 +446,14 @@ def _photometric_agreement(
     if min(half_previous.shape[:2]) >= _MIN_FLOW_SIDE:
         # pyrDown centers half-scale pixel i on full-scale pixel 2i, so only the map's translation halves
         half = np.hstack([forward[:, :2], forward[:, 2:] / 2])
-        score = _masked_correlation(half_previous, half_current, half, cells, step, 2)
+        half_overlay = None
+        if overlay is not None:
+            # a half-scale pixel is overlay when any of the 5x5 full-scale pixels pyrDown reads for it is
+            half_overlay = cv2.dilate(overlay.view(np.uint8), np.ones((5, 5), np.uint8))[::2, ::2] > 0
+        score = _masked_correlation(half_previous, half_current, half, cells, step, 2, half_overlay)
         if score is not None:
             return score
-    score = _masked_correlation(previous, current, forward, cells, step, 1)
+    score = _masked_correlation(previous, current, forward, cells, step, 1, overlay)
     return 0.0 if score is None else score
 
 
@@ -456,6 +464,7 @@ def _masked_correlation(
     cells: NDArray[np.uint8],
     step: int,
     factor: int,
+    overlay: NDArray[np.bool_] | None = None,
 ) -> float | None:
     """Take `_photometric_agreement`'s correlation on frames shrunk by `factor`, or None under the cell floor."""
     cv2 = _require_cv2()
@@ -470,6 +479,9 @@ def _masked_correlation(
         # support lies wholly in inlier cells, or a flat inlier region would borrow texture from its neighbor
         mask = cv2.erode(mask, np.ones((3, 3), np.uint8))
     mask = mask * covered.view(np.uint8)
+    if overlay is not None:
+        # the overlay in the new frame, and wherever the warp reads the old one's
+        mask[overlay | (cv2.warpAffine(overlay.astype(np.float32), forward, (width, height)) > 0)] = 0
 
     if cv2.countNonZero(mask) < _MIN_SAMPLES * (step / factor) ** 2:
         return None
@@ -480,6 +492,15 @@ def _masked_correlation(
     if std_a < 1e-3 or std_z < 1e-3:
         return 0.0
     return float((cv2.mean(warped * new, mask=mask)[0] - mean_a * mean_z) / (std_a * std_z))
+
+
+def _center_leverage(inliers: NDArray[np.float64], img_center: NDArray[np.float64]) -> float:
+    """How far the image center sits from the inliers, in standard deviations of their spread, or inf under 3."""
+    if len(inliers) < 3:
+        return np.inf
+    offset = img_center - inliers.mean(axis=0)
+    cov = np.cov(inliers.T) + np.eye(2)  # +1 px^2 keeps a one-row strip finite
+    return float(np.sqrt(offset @ np.linalg.solve(cov, offset)))
 
 
 def _pair_ego(
@@ -493,12 +514,15 @@ def _pair_ego(
     foe_limit_mult: float = 8.0,
     static_px: float = 0.2,
     frames: tuple[NDArray[np.uint8], NDArray[np.uint8], int] | None = None,
+    overlay: NDArray[np.bool_] | None = None,
 ) -> _PairReading | None:
     """Fit the camera motion for one frame pair, or None where no fit is possible.
 
     With ``frames=(previous, current, step)``, the processed grays and the sampling lattice's step (see
     `_lattice_step`), the fit is also checked against the pixels: see `_PairReading.agreement`. Without
-    them the check does not run.
+    them the check does not run. `overlay`, the processed overlay mask, is left out of that check, and
+    with it the pair is refused where the image center sits more than `_MAX_CENTER_LEVERAGE` from the
+    fit's inliers (see `_center_leverage`), as the motion there is then extrapolated, not measured.
     """
     proc_w, proc_h = proc_wh
     full_w, full_h = full_wh
@@ -522,9 +546,11 @@ def _pair_ego(
     resid = fit.residuals(pts, flow)
     speed = np.hypot(resid[:, 0], resid[:, 1]) * scale / gap
     outlier = _biweight_weights(speed, _robust_cutoff(speed)) <= _INLIER_WEIGHT
+    if overlay is not None and _center_leverage(pts[~outlier], img_center) > _MAX_CENTER_LEVERAGE:
+        return None
     agreement = np.nan
     if frames is not None:
-        agreement = _photometric_agreement(fit, pts, ~outlier, *frames)
+        agreement = _photometric_agreement(fit, pts, ~outlier, *frames, overlay=overlay)
 
     return _PairReading(
         div=div,
@@ -858,6 +884,81 @@ def _flow_frame(view: FrameView) -> _FlowFrame | None:
     return _FlowFrame(view.gray_small, (int(view.pixels.shape[-1]), int(view.pixels.shape[-2])))
 
 
+#: How far, in processed pixels, a sample can sit from the overlay and still be too near to trust.
+_MASK_MARGIN = 32
+#: Fewest quadrants of the frame that must each hold `_SUPPORT_SAMPLES` of a masked pair's kept samples. Fitted
+#: from one corner's samples, a 2% zoom or a 1 degree roll reads as a trusted pan of 1 to 3 px.
+_SUPPORT_QUADRANTS = 3
+#: Fewest kept samples a quadrant must hold to count toward `_SUPPORT_QUADRANTS`.
+_SUPPORT_SAMPLES = 3
+#: Farthest a masked pair's image center may sit from the fit's inliers, as a Mahalanobis distance over
+#: their spread. The dense HUD's half-frame support scores about 3.6, and inliers in one corner 12 to 14.
+_MAX_CENTER_LEVERAGE = 5.0
+
+
+def _as_mask(mask: ArrayLike | None, name: str) -> NDArray[np.bool_] | None:
+    """Take a caller's overlay mask as a boolean image, or None where it masks nothing.
+
+    Nonzero is overlay, so a mask read from a PNG (0/255) or a float image (0/1) means the same as a
+    boolean one. An all-false mask is no mask, which keeps a run bit-identical to one without.
+    """
+    if mask is None:
+        return None
+    arr = as_numpy(mask) != 0
+    if arr.ndim != 2 or arr.size == 0:
+        raise ValueError(f"{name} must be a non-empty 2D (height, width) image, got shape {arr.shape}.")
+    return arr if arr.any() else None
+
+
+class _FittedMask(NamedTuple):
+    """An overlay mask at a frame's processed size: the overlay and the pixels within the margin of it."""
+
+    overlay: NDArray[np.bool_]
+    near: NDArray[np.bool_]
+
+
+class _OverlayMask:
+    """An overlay mask, fitted to each frame size a video presents and cached for it."""
+
+    def __init__(self, mask: NDArray[np.bool_], name: str) -> None:
+        self._mask = mask
+        self._name = name
+        self._fits: dict[tuple[tuple[int, int], tuple[int, int]], _FittedMask] = {}
+
+    def fit(self, full_wh: tuple[int, int], proc_shape: tuple[int, int]) -> _FittedMask:
+        """Fit the mask to a frame of original size ``full_wh`` (W, H) processed to ``proc_shape`` (h, w).
+
+        The width sets the scale. The mask is scaled uniformly, or sits at the top of a frame padded at
+        the bottom by at most 1% of its height, and anything else raises.
+        """
+        key = (full_wh, proc_shape)
+        if key not in self._fits:
+            self._fits[key] = self._build(full_wh, proc_shape)
+        return self._fits[key]
+
+    def _build(self, full_wh: tuple[int, int], proc_shape: tuple[int, int]) -> _FittedMask:
+        cv2 = _require_cv2()
+        (width, height), (h, w) = full_wh, proc_shape
+        mh, mw = self._mask.shape
+        excess = height - mh * width / mw
+        if abs(excess) > 1 and not 1 < excess <= 0.01 * height:
+            raise ValueError(
+                f"{self._name} of {mw}x{mh} does not fit a {width}x{height} frame: "
+                "a mask is scaled uniformly, with at most 1% padding at the bottom."
+            )
+        # Area-resize so a processed pixel is overlay when any source pixel under it is. Float keeps a
+        # lone source pixel above zero however far the mask shrinks.
+        scaled = cv2.resize(
+            self._mask.astype(np.float32), (w, max(1, round(mh * w / mw))), interpolation=cv2.INTER_AREA
+        )
+        overlay = np.zeros((h, w), dtype=np.bool_)
+        rows = min(h, scaled.shape[0])
+        overlay[:rows] = scaled[:rows] > 0
+        kernel = np.ones((2 * _MASK_MARGIN + 1,) * 2, dtype=np.uint8)
+        near = cv2.dilate(overlay.astype(np.uint8), kernel) > 0
+        return _FittedMask(overlay, near)
+
+
 def _flow_estimator(flow: FlowMethod) -> Any | None:
     """Build the DIS estimator for a video, or None where Lucas-Kanade needs none."""
     cv2 = _require_cv2()
@@ -870,6 +971,7 @@ def _measure_pair(
     current: _FlowFrame,
     grid_target: int,
     gap: int,
+    mask: _FittedMask | None = None,
 ) -> _PairReading | None:
     """Read the camera motion between two frames, or None where the pair cannot be read.
 
@@ -877,23 +979,49 @@ def _measure_pair(
     processed shape, when a processed side is under `_MIN_FLOW_SIDE`, or when either frame is a
     single gray level, which holds no motion to read and would read as a still camera. Pixel
     quantities are scaled by the pair's own full resolution.
+
+    With `mask`, fitted to the pair's processed shape, the motion is read around the overlay. Samples
+    within `_MASK_MARGIN` of it are dropped, as their flow is pulled toward its zero motion, and so are
+    samples whose flow carries them out of the frame, which weigh more once masking concentrates what is
+    kept. The pair is refused unless what is left holds `_SUPPORT_SAMPLES` samples in each of
+    `_SUPPORT_QUADRANTS` quadrants, and again unless the fit's inliers surround the image center closely
+    enough to pin the motion there (`_MAX_CENTER_LEVERAGE`). The agreement check leaves out the overlay.
     """
     height, width = previous.gray.shape[:2]
     if previous.full_wh != current.full_wh or previous.gray.shape != current.gray.shape:
         return None
-    if min(width, height) < _MIN_FLOW_SIDE:
-        return None
-    if np.ptp(previous.gray) == 0 or np.ptp(current.gray) == 0:
+    if min(width, height) < _MIN_FLOW_SIDE or np.ptp(previous.gray) == 0 or np.ptp(current.gray) == 0:
         return None
     pts, vectors = (
         _grid_flow_dis(estimator, previous.gray, current.gray, grid_target)
         if estimator is not None
         else _grid_flow_lk(previous.gray, current.gray, grid_target)
     )
+    if mask is not None:
+        pts, vectors = _clear_of_overlay(pts, vectors, mask, (width, height))
     if len(pts) < _MIN_SAMPLES:
         return None
     frames = (previous.gray, current.gray, _lattice_step(previous.gray.shape, grid_target))
-    return _pair_ego(pts, vectors, (width, height), current.full_wh, gap, frames=frames)
+    overlay = None if mask is None else mask.overlay
+    return _pair_ego(pts, vectors, (width, height), current.full_wh, gap, frames=frames, overlay=overlay)
+
+
+def _clear_of_overlay(
+    pts: NDArray[np.float64],
+    vectors: NDArray[np.float64],
+    mask: _FittedMask,
+    proc_wh: tuple[int, int],
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Keep the samples a masked pair reads (see `_measure_pair`), or none where they lack spatial support."""
+    width, height = proc_wh
+    dest = pts + vectors
+    keep = ~mask.near[pts[:, 1].astype(int), pts[:, 0].astype(int)]
+    keep &= (dest[:, 0] >= 0) & (dest[:, 0] < width) & (dest[:, 1] >= 0) & (dest[:, 1] < height)
+    pts, vectors = pts[keep], vectors[keep]
+    quadrant = (pts[:, 0] >= width / 2) + 2 * (pts[:, 1] >= height / 2)
+    if (np.bincount(quadrant, minlength=4) >= _SUPPORT_SAMPLES).sum() < _SUPPORT_QUADRANTS:
+        return pts[:0], vectors[:0]
+    return pts, vectors
 
 
 class _EgoEngine:
@@ -902,9 +1030,10 @@ class _EgoEngine:
     Holds one DIS estimator for the video, the frames still waiting for their pair, and one
     reading per pair, so a long video never has to be decoded into memory at once. Every
     reported pixel quantity is scaled back to the original size of the pair it was measured on.
+    `mask_name` is what the caller calls ``options.ego_mask``, which an error about its fit names.
     """
 
-    def __init__(self, options: VideoOptions) -> None:
+    def __init__(self, options: VideoOptions, mask_name: str = "mask") -> None:
         self._options = options
         self._estimator = _flow_estimator(options.ego_flow)
         self._pairs: _PairBuffer[_FlowFrame | None] = _PairBuffer(options.ego_gap)
@@ -912,6 +1041,7 @@ class _EgoEngine:
         self._readings: list[_PairReading | None] = []
         # Per pair, the first frame's diagonal over the pair's, so the temporal gate reads one unit.
         self._scales: list[float] = []
+        self._overlay = None if options.ego_mask is None else _OverlayMask(options.ego_mask, mask_name)
         self._full_wh: tuple[int, int] | None = None
         self._n_frames = 0
 
@@ -922,6 +1052,8 @@ class _EgoEngine:
             self._full_wh = full_wh
         self._n_frames += 1
         current = _flow_frame(view)
+        # Fitted before the pair is measured, so a bad geometry raises at the first frame of a size.
+        fitted = None if self._overlay is None or current is None else self._overlay.fit(full_wh, current.gray.shape)
         previous = self._pairs.push(current)
         gap = self._options.ego_gap
         if self._n_frames <= gap:
@@ -930,7 +1062,7 @@ class _EgoEngine:
         reading = (
             None
             if previous is None or current is None
-            else _measure_pair(self._estimator, previous, current, self._options.ego_grid_target, gap)
+            else _measure_pair(self._estimator, previous, current, self._options.ego_grid_target, gap, fitted)
         )
         self._readings.append(reading)
         # A measured pair shares one original size, which is this frame's.
@@ -960,6 +1092,7 @@ def ego_stats(
     flow: FlowMethod = "dis",
     grid_target: int = 40,
     max_frames: int | None = None,
+    mask: ArrayLike | None = None,
 ) -> EgoStatsResult: ...
 @overload
 def ego_stats(
@@ -969,6 +1102,7 @@ def ego_stats(
     flow: FlowMethod = "dis",
     grid_target: int = 40,
     max_frames: int | None = None,
+    mask: ArrayLike | None = None,
 ) -> EgoStatsResult: ...
 @overload
 def ego_stats(
@@ -978,6 +1112,7 @@ def ego_stats(
     flow: FlowMethod = "dis",
     grid_target: int = 40,
     max_frames: int | None = None,
+    mask: ArrayLike | None = None,
 ) -> EgoStatsResult: ...
 
 
@@ -988,6 +1123,7 @@ def ego_stats(
     flow: FlowMethod = "dis",
     grid_target: int = 40,
     max_frames: int | None = None,
+    mask: ArrayLike | None = None,
 ) -> EgoStatsResult:
     """Measure camera ego-motion for one video sequence or a whole tracking dataset.
 
@@ -1027,6 +1163,12 @@ def ego_stats(
         gives a finer picture of what moved independently, at quadratic cost.
     max_frames : int or None, default None
         Stop after this many frames of each sequence. None measures all of them.
+    mask : ArrayLike or None, default None
+        A 2D (height, width) image of a burned-in overlay such as a HUD, where nonzero marks the
+        overlay. The camera is read from the rest of the frame. The mask is scaled uniformly to each
+        frame's size, or sits at the top of a frame padded at the bottom by at most 1% of its height.
+        A pair whose samples outside the overlay do not reach three quadrants of the frame is refused.
+        None, or a mask with no nonzero pixel, reads the whole frame.
 
     Returns
     -------
@@ -1041,7 +1183,8 @@ def ego_stats(
         If OpenCV is not installed. Install it with the ``dataeval[opencv]`` extra.
     ValueError
         If `gap`, `proc_short_side`, `grid_target` or `max_frames` is not positive, if
-        `proc_short_side` is under 32 px, or if `flow` is not one of the supported estimators.
+        `proc_short_side` is under 32 px, if `flow` is not one of the supported estimators, if
+        `mask` is not a non-empty 2D image, or if `mask` does not fit a frame's size.
 
     See Also
     --------
@@ -1069,6 +1212,14 @@ def ego_stats(
     frame size changes. Normalize them by frame size before comparing sequences shot at
     different resolutions.
 
+    **Overlays.** A burned-in overlay does not move with the scene. Without `mask`, a light one
+    refuses pans and a dense one can read a pan as a trusted slower pan or a still camera. With
+    `mask`, samples within 32 px of the overlay, at `proc_short_side`, are left out too, so a mask
+    leaves less of the frame than its area suggests, and `mover_frac` is over the samples kept.
+    Movers are judged against what is left, so one covering about a fifth of the frame can be read
+    as the camera. A masked pair is refused where its samples, or the fit's inliers, do not spread
+    across the frame.
+
     **Cost.** Linear in frames measured. Per pair, optical flow takes a third to a half of the
     time, and the robust fit and the check that it explains the new frame share the rest. Flow
     and that check are roughly linear in pixels at `proc_short_side`, so lower `proc_short_side`
@@ -1094,7 +1245,13 @@ def ego_stats(
     # Imported here, on the caller's thread, because run_videos caps OpenCV's threads only
     # when cv2 is already imported, and the workers would otherwise import it first.
     _require_cv2()
-    options = VideoOptions(ego_gap=gap, ego_proc_short_side=proc_short_side, ego_flow=flow, ego_grid_target=grid_target)
+    options = VideoOptions(
+        ego_gap=gap,
+        ego_proc_short_side=proc_short_side,
+        ego_flow=flow,
+        ego_grid_target=grid_target,
+        ego_mask=_as_mask(mask, "mask"),
+    )
     item_rows = run_videos(source, partial(_measure_video, options, max_frames))
     _logger.info("Ego stats complete for %d video(s).", len(item_rows))
     return EgoStatsResult(stats=_concat_items(item_rows), aggregations=EGO_AGGREGATIONS)

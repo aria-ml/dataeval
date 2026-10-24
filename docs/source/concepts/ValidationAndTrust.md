@@ -906,7 +906,12 @@ statistical and computational.
     normalizing; the rates are. The temporal trust gate assumes a roughly steady
     camera state across the sequence. A reading is attributed to the *later* frame of the
     pair it was measured from, so the leading `gap` frames of every sequence
-    carry no reading.
+    carry no reading. A burned-in overlay (a HUD, telemetry text) reads as scene
+    content: a light one gets pans refused, and a dense one can read a pan as a
+    trusted slower pan or a still camera. Passing the overlay as `mask=` excludes
+    it, and a masked pair whose remaining samples don't spread across the frame
+    is refused. Movers are then judged against what the mask leaves, so one
+    covering about a fifth of the frame can be read as the camera.
 - - {func}`.phash`, {func}`.phash_d4`, {func}`.dhash`, {func}`.dhash_d4`,
     {func}`.xxhash`
   - Perceptual hashing ([Zauner, 2010](DataIntegrity.md#references)); xxHash

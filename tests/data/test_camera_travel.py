@@ -12,6 +12,7 @@ from dataeval.core import ego_stats
 from dataeval.core._ego_stats import _PairReading
 from dataeval.data import AllFrames, CameraTravel, Chain, HasLabels, SequenceFrames, Stride
 from dataeval.protocols import DatasetMetadata, DatumMetadata, MultiobjectTrackingDatum, VideoStream
+from tests.core.test_ego_overlay import CORNER, DENSE, hud_pan
 from tests.core.test_ego_stats import (
     FakeFrame,
     _blown_out,
@@ -294,4 +295,21 @@ class TestConstruction:
             CameraTravel(0.25)
 
     def test_distance_is_stored_as_a_float_and_shown_in_the_repr(self):
-        assert repr(CameraTravel(1)) == "CameraTravel(distance=1.0)"
+        assert repr(CameraTravel(1)) == "CameraTravel(distance=1.0, mask=None)"
+
+
+class TestOverlay:  # real optical flow, under a burned-in HUD
+    def test_a_masked_overlay_pan_keeps_the_frames_the_pan_implies(self):
+        stream = hud_pan(8, 13)
+        masked = SequenceFrames(_dataset_of([stream]), CameraTravel(0.045, mask=DENSE))
+        assert _kept(masked)[0] == [0, 4, 8, 12]
+        assert len(_kept(SequenceFrames(_dataset_of([stream]), CameraTravel(0.045)))[0]) < 4
+
+    def test_pairs_the_mask_refuses_are_kept_unmeasured(self):
+        positions, _, unmeasured = _kept(SequenceFrames(_dataset_of([hud_pan(8, 8)]), CameraTravel(0.045, mask=CORNER)))
+        assert positions == list(range(8))
+        assert unmeasured == [False] + [True] * 7
+
+    def test_the_repr_summarizes_the_mask(self):
+        assert repr(CameraTravel(0.2, mask=DENSE)) == "CameraTravel(distance=0.2, mask=<640x360, coverage 0.144>)"
+        assert "mask=None" in repr(CameraTravel(0.2))
