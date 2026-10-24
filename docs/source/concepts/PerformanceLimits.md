@@ -331,7 +331,7 @@ mismatch between train and test — the projection will be optimistic.
 
 - [How to measure classification feasibility (BER)](../notebooks/h2_measure_ic_feasibility.py)
 - [How to measure data sufficiency](../notebooks/h2_measure_ic_sufficiency.py)
-- [How to encode with ONNX](../notebooks/h2_encode_with_onnx.py)
+- [How to create embeddings](../notebooks/h2_create_embeddings.py)
 
 ## References
 

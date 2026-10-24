@@ -139,7 +139,7 @@ print(f"Image shape: {dataset[0][0].shape}")
 # pooled features down to 128 dimensions, wrap it in a {class}`.TorchExtractor` with the model's standard
 # resize-and-normalize preprocessing as `transforms`, and run the dataset through {class}`.Embeddings`.
 #
-# For other ways to build embeddings, see [How to create embeddings](./h2_encode_with_onnx.py).
+# For other ways to build embeddings, see [How to create embeddings](./h2_create_embeddings.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
@@ -390,7 +390,7 @@ print(f"Number of outliers found as uncovered images: {len(uncovered_outliers)}"
 # - [Dataset Bias and Coverage Concept Page](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Deep dive into coverage geometry and feature space density.
 # - [Clean a dataset with labels](./tt_clean_dataset.py) — Tutorial on identifying label noise and corrupt samples.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Tutorial measuring mutual information and factor balance.
-# - [Encode image embeddings with an ONNX model](./h2_encode_with_onnx.py) — How-to guide on framework-agnostic ONNX extractor workflows.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [Identify outliers and anomalies with clustering](./h2_cluster_analysis.py) — How-to guide on clustering workflows.
 # - [Detect undersampled subsets of datasets](./h2_detect_undersampling.py) — How-to guide on locating low-density data clusters.
 # - [Display data distributions between two datasets](./h2_measure_divergence.py) — How-to guide on distribution divergence.

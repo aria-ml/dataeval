@@ -253,7 +253,7 @@ assert (wonky / 20) > 0.4
 # - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find augmented image pairs using duplicate detection.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Measure dataset bias, factor correlations, and class imbalances.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Apply clustering algorithms to identify groupings in embedded data.
-# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — Encode image datasets into vector embeddings using ONNX runtime models.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Calculate custom metrics for bounding boxes and object annotations.
 # - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py) — Plot and inspect dataset anomalies and cleaning flags.
 # - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Extract and attach intrinsic image properties to dataset metadata.

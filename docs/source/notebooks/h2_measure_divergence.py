@@ -72,7 +72,7 @@ from dataeval.extractors import FlattenExtractor
 # The embeddings here are the flattened pixels of each image, made by a {class}`.FlattenExtractor`. Flattened pixels are
 # a baseline, because distances between raw pixels follow brightness and alignment more than content. They work in this
 # example because MNIST images are small and share one shape. For photographs, use an extractor that wraps a model, as
-# described in [How to create embeddings](./h2_encode_with_onnx.py).
+# described in [How to create embeddings](./h2_create_embeddings.py).
 
 # %%
 # Load in the training mnist dataset and use the first 4000
@@ -159,6 +159,6 @@ assert div["divergence"] > 0.95
 #
 # ### How-to guides
 #
-# - [How to create embeddings](./h2_encode_with_onnx.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented regions in dataset feature space.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Perform k-means or MST clustering on extracted embeddings.

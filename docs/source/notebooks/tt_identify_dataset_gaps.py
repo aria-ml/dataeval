@@ -295,7 +295,7 @@ print(representation.dark_branches)
 # 1000-class logits), give it the model's standard resize-and-normalize preprocessing as `transforms`, and run the
 # dataset through {class}`.Embeddings`. That yields a 512-dimensional feature per image.
 #
-# For other ways to build embeddings, see [How to create embeddings](./h2_encode_with_onnx.py).
+# For other ways to build embeddings, see [How to create embeddings](./h2_create_embeddings.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
@@ -473,7 +473,7 @@ assert all(report_by_class[c]["gap"] == "ok" for c in ["airplane", "cat", "dog",
 # - [Dataset bias and coverage](../concepts/DatasetBias.md) — Read about dispersion, isotropy, and representation metrics for assessing dataset coverage.
 # - [Assess data space tutorial](./tt_assess_data_space.py) — Discover coverage gaps, clusters, and outliers in unlabeled dataset embeddings.
 # - [Reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Map and validate dataset labels against a target domain ontology.
-# - [Encode a dataset with an ONNX model](./h2_encode_with_onnx.py) — Extract image embeddings and predictions using an ONNX runtime session.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [Embed object detection crops](./h2_embed_detection_crops.py) — Extract feature embeddings for individual bounding box targets in detection datasets.
 
 # %% [markdown]

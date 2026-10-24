@@ -54,7 +54,7 @@ datasets for machine learning.
 ```{toctree}
 :hidden:
 
-../notebooks/h2_encode_with_onnx.py
+../notebooks/h2_create_embeddings.py
 ../notebooks/h2_embed_detection_crops.py
 ../notebooks/h2_cluster_analysis.py
 ../notebooks/h2_deduplicate.py
@@ -105,7 +105,7 @@ datasets for machine learning.
   - Filter, balance, reorder, and relabel a dataset by composing
     a {class}`.View` from {class}`.Operation` steps
   - [![Open In Colab][colab-badge]][view-colab]
-- - [](../notebooks/h2_encode_with_onnx.py)
+- - [](../notebooks/h2_create_embeddings.py)
   - Create image embeddings with PyTorch, ONNX or a model-free extractor, and check that two frameworks agree
   - [![Open In Colab][colab-badge]][onx-colab]
 - - [](../notebooks/h2_place_transforms.py)
@@ -198,7 +198,7 @@ datasets for machine learning.
 
 :::
 
-[onx-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_encode_with_onnx.ipynb
+[onx-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_create_embeddings.ipynb
 [crop-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_embed_detection_crops.ipynb
 [clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_cluster_analysis.ipynb
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_deduplicate.ipynb

@@ -176,7 +176,7 @@ print(f"vocabulary:  {train_view.metadata.get('index2label')}")
 # 1000-class logits), give it the model's standard resize-and-normalize preprocessing as `transforms`, and run each split
 # through {class}`.Embeddings`. Keeping the `transforms` in a variable lets you reuse them further down.
 #
-# For other ways to build embeddings, see [How to create embeddings](./h2_encode_with_onnx.py).
+# For other ways to build embeddings, see [How to create embeddings](./h2_create_embeddings.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
@@ -610,7 +610,7 @@ assert poor_parity_p_value < 0.01, f"contrived poor-parity set no longer trips t
 # - [Compare label distributions](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
 # - [Configure global DataEval defaults](./h2_configure_defaults.py) — Set global default configuration parameters like batch size and execution device.
 # - [Build dataset views](./h2_build_dataset_views.py) — Filter, reshape, and transform datasets without copying underlying media files.
-# - [Encode with an ONNX model](./h2_encode_with_onnx.py) — Extract image embeddings and predictions using an ONNX runtime inference session.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [Embed object detection crops](./h2_embed_detection_crops.py) — Extract feature embeddings for individual bounding box targets in detection datasets.
 
 # %% [markdown]
