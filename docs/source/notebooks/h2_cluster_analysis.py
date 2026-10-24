@@ -19,19 +19,19 @@
 # %% [markdown]
 # ## Problem statement
 #
-# Data does not typically come labeled and labeling/verifying labels is a time and resource intensive process. Exploratory
-# data analysis (EDA) can often be enhanced by splitting data into similar groups.
+# Data does not typically come labeled, and labeling or verifying labels takes time and resources. Exploratory data
+# analysis (EDA) often improves when you split data into similar groups.
 #
-# [Clustering](../concepts/Clustering.md) is a method which groups data in the format of (samples, features). This can be
-# used with images or image embeddings as long as the arrays are flattened to only contain 2 dimensions.
+# [Clustering](../concepts/Clustering.md) groups data in the format (samples, features). You can use it with images or
+# image embeddings as long as the arrays are flattened to only contain 2 dimensions.
 #
-# The `cluster` function utilizes a clustering algorithm based on the HDBSCAN algorithm. The `Outliers` and `Duplicates`
-# detectors can then analyze the cluster results to identify outliers and duplicates.
+# The `cluster` function uses a clustering algorithm based on HDBSCAN. The `Outliers` and `Duplicates` detectors can
+# then analyze the cluster results to identify outliers and duplicates.
 
 # %% [markdown]
 # ### When to use
 #
-# The clustering workflow can be used during the EDA process to perform the following:
+# Use the clustering workflow during the EDA process to:
 #
 # - group a dataset into clusters
 # - verify labeling as a quality control
@@ -47,13 +47,13 @@
 #    - `dataeval`
 #    - `matplotlib`
 #
-# This could be a set of flattened images or image embeddings. We recommend using image embeddings (with the feature
-# dimension being \<=1000).
+# This could be a set of flattened images or image embeddings. Prefer image embeddings, with a feature dimension
+# of \<=1000.
 
 # %% [markdown]
 # ## Getting started
 #
-# Let's import the required libraries needed to set up a minimal working example.
+# Import the libraries you need for a minimal working example.
 
 # %% tags=["remove_cell"]
 try:
@@ -75,9 +75,8 @@ from dataeval.quality import Duplicates, Outliers
 # %% [markdown]
 # ## Loading in data
 #
-# For the purposes of this demonstration, we are just going to create a generic set of blobs for clustering.
-#
-# This is to help show all of the clustering functionality in one how-to.
+# In this demonstration you create a generic set of blobs for clustering. This shows all of the clustering functionality
+# in one how-to.
 
 # %%
 # Creating 5 clusters
@@ -90,8 +89,8 @@ blobs = dsets.make_blobs(
 test_data, labels = np.asarray(blobs[0]), np.asarray(blobs[1])
 
 # %% [markdown]
-# Because the clustering result can be used to detect duplicate and outlier data, we are going to modify the dataset to
-# contain a few duplicate datapoints and an outlier.
+# Because the clustering result can be used to detect duplicate and outlier data, modify the dataset to contain a few
+# duplicate datapoints and an outlier.
 
 # %%
 test_data[71] = [1, 5]
@@ -128,9 +127,8 @@ print("Array shape:", test_data.ndim)
 # %% [markdown]
 # ## Cluster the data
 #
-# We are now ready to cluster the data and inspect the results.\
-# There are two different clustering methods, "kmeans" and "hdbscan". These are selected via the _algorithm_ parameter,
-# with "hdbscan" being the default.
+# Cluster the data and inspect the results. There are two clustering methods, "kmeans" and "hdbscan". You select one
+# with the `algorithm` parameter, and "hdbscan" is the default.
 
 # %%
 # Evaluate the clusters
@@ -159,12 +157,12 @@ for i, (x, y) in enumerate(test_data):
 # %% [markdown]
 # ## Results
 #
-# We can list out each category followed by the number of items in the category and then display those items on the line
-# below.
+# The results list each category, followed by the number of items in the category, and then display those items on the
+# line below.
 #
-# For the outlier results, the clusterer provides a list of all points that it found to be an outlier.
+# For the outlier results, the clusterer provides a list of all points it found to be outliers.
 #
-# For the duplicates results, the clusterer provides a list of sets of points which it identified as near duplicates.
+# For the duplicate results, the clusterer provides a list of sets of points it identified as near duplicates.
 
 # %%
 # Show results using the new detector classes
@@ -177,8 +175,7 @@ outliers_result = outliers_detector.from_clusters(test_data, clusters, cluster_t
 print("outliers: ", outliers_result.outliers)
 
 # %% [markdown]
-# We can see that there was one outlier and there are also 2 sets of near duplicates (the intentionally duplicated
-# points).
+# The results show one outlier and 2 sets of near duplicates (the intentionally duplicated points).
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
