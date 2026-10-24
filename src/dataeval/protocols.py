@@ -891,6 +891,11 @@ class FeatureExtractor(Protocol):
     - Extracting statistical features from metadata
     - Converting structured data to numeric representations
 
+    The protocol requires only ``__call__``, so ``isinstance(x, FeatureExtractor)`` cannot tell an extractor
+    that returns one row per input item from one that returns a row per detection or a ``dict``.
+    :class:`~dataeval.Embeddings` additionally requires one row per dataset item, and the evaluators that
+    build an ``Embeddings`` internally inherit that requirement.
+
     Example
     -------
     Creating a feature extractor for model uncertainties:

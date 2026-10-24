@@ -29,7 +29,7 @@ class FlattenExtractor(ReprMixin):
     >>> from dataeval import Embeddings
     >>>
     >>> extractor = FlattenExtractor()
-    >>> embeddings = Embeddings(train_dataset, extractor=extractor)
+    >>> embeddings = Embeddings(train_dataset, extractor=extractor, batch_size=32)
     >>> result = np.asarray(embeddings)
     """
 

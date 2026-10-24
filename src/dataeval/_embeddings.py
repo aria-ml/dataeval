@@ -3,7 +3,7 @@
 __all__ = ["Embeddings"]
 
 import os
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Self
 
@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 from dataeval._log import get_logger
 from dataeval.config import resolve_batch_size
-from dataeval.exceptions import NotFittedError
+from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import (
     AnnotatedDataset,
@@ -40,6 +40,15 @@ class Embeddings(Array, FeatureExtractor):
     This class also implements the :class:`~dataeval.protocols.FeatureExtractor` protocol,
     allowing it to be used directly with drift detectors and quality metrics that accept
     feature extractors.
+
+    The extractor must return one row for each image it is given, in order. ``Embeddings`` checks the
+    row count of every batch and raises when it differs, and raises when the extractor returns something
+    other than an array, such as a ``dict``. The count cannot prove that each row belongs to the image
+    at the same position: an extractor that returns one row per detection passes whenever the total number
+    of detections equals the number of images, even though the rows then belong to different images.
+    Extractors that return one row per detection or per class, such as a detection model wrapped in
+    :class:`~dataeval.extractors.ScoresExtractor`, are not valid here. Call them directly and give the
+    result, or the extractor itself, to a drift detector.
 
     Parameters
     ----------
@@ -92,6 +101,7 @@ class Embeddings(Array, FeatureExtractor):
     >>> from dataeval import Embeddings
     >>> from dataeval.extractors import TorchExtractor
     >>>
+    >>> extractor = TorchExtractor(my_model)
     >>> embeddings = Embeddings(train_dataset, extractor=extractor, batch_size=32)
     >>> train_emb = embeddings[:]
     >>> train_emb.shape
@@ -100,7 +110,7 @@ class Embeddings(Array, FeatureExtractor):
     Using with default flattening (no model):
 
     >>> # Uses FlattenExtractor by default
-    >>> embeddings = Embeddings(dataset)
+    >>> embeddings = Embeddings(dataset, batch_size=32)
     >>> flat_features = np.asarray(embeddings)
     """
 
@@ -123,7 +133,6 @@ class Embeddings(Array, FeatureExtractor):
         self._progress_callback = progress_callback
 
         self._dataset = dataset
-        self._embeddings_only: bool = False
 
         self._cached_idx: set[int] = set()
         self._embeddings: np.ndarray | np.memmap = np.empty((0,))
@@ -189,11 +198,6 @@ class Embeddings(Array, FeatureExtractor):
         -------
         Self
             Returns self for method chaining.
-
-        Raises
-        ------
-        ValueError
-            When called on an embeddings-only instance.
 
         Example
         -------
@@ -287,8 +291,7 @@ class Embeddings(Array, FeatureExtractor):
         ValueError
             When copy=False but dtype conversion is requested (unavoidable copy).
         """
-        # Trigger computation for lazy embeddings
-        # Always compute if not embeddings-only (handles both empty cache and no-cache scenarios)
+        # Trigger computation for lazy embeddings, whether the cache is empty or only partly filled
         arr = self[:]
 
         # Check if dtype conversion is needed
@@ -426,11 +429,6 @@ class Embeddings(Array, FeatureExtractor):
         -------
         Embeddings
             New Embeddings object configured identically to the current instance.
-
-        Raises
-        ------
-        ValueError
-            When called on embeddings-only instance that lacks an extractor.
         """
         return self.__class__(
             dataset,
@@ -519,6 +517,27 @@ class Embeddings(Array, FeatureExtractor):
 
         return [unwrap_image(self._dataset[idx]) for idx in indices]
 
+    def _rows(self, raw: Any, expected: int) -> NDArray[Any]:
+        """Return the extractor's output as an array with one row for each of ``expected`` images.
+
+        A matching count is the most a shape can prove. It cannot show that each row belongs to the image at the
+        same position, so an extractor that returns one row per detection still passes when the totals agree.
+        """
+        name = type(self._extractor).__name__
+        advice = (
+            "Embeddings stores one row for each dataset item. An extractor that returns one row per detection or per "
+            "class, such as a detection model wrapped in ScoresExtractor, DetectionGeometryExtractor or "
+            "ClasswiseUncertaintyExtractor, cannot be wrapped in Embeddings. Call it directly and give the result, or "
+            "the extractor itself, to a drift detector."
+        )
+        if isinstance(raw, Mapping):
+            raise TypeError(f"{name} returned a {type(raw).__name__}, not an array. {advice}")
+        rows = np.asarray(raw)
+        if rows.ndim == 0 or len(rows) != expected:
+            got = "a single value" if rows.ndim == 0 else f"{len(rows)} rows"
+            raise ShapeMismatchError(f"{name} returned {got} for a batch of {expected} images. {advice}")
+        return rows
+
     def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:  # noqa: C901
         """Process indices in batches using the extractor."""
         if self._dataset is None:
@@ -544,7 +563,7 @@ class Embeddings(Array, FeatureExtractor):
                 batch_images = self._fetch_images(batch_idx)
 
                 # Extract features
-                embeddings = np.asarray(self._extractor(batch_images))
+                embeddings = self._rows(self._extractor(batch_images), len(batch_idx))
 
                 # Initialize storage on first batch
                 if self._embeddings.size == 0:
@@ -629,7 +648,7 @@ class Embeddings(Array, FeatureExtractor):
         Raises
         ------
         NotFittedError
-            If no dataset is bound and instance is not embeddings-only.
+            If no dataset is bound.
         """
         if self._dataset is None:
             raise NotFittedError("Cannot determine length: no dataset bound. Call bind() first.")
