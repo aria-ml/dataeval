@@ -193,4 +193,4 @@ assert set(np.unique(metadata.class_labels)).issubset(set(focus_indices))  # onl
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find classes or regions thin on coverage in embedding space.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster crop embeddings to surface outliers and sub-groupings.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Compute custom bounding box and object statistics.
-# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — Use ONNX runtime models as an alternative extractor for embeddings.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.

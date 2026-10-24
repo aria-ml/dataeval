@@ -1169,7 +1169,7 @@ plt.show()
 # - [OOD detection concepts](../concepts/DistributionShift.md#out-of-distribution-detection) — Learn about reconstruction and distance-based out-of-distribution detection methods.
 # - [Monitor shift tutorial](./tt_monitor_shift.py) — Monitor feature distributions over time to detect operational data drift.
 # - [Clean dataset tutorial](./tt_clean_dataset.py) — Identify duplicate, corrupt, and low-quality samples to prepare a dataset for model training.
-# - [Encode with an ONNX model](./h2_encode_with_onnx.py) — Extract image embeddings and predictions using an ONNX runtime inference session.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [Configure global DataEval defaults](./h2_configure_defaults.py) — Set global default configuration parameters like batch size and execution device.
 
 # %% [markdown]

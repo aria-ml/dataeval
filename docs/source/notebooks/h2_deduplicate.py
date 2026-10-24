@@ -244,7 +244,7 @@ assert annotation_results.augmented().data()["item_indices"].item().to_list() ==
 # - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
 # - [Introduction to data cleaning](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
 # - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors such as dimensions and pixel statistics to dataset metadata.
-# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — Encode image datasets into vector embeddings using ONNX runtime models.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings and factors to discover structural groupings in your data.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Configure custom image statistics across full images, bounding boxes, and backgrounds.
 # - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py) — Plot and visualize dataset anomalies, duplicates, and quality issues.

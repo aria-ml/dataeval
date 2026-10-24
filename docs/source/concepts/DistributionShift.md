@@ -640,7 +640,7 @@ high-dimensional embeddings.
 
 ### How-to guides
 
-- [How to encode with ONNX](../notebooks/h2_encode_with_onnx.py)
+- [How to create embeddings](../notebooks/h2_create_embeddings.py)
 
 ### Tutorials
 
