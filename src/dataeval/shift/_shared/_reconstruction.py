@@ -72,10 +72,9 @@ def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelPara
     # K x D (D = latent_dim)
     mu = torch.sum(torch.unsqueeze(gamma, -1) * torch.unsqueeze(z, 1), 0) / torch.unsqueeze(sum_gamma, -1)
     z_mu = torch.unsqueeze(z, 1) - torch.unsqueeze(mu, 0)  # N x K x D
-    z_mu_outer = torch.unsqueeze(z_mu, -1) * torch.unsqueeze(z_mu, -2)  # N x K x D x D
 
-    # K x D x D
-    cov = torch.sum(torch.unsqueeze(torch.unsqueeze(gamma, -1), -1) * z_mu_outer, 0) / torch.unsqueeze(
+    # K x D x D, summed over the samples without building the N x K x D x D outer products
+    cov = torch.einsum("nkd,nke->kde", torch.unsqueeze(gamma, -1) * z_mu, z_mu) / torch.unsqueeze(
         torch.unsqueeze(sum_gamma, -1),
         -1,
     )

@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 import torch
 from sklearn.datasets import load_digits
+from torch.utils._python_dispatch import TorchDispatchMode
 
 from dataeval.exceptions import NotFittedError
 from dataeval.shift._ood._reconstruction import OODReconstruction
@@ -1055,6 +1056,65 @@ def test_gmm_params_energy():
 
     sample_energy, _ = gmm_energy(tz, params, return_mean=False)
     assert sample_energy.numpy().shape[0] == N  # type: ignore
+
+
+@pytest.mark.required
+@pytest.mark.parametrize(("dtype", "rtol"), [(torch.float64, 1e-10), (torch.float32, 1e-4)])
+def test_gmm_params_match_the_weighted_moments_of_each_component(dtype: torch.dtype, rtol: float):
+    """Each component's mean and covariance are the gamma-weighted moments of the latent codes."""
+    N, K, D = 200, 3, 8
+    generator = torch.Generator().manual_seed(0)
+    z = torch.randn(N, D, generator=generator, dtype=dtype)
+    gamma = torch.softmax(torch.randn(N, K, generator=generator, dtype=dtype), dim=-1)
+
+    params = gmm_params(z, gamma)
+
+    z_np, gamma_np = z.double().numpy(), gamma.double().numpy()
+    for k in range(K):
+        weight = gamma_np[:, k].sum()
+        mu = (gamma_np[:, k, None] * z_np).sum(0) / weight
+        centered = z_np - mu
+        cov = (centered * gamma_np[:, k, None]).T @ centered / weight
+        np.testing.assert_allclose(params.phi[k].double().numpy(), weight / N, rtol=rtol)
+        np.testing.assert_allclose(params.mu[k].double().numpy(), mu, rtol=rtol, atol=rtol)
+        np.testing.assert_allclose(params.cov[k].double().numpy(), cov, rtol=rtol, atol=rtol)
+
+
+class _LargestTensor(TorchDispatchMode):
+    """Record the element count of the largest tensor that any operation returns."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.largest = 0
+
+    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+        out = func(*args, **(kwargs or {}))
+        for tensor in out if isinstance(out, (tuple, list)) else (out,):
+            if isinstance(tensor, torch.Tensor):
+                self.largest = max(self.largest, tensor.numel())
+        return out
+
+
+@pytest.mark.required
+def test_gmm_params_never_builds_an_outer_product_for_every_sample():
+    """Fitting on 10,000 samples with a 256-dimensional latent space needed about 16 GB.
+
+    The covariance used to be summed from an ``N x K x D x D`` tensor of outer products, so the memory
+    grew with the number of samples times the square of the latent dimension. Contracting over the
+    samples keeps every intermediate at ``N x K x D`` or smaller.
+    """
+    N, K, D = 300, 3, 64
+    generator = torch.Generator().manual_seed(0)
+    z = torch.randn(N, D, generator=generator)
+    gamma = torch.softmax(torch.randn(N, K, generator=generator), dim=-1)
+
+    with _LargestTensor() as recorder:
+        gmm_params(z, gamma)
+
+    assert recorder.largest <= 2 * N * K * D, (
+        f"an intermediate of {recorder.largest:,} elements was built; "
+        f"an N x K x D x D tensor would have {N * K * D * D:,}"
+    )
 
 
 @pytest.mark.required
