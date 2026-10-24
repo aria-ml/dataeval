@@ -92,24 +92,50 @@ to embeddings.
 
 ## Creating embeddings
 
-Embeddings can be created using DataEval's {class}`.Embeddings` class. The
-Embeddings class takes a neural network as input, and that network handles the
-actual transformation from pixels to vectors.
+Two objects create embeddings. An extractor turns a batch of images into
+vectors. The {class}`.Embeddings` class applies an extractor to a dataset one
+batch at a time, keeps the result, and passes it to any DataEval tool. Every
+example in the documentation uses the same two steps:
 
-If you already had a model trained for your specific task, the best embeddings
-would of course come directly from that model. The {class}`.Embeddings` class
-allows you to specify the appropriate layer from which to extract embeddings
-during inference. These will be well-suited to your domain and task—after all,
-your model has already learned exactly the patterns that matter in your data.
+```python
+from dataeval import Embeddings
+from dataeval.extractors import TorchExtractor
 
-But you most likely won't yet have a trained model when you first want to
-make embeddings. Instead, you'll choose from a set of pre-trained embedding
-models, selecting ones that were trained for tasks most similar to what you
-set out to accomplish. Such a neural network model will already have been
-trained on large image datasets using one of various possible objectives, and
-the training objective fundamentally shapes what patterns the resulting
-embeddings capture. The table below shows examples of appropriate models for a
-variety of metrics and tasks.
+extractor = TorchExtractor(model, transforms=transforms, layer_name="avgpool")
+embeddings = Embeddings(dataset, extractor=extractor, batch_size=64)
+```
+
+Pass the dataset first and everything else by keyword. `Embeddings` computes the
+vectors when you first use them and keeps them, so build one `Embeddings` object
+for each dataset and give it to every tool that needs it. Call
+`np.asarray(embeddings)` when you need a plain array.
+[How to create embeddings](../notebooks/h2_encode_with_onnx.py) runs this recipe
+with PyTorch, with ONNX and with the extractors that need no model.
+
+### Choose an extractor
+
+| Extractor                  | Use it when                                                               | What it needs                                                    |
+| -------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| {class}`.TorchExtractor`   | You have a PyTorch model, either your own or a pre-trained one            | The model, its preprocessing as `transforms`, and a `layer_name` |
+| {class}`.OnnxExtractor`    | You have an ONNX model, or you want to run a model without PyTorch        | The `onnx` extra and an `output_name`                            |
+| {class}`.FlattenExtractor` | You want a baseline, or the images are small, such as MNIST               | Images of one shape. No model                                    |
+| {class}`.BoVWExtractor`    | You are looking for near-duplicates that survived a rotation or a rescale | The `opencv` extra and a call to `fit` before use. No model      |
+
+Flattened pixels are a baseline and not an assessment, because distances between
+raw pixels follow brightness and alignment more than content.
+[Validation and Trust](ValidationAndTrust.md#extractors-that-embed-the-data)
+lists what each extractor embeds and how each can mislead a metric.
+
+### Choose a model
+
+If you have a model trained for your task, use it. Its layers have already
+learned the patterns that matter in your data, so its embeddings suit your domain
+and task.
+
+If you do not have a trained model, choose a pre-trained one that was trained
+for a task close to yours. The training objective shapes which patterns the
+embeddings capture. The table shows examples of models for a range of metrics
+and tasks.
 
 | Model Type               | Example Models                           | Best for These Metrics                       | Why                                                                                                      |
 | ------------------------ | ---------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -118,6 +144,73 @@ variety of metrics and tasks.
 | **Self-Supervised**      | DINO, MAE, SimCLR                        | Drift, Prioritization, Duplicate Detection   | Embeddings capture general visual patterns without class bias, good for broad visual similarity          |
 | **Contrastive Learning** | CLIP, SwAV, MoCo                         | Similarity Search, Nearest Neighbor Analysis | Embeddings optimized for distinguishing similar vs. dissimilar pairs, excellent for comparison tasks     |
 | **Segmentation**         | U-Net, Mask R-CNN, DeepLab               | Fine-grained Analysis, Pixel-level Quality   | Embeddings understand detailed spatial structure and boundaries within images                            |
+
+### Select the layer
+
+A classifier ends in a layer that outputs class scores, and class scores are not
+image features. Select the layer before the classifier.
+
+- With {class}`.TorchExtractor`, name the layer in `layer_name`. Without it, the
+  extractor returns the model output, which for ResNet18 is 1000 ImageNet class
+  scores and not image features. `avgpool` is the layer before the classifier of
+  a torchvision ResNet.
+- With {class}`.OnnxExtractor`, call
+  {func}`~dataeval.utils.onnx.to_encoding_model` on the exported model. It finds
+  the layer before the classifier and returns a model that outputs it, together
+  with the layer name to give to `output_name`.
+
+### Set the batch size
+
+`Embeddings` raises a `ValueError` when it finds no batch size in its own
+argument, in the extractor or in {func}`dataeval.config.set_batch_size`. Pass
+`batch_size=` every time, so the value is visible where you use it.
+
+The value on `Embeddings` is how many images are loaded, encoded and stored in
+one step. {class}`.TorchExtractor` and {class}`.OnnxExtractor` have a
+`batch_size` of their own, which is how many images go through the model in one
+forward pass. When both are set, the smaller value limits the forward pass. Set
+the extractor value only to bound the memory of a GPU. Neither value changes the
+embeddings except for differences in the last digits, which come from
+floating-point rounding.
+
+### Store large embeddings on disk
+
+By default `Embeddings` keeps the vectors in memory. Pass `path=` to let it use a
+memory-mapped file at that location when the embeddings would take more than
+`memory_threshold` of the available memory. The default threshold is 0.8. When
+the embeddings fit in memory, no file is written.
+
+### Keep one row for each item
+
+`Embeddings` stores one row for each dataset item, in order. It counts the rows
+of every batch and raises an error when the extractor returns a different number
+of rows, or returns a dictionary instead of an array. The count cannot show that
+each row belongs to the image at the same position, so check the extractor and
+not only the error.
+
+An extractor that returns one row for each detection does not meet this
+requirement. That includes {class}`.ScoresExtractor` around a detection model,
+{class}`.DetectionGeometryExtractor`, and {class}`.TorchExtractor` with
+`postprocess_fn`. The same holds for {class}`.ClasswiseUncertaintyExtractor`,
+which returns one array for each class. {class}`.Duplicates`, {class}`.Outliers`,
+{class}`.Coverage` and {class}`.Prioritize` build an `Embeddings` from the
+extractor you give them, so they have the same requirement. Send these extractors
+to a drift detector instead:
+
+- Pass the extractor as the detector's `extractor=`, or call the extractor and
+  pass the array it returns.
+- For {class}`.ClasswiseUncertaintyExtractor`, call it, select the array of one
+  class, and give that array to a detector. Do not pass it as `extractor=`.
+  Fitting succeeds, because encoding is lazy, and `predict` raises a `TypeError`.
+
+[Validation and Trust](ValidationAndTrust.md#extractors-that-embed-a-models-predictions)
+describes what each of these extractors produces.
+
+### Give the embeddings to a tool
+
+Each tool takes embeddings through its own argument.
+[What data does each tool need?](../getting-started/input-requirements.md#how-each-tool-takes-embeddings)
+lists them in one table.
 
 ## Related concept pages
 
@@ -135,6 +228,8 @@ variety of metrics and tasks.
 
 ### How-to guides
 
+- [How to create embeddings](../notebooks/h2_encode_with_onnx.py)
+- [Embed object detection crops and visualize class clusters](../notebooks/h2_embed_detection_crops.py)
 - [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
 - [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
 

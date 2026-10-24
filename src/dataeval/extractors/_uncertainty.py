@@ -135,10 +135,12 @@ class _UncertaintyBase(ReprMixin):
     :class:`OnnxExtractor`, an :class:`~dataeval.Embeddings`, or a custom one.
 
     Running both per-instance and per-class uncertainty on the same data calls
-    ``scores`` once each. The only expensive step is inference, so to avoid
-    paying it twice, wrap ``scores`` in a caching :class:`~dataeval.Embeddings`
-    and share that one instance between the two extractors -- the second call
-    hits the cache.
+    ``scores`` once each. The only expensive step is inference, so for a
+    classification model, avoid paying it twice by wrapping ``scores`` in a
+    caching :class:`~dataeval.Embeddings` and sharing that one instance between
+    the two extractors -- the second call hits the cache. A detection model
+    returns one row for each detection, which :class:`~dataeval.Embeddings` does
+    not accept, so each extractor runs the model.
     """
 
     def __init__(
@@ -232,10 +234,11 @@ class ClasswiseUncertaintyExtractor(_UncertaintyBase):
     will still pass ``isinstance(x, FeatureExtractor)`` at runtime, which only
     checks for ``__call__``; do not pass it to a drift detector directly.)
 
-    To run both per-instance (:class:`UncertaintyExtractor`) and per-class
-    uncertainty on the same data without paying for inference twice, wrap the
-    ``scores`` extractor in a caching :class:`~dataeval.Embeddings` and share that
-    one instance between both extractors.
+    Do not wrap the ``scores`` extractor of a detection model in
+    :class:`~dataeval.Embeddings` to share inference between this extractor and
+    :class:`UncertaintyExtractor`. The scores have one row for each detection,
+    and :class:`~dataeval.Embeddings` requires one row for each image. Each
+    extractor runs the model.
 
     Parameters
     ----------

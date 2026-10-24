@@ -86,6 +86,10 @@ actually embeds, and the conditions under which it will mislead you.
 These describe the images. Distances between their outputs are claims about the
 data itself, which is what every geometric metric in this library assumes.
 
+{class}`.Embeddings` accepts an extractor only when it returns one row for each
+dataset item. Every extractor in this table does, except {class}`.TorchExtractor`
+with `postprocess_fn`.
+
 :::{list-table}
 :widths: 20 32 48
 :header-rows: 1
@@ -108,12 +112,16 @@ data itself, which is what every geometric metric in this library assumes.
     Requires the `opencv` extra.
   - Invariant to rotation, scale, and minor viewpoint change, which is why it is
     the option for finding near-duplicates that survived a geometric transform.
-    Two hazards: it is the **only stateful extractor** — `__call__` fits the
-    vocabulary on the first data it sees and reuses it thereafter, so two
-    separately constructed instances produce embeddings that are not comparable
-    (fit once, share the instance) — and the vocabulary is a k-means fit, so
-    reproducibility depends on the
+    Two hazards: it is the **only stateful extractor** — it learns its
+    vocabulary from the images you give to `fit`, so two separately constructed
+    instances produce embeddings that are not comparable (fit once, share the
+    instance) — and the vocabulary is a k-means fit, so reproducibility depends
+    on the
     [global seed](../notebooks/h2_configure_defaults.py#configuring-the-global-seed).
+    Fit it yourself on the images that should define the vocabulary. An unfitted
+    instance fits on the data of its first call and raises a `UserWarning`. Inside
+    {class}`.Embeddings` or {class}`.Duplicates` that call covers one batch, so
+    the vocabulary comes from `batch_size` images and not from the dataset.
     Images with no SIFT keypoints (uniform or untextured) become all-zero rows,
     which read as identical to each other.
 - - {class}`.TorchExtractor`
@@ -126,6 +134,9 @@ data itself, which is what every geometric metric in this library assumes.
     output are different spaces with different metrics, and `transforms` that do
     not match the model's training preprocessing degrade the embedding without
     raising anything. Device and precision differences perturb values slightly.
+    With `postprocess_fn` set, the extractor returns one row for each detection
+    and does not fit {class}`.Embeddings`. See
+    [Keep one row for each item](Embeddings.md#keep-one-row-for-each-item).
 - - {class}`.OnnxExtractor`
   - The same, executed through ONNX Runtime, with lazy model loading and
     automatic provider selection (CUDA, then CoreML, then CPU).
@@ -135,6 +146,16 @@ data itself, which is what every geometric metric in this library assumes.
     size by bilinear resize. Because the execution provider is selected from
     what is available, the same model on two machines can differ numerically —
     do not treat runs as bitwise comparable across hardware.
+- - {class}`.VideoTorchExtractor`
+  - One vector for each video. The extractor splits a video into non-overlapping
+    clips, embeds each clip with a pre-trained video model, and combines the clip
+    vectors with `clip_aggregation` (`"mean"` by default, or `"max"`).
+  - Everything above for {class}`.TorchExtractor`, plus: `pooling` (`"first"` by
+    default) decides how the sequence output of a clip becomes one vector, and
+    `clip_aggregation` decides how clips become a video. Each choice changes the
+    geometry without raising an error. The extractor needs a frame count from
+    `num_frames` or from `model.config.num_frames`. Without a `processor`, the
+    videos must already be preprocessed.
 
 :::
 
@@ -198,8 +219,10 @@ apply to every row in this table:
 wrap a score producer rather than a model, so any `FeatureExtractor` can supply
 their input — including {class}`.TorchExtractor`, {class}`.OnnxExtractor`, or an
 {class}`.Embeddings`. Running both over the same data invokes that producer
-twice; wrapping it in a caching {class}`.Embeddings` and sharing the one instance
-avoids paying for inference again.
+twice. For a classification model, wrapping the producer in a caching
+{class}`.Embeddings` and sharing the one instance avoids paying for inference
+again. A detection model returns one row for each detection, which
+{class}`.Embeddings` does not accept, so both extractors run the model.
 ```
 
 No result object records the extractor that produced it, so **record which
