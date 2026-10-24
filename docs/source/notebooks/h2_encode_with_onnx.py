@@ -91,12 +91,14 @@ print(f"Shape of the first image: {subset[0][0].shape}")
 # ## Create embeddings with PyTorch
 #
 # Wrap a pre-trained model in a {class}`.TorchExtractor`, then pass the dataset and the extractor to
-# {class}`.Embeddings`. Three arguments decide what the embeddings are:
+# {class}`.Embeddings`. Two arguments of the extractor decide what the embeddings are:
 #
 # - `transforms` applies the preprocessing the model was trained with. Torchvision publishes it with the weights.
 # - `layer_name` selects the layer whose output becomes the embedding. Without it, the extractor returns the model output,
 #   which for ResNet18 is 1000 ImageNet class scores and not image features. `avgpool` is the layer before the classifier.
-# - `batch_size` on `Embeddings` sets how many images are loaded and encoded at a time. It does not change the result.
+#
+# `batch_size` on `Embeddings` sets how many images are loaded and encoded at a time. It does not change the embeddings
+# except for differences in the last digits, which come from floating-point rounding.
 
 # %%
 weights = ResNet18_Weights.DEFAULT

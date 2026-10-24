@@ -208,6 +208,9 @@ assert warned == {"DIMENSION": False, "VISUAL": True}
 # 14x14 imagery. The normalization sits in the {class}`.TorchExtractor` (or extractor), so only the embeddings see it, and
 # `brightness` stays a statistic about pixels rather than about a mean and standard deviation
 # someone chose.
+#
+# The cell calls the extractor directly on one image, to show what the model receives. For a whole dataset, pass the
+# extractor to {class}`.Embeddings`, which makes the same call for each batch.
 
 # %%
 model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(14 * 14, 16))

@@ -125,11 +125,12 @@ from dataeval.utils.preprocessing import rescale, resize, to_canonical_grayscale
 # Set random seeds for reproducibility
 dataeval.config.set_seed(173, all_generators=True)
 
-# Set default batch size
+# Set the batch size that the reconstruction detectors use in predict
 dataeval.config.set_batch_size(64)
 
 # Set default torch device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+dataeval.config.set_device(device)
 print(f"Using device: {device}")
 
 
@@ -327,13 +328,13 @@ print("✓ Embedding model trained!")
 
 # %%
 # Create extractor using the trained embedding model
-knn_extractor = TorchExtractor(embedding_model, device=device)
+knn_extractor = TorchExtractor(embedding_model)
 
 # Get embeddings for all datasets
 print("Extracting embeddings...")
-train_in_emb = Embeddings(train_in, extractor=knn_extractor)
-test_in_emb = Embeddings(test_in, extractor=knn_extractor)
-test_ood_emb = Embeddings(test_ood, extractor=knn_extractor)
+train_in_emb = Embeddings(train_in, extractor=knn_extractor, batch_size=64)
+test_in_emb = Embeddings(test_in, extractor=knn_extractor, batch_size=64)
+test_ood_emb = Embeddings(test_ood, extractor=knn_extractor, batch_size=64)
 
 print(f"Training embeddings shape: {train_in_emb.shape}")
 print(f"Test in-dist embeddings shape: {test_in_emb.shape}")
@@ -856,9 +857,9 @@ medium_ood = np.rot90(test_in[:500], k=1, axes=(2, 3)).copy()
 hard_ood = test_ood
 
 # Get embeddings for all OOD scenarios (reuse the same extractor)
-easy_ood_emb = Embeddings(easy_ood, extractor=knn_extractor)
-medium_ood_emb = Embeddings(medium_ood, extractor=knn_extractor)
-hard_ood_emb = Embeddings(hard_ood, extractor=knn_extractor)
+easy_ood_emb = Embeddings(easy_ood, extractor=knn_extractor, batch_size=64)
+medium_ood_emb = Embeddings(medium_ood, extractor=knn_extractor, batch_size=64)
+hard_ood_emb = Embeddings(hard_ood, extractor=knn_extractor, batch_size=64)
 
 print("Created three OOD scenarios:")
 print(f"1. Easy (CIFAR10 → grayscale): {easy_ood.shape}")

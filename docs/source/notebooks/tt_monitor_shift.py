@@ -173,12 +173,10 @@ print(f"vocabulary:  {train_view.metadata.get('index2label')}")
 # Reduce each image to a feature vector with a
 # [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
 # Torchvision: point a {class}`.TorchExtractor` at its penultimate `avgpool` layer (its learned features, not the
-# 1000-class logits) and run each split through {class}`.Embeddings`, which applies the model's standard
-# resize-and-normalize preprocessing for you. Keeping the `transforms` in a variable lets you reuse them further down.
+# 1000-class logits), give it the model's standard resize-and-normalize preprocessing as `transforms`, and run each split
+# through {class}`.Embeddings`. Keeping the `transforms` in a variable lets you reuse them further down.
 #
-# > For other ways to build embeddings, see [Encode images with an ONNX model](./h2_encode_with_onnx.py) (a
-# > framework-agnostic ONNX extractor) and [Embed object detection crops](./h2_embed_detection_crops.py) (one embedding
-# > per object box).
+# For other ways to build embeddings, see [How to create embeddings](./h2_encode_with_onnx.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
