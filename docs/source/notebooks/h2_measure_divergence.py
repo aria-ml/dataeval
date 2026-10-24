@@ -37,7 +37,7 @@
 # 1. A Python environment with the following packages installed:
 #    - dataeval
 #    - maite-datasets
-# 1. A set of image embeddings for each dataset (usually obtained with an AutoEncoder)
+# 1. A set of image embeddings for each dataset. This guide builds them from the pixels of MNIST images.
 
 # %% [markdown]
 # ## Getting started
@@ -55,10 +55,12 @@ except Exception:
     pass
 
 # %%
+import numpy as np
 from maite_datasets.image_classification import MNIST
 
 from dataeval import Embeddings
 from dataeval.core import divergence_fnn
+from dataeval.data import Limit, View
 from dataeval.extractors import FlattenExtractor
 
 # %% [markdown]
@@ -66,16 +68,22 @@ from dataeval.extractors import FlattenExtractor
 #
 # Load the MNIST data and create the training dataset. For the purposes of this example, we will use subsets of the
 # training (4000) data.
+#
+# The embeddings here are the flattened pixels of each image, made by a {class}`.FlattenExtractor`. Flattened pixels are
+# a baseline, because distances between raw pixels follow brightness and alignment more than content. They work in this
+# example because MNIST images are small and share one shape. For photographs, use an extractor that wraps a model, as
+# described in [How to create embeddings](./h2_encode_with_onnx.py).
 
 # %%
 # Load in the training mnist dataset and use the first 4000
 train_ds = MNIST(root="./data/", image_set="train", download=True)
+train_view = View(train_ds, Limit(4000))
 
-# Create extractor
+# Create the extractor. It holds no state, so one instance serves every dataset below
 extractor = FlattenExtractor()
 
-# Extract the first 4000 embeddings
-embeddings = Embeddings(train_ds, extractor=extractor, batch_size=400)[:4000]
+# Extract the embeddings of the 4000 images
+embeddings = np.asarray(Embeddings(train_view, extractor=extractor, batch_size=64))
 
 # %%
 print("Number of samples: ", len(embeddings))
@@ -96,7 +104,10 @@ div = divergence_fnn(data_a, data_b)
 print(div)
 
 # %% [markdown]
-# We estimate that the divergence between these (identically distributed) images sets is at or close to 0.
+# The two halves are samples of the same dataset, so this value is the reference for the next comparison. It is above 0.
+# The nearest neighbor estimator can overestimate divergence when the samples are sparse relative to the dimensionality,
+# as 2000 samples of 784 pixels are. HP divergence has no significance threshold, so
+# [read a divergence against a reference](../concepts/Divergence.md#limitations) like this one.
 
 # %% [markdown]
 # ## Loading in corrupted data
@@ -105,10 +116,10 @@ print(div)
 
 # %%
 corrupted_ds = MNIST(root="./data", image_set="train", corruption="translate", download=True)
+corrupted_view = View(corrupted_ds, Limit(2000))
 
-# Create extractor
-corrupted_extractor = FlattenExtractor()
-corrupted_emb = Embeddings(corrupted_ds, extractor=corrupted_extractor, batch_size=64)[:2000]
+# Reuse the extractor from above
+corrupted_emb = np.asarray(Embeddings(corrupted_view, extractor=extractor, batch_size=64))
 
 # %%
 print("Number of corrupted samples: ", len(corrupted_emb))
@@ -128,7 +139,8 @@ print(div)
 assert div["divergence"] > 0.95
 
 # %% [markdown]
-# We conclude that the translated MNIST images are significantly different from the original images.
+# We conclude that the translated MNIST images differ from the original images far more than two samples of the original
+# images differ from each other.
 
 # %% [markdown]
 # ## Next steps
@@ -147,6 +159,6 @@ assert div["divergence"] > 0.95
 #
 # ### How-to guides
 #
-# - [How to encode images with ONNX models](./h2_encode_with_onnx.py) — Extract image embeddings using ONNX runtime models.
+# - [How to create embeddings](./h2_encode_with_onnx.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented regions in dataset feature space.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Perform k-means or MST clustering on extracted embeddings.
