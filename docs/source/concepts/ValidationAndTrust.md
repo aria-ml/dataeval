@@ -918,23 +918,30 @@ statistical and computational.
   - Ground-truth checked (kinematics recovered from analytically constructed
     flow fields)
   - Measures **apparent** motion, so it cannot distinguish a moving camera from
-    a scene moving coherently against a still one. Pairs where the two are
-    genuinely ambiguous are refused rather than guessed; the per-frame
-    `ego_trusted` flag reports which, and a sequence roll-up answers null rather
+    a scene moving coherently against a still one. A pair is refused rather than
+    guessed when the camera can't be told apart from an independent mover, or a
+    mover captures the fit; when the fitted motion doesn't explain the new frame
+    (a hard cut, a large field-of-view switch, a misread fast pan) or nothing in
+    the frame confirms it (a nearly textureless noisy frame); when the pair can't
+    be read (the frames differ in size, a processed side is under 32 px, or a
+    frame holds a non-finite pixel or is a single gray level); when the flow
+    samples can't pin an affine motion or, with a `mask`, too few remain or they
+    or the fit's inliers don't spread across the frame; or when the pair departs
+    from the camera state the rest of the sequence agrees on (the temporal gate,
+    which assumes a roughly steady camera). The per-frame `ego_trusted` flag
+    reports which frames were refused, and a sequence roll-up answers null rather
     than from too little evidence once fewer than a quarter of its frames were
     trusted. The affine model is first-order and carries no depth, so a camera
     translating through a scene with strong parallax is fitted only
     approximately. `pan_speed` and `mover_speed` are in the pixels of the frames
     they were measured on and are not comparable across resolutions without
-    normalizing; the rates are. The temporal trust gate assumes a roughly steady
-    camera state across the sequence. A reading is attributed to the *later* frame of the
-    pair it was measured from, so the leading `gap` frames of every sequence
+    normalizing; the rates are. A reading is attributed to the *later* frame of
+    the pair it was measured from, so the leading `gap` frames of every sequence
     carry no reading. A burned-in overlay (a HUD, telemetry text) reads as scene
     content: a light one gets pans refused, and a dense one can read a pan as a
     trusted slower pan or a still camera. Passing the overlay as `mask=` excludes
-    it, and a masked pair whose remaining samples don't spread across the frame
-    is refused. Movers are then judged against what the mask leaves, so one
-    covering about a fifth of the frame can be read as the camera.
+    it. Movers are then judged against what the mask leaves, so one covering
+    about a fifth of the frame can be read as the camera.
 - - {func}`.phash`, {func}`.phash_d4`, {func}`.dhash`, {func}`.dhash_d4`,
     {func}`.xxhash`
   - Perceptual hashing ([Zauner, 2010](DataIntegrity.md#references)); xxHash

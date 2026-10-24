@@ -760,13 +760,21 @@ class EgoFactors(TypedDict):
     mover_speed : Sequence[float]
         Median speed of those samples, full-resolution pixels per frame. NaN where none.
     ego_trusted : Sequence[bool]
-        Whether this frame's camera estimate could be told apart from a mover's. False as well
-        where the fitted camera motion does not explain the new frame, as across a hard cut, a
-        large field-of-view switch or a misread fast pan, where nothing in the frame confirms the
-        fit, as on a nearly textureless noisy frame, or where the pair could not be read: the two
-        frames differ in size, a processed side is under 32 px, a frame holds a non-finite pixel,
-        or a frame is a single gray level once converted to grayscale, as a black dropout or a
-        frame whose values all saturate the conversion is.
+        Whether this frame's camera estimate can be trusted. False where any of these holds:
+
+        - the camera could not be told apart from an independent mover, or a mover filling the
+          middle of the frame captured the fit;
+        - the fitted camera motion does not explain the new frame, as across a hard cut, a large
+          field-of-view switch or a misread fast pan, or nothing in the frame confirms the fit,
+          as on a nearly textureless noisy frame;
+        - the pair could not be read: the two frames differ in size, a processed side is under
+          32 px, a frame holds a non-finite pixel, or a frame is a single gray level once
+          converted to grayscale, as a black dropout or a frame whose values all saturate the
+          conversion is;
+        - the flow samples cannot pin an affine motion, or, with a ``mask``, too few remain, or
+          they or the fit's inliers do not spread across the frame;
+        - the pair's camera state departs from what the rest of the sequence agrees on (the
+          temporal gate), which marks a burst of capture by something else.
     """
 
     item_index: Sequence[int]
