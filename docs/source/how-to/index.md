@@ -106,7 +106,7 @@ datasets for machine learning.
     a {class}`.View` from {class}`.Operation` steps
   - [![Open In Colab][colab-badge]][view-colab]
 - - [](../notebooks/h2_encode_with_onnx.py)
-  - Encode image embeddings with an ONNX model
+  - Create image embeddings with PyTorch, ONNX or a model-free extractor, and check that two frameworks agree
   - [![Open In Colab][colab-badge]][onx-colab]
 - - [](../notebooks/h2_place_transforms.py)
   - Decide whether a transform belongs in a {class}`.View` or in an
