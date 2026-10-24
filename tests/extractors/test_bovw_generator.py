@@ -9,6 +9,9 @@ import pytest
 
 pytest.importorskip("cv2", reason="opencv-python not installed")
 
+# Calling the extractor unfitted fits it and warns; test_bovw.py::TestBoVWAutoFit asserts that warning.
+pytestmark = pytest.mark.filterwarnings("ignore:BoVWExtractor is fitting its vocabulary:UserWarning")
+
 
 @pytest.fixture
 def rgb_images():

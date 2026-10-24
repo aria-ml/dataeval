@@ -353,7 +353,8 @@ else:
 # Method 2: BoVW-based detection (rotation invariant at any angle)
 # Use a smaller vocab_size for this small dataset (~32 images).
 # Large vocabularies create sparse histograms that cluster poorly.
-bovw_extractor = BoVWExtractor(vocab_size=32)
+# Fit the vocabulary once on all of the images, then share the fitted extractor with the detectors below.
+bovw_extractor = BoVWExtractor(vocab_size=32).fit(images)
 cluster_sensitivity = 1.75
 
 bovw_detector = Duplicates(

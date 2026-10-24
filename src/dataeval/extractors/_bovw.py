@@ -2,6 +2,7 @@
 
 __all__ = []
 
+import warnings
 from collections.abc import Sized
 from functools import partial
 from typing import TYPE_CHECKING, Any
@@ -138,7 +139,7 @@ class BoVWExtractor:
     >>> # Use embeddings for duplicate detection
     >>> embeddings = extractor.transform(unlabeled_data)
 
-    One-shot fit and transform
+    One-shot fit and transform (emits a ``UserWarning``, because the call fits on whatever it is given)
 
     >>> # Convenience method that fits and transforms in one call
     >>> extractor = BoVWExtractor(vocab_size=64)
@@ -157,6 +158,11 @@ class BoVWExtractor:
     sample of images. Once fitted, the same extractor can transform new images
     into comparable embeddings. Calling :meth:`fit` again will replace the
     existing vocabulary.
+
+    Calling the extractor before :meth:`fit` fits the vocabulary on the data of that
+    call and warns. Inside :class:`~dataeval.Embeddings`, :class:`~dataeval.quality.Duplicates`
+    or :class:`~dataeval.quality.Outliers` that call is one batch of ``batch_size`` images,
+    not the whole dataset, so fit explicitly on the images you want the vocabulary learned from.
 
     **Image Format**: Images should be in (C, H, W) channel-first format, which
     is standard for PyTorch datasets. Both RGB (3 channels) and grayscale
@@ -287,8 +293,8 @@ class BoVWExtractor:
         Extract BoVW histogram embeddings from images.
 
         If the vocabulary has not been fitted yet, this method will first
-        train the vocabulary on the input data before transforming.
-        If the vocabulary is already fitted, this method only transforms.
+        train the vocabulary on the input data before transforming, and warns that it
+        did. If the vocabulary is already fitted, this method only transforms.
 
         This allows the extractor to be used as a
         :class:`~dataeval.protocols.FeatureExtractor` where ``__call__``
@@ -312,6 +318,14 @@ class BoVWExtractor:
             If no SIFT features are found in any image (only when fitting).
         """
         if self._kmeans is None:
+            warnings.warn(
+                "BoVWExtractor is fitting its vocabulary on the data of this one call. Inside Embeddings, Duplicates "
+                "or Outliers that call is a single batch of batch_size images, not the whole dataset, and every later "
+                "batch is encoded with that vocabulary. Call fit() on the images you want the vocabulary learned from, "
+                "then pass the fitted extractor. This warning is not raised once the extractor is fitted.",
+                UserWarning,
+                stacklevel=2,
+            )
             self.fit(data)
         return self.transform(data)
 

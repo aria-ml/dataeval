@@ -1,6 +1,7 @@
 """Tests for BoVWExtractor (Bag of Visual Words)."""
 
 import multiprocessing
+import warnings
 
 import numpy as np
 import pytest
@@ -11,6 +12,9 @@ from dataeval import Embeddings
 from dataeval.config import get_seed, set_seed, use_max_processes, use_seed
 from dataeval.exceptions import NotFittedError
 from dataeval.extractors._bovw import BoVWExtractor
+
+# Most tests here call the extractor on its own, which fits it and warns. TestBoVWAutoFit asserts the warning.
+pytestmark = pytest.mark.filterwarnings("ignore:BoVWExtractor is fitting its vocabulary:UserWarning")
 
 
 @pytest.mark.optional
@@ -317,6 +321,53 @@ class TestBoVWEdgeCases:
         emb2 = extractor.transform(test_images)
 
         np.testing.assert_array_equal(emb1, emb2)
+
+
+@pytest.mark.optional
+class TestBoVWAutoFit:
+    """Calling an unfitted extractor fits it on that call's data, which inside Embeddings is one batch."""
+
+    @pytest.fixture
+    def images(self):
+        rng = np.random.default_rng(42)
+        return [rng.integers(0, 256, size=(3, 64, 64), dtype=np.uint8) for _ in range(6)]
+
+    def test_calling_an_unfitted_extractor_warns(self, images):
+        with pytest.warns(UserWarning, match=r"fitting its vocabulary on the data of this one call"):
+            BoVWExtractor(vocab_size=16)(images)
+
+    def test_a_fitted_extractor_does_not_warn(self, images):
+        extractor = BoVWExtractor(vocab_size=16).fit(images)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            extractor(images)
+
+    def test_inside_embeddings_the_vocabulary_is_fit_on_the_first_batch_only(self, images):
+        """The hazard the warning names: with batch_size=2, six images teach the vocabulary from two."""
+        seen: list[int] = []
+
+        class Recording(BoVWExtractor):
+            def fit(self, data):
+                seen.append(len(list(data)))
+                return super().fit(data)
+
+        with pytest.warns(UserWarning, match="fitting its vocabulary"):
+            Embeddings(images, extractor=Recording(vocab_size=16), batch_size=2)[:]
+        assert seen == [2]
+
+    def test_fitting_first_uses_every_image(self, images):
+        seen: list[int] = []
+
+        class Recording(BoVWExtractor):
+            def fit(self, data):
+                seen.append(len(list(data)))
+                return super().fit(data)
+
+        extractor = Recording(vocab_size=16).fit(images)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            Embeddings(images, extractor=extractor, batch_size=2)[:]
+        assert seen == [6]
 
 
 # `optional`, like the rest of this module: the file is skipped wholesale where
