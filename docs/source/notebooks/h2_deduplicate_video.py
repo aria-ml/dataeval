@@ -30,7 +30,7 @@
 # - Was the footage resampled or repackaged at another frame rate, so the frames no longer line up one to one?
 # - Is one object annotated twice, under two track identifiers?
 #
-# The :class:`~dataeval.quality.Duplicates` class answers these questions for a multi-object tracking (MOT) dataset.
+# The {class}`~dataeval.quality.Duplicates` class answers these questions for a multi-object tracking (MOT) dataset.
 # In this guide you will build a small dataset with known duplicates, run each detection against it, and read the
 # results.
 #
@@ -295,11 +295,8 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
 # ```python
 # import logging
 # logging.basicConfig(level=logging.WARNING)
+# ```
 # ````
-#
-# ```
-#
-# ```
 #
 
 # %% [markdown]
@@ -541,7 +538,7 @@ display(
 #
 # Every duplicate is reported in source-video coordinates, as a sequence index and frame numbers. To view the
 # duplicated frames, pull out a sequence, or build a split without them, pass those coordinates to
-# :class:`~dataeval.data.FrameIndices`, which `frame_sample` accepts.
+# {class}`~dataeval.data.FrameIndices`, which `frame_sample` accepts.
 #
 # ```{note}
 # `Duplicates` reports frame numbers (each frame's `frame_index`), while `FrameIndices` takes stream positions. A

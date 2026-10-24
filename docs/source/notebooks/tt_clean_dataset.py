@@ -296,7 +296,7 @@ plot_sample_images_by_class(ds, lstats["image_indices_per_class"])
 # ### Extreme/missing values
 #
 # Here you will detect and identify the images associated with the extreme values from DataEval's stat functions. To
-# detect these extreme values, you will use the :class:`.Outliers` class. The `Outliers` class has multiple methods to
+# detect these extreme values, you will use the {class}`.Outliers` class. The `Outliers` class has multiple methods to
 # determine the extreme values, which are discussed in the [Data Cleaning explanation](../concepts/DataIntegrity.md). For
 # this guide, you will use the "zscore" as the Z score defines outliers in a normal distribution.
 #
