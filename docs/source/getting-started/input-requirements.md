@@ -97,6 +97,25 @@ can skip images entirely — `from_stats()` takes a pre-computed `StatsResult`
 from {func}`.image_stats` in their place. Both also accept `per_target=True`
 to score individual detections rather than whole images.
 
+## How each tool takes embeddings
+
+A tool that works on embeddings either builds them from an extractor or accepts
+embeddings you have already computed. Build the {class}`.Embeddings` once for each
+dataset and give it to every tool, as described in
+[Embeddings](../concepts/Embeddings.md#creating-embeddings). The tools take it
+through different arguments:
+
+| Tool                                     | Give it an extractor                                                                 | Give it embeddings                                                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| {class}`.Duplicates`, {class}`.Outliers` | `extractor=` and `batch_size=` in the constructor. `evaluate` builds the embeddings. | `from_clusters()` takes the result of clustering embeddings. `evaluate` has no embeddings argument.   |
+| {class}`.Coverage`                       | `extractor=` and `batch_size=` in the constructor                                    | `evaluate(labels, embeddings=...)` or `from_embeddings(embeddings, labels)`                           |
+| {class}`.Prioritize`                     | `extractor=` and `batch_size=` in the constructor                                    | `evaluate(embeddings)` or `from_embeddings(embeddings, labels)`                                       |
+| Drift and OOD detectors                  | `extractor=` in the constructor                                                      | An array or an {class}`.Embeddings` passed to `fit` and `predict`                                     |
+| Functions in {mod}`dataeval.core`        | Not applicable                                                                       | An array. The `coverage_*` functions need values in the unit interval, or `force_unit_interval=True`. |
+
+The tools in the first three rows build an {class}`.Embeddings` from the extractor
+you give them, so the extractor must return one row for each dataset item.
+
 ## Core functions
 
 The stateless functions in {mod}`dataeval.core` take arrays and labels
