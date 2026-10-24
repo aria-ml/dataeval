@@ -239,45 +239,44 @@ embedding space. Duplicates inflate benchmark scores and cause models to overfit
 to repeated collection events rather than generalizing to new conditions.
 
 ```python
-from torch.nn import Flatten
-
-from dataeval.extractors import TorchExtractor
+from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates
 
-# Configure a feature extractor using a pre-trained PyTorch model.
-# Here we use a simple Flatten layer for demonstration, but in practice
-# you would use a more powerful model like a pre-trained ResNet or ViT.
-extractor = TorchExtractor(Flatten())
+# Configure a feature extractor. FlattenExtractor turns each image into a
+# vector of its pixels, which keeps this example small. In practice you
+# would use a model-based extractor, such as TorchExtractor or OnnxExtractor
+# with a pre-trained ResNet or ViT.
+extractor = FlattenExtractor()
 
 # Find near-duplicates using only embedding-based clustering.
-# An aggressive cluster_threshold of 1.5 should produce detections
-# of near duplicates even with a simple Flatten extractor.
+# An aggressive cluster_sensitivity of 1.5 should produce detections
+# of near duplicates even with a simple FlattenExtractor.
 evaluator = Duplicates(
     flags=ImageStats.NONE,
     cluster_algorithm="hdbscan",
-    cluster_threshold=1.5,
+    cluster_sensitivity=1.5,
     extractor=extractor,
     batch_size=64,
 )
 result = evaluator.evaluate(dataset)
 
 # Near duplicates are grouped into sets of indices that are within
-# the specified cluster_threshold in embedding space.
+# the specified cluster_sensitivity in embedding space.
 print(result)
 ```
 
 ```text
-shape: (3, 5)
-┌──────────┬───────┬──────────┬────────────────┬─────────────┐
-│ group_id ┆ level ┆ dup_type ┆ item_indices   ┆ methods     │
-│ ---      ┆ ---   ┆ ---      ┆ ---            ┆ ---         │
-│ i64      ┆ str   ┆ str      ┆ list[i64]      ┆ list[str]   │
-╞══════════╪═══════╪══════════╪════════════════╪═════════════╡
-│ 0        ┆ item  ┆ near     ┆ [18586, 39942] ┆ ["cluster"] │
-│ 1        ┆ item  ┆ near     ┆ [23157, 31426] ┆ ["cluster"] │
-│ 2        ┆ item  ┆ near     ┆ [32024, 49135] ┆ ["cluster"] │
-└──────────┴───────┴──────────┴────────────────┴─────────────┘
+shape: (3, 7)
+┌──────────┬───────┬──────────┬────────────────┬─────────────┬────────────┬───────────────────────┐
+│ group_id ┆ level ┆ dup_type ┆ item_indices   ┆ methods     ┆ differs_on ┆ annotation_divergence │
+│ ---      ┆ ---   ┆ ---      ┆ ---            ┆ ---         ┆ ---        ┆ ---                   │
+│ i64      ┆ str   ┆ str      ┆ list[i64]      ┆ list[str]   ┆ list[str]  ┆ f64                   │
+╞══════════╪═══════╪══════════╪════════════════╪═════════════╪════════════╪═══════════════════════╡
+│ 0        ┆ item  ┆ near     ┆ [18586, 39942] ┆ ["cluster"] ┆ null       ┆ null                  │
+│ 1        ┆ item  ┆ near     ┆ [23157, 31426] ┆ ["cluster"] ┆ null       ┆ null                  │
+│ 2        ┆ item  ┆ near     ┆ [32024, 49135] ┆ ["cluster"] ┆ null       ┆ null                  │
+└──────────┴───────┴──────────┴────────────────┴─────────────┴────────────┴───────────────────────┘
 ```
 
 A result with many large groups is a signal that your dataset contains
