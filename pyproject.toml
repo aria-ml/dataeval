@@ -180,7 +180,8 @@ conflicts = [
 ]
 constraint-dependencies = [
     "cryptography>=46.0.5",    # CVE-2026-26007: Missing Subgroup Validation for SECT Curves
-    "filelock>=3.20.3",        # GHSA-w853-jp5j-5j7f, GHSA-qmgc-5h2g-mvrw
+    "filelock>=4.2.1",         # CVE-2026-112940: (GHSA-v4x8-3wr5-3wq8) ReadWriteLock lets SQLite reopen files by name
+                               # GHSA-w853-jp5j-5j7f, GHSA-qmgc-5h2g-mvrw (fixed earlier, in 3.20.3)
     "pillow>=13.0.0",          # Pillow 13.0.0 security release (decoder/encoder OOB reads and writes, DoS):
                                # CVE-2026-112395, CVE-2026-112397, CVE-2026-112400,
                                # CVE-2026-112403, CVE-2026-112404, CVE-2026-112895,
