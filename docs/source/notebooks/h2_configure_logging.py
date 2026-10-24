@@ -56,7 +56,7 @@ import os
 
 import sklearn.datasets as dsets
 
-from dataeval.core._ber import ber_knn, ber_mst
+from dataeval.core import ber_knn, ber_mst
 
 # %% [markdown]
 # ## Understanding logging levels

@@ -54,7 +54,7 @@
 #
 # Out-of-distribution (OOD) detection is critical for ensuring model reliability in production. When models encounter data
 # that differs significantly from their training distribution, predictions become unreliable. This tutorial demonstrates
-# seven different approaches to OOD detection:
+# six different approaches to OOD detection:
 #
 # **Reconstruction-Based Methods:**
 #
@@ -1076,8 +1076,9 @@ plt.show()
 # embedding_model = YourPretrainedModel()  # ResNet, ViT, CLIP, etc.
 #
 # # Create embeddings
-# train_emb = Embeddings(train_data, model=embedding_model)
-# test_emb = Embeddings(test_data, model=embedding_model)
+# extractor = TorchExtractor(embedding_model)
+# train_emb = Embeddings(train_data, extractor=extractor, batch_size=64)
+# test_emb = Embeddings(test_data, extractor=extractor, batch_size=64)
 #
 # # Cosine distance — best for normalized/pretrained embeddings
 # ood_knn_cos = OODKNeighbors(k=10, distance_metric="cosine", threshold_perc=95.0)

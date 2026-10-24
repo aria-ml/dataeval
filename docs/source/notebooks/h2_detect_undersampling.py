@@ -123,7 +123,7 @@ subset = View(train_ds, Limit(2000))
 
 
 # %% [markdown]
-# In this tutorial, we will use an autoencoder to reduce the dimension of the MNIST images.
+# In this how-to, you use an autoencoder to reduce the dimension of the MNIST images.
 
 
 # %%
@@ -230,14 +230,8 @@ for count, i in enumerate(axs):
     i.title.set_text(int(labels[idx]))
 
 # %% [markdown]
-# The Coverage tool identified that in this set of 2000 images, there is potential under-coverage when it comes to wonky
-# 2s and 7s. Other digits have some undercovered instances, but could be they are just outliers.
-#
-# <!--
-# More investigation into outlier status is needed, see
-# [How to identify outliers and/or anomalies in a dataset](ClustererTutorial.ipynb)
-# for more info.
-# -->
+# `coverage_adaptive` identified that in this set of 2000 images, there is potential under-coverage when it comes to
+# wonky 2s and 7s. Other digits have some undercovered instances, but they could be outliers.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###

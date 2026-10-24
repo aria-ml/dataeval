@@ -52,9 +52,9 @@ except Exception:
 
 # %%
 import numpy as np
+from scipy.stats import entropy
 
 from dataeval.config import set_seed
-from dataeval.extractors._uncertainty import _prediction_uncertainty
 from dataeval.shift import DriftDomainClassifier, DriftUnivariate
 
 # Set random seed for reproducibility
@@ -85,13 +85,13 @@ curr_logits = rng.normal(loc=0, scale=1.0, size=(num_samples, num_classes))
 curr_probs = np.exp(curr_logits) / np.sum(np.exp(curr_logits), axis=1, keepdims=True)
 
 # %% [markdown]
-# Now, we use DataEval's internal uncertainty helper to convert probabilities into a 1D array of normalized
-# entropy values, and use {class}`.DriftUnivariate` to check if the new entropy distribution is significantly
-# different from the baseline.
+# Now convert the probabilities into one normalized entropy value per prediction with `scipy.stats.entropy`, and use
+# {class}`.DriftUnivariate` to check whether the new entropy distribution differs significantly from the baseline.
 
 # %%
-prev_entropy = _prediction_uncertainty(prev_probs, preds_type="probs")
-curr_entropy = _prediction_uncertainty(curr_probs, preds_type="probs")
+# Divide by the maximum entropy so that 1.0 means a uniform prediction
+prev_entropy = np.asarray(entropy(prev_probs, axis=1))[:, None] / np.log(num_classes)
+curr_entropy = np.asarray(entropy(curr_probs, axis=1))[:, None] / np.log(num_classes)
 
 # Use Kolmogorov-Smirnov (ks) test
 detector = DriftUnivariate(method="ks").fit(prev_entropy)

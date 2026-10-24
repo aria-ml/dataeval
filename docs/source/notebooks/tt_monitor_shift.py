@@ -18,7 +18,7 @@
 #
 # This guide provides a beginner friendly introduction on monitoring post deployment data shifts.
 #
-# Estimated time to complete: 5 minutes
+# Estimated time to complete: 15 minutes
 #
 # Relevant ML stages: [Monitoring](../getting-started/roles/ML_Lifecycle.md#monitoring)
 #
