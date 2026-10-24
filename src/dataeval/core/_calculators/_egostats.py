@@ -42,7 +42,7 @@ class EgoStatCalculator(ReadingCalculator):
     def __init__(self, options: VideoOptions) -> None:
         super().__init__(options)
         # Loads OpenCV, which is why this calculator is built only when an EGO flag is selected.
-        self.engine = _EgoEngine(options)
+        self.engine = _EgoEngine(options, "ego_mask")
 
     def get_applicable_flags(self) -> VideoStats:
         """Return which flags this calculator handles."""

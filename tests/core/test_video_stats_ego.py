@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from dataeval import Metadata
+from dataeval.config import use_max_processes
 from dataeval.core import ego_stats, video_stats
 from dataeval.flags import VideoStats
 
@@ -15,6 +16,7 @@ pytest.importorskip("cv2", reason="VideoStats.EGO requires opencv")
 
 # Imported as a module so pytest does not collect its test classes a second time here.
 from tests.core import test_ego_stats as ego_tests
+from tests.core.test_ego_overlay import DENSE, hud_pan
 from tests.core.test_ego_stats import FakeDataset, FakeFrame, ambiguous_stream, panning_stream, texture
 
 pytestmark = pytest.mark.optional
@@ -32,6 +34,30 @@ def test_ego_equals_the_metadata_roll_up():
     for name in EXPECTED - {"motion_mode"}:
         np.testing.assert_array_equal(ours[name], np.asarray(rows[name].to_list(), dtype=float), err_msg=name)
     assert ours["motion_mode"].tolist() == rows["motion_mode"].to_list()
+
+
+@pytest.mark.filterwarnings(
+    "ignore:.*binned automatically:UserWarning"
+)  # the pan speeds vary; only roll-ups are compared
+def test_ego_mask_matches_ego_stats():
+    from tests.embeddings.test_embeddings import MockDataset
+    from tests.metadata.test_structurers import _FrameTracks, _MOTTarget
+
+    streams = [hud_pan(8, 8, seed=s) for s in range(3)]
+    ds = MockDataset(streams, [_MOTTarget([_FrameTracks([0]) for _ in s]) for s in streams], None)
+    md = Metadata(ds)
+    md.add_factors(cast("Any", ego_stats(ds, mask=DENSE)), level="unit", key="unit_index")
+    with use_max_processes(2):  # the mask goes through the threaded runner
+        ours = video_stats(ds, stats=VideoStats.EGO, ego_mask=DENSE)["stats"]
+    rows = md.rows_at("sequence")
+    assert set(ours) == EXPECTED
+    for name in EXPECTED - {"motion_mode"}:
+        np.testing.assert_array_equal(ours[name], np.asarray(rows[name].to_list(), dtype=float), err_msg=name)
+    assert ours["motion_mode"].tolist() == rows["motion_mode"].to_list()
+
+
+def test_ego_mask_is_ignored_without_ego_flags():
+    video_stats(cast(Any, [panning_stream(n_frames=3)]), stats=VideoStats.DESCRIPTIVE, ego_mask=np.ones((3, 4, 4)))
 
 
 def test_ego_equals_the_metadata_roll_up_across_trusted_ambiguous_and_empty_videos():

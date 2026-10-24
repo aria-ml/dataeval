@@ -24,7 +24,7 @@ from dataeval.core._compute_stats import AddressedResult, _produced_stat_names, 
 from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
 from dataeval.core._video_runner import CLOCK, VideoClock, VideoOptions, run_videos, walk
 from dataeval.flags import VideoStats
-from dataeval.protocols import MultiobjectTrackingDataset, ProgressCallback, VideoStream
+from dataeval.protocols import ArrayLike, MultiobjectTrackingDataset, ProgressCallback, VideoStream
 from dataeval.types import Aggregator, SourceIndex
 
 _logger = get_logger(__name__)
@@ -140,6 +140,7 @@ def video_stats(
     redundancy_radius: int = DEFAULT_REDUNDANCY_RADIUS,
     ego_gap: int = 1,
     ego_proc_short_side: int = 360,
+    ego_mask: ArrayLike | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> AddressedResult:
     """
@@ -166,6 +167,14 @@ def video_stats(
     ego_proc_short_side : int, default 360
         Short side, in pixels, frames are downscaled to before the `EGO` optical flow, as
         ``proc_short_side`` in :func:`ego_stats`.
+    ego_mask : ArrayLike or None, default None
+        A 2D (height, width) image of a burned-in overlay such as a HUD, where nonzero marks the
+        overlay, as ``mask`` in :func:`ego_stats`. The `EGO` statistics read the camera from the rest
+        of the frame. Without it, a dense overlay can read a pan as slower or still, and a light one
+        gets pans refused, which skews the `EGO` summaries or leaves them NaN. A mask also drops
+        samples within 32 px of the overlay, at `ego_proc_short_side`, and movers are judged against
+        what is left, so one covering about a fifth of the frame can be read as the camera. Ignored
+        unless `stats` selects an `EGO` statistic.
     progress_callback : ProgressCallback or None, default None
         Called once per finished video with the count so far and the total.
 
@@ -185,7 +194,7 @@ def video_stats(
     ValueError
         If `redundancy_radius` is negative, or if `stats` selects an `EGO` statistic and
         `ego_gap` or `ego_proc_short_side` is not positive or `ego_proc_short_side` is under
-        32 px.
+        32 px, or if `ego_mask` is not a 2D image or does not fit the frames (see :func:`ego_stats`).
 
     Warns
     -----
@@ -253,6 +262,7 @@ def video_stats(
         redundancy_radius=redundancy_radius,
         ego_gap=ego_gap,
         ego_proc_short_side=ego_proc_short_side,
+        ego_mask=_ego_stats._as_mask(ego_mask, "ego_mask") if stats & VideoStats.EGO else None,
     )
     _check_options(stats, options)
     calculators = cast(_Plan, CalculatorRegistry.get_calculators(stats))

@@ -92,6 +92,7 @@ class VideoOptions(NamedTuple):
     ego_proc_short_side: int = 360
     ego_flow: Literal["dis", "lk"] = "dis"
     ego_grid_target: int = 40
+    ego_mask: NDArray[np.bool_] | None = None
 
 
 class FrameView:
