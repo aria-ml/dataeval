@@ -292,18 +292,15 @@ print(representation.dark_branches)
 # To measure variety you need a numeric representation of each image. Extract a feature vector per image with a
 # [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
 # Torchvision. Point a {class}`.TorchExtractor` at its penultimate `avgpool` layer (its learned features, not the
-# 1000-class logits) and run the dataset through {class}`.Embeddings`, which applies the model's standard
-# resize-and-normalize preprocessing for you. That yields a 512-dimensional feature per image.
+# 1000-class logits), give it the model's standard resize-and-normalize preprocessing as `transforms`, and run the
+# dataset through {class}`.Embeddings`. That yields a 512-dimensional feature per image.
 #
-# > For other ways to build embeddings, see
-# > [Encode images with an ONNX model](./h2_encode_with_onnx.py) (a framework-agnostic ONNX
-# > extractor) and [Embed object detection crops](./h2_embed_detection_crops.py) (one embedding per
-# > object box).
+# For other ways to build embeddings, see [How to create embeddings](./h2_encode_with_onnx.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
-extractor = TorchExtractor(resnet, ResNet18_Weights.DEFAULT.transforms(), layer_name="avgpool")
-features = np.asarray(Embeddings(dataset=dataset, extractor=extractor, batch_size=64)[:])
+extractor = TorchExtractor(resnet, transforms=ResNet18_Weights.DEFAULT.transforms(), layer_name="avgpool")
+features = np.asarray(Embeddings(dataset, extractor=extractor, batch_size=64))
 print("feature shape:", features.shape)
 
 # %% [markdown]

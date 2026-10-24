@@ -136,12 +136,10 @@ print(f"Image shape: {dataset[0][0].shape}")
 # Reduce each image to a compact 128-dimensional embedding with a
 # [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
 # Torchvision: replace its 1000-class head with a fresh {class}`~torch.nn.Linear` layer that projects the network's 512
-# pooled features down to 128 dimensions, wrap it in a {class}`.TorchExtractor`, and run the dataset through
-# {class}`.Embeddings`, which applies the model's standard resize-and-normalize preprocessing for you.
+# pooled features down to 128 dimensions, wrap it in a {class}`.TorchExtractor` with the model's standard
+# resize-and-normalize preprocessing as `transforms`, and run the dataset through {class}`.Embeddings`.
 #
-# > For other ways to build embeddings, see [Encode images with an ONNX model](./h2_encode_with_onnx.py) (a
-# > framework-agnostic ONNX extractor) and [Embed object detection crops](./h2_embed_detection_crops.py) (one embedding
-# > per object box).
+# For other ways to build embeddings, see [How to create embeddings](./h2_encode_with_onnx.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)

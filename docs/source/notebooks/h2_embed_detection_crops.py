@@ -63,11 +63,12 @@ from maite_datasets.object_detection import VOCDetection
 from torchvision.models import ResNet18_Weights, resnet18
 
 from dataeval import Embeddings, Metadata
+from dataeval.config import set_device
 from dataeval.data import DetectionCrops, Filter, View
 from dataeval.extractors import TorchExtractor
 
-# Use the GPU if one is available, otherwise the CPU.
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Use the GPU if one is available, otherwise the CPU. Every extractor then runs on that device.
+set_device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Render the projection below as an interactive plotly figure.
 dep.set_default_backend("plotly")
@@ -138,10 +139,9 @@ resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
 extractor = TorchExtractor(
     resnet,
     transforms=ResNet18_Weights.DEFAULT.transforms(),
-    device=device,
     layer_name="avgpool",  # capture the penultimate features, not the 1000-class logits
 )
-embeddings = np.asarray(Embeddings(dataset=crops, extractor=extractor, batch_size=64)[:])
+embeddings = np.asarray(Embeddings(crops, extractor=extractor, batch_size=64))
 print("embedding shape:", embeddings.shape)
 
 # %% [markdown]
