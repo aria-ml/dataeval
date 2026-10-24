@@ -76,7 +76,8 @@ class Embeddings(Array, FeatureExtractor):
         the global default. This is distinct from an extractor's own forward-pass
         (compute) batch size: an extractor with its own ``batch_size`` sub-batches
         each chunk for the model, so the smaller of the two bounds the forward
-        pass. Batching never changes the resulting embeddings.
+        pass. Batching does not change the resulting embeddings except for
+        differences in the last digits, which come from floating-point rounding.
     path : Path, str, or None, default None
         File path for memory-mapped storage. When None, caches embeddings in memory only.
         When Path or string is provided, uses memory-mapped storage for large embeddings
