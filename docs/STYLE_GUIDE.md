@@ -127,16 +127,34 @@ docs build and on tutorials of similar length. Review checks the structure.
 | Section | Level | Required | Content |
 | ------- | ----- | -------- | ------- |
 | Title | H1 | yes | `How to <verb> ...` |
-| `Problem statement` | H2 | yes | The problem and the tool that solves it, in one or two paragraphs |
-| `When to use` | H3 | yes | Two or three situations, as a list |
-| `What you will need` | H3 | yes | The prerequisites |
-| `Getting started` | H2 | yes | Imports and, if needed, configuration |
-| Working sections | H2 | yes | Named for the action, for example `Create embeddings with PyTorch` |
+| Lead | | yes | No heading. At most 120 words in up to three short blocks: the problem and the tool that solves it, with a link to its concept page; when to use it, as a sentence or a short list; and any requirement beyond `pip install dataeval` |
+| Working sections | H2 | yes | One per step, named for the action, for example `Create embeddings with PyTorch` |
 | `Next steps` | H2 | yes | See the Next steps section |
 
-A how-to has no `Introduction`, `Setup`, `Summary`, `What you learned`, `Key takeaways` or `Conclusion`. It ends with
-its Next steps. If a closing paragraph holds something the reader needs, move it into the section where the reader
-needs it.
+The hidden Colab cell and the imports cell follow the lead, with no heading above them. The lead replaces the
+`Problem statement`, `When to use`, `What you will need` and `Getting started` headings, so a how-to has none of them,
+and none named `Introduction`, `Setup`, `Summary`, `What you learned`, `Key takeaways` or `Conclusion`. It ends with its
+Next steps. If a closing paragraph holds something the reader needs, move it into the section where the reader needs it.
+
+Keep a how-to short (review):
+
+- Aim for 600 words or fewer of prose outside the Next steps list. Count the words of the markdown cells, without the
+  headings. The four models in this guide, `h2_cluster_analysis`, `h2_deduplicate`, `h2_measure_divergence` and
+  `h2_measure_label_independence`, run from 322 to 501 words.
+- Stay on the task. Leave out topics the task does not need, and keep tests out of the visible page. A check that the
+  result is right, such as a comparison of two paths or a proof that a number matches, goes in a hidden assertion cell
+  and not in a section.
+- Write a step as a short lead-in, the code, and at most two sentences on what to read in the output. The lead-in is at
+  most two sentences, or one short list when the step implements a contract. Use five steps or fewer. A how-to that
+  needs more is two how-tos.
+- Treat more than 80 lines of code as a prompt to check the scaffolding: a dataset, a model or a helper that the recipe
+  does not need. Hide it, as the code cell rules describe, or cut it. Do not cut the recipe's own cells.
+- Cut an explanation of why something works and link the tutorial or concept page that owns it. Cut a sentence that
+  repeats what a code line says or what an output just showed. Keep every limit, assumption and caveat.
+- A how-to that needs more than the budget because it carries two tasks or several alternative paths is two how-tos. A
+  how-to that has to teach a concept to be useful is a tutorial.
+
+No test checks the length yet, so review checks it.
 
 ## Write headings
 
@@ -169,7 +187,8 @@ documentation prose:
 
 Rules (review):
 
-- List two to four entries. Some older notebooks have more. Trim them when you edit those notebooks.
+- List two to four entries in a tutorial and two or three in a how-to. Some older notebooks have more. Trim them when
+  you edit those notebooks.
 - Include at most two concept pages and at most two notebooks.
 - Choose the concept page of the evaluator or topic the notebook is about. Add a second only when the notebook relies
   on a second distinct idea. Leave out general pages, such as Acting on Results or Data Integrity, unless they are the
@@ -179,7 +198,8 @@ Rules (review):
 - Leave out a link the body already makes for a side detail, such as an optional setting or an alternative way to do
   the step. Keep the topic's concept page and the natural next task even when the body links them. Leave out a link to
   a notebook about an unrelated evaluator and a link to a notebook that is going to be removed.
-- Use the exact title of the target page as the link text, and a one-sentence description.
+- Use the exact title of the target page as the link text, and a one-sentence description. A tutorial and a how-to use
+  the same form.
 
 ## Write the code cells
 
@@ -193,9 +213,14 @@ Rules (review):
 - Import from the public modules shown in the API reference. Never import from a module whose name starts with an
   underscore.
 - Keep notebooks self-contained so they run on Colab: no helper imported from the repository. Use `maite-datasets` or
-  a small synthetic dataset, and list what the reader needs under `What you will need`.
+  a small synthetic dataset, and list what the reader needs under `What you will need` in a tutorial or at the end of
+  the lead in a how-to.
 - Keep scaffolding short. The recipe is the point of a how-to. Label a model or dataset that stands in for the
   reader's own as a stand-in.
+- Hide scaffolding. Tag a cell that only builds a dataset or model for the example, and that the reader would replace
+  with their own, with `tags=["hide-input"]`. The page shows the cell collapsed under "Show code cell source", the cell
+  still runs, and the `.py` file and Colab show it in full. Do not hide a cell that is part of the recipe, and do not
+  hide a cell whose code the text refers to.
 - Comment only what is not obvious from the code, and keep the comment short.
 
 ### The Colab cell
@@ -227,6 +252,8 @@ The docs build executes a notebook whose code cells changed and fails if an asse
 (`nb_execution_raise_on_error`). Assert a threshold or a range for anything that varies between hardware or runs.
 Training results differ between CPU and GPU, and some statistics vary slightly between runs. When you merge, trim or
 delete a notebook, keep every assertion cell it had or replace it with an equivalent one.
+
+In a how-to, the visible sections show the task and the assertion cells hold the tests.
 
 ### Seeds, devices and output
 

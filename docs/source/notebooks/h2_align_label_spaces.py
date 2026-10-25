@@ -15,53 +15,18 @@
 
 # %% [markdown]
 # # How to align two label spaces
-
-# %% [markdown]
-# ## Problem statement
 #
-# Two datasets rarely name things the same way. One annotates `"motorbike"` where
-# another writes `"motorcycle"`; one has a single `"car"` class where another
-# distinguishes `"sedan"` from `"suv"`. Before annotations from different sources
-# can be compared, graded against one another, or combined, their labels must be
-# *related*: which concept here corresponds to which concept there, and **how**.
+# Two datasets rarely name things the same way. {func}`.label_alignment` relates each class of a source vocabulary to a
+# reference {class}`.Ontology` as equivalent, narrower or broader, and reports whether the source can be expressed in the
+# target without loss. See [Ontology](../concepts/Ontology.md).
 #
-# Establishing those correspondences is **ontology alignment**. DataEval performs
-# it with {func}`.label_alignment`, which maps a *source* vocabulary onto a *target*
-# (reference) {class}`.Ontology` and reports, for each source class, the typed
-# correspondence it found — and whether the source can be expressed in the target
-# without loss.
-
-# %% [markdown]
-# ### When to use
+# Use it when you have two label vocabularies and want to:
 #
-# Use this workflow when you have two label vocabularies and want to:
+# - find which source classes are equivalent, narrower or broader than a target class
+# - get a `class_remap` (`source -> target`) for your labels and a `mergeability` verdict
 #
-# - find which source classes are *equivalent* to a target class (a safe rename)
-# - find which are *narrower* (a fine source class that can be safely **coarsened**
-#   up to a more general target) or *broader* (a coarse source class that spans
-#   several finer target classes — a granularity mismatch)
-# - get a **class_remap** (`source -> target`) for carrying source labels into the
-#   target vocabulary, and a **mergeability** verdict on how completely that can be
-#   done
-#
-# Aligning a *structureless* source — a bare list of class names — against the
-# target is exactly label [reconciliation](./h2_reconcile_labels_ontology.py)
-# ({func}`.label_reconciliation`) plus structural inference; `label_alignment`
-# generalizes it.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A source vocabulary (a list of class names, or an {class}`.Ontology`).
-# 1. A target/reference {class}`.Ontology`.
-# 1. Nothing else for the exact/structural core — it has no extra dependencies. The
-#    optional fuzzy-matching recipe in section 4 uses `rapidfuzz`
-#    (`pip install rapidfuzz`).
-
-# %% [markdown]
-# ## Getting started
-#
-# First import the required libraries needed to set up the example.
+# You need a source vocabulary (a list of class names or an `Ontology`) and a target `Ontology`. The optional fuzzy matcher
+# needs `rapidfuzz`.
 
 # %% tags=["remove_cell"]
 try:
@@ -77,7 +42,7 @@ from dataeval import Ontology
 from dataeval.core import label_alignment
 
 # %% [markdown]
-# ## A reference vocabulary
+# ## Define a reference vocabulary
 #
 # Alignment maps a source onto a *target* — the reference vocabulary everything is
 # expressed in. Here is a small two-level reference taxonomy, built dependency-free
@@ -133,11 +98,11 @@ rec = label_reconciliation(["sedan", "truck", "spaceship"], reference)
 print("reconciliation matched:", dict(rec["matched"]))
 
 # %% [markdown]
-# ## Reasoning across granularity
+# ## Reason across granularity
 #
-# The point of carrying a *relation* on each correspondence is that the relation,
-# not just the pairing, says what the data permits. The asymmetry between coarsening
-# and splitting is the heart of it.
+# The *relation* on each correspondence, not just the pairing, says what the data
+# permits. [Ontology](../concepts/Ontology.md) explains the asymmetry between
+# coarsening and splitting.
 #
 # ### Source coarser than target → `broader` (a granularity mismatch)
 #
@@ -157,9 +122,8 @@ print("class_remap:", dict(coarse["class_remap"]), "| mergeability:", coarse["me
 # ### Source finer than target → `narrower` (safe coarsening)
 #
 # The reverse direction *is* safe: every sedan is a car, so a fine source class can
-# always be coarsened up to a more general target. When the source carries its own
-# hierarchy, `label_alignment` propagates an equivalence anchor down to its descendants. Here
-# the reference is coarse (`car` is a leaf) and the source is fine.
+# always be coarsened up to a more general target. Here the reference is coarse
+# (`car` is a leaf) and the source is fine.
 
 # %%
 coarse_reference = Ontology.from_hierarchy({"vehicle": {"car": None, "truck": None}})
@@ -177,18 +141,14 @@ print("class_remap:", dict(result["class_remap"]), "| mergeability:", result["me
 # injective.)
 
 # %% [markdown]
-# ## Bring your own matcher: fuzzy name matching
+# ## Add a fuzzy name matcher
 #
-# Exact matching anchors on labels, synonyms, and ids; typos and word-order
-# variants slip past it. The `matchers=` argument is the **extension seam**: any
-# object implementing the {class}`.Matcher` protocol can propose additional
-# correspondences for the source concepts the exact pass left unanchored.
-#
-# DataEval ships the protocol and the dependency-free engine, not specific matchers
-# — string similarity, embeddings, and instance overlap are different, tunable
-# strategies. Here is a compact fuzzy matcher built on
-# [`rapidfuzz`](https://github.com/rapidfuzz/RapidFuzz) (`pip install rapidfuzz`)
-# that you can adapt or swap out.
+# Exact matching anchors on labels, synonyms, and ids, so typos and word-order
+# variants slip past it. Pass any object that implements the {class}`.Matcher`
+# protocol to `matchers=` to propose more correspondences for the source concepts
+# the exact pass left unanchored. DataEval ships the protocol and the engine, not
+# specific matchers. This one uses [`rapidfuzz`](https://github.com/rapidfuzz/RapidFuzz);
+# adapt or replace it.
 
 # %%
 from collections.abc import Iterable
@@ -251,13 +211,12 @@ for c in fuzzy["correspondences"]:
 print("unaligned_source:", fuzzy["unaligned_source"])
 
 # %% [markdown]
-# A proposal below the acceptance threshold is **withheld** rather than guessed —
-# alignment favors precision over recall, leaving `"stop sign"` unaligned for
-# inspection. The same seam accepts an embedding- or instance-based matcher with no
-# change to `label_alignment`.
+# A proposal below the acceptance threshold is **withheld** rather than guessed, so
+# alignment favors precision over recall and leaves `"stop sign"` unaligned for
+# inspection.
 
 # %% [markdown]
-# ## Aligning more than two sources
+# ## Align more than two sources
 #
 # To relate *several* sources, align each one to a single shared **reference
 # (pivot)** vocabulary rather than every pair. Correspondences between sources are
@@ -278,5 +237,4 @@ for name, labels in sources.items():
 #
 # - [Ontology](../concepts/Ontology.md) — Learn about the taxonomic model, correspondences, relations, matchers, and mergeability.
 # - [Distribution Shift](../concepts/DistributionShift.md) — Understand distributional differences between sources that remain after label alignment.
-# - [Divergence](../concepts/Divergence.md) — Measure distribution differences across aligned dataset label spaces.
 # - [How to reconcile label spaces with an ontology](./h2_reconcile_labels_ontology.py) — Reconcile structureless label lists against a reference ontology.

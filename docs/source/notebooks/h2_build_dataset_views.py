@@ -15,39 +15,16 @@
 
 # %% [markdown]
 # # How to build dataset views with View and Operation
-
-# %% [markdown]
-# ## Problem statement
 #
-# Analysis rarely runs on a dataset exactly as it ships. You need a *curated* version of it:
-# only certain classes, a balanced class distribution, a capped size, a reproducible shuffle,
-# or labels rewritten into a shared vocabulary — often several of these at once.
+# Analysis rarely runs on a dataset exactly as it ships. {class}`.View` builds a curated version of it without copying: it
+# applies an ordered pipeline of {class}`.Operation` steps lazily and works anywhere a dataset does.
 #
-# Copying the data to do this is wasteful and loses provenance. {class}`.View` instead wraps a
-# dataset and applies an ordered pipeline of {class}`.Operation` steps **lazily**, producing a
-# new dataset-shaped object without modifying or duplicating the original.
-
-# %% [markdown]
-# ### When to use
+# Use a view when you need:
 #
-# Use a {class}`.View` whenever you need a subset or a rewritten version of a dataset:
-# building train/test splits, focusing an experiment on a few classes, balancing an
-# imbalanced dataset, capping a dataset for a quick run, or conforming labels before merging
-# datasets. A view is accepted anywhere a dataset is — pass it straight to
-# {class}`.Embeddings`, {class}`.Metadata`, or any evaluator.
-
-# %% [markdown]
-# ### What you will need
+# - only certain classes, a balanced distribution or a capped size
+# - a reproducible shuffle or labels rewritten into a shared vocabulary
 #
-# 1. Any dataset implementing {class}`~dataeval.protocols.AnnotatedDataset`.
-# 1. A Python environment with the following packages installed:
-#    - `dataeval`
-#    - `maite-datasets`
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries needed to set up a minimal working example
+# This guide uses MNIST; any {class}`~dataeval.protocols.AnnotatedDataset` works.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -69,10 +46,9 @@ from dataeval.data import Filter, Limit, Operation, Relabel, Shuffle, View
 set_seed(0)  # For reproducibility
 
 # %% [markdown]
-# ## A dataset to work with
+# ## Create a view
 #
-# We use the MNIST test split (10,000 handwritten digits). Any
-# {class}`~dataeval.protocols.AnnotatedDataset` works the same way.
+# We use the MNIST test split (10,000 handwritten digits).
 
 # %%
 mnist = MNIST("./data", image_set="test", download=True)
@@ -80,8 +56,6 @@ print("source dataset size:", len(mnist))
 print("source vocabulary:", mnist.metadata.get("index2label"))
 
 # %% [markdown]
-# ## The basics
-#
 # A {class}`.View` takes a dataset and a list of operations. It behaves like a dataset —
 # `len()`, indexing, and iteration all work — but nothing is copied, and the source is
 # untouched.
@@ -99,11 +73,23 @@ assert len(view) == 500
 assert len(mnist) == 10000
 
 # %% [markdown]
-# ## Order matters
+# The built-in operations:
+#
+# | operation | what it does |
+# | --- | --- |
+# | {class}`.Filter` | keep datums matching classes and/or a metadata-factor predicate, and drop the detections or tracks that do not match |
+# | {class}`.ClassBalance` | resample to a balanced class distribution, optionally to a target size |
+# | {class}`.Limit` | cap to the first *n* of the current selection |
+# | {class}`.Shuffle` | randomize order, optionally seeded |
+# | {class}`.Reverse` | reverse the current order |
+# | {class}`.Indices` | keep the given source indices |
+# | {class}`.Relabel` | rewrite labels into a target vocabulary, dropping out-of-vocabulary datums |
+
+# %% [markdown]
+# ## Order the operations
 #
 # Operations run **in the order you list them**, and each one sees the result of the previous.
-# This makes a pipeline read top-to-bottom, but it also means order is meaningful — the same
-# two operations in opposite orders answer different questions.
+# The same two operations in opposite orders answer different questions.
 
 # %%
 limit_then_filter = View(mnist, operations=[Limit(500), Filter(classes=[0, 1])])
@@ -131,7 +117,7 @@ assert len(windowed) == 10
 assert all(i < 2000 for i in windowed.resolve_indices())
 
 # %% [markdown]
-# ## Operations see the result of earlier operations
+# ### Operations see the result of earlier operations
 #
 # Operations that inspect the data read it *through* the operations before them. That means a
 # filter placed after a relabeling step matches against the **new** vocabulary, not the
@@ -168,13 +154,12 @@ assert source_digits(filter_first) == [0]
 assert len(relabel_first) > len(filter_first)
 
 # %% [markdown]
-# The same two operations in the opposite order give very different results. With `Relabel`
-# first, `Filter(classes=[0])` reads each datum *through* it, so class `0` means the **new**
-# vocabulary's `even` — every even digit is kept. With `Filter` first, class `0` still
-# means the source digit `zero`, so only zeros survive.
+# With `Relabel` first, class `0` means the **new** vocabulary's `even`, so every even digit
+# is kept. With `Filter` first, class `0` still means the source digit `zero`, so only zeros
+# survive.
 
 # %% [markdown]
-# ## Writing your own Operation
+# ## Write your own Operation
 #
 # Subclass {class}`.Operation` and implement `apply(view)`. Inside `apply` you have three
 # levers, and you may use any combination of them:
@@ -232,20 +217,7 @@ assert np.array_equal(np.asarray(custom[0][0]), 255 - np.asarray(mnist[0][0]))
 # access.
 
 # %% [markdown]
-# ## Built-in operations
-#
-# | operation | what it does |
-# | --- | --- |
-# | {class}`.Filter` | keep datums matching classes and/or a metadata-factor predicate, and drop the detections or tracks that do not match |
-# | {class}`.ClassBalance` | resample to a balanced class distribution, optionally to a target size |
-# | {class}`.Limit` | cap to the first *n* of the current selection |
-# | {class}`.Shuffle` | randomize order, optionally seeded |
-# | {class}`.Reverse` | reverse the current order |
-# | {class}`.Indices` | keep the given source indices |
-# | {class}`.Relabel` | rewrite labels into a target vocabulary, dropping out-of-vocabulary datums |
-
-# %% [markdown]
-# ## Tracking what a view did
+# ## Track what a view did
 #
 # A view records its own lineage, which is useful for reproducibility and for writing sidecar
 # metadata alongside derived datasets.
@@ -268,4 +240,3 @@ assert nested.root is mnist
 # - [Ontology](../concepts/Ontology.md) — Learn about taxonomic ontologies and label space mapping.
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand coverage and balance in dataset views.
 # - [How to conform and merge datasets with different label vocabularies](./h2_conform_and_merge_datasets.py) — Conform and merge datasets with disparate label vocabularies into a unified view.
-# - [How to align label spaces across datasets](./h2_align_label_spaces.py) — Establish typed correspondences between source and reference label spaces.
