@@ -18,12 +18,14 @@ def cd(rel_path: str):
 
 
 def download():
-    from maite_datasets.image_classification import CIFAR10, MNIST
+    from maite_datasets.image_classification import CIFAR10, MNIST, MilitaryVehicles
     from maite_datasets.object_detection import SeaDrone, VOCDetection
 
     with cd("notebooks"):
         CIFAR10(root="./data", download=True, image_set="test")
         MNIST(root="./data", download=True, image_set="train", corruption="translate")
+        MilitaryVehicles(root="./data", download=True, image_set="train")
+        MilitaryVehicles(root="./data", download=True, image_set="test")
         SeaDrone(root="./data", download=True, image_set="val")
         VOCDetection(root="./data", download=True, image_set="train", year="2012")
         VOCDetection(root="./data", download=True, image_set="val", year="2012")
