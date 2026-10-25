@@ -296,4 +296,4 @@ print(f"weather over detections: clear={detection_rows.count('clear')}, rainy={d
 # - [Acting on Results](../concepts/ActingOnResults.md) — Understand strategies for handling biased or imbalanced data factors.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Identify bias and correlations across dataset factor levels.
 # - [How to apply DataEval's statistical outputs to Metadata](./h2_add_intrinsic_factors.py) — Augment dataset metadata with calculated statistical factors.
-# - [How to wrap a DataFrame-backed object detection dataset](./h2_wrap_dataframe_od_dataset.py) — Wrap custom DataFrame object detection datasets for DataEval.
+# - [How to wrap a DataFrame as a dataset](./h2_wrap_dataframe_dataset.py) — Wrap a pandas DataFrame catalog as a classification or detection dataset, with optional lazy image loading.

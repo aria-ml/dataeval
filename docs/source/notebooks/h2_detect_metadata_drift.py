@@ -56,7 +56,8 @@ pl.Config.set_tbl_rows(20)
 # ## Split the dataset into two campaigns
 #
 # Pass `lazy=True` so that images decode only when requested. See
-# [How to delay image loading until needed](./h2_lazy_load_images.py). The flight telemetry includes altitude, gimbal
+# the [Defer image decoding](./h2_wrap_dataframe_dataset.py#defer-image-decoding) step of how to wrap a DataFrame as a dataset.
+# The flight telemetry includes altitude, gimbal
 # orientation and airframe type.
 
 # %%
