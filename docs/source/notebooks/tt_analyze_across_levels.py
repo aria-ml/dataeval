@@ -262,7 +262,7 @@ class Sparse:
     def __getitem__(self, index):
         count = self.counts[index]
         target = BoxTarget(np.tile([[0.0, 0.0, 10.0, 10.0]], (count, 1)), np.arange(count) % 2, np.ones(count))
-        return np.zeros((3, 8, 8), np.uint8), target, DatumMetadata(id=index, altitude_m=float(100 * index))
+        return np.zeros((3, 8, 8), np.uint8), target, DatumMetadata(id=index, **{"altitude_m": float(100 * index)})
 
 
 sparse = Metadata(Sparse(), auto_bin_method="uniform_count")
