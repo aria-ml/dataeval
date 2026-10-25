@@ -15,35 +15,17 @@
 
 # %% [markdown]
 # # How to embed object detection crops and visualize class clusters
-
-# %% [markdown]
-# ## Problem statement
 #
-# DataEval's embedding-based tools — {class}`.Coverage`, {func}`.ber_mst`,
-# {class}`.Balance` — assume **one embedding per label**, which is the image-classification
-# shape. An object detection image holds *many* objects of *different* classes, so a single
-# whole-image embedding cannot be colored by one class, and these tools do not consume it
-# directly.
+# DataEval's embedding-based tools, {class}`.Coverage`, {func}`.ber_mst` and {class}`.Balance`, assume one embedding per label,
+# the image-classification shape. An object detection image holds many objects of different classes, so one whole-image
+# embedding cannot be colored by one class. {class}`.DetectionCrops` presents the ground-truth boxes as an
+# image-classification dataset, one crop per detection, so every per-(image, label) tool works on it unchanged. See
+# [Performance Limits](../concepts/PerformanceLimits.md).
 #
-# This guide shows the bridge: {class}`.DetectionCrops` presents an object detection
-# dataset's ground-truth boxes *as* an image-classification dataset — one crop per
-# detection, labeled with the detection's class — so every per-(image, label) tool works on
-# it unchanged. You'll extract an embedding for each object crop from PASCAL VOC and project
-# them to 2D to *see* how the classes cluster in embedding space. This is the same
-# bounding-box-classification view behind detection feasibility (see
-# [Performance Limits](../concepts/PerformanceLimits.md)) and embedding-space coverage.
+# Use it when you want to embed the objects in a detection dataset, for example to see how the classes cluster in embedding
+# space.
 #
-# Estimated time to complete: 10 minutes
-#
-# ### What you will need
-#
-# - A Python environment with `dataeval`, `dataeval-plots`, `maite-datasets`, and
-#   `torchvision` installed.
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries needed to set up a minimal working example
+# You need `dataeval`, `dataeval-plots`, `maite-datasets` and `torchvision`.
 
 # %% tags=["remove_cell"]
 try:
@@ -185,6 +167,5 @@ assert set(np.unique(metadata.class_labels)).issubset(set(focus_indices))  # onl
 # ## Next steps
 #
 # - [Embeddings](../concepts/Embeddings.md) — Feature vectors extracted per crop for evaluation and analysis.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Measure feature space coverage and identify gaps across crop embeddings.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Embed, project, and reason about a dataset end to end.
 # - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Put crop embeddings through BER to bound achievable classification accuracy.

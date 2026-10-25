@@ -15,36 +15,14 @@
 
 # %% [markdown]
 # # How to measure dataset sufficiency for image classification
-
-# %% [markdown]
-# ## Problem statement
 #
-# For machine learning tasks, often we would like to evaluate the performance of a model on a small, preliminary dataset.
-# In situations where data collection is expensive, we would like to extrapolate hypothetical performance out to a larger
-# dataset.
+# When data collection is expensive, you can evaluate a model on a small, preliminary dataset and extrapolate its performance to
+# a larger one. {class}`.Sufficiency` trains your model on growing subsets of the data to build
+# [sufficiency](../concepts/PerformanceLimits.md#sufficiency--the-diminishing-returns-curve) curves, then projects them.
 #
-# DataEval has introduced a method projecting performance via
-# _[sufficiency](../concepts/PerformanceLimits.md#sufficiency--the-diminishing-returns-curve) curves_.
-
-# %% [markdown]
-# ### When to use
+# Use it when you want to know whether collecting more data is worthwhile.
 #
-# The {class}`.Sufficiency` class should be used when you would like to extrapolate hypothetical performance. For example,
-# if you have a small dataset, and would like to know if it is worthwhile to collect more data.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A particular model architecture.
-# 1. Metric(s) that we would like to evaluate.
-# 1. A dataset of interest.
-# 1. A Python environment with the following packages installed:
-#    - `tabulate`
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries needed to set up a minimal working example
+# You need a model architecture, the metrics you want to evaluate, a dataset and `tabulate`.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -107,7 +85,7 @@ dep.set_default_backend("plotly")
 pio.renderers.default = "notebook"
 
 # %% [markdown]
-# ## Load data and create model
+# ## Load the data and create the model
 #
 # Before calculating the sufficiency of a dataset, the dataset must be loaded and the model architecture defined. We will
 # walk through these in the following steps.
@@ -162,7 +140,7 @@ model: Net = cast(Net, torch.compile(Net().to(device)))
 
 
 # %% [markdown]
-# ## Strategy protocols
+# ## Define the strategies
 #
 # Training and evaluation functions are heavily dependent on the hyperparameters defined by a user. These can include
 # metrics, loss functions, optimizers, model architectures, input sizes, etc.
@@ -279,7 +257,7 @@ mnist_config = Sufficiency.Config(
 )
 
 # %% [markdown]
-# ## Initialize sufficiency metric
+# ## Evaluate sufficiency
 #
 # Attach the custom training and evaluation functions to the Sufficiency metric and define the number of models to train
 # in parallel (stability), as well as the number of steps along the learning curve to evaluate.
@@ -292,8 +270,6 @@ suff = Sufficiency(
 )
 
 # %% [markdown]
-# ## Evaluate sufficiency
-#
 # Now we can evaluate the metric to train the models and produce the learning curve.
 
 # %%
@@ -314,12 +290,10 @@ for plot in dep.plot(output, backend="plotly"):
     display(plot)
 
 # %% [markdown]
-# ## Results
-#
 # Using these learning curves, we can project performance under much larger datasets (with the same models).
 
 # %% [markdown]
-# ## Predicting sample requirements
+# ## Predict sample requirements
 #
 # We can also predict the amount of training samples required to achieve specific performance thresholds.
 #
@@ -337,11 +311,6 @@ output.inv_project([0.90, 0.93, 0.99])
 # %% [markdown]
 # ## Next steps
 #
-# ### Concepts
-#
 # - [Performance Limits](../concepts/PerformanceLimits.md) — Understand sufficiency curves and diminishing returns in dataset scaling.
-#
-# ### How-to guides
-#
 # - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Measure Bayes Error Rate to evaluate classification task difficulty.
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented regions in dataset feature space.
