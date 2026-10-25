@@ -326,9 +326,6 @@ assert not result_test.drifted
 # %% [markdown]
 # ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md) — Explore Distribution Shift.
 # - [Uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection) — Explore Uncertainty-based drift detection.
 # - [Detect drift with prediction uncertainty](./tt_detect_drift_with_uncertainty.py) — Monitor deployed object detectors for drift using prediction uncertainty.
-# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational data over time.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.
