@@ -164,7 +164,7 @@ export-merged-sbom:
   extends: .rules_tag_only
   image: docker:stable
   before_script:
-    - apk add --update jq curl
+    - apk add --quiet --update jq curl > /dev/null
   script:
     - >
       curl --header "Authorization: Bearer $PRIVATE_TOKEN"

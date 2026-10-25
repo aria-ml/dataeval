@@ -38,7 +38,7 @@ test:
   before_script:
     # The comprehensive lane runs the ffmpeg-marked tests, which build their synthetic
     # clips with ffmpeg/ffprobe (see tests/fixtures/videos.py).
-    - apt-get update && apt-get install -y --no-install-recommends ffmpeg
+    - apt-get update -qq && apt-get install -qq -y --no-install-recommends ffmpeg > /dev/null
     - uv tool install nox --with nox-uv
   script:
     - uvx nox -e test
