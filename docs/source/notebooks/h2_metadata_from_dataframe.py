@@ -256,4 +256,4 @@ print(od_balance.balance)
 #
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
-# - [How to wrap a DataFrame-backed image classification dataset](./h2_wrap_dataframe_ic_dataset.py) — Adapt tabular image classification catalogs into DataEval dataset formats.
+# - [How to wrap a DataFrame as a dataset](./h2_wrap_dataframe_dataset.py) — Wrap a pandas DataFrame catalog as a classification or detection dataset, with optional lazy image loading.

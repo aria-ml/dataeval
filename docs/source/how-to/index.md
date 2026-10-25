@@ -68,10 +68,8 @@ datasets for machine learning.
 ../notebooks/h2_bin_factors_by_level.py
 ../notebooks/h2_control_factor_binning.py
 ../notebooks/h2_detect_undersampling.py
-../notebooks/h2_wrap_dataframe_ic_dataset.py
-../notebooks/h2_wrap_dataframe_od_dataset.py
+../notebooks/h2_wrap_dataframe_dataset.py
 ../notebooks/h2_metadata_from_dataframe.py
-../notebooks/h2_lazy_load_images.py
 ../notebooks/h2_build_dataset_views.py
 ../notebooks/h2_place_transforms.py
 ../notebooks/h2_reconcile_labels_ontology.py
@@ -85,20 +83,15 @@ datasets for machine learning.
 :widths: 30 50 20
 :header-rows: 0
 
-- - [](../notebooks/h2_wrap_dataframe_ic_dataset.py)
-  - Wrap a pandas DataFrame catalog as a DataEval dataset
+- - [](../notebooks/h2_wrap_dataframe_dataset.py)
+  - Wrap a pandas DataFrame catalog of images or bounding boxes as a
+    DataEval dataset, and defer image decoding to speed up
+    metadata-only analysis
   - [![Open In Colab][colab-badge]][wdf-colab]
-- - [](../notebooks/h2_wrap_dataframe_od_dataset.py)
-  - Wrap a long-format DataFrame of bounding boxes as an
-    object detection dataset
-  - [![Open In Colab][colab-badge]][wdfod-colab]
 - - [](../notebooks/h2_metadata_from_dataframe.py)
   - Build a MetadataLike object from a DataFrame for bias
     analysis without loading images
   - [![Open In Colab][colab-badge]][mdf-colab]
-- - [](../notebooks/h2_lazy_load_images.py)
-  - Defer image decoding to speed up metadata-only analysis
-  - [![Open In Colab][colab-badge]][lazy-colab]
 - - [](../notebooks/h2_build_dataset_views.py)
   - Filter, balance, reorder, and relabel a dataset by composing
     a {class}`.View` from {class}`.Operation` steps
@@ -203,10 +196,8 @@ datasets for machine learning.
 [bin-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_bin_factors_by_level.ipynb
 [ctrl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_control_factor_binning.ipynb
 [cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_detect_undersampling.ipynb
-[wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_wrap_dataframe_ic_dataset.ipynb
-[wdfod-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_wrap_dataframe_od_dataset.ipynb
+[wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_wrap_dataframe_dataset.ipynb
 [mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_metadata_from_dataframe.ipynb
-[lazy-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_lazy_load_images.ipynb
 [view-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_build_dataset_views.ipynb
 [xfrm-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_place_transforms.ipynb
 [onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_reconcile_labels_ontology.ipynb
