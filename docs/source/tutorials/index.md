@@ -32,6 +32,7 @@ local checkout.
 ../notebooks/tt_assess_data_space.py
 ../notebooks/tt_identify_dataset_gaps.py
 ../notebooks/tt_identify_bias.py
+../notebooks/tt_analyze_by_custom_class_axis.py
 ../notebooks/tt_analyze_across_levels.py
 ../notebooks/tt_augmentation_duplicates.py
 ../notebooks/tt_compare_objects_to_surroundings.py
@@ -57,6 +58,11 @@ local checkout.
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
   - [![Open In Colab][colab-badge]][bias-colab]
+* - [](../notebooks/tt_analyze_by_custom_class_axis.py)
+  - Learn how to condition bias, diversity and splitting on a factor of your own with
+    {meth}`.Metadata.classed_by`, and how to tell whether a class or an environmental
+    condition drives an imbalance.
+  - [![Open In Colab][colab-badge]][axis-colab]
 * - [](../notebooks/tt_analyze_across_levels.py)
   - Learn why a per-image factor read from detection rows is weighted by
     detection count, and how to choose the population your question is about.
@@ -79,6 +85,7 @@ local checkout.
 [dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_assess_data_space.ipynb
 [gaps-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_identify_dataset_gaps.ipynb
 [bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_identify_bias.ipynb
+[axis-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_analyze_by_custom_class_axis.ipynb
 [levels-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_analyze_across_levels.ipynb
 [augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_augmentation_duplicates.ipynb
 [surr-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_compare_objects_to_surroundings.ipynb

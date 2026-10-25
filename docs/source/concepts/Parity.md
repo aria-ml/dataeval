@@ -1137,9 +1137,12 @@ In brief:
 
 ## See this in practice
 
+### Tutorials
+
+- [Analyze bias against a custom class axis](../notebooks/tt_analyze_by_custom_class_axis.py)
+
 ### How-to guides
 
-- [How to analyze bias against a custom class axis](../notebooks/h2_analyze_by_custom_class_axis.py)
 - [How to measure label independence](../notebooks/h2_measure_label_independence.py)
 
 ## References

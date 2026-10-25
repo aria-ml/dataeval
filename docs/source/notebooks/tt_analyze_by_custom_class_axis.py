@@ -15,10 +15,43 @@
 
 # %% [markdown]
 # (custom-class-axis)=
-# # How to analyze bias against a custom class axis
+# # Analyze bias against a custom class axis
+#
+# This tutorial shows you how to condition DataEval's bias evaluators on an environmental factor and not on the object classes. You
+# create a dataset in which class and weather are tangled together, then separate the two.
+#
+# Estimated time to complete: 15 minutes
+#
+# Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
+#
+# Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
+#
+# ## What you will do
+#
+# - Create a synthetic dataset in which class, weather and altitude are correlated
+# - Pivot the class axis to an environmental factor and evaluate `Balance` against it
+# - Disentangle class-level findings from correlated environmental conditions
+# - Evaluate factors at the image level and not the detection level
+# - Combine factors into a composite axis to find combinations that were never collected
+# - Test the observed combinations with `Parity` and `Diversity`
+# - Check which class axis a result used
+# - Stratify dataset splits across metadata conditions
+#
+# ## What you will learn
+#
+# - How a custom class axis changes what the class-conditional evaluators report
+# - How to tell whether a class or an environmental factor drives an imbalance
+# - How the image-level and detection-level views weight an image
+# - Which combinations of conditions the data never covers
+#
+# ## What you will need
+#
+# - A Python environment with `dataeval` installed
+# - No external data: this tutorial creates a synthetic dataset in memory
+#
 
 # %% [markdown]
-# ## Problem statement
+# ## Introduction
 #
 # DataEval evaluators — including {class}`.Balance`, {class}`.Diversity`,
 # {class}`.Parity`, {class}`.Coverage`, and {func}`.split_dataset` — condition
@@ -31,17 +64,6 @@
 # and all class-conditional evaluators condition on them instead. The dataset's
 # original class labels are retained as a factor named `class`.
 #
-# This guide shows you how to:
-#
-# - Pivot the class axis to an environmental factor to detect metadata imbalance.
-# - Disentangle class-level findings from correlated environmental conditions.
-# - Evaluate factors at the unit (image) level rather than the instance (detection) level.
-# - Combine multiple factors into a composite axis to identify uncollected data combinations.
-# - Stratify dataset splits across metadata conditions.
-
-# %% [markdown]
-# ### When to use
-#
 # You should use a custom class axis when:
 #
 # - You need to evaluate balance, diversity, or parity across environmental or operational conditions (such as weather, site, or sensor platform).
@@ -51,13 +73,7 @@
 # - You want to stratify dataset splits across operational metadata rather than class labels.
 
 # %% [markdown]
-# ### What you will need
-#
-# 1. A Python environment with `dataeval` installed.
-# 2. No external data; this guide creates a synthetic dataset in memory.
-
-# %% [markdown]
-# ## Getting started
+# ## Setup
 #
 # First, import the required libraries to set up the example.
 
@@ -398,9 +414,25 @@ print(f"stratified on: {splits.class_axis.name} ({splits.class_axis.source})")
 # Custom class axes persist across view operations ({meth}`.Metadata.at`, {meth}`.Metadata.where`, {meth}`.Metadata.having`, and {meth}`.Metadata.agg`). However, like filters and view transformations, custom class axes are not serialized by {meth}`.Metadata.save`.
 
 # %% [markdown]
+# ## Conclusion
+#
+# You created a dataset in which class, weather and altitude are correlated, and pivoted the class axis to weather. Against the weather
+# axis, you saw that the altitude imbalance the class view attributes to trucks follows the weather. You evaluated the factors per image,
+# listed the combinations of weather and altitude that the data never covers, tested the combinations that exist with `Parity`, checked
+# which axis a result used, and stratified a split on it.
+#
+
+# %% [markdown]
 # ## Next steps
 #
-# - [How to reason about factor binning across levels](./h2_bin_factors_by_level.py) — Understand how factor levels influence binning and fan-out.
 # - [How to control factor binning](./h2_control_factor_binning.py) — Declare explicit bin edges for consistent factor levels across collections.
 # - [How to detect undersampling](./h2_detect_undersampling.py) — Measure coverage across custom groups and classes.
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about mutual information, parity, and diversity metrics.
+
+# %% [markdown]
+# ## On your own
+#
+# To run the same analysis on your own dataset, build a `Metadata` for it that holds the environmental factors you suspect. Compare
+# `Balance().evaluate(metadata)` with `Balance().evaluate(metadata.classed_by("<factor>"))` for each suspect factor. Use
+# `metadata.at("unit")` when the factor is recorded per image and your dataset has several detections per image. Pass several factor
+# names to `classed_by` to list the combinations that your data never covers.
