@@ -251,24 +251,6 @@ print(repr(watercraft))
 print("ids:", sorted(watercraft.ids))
 
 # %% [markdown]
-# ## Summary
-#
-# - {meth}`.Ontology.from_hierarchy` builds a taxonomy from plain Python with no
-#   extra dependencies; {meth}`.Ontology.from_rdf` parses standards-based
-#   OWL/RDF/JSON-LD (with the `dataeval[ontology]` extra).
-# - {func}`.label_reconciliation` returns a {class}`.LabelReconciliationResult`
-#   reporting `matched` / `unmatched` / `ambiguous` classes plus hierarchy
-#   (`ancestor_paths`, `induced_edges`, `relations`) and flags truncated
-#   hierarchies via `external_ancestors`.
-# - The {class}`.Ontology` object supports graph queries (`ancestors`,
-#   `descendants`, `siblings`, `depth_of`, `subtree`, …) for exploration.
-#
-# Reconciliation here is exact (labels, synonyms, ids). Fuzzy and semantic
-# normalization of messy raw labels is planned future work — an `unmatched`
-# label means "not present in this ontology," and is the natural input to such a
-# normalization step.
-
-# %% [markdown]
 # ## Next steps
 #
 # - [Ontology](../concepts/Ontology.md) — Learn about ontologies, taxonomies, and label reconciliation concepts.

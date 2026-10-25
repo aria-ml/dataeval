@@ -292,49 +292,6 @@ print(f"                image ={units['unit_sharpness'].mean():.1f}")
 print(f"                back  ={units['unit_background_sharpness'].mean():.1f}")
 
 # %% [markdown]
-# ## Key takeaways
-#
-# From this analysis, we've learned:
-#
-# 1. **Custom Statistics Selection**: The {class}`.ImageStats` flags allow fine-grained control over which statistics to
-#    compute, optimizing performance by avoiding unnecessary calculations.
-#
-# 1. **Granular Analysis**: Using `per_image`, `per_target`, and `per_background`, we can analyze statistics over three
-#    different regions of the same dataset:
-#
-#    - Full images provide context about overall scene properties
-#    - Bounding boxes reveal properties of individual objects
-#    - Backgrounds describe the scene an object was captured in, with the objects removed
-#
-# 1. **Guarding the background**: `background_fraction` says how much of an image survived masking, and a background
-#    statistic should not be read without it. Hash and dimension statistics are not computed for the background at all.
-#
-# 1. **SourceIndex Tracking**: The {class}`.SourceIndex` objects allow us to precisely track which image and box
-#    each statistic corresponds to.
-#
-# 1. **Handing results to Metadata**: Passing a whole result to {meth}`.Metadata.add_factors` uses that tracking to place
-#    every value on the row it describes, turning one statistic into one factor per level.
-
-# %% [markdown]
-# ## Conclusion
-#
-# This notebook demonstrated how to use {func}`.image_stats` with custom {class}`.ImageStats` flags to perform flexible,
-# efficient analysis on object detection datasets, over whole images, individual boxes, and the background behind them.
-#
-# These techniques are valuable for:
-#
-# - Dataset quality assessment
-# - Identifying biases or artifacts
-# - Understanding object characteristics
-# - Separating a target's properties from those of the scene it sits in
-# - Optimizing preprocessing pipelines
-# - Detecting outliers or anomalies
-#
-# Once the factors are on the metadata, the question becomes which population you are analyzing them over — an object,
-# an image, or the scene behind it. [Analyze a dataset across its levels](./tt_analyze_across_levels.py) works that
-# through end to end on this same dataset.
-
-# %% [markdown]
 # ## Next steps
 #
 # - [Acting on Results](../concepts/ActingOnResults.md) — Learn strategies for addressing dataset issues identified during evaluation.

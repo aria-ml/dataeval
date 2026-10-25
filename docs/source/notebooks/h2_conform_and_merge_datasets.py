@@ -220,20 +220,6 @@ except ValueError as error:
     print("without conforming:", str(error).splitlines()[0])
 
 # %% [markdown]
-# ## Summary
-#
-# - A reference {class}`.Ontology` defines the shared target vocabulary.
-# - {func}`.label_alignment` relates each dataset's class *names* to that vocabulary
-#   (by name, so reordered indices don't matter); {class}`.View` with
-#   {class}`.Relabel` applies it — rewriting labels, resizing the label space, and
-#   dropping out-of-vocabulary classes.
-# - Once datasets share an `index2label`, {func}`.merge_datasets` combines them into
-#   one dataset; it refuses datasets whose vocabularies differ, so conforming is a
-#   prerequisite, not an afterthought.
-# - {class}`.View` is a general seam: `Relabel` is the first {class}`.Operation`, with
-#   metadata- and value-conforming operations to follow.
-
-# %% [markdown]
 # ## Next steps
 #
 # - [Ontology](../concepts/Ontology.md) — Explore the taxonomic model the reference is built on, correspondences, relations, and mergeability.

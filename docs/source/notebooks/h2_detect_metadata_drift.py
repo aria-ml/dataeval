@@ -354,29 +354,6 @@ for year in ("2020", "2021"):
 # tells you something about the collection that the first pass could not report at all.
 
 # %% [markdown]
-# ## What you learned
-#
-# 1. **You will use {class}`.Metadata` as a {class}`~dataeval.protocols.FeatureExtractor`**.
-#    Passing it as `extractor=` configures both the fit and predict stages of the detector.
-# 1. **You should fit on the reference and transform on the operational data**. This ensures
-#    both datasets are mapped to the same bins for a valid comparison.
-# 1. **You should choose the level deliberately**. Setting `view="unit"` avoids replicating
-#    telemetry factors across individual object detections.
-# 1. **You will map results to factor names**. Reusing the fitted extractor lets you resolve
-#    positional p-values to specific, named operational conditions.
-# 1. **You will separate real drift from data artifacts**. Investigating the raw underlying
-#    data is necessary to distinguish true changes from missing-data codes.
-# 1. **You should check why a factor was dropped before you accept it**. A column held back
-#    for mixing types or for naming its rows becomes a factor once you declare how to read
-#    it with {meth}`~.Metadata.repair`.
-# 1. **You should declare a repair before you compare two datasets**. Both sides must read
-#    the same factors in the same order, and declaring the reading up front is what makes
-#    them agree.
-# 1. **You should pick a period that a time split cannot explain away**. An absolute period
-#    separates two campaigns on its own; a recurring position such as `every="hour_of_day"`
-#    stays comparable across them.
-
-# %% [markdown]
 # ## Next steps
 #
 # - [How to control factor binning](./h2_control_factor_binning.py) — Declare bin edges for
