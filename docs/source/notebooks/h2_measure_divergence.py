@@ -149,16 +149,8 @@ assert div["divergence"] > 0.95
 #
 # - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional space.
 # - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across datasets.
-# - [Clustering](../concepts/Clustering.md) — Explore cluster structure and density analysis in feature space.
 #
 # ### Tutorials
 #
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and operational data.
-# - [Identify out-of-distribution samples](./tt_identify_ood_samples.py) — Find anomalous or out-of-distribution samples using feature embeddings.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Analyze unlabeled image collections using clustering and divergence metrics.
-#
-# ### How-to guides
-#
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented regions in dataset feature space.
-# - [How to run clustering analysis](./h2_cluster_analysis.py) — Perform k-means or MST clustering on extracted embeddings.

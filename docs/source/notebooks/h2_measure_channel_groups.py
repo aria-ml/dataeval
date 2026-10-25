@@ -420,16 +420,9 @@ print(sorted(per_group))
 # ### Concepts
 #
 # - [Image Statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across channels.
-# - [Data Integrity](../concepts/DataIntegrity.md) — Learn how data integrity checks identify quality issues in dataset channels.
 # - [Metadata Levels](../concepts/MetadataLevels.md) — Explore dataset, datum, and factor levels in DataEval metadata.
-#
-# ### Tutorials
-#
-# - [Compare objects to their surroundings](./tt_compare_objects_to_surroundings.py) — Measure visual context and object contrast against surrounding pixels.
-# - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Evaluate datasets across instance, item, and dataset levels.
 #
 # ### How-to guides
 #
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Compute custom bounding box and image statistics for object detection tasks.
-# - [How to build dataset views](./h2_build_dataset_views.py) — Filter and transform dataset subsets using View and operations.
 # - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Add domain-specific intrinsic factors to Metadata for deeper analysis.

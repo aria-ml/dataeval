@@ -185,12 +185,6 @@ assert set(np.unique(metadata.class_labels)).issubset(set(focus_indices))  # onl
 # ## Next steps
 #
 # - [Embeddings](../concepts/Embeddings.md) — Feature vectors extracted per crop for evaluation and analysis.
-# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand classification feasibility and bounding detection performance.
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Measure feature space coverage and identify gaps across crop embeddings.
-# - [Clustering](../concepts/Clustering.md) — Learn how DataEval groups embeddings to surface data structure.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Embed, project, and reason about a dataset end to end.
 # - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Put crop embeddings through BER to bound achievable classification accuracy.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find classes or regions thin on coverage in embedding space.
-# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster crop embeddings to surface outliers and sub-groupings.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Compute custom bounding box and object statistics.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.

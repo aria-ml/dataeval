@@ -255,18 +255,6 @@ assert (wonky / 20) > 0.4
 # ## Next steps
 #
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias, representation, and coverage geometry.
-# - [Embeddings](../concepts/Embeddings.md) — Understand vector embeddings and feature representations.
-# - [Clustering](../concepts/Clustering.md) — Explore clustering techniques for grouping similar data points.
 # - [Acting on Results](../concepts/ActingOnResults.md) — Recommendations for addressing coverage gaps and dataset issues.
-# - [Data Integrity](../concepts/DataIntegrity.md) — Overview of data quality and integrity checks.
-# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand theoretical performance boundaries based on data coverage.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover structure, clusters, and coverage in unlabeled datasets.
-# - [Clean a dataset](./tt_clean_dataset.py) — Detect duplicates, outliers, and corrupted samples in datasets.
-# - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find augmented image pairs using duplicate detection.
-# - [Identify bias and correlations](./tt_identify_bias.py) — Measure dataset bias, factor correlations, and class imbalances.
-# - [How to run clustering analysis](./h2_cluster_analysis.py) — Apply clustering algorithms to identify groupings in embedded data.
 # - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Calculate custom metrics for bounding boxes and object annotations.
-# - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py) — Plot and inspect dataset anomalies and cleaning flags.
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Extract and attach intrinsic image properties to dataset metadata.
-# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Set default configuration options for DataEval execution.
