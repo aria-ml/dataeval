@@ -1088,8 +1088,10 @@ which caveats attach to each evaluator — see
 - [How to control and reuse a factor's binning](../notebooks/h2_control_factor_binning.py)
   — declaring the cuts you mean, ratifying the ones you do not, and carrying the
   whole map to the next collection so two results are comparable.
-- [How to bin factors by level](../notebooks/h2_bin_factors_by_level.py) — a worked
-  example of binning at a factor's own level, with the numbers that show why the
-  alternative distorts.
 - [How to configure logging](../notebooks/h2_configure_logging.py) — surfacing the
   auto-binning warnings the default silences.
+
+### Tutorials
+
+- [Analyze a dataset across its levels](../notebooks/tt_analyze_across_levels.py#binning-follows-the-level)
+  — binning at a factor's own level, checked on an aerial detection dataset.
