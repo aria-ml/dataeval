@@ -86,9 +86,10 @@ and the [identify bias tutorial](../notebooks/tt_identify_bias.py).
 
 ### Does my dataset cover the range of conditions the model will encounter in deployment?
 
-Use {func}`.coverage_naive` or {func}`.coverage_adaptive` to identify gaps in the feature space and
-{func}`.completeness` to measure how effectively the dataset spans available
-embedding dimensions.
+Use {class}`.Coverage` to find the samples that sit in under-sampled regions of the embedding space and
+the classes with the least variety. It needs a class label for each embedding. For embeddings without labels,
+{func}`.coverage_naive` and {func}`.coverage_adaptive` return the same under-sampled samples. Use
+{func}`.completeness` to measure how effectively the dataset spans available embedding dimensions.
 See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md).
 
 ### Are my training and test splits drawn from the same distribution?
@@ -142,7 +143,7 @@ improve coverage and generalization.
 ### Should I collect more data, or is my current dataset already saturated?
 
 Run {class}`.Sufficiency` first to assess the learning curve trajectory. If
-the curve has flattened, also run {func}`.coverage_naive` or {func}`.coverage_adaptive` and
+the curve has flattened, also run {class}`.Coverage` and
 {func}`.completeness` to determine whether gaps in the feature space — rather than
 total sample count — are the binding constraint.
 

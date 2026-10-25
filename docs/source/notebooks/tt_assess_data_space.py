@@ -319,6 +319,19 @@ cov = coverage_adaptive(embeddings, 50, 0.01, force_unit_interval=True)
 print(f"Number of uncovered images: {len(cov['uncovered_indices'])}")
 
 # %% [markdown]
+# This tutorial has no labels, so it calls the function directly. When you have a class label for each embedding,
+# {class}`.Coverage` finds the same under-sampled images and adds a breakdown of how varied each class is.
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+from dataeval.scope import Coverage
+
+labeled = Coverage(num_observations=50, percent=0.01).evaluate(
+    np.zeros(len(embeddings), dtype=int), embeddings=embeddings
+)
+assert np.array_equal(np.sort(labeled.uncovered_indices), np.sort(cov["uncovered_indices"]))
+
+# %% [markdown]
 # You can plot a few images using the same function as before.
 
 # %%
