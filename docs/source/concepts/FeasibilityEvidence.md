@@ -4,11 +4,11 @@ A determination of {class}`.Feasibility` cites the evidence items behind it in `
 names the theorems it rests on. This page describes the evidence in `FeasibilityOutput.evidence`: the spine that every
 item shares, and then each evidence kind, with what it bounds, its information scope, its `basis`, its `details` keys
 and how it spends its share of the error budget. For the determinations, scopes and recommendations themselves, see
-[Feasibility](PerformanceLimits.md#feasibility--determinations-with-evidence).
+[Feasibility](PerformanceLimits.md#feasibility-determinations-with-evidence).
 
 To read a result, start with `print(result)`: a header that states the judged scope and the call's joint confidence,
 then a table with one row per requirement (its determination, the deciding lower confidence bound and the deciding upper
-confidence bound, each with its source), then *Next*, the plain action for each undecided requirement, and *Notes*,
+confidence bound, each with its source), then "Next", the plain action for each undecided requirement, and "Notes",
 which give the observed scores, ceilings narrower than the judged scope and conflicts. A recall requirement shows both
 of its witness's bounds in its lower-bound cell. `result.aggregate_by_evidence()` lays out every bound of the call as
 one table, one row per evidence item, target and bounded quantity, with a readable source name (such as "your model" or
@@ -64,7 +64,7 @@ An {class}`.Endpoint` is one bound on one target:
 | Field | Meaning |
 | --- | --- |
 | `target_spec` | The target's canonical, versioned JSON, the same string as the `target_spec` column of `determinations`. |
-| `value` | The endpoint, on the metric's scale; null exactly when the endpoint is unavailable. |
+| `value` | The endpoint, on the metric's scale; null when the endpoint is unavailable. |
 | `direction` | `"upper"` for a ceiling and for a false-positive-rate endpoint, `"lower"` for a witness's metric endpoint. |
 | `alpha` | The claim's share of the call's error budget that this endpoint spends. A witness on a recall target spends half of its claim's share on each of its two endpoints. |
 | `quantity` | What the endpoint bounds: `"metric"` (the target's metric; recall for a recall target) or `"false_positive_rate"` (the false-positive rate a recall target limits). Only a witness has a false-positive-rate endpoint, and it is always an upper endpoint. |
@@ -73,12 +73,12 @@ An {class}`.Endpoint` is one bound on one target:
 
 The three states are kept distinct:
 
-- **unavailable**: no endpoint could be computed, for example too few units, no complete panel, or a missing
+- `unavailable`: no endpoint could be computed, for example too few units, no complete panel, or a missing
   `max_sequence_length`. The value is null and `reason` says why.
-- **uninformative**: computed and valid, but at the metric's trivial value: a ceiling at the maximum, 1 (reason
+- `uninformative`: computed and valid, but at the metric's trivial value: a ceiling at the maximum, 1 (reason
   `"a ceiling at the metric's maximum (1)"`), a witness at the minimum, 0, or a false-positive upper endpoint at 1
   (reason `"a false-positive bound at its maximum (1)"`). It says nothing about any threshold.
-- **informative**: valid and not trivial.
+- `informative`: valid and not trivial.
 
 ### Details shared by every kind
 
@@ -106,10 +106,10 @@ at least `1 - alpha`.
 
 ## `local_panel_ceiling/v1`
 
-**What it bounds.** An upper bound on the accuracy, the AP, or the recall at a false-positive limit, that a model in its
+This kind gives an upper bound on the accuracy, the AP, or the recall at a false-positive limit, that a model in its
 information scope can reach on the population. It needs only the dataset's own labels.
 
-**Construction.** Feasibility splits the units in half, keeping each group whole: a fit split and an audit split. It
+Feasibility splits the units in half, keeping each group whole: a fit split and an audit split. It
 fits a k-means partition of the representation, with `n_cells` cells, on the fit split only, so labels never enter the
 partition. Within each cell it draws random disjoint panels of `panel_size` (m) audit units; on grouped data it first
 draws one item per group, uniformly. The labels of a panel come from different images in one cell, so they are draws
@@ -128,35 +128,35 @@ for a cell without panels), $v$ is the largest value the consensus can take and 
 allowance (0 without one). $r_1$ covers the panels given the cells, and $r_2$ covers the cell shares; both are
 Hoeffding (1963) steps, valid for independent terms that are not identically distributed, and $\ell$ is floored at 0.
 
-- **Accuracy:** the 0-1 consensus value is $1 - \max_k N_k / m$, the share of a panel's labels outside its most common
+- Accuracy: the 0-1 consensus value is $1 - \max_k N_k / m$, the share of a panel's labels outside its most common
   class, with $v = 1 - \lceil m / M \rceil / m$ for $M$ classes. The ceiling is $1 - \max(0, \ell - \Gamma)$, with
   $\Gamma$ the information-loss allowance (0 without one).
-- **AP, per class:** the one-vs-rest consensus value is $\min(k/m, \lambda(1 - k/m))$, where $k$ counts the class's
+- AP, per class: the one-vs-rest consensus value is $\min(k/m, \lambda(1 - k/m))$, where $k$ counts the class's
   labels in a panel and $\lambda$ is the cost of a false alarm relative to a missed positive. It is pooled as above at
   each positive cost where it changes slope, $\lambda = k/(m-k)$ for $k = 1, \dots, m - 1$ (at $m = 5$: 1/4, 2/3, 3/2
   and 4). Those risk lower bounds and an upper endpoint on the class's prevalence in the audit feed the
   Reid–Williamson (2011) risk-to-AP envelope, an upper bound on any scorer's population AP. Allowances are not applied
   to AP. Macro AP is the mean over every class index from 0 to the largest declared index, so a class absent from the
   data, or an index missing from a sparse `index2label`, still counts with its trivial endpoint.
-- **Recall, per class:** a recall target (a minimum recall $r_0$ for a class at a false-positive limit $f_0$) uses the
+- Recall, per class: a recall target (a minimum recall $r_0$ for a class at a false-positive limit $f_0$) uses the
   same one-vs-rest consensus values and risk lower bounds $\ell_j$ at the positive kink costs $\lambda_j$, with a
   two-sided interval $[\pi^-, \pi^+]$ on the class's prevalence in the audit. The ceiling $U_r$ bounds the recall any
   model that gives one answer per cell reaches at a false-positive rate of at most $f_0$:
   $U_r = \min_j \max_{\pi \in [\pi^-, \pi^+]} \left[1 - \lambda_j f_0 - (\ell_j - \lambda_j f_0)/\pi\right]$, each term
   clipped to $[0, 1]$ (a term whose maximum is unbounded, because $\ell_j < \lambda_j f_0$ and $\pi^- = 0$, is 1). The
   derivation and the three cases are in [Performance Limits](PerformanceLimits.md#recall-at-a-false-positive-limit).
-  The target is excluded exactly when $U_r < r_0$. Allowances are not applied to recall.
+  The target is excluded if and only if $U_r < r_0$. Allowances are not applied to recall.
 
-**Information scope.** Without allowances, the consensus bounds only models that give one fixed answer per cell, so the
-item is `partition_restricted`. On image data, `allowances={"beta": ...}` makes the accuracy endpoints
-`fixed_representation` and adding `"gamma"` makes them `full_input`; the item then splits into
+Its information scope depends on the allowances. Without allowances, the consensus bounds only models that give one
+fixed answer per cell, so the item is `partition_restricted`. On image data, `allowances={"beta": ...}` makes the
+accuracy endpoints `fixed_representation` and adding `"gamma"` makes them `full_input`; the item then splits into
 `local_panel_ceiling/v1:accuracy` at that scope and `local_panel_ceiling/v1:cost_weighted` (AP and recall) at
 `partition_restricted`, each present when the call has such targets. On grouped (video) data, local panels read single
 frames and stay `partition_restricted` whatever the allowances. β is a scalar, and it must be a justified bound: β = 0
 asserts that no model reading the representation beats one fixed answer per cell. A per-cell β is rejected, since the
 partition's cells are internal.
 
-**Basis** (the `basis` string):
+The `basis` string is:
 
 ```text
 DataEval's post-stratified pooling (C3) of DFE disjoint within-cell panels, proved in local_panel_bound's Notes with two
@@ -166,10 +166,10 @@ prevalence interval; prevalence: Clopper-Pearson (1934) exact binomial endpoints
 hybrid
 ```
 
-**Spine values.** `sample` is `"audit split"`, or `"audit split, one item drawn uniformly per group"` on grouped data.
+In the spine, `sample` is `"audit split"`, or `"audit split, one item drawn uniformly per group"` on grouped data.
 `provenance` is `{"route": "post-stratified local panels (C3)", "partition": "k-means fitted on the fit split"}`.
 
-**`details` keys**, besides the shared ones:
+Besides the shared keys, `details` holds:
 
 | Key | Contents |
 | --- | --- |
@@ -192,22 +192,22 @@ drop the cost 0, whose risk is trivially 0 and bounds nothing, so every entry ha
 `support` that is an effective constant: it reproduces $r_1 + r_2$, so the suggested minimum tracks this construction
 rather than a single Hoeffding step.
 
-**Error budget.** Accuracy: two Hoeffding steps, $\delta_w = \delta_b$ = half the claim's share. AP for one class: the
-share is split equally over the $m - 1$ positive costs and one prevalence upper endpoint (5 parts at $m = 5$), and each
-cost's pooling halves its part again. Macro AP: the share is first divided equally among the classes. Recall: the share
-is split equally over the $m - 1$ positive costs and two prevalence endpoints, lower and upper (6 parts at $m = 5$), and
-each cost's pooling halves its part again. The prevalence endpoints are exact binomial on ungrouped data (the panel
-units' 0/1 labels), hybrid on grouped data, where recall targets are refused anyway.
+The claim's share is spent as follows. Accuracy: two Hoeffding steps, $\delta_w = \delta_b$ = half the claim's share.
+AP for one class: the share is split equally over the $m - 1$ positive costs and one prevalence upper endpoint (5 parts
+at $m = 5$), and each cost's pooling halves its part again. Macro AP: the share is first divided equally among the
+classes. Recall: the share is split equally over the $m - 1$ positive costs and two prevalence endpoints, lower and
+upper (6 parts at $m = 5$), and each cost's pooling halves its part again. The prevalence endpoints are exact binomial
+on ungrouped data (the panel units' 0/1 labels), hybrid on grouped data, where recall targets are refused anyway.
 
-**Assumptions recorded:** the representation was fitted and selected independently of the audit units' labels
+It records these assumptions: the representation was fitted and selected independently of the audit units' labels
 (declared by you); β and Γ are user-supplied and assumed, not estimated; on grouped data, single-frame local panels stay
 `partition_restricted`.
 
-**Defaults.** `panel_size` 5 (at least 2 when you set it); `n_cells` 10 below 20,000 planned audit units, 30 below
+The defaults are `panel_size` 5 (at least 2 when you set it); `n_cells` 10 below 20,000 planned audit units, 30 below
 50,000, and 300 from 50,000. Both are provisional and recorded in `provisional_defaults` when you leave them unset.
 
-**Unavailable when** the fit split has fewer items than cells, the audit has fewer than 2 units, or no cell holds m
-audit units.
+An endpoint is unavailable when the fit split has fewer items than cells, the audit has fewer than 2 units, or no cell
+holds m audit units.
 
 ### Allowances
 
@@ -215,10 +215,10 @@ Without allowances, the local-panel accuracy ceiling bounds only models that giv
 data, an allowance extends it to a broader scope by asserting, in risk units, how much better a broader model can do.
 On grouped (video) data, local panels read single frames and stay `partition_restricted` whatever the allowances.
 
-- **β** (`allowances={"beta": ...}`) bounds how much a model reading the representation can improve on one fixed
+- β (`allowances={"beta": ...}`) bounds how much a model reading the representation can improve on one fixed
   answer per cell. With it, the ceiling covers `fixed_representation`. β = 0 asserts that no model reading the
   representation beats one fixed answer per cell.
-- **Γ** (`"gamma"`, given with β) bounds how much reading the full input can lower the best risk below what the
+- Γ (`"gamma"`, given with β) bounds how much reading the full input can lower the best risk below what the
   representation allows. With both, the ceiling covers `full_input`. Γ = 0 asserts that reading the full input cannot
   lower it at all.
 
@@ -230,10 +230,10 @@ one, repeated labels (`replica_ceiling/v1`, below) give a `full_input` ceiling t
 
 ## `replica_ceiling/v1`
 
-**What it bounds.** An upper bound on the accuracy, the AP, or the recall at a false-positive limit, that any model
+This kind gives an upper bound on the accuracy, the AP, or the recall at a false-positive limit, that any model
 reading the full input can reach on the population, against one label drawn under the annotation protocol.
 
-**Construction.** `replicas=` maps datum ids to extra, independent class labels of those items. Each such item's panel
+`replicas=` maps datum ids to extra, independent class labels of those items. Each such item's panel
 is its primary label plus its replicas, so $m_i = 1 + r_i$; items without replicas are not used. Because a panel holds
 labels of one input, its consensus value lower-bounds the error of the best answer to that input, whatever the model
 reads (the DFE consensus inequality). The accuracy ceiling is one minus a lower endpoint on the mean consensus value. AP
@@ -244,9 +244,9 @@ risk lower bounds with a two-sided interval on the class's prevalence, and repor
 (`sequence_mean`) or total (`frame_pooled`) as its observation; a `frame_pooled` accuracy is a ratio of per-group totals
 bounded with simultaneous numerator and denominator endpoints, whose support is the declared `max_sequence_length`.
 
-**Information scope.** `full_input`.
+Its information scope is `full_input`.
 
-**Basis:**
+The `basis` string is:
 
 ```text
 DFE replicated consensus (consensus inequality); Hoeffding (1963) and Maurer-Pontil (2009, Theorem 4) hybrid endpoints;
@@ -255,10 +255,10 @@ Reid-Williamson (2011) risk-to-AP envelope (DFE operating-point inequalities); r
 operating-point inequalities over a two-sided prevalence interval
 ```
 
-**Spine values.** `sample` is `"<n> items with replicas"`. `provenance` is
+In the spine, `sample` is `"<n> items with replicas"`. `provenance` is
 `{"route": "replicated consensus", "replicas": "replicas= sidecar plus the primary label"}`.
 
-**`details` keys**, besides the shared ones: `replica_items`, the positions of the items with replicas, and
+Besides the shared keys, `details` holds `replica_items`, the positions of the items with replicas, and
 `cost_grid`, as for local panels.
 `details["results"]` holds, per accuracy target, the {func}`.mean_endpoint` result on the consensus loss (`n`, `mean`,
 `variance`, `radius_hoeffding`, `radius_bernstein`, `endpoint`, `method`, `side`, `support`, `delta`) plus `deltas`;
@@ -267,17 +267,18 @@ for `frame_pooled`, `ratio_endpoint`, `num_support`, `den_support` and `deltas`.
 and `risk_lower` keep), `mu_upper` and `deltas`. Per recall target it holds `value` ($U_r$), `costs` and `risk_lower`
 (positive costs only, the cost 0 dropped), `risk_results`, `pi_lower`, `pi_upper` and `deltas`.
 
-**Error budget.** Accuracy: one hybrid endpoint at the claim's share. The hybrid method computes a Hoeffding radius and
-an empirical Bernstein radius, each at half that share, and uses the smaller. When the items' panel sizes differ, their
-consensus values are not identically distributed, so every replica endpoint uses Hoeffding alone, at the full share;
-Hoeffding needs only independent observations with a common support. `method` in `details["endpoints"]` and in the raw
-results records which. A `frame_pooled` ratio spends half on the numerator and half on the denominator. AP for one
-class: the share is split equally over the positive costs and one prevalence upper endpoint; macro AP first divides it
-among the classes. Recall: the share is split equally over the positive costs and two prevalence endpoints (lower and
-upper). A label share is not a Bernoulli trial, so these endpoints use the same method as the item's other replica
-endpoints (hybrid, or Hoeffding alone when panel sizes differ), never exact binomial.
+The claim's share is spent as follows. Accuracy: one hybrid endpoint at the claim's share. The hybrid method computes a
+Hoeffding radius and an empirical Bernstein radius, each at half that share, and uses the smaller. When the items'
+panel sizes differ, their consensus values are not identically distributed, so every replica endpoint uses Hoeffding
+alone, at the full share; Hoeffding needs only independent observations with a common support. `method` in
+`details["endpoints"]` and in the raw results records which. A `frame_pooled` ratio spends half on the numerator and
+half on the denominator. AP for one class: the share is split equally over the positive costs and one prevalence upper
+endpoint; macro AP first divides it among the classes. Recall: the share is split equally over the positive costs and
+two prevalence endpoints (lower and upper). A label share is not a Bernoulli trial, so these endpoints use the same
+method as the item's other replica endpoints (hybrid, or Hoeffding alone when panel sizes differ), never exact
+binomial.
 
-**Assumptions recorded:**
+It records these assumptions:
 
 - Items with replicas are a random sample of the population, so the ceiling describes the population, not only those
   items.
@@ -295,10 +296,10 @@ endpoints (hybrid, or Hoeffding alone when panel sizes differ), never exact bino
 Two items of this kind run by default (`builtin_witnesses=True`): `builtin_witness/v1:knn`, a 5-nearest-neighbor
 classifier, and `builtin_witness/v1:probe`, a logistic-regression probe.
 
-**What it bounds.** A lower bound on the accuracy, or the AP, that the frozen model reaches on the population, and, for
+This kind gives a lower bound on the accuracy, or the AP, that the frozen model reaches on the population, and, for
 a recall target, a lower bound on its recall together with an upper bound on its false-positive rate.
 
-**Construction.** Each model is fitted on the fit split's representation and labels only, then frozen and scored once on
+Each model is fitted on the fit split's representation and labels only, then frozen and scored once on
 the audit split. Accuracy uses each unit's correctness (a group's mean or total on grouped data). A recall target for
 class $c$ uses the model's top class as its decision: a lower endpoint on the share of decisions $c$ among the audit
 items labeled $c$ (recall), and an upper endpoint on the share among the other audit items (false-positive rate), each
@@ -309,10 +310,10 @@ At each threshold a lower endpoint on true positives and an upper endpoint on fa
 the prevalence, give a staircase that lies under the model's precision-recall curve (Davis and Goadrich, 2006). On
 ungrouped data all of these AP endpoints are exact binomial.
 
-**Information scope.** `fixed_representation`: the models read only the representation. They are eligible to
+Its information scope is `fixed_representation`: the models read only the representation. They are eligible to
 demonstrate `fixed_representation` and `full_input` targets.
 
-**Basis** (shared with `user_witness/v1`):
+The `basis` string is shared with `user_witness/v1`:
 
 ```text
 Frozen witness scored once on the audit; Clopper-Pearson (1934) exact binomial endpoints on ungrouped Bernoulli trials,
@@ -320,49 +321,50 @@ else Hoeffding (1963) and Maurer-Pontil (2009, Theorem 4) hybrid endpoints; fram
 with simultaneous numerator and denominator endpoints; AP via the DFE witness staircase (Davis-Goadrich 2006)
 ```
 
-**Spine values.** `sample` is `"audit split"`. `provenance` is `{"reads": "representation", "model": ..., "params":
+In the spine, `sample` is `"audit split"`. `provenance` is `{"reads": "representation", "model": ..., "params":
 ..., "fit": "fit split"}`, with the model's class name and its parameters.
 
-**`details["results"]`** holds, per accuracy target, the `mean_endpoint` result on per-unit correctness (the
+`details["results"]` holds, per accuracy target, the `mean_endpoint` result on per-unit correctness (the
 `binomial_endpoint` result on ungrouped data, with `method` `"exact_binomial"`) plus `deltas` (or the ratio form for
 `frame_pooled`). Per AP class it holds `value`, `thresholds`, `tp_lower`, `fp_upper`, `mu_upper` and `deltas`; a macro
 AP target holds `value`, `per_class` and `deltas`. Per recall target it holds the recall endpoint's `value`, `stats` and
 `population` (such as `audit items labeled 'Tank'`), a `false_positive_rate` entry of the same form for the other audit
 items, and `deltas`.
 
-**Error budget.** Accuracy: one endpoint at the claim's share: exact binomial on ungrouped data, else hybrid
-(Hoeffding and empirical Bernstein at half each). AP for one class with $T$ distinct thresholds: $2T + 1$ endpoints at
-an equal part each. Macro AP first divides the share among the classes. Recall: the recall and false-positive endpoints
-at half the claim's share each.
+The claim's share is spent as follows. Accuracy: one endpoint at the claim's share: exact binomial on ungrouped data,
+else hybrid (Hoeffding and empirical Bernstein at half each). AP for one class with $T$ distinct thresholds: $2T + 1$
+endpoints at an equal part each. Macro AP first divides the share among the classes. Recall: the recall and
+false-positive endpoints at half the claim's share each.
 
-**Assumptions recorded:** the representation was fitted and selected independently of the audit units' labels
+It records these assumptions: the representation was fitted and selected independently of the audit units' labels
 (declared by you); the model was fitted on the fit split only and frozen before the audit.
 
-**Unavailable when** a model cannot be fitted on the fit split or score the audit, for example with a single class in
-the fit split. A recall endpoint is unavailable when the audit holds no item of the class, and the false-positive
-endpoint when it holds no other item.
+An endpoint is unavailable when a model cannot be fitted on the fit split or score the audit, for example with a single
+class in the fit split. A recall endpoint is unavailable when the audit holds no item of the class, and the
+false-positive endpoint when it holds no other item.
 
 ## `user_witness/v1`
 
-**What it bounds.** A lower bound on the accuracy, or the AP, that your frozen model reaches on the population, and, for
+This kind gives a lower bound on the accuracy, or the AP, that your frozen model reaches on the population, and, for
 a recall target, a lower bound on its recall together with an upper bound on its false-positive rate.
 
-**Construction.** `predictions=` holds your model's class scores, shape `(len(dataset), n_classes)`, aligned with the
+`predictions=` holds your model's class scores, shape `(len(dataset), n_classes)`, aligned with the
 dataset and finite, or class decisions (below). The scores on the fit split set the AP thresholds; the scores on the
-audit split give the endpoints, exactly as for the built-in witnesses.
+audit split give the endpoints, as for the built-in witnesses.
 
-**Class decisions.** A 1-D integer array of length `len(dataset)` is read as one class decision per item, indices of the
-dataset's declared classes. An index outside them is refused, and so is a boolean or float array (cast to integers, a
-boolean would silently mean classes 0 and 1). Decisions are turned into one-hot scores, so the decision is the given
-class and accuracy and recall targets get their endpoints from it. They rank nothing, so an AP target gets no endpoint
-from them: it is unavailable with the reason `"predictions are class decisions, not scores; AP needs scores"`. Use
-decisions for any policy other than the top class, such as a threshold on one class's score applied as a complete
-multiclass policy before the call. One call's decisions feed every target in it, so a second operating point needs its
-own call with the error budget split across the planned calls. Scores for a relabeled dataset come from
-`Relabel.fold_scores`, which sums the columns of source classes that map to one target class (see
+You can also pass class decisions. A 1-D integer array of length `len(dataset)` is read as one class decision per item,
+indices of the dataset's declared classes. An index outside them is refused, and so is a boolean or float array (cast
+to integers, a boolean would silently mean classes 0 and 1). Decisions are turned into one-hot scores, so the decision
+is the given class and accuracy and recall targets get their endpoints from it. They rank nothing, so an AP target gets
+no endpoint from them: it is unavailable with the reason
+`"predictions are class decisions, not scores; AP needs scores"`. Use decisions for any policy other than the top
+class, such as a threshold on one class's score applied as a complete multiclass policy before the call. One call's
+decisions feed every target in it, so a second operating point needs its own call with the error budget split across
+the planned calls. Scores for a relabeled dataset come from `Relabel.fold_scores`, which sums the columns of source
+classes that map to one target class (see
 [Performance Limits](PerformanceLimits.md#decision-arrays-and-folded-scores)).
 
-**Information scope.** From `provenance["reads"]`, the model class the witness belongs to:
+The information scope comes from `provenance["reads"]`, the model class the witness belongs to:
 
 | `reads` | `information_scope` | Eligible to demonstrate |
 | --- | --- | --- |
@@ -372,9 +374,9 @@ own call with the error budget split across the planned calls. Scores for a rela
 A witness giving one answer per cell (`"partition"`) would be eligible at every scope, but it needs the internal
 partition, which this release does not expose, so it is rejected.
 
-**Basis:** the same string as `builtin_witness/v1`.
+The `basis` string is the same as for `builtin_witness/v1`.
 
-**Spine values.** `sample` is `"audit split"`. `provenance` is your declared provenance, with `reads` filled in. Its
+In the spine, `sample` is `"audit split"`. `provenance` is your declared provenance, with `reads` filled in. Its
 accepted keys are `reads`, `training_items`, `frozen_before_audit`, `selection`, `preprocessing` and `decision_policy`;
 others are rejected, and `provenance` is accepted only together with `predictions`. Two are checked: `reads` must be one
 of its two values, and `training_items`, the datum ids of this dataset's items that the model trained on (any iterable,
@@ -383,15 +385,17 @@ a set too), must be of the datum ids' type and share no physical group with an a
 decisions, frozen before the audit; it is accepted only when `predictions=` are class decisions, and a call that gives
 it with scores raises a `ValueError`.
 
-**`details`**: `assumptions` and `results` as for `builtin_witness/v1`.
+`details` holds `assumptions` and `results` as for `builtin_witness/v1`.
 
-**Error budget.** As for `builtin_witness/v1`.
+The error budget is spent as for `builtin_witness/v1`.
 
-**Assumptions recorded:** your declared provenance is recorded, not verified. A demonstration by this witness assumes
-the model was trained without the audit units and frozen before scoring them. With class decisions, the evidence adds
-that the decisions follow a policy frozen before the audit (declared).
+It records these assumptions: your declared provenance is recorded, not verified. A demonstration by this witness
+assumes the model was trained without the audit units and frozen before scoring them. With class decisions, the
+evidence adds that the decisions follow a policy frozen before the audit (declared).
 
-**A recall target, read.** For `Tank` at least 80% recall with at most 10% false positives, one call on a synthetic
+### Read a recall target
+
+For `Tank` at least 80% recall with at most 10% false positives, one call on a synthetic
 dataset with class decisions and `provenance={"decision_policy": "top class of the frozen classifier"}` prints:
 
 ```text
@@ -416,13 +420,13 @@ Had its false-positive upper endpoint exceeded 10%, the lower cell would still s
 
 ## What the first release does not do
 
-- **Object detection and tracking.** `evaluate` raises `NotImplementedError` for detection and tracking datasets.
-- **Frame-weighted local panels.** `frame_pooled` targets get no local-panel ceiling yet, and spend no budget on one;
+- Object detection and tracking: `evaluate` raises `NotImplementedError` for detection and tracking datasets.
+- Frame-weighted local panels: `frame_pooled` targets get no local-panel ceiling yet, and spend no budget on one;
   their ceilings come only from replicas.
-- **User-supplied partitions.** Feasibility always fits its own label-blind k-means partition on the fit split. Since
+- User-supplied partitions: Feasibility always fits its own label-blind k-means partition on the fit split. Since
   that partition is internal, a per-cell β and a witness reading the partition (`reads="partition"`) are rejected.
-- **Estimated allowances.** β and Γ are taken as given and recorded as assumed; Feasibility does not estimate them.
-- **Recall beyond one pooled operating condition.** A recall target is for image classification, one class per target
+- Estimated allowances: β and Γ are taken as given and recorded as assumed; Feasibility does not estimate them.
+- Recall beyond one pooled operating condition: a recall target is for image classification, one class per target
   and one frozen operating point per call, with the false-positive limit on the pooled negatives. It is refused on
   grouped data, with `false_positive_scope="each_class"`, and as a mapping key.
 
@@ -434,5 +438,5 @@ Had its false-positive upper endpoint exceeded 10%, the lower cell would still s
 
 ## See this in practice
 
-- [Feasibility tutorial](../notebooks/tt_assess_ic_feasibility.py) — the evidence behind a tank recall requirement,
-  read as a table and a chart
+- [Assess whether a classification requirement is reachable](../notebooks/tt_assess_ic_feasibility.py) — the evidence
+  behind a tank recall requirement, read as a table and a chart

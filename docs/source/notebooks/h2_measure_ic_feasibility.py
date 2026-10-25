@@ -15,39 +15,17 @@
 
 # %% [markdown]
 # # How to determine image classification feasibility
-
-# %% [markdown]
-# ## Problem statement
 #
-# For classification machine learning tasks, there is an _inherent difficulty_ associated with signal to noise ratio in
-# the images. One way of quantifying this difficulty is the
-# [Bayes Error Rate](../concepts/PerformanceLimits.md#bayes-error-rate--the-irreducible-floor), or irreducable error. This
-# metric tells you if it would be _feasible_ to use a given feature set to predict a target variable.
+# A classification requirement is reachable only if the classes are separable in your features. The Bayes error rate
+# (BER) measures how much they overlap, and {func}`.ber_mst` estimates it from image embeddings. See
+# [Performance Limits](../concepts/PerformanceLimits.md#bayes-error-rate--the-irreducible-floor).
 #
-# DataEval has introduced a method of calculating this error rate that uses image embeddings.
-
-# %% [markdown]
-# ### When to use
+# Use it to check an accuracy requirement against the imagery before you invest in modeling. If the estimated lower end
+# of the achievable accuracy falls short of the requirement, the estimate does not show that the requirement is
+# reachable. It does not prove it unreachable either, because BER bounds hold only in the limit of unlimited data.
 #
-# The `ber_mst` or `ber_knn` functions should be used when you would like to measure the feasibility of a machine learning
-# task. For example, if you have an operational accuracy requirement of 80%, and would like to know if this is feasibly
-# achievable given the imagery. If the estimated lower end of the achievable accuracy falls short of the accuracy you
-# desire, the estimate does not show that the requirement is reachable with the existing data. It does not prove the
-# requirement unreachable either: BER bounds hold only in the limit of unlimited data. A shortfall can point to classes
-# that overlap in these features or to noisy labels.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A set of image {term}`embeddings <Embeddings>` and their corresponding class labels. This requires training an
-#    autoencoder to compress the images.
-# 1. A Python environment with the following packages installed:
-#    - `dataeval`
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries needed to set up a minimal working example
+# You need `dataeval` and `maite-datasets`. This guide flattens MNIST pixels into embeddings. For larger images, reduce
+# the dimensionality first, for example with an autoencoder.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -72,14 +50,11 @@ from dataeval.extractors import FlattenExtractor
 set_seed(42)  # For reproducibility
 
 # %% [markdown]
-# ## Loading in data
+# ## Load the data
 #
-# We use the `MNIST` handwritten-digit dataset (imported from `maite-datasets`). Suppose we need a classifier that
-# reaches **99% accuracy**. We will use BER to check whether that target is _feasible_ — first for the full ten-digit
-# problem, then for progressively narrower versions of the task.
-#
-# BER is estimated from a one-dimensional feature per image. MNIST images are small, so we flatten the raw pixels
-# directly (no embedding necessary); in practice you would first reduce dimensionality with an autoencoder.
+# Load the MNIST training set. Suppose you need a classifier that reaches 99% accuracy. BER can check whether that
+# target is feasible, first for the full ten-digit problem and then for narrower versions of the task. MNIST images are
+# small, so a {class}`.FlattenExtractor` turns the raw pixels directly into embeddings.
 
 # %%
 # Configure the dataset transforms
@@ -93,9 +68,9 @@ mnist = MNIST(root="./data/", image_set="train", transforms=transforms, download
 extractor = FlattenExtractor()
 
 # %% [markdown]
-# ## All ten digits
+# ## Estimate all ten digits
 #
-# First we estimate the lower end of the achievable accuracy for the full task: telling all ten digits apart. We take a
+# Estimate the lower end of the achievable accuracy for the full task: telling all ten digits apart. Take a
 # class-balanced subset of 6,000 images (600 per digit) so that no class dominates the estimate.
 
 # %%
@@ -112,15 +87,15 @@ print("Estimated lower end of the achievable (Bayes) accuracy (10 digits):", 1 -
 assert 0.92 < 1 - ber_all["upper_bound"] < 0.95
 
 # %% [markdown]
-# The estimated lower end of the achievable accuracy for the ten-digit task is about **94%**, well short of our 99%
+# The estimated lower end of the achievable accuracy for the ten-digit task is about 94%, well short of the 99%
 # requirement, so this estimate does not show that 99% is reachable. On raw pixels several digits are easily confused
 # (4/9, 3/5/8).
 
 # %% [markdown]
 # ## Narrow the task to three digits (1, 4, 9)
 #
-# If the application only needs to distinguish a few digits, the task is easier. We keep just 1, 4, and 9 and, with the
-# same 6,000-image budget concentrated on fewer classes, balance to 2,000 per class.
+# If the application only needs to distinguish a few digits, the task is easier. Keep just 1, 4 and 9 and, with the same
+# 6,000-image budget concentrated on fewer classes, balance to 2,000 per class.
 
 # %%
 digits_149 = View(mnist, operations=[Filter(classes=(1, 4, 9)), ClassBalance("interclass", num_samples=6000)])
@@ -136,14 +111,14 @@ print("Estimated lower end of the achievable (Bayes) accuracy (1, 4, 9):", 1 - b
 assert 0.96 < 1 - ber_149["upper_bound"] < 0.98
 
 # %% [markdown]
-# Narrowing from ten classes to three raises the estimate to about **97%** — a concrete demonstration that feasibility
-# is a property of the *task*, not just the data. But 97% still falls short of our 99% requirement.
+# Narrowing from ten classes to three raises the estimate to about 97%, which shows that feasibility is a property of
+# the task and not only of the data. But 97% still falls short of the 99% requirement.
 
 # %% [markdown]
 # ## Reformulate as a binary problem (1 vs. not-1)
 #
-# Suppose the real question is only "is this a 1?". We collapse the three-digit labels into a binary target and re-check
-# feasibility on the same images.
+# Suppose the real question is only "is this a 1?". Collapse the three-digit labels into a binary target and check
+# feasibility again on the same images.
 
 # %%
 labels_binary = labels_149 == 1
@@ -157,38 +132,13 @@ print("Estimated lower end of the achievable (Bayes) accuracy (1 vs. not-1):", 1
 assert 0.99 < 1 - ber_binary["upper_bound"] < 0.998
 
 # %% [markdown]
-# The estimate for the binary formulation reaches about **99.5%**, which *does* clear our requirement.
-
-# %% [markdown]
-# ## Summary
-#
-# BER lets us check feasibility _before_ investing in modeling. On raw-pixel MNIST:
-#
-# | task | classes | estimated lower end of the achievable (Bayes) accuracy |
-# | --- | --- | --- |
-# | all digits | 10 | ~94% |
-# | 1, 4, 9 | 3 | ~97% |
-# | 1 vs. not-1 | 2 | ~99.5% |
-#
-# Only the binary formulation's estimate clears a 99% requirement. When the estimate falls short of your target
-# accuracy, BER can guide you to reformulate the task: narrowing the class set (or merging classes) raises the
-# estimate of the achievable accuracy.
+# The estimate for the binary formulation reaches about 99.5%, which clears the requirement. When the estimate falls
+# short of your target accuracy, narrowing the class set or merging classes raises the estimate, so reformulating the
+# task can bring the requirement within reach.
 
 # %% [markdown]
 # ## Next steps
 #
-# ### Concepts
-#
 # - [Performance Limits](../concepts/PerformanceLimits.md) — Understand Bayes Error Rate and theoretical performance ceilings for classification tasks.
-# - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional space.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias and coverage concepts in DataEval.
-#
-# ### Tutorials
-#
-# - [Clean a dataset](./tt_clean_dataset.py) — Identify and clean corrupted, duplicated, or mislabeled samples.
-#
-# ### How-to guides
-#
+# - [Assess whether a classification requirement is reachable](./tt_assess_ic_feasibility.py) — Judge whether classification requirements are reachable, with the evidence behind each answer.
 # - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model performance curves as a function of dataset size.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented regions in dataset feature space.
-# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Configure global execution options including random seeds and execution devices.
