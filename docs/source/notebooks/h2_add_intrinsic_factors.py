@@ -129,7 +129,7 @@ pairs = balance_output.factors
 assert pairs.filter((pl.col("factor1") == "std") & (pl.col("factor2") == "var"))["mi_value"][0] > 0.9
 for other in ("brightness", "darkness", "contrast"):
     assert pairs.filter((pl.col("factor1") == "mean") & (pl.col("factor2") == other))["is_correlated"][0]
-assert balance_output.balance["mi_value"][1:].max() < 0.1
+assert (balance_output.balance["mi_value"][1:] < 0.1).all()
 assert not balance_output.classwise["is_imbalanced"].any()
 
 spread = diversity_output.factors

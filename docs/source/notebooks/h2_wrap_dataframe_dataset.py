@@ -199,7 +199,7 @@ class DataFrameODDataset(DataFrameICDataset):
     def __len__(self) -> int:
         return len(self._groups)
 
-    def __getitem__(self, index: int) -> tuple[Any, BoxTarget, DatumMetadata]:
+    def __getitem__(self, index: int) -> tuple[Any, BoxTarget, DatumMetadata]:  # pyright: ignore[reportIncompatibleMethodOverride]
         rows = self._groups[index]
         first = rows.iloc[0]
         x, y, w, h = (rows[col].to_numpy(dtype=np.float32) for col in ("x", "y", "w", "h"))
@@ -335,7 +335,7 @@ assert isinstance(od_target, ObjectDetectionTarget)
 assert od_image.shape == (3, 128, 128)
 assert od_target.boxes.shape == (len(od_target.labels), 4)
 assert len(od_dataset) == od_catalog["filepath"].nunique() < len(od_catalog)
-assert len(od_datum["occlusion"]) == len(od_target.labels)
+assert len(od_datum["occlusion"]) == len(od_target.labels)  # pyright: ignore[reportGeneralTypeIssues]
 assert set(od_metadata.factor_names) == {"weather", "occlusion"}
 
 lazy_dataset = LazyICDataset(catalog, index2label, ["weather"])
