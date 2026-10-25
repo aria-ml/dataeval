@@ -104,7 +104,7 @@ datasets for machine learning.
     a {class}`.View` from {class}`.Operation` steps
   - [![Open In Colab][colab-badge]][view-colab]
 - - [](../notebooks/h2_create_embeddings.py)
-  - Create image embeddings with PyTorch, ONNX or a model-free extractor, and check that two frameworks agree
+  - Create image embeddings with PyTorch, ONNX or a model-free extractor
   - [![Open In Colab][colab-badge]][onx-colab]
 - - [](../notebooks/h2_place_transforms.py)
   - Decide whether a transform belongs in a {class}`.View` or in an

@@ -15,61 +15,15 @@
 
 # %% [markdown]
 # # How to build a MetadataLike object from a DataFrame
-
-# %% [markdown]
-# ## Problem statement
 #
-# DataEval's bias evaluators ({class}`.Balance`, {class}`.Diversity`,
-# {class}`.Parity`) do not need your images - they only need your
-# **factors and labels**. They accept any object that satisfies the
-# {class}`.MetadataLike` protocol, which is just four properties:
+# DataEval's bias evaluators, {class}`.Balance`, {class}`.Diversity` and {class}`.Parity`, need your factors and labels but
+# not your images. They accept any object that satisfies the {class}`.MetadataLike` protocol, so a pandas `DataFrame` can
+# feed them directly.
 #
-# - `factor_names` - the names of the metadata factors
-# - `factor_data` - a `(n_samples, n_factors)` integer array of *discretized*
-#   factor values (continuous factors must be pre-binned to integers)
-# - `class_labels` - one label per sample
-# - `is_binned` - a flag per factor, same length as `factor_names`: `True` where
-#   you produced that factor's integers by cutting a range into bins, `False`
-#   where each integer stands for a value of its own (a category, a count)
+# Use this when your labels and metadata factors already live in a table and you want to run bias analysis on them without
+# decoding images or building a full {class}`.AnnotatedDataset`.
 #
-# ```{note}
-# `is_binned` replaced `is_discrete` in v1.1; containers providing only
-# `is_discrete` stopped being recognized as metadata in v1.2. The flag is
-# read to decide whether a factor's number of distinct codes is a real ceiling
-# on what it can share with another factor — for a binned factor that count
-# describes your bin choice rather than the variable, so it is not used as one.
-# ```
-#
-# and two optional properties: `index2label` (class-name mapping) and
-# `item_indices` (which source image each label came from).
-#
-# When your factors are already tabular, you can implement `MetadataLike` directly
-# from a `DataFrame` and run bias analysis **without loading a single image**. This
-# is lighter than wrapping a full dataset (see the related how-tos) and is all you
-# need when you only care about labels and metadata.
-#
-# You will build one reusable adapter and apply it to an image classification
-# catalog and an object detection catalog.
-
-# %% [markdown]
-# ### When to use
-#
-# Use this when your labels and metadata factors live in a table and you want to
-# run bias/diversity/parity analysis on them - without decoding images or building
-# a full {class}`.AnnotatedDataset`.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A table of factors and labels (here, pandas `DataFrame`s)
-# 1. A Python environment with the following packages installed:
-#    - `dataeval`
-#    - `pandas`
-
-# %% [markdown]
-# ## Getting started
-#
-# First import the required libraries needed to set up the example.
+# You need `dataeval` and `pandas`.
 
 # %% tags=["remove_cell"]
 try:
@@ -90,9 +44,27 @@ from dataeval.protocols import MetadataLike
 # %% [markdown]
 # ## Write the adapter
 #
-# The adapter discretizes the factor columns - the one preprocessing step
-# `MetadataLike` requires - and exposes the four properties of the protocol plus
-# the two optional ones:
+# `MetadataLike` is four properties:
+#
+# - `factor_names` - the names of the metadata factors
+# - `factor_data` - a `(n_samples, n_factors)` integer array of *discretized*
+#   factor values (continuous factors must be pre-binned to integers)
+# - `class_labels` - one label per sample
+# - `is_binned` - a flag per factor, same length as `factor_names`: `True` where
+#   you produced that factor's integers by cutting a range into bins, `False`
+#   where each integer stands for a value of its own (a category, a count)
+#
+# ```{note}
+# `is_binned` replaced `is_discrete` in v1.1; containers providing only
+# `is_discrete` stopped being recognized as metadata in v1.2. See
+# {ref}`what to change and why <metadatalike-is-binned>`.
+# ```
+#
+# and two optional properties: `index2label` (class-name mapping) and
+# `item_indices` (which source image each label came from).
+#
+# The adapter discretizes the factor columns, the one preprocessing step the protocol
+# requires:
 #
 # - **Discrete factors** (categorical or already-integer) are integer-encoded with
 #   `pandas.factorize`.
@@ -181,12 +153,12 @@ class DataFrameMetadata:
 
 
 # %% [markdown]
-# ## From an image classification DataFrame
+# ## Apply the adapter to an image classification DataFrame
 #
 # A classification catalog has **one row per image**: the label plus any metadata
 # factors. Here `weather` is categorical (discrete) and `altitude_m` is continuous.
 
-# %%
+# %% tags=["hide-input"]
 rng = np.random.default_rng(0)
 ic_index2label = {0: "cat", 1: "dog", 2: "bird"}
 weather_options = ["clear", "rainy", "foggy"]
@@ -226,14 +198,14 @@ ic_balance = Balance().evaluate(ic_meta)
 print(ic_balance.balance)
 
 # %% [markdown]
-# ## From an object detection DataFrame
+# ## Apply the adapter to an object detection DataFrame
 #
 # An object detection catalog in *long* format has **one row per box**. Each row
 # carries its image's factors, so `factor_data` and `class_labels` are naturally
 # per-detection. The extra step is `item_indices`, which records the image each
 # box belongs to.
 
-# %%
+# %% tags=["hide-input"]
 od_index2label = {0: "person", 1: "car", 2: "bicycle"}
 
 rows = []
@@ -278,11 +250,6 @@ print(f"factor_data shape:    {od_meta.factor_data.shape}")
 # %%
 od_balance = Balance().evaluate(od_meta)
 print(od_balance.balance)
-
-# %% [markdown]
-# That is all it takes: one adapter that discretizes factor columns turns either
-# kind of tabular catalog into a `MetadataLike` ready for {class}`.Balance`,
-# {class}`.Diversity`, and {class}`.Parity` - no images required.
 
 # %% [markdown]
 # ## Next steps

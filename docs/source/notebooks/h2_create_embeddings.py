@@ -15,40 +15,16 @@
 
 # %% [markdown]
 # # How to create embeddings
-
-# %% [markdown]
-# ## Problem statement
 #
-# Most DataEval analyses that group or compare images, such as [clustering](../concepts/Clustering.md), duplicate
-# detection and [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space), start from
-# [embeddings](../concepts/Embeddings.md): one vector for each image.
-#
-# The recipe is the same whichever framework holds your model. You choose an extractor, then pass the dataset and the
-# extractor to {class}`.Embeddings`. This guide builds embeddings with PyTorch and with ONNX from the same weights, checks
-# that the two agree, and shows the two extractors that need no model.
-
-# %% [markdown]
-# ### When to use
+# Most DataEval analyses that group or compare images start from [embeddings](../concepts/Embeddings.md), one vector for each
+# image. You choose an extractor, then pass the dataset and the extractor to {class}`.Embeddings`.
 #
 # Use this guide when you want to:
 #
 # - turn a dataset into embeddings with a pre-trained PyTorch or ONNX model
-# - move a model from PyTorch to ONNX and confirm that the embeddings do not change
 # - build a baseline from raw pixels or from local image features, with no model
-
-# %% [markdown]
-# ### What you will need
 #
-# 1. An image dataset. This guide uses 100 images of the VOC2012 validation split.
-# 1. A Python environment with the following packages installed:
-#    - `dataeval[onnx,opencv]`
-#    - `maite-datasets`
-#    - `torchvision`
-
-# %% [markdown]
-# ## Getting started
-#
-# Import the libraries you need for a minimal working example.
+# It uses 100 VOC2012 images and needs `dataeval[onnx,opencv]`, `maite-datasets` and `torchvision`.
 
 # %% tags=["remove_cell"]
 try:
@@ -118,8 +94,8 @@ print(f"Embeddings shape: {torch_embeddings.shape}")
 # %% [markdown]
 # ## Create embeddings with ONNX
 #
-# ONNX stores a model in a framework-independent file. Export the same pre-trained ResNet18 so you can compare the two
-# paths. If you already have an ONNX model, skip the export and start at `to_encoding_model`.
+# Export the pre-trained ResNet18 to ONNX. If you already have an ONNX model, skip the export and start at
+# `to_encoding_model`.
 #
 # Export a fresh copy of the weights. `TorchExtractor` moves the model it receives to the configured device, so the model
 # above is not the one to export.
@@ -174,25 +150,14 @@ onnx_embeddings = Embeddings(subset, extractor=onnx_extractor, batch_size=32)
 
 print(f"Embeddings shape: {onnx_embeddings.shape}")
 
-# %% [markdown]
-# ## Check that both paths agree
-#
-# Compare the two sets of embeddings with cosine similarity. A value close to 1 means two vectors point the same way.
-# Small differences in the last digits are expected, because the two runtimes order floating-point operations
-# differently.
-
-# %%
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# the ONNX path reproduces the PyTorch embeddings
 torch_array = np.asarray(torch_embeddings)
 onnx_array = np.asarray(onnx_embeddings)
 cosine = (torch_array * onnx_array).sum(axis=1) / (
     np.linalg.norm(torch_array, axis=1) * np.linalg.norm(onnx_array, axis=1)
 )
-
-print(f"Shapes: {torch_array.shape} and {onnx_array.shape}")
-print(f"Lowest cosine similarity: {cosine.min():.6f}")
-
-# %% tags=["remove_cell"]
-# TEST ASSERTION CELL ###
 assert torch_array.shape == onnx_array.shape == (100, 512)
 assert cosine.min() > 0.999
 
@@ -241,4 +206,3 @@ assert bovw_embeddings.shape == (100, 64)
 # - [Embeddings](../concepts/Embeddings.md) — Learn what embeddings represent and how they are used across DataEval.
 # - [Validation and Trust](../concepts/ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers) — See what each extractor embeds and how each can mislead a metric.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings to find groups, outliers and duplicates.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Use embeddings to find thin regions of a dataset.

@@ -15,54 +15,18 @@
 
 # %% [markdown]
 # # How to reconcile labels against an ontology
-
-# %% [markdown]
-# ## Problem statement
 #
-# A dataset's class names rarely live in isolation — they belong to a domain
-# *taxonomy*. "sedan" and "pickup truck" are both land vehicles; "fighter jet" is
-# an aircraft. Knowing this hierarchy lets you sanity-check labels (does every
-# class actually exist in the reference vocabulary?) and reason about
-# relationships between them (which classes are siblings, which subsume others).
+# A dataset's class names belong to a domain taxonomy: "sedan" and "pickup truck" are both land vehicles, and "fighter jet" is
+# an aircraft. {func}`.label_reconciliation` matches class names against a reference {class}`.Ontology` and recovers their
+# place in its hierarchy. See [Ontology](../concepts/Ontology.md).
 #
-# DataEval represents a taxonomy with the {class}`.Ontology` class — a small,
-# in-memory, strongly-typed graph of concepts — and reconciles a dataset's class
-# names against it with {func}`.label_reconciliation`.
-
-# %% [markdown]
-# ### When to use
+# Use it when you have a set of class names and a reference ontology, and you want to:
 #
-# Use this workflow when you have a set of class names (e.g.
-# `index2label.values()`) and a reference ontology, and you want to:
+# - check which names map to known concepts, and which are unmatched or ambiguous
+# - recover each class's is-a path and its relationships to the other classes
 #
-# - check which class names map to known concepts (and which are unmatched or
-#   ambiguous)
-# - recover each class's place in the hierarchy (its is-a path to the root)
-# - understand pairwise relationships (ancestor / descendant / sibling) between
-#   your classes
-#
-# This is *exact* reconciliation (matching on preferred labels, synonyms, and
-# ids). Fuzzy / semantic *normalization* of messy labels is a separate, future
-# capability — here, an "unmatched" label simply means "not found in the
-# ontology," not "invalid."
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A set of class names to reconcile.
-# 1. A reference ontology.
-# 1. A Python environment with `dataeval[ontology]` installed.
-#
-# ```{note}
-# Parsing a reference ontology from an RDF/OWL/JSON-LD source requires the
-# `ontology` extra, which pulls in `rdflib`. Building an ontology in
-# memory needs no extra dependencies.
-# ```
-
-# %% [markdown]
-# ## Getting started
-#
-# Import the pieces you need.
+# Matching is exact on preferred labels, synonyms and ids, and an unmatched label means "not found," not "invalid." Reading
+# RDF, OWL or JSON-LD needs `dataeval[ontology]`.
 
 # %% tags=["remove_cell"]
 try:
@@ -96,8 +60,8 @@ ontology = Ontology.from_hierarchy({
 print(ontology)
 
 # %% [markdown]
-# The `repr` summarizes the structure: total concepts, roots (top-level
-# concepts), leaves (most specific), and external references (more on those below).
+# The `repr` summarizes the concepts, roots, leaves, and external references (more on
+# those below).
 
 # %% [markdown]
 # ## Reconcile a dataset's class names
@@ -115,15 +79,13 @@ result = label_reconciliation(index2label.values(), ontology)
 # The return value is a {class}`.LabelReconciliationResult` — a `TypedDict` whose
 # keys fall into two groups: a *match report* (`matched`, `unmatched`,
 # `ambiguous`) and the recovered *hierarchy* of the matched classes
-# (`ancestor_paths`, `external_ancestors`, `induced_edges`, `relations`). The rest
-# of this section walks through each.
+# (`ancestor_paths`, `external_ancestors`, `induced_edges`, `relations`).
 
 # %%
 print("keys:", list(result))
 
 # %% [markdown]
-# Start with the match report — which class names resolved to a concept, and which
-# did not:
+# Start with the match report:
 
 # %%
 print("matched:  ", result["matched"])
@@ -157,12 +119,11 @@ print("sedan vs fighter jet: ", result["relations"][("sedan", "fighter jet")])
 label_reconciliation(["vehicle", "land vehicle", "sedan"], ontology)["induced_edges"]
 
 # %% [markdown]
-# ## Richer ontologies from OWL / RDF / JSON-LD
+# ## Load an ontology from OWL, RDF or JSON-LD
 #
-# Real ontologies usually ship as standards-based OWL/RDF/JSON-LD files with
-# preferred labels, synonyms, and definitions. Parse already-in-memory content
-# with {meth}`.Ontology.from_rdf` (this requires the `dataeval[ontology]` extra).
-# DataEval does not read files itself — load the bytes/text however you like
+# Parse OWL/RDF/JSON-LD content that is already in memory with
+# {meth}`.Ontology.from_rdf` (this requires the `dataeval[ontology]` extra).
+# DataEval does not read files itself: load the bytes/text however you like
 # (here, a small inline JSON-LD document) and pass them in.
 
 # %%
@@ -204,7 +165,7 @@ print("synonyms:  ", concept.synonyms)
 print("definition:", concept.definition)
 
 # %% [markdown]
-# ## Incomplete (subset) ontologies
+# ## Work with an incomplete ontology
 #
 # Ontologies are frequently distributed as subsets, where a concept's parent is
 # referenced but not itself included. DataEval keeps these as *external
@@ -224,12 +185,11 @@ subset_result = label_reconciliation(["Frigate", "Sedan"], subset)
 print("external_ancestors:", subset_result["external_ancestors"])
 
 # %% [markdown]
-# `"Frigate"` matched, but its hierarchy is unresolved above `warship` — useful
-# for deciding whether the subset is sufficient or the full ontology is needed.
-# `"Sedan"` is fully rooted, so it is absent from `external_ancestors`.
+# `"Frigate"` matched, but its hierarchy is unresolved above `warship`. `"Sedan"` is
+# fully rooted, so it is absent from `external_ancestors`.
 
 # %% [markdown]
-# ## Exploring the hierarchy
+# ## Explore the hierarchy
 #
 # The {class}`.Ontology` object exposes dependency-free graph queries for ad-hoc
 # exploration:
