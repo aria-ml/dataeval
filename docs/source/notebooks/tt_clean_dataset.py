@@ -597,15 +597,7 @@ display(duplicates)
 #
 # - [Data Integrity](../concepts/DataIntegrity.md) — Understand core principles of dataset integrity, duplicates, and outliers.
 # - [Assess the data space](./tt_assess_data_space.py) — Evaluate coverage, bias, and dimensionality across dataset splits.
-# - [Identify bias and correlations](./tt_identify_bias.py) — Identify dataset bias and correlation issues in object detection datasets.
-# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational data over time.
 # - [Identify and remove duplicates from a PyTorch Dataset](./h2_deduplicate.py) — Remove exact, duplicate, or near-duplicate images from datasets.
-# - [Find negatively impactful images](./h2_visualize_cleaning_issues.py) — Visualize data cleaning issues and identify negatively impactful samples.
-# - [Identify outliers and anomalies with clustering](./h2_cluster_analysis.py) — Group embeddings using cluster analysis to surface dataset anomalies.
-# - [Customize image stats for object detection datasets](./h2_custom_image_stats_object_detection.py) — Specify custom statistics for bounding box detection datasets.
-# - [Configure logging](./h2_configure_logging.py) — Configure pipeline logging defaults and verbosity settings.
-# - [Calculate feasibility of performance requirements (BER)](./h2_measure_ic_feasibility.py) — Estimate Bayes Error Rate to evaluate problem feasibility.
-# - [Determine how much data you need (sufficiency)](./h2_measure_ic_sufficiency.py) — Calculate sample sufficiency metrics for model training.
 
 # %% [markdown]
 # ## On your own

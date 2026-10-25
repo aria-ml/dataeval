@@ -659,12 +659,8 @@ Balance().evaluate(custom_metadata)
 # ## Next steps
 #
 # - [Dataset bias concepts](../concepts/DatasetBias.md) — Learn about normalized mutual information and diversity indices for measuring dataset bias.
-# - [Clean dataset tutorial](./tt_clean_dataset.py) — Identify duplicate, corrupt, and low-quality samples to prepare a dataset for model training.
-# - [Assess data space tutorial](./tt_assess_data_space.py) — Identify coverage gaps, undersampled clusters, and outliers in dataset representations.
-# - [Monitor shift tutorial](./tt_monitor_shift.py) — Monitor feature distributions over time to detect operational data drift.
 # - [Add intrinsic factors](./h2_add_intrinsic_factors.py) — Apply statistical image metrics as intrinsic factors in dataset metadata.
 # - [Measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
-# - [Detect undersampling](./h2_detect_undersampling.py) — Identify undersampled subsets and rare feature combinations in dataset metadata.
 
 # %% [markdown]
 # ## On your own

@@ -373,13 +373,8 @@ assert len(cov["uncovered_indices"]) > 0
 #
 # - [Clustering Concept Page](../concepts/Clustering.md) — Mathematical foundations of minimum spanning tree linkage clustering.
 # - [Dataset Bias and Coverage Concept Page](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Deep dive into coverage geometry and feature space density.
-# - [Clean a dataset with labels](./tt_clean_dataset.py) — Tutorial on identifying label noise and corrupt samples.
-# - [Identify bias and correlations](./tt_identify_bias.py) — Tutorial measuring mutual information and factor balance.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
 # - [Identify outliers and anomalies with clustering](./h2_cluster_analysis.py) — How-to guide on clustering workflows.
 # - [Detect undersampled subsets of datasets](./h2_detect_undersampling.py) — How-to guide on locating low-density data clusters.
-# - [Display data distributions between two datasets](./h2_measure_divergence.py) — How-to guide on distribution divergence.
-# - [Apply statistical outputs as intrinsic metadata factors](./h2_add_intrinsic_factors.py) — How-to guide on metadata factor extraction.
 
 # %% [markdown]
 # ## On your own

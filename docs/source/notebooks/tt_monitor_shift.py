@@ -607,11 +607,6 @@ assert poor_parity_p_value < 0.01, f"contrived poor-parity set no longer trips t
 # - [Distribution shift concepts](../concepts/DistributionShift.md) — Read about covariate shift, concept drift, and label parity in deployed ML models.
 # - [Identify out-of-distribution samples tutorial](./tt_identify_ood_samples.py) — Detect anomalous and out-of-distribution samples using autoencoders and k-NN.
 # - [Display data distributions](./h2_measure_divergence.py) — Measure statistical divergence and plot distribution overlays between reference and target datasets.
-# - [Compare label distributions](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
-# - [Configure global DataEval defaults](./h2_configure_defaults.py) — Set global default configuration parameters like batch size and execution device.
-# - [Build dataset views](./h2_build_dataset_views.py) — Filter, reshape, and transform datasets without copying underlying media files.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
-# - [Embed object detection crops](./h2_embed_detection_crops.py) — Extract feature embeddings for individual bounding box targets in detection datasets.
 
 # %% [markdown]
 # ## On your own
