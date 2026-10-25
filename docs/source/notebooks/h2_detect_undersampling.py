@@ -24,19 +24,20 @@
 # regional sparsity is through [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space)
 # analysis.
 #
-# To help with this, DataEval has introduced a {func}`.coverage_adaptive` function, that provides a user with example images which
-# have few similar instances within the provided dataset.
+# To help with this, the {class}`.Coverage` evaluator provides a user with example images which have few similar
+# instances within the provided dataset.
 
 # %% [markdown]
 # ### When to use
 #
-# The `coverage` function should be used when you have lots of images, but only a small fraction from certain
+# The {class}`.Coverage` evaluator should be used when you have lots of images, but only a small fraction from certain
 # regimes/labels.
 #
 # ### What you will need
 #
 # 1. Image classification dataset.
-# 1. Autoencoder trained on image classification dataset for dimension reduction.
+# 1. A model that turns each image into an embedding. This how-to uses an autoencoder trained on MNIST, which is
+#    provided with the guide.
 # 1. A Python environment with the following packages installed:
 #    - `dataeval`
 #    - `tabulate`
@@ -94,9 +95,9 @@ from maite_datasets.image_classification import MNIST
 from sklearn.manifold import TSNE
 
 from dataeval import Embeddings, Metadata
-from dataeval.core import coverage_adaptive
 from dataeval.data import Limit, View
 from dataeval.extractors import TorchExtractor
+from dataeval.scope import Coverage
 
 print(torch.cuda.is_available())
 
@@ -124,6 +125,10 @@ subset = View(train_ds, Limit(2000))
 
 # %% [markdown]
 # In this how-to, you use an autoencoder to reduce the dimension of the MNIST images.
+#
+# The autoencoder stands in for the model that you would use on your own data. Any extractor works, such as a pre-trained
+# network or an autoencoder trained on your dataset. The [Embeddings](../concepts/Embeddings.md#choose-an-extractor)
+# page lists the extractors.
 
 
 # %%
@@ -189,7 +194,8 @@ extractor = TorchExtractor(model.encoder)
 
 # Calculate the embeddings and extract the labels from the dataset
 embeddings = Embeddings(subset, extractor=extractor, batch_size=64)
-labels = Metadata(subset).class_labels
+metadata = Metadata(subset)
+labels = metadata.class_labels
 
 # %% [markdown]
 # To visualize the encodings, we will use TSNE on them to view separation.
@@ -197,7 +203,7 @@ labels = Metadata(subset).class_labels
 # %%
 # Visualize 10d as 2d with TSNE
 tsne = TSNE(n_components=2)
-red_dim = tsne.fit_transform(embeddings)
+red_dim = tsne.fit_transform(np.asarray(embeddings))
 
 # %%
 # Plot results with color being label
@@ -214,28 +220,34 @@ plt.show()
 # %% [markdown]
 # Some good separation, but you can see a few images in the "gaps". This could be an artifact of dimension reduction, or
 # suggest that we have poor coverage for some covariates.
+#
+# Measure the coverage with {class}`.Coverage`. It rescales the embeddings to the unit interval for you, so the range of
+# your extractor's output does not matter.
 
 # %%
 # Use data adaptive cutoff
-cvrg = coverage_adaptive(embeddings, 20, 0.01)
+cvrg = Coverage(num_observations=20, percent=0.01).evaluate(metadata, embeddings=embeddings)
 
 # %%
 # Plot the least covered 1%
 f, axs = plt.subplots(4, 5, figsize=(5, 5))
 axs = axs.flatten()
 for count, i in enumerate(axs):
-    idx = cvrg["uncovered_indices"][count]
+    idx = cvrg.uncovered_indices[count]
     i.imshow(np.squeeze(train_ds[idx][0]), cmap="gray")
     i.set_axis_off()
     i.title.set_text(int(labels[idx]))
 
 # %% [markdown]
-# `coverage_adaptive` identified that in this set of 2000 images, there is potential under-coverage when it comes to
+# {class}`.Coverage` identified that in this set of 2000 images, there is potential under-coverage when it comes to
 # wonky 2s and 7s. Other digits have some undercovered instances, but they could be outliers.
+#
+# {class}`.Coverage` also reports coverage for each class. See
+# [Identify gaps in a labeled dataset](./tt_identify_dataset_gaps.py).
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-wonky = sum(labels[i] == 2 or labels[i] == 7 for idx, i in enumerate(cvrg["uncovered_indices"]) if idx < 20)
+wonky = sum(labels[i] == 2 or labels[i] == 7 for idx, i in enumerate(cvrg.uncovered_indices) if idx < 20)
 print(wonky)
 assert (wonky / 20) > 0.4
 
