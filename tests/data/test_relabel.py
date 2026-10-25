@@ -14,6 +14,8 @@ from dataeval.protocols import ObjectDetectionTarget
 from dataeval.types import OntologyConcept
 from dataeval.types._target import detection_score
 
+from .conftest import MockICDataset
+
 
 def target_ontology() -> Ontology:
     return Ontology.from_hierarchy({"vehicle": {"car": {"sedan": None, "suv": None}, "truck": None}})
@@ -598,3 +600,48 @@ class TestReduceDetectionScoresShim:
             opted_out = Relabel(remap, ["v", "c"], reduce_detection_scores=False)
         folded = View(ic_dataset([0, 1], {0: "car", 1: "bike"}), [opted_out])[1][1]
         np.testing.assert_allclose(np.asarray(default), np.asarray(folded))
+
+
+def ds_with(names):
+    """An image-classification dataset whose items are the named classes, indexed in first-seen order."""
+    index2label = dict(enumerate(dict.fromkeys(names)))
+    by_name = {name: i for i, name in index2label.items()}
+    return MockICDataset([by_name[n] for n in names], index2label)
+
+
+def _applied_relabel():
+    relabel = Relabel({"T-72": "Tank", "T-80": "Tank", "BMP-1": "BMP"}, target=["Tank", "BMP"])
+    return relabel, View(ds_with(["T-72", "T-80", "BMP-1"]), [relabel])
+
+
+@pytest.mark.required
+@pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+class TestFoldScores:
+    def test_fold_scores_sums_coarsened_columns(self):
+        relabel, view = _applied_relabel()
+        folded = relabel.fold_scores(np.array([[0.2, 0.3, 0.5], [0.6, 0.1, 0.3], [0.1, 0.1, 0.8]]), view=view)
+        np.testing.assert_allclose(folded, [[0.5, 0.5], [0.7, 0.3], [0.2, 0.8]])
+
+    def test_fold_scores_drops_rows_the_relabel_dropped(self):
+        relabel = Relabel({"T-72": "Tank"}, target=["Tank"])  # BMP-1 is out of vocabulary: its datums drop
+        view = View(ds_with(["T-72", "BMP-1", "T-72"]), [relabel])
+        folded = relabel.fold_scores(np.array([[1.0, 0.0], [0.0, 1.0], [0.9, 0.1]]), view=view)
+        np.testing.assert_allclose(folded, [[1.0], [0.9]])
+
+    def test_fold_scores_without_a_view_passes_rows_through(self):
+        relabel, _ = _applied_relabel()
+        assert relabel.fold_scores(np.ones((5, 3))).shape == (5, 2)
+
+    def test_fold_scores_before_apply_raises(self):
+        with pytest.raises(OntologyError):
+            Relabel({"a": "b"}).fold_scores(np.ones((2, 1)))
+
+    def test_fold_scores_rejects_the_wrong_width(self):
+        relabel, view = _applied_relabel()
+        with pytest.raises(ValueError, match="columns"):
+            relabel.fold_scores(np.ones((len(view.source), 99)), view=view)
+
+    def test_fold_scores_rejects_rows_that_do_not_match_the_source(self):
+        relabel, view = _applied_relabel()
+        with pytest.raises(ValueError, match="rows"):
+            relabel.fold_scores(np.ones((2, 3)), view=view)

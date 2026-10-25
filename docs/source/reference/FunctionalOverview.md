@@ -95,7 +95,8 @@ DataEval's public API.
   - ✔
   - 
 * - {func}`UAP <.uap>`
-  - Determines feasibility of an object detection task by estimating upper bound on average precision
+  - Measures the average precision one crop classifier reaches on ground-truth object detection boxes, the
+  classification part of the task without localization error
   - 
   - ✔
   -
@@ -151,6 +152,12 @@ DataEval's public API.
   - ✔
   - ✔
   - ✔
+* - {class}`.Feasibility`
+  - Decides whether a classification accuracy or AP target is demonstrated, ruled out under recorded
+  assumptions, or neither, with the evidence behind each determination (experimental)
+  - ✔
+  - 
+  - 
 * - {class}`Out-of-Distribution Domain Classifier <.OODDomainClassifier>`  
 {class}`Out-of-Distribution K-Nearest Neighbors <.OODKNeighbors>`  
 {class}`Out-of-Distribution Reconstruction <.OODReconstruction>`

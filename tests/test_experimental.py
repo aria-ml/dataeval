@@ -5,7 +5,13 @@ import warnings
 
 import pytest
 
-from dataeval._experimental import _lazy_import_with_warning, _warn_on_access, deprecated, experimental
+from dataeval._experimental import (
+    _lazy_import_with_warning,
+    _warn_on_access,
+    deprecated,
+    experimental,
+    quiet_experimental,
+)
 from dataeval.exceptions import DeprecatedWarning, ExperimentalWarning
 
 
@@ -109,6 +115,26 @@ class TestExperimentalDecorator:
             warnings.simplefilter("always", ExperimentalWarning)
             MyClass()
         assert len(w) == 0
+
+    def test_quiet_scope_leaves_the_warning_unspent(self):
+        @experimental
+        def my_func():
+            return 1
+
+        @experimental
+        class MyClass:
+            pass
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always", ExperimentalWarning)
+            with quiet_experimental():
+                my_func()
+                MyClass()
+        assert len(w) == 0
+        with pytest.warns(ExperimentalWarning, match="my_func"):
+            my_func()
+        with pytest.warns(ExperimentalWarning, match="MyClass"):
+            MyClass()
 
 
 class TestDeprecatedDecorator:

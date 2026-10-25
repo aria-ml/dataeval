@@ -1,10 +1,11 @@
 # Acting on Results
 
-DataEval produces diagnostic outputs, not decisions. Every evaluator returns
-scores, indices, flags, or p-values — but none of them tell you what to do next.
-That judgment requires understanding what the result means in the context of
-your program, your data collection constraints, and your performance
-requirements.
+DataEval produces evidence and judgment calls, not decisions. Every evaluator
+returns evidence — scores, indices, p-values, bounds — and many add a judgment
+call on top of it, such as a flag or a determination. None of them makes the
+decision for you. That decision requires understanding what the result means in
+the context of your program, your data collection constraints, and your
+performance requirements.
 
 This page maps each category of DataEval output to the decisions it informs and
 the actions available to you. It is not a procedure to follow linearly. Real
@@ -13,12 +14,14 @@ interact with another. Use this page as a reference: when a diagnostic produces
 a result you need to act on, find the relevant section and understand your
 options before committing to a course of action.
 
-One framing applies across all of it: DataEval finds *evidence* of problems. The
-interpretation is always yours. A high BER upper bound is evidence that class
-overlap may be irreducible — it is not proof that your requirement is
-unachievable. A detected duplicate is evidence of potential redundancy — it is
-not an instruction to delete. Every DataEval output is a prompt to investigate,
-not a verdict.
+One framing applies across all of it: DataEval finds *evidence* and makes
+judgment calls on it. The final decision is always yours. A high BER lower bound
+is evidence that class overlap may be irreducible — it is not proof that your
+requirement is unachievable. A detected duplicate is evidence of potential
+redundancy — it is not an instruction to delete. A {class}`.Feasibility`
+determination is a judgment on the evidence it cites, under its recorded
+assumptions — it is not a decision to build or to stop. Every DataEval output is
+a prompt to investigate, not a verdict.
 
 ## Data Integrity findings
 
@@ -502,14 +505,18 @@ collection: acquiring more data for the underrepresented classes.
 
 ### BER upper and lower bounds
 
-{func}`.ber_mst` and {func}`.ber_knn` returns upper and lower bounds on the
+{func}`.ber_mst` and {func}`.ber_knn` return upper and lower bounds on the
 Bayes Error Rate — the irreducible classification error given the current
-feature representation. The upper bound is the actionable number: if the BER
-upper bound exceeds your operational accuracy requirement, no classifier trained
-on this data in this feature space will meet the requirement.
+feature representation — and the two bounds point in different directions. The
+{func}`.ber_knn` upper bound is an error a nearest-neighbor classifier already
+achieves, so an upper bound within your operational error allowance shows the
+requirement is reachable. The lower bound is what suggests a requirement is out
+of reach: if it exceeds the allowance, no classifier reading this feature space
+is expected to meet the requirement. It is an asymptotic estimate, so treat it as
+evidence rather than proof.
 
-**The BER upper bound exceeds the requirement.** This does not mean the task is
-impossible — it means it is impossible with the current data and feature
+**The BER lower bound exceeds the requirement.** This does not mean the task is
+impossible — it means it is out of reach with the current data and feature
 representation. Three levers are available:
 
 1. **Better embeddings**: if the current feature representation conflates
@@ -542,14 +549,17 @@ requirements — localization error is an additional, separate constraint.
 
 {func}`.uap` computes the Upper-bound Average Precision over bounding box crops,
 treating the problem as classification and removing localization error. The
-result is a strict upper bound on what any detector can achieve in mAP: your
-operational detector must also solve localization, so actual mAP will be lower.
+score comes from one crop classifier, so it shows what that classifier reaches on
+correctly localized boxes, not a ceiling on what any detector can achieve: a
+better crop classifier, or a detector that uses context the crop leaves out, can
+score higher.
 
-A UAP that already fails to meet the requirement means the classification
-problem itself is infeasible — even with perfect localization, the requirement
-cannot be met. A UAP that passes gives you headroom to lose to localization
-error. The gap between UAP and your requirement is the tolerance budget for
-localization and detection-specific factors.
+A UAP that meets the requirement shows the classification part of the problem
+is reachable and leaves headroom to lose to localization error; the gap between
+UAP and your requirement is the tolerance budget for localization and
+detection-specific factors. A UAP that falls short is a warning sign rather than
+a verdict: try a stronger crop classifier or embedding before concluding the
+classification problem is out of reach.
 
 ### Sufficiency learning curves
 

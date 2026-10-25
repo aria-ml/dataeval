@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from dataeval import Ontology
 from dataeval.bias import Balance, Diversity, Parity
 from dataeval.extractors import FlattenExtractor
-from dataeval.performance import Sufficiency
+from dataeval.performance import Feasibility, Sufficiency
 from dataeval.quality import Duplicates, Outliers
 from dataeval.scope import Coverage, Prioritize, Representation
 from dataeval.shift import (
@@ -38,6 +38,7 @@ _CASES = [
     ("Coverage", lambda **kw: Coverage(**kw), "method", "nope"),
     ("Prioritize", lambda **kw: Prioritize(**kw), "method", "nope"),
     ("Representation", lambda **kw: Representation(_ONTOLOGY, **kw), "expected", "lots"),
+    ("Feasibility", lambda **kw: Feasibility(**kw), "alpha", "high"),
     ("Sufficiency", lambda **kw: Sufficiency(MagicMock(), **kw), "runs", "many"),
 ]
 
@@ -149,6 +150,12 @@ _BOUNDS = [
     (OODReconstruction.Config, "batch_size", 1, 0),
     (OODReconstruction.Config, "threshold_perc", 100.0, 100.01),
     (OODReconstruction.Config, "gmm_weight", 1.0, 1.01),
+    (Feasibility.Config, "alpha", 0.99, 1.0),
+    (Feasibility.Config, "alpha", 0.01, 0.0),
+    (Feasibility.Config, "batch_size", 1, 0),
+    (Feasibility.Config, "panel_size", 2, 1),
+    (Feasibility.Config, "n_cells", 1, 0),
+    (Feasibility.Config, "max_sequence_length", 1, 0),
     (Sufficiency.Config, "runs", 1, 0),
     (Sufficiency.Config, "substeps", 1, 0),
 ]

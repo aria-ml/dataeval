@@ -3,6 +3,9 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from dataeval.core._mst import grouped_neighbors
+from dataeval.exceptions import ShapeMismatchError
+
 
 @pytest.mark.required
 class TestMst:
@@ -172,3 +175,42 @@ class TestMst:
 
         knn_warnings = [rec for rec in caplog.records if "k-nearest neighbors" in rec.message.lower()]
         assert len(knn_warnings) == 0, "Unexpected warning with sufficient k"
+
+
+@pytest.mark.required
+class TestGroupedNeighbors:
+    def test_no_neighbor_shares_the_group(self):
+        rng = np.random.default_rng(0)
+        data = np.repeat(rng.normal(size=(300, 8)), 3, axis=0)
+        groups = np.arange(300).repeat(3)
+        indices, _, valid = grouped_neighbors(data, groups, 5)
+        assert not (groups[indices] == groups[:, None]).any()
+        assert valid.all()
+
+    def test_large_group_is_excluded(self):
+        """A group above the 256-row cap takes the separate search path and is still excluded."""
+        groups = np.r_[np.zeros(400, int), np.arange(1, 501)]
+        data = np.random.default_rng(1).normal(size=(900, 3))
+        indices, _, valid = grouped_neighbors(data, groups, 5)
+        assert not (groups[indices] == groups[:, None]).any()
+        assert valid.all()
+
+    def test_too_few_outside_group_marks_invalid(self):
+        data = np.array([[0.0], [1.0], [5.0]])
+        _, _, valid = grouped_neighbors(data, np.array([0, 0, 1]), 2)
+        assert valid[:2].sum(axis=1).tolist() == [1, 1]  # only one sample lies outside group 0
+        assert valid[2].all()
+
+    def test_more_neighbors_than_samples(self):
+        indices, _, valid = grouped_neighbors(np.arange(10.0).reshape(5, 2), np.arange(5), 10)
+        assert indices.shape == (5, 10)
+        assert valid.sum(axis=1).tolist() == [4] * 5
+
+    def test_distances_are_sorted(self):
+        data = np.random.default_rng(2).normal(size=(200, 4))
+        _, distances, _ = grouped_neighbors(data, np.arange(200) // 2, 6)
+        assert (np.diff(distances, axis=1) >= 0).all()
+
+    def test_shape_mismatch(self):
+        with pytest.raises(ShapeMismatchError):
+            grouped_neighbors(np.zeros((5, 2)), np.arange(4), 1)

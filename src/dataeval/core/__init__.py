@@ -12,6 +12,7 @@ __all__ = [
     "CoverageResult",
     "DivergenceResult",
     "EgoStatsResult",
+    "EndpointResult",
     "FactorResult",
     "FeatureDistanceResult",
     "HashGroupResult",
@@ -23,6 +24,7 @@ __all__ = [
     "LabelParityResult",
     "LabelReconciliationResult",
     "LabelStatsResult",
+    "LocalPanelResult",
     "MSTResult",
     "MutualInfoResult",
     "NullModelMetrics",
@@ -41,8 +43,11 @@ __all__ = [
     "align_subsequence",
     "annotation_divergence",
     "annotation_fingerprint",
+    "ap_lower_staircase",
+    "ap_upper_envelope",
     "ber_knn",
     "ber_mst",
+    "binomial_endpoint",
     "cluster",
     "combination_scores",
     "combine_stats_results",
@@ -51,22 +56,28 @@ __all__ = [
     "compute_neighbors",
     "compute_ratios",
     "compute_stats",
+    "consensus_max",
+    "cost_consensus",
+    "cost_consensus_max",
     "coverage_adaptive",
     "coverage_naive",
     "dhash",
     "dhash_d4",
+    "disjoint_panels",
     "divergence_fnn",
     "divergence_mst",
     "ego_stats",
     "feature_distance",
     "factor_deviation",
     "factor_predictors",
+    "fit_partition",
     "frame_annotation_hash",
     "hamming_distance",
     "hash_groups",
     "hash_neighbors",
     "image_stats",
     "is_continuous",
+    "kink_costs",
     "label_alignment",
     "label_cooccurrence",
     "label_coverage",
@@ -74,8 +85,10 @@ __all__ = [
     "label_parity",
     "label_reconciliation",
     "label_stats",
+    "local_panel_bound",
     "match_segments",
     "minimum_spanning_tree",
+    "mean_endpoint",
     "mutual_info",
     "mutual_info_classwise",
     "nullmodel_accuracy",
@@ -95,14 +108,18 @@ __all__ = [
     "rank_kmeans_complexity",
     "rank_result_class_balanced",
     "rank_result_stratified",
+    "ratio_endpoint",
     "redundant_runs",
     "sequence_containment",
     "sequence_fingerprint",
     "sequence_residuals",
     "track_stats",
+    "units_to_cross",
     "xxhash",
     "uap",
     "video_stats",
+    "witness_thresholds",
+    "zero_one_consensus",
 ]
 
 from dataeval.core._alignment import SubsequenceAlignment, align_subsequence
@@ -112,6 +129,7 @@ from dataeval.core._annotation_match import (
     annotation_fingerprint,
     frame_annotation_hash,
 )
+from dataeval.core._ap_bounds import ap_lower_staircase, ap_upper_envelope, witness_thresholds
 from dataeval.core._ber import BERResult, ber_knn, ber_mst
 from dataeval.core._bin import is_continuous
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
@@ -124,6 +142,21 @@ from dataeval.core._compute_stats import (
     StatsResult,
     combine_stats_results,
     compute_stats,
+)
+from dataeval.core._concentration import (
+    EndpointResult,
+    binomial_endpoint,
+    mean_endpoint,
+    ratio_endpoint,
+    units_to_cross,
+)
+from dataeval.core._consensus import (
+    consensus_max,
+    cost_consensus,
+    cost_consensus_max,
+    disjoint_panels,
+    kink_costs,
+    zero_one_consensus,
 )
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
@@ -145,6 +178,7 @@ from dataeval.core._label_errors import LabelErrorResult, label_errors
 from dataeval.core._label_parity import LabelParityResult, label_parity
 from dataeval.core._label_reconciliation import LabelReconciliationResult, label_reconciliation
 from dataeval.core._label_stats import LabelStatsResult, label_stats
+from dataeval.core._local_panels import LocalPanelResult, fit_partition, local_panel_bound
 from dataeval.core._metadata_insights import factor_deviation, factor_predictors
 from dataeval.core._mst import MSTResult, compute_neighbors, minimum_spanning_tree
 from dataeval.core._mutual_info import MutualInfoResult, mutual_info, mutual_info_classwise

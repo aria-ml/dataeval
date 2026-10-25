@@ -9,7 +9,8 @@ the [machine learning life cycle](../getting-started/roles/ML_Lifecycle.md).
 Currently, there are tutorials for the following stages:
 
 1. [Data engineering](#data-engineering)
-2. [Monitoring](#monitoring)
+2. [Model development](#model-development)
+3. [Monitoring](#monitoring)
 
 More tutorials are always in development, but you can suggest specific
 tutorials by [requesting a topic](../getting-started/contributing.md).
@@ -99,6 +100,35 @@ local checkout.
 <!-- markdownlint-enable MD053 -->
 
 <!-- END DATA ENGINEERING -->
+
+## **Model development**
+
+```{toctree}
+:hidden:
+:caption: Model development
+
+../notebooks/tt_assess_ic_feasibility.py
+```
+
+```{list-table}
+:widths: 20 60 20
+:header-rows: 0
+
+* - [](../notebooks/tt_assess_ic_feasibility.py)
+  - Learn how the experimental {class}`.Feasibility` evaluator judges whether
+    military vehicle requirements are reachable, how to read the evidence
+    behind each determination, and how to change a question the evidence
+    cannot answer into one it can.
+  - [![Open In Colab][colab-badge]][feas-colab]
+```
+
+<!-- markdownlint-disable MD053 -->
+
+[feas-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_assess_ic_feasibility.ipynb
+
+<!-- markdownlint-enable MD053 -->
+
+<!-- END MODEL DEVELOPMENT -->
 
 ## **Monitoring**
 
