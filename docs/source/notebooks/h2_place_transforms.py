@@ -261,19 +261,6 @@ print("...but ask whether the data really has three channels")
 # That is the last reason to prefer the curated operations.
 
 # %% [markdown]
-# ## Summary
-#
-# - Ask **does an evaluator that never touches my model need to see it?** Yes puts it in a
-#   view operation; no puts it in the extractor's `transforms=`.
-# - Put dataset definition in the view: deployed resolution, fixed crops, band selection are
-#   claims about your data.
-# - Put model-input adaptation in the extractor: normalize, dtype cast, and channel broadcast
-#   stay out of your statistics there.
-# - Answer a {class}`~dataeval.exceptions.StatsInvalidatedWarning` in one of three ways: move
-#   the transform to the extractor, narrow `flags=`, or assert with `invalidates=`.
-# - Expect to use both homes at once. Layering them is the normal case, not a compromise.
-
-# %% [markdown]
 # ## Next steps
 #
 # - [Data Integrity](../concepts/DataIntegrity.md) — Learn about data corruption, missing values, and dataset quality issues.

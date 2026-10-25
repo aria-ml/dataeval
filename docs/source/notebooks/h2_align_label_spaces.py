@@ -173,7 +173,8 @@ print("class_remap:", dict(result["class_remap"]), "| mergeability:", result["me
 # %% [markdown]
 # `"sedan"` is coarsened to `"car"` — valid, but now `"sedan"` and `"car"` both map
 # to `"car"` and can no longer be told apart, so the source is only **lossily**
-# expressible. (A source is *lossless* only when its `class_remap` is injective.)
+# expressible, and its `mergeability` is `lossy`. (A source is *lossless* only when its `class_remap` is
+# injective.)
 
 # %% [markdown]
 # ## Bring your own matcher: fuzzy name matching
@@ -271,21 +272,6 @@ sources = {
 for name, labels in sources.items():
     r = label_alignment(labels, reference)
     print(f"{name:>10}: class_remap={dict(r['class_remap'])}  mergeability={r['mergeability']}")
-
-# %% [markdown]
-# ## Summary
-#
-# - {func}`.label_alignment` maps a source vocabulary (a list of names or an
-#   {class}`.Ontology`) onto a target {class}`.Ontology`, returning a
-#   {class}`.LabelAlignmentResult` of typed {class}`.Correspondence` objects.
-# - Relations carry meaning: `equivalent` (rename) and `narrower` (safe coarsening)
-#   populate `class_remap`; `broader` flags a granularity mismatch and is excluded.
-# - `mergeability` summarizes how completely the source is expressible in the target
-#   — `lossless`, `lossy` (specificity collapses), or `partial` (unaligned classes).
-# - The `matchers=` seam accepts any {class}`.Matcher` (e.g. the fuzzy recipe above)
-#   to catch near-miss names; below-threshold proposals are withheld, not guessed.
-# - Align several sources to one shared **pivot** ontology to express them in a
-#   common label space.
 
 # %% [markdown]
 # ## Next steps

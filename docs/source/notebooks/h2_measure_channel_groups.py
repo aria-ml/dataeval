@@ -415,25 +415,6 @@ print(sorted(per_group))
 #   key will trigger a warning.
 
 # %% [markdown]
-# ## Summary
-#
-# By naming band groups, you will ensure that DataEval measures multi-band imagery precisely:
-#
-# - **Range-specific evaluation**: You will measure each group against its own range,
-#   preventing differing dynamic ranges from corrupting statistics.
-# - **Direct Metadata integration**: You will output statistics as columns on each image's
-#   row, allowing direct use in downstream analyses.
-# - **Consistent schema**: You will receive consistent column formats, with missing bands
-#   marked explicitly rather than omitted.
-# - **Spatial composition**: You will combine channel groups with spatial constraints like
-#   `per_background`.
-# - **Custom metrics per group**: You will configure distinct statistics for each group by
-#   passing `stats` as a mapping.
-#
-# You should use this feature whenever your imagery channels represent distinct physical
-# measurements.
-
-# %% [markdown]
 # ## Next steps
 #
 # ### Concepts

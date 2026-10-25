@@ -263,16 +263,6 @@ assert len(nested.operation_groups) == 2
 assert nested.root is mnist
 
 # %% [markdown]
-# ## Summary
-#
-# - {class}`.View` wraps a dataset with an ordered pipeline of {class}`.Operation` steps,
-#   lazily and without copying.
-# - Operations run in the order given, each seeing the result of the previous — so order is
-#   meaningful, and an operation may appear more than once.
-# - Operations that inspect data read it *through* earlier operations.
-# - Write your own by subclassing {class}`.Operation` and implementing `apply(view)`.
-
-# %% [markdown]
 # ## Next steps
 #
 # - [Ontology](../concepts/Ontology.md) — Learn about taxonomic ontologies and label space mapping.

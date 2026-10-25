@@ -353,23 +353,6 @@ print(f"digest: {restored.encoding_digest == winter.encoding_digest}")
 # might want from it.
 
 # %% [markdown]
-# ## What you learned
-#
-# - {meth}`.Metadata.encoding` shows the map from values to codes, and its
-#   `provenance` says who chose it - `derived` means nobody did
-# - `continuous_factor_bins` and `factor_levels` declare the cuts and vocabularies
-#   that carry your meaning; infinite outer edges keep them safe to reapply
-# - {meth}`.Metadata.accept` fixes a derived placement without moving a code, and
-#   records that a person signed it off
-# - {meth}`.Metadata.export_encoding` writes reviewable JSON for version control,
-#   and passing it back as `encoding=` gives the next dataset the same alphabet
-# - {attr}`.Metadata.encoding_digest` says whether two results are comparable, and
-#   travels on the result itself
-# - A locked cut reports when it stops fitting rather than quietly re-fitting
-# - {attr}`~dataeval.bias.Balance.factor_source` honors a declared cut and reads
-#   unbinned values where nobody declared one; `scored_as` says which happened
-
-# %% [markdown]
 # ## Related concepts
 #
 # - [Binning](../concepts/Binning.md)

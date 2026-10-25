@@ -321,19 +321,6 @@ print(f"\nflagged {rows['instance_is_outlier'].sum()} of {rows.height} instance 
 # statistics themselves, and it is why a factor's name carries the level it was measured at.
 
 # %% [markdown]
-# ## What you learned
-#
-# 1. **An evaluator's keys are addresses.** {class}`.Outliers` and {class}`.Duplicates` return {class}`.SourceIndex`
-#    objects, and the minimal spelling — level unstated — is what producers emit and what compares equal.
-# 1. **{class}`.SourceLocator` follows one.** Bind it to the object you measured, index it with an address, and read
-#    the image, frame, track or detection it names. Nothing is read until you look.
-# 1. **{meth}`~.SourceItem.at` and {meth}`~.SourceItem.within` supply the parentage an address leaves out**, in both
-#    directions, over all four levels.
-# 1. **{attr}`~.SourceItem.source_datum` is the data before the view touched it**, which is how you tell a finding
-#    about your data from a finding about your pipeline.
-# 1. **Findings go back in as factors**, keyed on the addresses that produced them.
-
-# %% [markdown]
 # ## Next steps
 #
 # - [Metadata levels](../concepts/MetadataLevels.md) — the level graph an address names a row in
