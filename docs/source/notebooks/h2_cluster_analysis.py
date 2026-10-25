@@ -15,45 +15,20 @@
 
 # %% [markdown]
 # # How to run clustering analysis
-
-# %% [markdown]
-# ## Problem statement
 #
-# Data does not typically come labeled, and labeling or verifying labels takes time and resources. Exploratory data
-# analysis (EDA) often improves when you split data into similar groups.
+# Data does not typically come labeled, and labeling or verifying labels takes time and resources. Clustering groups data of
+# shape (samples, features) into similar groups with an algorithm based on HDBSCAN, and {class}`.Outliers` and
+# {class}`.Duplicates` can analyze the result to find outliers and near duplicates. See
+# [Clustering](../concepts/Clustering.md).
 #
-# [Clustering](../concepts/Clustering.md) groups data in the format (samples, features). You can use it with images or
-# image embeddings as long as the arrays are flattened to only contain 2 dimensions.
-#
-# The `cluster` function uses a clustering algorithm based on HDBSCAN. The `Outliers` and `Duplicates` detectors can
-# then analyze the cluster results to identify outliers and duplicates.
-
-# %% [markdown]
-# ### When to use
-#
-# Use the clustering workflow during the EDA process to:
+# Use the clustering workflow during exploratory data analysis to:
 #
 # - group a dataset into clusters
 # - verify labeling as a quality control
-# - identify [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings) in your dataset
-#   using the `Outliers` detector
-# - identify duplicates in your dataset using the `Duplicates` detector
-
-# %% [markdown]
-# ### What you will need
+# - find outliers and duplicates in your dataset
 #
-# 1. A 2 dimensional dataset (samples, features)
-# 1. A Python environment with the following packages installed:
-#    - `dataeval`
-#    - `matplotlib`
-#
-# This could be a set of flattened images or image embeddings. Prefer image embeddings, with a feature dimension
-# of \<=1000.
-
-# %% [markdown]
-# ## Getting started
-#
-# Import the libraries you need for a minimal working example.
+# You need a two-dimensional array of samples and features, such as flattened images or, preferably, image embeddings with a
+# feature dimension of 1000 or fewer. The example needs `dataeval` and `matplotlib`.
 
 # %% tags=["remove_cell"]
 try:
@@ -73,7 +48,7 @@ from dataeval.core import cluster
 from dataeval.quality import Duplicates, Outliers
 
 # %% [markdown]
-# ## Loading in data
+# ## Create the data
 #
 # In this demonstration you create a generic set of blobs for clustering. This shows all of the clustering functionality
 # in one how-to.
@@ -86,7 +61,7 @@ blobs = dsets.make_blobs(
     cluster_std=0.3,
     random_state=33,
 )
-test_data, labels = np.asarray(blobs[0]), np.asarray(blobs[1])
+test_data = np.asarray(blobs[0])
 
 # %% [markdown]
 # Because the clustering result can be used to detect duplicate and outlier data, modify the dataset to contain a few
@@ -96,33 +71,6 @@ test_data, labels = np.asarray(blobs[0]), np.asarray(blobs[1])
 test_data[71] = [1, 5]
 test_data[79] = test_data[24]
 test_data[63] = test_data[58] + 1e-5
-labels[79] = labels[24]
-labels[63] = labels[58]
-
-# %% [markdown]
-# ## Visualizing the clusters
-
-# %%
-# Mapping from labels to colors
-label_to_color = np.array(["b", "r", "g", "y", "m", "gray"])
-
-# Translate labels to colors using vectorized operation
-color_array = label_to_color[labels]
-
-# Set plotting parameters
-plot_kwds = {"alpha": 0.5, "s": 50, "linewidths": 0}
-
-# Create scatter plot
-plt.scatter(test_data.T[0], test_data.T[1], c=color_array, **plot_kwds)
-
-# Annotate each point in the scatter plot
-for i, (x, y) in enumerate(test_data):
-    plt.annotate(str(i), (x, y), textcoords="offset points", xytext=(0, 1), ha="center")
-
-# %%
-# Verify the number of datapoints and that the shape is 2 dimensional
-print("Number of samples: ", len(test_data))
-print("Array shape:", test_data.ndim)
 
 # %% [markdown]
 # ## Cluster the data
@@ -139,6 +87,8 @@ clusters["clusters"]
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
+assert len(test_data) == 100
+assert test_data.ndim == 2
 assert clusters["clusters"].max() == 4
 assert clusters["clusters"].min() == -1
 
@@ -146,8 +96,10 @@ assert clusters["clusters"].min() == -1
 # ### Visualize the resulting clusters
 
 # %%
-# Using the same plotting as above
+# Color each point by its cluster. Cluster -1 holds the points that belong to no cluster and takes the last color.
+label_to_color = np.array(["b", "r", "g", "y", "m", "gray"])
 color_array = label_to_color[clusters["clusters"]]
+plot_kwds = {"alpha": 0.5, "s": 50, "linewidths": 0}
 plt.scatter(test_data.T[0], test_data.T[1], c=color_array, **plot_kwds)
 
 # Annotate each point in the scatter plot
@@ -155,10 +107,7 @@ for i, (x, y) in enumerate(test_data):
     plt.annotate(str(i), (x, y), textcoords="offset points", xytext=(0, 1), ha="center")
 
 # %% [markdown]
-# ## Results
-#
-# The results list each category, followed by the number of items in the category, and then display those items on the
-# line below.
+# ## Find outliers and duplicates
 #
 # For the outlier results, the clusterer provides a list of all points it found to be outliers.
 #
@@ -186,6 +135,5 @@ assert len(duplicates_result.near) == 2
 # ## Next steps
 #
 # - [Embeddings](../concepts/Embeddings.md) — Understand feature extraction and vector embeddings for clustering.
-# - [Data Integrity](../concepts/DataIntegrity.md) — Explore outlier and duplicate detection methodologies.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate unlabeled image datasets using clustering and coverage metrics.
 # - [How to identify duplicates](./h2_deduplicate.py) — Detect exact and near-duplicate images in dataset collections.

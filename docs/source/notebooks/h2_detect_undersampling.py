@@ -15,37 +15,15 @@
 
 # %% [markdown]
 # # How to detect undersampled data subsets
-
-# %% [markdown]
-# ## Problem statement
 #
-# For most computer vision tasks like **image classification** and **object detection**, we often have a lot of images,
-# but certain subsets of the images can be undersampled, such as label, style within a label, etc. A way to detect this
-# regional sparsity is through [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space)
-# analysis.
+# Most computer vision datasets have many images, but some subsets, such as a label or a style within a label, can be
+# undersampled. [Coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) analysis finds this
+# regional sparsity, and the {class}`.Coverage` evaluator returns example images that have few similar instances in the dataset.
 #
-# To help with this, the {class}`.Coverage` evaluator provides a user with example images which have few similar
-# instances within the provided dataset.
-
-# %% [markdown]
-# ### When to use
+# Use it when you have many images but only a small fraction from certain regimes or labels.
 #
-# The {class}`.Coverage` evaluator should be used when you have lots of images, but only a small fraction from certain
-# regimes/labels.
-#
-# ### What you will need
-#
-# 1. Image classification dataset.
-# 1. A model that turns each image into an embedding. This how-to uses an autoencoder trained on MNIST, which is
-#    provided with the guide.
-# 1. A Python environment with the following packages installed:
-#    - `dataeval`
-#    - `tabulate`
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries needed to set up a minimal working example
+# You need an image classification dataset, a model that turns each image into an embedding, `dataeval` and `tabulate`. This
+# guide uses an autoencoder trained on MNIST, which stands in for your own model.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -99,8 +77,6 @@ from dataeval.data import Limit, View
 from dataeval.extractors import TorchExtractor
 from dataeval.scope import Coverage
 
-print(torch.cuda.is_available())
-
 # %% [markdown]
 # ## Load the data
 #
@@ -124,6 +100,8 @@ subset = View(train_ds, Limit(2000))
 
 
 # %% [markdown]
+# ## Create the embeddings
+#
 # In this how-to, you use an autoencoder to reduce the dimension of the MNIST images.
 #
 # The autoencoder stands in for the model that you would use on your own data. Any extractor works, such as a pre-trained
@@ -131,7 +109,7 @@ subset = View(train_ds, Limit(2000))
 # page lists the extractors.
 
 
-# %%
+# %% tags=["hide-input"]
 # Define model architecture
 class Autoencoder(nn.Module):
     def __init__(self):
@@ -198,6 +176,8 @@ metadata = Metadata(subset)
 labels = metadata.class_labels
 
 # %% [markdown]
+# ## Visualize the embeddings
+#
 # To visualize the encodings, we will use TSNE on them to view separation.
 
 # %%
@@ -220,6 +200,9 @@ plt.show()
 # %% [markdown]
 # Some good separation, but you can see a few images in the "gaps". This could be an artifact of dimension reduction, or
 # suggest that we have poor coverage for some covariates.
+
+# %% [markdown]
+# ## Measure the coverage
 #
 # Measure the coverage with {class}`.Coverage`. It rescales the embeddings to the unit interval for you, so the range of
 # your extractor's output does not matter.
@@ -255,6 +238,5 @@ assert (wonky / 20) > 0.4
 # ## Next steps
 #
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias, representation, and coverage geometry.
-# - [Acting on Results](../concepts/ActingOnResults.md) — Recommendations for addressing coverage gaps and dataset issues.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover structure, clusters, and coverage in unlabeled datasets.
 # - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.

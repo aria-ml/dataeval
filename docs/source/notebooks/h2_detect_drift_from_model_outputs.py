@@ -15,31 +15,15 @@
 
 # %% [markdown]
 # # How to detect distribution shift from precomputed model outputs
-
-# %% [markdown]
-# ## Problem statement
 #
-# In many production monitoring environments, you do not have direct access to the model, its weights,
-# or the original training data. You might only have logs of what the model outputted — class probabilities,
-# logits, embeddings, or hard prediction labels — recorded over time.
+# In many production monitoring environments you have no access to the model, its weights or the original training data, only
+# logs of what the model output over time: class probabilities, logits, embeddings or hard prediction labels. DataEval's
+# drift detectors accept raw arrays, so you can pass those outputs to `.fit()` and `.predict()` without wrapping a model in a
+# `FeatureExtractor`.
 #
-# Monitoring from outputs alone is critical for real-world observability. Fortunately,
-# DataEval's drift detectors treat raw arrays as first-class citizens. You do not need to wrap a model in
-# a `FeatureExtractor` if you already have the outputs; you can pass numpy arrays directly to `.fit()` and
-# `.predict()`.
+# Use this guide when you want to detect different types of shift from precomputed predictions alone.
 #
-# This guide shows how to detect different types of shift using only precomputed predictions.
-#
-# ### What you will need
-#
-# - A Python environment with the `dataeval` package installed. No extra dependencies (like `torch` or
-#   `maite-datasets`) are required.
-
-# %% [markdown]
-# ## Getting started
-#
-# Import the libraries needed for this example. We will use NumPy to simulate our historical (baseline)
-# predictions and our incoming (operational) predictions.
+# You need `dataeval`. No extra dependencies, such as `torch` or `maite-datasets`, are required.
 
 # %% tags=["remove_cell"]
 try:
@@ -62,7 +46,7 @@ set_seed(0, all_generators=True)
 rng = np.random.default_rng(0)
 
 # %% [markdown]
-# ## Confidence/uncertainty drift (using entropy)
+# ## Detect confidence drift with entropy
 #
 # If a deployed model encounters data outside its training distribution, its predictions typically become
 # less confident (more uniform). We can calculate the {term}`Shannon entropy<Shannon Entropy>` of the predicted
@@ -104,7 +88,7 @@ print(f"Confidence Shift Detected: {result.drifted}")
 assert result.drifted
 
 # %% [markdown]
-# ## Marginal class probability shift
+# ## Detect marginal class probability shift
 #
 # Sometimes the model remains confident, but the frequency with which it predicts certain classes changes.
 # You can pass the raw probability arrays `(N, C)` directly into the univariate detector. It will
@@ -131,7 +115,7 @@ assert result_marginal.drifted
 assert result_marginal.details["feature_drift"].any()
 
 # %% [markdown]
-# ## Joint probability shift (multivariate)
+# ## Detect joint probability shift
 #
 # If the relationships or correlations between the predicted classes shift, univariate tests might miss it.
 # The {class}`.DriftDomainClassifier` treats the model outputs as features and trains a LightGBM classifier
@@ -149,7 +133,7 @@ print(f"Multivariate Shift Detected: {result_multivariate.drifted} (AUROC: {resu
 assert result_multivariate.drifted
 
 # %% [markdown]
-# ## Label shift (prior shift) from hard predictions
+# ## Detect label shift from hard predictions
 #
 # If you don't even have probabilities — only discrete integer labels output by the model — you can still
 # detect label shift. Simply one-hot encode the predictions to create an `(N, C)` array where each row
@@ -177,6 +161,5 @@ assert result_label.drifted
 # ## Next steps
 #
 # - [Distribution Shift](../concepts/DistributionShift.md) — Explore types of distribution shift and strategies for detecting drift.
-# - [Divergence](../concepts/Divergence.md) — Learn about distance and divergence metrics used to compare distributions.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational streams over time.
 # - [How to detect drift using prediction uncertainty](./h2_detect_uncertainty_drift.py) — Calculate uncertainty metrics to monitor distribution changes.

@@ -15,42 +15,17 @@
 
 # %% [markdown]
 # # How to conform and merge datasets with different label vocabularies
-
-# %% [markdown]
-# ## Problem statement
 #
-# You have a curated **reference** dataset, and a second **incoming** dataset arrives
-# labeled under a *different scheme*: different class names, different (or reordered)
-# integer indices, and an overlapping-but-not-identical set of classes. You cannot
-# simply concatenate them — index `0` might mean `"sedan"` in one and `"submarine"`
-# in the other, and one dataset may contain classes the other has never seen.
+# A second, incoming dataset can arrive labeled under a different scheme: different class names, reordered indices and an
+# overlapping but not identical set of classes. You cannot simply concatenate it with your reference dataset, because index `0`
+# might mean `"sedan"` in one and `"submarine"` in the other. This guide conforms the incoming dataset to the reference
+# vocabulary, an {class}`.Ontology`, with {func}`.label_alignment` and {class}`.Relabel`, then merges the two with
+# {func}`.merge_datasets`. See [ontology alignment](./h2_align_label_spaces.py).
 #
-# This guide **conforms** the incoming dataset to your reference vocabulary (an
-# {class}`.Ontology`) and then **merges** the two into a single dataset you can
-# analyze together. It builds on
-# [ontology alignment](./h2_align_label_spaces.py): alignment establishes *how* the
-# labels correspond; {class}`.View` with {class}`.Relabel` *applies* that to the
-# data, and {func}`.merge_datasets` combines the conformed results.
-
-# %% [markdown]
-# ```{note}
-# The dataset-view API is {class}`.View`, built from an ordered pipeline of
-# {class}`.Operation` steps (such as {class}`.Relabel`, {class}`.Filter`, and
-# {class}`.Limit`).
-# ```
-
-# %% [markdown]
-# ### When to use
+# Use it to combine annotation sources that name or index their classes differently, or to bring an incoming dataset into a
+# fixed reference taxonomy before analysis.
 #
-# - combining annotation sources that name or index their classes differently
-# - bringing an incoming dataset into a fixed reference taxonomy before analysis
-# - reconciling a partially-overlapping class set against a reference vocabulary
-#
-# ### What you will need
-#
-# 1. A reference {class}`.Ontology` (the target vocabulary).
-# 1. Two datasets to combine.
-# 1. `dataeval` installed (`pip install dataeval`).
+# You need a reference ontology and two datasets.
 
 # %% tags=["remove_cell"]
 try:
@@ -73,16 +48,13 @@ from dataeval.data import Relabel, View, merge_datasets
 from dataeval.protocols import DatasetMetadata
 
 # %% [markdown]
-# ## A tiny dataset for the example
-#
 # Conforming and merging act purely on **labels** and `index2label`, so the images
-# are irrelevant here — we use a small in-memory dataset with blank images to keep
-# the example fast and self-contained. A real
+# are irrelevant here. The example uses a small in-memory dataset with blank images. A real
 # {class}`~dataeval.protocols.AnnotatedDataset` (e.g. a `maite-datasets` loader or
 # your own) works identically.
 
 
-# %%
+# %% tags=["hide-input"]
 class ToyDataset:
     """A minimal image-classification dataset: one-hot targets + an index2label."""
 
@@ -107,7 +79,7 @@ def labels_from_counts(counts: dict[str, int], index2label: dict[int, str]) -> l
 
 
 # %% [markdown]
-# ## A reference vocabulary
+# ## Define the reference vocabulary
 #
 # The reference vocabulary is an {class}`.Ontology` — the label space everything will
 # be expressed in. Here is a taxonomy of vessels grouped by domain (air / land /
@@ -124,7 +96,7 @@ print(reference_ontology)
 print("reference vocabulary:", {i: reference_ontology.concept(c).label for i, c in enumerate(reference_ontology.ids)})
 
 # %% [markdown]
-# ## The reference dataset, conformed to the vocabulary
+# ## Conform the reference dataset
 #
 # Our reference data uses its **own** label ordering. We align its class names to the
 # ontology and conform it. Every class is in the vocabulary, so this is lossless — it
@@ -145,7 +117,7 @@ print("reference images:", len(reference))
 print("reference now uses the vocabulary:", reference.metadata.get("index2label"))
 
 # %% [markdown]
-# ## An incoming dataset in its own label scheme
+# ## Align the incoming labels to the reference vocabulary
 #
 # The incoming data uses a **different, reordered** `index2label` (note `submarine`
 # is index `0` here), and an overlapping-but-different class set: `sedan` and
@@ -162,8 +134,6 @@ incoming = ToyDataset(
 print("incoming vocabulary:", incoming.metadata.get("index2label"))
 
 # %% [markdown]
-# ## Align the incoming labels to the reference vocabulary
-#
 # {func}`.label_alignment` relates the incoming class *names* to the reference
 # ontology. Matching is by name, so the reordered indices are irrelevant — `sedan`,
 # `frigate`, and `fighter jet` map by equivalence, while `submarine` is
@@ -194,7 +164,7 @@ print(
 )
 
 # %% [markdown]
-# ## Merge
+# ## Merge the datasets
 #
 # Both datasets now share one `index2label`, so {func}`.merge_datasets` can combine
 # them into a single dataset view. The per-class counts show the union: `sedan` and
@@ -211,13 +181,15 @@ print("per-class counts:", dict(counts))
 
 # %% [markdown]
 # Conforming first is what makes the merge sound. Merging the datasets *before*
-# conforming fails, because their label vocabularies do not line up:
+# conforming raises a `ValueError`, because their label vocabularies do not line up.
 
-# %%
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
 try:
     merge_datasets(reference, incoming)
-except ValueError as error:
-    print("without conforming:", str(error).splitlines()[0])
+    raise AssertionError("merging before conforming should raise")
+except ValueError:
+    pass
 
 # %% [markdown]
 # ## Next steps

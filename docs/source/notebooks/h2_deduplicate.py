@@ -15,36 +15,15 @@
 
 # %% [markdown]
 # # How to identify duplicates
-
-# %% [markdown]
-# ## Problem statement
 #
-# One of the first steps in Exploratory Data Analysis (EDA) is to check for duplicates. Duplicates add no new information
-# and can distort model training by over-emphasizing features that in appear in the duplicates.
+# Duplicates add no new information and can distort model training by over-emphasizing the features that appear in them.
+# {class}`.Duplicates` finds exact and near duplicate images so you can remove them before you train. It also looks past
+# pixels: when a dataset carries object detection targets, it checks whether two items share one annotation (a synthetic
+# copy) or share pixels but disagree on annotation (one collect labeled twice).
 #
-# DataEval provides a Duplicates class to assist you in removing duplicates so you can start training your models on high
-# quality data.
-
-# %% [markdown]
-# ### When to use
+# Use it when you need to find duplicate images in a dataset, as one of the first steps of exploratory data analysis.
 #
-# The Duplicates class should be used if you need to find duplicate images in your dataset. It also looks past pixels:
-# when your dataset carries object detection targets, it checks whether two items share one annotation (a synthetic
-# copy) or share pixels but disagree on annotation (one collect labeled twice) - see the annotation duplicates
-# section below.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A python environment with following packages installed:
-#    - dataeval
-#    - maite-datasets
-# 1. A dataset to analyze
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries needed to set up a minimal working example
+# You need `dataeval`, `maite-datasets` and a dataset to analyze.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -72,7 +51,7 @@ from dataeval.quality import Duplicates
 set_max_processes(4)
 
 # %% [markdown]
-# ## Loading in the data
+# ## Load the data
 #
 # Load the MNIST data and create the dataset.
 #
@@ -89,7 +68,7 @@ labels = Metadata(testing_dataset).class_labels
 # %% [markdown]
 # Because the MNIST dataset does not contain any exact duplicates we are going to adjust the dataset to include some.
 
-# %%
+# %% tags=["hide-input"]
 # Creating some indices to duplicate
 print("Exact duplicates")
 duplicates = {}
@@ -104,7 +83,7 @@ indices_with_duplicates = [duplicates.get(i, i) for i in range(len(testing_datas
 duplicates_ds = View(testing_dataset, Indices(indices_with_duplicates))
 
 # %% [markdown]
-# ## Finding the duplicates
+# ## Find the duplicates
 #
 # Now we are asking our Duplicates class to find the needle in the haystack. There are only 4 exact duplicates.
 
@@ -136,7 +115,7 @@ for k, v in duplicates.items():
 
 
 # %% [markdown]
-# ## Removing the duplicates
+# ## Remove the duplicates
 #
 # `deduplicate()` turns the result into a plan of what to remove. Its arguments state the policy: which kinds of
 # duplicate to collapse, and which member of each set to keep. By default it collapses exact duplicates and keeps
@@ -157,7 +136,7 @@ assert len(plan) == len(duplicates)
 assert len(deduplicated_ds) == len(duplicates_ds) - len(duplicates)
 
 # %% [markdown]
-# ## Beyond pixels: annotation duplicates
+# ## Find annotation duplicates
 #
 # MNIST has no object detection targets, so everything above compared pixels only. When a dataset does carry targets
 # (boxes and labels), `Duplicates` also digests the annotation itself - on by default, no argument needed - and two
@@ -166,10 +145,11 @@ assert len(deduplicated_ds) == len(duplicates_ds) - len(duplicates)
 # - `divergent()` - items whose annotation was checked and found to disagree: one collect labeled two different ways.
 # - `augmented()` - items sharing one annotation over different pixels: the signature of a synthetic copy.
 #
-# Build a tiny object detection dataset with one pair of each to see both.
+# Build a tiny object detection dataset with four items to see both. Items 0 and 1 have identical pixels and two different
+# boxes, a divergent pair. Items 2 and 3 have the same box over two independently sampled images, an augmented pair.
 
 
-# %%
+# %% tags=["hide-input"]
 @dataclass
 class BoxTarget:
     """A minimal object detection target: boxes, labels, and scores."""
@@ -204,13 +184,13 @@ class TinyObjectDetectionDataset:
 rng = np.random.default_rng(0)
 same_image = rng.random((3, 16, 16))
 
-# Items 0, 1: identical pixels, two different boxes drawn for the same collect - a divergent pair.
-# Items 2, 3: identical annotation, two independently sampled images - an augmented pair.
 annotation_images = [same_image, same_image.copy(), rng.random((3, 16, 16)), rng.random((3, 16, 16))]
 annotation_boxes = [[[1.0, 1.0, 6.0, 6.0]], [[9.0, 9.0, 14.0, 14.0]], [[0.0, 0.0, 5.0, 5.0]], [[0.0, 0.0, 5.0, 5.0]]]
 annotation_labels = [[0], [0], [0], [0]]
 
 annotation_ds = TinyObjectDetectionDataset(annotation_images, annotation_boxes, annotation_labels)
+
+# %%
 annotation_results = Duplicates(hash_radius=0).evaluate(annotation_ds)
 
 # %% [markdown]
@@ -236,7 +216,6 @@ assert annotation_results.augmented().data()["item_indices"].item().to_list() ==
 # %% [markdown]
 # ## Next steps
 #
-# - [Acting on Results](../concepts/ActingOnResults.md) — Learn strategies for addressing dataset issues identified during evaluation.
 # - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data quality issues.
 # - [Identify duplicate video](./tt_identify_duplicate_video.py) — Find duplicate footage, train/test leakage, and redundant frames in video and MOT datasets.
 # - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.

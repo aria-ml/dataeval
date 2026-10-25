@@ -15,34 +15,16 @@
 
 # %% [markdown]
 # # How to measure train and test dataset divergence
-
-# %% [markdown]
-# ## Problem statement
 #
-# When evaluating new testing data, or comparing two datasets, we often want to have a quantitative way of comparing and
-# evaluating shifts in covariates. HP [divergence](../concepts/Divergence.md) is a nonparametric divergence metric which
-# gives the distance between two datasets. A divergence of 0 means that the two datasets are approximately identically
-# distributed. A divergence of 1 means the two datasets are completely separable.
-
-# %% [markdown]
-# ### When to use
+# When you evaluate new test data or compare two datasets, you often want a quantitative measure of the shift in covariates. HP
+# [divergence](../concepts/Divergence.md) is a nonparametric measure of the distance between two datasets: 0 means they are
+# approximately identically distributed, and 1 means they are completely separable.
 #
-# The `divergence_fnn` or `divergence_mst` functions should be used when you would like to know how far two datasets are
-# diverged for one another. For example, if you would like to measure
-# [operational drift](../concepts/DistributionShift.md#drift-detection).
-
-# %% [markdown]
-# ### What you will need
+# Use {func}`.divergence_fnn` or {func}`.divergence_mst` when you want to know how far apart two datasets are, for example to
+# measure [operational drift](../concepts/DistributionShift.md#drift-detection).
 #
-# 1. A Python environment with the following packages installed:
-#    - dataeval
-#    - maite-datasets
-# 1. A set of image embeddings for each dataset. This guide builds them from the pixels of MNIST images.
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries needed to set up a minimal working example
+# You need `dataeval`, `maite-datasets` and a set of image embeddings for each dataset. This guide builds them from the pixels
+# of MNIST images.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -64,7 +46,7 @@ from dataeval.data import Limit, View
 from dataeval.extractors import FlattenExtractor
 
 # %% [markdown]
-# ## Loading in data
+# ## Load the data
 #
 # Load the MNIST data and create the training dataset. For the purposes of this example, we will use subsets of the
 # training (4000) data.
@@ -85,12 +67,8 @@ extractor = FlattenExtractor()
 # Extract the embeddings of the 4000 images
 embeddings = np.asarray(Embeddings(train_view, extractor=extractor, batch_size=64))
 
-# %%
-print("Number of samples: ", len(embeddings))
-print("Image shape:", embeddings[0].shape)
-
 # %% [markdown]
-# ## Calculate initial divergence
+# ## Calculate the initial divergence
 #
 # Let's calculate the divergence using nearest neighbor disagreements between the first 2000 images and the second 2000
 # images from this sample.
@@ -110,7 +88,7 @@ print(div)
 # [read a divergence against a reference](../concepts/Divergence.md#limitations) like this one.
 
 # %% [markdown]
-# ## Loading in corrupted data
+# ## Load the corrupted data
 #
 # Now let's load in a corrupted mnist dataset.
 
@@ -121,12 +99,8 @@ corrupted_view = View(corrupted_ds, Limit(2000))
 # Reuse the extractor from above
 corrupted_emb = np.asarray(Embeddings(corrupted_view, extractor=extractor, batch_size=64))
 
-# %%
-print("Number of corrupted samples: ", len(corrupted_emb))
-print("Corrupted image shape:", corrupted_emb[0].shape)
-
 # %% [markdown]
-# ## Calculate corrupted divergence
+# ## Calculate the corrupted divergence
 #
 # Now lets calculate the divergence between this corrupted dataset and the original images
 
@@ -136,6 +110,8 @@ print(div)
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
+assert embeddings.shape == (4000, 784)
+assert corrupted_emb.shape == (2000, 784)
 assert div["divergence"] > 0.95
 
 # %% [markdown]
@@ -145,12 +121,6 @@ assert div["divergence"] > 0.95
 # %% [markdown]
 # ## Next steps
 #
-# ### Concepts
-#
 # - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional space.
 # - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across datasets.
-#
-# ### Tutorials
-#
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and operational data.
-# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Analyze unlabeled image collections using clustering and divergence metrics.

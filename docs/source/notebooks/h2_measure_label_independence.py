@@ -15,35 +15,14 @@
 
 # %% [markdown]
 # # How to measure label independence
-
-# %% [markdown]
-# ## Problem statement
 #
-# For machine learning tasks, a discrepancy in label frequencies between train and test datasets can result in poor model
-# performance.
+# A discrepancy in label frequencies between training and test datasets can hurt model performance. The
+# [label parity](../concepts/DistributionShift.md#label-parity) test compares the label distributions of two datasets.
 #
-# To help with this, DataEval has a [label parity](../concepts/DistributionShift.md#label-parity) tool that compares the
-# label distributions of two datasets.
-
-# %% [markdown]
-# ### When to use
+# Use {func}`.label_parity` when you want to know whether two datasets have statistically independent labels. It is a symmetric
+# two-sample test of homogeneity: the null hypothesis is that both datasets draw their labels from one class distribution.
 #
-# DataEval provides a {func}`.label_parity` function to use when you would like to determine if two datasets have
-# statistically independent labels. It is a symmetric two-sample test of homogeneity: the null hypothesis is that both
-# datasets draw their labels from one class distribution.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A Python environment with the following packages installed:
-#    - dataeval
-# 1. A labeled training image dataset
-# 1. A labeled test image dataset to evaluate the label distribution of
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries needed to set up a minimal working example
+# You need `dataeval` and a labeled training dataset and test dataset. This guide uses MNIST.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -115,6 +94,5 @@ assert 0.9 < results["p_value"] <= 1.0
 # ## Next steps
 #
 # - [Distribution Shift](../concepts/DistributionShift.md) — Learn about types of shift and techniques to quantify distribution changes.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
 # - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.
