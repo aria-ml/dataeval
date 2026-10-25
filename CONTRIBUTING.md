@@ -141,3 +141,11 @@ and/or improvement of existing features and workflows.
 
 Feel free to reach out to <dataeval@ariacoustics.com> as we would love to hear
 from you.
+
+### Writing documentation
+
+Tutorials, how-to guides, concept pages and docstrings follow the
+[documentation style guide](https://github.com/aria-ml/dataeval/blob/main/docs/STYLE_GUIDE.md). It covers which kind of
+page to write, the voice, the structure of a tutorial and a how-to, headings, code cells, links and the checks to run
+before you open a merge request. Run `uv run nox -s docs` to build the documentation and execute the notebooks you
+changed.
