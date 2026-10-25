@@ -15,6 +15,11 @@ from dataeval.shift._drift._known_domains import DriftKnownDomains, _greater, _s
 from dataeval.utils.thresholds import ConstantThreshold, ZScoreThreshold
 from tests.conftest import MockICDataset
 
+# This module deliberately exercises the experimental detector.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning"),
+]
+
 N_FEATURES = 6
 CENTERS = {"day": 0.0, "dusk": 4.0, "night": 8.0}
 

@@ -2225,12 +2225,13 @@ class TestChannelGroups:
 
     def test_geometry_is_not_banded(self):
         """Dropping bands does not narrow a bounding box, so `rgb_width` would restate `width`."""
-        result = image_stats(
-            [self._cube()],
-            stats=ImageStats.DIMENSION_WIDTH | ImageStats.DIMENSION_CHANNELS,
-            normalize_pixel_values=False,
-            channels=self._GROUPS,
-        )["stats"]
+        with pytest.warns(UserWarning, match="none of the requested statistics vary with a band subset"):
+            result = image_stats(
+                [self._cube()],
+                stats=ImageStats.DIMENSION_WIDTH | ImageStats.DIMENSION_CHANNELS,
+                normalize_pixel_values=False,
+                channels=self._GROUPS,
+            )["stats"]
 
         assert set(result) == {"width", "channels"}
 
@@ -2404,14 +2405,15 @@ class TestChannelGroupComposition:
         rng = np.random.default_rng(0)
         image = rng.integers(0, 256, (4, 16, 16), np.uint8)
 
-        result = image_stats(
-            [image],
-            boxes=[[(0, 0, 8, 8)]],
-            stats=ImageStats.HASH_XXHASH,
-            per_background=True,
-            normalize_pixel_values=False,
-            channels={"nir": 3},
-        )["stats"]
+        with pytest.warns(UserWarning, match="none of the requested statistics apply to a background region"):
+            result = image_stats(
+                [image],
+                boxes=[[(0, 0, 8, 8)]],
+                stats=ImageStats.HASH_XXHASH,
+                per_background=True,
+                normalize_pixel_values=False,
+                channels={"nir": 3},
+            )["stats"]
 
         assert "nir_xxhash" in result
         assert not any(name.startswith("background_") for name in result if name != "background_fraction")
@@ -2676,9 +2678,9 @@ class TestPerGroupStatsValidation:
         different remedies, so both are said; the ordering is what decides which one a
         caller running with warnings-as-errors gets to read.
         """
-        # `match` satisfies at least one of the recorded warnings; the assertions below
-        # are what pin the pair and their order.
-        with pytest.warns(UserWarning, match="nothing computes them") as caught:
+        # Accept both expected messages so neither is re-emitted; the assertions
+        # below pin the pair and their order.
+        with pytest.warns(UserWarning, match="nothing computes them|none of the requested statistics vary") as caught:
             image_stats(
                 self._IMAGE,
                 stats={"rgb": ImageStats.DIMENSION_WIDTH},

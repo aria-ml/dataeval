@@ -5,6 +5,7 @@ from dataeval.core._completeness import completeness
 
 
 @pytest.mark.required
+@pytest.mark.filterwarnings("error::RuntimeWarning")
 class TestNearestNeighborDistancesUnit:
     def test_distances_align_with_pairs(self):
         """Each returned distance is the euclidean distance between its pair, in pair order."""
@@ -29,10 +30,25 @@ class TestNearestNeighborDistancesUnit:
         """No neighbors, no distances."""
         result = completeness(np.random.default_rng(2).random((1, 4)))
         assert list(result["nearest_neighbor_distances"]) == []
+        assert result["completeness"] == 0.0
+        assert result["isotropy"] == 0.0
 
 
 @pytest.mark.required
+@pytest.mark.filterwarnings("error::RuntimeWarning")
 class TestCompletenessUnit:
+    @pytest.mark.parametrize("value", [0.0, 2.0])
+    def test_constant_cloud_has_no_dimensional_variation(self, value):
+        result = completeness(np.full((5, 3), value))
+        assert result["completeness"] == 0.0
+        assert result["isotropy"] == 0.0
+
+    def test_zero_eigenvalues_do_not_poison_isotropy(self):
+        embeddings = np.zeros((30, 4))
+        embeddings[:, 0] = np.linspace(-1, 1, 30)
+        result = completeness(embeddings)
+        assert result["isotropy"] == pytest.approx(1.0)
+
     def test_uniform_data_completeness(self):
         """Test that uniform random data has high completeness."""
         embs = np.random.random(size=(1000, 10))

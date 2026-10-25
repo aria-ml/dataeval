@@ -122,7 +122,8 @@ def feature_distance(
             results.append({"statistic": 0.0, "location": 0.0, "dist": 0.0, "p_value": 1.0})
             continue
 
-        ks_result = ks_2samp(fdata1, fdata2, method="asymp")
+        # A singleton's asymptotic effective sample size can round to zero.
+        ks_result = ks_2samp(fdata1, fdata2, method="exact" if min(n, m) == 1 else "asymp")
 
         # Normalized location
         loc = float((ks_result.statistic_location - xmin) / (xmax - xmin))

@@ -85,6 +85,7 @@ class TestMetadataFromFactors:
         np.testing.assert_array_equal(md.item_indices, item_indices)
         assert md.factor_data.shape == (5, 1)
 
+    @pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
     @pytest.mark.parametrize("evaluator", [Balance, Diversity, Parity])
     def test_end_to_end_bias_evaluators(self, evaluator):
         rng = np.random.default_rng(1)

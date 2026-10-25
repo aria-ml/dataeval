@@ -19,6 +19,12 @@ from dataeval.core._bin import bin_data
 from dataeval.types import BinSpec, LevelSpec
 from tests.embeddings.test_embeddings import MockDataset, ObjectDetectionTarget
 
+# Default binning and identifier rejection are intentional here; warning-specific tests assert emission.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:.*binned automatically:UserWarning"),
+    pytest.mark.filterwarnings("ignore:.*was dropped:UserWarning"),
+]
+
 
 def _target(count: int) -> ObjectDetectionTarget:
     if not count:

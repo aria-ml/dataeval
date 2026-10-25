@@ -44,7 +44,6 @@ class _ReturnsZero(FrameSelector):
 
     def select(self, frames):
         yield from (FrameVerdict(frame.position) for frame in frames)
-        return 0  # noqa: B901
 
 
 def _assert_source_frames_balance(frames: SequenceFrames) -> None:
@@ -64,7 +63,6 @@ class _MisreturningChain(Chain):
 
     def select(self, frames):
         yield from super().select(frames)
-        return 0  # noqa: B901
 
 
 @pytest.mark.required

@@ -188,7 +188,51 @@ class TorchExtractor(ReprMixin):
         """Validate and return the target layer for hook registration."""
         return get_valid_layer(layer_name, model)
 
-    def __call__(self, data: Any) -> Array:  # noqa: C901
+    def _to_tensors(self, data: Any) -> list[torch.Tensor]:
+        """Convert input data to a list of torch tensors."""
+        images: list[torch.Tensor] = []
+        for img in iter_images(data):
+            if isinstance(img, torch.Tensor):
+                tensor = img
+            else:
+                array = as_numpy(img)
+                tensor = torch.as_tensor(array if array.flags.writeable else array.copy())
+            for transform in self._transforms:
+                tensor = transform(tensor)
+            images.append(tensor)
+        return images
+
+    def _extract_features(self, images: list[torch.Tensor], batch_size: int) -> list[torch.Tensor]:
+        """Extract features from a list of torch tensors."""
+        outputs: list[torch.Tensor] = []
+        for start in range(0, len(images), batch_size):
+            input_tensor = torch.stack(images[start : start + batch_size]).to(self.device)
+            with torch.no_grad():
+                if self._layer_name:
+                    _ = self._model(input_tensor)  # Triggers hook
+                    output = self._captured_output
+                else:
+                    output = self._model(input_tensor)
+            postprocess_fn = self._postprocess_fn
+            if postprocess_fn is not None:
+                decoded = postprocess_fn(output)
+                output = decoded[0] if isinstance(decoded, tuple) else decoded
+            elif isinstance(output, tuple):
+                output = output[0]
+            outputs.append(output.detach().cpu())
+        return outputs
+
+    def _postprocess_outputs(self, outputs: list[torch.Tensor]) -> np.ndarray:
+        """Postprocess the list of outputs into a final numpy array."""
+        result = torch.cat(outputs).numpy()
+        if self._postprocess_fn is not None:
+            if result.ndim > 2:
+                result = result.reshape(-1, result.shape[-1])
+        elif self._flatten and result.ndim > 2:
+            result = result.reshape(result.shape[0], -1)
+        return result
+
+    def __call__(self, data: Any) -> Array:
         """
         Extract features from a batch of images.
 
@@ -214,12 +258,7 @@ class TorchExtractor(ReprMixin):
         :class:`~dataeval.Embeddings` (which loads and batches the data) instead
         of calling it directly, or set ``batch_size`` to bound the forward pass.
         """
-        images: list[torch.Tensor] = []
-        for img in iter_images(data):
-            tensor = torch.as_tensor(as_numpy(img))
-            for transform in self._transforms:
-                tensor = transform(tensor)
-            images.append(tensor)
+        images = self._to_tensors(data)
 
         if not images:
             return np.empty((0,), dtype=np.float32)
@@ -227,37 +266,9 @@ class TorchExtractor(ReprMixin):
         # batch_size is None -> a single forward pass over all images.
         bs = self._batch_size if self._batch_size is not None else len(images)
 
-        outputs: list[torch.Tensor] = []
-        for start in range(0, len(images), bs):
-            input_tensor = torch.stack(images[start : start + bs]).to(self.device)
-            with torch.no_grad():
-                if self._layer_name:
-                    _ = self._model(input_tensor)  # Triggers hook
-                    output = self._captured_output
-                else:
-                    output = self._model(input_tensor)
-            postprocess_fn = self._postprocess_fn
-            if postprocess_fn is not None:
-                # postprocess_fn decodes the full raw model output (which may be a tuple).
-                decoded = postprocess_fn(output)
-                # It may itself return a tuple of tensors; the scores are element 0.
-                output = decoded[0] if isinstance(decoded, tuple) else decoded
-            elif isinstance(output, tuple):
-                # No decoder: take the primary output (e.g. a VAE returns (recon, mu, logvar)).
-                output = output[0]
-            outputs.append(output.detach().cpu())
+        outputs = self._extract_features(images, bs)
 
-        result = torch.cat(outputs).numpy()
-
-        if self._postprocess_fn is not None:
-            # Decoded detection scores: collapse any leading dims to (n, n_classes).
-            if result.ndim > 2:
-                result = result.reshape(-1, result.shape[-1])
-        elif self._flatten and result.ndim > 2:
-            # Embeddings: flatten spatial dims (N, C, H, W) -> (N, C*H*W).
-            result = result.reshape(result.shape[0], -1)
-
-        return result
+        return self._postprocess_outputs(outputs)
 
     def __repr__(self) -> str:
         layer_info = f", layer_name={self._layer_name!r}" if self._layer_name else ""

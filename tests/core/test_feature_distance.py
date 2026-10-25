@@ -65,6 +65,7 @@ def mock_metadata(
 class TestFeatureDistance:
     """Tests valid combinations of input metadata run without errors."""
 
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
     @pytest.mark.parametrize(
         ("factors", "shape1", "shape2"),
         [
@@ -88,6 +89,14 @@ class TestFeatureDistance:
 
         assert len(result) == len(factors)
         assert isinstance(result[0]["statistic"], float)
+        for factor in result:
+            assert np.isfinite([factor["statistic"], factor["location"], factor["dist"], factor["p_value"]]).all()
+            assert 0.0 <= factor["p_value"] <= 1.0
+
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
+    def test_distinct_singletons_have_a_finite_exact_p_value(self):
+        result = feature_distance([[0.0]], [[1.0]])[0]
+        assert result == {"statistic": 1.0, "location": 0.0, "dist": 1.0, "p_value": 1.0}
 
     def test_no_warn_on_many_samples(self, RNG: Generator):
         """Solving the equation where N==M brings the sample count to 32 to make a valid solution."""

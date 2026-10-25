@@ -185,6 +185,15 @@ class TestQualityGate:
         finally:
             _numeric_scalar_stats.cache_clear()
 
+    @pytest.mark.parametrize("error", [AttributeError, TypeError, ValueError])
+    def test_unexpected_calculator_errors_propagate(self, monkeypatch, error):
+        def broken(calculators, datum, box):
+            raise error("calculator bug")
+
+        monkeypatch.setattr(image_stats_module, "_collect_calculator_stats", broken)
+        with pytest.raises(error, match="calculator bug"):
+            QualityGate("sharpness", min=0.0)
+
     def test_it_chains_first_as_the_whole_input_stage(self):
         # inverted_cdf at 0.5 is 9.0, so the gate drops frames 0-2, and Redundancy folds the constant 3-9 into frame 3
         chain = Chain(_Scripted([1.0] * 3 + [9.0] * 7, min_quantile=0.5), Redundancy())

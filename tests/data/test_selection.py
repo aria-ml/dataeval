@@ -13,6 +13,11 @@ from dataeval.data._shuffle import Shuffle
 from dataeval.data._view import View
 from dataeval.types import SourceIndex
 
+# These selection tests intentionally cover the legacy ClassFilter interface.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:'ClassFilter' is deprecated:dataeval.exceptions.DeprecatedWarning"),
+]
+
 
 class MockTarget(NamedTuple):
     label: int

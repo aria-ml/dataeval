@@ -55,6 +55,8 @@ def _get_effective_dim(x: Array, do_ranks: bool = True) -> float:
     uses the raw centered embeddings.
     """
     n, d = x.shape
+    if n < 2 or np.all(x == x[0]):
+        return 0.0
 
     # Get singular values, either with ranks or with raw data.
     if do_ranks:
@@ -72,8 +74,10 @@ def _get_effective_dim(x: Array, do_ranks: bool = True) -> float:
     # The eigenvalues of the covariance matrix are related to singular values by: eigenvalues = s^2/(n-1)
     eigenvalues = (s**2) / (n - 1)
 
-    # Filter negligible eigenvalues
-    eigenvalues = np.sort(eigenvalues)[::-1]
+    # Zero eigenvalues contribute zero entropy; exclude them before taking logs.
+    eigenvalues = eigenvalues[eigenvalues > 0]
+    if not eigenvalues.size:
+        return 0.0
 
     # Calculate entropy of normalized eigenvalues
     normalized_eigs = eigenvalues / np.sum(eigenvalues)
@@ -136,6 +140,9 @@ def completeness(embeddings: Array) -> CompletenessResult:
     makes it invariant to monotone transformations of individual embedding
     dimensions. Isotropy decomposes the raw centered embeddings, so it reports
     the variance geometry the feature extractor actually produced.
+
+    A single sample or a constant cloud has no variation to measure and returns
+    zero for both scores.
 
     ``d_eff`` in this exact form is DataEval's own, but it is not unprecedented.
     It is closely related to the *effective rank* of Roy & Vetterli (2007), which
@@ -222,7 +229,7 @@ def completeness(embeddings: Array) -> CompletenessResult:
     # This is equivalent to the Nth root of the "occupied fraction" in traditional approaches
     completeness_score = rank_effective_dim / d
 
-    isotropy_score = raw_effective_dim / manifold_dim
+    isotropy_score = raw_effective_dim / manifold_dim if manifold_dim else 0.0
 
     _logger.debug(
         "Rank effective dimensionality: %.2f, Completeness score: %.4f", rank_effective_dim, completeness_score

@@ -177,6 +177,7 @@ class TestMWUDrift:
         assert preds.details["distances"].min() >= 0.0
 
 
+@pytest.mark.filterwarnings("ignore:p-value (capped|floored):UserWarning")
 @pytest.mark.required
 class TestAndersonDrift:
     """Tests for Anderson-Darling drift detection."""
@@ -225,7 +226,10 @@ class TestAndersonDrift:
 class TestBWSDrift:
     """Tests for Baumgartner-Weiss-Schindler drift detection."""
 
-    n, n_test = 500, 200
+    # These constant, completely separated samples only exercise detector wiring.
+    # BWS permutes the pooled samples thousands of times for every feature, so
+    # hundreds of rows add substantial cost without strengthening the assertions.
+    n, n_test = 50, 20
 
     def get_embeddings(self, n: int = 100, n_features: int = 10, value: float | None = None) -> Embeddings:
         arr = (

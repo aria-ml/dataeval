@@ -130,10 +130,11 @@ class _TinyDetector(torch.nn.Module):
         return boxes, scores
 
 
-@pytest.fixture
-def onnx_classifier(tmp_path: Path) -> Path:
+@pytest.fixture(scope="session")
+def onnx_classifier(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Export once per worker; tests only read the model file."""
     _require_onnx_runtime()
-    path = tmp_path / "classifier.onnx"
+    path = tmp_path_factory.mktemp("onnx_classifier") / "classifier.onnx"
     model = _TinyClassifier(n_classes=4).eval()
     dummy = torch.zeros(1, 3, 8, 8)
     with warnings.catch_warnings(action="ignore"):
@@ -149,10 +150,11 @@ def onnx_classifier(tmp_path: Path) -> Path:
     return path
 
 
-@pytest.fixture
-def onnx_detector(tmp_path: Path) -> Path:
+@pytest.fixture(scope="session")
+def onnx_detector(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Export once per worker; tests only read the model file."""
     _require_onnx_runtime()
-    path = tmp_path / "detector.onnx"
+    path = tmp_path_factory.mktemp("onnx_detector") / "detector.onnx"
     model = _TinyDetector(n_boxes=5, n_classes=4).eval()
     dummy = torch.zeros(1, 3, 8, 8)
     with warnings.catch_warnings(action="ignore"):

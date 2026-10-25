@@ -69,6 +69,7 @@ class TestShiftConfigs:
         with pytest.raises(ValidationError, match=field):
             detector.Config(**{field: value})
 
+    @pytest.mark.filterwarnings("ignore:'DriftKnownDomains' is experimental:dataeval.exceptions.ExperimentalWarning")
     @pytest.mark.parametrize("detector", _BUILDABLE, ids=_name)
     def test_constructor_refuses_a_wrong_type(self, detector):
         field, value = _WRONG_TYPE[detector]

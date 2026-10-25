@@ -17,6 +17,12 @@ from dataeval.flags import ImageStats
 from dataeval.types import FactorInfo, LevelSpec
 from tests.embeddings.test_embeddings import MockDataset
 
+# These schema tests intentionally derive bins and retain legacy statistics compatibility coverage.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:.*binned automatically:UserWarning"),
+    pytest.mark.filterwarnings("ignore:'compute_ratios' is deprecated:dataeval.exceptions.DeprecatedWarning"),
+]
+
 
 @dataclass
 class ObjectDetectionTarget:

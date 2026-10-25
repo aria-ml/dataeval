@@ -562,6 +562,7 @@ class TestODSplitDataset:
         check_stratification(labels, splits, tolerance=0.02)
 
 
+@pytest.mark.filterwarnings("ignore:`patient_id` was dropped:UserWarning")
 @pytest.mark.required
 class TestSplitOnNamesAFactorTheMetadataDoesNotCarry:
     """``split_on`` exists to keep rows that belong together on one side of a split.

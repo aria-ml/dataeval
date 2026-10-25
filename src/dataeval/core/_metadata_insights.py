@@ -50,9 +50,16 @@ def _calc_median_deviations(reference: NDArray[Any], test: NDArray[Any]) -> NDAr
     pdev = np.where(ref_dev > 0, ref_dev, np.nan)  # (S, F)
     ndev = np.where(ref_dev < 0, ref_dev, np.nan)  # (S, F)
 
-    # Calculate middle of positive and negative distributions per feature
-    pscale = np.nanmedian(pdev, axis=0)  # (F, )
-    nscale = np.abs(np.nanmedian(ndev, axis=0))  # (F, )
+    # Empty sides of a feature's distribution have no median. Keep the unit
+    # fallback for those columns without reducing an all-NaN slice.
+    positive = np.any(ref_dev > 0, axis=0)
+    negative = np.any(ref_dev < 0, axis=0)
+    pscale = np.ones(ref_median.shape)
+    nscale = np.ones(ref_median.shape)
+    if np.any(positive):
+        pscale[positive] = np.nanmedian(pdev[:, positive], axis=0)
+    if np.any(negative):
+        nscale[negative] = np.abs(np.nanmedian(ndev[:, negative], axis=0))
 
     # Replace 0's for division. Negatives should not happen
     pscale = np.where(pscale > 0, pscale, 1.0)  # (F, )
@@ -251,9 +258,6 @@ def factor_predictors(  # noqa: C901
     # Stack all factor arrays
     data = np.column_stack(arrays)  # (n_samples, n_factors)
 
-    # Calculate mean, std of each factor over all samples
-    scaled_data = (data - np.mean(data, axis=0)) / np.std(data, axis=0, ddof=1)  # (n_samples, n_factors)
-
     # Default to all continuous if not specified
     if discrete_features is None:
         discrete_features = [False] * len(factor_names)
@@ -262,6 +266,17 @@ def factor_predictors(  # noqa: C901
         raise ShapeMismatchError(
             f"discrete_features length ({len(discrete_features)}) must match number of factors ({len(factor_names)})",
         )
+
+    scaled_data = np.empty(data.shape, dtype=np.float64)
+    for column, discrete in enumerate(discrete_features):
+        if discrete:
+            # Discrete MI expects category codes; standardizing them turns the
+            # codes into apparent continuous labels and triggers sklearn warnings.
+            scaled_data[:, column] = np.unique(data[:, column], return_inverse=True)[1]
+        else:
+            values = np.asarray(data[:, column], dtype=np.float64)
+            scale = np.std(values, ddof=1) if n_samples > 1 else 0.0
+            scaled_data[:, column] = (values - np.mean(values)) / (scale if scale > 0 else 1.0)
 
     mutual_info_values = mutual_info_classif(
         X=scaled_data,

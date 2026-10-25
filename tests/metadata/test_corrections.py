@@ -147,7 +147,8 @@ class TestUnusableRows:
     def test_a_column_dropped_for_naming_its_rows_names_them_too(self):
         """Its values were kept, like a held-back column's, so they can be found the same way."""
         values = _timestamps()
-        rows = _md(values).unusable_rows("d")
+        with pytest.warns(UserWarning, match="`d` was dropped"):
+            rows = _md(values).unusable_rows("d")
         assert rows["item_index"].to_list() == list(range(len(values)))
         assert rows["value"].to_list() == values
 
@@ -374,6 +375,7 @@ def _timestamps():
     return [f"2020-08-27T{hour:02d}:{minute:02d}:00" for hour in range(8, 16) for minute in range(0, 42, 7)]
 
 
+@pytest.mark.filterwarnings("ignore:`d` was dropped:UserWarning")
 @pytest.mark.required
 class TestRepairingAColumnThatNamesItsRows:
     """A timestamp is dropped for a reason no cleanup fixes, and repaired all the same."""
@@ -411,6 +413,7 @@ class TestRepairingAColumnThatNamesItsRows:
         assert md.dropped_factors == {"d": ["cardinality_over_budget"]}
         assert "d" not in md.factor_names
 
+    @pytest.mark.filterwarnings("ignore:.*binned automatically:UserWarning")
     def test_the_instant_is_kept_and_cut_into_bins(self):
         """A numeric column never names its rows however distinct its values: it is cut
         into bins instead, which is the whole reason the identifier rule asks only about
@@ -528,6 +531,7 @@ class TestParseDateTimeReadsEverySpellingOfAMoment:
         assert sorted(set(md.rows_at("sequence")["d"].to_list())) == [12, 13, 14, 15, 16, 17]
 
 
+@pytest.mark.filterwarnings("ignore:`d` was dropped:UserWarning")
 @pytest.mark.required
 class TestUnusableSamplesAColumnThatNamesItsRows:
     """The values of an identifier column are near-unique by definition, so reporting every

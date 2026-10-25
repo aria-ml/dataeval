@@ -26,6 +26,7 @@ class TestMDPreprocessingUnit:
             cont_factors = output.rows_at(output.view).select(output.factor_names).to_numpy().T[0]
             assert np.all(cont_factors == [0.1, 0.2, 0.3])
 
+    @pytest.mark.filterwarnings("ignore:.*binned automatically:UserWarning")
     @pytest.mark.parametrize(
         "data_values",
         [
@@ -92,5 +93,6 @@ class TestMDPreprocessingFunctional:
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 100}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.factor_data
+        with pytest.warns(UserWarning, match="Declared cuts left bins unused: data1"):
+            disc_factors = output.factor_data
         assert len(np.unique(disc_factors)) == 5

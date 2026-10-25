@@ -624,7 +624,9 @@ class TestStreamPairs:
 
         peak = 0
         for _pair in _stream_pairs(frames(), gap):
-            gc.collect()
+            # Only frames just created by this loop need collecting. A full
+            # collection repeatedly scans all the imported ML libraries.
+            gc.collect(0)
             peak = max(peak, sum(ref() is not None for ref in alive))
         assert peak == gap + 1
 

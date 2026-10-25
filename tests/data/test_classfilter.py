@@ -16,6 +16,11 @@ from dataeval.data._view import View
 from dataeval.protocols import ObjectDetectionTarget
 from dataeval.utils._mask import try_mask_object
 
+# Compatibility coverage deliberately calls the deprecated shim; its warning has a separate test.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:'ClassFilter' is deprecated:dataeval.exceptions.DeprecatedWarning"),
+]
+
 
 @pytest.mark.required
 class TestTryMaskObject:

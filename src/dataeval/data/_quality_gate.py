@@ -39,17 +39,20 @@ def _single_statistics() -> dict[str, tuple[type[Any], ImageStats]]:
 def _reads_one_number(stat: str, calculator: tuple[type[Any], ImageStats]) -> bool:
     """Whether ``calculator`` reads the probe image as one real number, NaN included.
 
-    A calculator that raises on the probe is unsupported rather than fatal: it may be a costly or
-    model-based one that cannot run here, and the gate should refuse it, not crash.
+    A calculator that raises RuntimeError on the probe is unsupported: it may depend on an
+    unavailable model. Other failures propagate so calculator bugs remain visible.
     """
     from dataeval.core._image_stats import _collect_calculator_stats
 
     try:
         stats, _, _ = _collect_calculator_stats([calculator], _PROBE, None)
-        ((value,),) = stats[0].values()
-    except Exception:
+    except RuntimeError:
         _logger.debug("QualityGate: %r could not be read off the probe image; it is unsupported.", stat, exc_info=True)
         return False
+    values = stats[0].get(stat, [])
+    if len(stats[0]) != 1 or len(values) != 1:
+        return False
+    value = values[0]
     return isinstance(value, numbers.Real) and not isinstance(value, bool)
 
 

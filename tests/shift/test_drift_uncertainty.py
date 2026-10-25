@@ -27,7 +27,7 @@ class PtModel(nn.Module):
         self.dense1 = nn.Linear(n_features, 20)
         self.dense2 = nn.Linear(20, n_labels)
         self.dropout = nn.Dropout(0.5) if dropout else nn.Identity()
-        self.softmax = nn.Softmax() if softmax else nn.Identity()
+        self.softmax = nn.Softmax(dim=-1) if softmax else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = nn.ReLU()(self.dense1(x))

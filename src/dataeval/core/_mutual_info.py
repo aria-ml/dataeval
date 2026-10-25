@@ -88,7 +88,11 @@ def _chance_correction(contingency: Any, n_effective: int | None) -> float:
         # so nothing could have lined up by luck, and the hypergeometric sum has no range
         # to run over.
         return 0.0
-    return float(expected_mutual_information(rescaled(contingency, n_effective), n_effective))
+    # sklearn truncates rescaled margins to integers, so a rare category can
+    # have a zero margin. It still takes log(0), although the corresponding
+    # hypergeometric summation is empty and correctly contributes zero.
+    with np.errstate(divide="ignore"):
+        return float(expected_mutual_information(rescaled(contingency, n_effective), n_effective))
 
 
 def _adjusted_share(

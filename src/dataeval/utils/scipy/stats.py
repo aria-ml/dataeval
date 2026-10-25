@@ -19,6 +19,7 @@ __all__ = [
 ]
 
 from collections.abc import Sequence
+from inspect import signature
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -41,6 +42,8 @@ _SCIPY_1_12_SUPPORTS_AXIS = scipy.__version__ >= "1.12.0"
 
 # scipy.stats.bws_test was added in scipy 1.12.0; its `axis` parameter in 1.18.0.
 _BWS_TEST_SUPPORTS_AXIS = scipy.__version__ >= "1.18.0"
+
+_ANDERSON_KSAMP_SUPPORTS_VARIANT = "variant" in signature(_scipy_anderson_ksamp).parameters
 
 
 class Chi2ContingencyResult(NamedTuple):
@@ -409,6 +412,10 @@ def anderson_ksamp(
 
     Wrapper for :func:`scipy.stats.anderson_ksamp`.
     """
+    if _ANDERSON_KSAMP_SUPPORTS_VARIANT and "variant" not in kwargs:
+        # Preserve the legacy midrank choice without using SciPy's deprecated
+        # keyword or its deprecated default result format.
+        kwargs["variant"] = "midrank" if kwargs.pop("midrank", True) else "right"
     raw = _scipy_anderson_ksamp(samples, **kwargs)
 
     stat = getattr(raw, "statistic", raw[0] if isinstance(raw, tuple) else None)

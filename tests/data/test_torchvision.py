@@ -1,8 +1,10 @@
 """Tests for the TorchvisionTransform escape-hatch view operation."""
 
+import os
 import subprocess
 import sys
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
@@ -212,16 +214,21 @@ class TestDeterminism:
             "out = np.stack([np.asarray(d[0]) for d in View(ds, [op])]);"
             "print(xxh.xxh64_hexdigest(out.tobytes()))"
         )
-        digests = []
-        for hash_seed in ("0", "12345"):
+
+        def digest(hash_seed):
             result = subprocess.run(
                 [sys.executable, "-c", code],
                 capture_output=True,
                 text=True,
                 check=True,
-                env={"PATH": "/usr/bin:/bin", "PYTHONHASHSEED": hash_seed, "HOME": "/tmp"},
+                env={**os.environ, "PATH": "/usr/bin:/bin", "PYTHONHASHSEED": hash_seed, "HOME": "/tmp"},
             )
-            digests.append(result.stdout.strip())
+            return result.stdout.strip()
+
+        # Each fresh interpreter pays the torch/torchvision import cost. They
+        # are independent, so overlap startup while retaining both hash seeds.
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            digests = list(executor.map(digest, ("0", "12345")))
         assert digests[0] == digests[1]
 
     def test_two_chained_ops_with_distinct_seeds_decorrelate(self):

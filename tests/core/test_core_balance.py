@@ -410,6 +410,7 @@ class TestValidateEffectiveN:
 
 
 @pytest.mark.required
+@pytest.mark.filterwarnings("error::RuntimeWarning")
 class TestChanceCorrectionEffectiveN:
     """Verify chance correction using effective entity counts."""
 
@@ -435,6 +436,12 @@ class TestChanceCorrectionEffectiveN:
         """Verify single-entity tables produce zero expected mutual information."""
         table = contingency_matrix(np.zeros(10, dtype=np.intp), np.arange(10) % 3, sparse=True)
         assert _chance_correction(table, 1) == 0.0
+
+    def test_rare_categories_with_subunit_effective_margins_are_finite(self):
+        table = contingency_matrix([0] * 8 + [1, 2], [0, 1] * 5, sparse=True)
+        expected = _chance_correction(table, 2)
+        assert np.isfinite(expected)
+        assert 0.0 <= expected <= np.log(2)
 
     def test_counts_at_or_above_the_rows_keep_the_row_count(self):
         """Verify entity counts at or above row count use standard row-based expectation."""

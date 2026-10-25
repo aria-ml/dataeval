@@ -496,8 +496,11 @@ class TestTailCalibration:
         rng = np.random.default_rng(0)
         names = tuple(f"c{i}" for i in range(d))
         rates = []
+        # 100 fits cover 10,000–50,000 clean observations per shape. At the
+        # smallest shape they still reject a naive chi-squared tail (2.11%
+        # flagged versus 1.67% calibrated); 50 fits missed that regression.
         with use_seed(0):
-            for _ in range(200):
+            for _ in range(100):
                 x = rng.standard_normal((n, d))
                 result = combination_scores(dict(zip(names, x.T, strict=True)), groups=[names])
                 rates.append(np.mean(result["tail"] < 0.01))

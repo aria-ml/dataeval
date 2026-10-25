@@ -596,6 +596,7 @@ class Chain(FrameSelector):
         def continuation(frames: Iterator[FrameCandidate]) -> Generator[FrameVerdict, None, tuple[_StageTrace, ...]]:
             after_runs: list[_StageRun] = []
             yield from _verdicts(self._streamed(start, stop, _arriving(frames, carried), info, after_runs))
+            # SequenceFrames._returned reads the completed trace from StopIteration.value.
             return (*trace, *(run.trace() for run in after_runs))  # noqa: B901
 
         return continuation
@@ -638,4 +639,5 @@ class Chain(FrameSelector):
             # Returning a value from a generator is the protocol: SequenceFrames reads it off StopIteration.
             return self._second_pass(survivors, info, trace, runs)
         yield from _verdicts(survivors)
+        # SequenceFrames._returned reads the completed trace from StopIteration.value.
         return (*trace, *(run.trace() for run in runs))  # noqa: B901

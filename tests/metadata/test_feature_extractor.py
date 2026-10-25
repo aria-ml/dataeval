@@ -14,7 +14,7 @@ def mock_ds():
     return MockDataset(
         np.ones((10, 3, 3)),
         np.ones((10, 3)),
-        [{str(i): float(i), "category": f"cat_{i % 3}"} for i in range(10)],
+        [{"value": float(i), "category": f"cat_{i % 3}"} for i in range(10)],
     )
 
 
@@ -24,7 +24,9 @@ def mock_ds2():
     return MockDataset(
         np.ones((5, 3, 3)),
         np.ones((5, 3)),
-        [{str(i): float(i + 10), "category": f"cat_{i % 3}"} for i in range(5)],
+        # Cover the fitted bins so these binding tests do not also exercise
+        # the empty-bin diagnostics for a shifted distribution.
+        [{"value": float(2 * i), "category": f"cat_{i % 3}"} for i in range(5)],
     )
 
 
@@ -109,35 +111,35 @@ class TestMetadataFeatureExtractor:
 
     def test_call_with_data_unbound(self, mock_ds):
         """Test __call__ with data argument on unbound instance."""
-        metadata = Metadata(continuous_factor_bins={"0": 5})
+        metadata = Metadata(continuous_factor_bins={"value": 5})
         result = metadata(mock_ds)
-        assert result.shape[0] == 10
-        assert len(result.shape) == 2
+        assert result.shape == (10, 2)
 
     def test_call_bound_no_args(self, mock_ds):
         """Test __call__ without arguments uses bound dataset."""
-        metadata = Metadata(mock_ds, continuous_factor_bins={"0": 5})
+        metadata = Metadata(mock_ds, continuous_factor_bins={"value": 5})
         result = metadata()
         assert result.shape[0] == 10
 
     def test_call_same_dataset(self, mock_ds):
         """Test __call__ with same dataset (by identity) returns cached data."""
-        metadata = Metadata(mock_ds, continuous_factor_bins={"0": 5})
+        metadata = Metadata(mock_ds, continuous_factor_bins={"value": 5})
         result1 = metadata()
         result2 = metadata(mock_ds)
         np.testing.assert_array_equal(result1, result2)
 
     def test_call_different_dataset(self, mock_ds, mock_ds2):
         """Test __call__ with different dataset creates new computation."""
-        metadata = Metadata(mock_ds, continuous_factor_bins={"0": 5})
+        metadata = Metadata(mock_ds, continuous_factor_bins={"value": 5})
         result1 = metadata()
         result2 = metadata(mock_ds2)
         assert result1.shape[0] == 10
         assert result2.shape[0] == 5
+        assert result1.shape[1] == result2.shape[1] == 2
 
     def test_bind_clears_state(self, mock_ds, mock_ds2):
         """Test bind() clears cached state."""
-        metadata = Metadata(mock_ds, continuous_factor_bins={"0": 5})
+        metadata = Metadata(mock_ds, continuous_factor_bins={"value": 5})
         # Access to cache state
         _ = metadata()
 

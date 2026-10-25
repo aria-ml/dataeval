@@ -397,7 +397,8 @@ class TestWhereAndHaving:
         metadata = Metadata(_mot_dataset([[4, 4], [[1, 2, 3]]]))
         metadata.continuous_factor_bins = {"time_s": 3}
         metadata._structure()
-        metadata.factor_data  # noqa: B018  # bin
+        with pytest.warns(UserWarning, match="Declared cuts left bins unused: time_s"):
+            metadata.factor_data  # noqa: B018  # bin
         before = metadata._store.frame("unit")["time_s↕"].to_list()
         kept = metadata.where(pl.col("item_index") == 0, level="unit")
         survivors = kept._store.frame("unit")["time_s↕"].to_list()

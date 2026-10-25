@@ -10,6 +10,11 @@ from dataeval import Metadata
 from dataeval.bias import Balance, Diversity, Parity
 from tests.conftest import MockICDataset
 
+# Parity is intentionally included in the evaluator interface checks.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning"),
+]
+
 _FACTORS = {
     "var_cat": ["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"],
     "var_float_cat": [1.1, 1.1, 0.1, 0.1, 1.1, 0.1, 1.1, 0.1, 0.1, 1.1, 1.1, 0.1],

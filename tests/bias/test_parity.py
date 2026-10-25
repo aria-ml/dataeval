@@ -298,7 +298,8 @@ class TestCellsNameTheirLevels:
 
     def test_a_binned_factors_level_is_named_by_its_interval(self):
         """`illum_lux = 3` said nothing about which lighting to go and collect."""
-        levels = Parity().evaluate(self._metadata()).cells.filter(pl.col("factor_name") == "illum_lux")["level"]
+        with pytest.warns(UserWarning, match="binned automatically"):
+            levels = Parity().evaluate(self._metadata()).cells.filter(pl.col("factor_name") == "illum_lux")["level"]
         assert levels.len() > 0
         for name in levels:
             assert not name.lstrip("-").isdigit(), f"{name!r} is still a bare code"

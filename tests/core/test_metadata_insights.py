@@ -13,6 +13,7 @@ from dataeval.exceptions import ShapeMismatchError
 
 
 @pytest.mark.required
+@pytest.mark.filterwarnings("error::RuntimeWarning")
 class TestCalcMedianDeviations:
     """Tests for the _calc_median_deviations helper function."""
 
@@ -362,6 +363,12 @@ class TestFindFactorPredictors:
         )
 
         assert set(result.keys()) == {"categorical", "continuous"}
+
+    @pytest.mark.filterwarnings("error::UserWarning")
+    def test_noninteger_categories_are_treated_as_discrete_labels(self):
+        factors = {"category": np.repeat([0.1, 0.2], 20)}
+        result = factor_predictors(factors, list(range(20, 40)), discrete_features=[True])
+        assert result["category"] == pytest.approx(1.0)
 
     def test_all_samples_flagged(self):
         """Tests when all samples are flagged."""

@@ -11,6 +11,11 @@ from dataeval.core._compute_stats import SOURCE_INDEX
 from dataeval.flags import ImageStats
 from dataeval.types import SourceIndex
 
+# Compatibility coverage deliberately calls the deprecated API; its warning has a separate test.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:'compute_ratios' is deprecated:dataeval.exceptions.DeprecatedWarning"),
+]
+
 
 class TestCalculateRatios:
     """Test compute_ratios function with various scenarios."""

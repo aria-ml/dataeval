@@ -44,6 +44,7 @@ _CASES = [
 
 @pytest.mark.required
 class TestConstructorsValidate:
+    @pytest.mark.filterwarnings("ignore:'Parity' is experimental:dataeval.exceptions.ExperimentalWarning")
     @pytest.mark.parametrize(("build", "field", "value"), [c[1:] for c in _CASES], ids=[c[0] for c in _CASES])
     def test_a_wrong_argument_raises(self, build, field, value):
         with pytest.raises(ValidationError, match=field):

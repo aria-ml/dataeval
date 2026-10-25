@@ -137,7 +137,8 @@ def test_a_walk_holds_a_bounded_number_of_frames():
         nonlocal peak
         base = texture(0)
         for k in range(12):
-            gc.collect()
+            # Collect newly created frames without rescanning the entire ML heap.
+            gc.collect(0)
             peak = max(peak, sum(ref() is not None for ref in alive))
             frame = FakeFrame(np.roll(base, 3 * k, axis=1), k)  # built lazily, never listed
             alive.append(weakref.ref(frame.pixels))

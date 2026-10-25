@@ -235,6 +235,8 @@ class TestOtherTwoSampleTests:
         ):
             bws_test(a, b)
 
+    @pytest.mark.filterwarnings("ignore:p-value (capped|floored):UserWarning")
+    @pytest.mark.filterwarnings("error:Parameter.*variant:UserWarning")
     def test_anderson_ksamp(self):
         a = np.array([1.0, 2.0, 3.0])
         b = np.array([2.0, 3.0, 4.0])
@@ -242,6 +244,25 @@ class TestOtherTwoSampleTests:
         assert isinstance(result, AndersonKsampResult)
         assert isinstance(result.statistic, float)
         assert isinstance(result.pvalue, float)
+
+    @pytest.mark.parametrize("supports_variant", [False, True])
+    @pytest.mark.parametrize("midrank", [None, True, False])
+    def test_anderson_supports_both_scipy_keyword_interfaces(self, supports_variant, midrank):
+        def legacy(samples, midrank=True):
+            assert midrank is (True if requested is None else requested)
+            return SimpleNamespace(statistic=1.0, pvalue=0.2)
+
+        def modern(samples, *, variant):
+            assert variant == ("right" if requested is False else "midrank")
+            return SimpleNamespace(statistic=1.0, pvalue=0.2)
+
+        requested = midrank
+        with (
+            patch("dataeval.utils.scipy.stats._ANDERSON_KSAMP_SUPPORTS_VARIANT", supports_variant),
+            patch("dataeval.utils.scipy.stats._scipy_anderson_ksamp", modern if supports_variant else legacy),
+        ):
+            kwargs = {} if midrank is None else {"midrank": midrank}
+            assert anderson_ksamp([[1, 2], [3, 4]], **kwargs) == AndersonKsampResult(1.0, 0.2)
 
     def test_cramervonmises_2samp_refuses_a_non_numeric_result(self):
         with (

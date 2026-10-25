@@ -253,8 +253,10 @@ def test(session: nox.Session) -> None:
         remaining_posargs = list(session.posargs)
 
     # Standard pytest configuration
-    pytest_args = ["-m", "not cuda"]
-    xdist_args = [f"-n{TEST_WORKERS}", "--dist", "loadfile"]
+    pytest_args = ["-m", "not cuda", "-q"]
+    # Schedule small batches so the expensive calibration cases in a single
+    # module can run on different workers instead of leaving other workers idle.
+    xdist_args = [f"-n{TEST_WORKERS}", "--dist", "load", "--maxschedchunk=10"]
     cov_args = ["--cov", f"--junitxml=output/junit.{python_version}.xml"]
     cov_term_args = ["--cov-report", "term-missing"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]

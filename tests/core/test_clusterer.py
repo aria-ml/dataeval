@@ -5,6 +5,9 @@ import sklearn.datasets as dsets
 
 @pytest.mark.required
 class TestMatrixOps:
+    @pytest.mark.filterwarnings(
+        "ignore:Number of distinct clusters .* found smaller than n_clusters:sklearn.exceptions.ConvergenceWarning"
+    )
     @pytest.mark.parametrize(
         "shape",
         [

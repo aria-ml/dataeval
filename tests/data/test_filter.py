@@ -9,6 +9,11 @@ import pytest
 
 from dataeval.data import ClassBalance, ClassFilter, Filter, Indices, View
 
+# The legacy shim is the compatibility oracle for the new Filter interface.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:'ClassFilter' is deprecated:dataeval.exceptions.DeprecatedWarning"),
+]
+
 VOCAB = {0: "car", 1: "person", 2: "boat"}
 
 

@@ -16,6 +16,11 @@ from dataeval import Metadata
 from dataeval._helpers import factors_excluding, resolve_label_axis
 from dataeval.bias import Balance, Diversity, Parity
 
+# These interface tests deliberately exercise the experimental Parity evaluator.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning"),
+]
+
 EVALUATORS = (Balance, Diversity, Parity)
 
 
@@ -134,7 +139,8 @@ class TestLabelAxisResolution:
         """
         rng = np.random.default_rng(0)
         metadata = Metadata.from_factors({"alt": rng.normal(50, 10, 200)}, class_labels=rng.integers(0, 3, 200))
-        assert metadata.is_discrete[metadata.factor_names.index("alt")] is False
+        with pytest.warns(UserWarning, match="binned automatically"):
+            assert metadata.is_discrete[metadata.factor_names.index("alt")] is False
         names = list(resolve_label_axis(metadata, "alt").names.values())
 
         # Interior bins carry both boundaries; the infinitely-bounded ends carry one.

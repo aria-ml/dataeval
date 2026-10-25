@@ -12,6 +12,12 @@ from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import SourceIndex
 from tests.embeddings.test_embeddings import MockDataset
 
+# These indexing tests intentionally derive bins and ingest legacy ratio results.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:.*binned automatically:UserWarning"),
+    pytest.mark.filterwarnings("ignore:'compute_ratios' is deprecated:dataeval.exceptions.DeprecatedWarning"),
+]
+
 # image_stats order for the 3-image / 2-1-3-detection fixture, both levels enabled.
 SOURCE_INDEX_3_IMAGES_6_CROPS = [
     SourceIndex(0, None),
