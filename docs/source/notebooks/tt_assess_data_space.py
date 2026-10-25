@@ -78,6 +78,7 @@ except Exception:
 
 # %%
 import dataeval_plots as dep
+import numpy as np
 import plotly.io as pio
 import torch
 from maite_datasets.object_detection import VOCDetection
@@ -92,7 +93,7 @@ from dataeval.quality import Outliers
 # Set default device for notebook
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 set_device(device)
-set_seed(0, all_generators=True)  # reproducible init for the fresh projection head added below
+set_seed(0, all_generators=True)  # fix the random seed for reproducible results
 
 # Use plotly to render plots
 dep.set_default_backend("plotly")
@@ -115,8 +116,8 @@ set_max_processes(4)
 # %% [markdown]
 # ## Construct embeddings
 #
-# Rather than analyze raw pixels, you'll work in [embedding](../concepts/Embeddings.md) space: a compact feature vector
-# per image that keeps the downstream algorithms fast and memory-light without sacrificing accuracy.
+# Rather than analyze raw pixels, you'll work in [embedding](../concepts/Embeddings.md) space: one feature vector per
+# image, with far fewer values than the image itself, which keeps the downstream algorithms fast and memory-light.
 #
 # ### Download VOC dataset
 #
@@ -133,25 +134,23 @@ print(f"Image shape: {dataset[0][0].shape}")
 # %% [markdown]
 # ### Extract embeddings
 #
-# Reduce each image to a compact 128-dimensional embedding with a
+# Reduce each image to a 512-dimensional feature vector with a
 # [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
-# Torchvision: replace its 1000-class head with a fresh {class}`~torch.nn.Linear` layer that projects the network's 512
-# pooled features down to 128 dimensions, wrap it in a {class}`.TorchExtractor` with the model's standard
-# resize-and-normalize preprocessing as `transforms`, and run the dataset through {class}`.Embeddings`.
+# Torchvision. Point a {class}`.TorchExtractor` at its penultimate `avgpool` layer (its learned features, not the
+# 1000-class logits), give it the model's standard resize-and-normalize preprocessing as `transforms`, and run the
+# dataset through {class}`.Embeddings`.
 #
 # For other ways to build embeddings, see [How to create embeddings](./h2_create_embeddings.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
-resnet.fc = torch.nn.Linear(resnet.fc.in_features, 128)  # project the 512 pooled features -> 128 dims
-extractor = TorchExtractor(resnet, ResNet18_Weights.DEFAULT.transforms())
-embeddings = Embeddings(dataset=dataset, extractor=extractor, batch_size=64)[:]
+extractor = TorchExtractor(resnet, transforms=ResNet18_Weights.DEFAULT.transforms(), layer_name="avgpool")
+embeddings = np.asarray(Embeddings(dataset, extractor=extractor, batch_size=64))
 
 print("embedding shape:", embeddings.shape)
 
 # %% [markdown]
-# Each image is now a single 128-dimensional feature vector rather than a full-resolution image, which
-# greatly speeds up the algorithms below without impacting the accuracy of the results.
+# Each image is now a single 512-dimensional feature vector rather than a full-resolution image.
 
 # %% [markdown]
 # ## Cluster the embeddings
@@ -160,35 +159,13 @@ print("embedding shape:", embeddings.shape)
 # similar characteristics. Based on this information, images can be found that are either too similar or too dissimilar.
 # Both cases can lead to performance degradation of downstream tasks such as data analysis or model training.
 #
-# ### Normalize embeddings
-#
-# Before clustering can be done, the embeddings need to be normalized between 0 and 1 for the {func}`.cluster` to properly
-# group them. Let's look at the current spread of the embeddings values.
-
-# %%
-print(f"Max value: {embeddings.max()}")
-print(f"Min value: {embeddings.min()}")
-
-# %% [markdown]
-# These are certainly not between 0 and 1 but the next step will fix that by doing min-max normalization.
-
-# %%
-# Puts the embeddings onto the unit interval [0-1]
-normalized_embs = (embeddings - embeddings.min()) / (embeddings.max() - embeddings.min())
-
-print(f"Max value: {normalized_embs.max()}")
-print(f"Min value: {normalized_embs.min()}")
-
-# %% [markdown]
-# Now your embeddings are between 0 and 1!
-#
 # ### Create clusters
 #
-# The data is now ready to be clustered. Run the normalized embeddings through the {func}`.cluster` function to generate
-# the {class}`.ClusterResult` mapping.
+# Run the embeddings through the {func}`.cluster` function to generate the {class}`.ClusterResult` mapping. The function
+# needs no rescaling of the embeddings: multiplying them all by a constant does not change the clusters.
 
 # %%
-output = cluster(normalized_embs)
+output = cluster(embeddings)
 
 # %% [markdown]
 # You have successfully clustered your image embeddings! The `ClusterResult` contains several keys related to clusters
@@ -230,7 +207,7 @@ output = cluster(normalized_embs)
 # %%
 # Use the Outliers.from_clusters() method
 detector = Outliers()
-result = detector.from_clusters(normalized_embs, output, cluster_threshold=3.0)
+result = detector.from_clusters(embeddings, output, cluster_threshold=3.0)
 
 # Extract the outlier indices from the result
 outliers = result.aggregate_by_item()["item_index"].to_list()
@@ -333,9 +310,11 @@ dep.plot(
 # The {func}`.coverage_adaptive` function will return a list of image indices that it finds to be underrepresented. This means it
 # does not have enough similar images around it. This should sound familiar as outliers have a very similar situation.
 # However, underrepresented images should be handled differently than outliers. More on this in the next section.
+#
+# Coverage expects embeddings between 0 and 1. Passing `force_unit_interval=True` rescales them for you.
 
 # %%
-cov = coverage_adaptive(normalized_embs, 50, 0.01)
+cov = coverage_adaptive(embeddings, 50, 0.01, force_unit_interval=True)
 
 print(f"Number of uncovered images: {len(cov['uncovered_indices'])}")
 
@@ -353,6 +332,12 @@ dep.plot(dataset, indices=cov["uncovered_indices"][:3], figsize=(10, 3))
 uncovered_outliers = set(cov["uncovered_indices"].tolist()).intersection(set(outliers))
 
 print(f"Number of outliers found as uncovered images: {len(uncovered_outliers)}")
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+assert embeddings.shape == (len(dataset), 512)
+assert 0 < len(outliers) <= 0.05 * len(dataset)
+assert len(cov["uncovered_indices"]) > 0
 
 # %% [markdown]
 # ## Handling flagged images
