@@ -122,9 +122,10 @@ the dataset is the limiting factor, not the model architecture.
 
 ### Can a detector plausibly achieve my mAP requirement on this dataset?
 
-Use {func}`.uap` to estimate the classification
-ceiling on bounding box crops. If UAP falls below your program's mAP requirement,
-no object detector trained on the current data can meet it.
+Use {func}`.uap` to measure the AP one crop classifier reaches on ground-truth
+bounding box crops. A UAP that meets your mAP requirement shows the
+classification part of detection is reachable; one that falls short is a warning
+sign, not proof that no detector can meet it.
 
 ### Do I have enough labeled examples to train a reliable model?
 

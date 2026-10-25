@@ -16,6 +16,7 @@ Each page may cover several evaluators that work together to answer questions ab
 - [Dataset Bias and Coverage](DatasetBias.md)
 - [Parity](Parity.md)
 - [Performance Limits](PerformanceLimits.md)
+- [Feasibility Evidence](FeasibilityEvidence.md)
 - [Distribution Shift](DistributionShift.md)
 - [Divergence](Divergence.md)
 - [Data Leakage](Leakage.md)
@@ -36,6 +37,7 @@ Clustering
 DatasetBias
 Parity
 PerformanceLimits
+FeasibilityEvidence
 DistributionShift
 Divergence
 Leakage

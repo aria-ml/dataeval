@@ -964,7 +964,7 @@ dev = [
     { name = "jupyter-cache" },
     { name = "jupyter-client" },
     { name = "jupytext" },
-    { name = "maite-datasets" },
+    { name = "maite-datasets", extra = ["hf"] },
     { name = "markupsafe" },
     { name = "myst-nb" },
     { name = "nox" },
@@ -1005,7 +1005,7 @@ docs = [
     { name = "jupyter-cache" },
     { name = "jupyter-client" },
     { name = "jupytext" },
-    { name = "maite-datasets" },
+    { name = "maite-datasets", extra = ["hf"] },
     { name = "markupsafe" },
     { name = "myst-nb" },
     { name = "numpy" },
@@ -1098,7 +1098,7 @@ dev = [
     { name = "certifi", specifier = ">=2024.7.4" },
     { name = "codespell", extras = ["toml"], specifier = ">=2.3" },
     { name = "coverage", extras = ["toml"], specifier = ">=7.6" },
-    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.6" },
+    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.15" },
     { name = "ipykernel", specifier = ">=6.26.0" },
     { name = "ipywidgets", specifier = ">=8.1.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
@@ -1106,7 +1106,7 @@ dev = [
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "jupytext", specifier = ">=1.19.1" },
-    { name = "maite-datasets", specifier = ">=0.0.21" },
+    { name = "maite-datasets", extras = ["hf"], specifier = ">=0.0.21" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "nox", specifier = ">=2025.5.1" },
@@ -1140,14 +1140,14 @@ dev = [
 ]
 docs = [
     { name = "certifi", specifier = ">=2024.7.4" },
-    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.6" },
+    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.15" },
     { name = "ipykernel", specifier = ">=6.26.0" },
     { name = "ipywidgets", specifier = ">=8.1.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "jupytext", specifier = ">=1.19.1" },
-    { name = "maite-datasets", specifier = ">=0.0.21" },
+    { name = "maite-datasets", extras = ["hf"], specifier = ">=0.0.21" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "numpy", specifier = ">=1.24.2" },
@@ -1201,16 +1201,16 @@ verify = [
 
 [[package]]
 name = "dataeval-plots"
-version = "0.0.8"
+version = "0.0.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "polars" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dc/6d/a04e430ad1084eca8baaf1eec4639ff6281e156ac8f3145408620fcf6751/dataeval_plots-0.0.8.tar.gz", hash = "sha256:f934ecbc1d2dee940bdb0ba70a3d4b4792ec5d89cc7015a09ea8f66a252daa91", size = 41081, upload-time = "2026-03-25T19:13:45.485Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/4f/6ce7effaa4ddbf035c03069b818b97dd9f51b509adc27cf8c9ded5cf7843/dataeval_plots-0.0.15.tar.gz", hash = "sha256:15e8952ace67679a91ab0cfa70290351253fbac2509f18a7a5031f0564d0c888", size = 63847, upload-time = "2026-10-24T17:01:52.728Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/32/4eee21fea6e0b9f7302637364899cedc1795383c080be1111fdc6068aa60/dataeval_plots-0.0.8-py3-none-any.whl", hash = "sha256:7bb0f53f865e0e4ef92de0722355971561cecd3ed206260ec80f5ccfa5a8c651", size = 49861, upload-time = "2026-03-25T19:13:46.648Z" },
+    { url = "https://files.pythonhosted.org/packages/06/0b/e783ff20b604e497542313e8dc36282ad9f6c02a835d58cb1b62db51c366/dataeval_plots-0.0.15-py3-none-any.whl", hash = "sha256:ca2e81fb70dac6dceb949f846409c445f88bee5e59f1deb03b7fc1a68ebceebb", size = 72850, upload-time = "2026-10-24T17:01:51.501Z" },
 ]
 
 [package.optional-dependencies]
@@ -1480,6 +1480,30 @@ wheels = [
 ]
 
 [[package]]
+name = "hf-xet"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/27/06d899ea7bd721d272f84aac98bdb238de98af4cc767a69056d967d68c71/hf_xet-1.7.0.tar.gz", hash = "sha256:d406ec79053c0871817f700c2ac8c36ba0d87f9c34b7458b0f0063bb218b0466", size = 985689, upload-time = "2026-10-06T20:18:43.89Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/7c/3e45174942e6793adde6cba4daa7fb037275cf02a944d9eadfcf9ff33b86/hf_xet-1.7.0-cp314-cp314t-macosx_10_12_x86_64.whl", hash = "sha256:fa029678be1ba7f953c409b0b27bf15cc69cd1c9b3a674fbd78856ebefca1052", size = 3803919, upload-time = "2026-10-06T20:18:09.844Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/3a/5e8b363391adcbb002e191dbf924dab31464ea9c45adfeb73502afc36d35/hf_xet-1.7.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:57bc157b8b7fe3bee9dcb9af7f3da8de41801c3b31a9ef68a77a33c6a6be382f", size = 3553588, upload-time = "2026-10-06T20:18:13.376Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/c2/0d1eaa5da13bbf9c896badc7f380601c7d973a87a6ffb4d100267c4536c1/hf_xet-1.7.0-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:87dab080f8f7d32781c2586904e3603f4e60d09bfc727706c3ae419e0829beeb", size = 4201962, upload-time = "2026-10-06T20:18:16.11Z" },
+    { url = "https://files.pythonhosted.org/packages/23/2d/225d5b11a9ca7d31b9470a57f2b2be1a5cef8b84325a2146aeb4589e226c/hf_xet-1.7.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:b01fe18dbbd151a2403d2c64ed30dc6547b00d6babab9a617d77c7acdb81ee66", size = 3982978, upload-time = "2026-10-06T20:18:18.092Z" },
+    { url = "https://files.pythonhosted.org/packages/93/34/9d681f0e3dac0b5dae0d7dea748429266f24e52415446523f464fbaa828e/hf_xet-1.7.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:4ee5e05a627f5ab5bad7a86582277d645556ea1e199903aae19e033a392aa13a", size = 4181558, upload-time = "2026-10-06T20:18:20.082Z" },
+    { url = "https://files.pythonhosted.org/packages/de/f0/277f039b7d72027bc2ed277f1b62a2f70f740a5aac2a3e7243e5b6854c5d/hf_xet-1.7.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:19c0e64f14175ccb6a1aff69e0d2ab9ec5269a560e6687abaf2b3fa4f73de7cd", size = 4411546, upload-time = "2026-10-06T20:18:21.999Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/7f/832d3ddb49326114175b7bcc50daea8565c09fd21ac03a02b211c09fefb7/hf_xet-1.7.0-cp314-cp314t-win_amd64.whl", hash = "sha256:757168feb5679647c0bb13ee5d0faebe799c4dff9051419885a566ebd79f949d", size = 3812809, upload-time = "2026-10-06T20:18:24.288Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/c4/310c3c29e5beae7c049e63947bd1923d597883b41c9ec4718589920812c4/hf_xet-1.7.0-cp314-cp314t-win_arm64.whl", hash = "sha256:b91569d5f1b61c34b043687da02c05dd3604f3d329e7868510bf3f7971599006", size = 3646174, upload-time = "2026-10-06T20:18:26.279Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/0b/b03be21ffaada749ba0d3197d8aefbf1aa698bac149580421c15239b299e/hf_xet-1.7.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e3e88a7a75d7d95cbee1f37dc31341d6201124cf21c6c4b1dfab8ccba9b09e0f", size = 3796096, upload-time = "2026-10-06T20:18:28.43Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/47/a26ebdce7056a61e931f228439bc0ab08cbec239d1690f965e5e637cba79/hf_xet-1.7.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:59fba37039233c7fcbe196817d6cdcf1b40dfb17b410f229d85b0cf0a1848da4", size = 3560352, upload-time = "2026-10-06T20:18:30.365Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/4c/2bf3b66c215d409655f28de1622393dde04c9461280d48c7924bb3b2decd/hf_xet-1.7.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:2814a6e999d13464c4d679b788cc5d784eb5a4edfc638a31f10e9a11ab531ef8", size = 4212180, upload-time = "2026-10-06T20:18:32.292Z" },
+    { url = "https://files.pythonhosted.org/packages/49/0c/a2f703a5a78267556e89e03316fa0805c86b72b50829bc67665746e8ebf0/hf_xet-1.7.0-cp38-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:fcfd6c22418e57dd5b3aea649e813b2e2cfb2aebf317b210d90f1fe4b3018b52", size = 3990011, upload-time = "2026-10-06T20:18:34.21Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/77/e52e4201b1cbf571530a61cc57f70182045a39a230089ee5f1df182a4de2/hf_xet-1.7.0-cp38-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:80f79dae613ce9e0ea1fd1ae15616ca9ac74aed4c770aabc199c4f03ebecc863", size = 4190628, upload-time = "2026-10-06T20:18:36.062Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/dc/03a21b89f118664a0926ff25b0f8e44a519bf22724a6a8fc7a9abbc188b6/hf_xet-1.7.0-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:0a9e802f33bf50c851abe45fc5380e61f959e2d369647d6742b79ad9d6c27cab", size = 4418814, upload-time = "2026-10-06T20:18:37.888Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/59/b35106dfa71b6eef605dc88bd038fe99c7f86fb132a15b60d0bf2f235b2c/hf_xet-1.7.0-cp38-abi3-win_amd64.whl", hash = "sha256:2b7bb5727889b0f2436dbaaad8fc4c3e66b8240d992716989e0c086b4278b1bc", size = 3822644, upload-time = "2026-10-06T20:18:40.052Z" },
+    { url = "https://files.pythonhosted.org/packages/48/cd/072313585f74fe9d441e2eb5e0a4703c30586cd709810ea369675f61b74e/hf_xet-1.7.0-cp38-abi3-win_arm64.whl", hash = "sha256:acc3851cf2576a8fb2ae926da863f4efabe21303cf292e9a44332802ab0dcc6a", size = 3662436, upload-time = "2026-10-06T20:18:42.205Z" },
+]
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1490,6 +1514,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55", size = 78784, upload-time = "2025-04-24T22:06:20.566Z" },
+]
+
+[[package]]
+name = "httpcore2"
+version = "2.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "h11", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+    { name = "truststore", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c0/61/afa9d6b7452f9eca73f73d45324eb0bb52f098fd5e6049bf6b8263be9b4e/httpcore2-2.16.0.tar.gz", hash = "sha256:c72cd0413563b17e1cd8354677dff887466f8ec2551679759e93126534428643", size = 69886, upload-time = "2026-10-21T07:09:45.31Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/af/c2/ce417c397afa5181f0e3c6ff01a4d01639414e1adef08730d97571297151/httpcore2-2.16.0-py3-none-any.whl", hash = "sha256:5c4358319f2602d984ad93182c9fee5160f22e9da7babdda870a5e7c4e2dc34f", size = 85070, upload-time = "2026-10-21T07:09:42.802Z" },
 ]
 
 [[package]]
@@ -1508,6 +1545,52 @@ wheels = [
 ]
 
 [[package]]
+name = "httpx2"
+version = "2.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+    { name = "httpcore2", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+    { name = "httpx2-jsfetch", marker = "(python_full_version >= '3.12' and sys_platform == 'emscripten') or (python_full_version < '3.12' and extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (python_full_version < '3.12' and extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (python_full_version < '3.12' and extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (python_full_version < '3.12' and extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (python_full_version < '3.12' and extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (python_full_version < '3.12' and extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130') or (sys_platform != 'emscripten' and extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (sys_platform != 'emscripten' and extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (sys_platform != 'emscripten' and extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (sys_platform != 'emscripten' and extra != 'extra-8-dataeval-cu130' and extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (sys_platform != 'emscripten' and extra != 'extra-8-dataeval-cu130' and extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (sys_platform != 'emscripten' and extra != 'extra-8-dataeval-cu130' and extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130') or (sys_platform != 'emscripten' and extra != 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (sys_platform != 'emscripten' and extra != 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (sys_platform != 'emscripten' and extra != 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+    { name = "idna" },
+    { name = "truststore", marker = "sys_platform != 'emscripten' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/43/73/5ca2cedf5e4e50423d1c258877865a6b62793633b561c58499f8aeb33b7e/httpx2-2.16.0.tar.gz", hash = "sha256:0d54c98128e8f2ff7fbbde0fca8c359e5f032edeaaaac443cdb7f31f685bcd7f", size = 103116, upload-time = "2026-10-21T07:09:46.348Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl", hash = "sha256:fd2c5d7909e8d86fe92d53020c310ca0e4e431b838c207c5754b9bbf0308d49a", size = 97880, upload-time = "2026-10-21T07:09:44.01Z" },
+]
+
+[[package]]
+name = "httpx2-jsfetch"
+version = "1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/c4/0e5636363151a2a1795e0a77617168b9ca438e1748ec05fc9b5687f93d64/httpx2_jsfetch-1.0.tar.gz", hash = "sha256:70a0e3eabfef7cce5ad9c629f7d01ca05e418f586646f4ddf14782e4c1454c60", size = 6872, upload-time = "2026-08-07T00:13:07.492Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9b/43/832f631d32e4f1211caa2ba368317739fe71f0b8530e4c9d15dc454bac2a/httpx2_jsfetch-1.0-py3-none-any.whl", hash = "sha256:cb916b707601e69a07721aabc8f3f6659be3a6893bc1ff5c6f9e02241df2da32", size = 6382, upload-time = "2026-08-07T00:13:06.567Z" },
+]
+
+[[package]]
+name = "huggingface-hub"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "filelock" },
+    { name = "fsspec" },
+    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'ARM64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+    { name = "httpx2" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "tqdm" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/46/dd/585639d95f6a987c0bdfb9045f050f4ad67240775644ba7a4fdc5aca3a3b/huggingface_hub-2.3.0.tar.gz", hash = "sha256:0b783b37f200f1d25bef2344a997c7d410f4437fbe9d8fd965f958e75cec7aef", size = 1063410, upload-time = "2026-10-23T08:52:06.594Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/89/5f6ef1162d0323f167b6baab04d1b4bd6a946161a8af6d86f622d9d79aa1/huggingface_hub-2.3.0-py3-none-any.whl", hash = "sha256:5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5", size = 855161, upload-time = "2026-10-23T08:52:04.78Z" },
+]
+
+[[package]]
 name = "humanize"
 version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1523,6 +1606,82 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cd/63/9496c57188a2ee585e0f1db071d75089a11e98aa86eb99d9d7618fc1edce/idna-3.18.tar.gz", hash = "sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848", size = 196711, upload-time = "2026-06-02T14:34:07.794Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl", hash = "sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2", size = 65455, upload-time = "2026-06-02T14:34:06.319Z" },
+]
+
+[[package]]
+name = "imagecodecs"
+version = "2026.3.6"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'emscripten'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
+]
+dependencies = [
+    { name = "numpy", marker = "python_full_version < '3.12' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/8d/dc18623e5e926ad53c626e128c8baaf4ec42e41029cf0a07381cfef79289/imagecodecs-2026.3.6.tar.gz", hash = "sha256:471b8a4d1b3843cbf7179b45f7d7261f0c0b28809efc1ca6c47822477b143b85", size = 9565259, upload-time = "2026-03-07T01:26:41.183Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/db/873d063c99a726d772bf6f076288da59bb12e9f2af3518c2e4de5fde234d/imagecodecs-2026.3.6-cp311-abi3-macosx_10_15_x86_64.whl", hash = "sha256:44cfb3b609d941014f8ac7cf8611b15ccfd7119443bbb6b5e53916b242d31f9e", size = 13953250, upload-time = "2026-03-07T06:13:36.959Z" },
+    { url = "https://files.pythonhosted.org/packages/42/84/36c38a82f033ffbc9e706dad32be7148f130fc00e7bb417ab60e063897a0/imagecodecs-2026.3.6-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:e64037f22980a211b17bf6bdf03f14ff459a7432eec24f7a58c342f6992132fa", size = 11697496, upload-time = "2026-03-07T01:25:56.412Z" },
+    { url = "https://files.pythonhosted.org/packages/45/fa/f67c4e644fdf06503e120f9d1c8d8654b99066dea7093a674b67704fa4a4/imagecodecs-2026.3.6-cp311-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:30fa140bb1a112a889926af36977214ed52a22e4557356043259b5e2f79cfba5", size = 25604431, upload-time = "2026-03-07T01:26:00.703Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/29/93ea9cbab7f57b4e60480c51fc51d8e138e399d11797c981d5f6e79f9832/imagecodecs-2026.3.6-cp311-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:e30a14aa2e1c6c90e00375292726486c1d90bf003b1414d608ea4d1f62fd8a79", size = 26468592, upload-time = "2026-03-07T01:26:04.933Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/a7/e3a89b2c516eaca7446e8f1335daeec90764b50888af5e073a2b6a987fcf/imagecodecs-2026.3.6-cp311-abi3-win32.whl", hash = "sha256:c972a45dfee1befbac048ba3492607003e9a185811e8febdc1ed531d48c07e75", size = 15597722, upload-time = "2026-03-07T01:26:08.106Z" },
+    { url = "https://files.pythonhosted.org/packages/22/c7/2b37a7fe9a2eb21011e50f046d62e68ac4e0f8d6ad94d7a10e9f8e8d685f/imagecodecs-2026.3.6-cp311-abi3-win_amd64.whl", hash = "sha256:e8fba5b9ac7be109ed35070208bc1683fa17cc381ed9535a4eae200c6d883bd8", size = 19177403, upload-time = "2026-03-07T01:26:11.718Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/c7/94e930cef9e0a29a2df5e3ba3bacd2c2f1e34ca373fe48624b64af8ae91c/imagecodecs-2026.3.6-cp311-abi3-win_arm64.whl", hash = "sha256:fc4856913be6c8b3861223158920d934a0ae203149a435f585622dbbff8ed696", size = 15193605, upload-time = "2026-03-07T01:26:15.016Z" },
+]
+
+[[package]]
+name = "imagecodecs"
+version = "2026.10.10"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and sys_platform == 'darwin'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin'",
+    "python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version == '3.12.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
+    "(python_full_version >= '3.14' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
+    "python_full_version == '3.13.*' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
+    "(python_full_version == '3.13.*' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
+    "(python_full_version == '3.12.*' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
+]
+dependencies = [
+    { name = "numpy", marker = "python_full_version >= '3.12' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/28/7d/1658ab284e024562f1fd3a684dded89b97125789743e0d1f57a494b64290/imagecodecs-2026.10.10.tar.gz", hash = "sha256:cde6914505668196b15e0f99dbc236b779e3b61217f04d2e498cbae790965f9f", size = 9685030, upload-time = "2026-10-09T22:45:38.598Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/29/df387ef1c428fd564274c742e0cc71a30506f278699528be1d3fa9e48ad5/imagecodecs-2026.10.10-cp312-abi3-macosx_12_0_arm64.whl", hash = "sha256:7e422e8fb55c717f90d5ead73374178546ad3372de584ee2b3c34f95ba6fa508", size = 13373607, upload-time = "2026-10-09T22:44:07.364Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/3c/80a0d3589a94348dee7904539c1d7a1e3ebd206a9b9ffc285c7352837a42/imagecodecs-2026.10.10-cp312-abi3-macosx_12_0_x86_64.whl", hash = "sha256:83a2b581868be7c3cbb095a300b1905639f3af4cd8ca6b59f84d176b5487ce27", size = 14983456, upload-time = "2026-10-09T22:44:10.899Z" },
+    { url = "https://files.pythonhosted.org/packages/29/33/a81db6af388919bbebcfc67eec127f7d91fbac0786497755989aa5b0d790/imagecodecs-2026.10.10-cp312-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:fe277d351622d4b53c637cf67c27202d485ee77aa33eaf99e9b55a79401831ab", size = 28763055, upload-time = "2026-10-09T22:44:16.009Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/3e/a3fadd95592572bd97d5034eecf31862ef921f977d96e4da542b6613d6b2/imagecodecs-2026.10.10-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:934ac2cd2d367cf6c891ee108627c47df85f21eea949adf3cf293d1fa8933e3f", size = 28350094, upload-time = "2026-10-09T22:44:20.646Z" },
+    { url = "https://files.pythonhosted.org/packages/17/80/3eedccc767d6ed2569ec2e1b759c1189d5db2fb09cfb542328778ef08ef3/imagecodecs-2026.10.10-cp312-abi3-pyemscripten_2025_0_wasm32.whl", hash = "sha256:a1d73a8962314ccf1ecf447c8646334f3084763c8f5c5610a30a61049d4fabbd", size = 4085560, upload-time = "2026-10-09T22:44:23.343Z" },
+    { url = "https://files.pythonhosted.org/packages/00/dd/9641540f5d34ad10aef4f44a6b4b919ef055e366a98c41e2b8f5decb6d6d/imagecodecs-2026.10.10-cp312-abi3-pyemscripten_2026_0_wasm32.whl", hash = "sha256:e9518d868cd862d17c9cb721435054c54671e30a01d385a8e263d07c2bbb83b8", size = 4068999, upload-time = "2026-10-09T22:44:25.302Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/81/728ab363b2677c45362f319b31fc442ad4e081425299546bc87b159e9a7f/imagecodecs-2026.10.10-cp312-abi3-win32.whl", hash = "sha256:dcc7098ab119fc7e9c8770f2305611f72cdc6c9c9bf5d157d3bca7a3a4e526ba", size = 14860487, upload-time = "2026-10-09T22:44:28.164Z" },
+    { url = "https://files.pythonhosted.org/packages/50/66/e83fe8867a4170b12a6a2a4721cbb764fd10f5a27291dc38dd9e1c2fa898/imagecodecs-2026.10.10-cp312-abi3-win_amd64.whl", hash = "sha256:6d02701315531283d6b6434dd871f17c1298c94be97dcd0ed590082d9a0b1f02", size = 19132594, upload-time = "2026-10-09T22:44:32.017Z" },
+    { url = "https://files.pythonhosted.org/packages/30/e7/24278542aef5e5afcb58fb13ec60ecb05f4c9c0c232156aeb9c4163fa42d/imagecodecs-2026.10.10-cp312-abi3-win_arm64.whl", hash = "sha256:250af78a96689ea9a23345dd9a7ef6579b7439887d7fe9fe76db5f97a5bbf8da", size = 15824882, upload-time = "2026-10-09T22:44:36.444Z" },
+    { url = "https://files.pythonhosted.org/packages/20/b9/88df81c904fdcb3799099a41b854506dc2885d1880fca6102ca4c18cfbe1/imagecodecs-2026.10.10-cp314-cp314t-macosx_12_0_arm64.whl", hash = "sha256:337eaa67d444e7c94aae9ecd8e3f1121b7815273fe39333feafbe0dd011fb0cf", size = 13839493, upload-time = "2026-10-09T22:44:40.421Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/ed/b2fdbda1820de065468065714d51a9cd15147b87516a0b59f747d846755c/imagecodecs-2026.10.10-cp314-cp314t-macosx_12_0_x86_64.whl", hash = "sha256:8baf90788e5eb8372cef00b45ecde53f2d31733c7ac1df0a33fc5ecd49b7849c", size = 15416217, upload-time = "2026-10-09T22:44:45.564Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/e0/c204fc45a990946637bb253e712158920e862ca45f57eb8ddf2f478f7daf/imagecodecs-2026.10.10-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:39af86b3bdea8d37797881454d68ab656c08a13aa6a5e93a0bc16dd25e9fcc61", size = 33721049, upload-time = "2026-10-09T22:44:53.896Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/04/ed2c82fef4a52f58109b5ccc5826a400f352f8fa31d31b375475989629ce/imagecodecs-2026.10.10-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:6d4f2e9725281a9a71028695f511181728f2a9c6fc7ad499be0cf9f1de18c43e", size = 32739995, upload-time = "2026-10-09T22:44:59.857Z" },
+    { url = "https://files.pythonhosted.org/packages/19/e6/6ee319231f76119f0e7254c8e9db2fc40c1076128a1a940ee555e2d92c63/imagecodecs-2026.10.10-cp314-cp314t-win32.whl", hash = "sha256:b1a95d351eb4ca390b6c4468218fb6b6a99094bf29d73911122f01bd1c6a8044", size = 15585277, upload-time = "2026-10-09T22:45:03.686Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/b0/5c183ec8cd098adbb12d1d78f38d7c38897c5cf23b60bdfa481dc97e48c5/imagecodecs-2026.10.10-cp314-cp314t-win_amd64.whl", hash = "sha256:e40c255bba4092d0469aa6ee81ade982c36183819fe703a27b84c11fdcc8d884", size = 19930206, upload-time = "2026-10-09T22:45:07.185Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/a6/3455c9959b7de44e0ec5b8e76ed924ecf73b771a932e726e334462a424d9/imagecodecs-2026.10.10-cp314-cp314t-win_arm64.whl", hash = "sha256:ab29498e5ca3048c0db69bdc8f47131f7f8b256575218c2ce4ebdcdbba28c26b", size = 16631260, upload-time = "2026-10-09T22:45:10.213Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/dd/0a2a9e554f09ccbb307d869734f569fed57bca6551f44ca900af921a00da/imagecodecs-2026.10.10-cp315-cp315t-macosx_12_0_arm64.whl", hash = "sha256:52f1ab4224fda35ce5e59e9a5d16b3037c67430ab55c1a335be65ba36dcd9694", size = 13828874, upload-time = "2026-10-09T22:45:13.511Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/35/fd29cc93c7f17c05f1ece7d931dc88aaddbaf135d6a166b538973ed0b453/imagecodecs-2026.10.10-cp315-cp315t-macosx_12_0_x86_64.whl", hash = "sha256:b535e2f5f86faa0d8de002d02b096673e303e5172307cfed10411e0442941645", size = 15403043, upload-time = "2026-10-09T22:45:16.829Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/fc/879f3b7b655d57c1f0836e73169d9811ff5c1f6ebbd0f29f8fa9285ae0c7/imagecodecs-2026.10.10-cp315-cp315t-manylinux_2_28_aarch64.whl", hash = "sha256:e73ba2c67a6d8e3d89b1500df609dbf2a1fc58cee8670ac538df61839338ba1e", size = 33463757, upload-time = "2026-10-09T22:45:21.071Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/11/68b42220b355fa2d973679c4b60784ec17826ffc5ee4ac879142c3e63ad7/imagecodecs-2026.10.10-cp315-cp315t-manylinux_2_28_x86_64.whl", hash = "sha256:56014bee17db061c1ef18aa7457e2dfd00f17b8ce574a9f7f95fb35d9745eb71", size = 32567493, upload-time = "2026-10-09T22:45:25.746Z" },
+    { url = "https://files.pythonhosted.org/packages/87/be/de9d962f50f0616bcf93277bbb618ca36354eafa2e56e22460a9bb7119d9/imagecodecs-2026.10.10-cp315-cp315t-win32.whl", hash = "sha256:e0e5b1d9147bfbaf97d92e74fc857578d1ff36023e57fe811969df7d29df1096", size = 15584969, upload-time = "2026-10-09T22:45:29.121Z" },
+    { url = "https://files.pythonhosted.org/packages/57/09/f29781107974ed3a0114513eaa842a7f983251cd25f13306792fe95c9337/imagecodecs-2026.10.10-cp315-cp315t-win_amd64.whl", hash = "sha256:8fdef708bd5703c612b5e3aaadc57e34476b66b464e37c8d55bfa208b09608d7", size = 19922533, upload-time = "2026-10-09T22:45:32.752Z" },
+    { url = "https://files.pythonhosted.org/packages/65/1f/2c481c58a2004771246753b686165c66e4e1433102f6a5370028e3224295/imagecodecs-2026.10.10-cp315-cp315t-win_arm64.whl", hash = "sha256:1fa03ac2170cce0aecfb06a5deae4a2796960f13e4104cf4c311d482d15f98f2", size = 16623893, upload-time = "2026-10-09T22:45:35.863Z" },
 ]
 
 [[package]]
@@ -2213,6 +2372,13 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c7/eb/7a69d3182f47f2cbc9572fcc5f67223423d14827fc800b4846d050b62706/maite_datasets-0.0.21.tar.gz", hash = "sha256:44dbfe89116b208c69429316eb7dc8fe3a22178ff504da5a997ca2b132aa340c", size = 126684, upload-time = "2026-09-02T17:43:02.987Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fc/1e/6c664037af7a48471af51f354e3f4d634a0aeadd59b7508de517117a4d2a/maite_datasets-0.0.21-py3-none-any.whl", hash = "sha256:685bd00160fbbdc39b43163d8c87109b560723bbe7dacb0044382b925c29c022", size = 156691, upload-time = "2026-09-02T17:43:01.689Z" },
+]
+
+[package.optional-dependencies]
+hf = [
+    { name = "huggingface-hub" },
+    { name = "imagecodecs", version = "2026.3.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
+    { name = "imagecodecs", version = "2026.10.10", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
 ]
 
 [[package]]
@@ -5702,6 +5868,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/a4/09/5683146fda6a2b569deb78ccfd8fbfea8bfe55f726b081c0a6bb18dd6f28/triton-3.7.1-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2020153b08280415ec0da6607834e79166442147e78e144df06b508c75b186d2", size = 197729537, upload-time = "2026-06-17T19:53:35.516Z" },
     { url = "https://files.pythonhosted.org/packages/e9/f8/448220c3092019f9fdfab39ec47985968181d67da34b44f6a7f6280a5cbb/triton-3.7.1-cp314-cp314t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c58e4c61f0c73b5dba3b5d19b4a7093c32f90dc18b2a7f121a7c16ccd31107b7", size = 184814760, upload-time = "2026-06-17T20:04:04.984Z" },
     { url = "https://files.pythonhosted.org/packages/f0/ac/229b7d4589d2e5937310e72c6d46e89599d16a4a12b479ffa1499fee8eb8/triton-3.7.1-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:10ba85fa2cca4a2fbdeb36bf1cb082f2c252bda55bf9fccd74f65ec5bc647e68", size = 197824404, upload-time = "2026-06-17T19:53:42.772Z" },
+]
+
+[[package]]
+name = "truststore"
+version = "0.10.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/9f/c5201d42a484c061e528825fc8e2d565f5abd50a4ced6fb7d29c4ec99b2b/truststore-0.10.5.tar.gz", hash = "sha256:30d36967ccaded5cbb38d602c433f53600036c79d502f4533a49b60a03bbefcd", size = 28091, upload-time = "2026-10-12T22:27:31.808Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl", hash = "sha256:9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c", size = 19017, upload-time = "2026-10-12T22:27:30.377Z" },
 ]
 
 [[package]]

@@ -31,9 +31,10 @@
 #
 # The `ber_mst` or `ber_knn` functions should be used when you would like to measure the feasibility of a machine learning
 # task. For example, if you have an operational accuracy requirement of 80%, and would like to know if this is feasibly
-# achievable given the imagery. A low feasibility score will tell you that the problem you are trying to score cannot be
-# solved with the existing data at the accuracy you desire. This in turn implies that your question does not follow a
-# learnable pattern or that your data is noisy.
+# achievable given the imagery. If the estimated lower end of the achievable accuracy falls short of the accuracy you
+# desire, the estimate does not show that the requirement is reachable with the existing data. It does not prove the
+# requirement unreachable either: BER bounds hold only in the limit of unlimited data. A shortfall can point to classes
+# that overlap in these features or to noisy labels.
 
 # %% [markdown]
 # ### What you will need
@@ -94,8 +95,8 @@ extractor = FlattenExtractor()
 # %% [markdown]
 # ## All ten digits
 #
-# First we measure the ceiling for the full task: telling all ten digits apart. We take a class-balanced subset of 6,000
-# images (600 per digit) so that no class dominates the estimate.
+# First we estimate the lower end of the achievable accuracy for the full task: telling all ten digits apart. We take a
+# class-balanced subset of 6,000 images (600 per digit) so that no class dominates the estimate.
 
 # %%
 digits_all = View(mnist, operations=[ClassBalance("interclass", num_samples=6000)])
@@ -104,15 +105,16 @@ labels_all = Metadata(digits_all).class_labels
 print("Label counts:", np.unique(labels_all, return_counts=True))
 
 ber_all = ber_mst(embeddings_all, labels_all)
-print("Maximum achievable accuracy (10 digits):", 1 - ber_all["upper_bound"])
+print("Estimated lower end of the achievable (Bayes) accuracy (10 digits):", 1 - ber_all["upper_bound"])
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
 assert 0.92 < 1 - ber_all["upper_bound"] < 0.95
 
 # %% [markdown]
-# The ceiling for the ten-digit task is only about **94%** — well short of our 99% requirement. On raw pixels several
-# digits are easily confused (4/9, 3/5/8), so no classifier can reliably do better on this data.
+# The estimated lower end of the achievable accuracy for the ten-digit task is about **94%**, well short of our 99%
+# requirement, so this estimate does not show that 99% is reachable. On raw pixels several digits are easily confused
+# (4/9, 3/5/8).
 
 # %% [markdown]
 # ## Narrow the task to three digits (1, 4, 9)
@@ -127,15 +129,15 @@ labels_149 = Metadata(digits_149).class_labels
 print("Label counts:", np.unique(labels_149, return_counts=True))
 
 ber_149 = ber_mst(embeddings_149, labels_149)
-print("Maximum achievable accuracy (1, 4, 9):", 1 - ber_149["upper_bound"])
+print("Estimated lower end of the achievable (Bayes) accuracy (1, 4, 9):", 1 - ber_149["upper_bound"])
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
 assert 0.96 < 1 - ber_149["upper_bound"] < 0.98
 
 # %% [markdown]
-# Narrowing from ten classes to three raises the ceiling to about **97%** — a concrete demonstration that feasibility is
-# a property of the _task_, not just the data. But 97% still does not meet our 99% requirement.
+# Narrowing from ten classes to three raises the estimate to about **97%** — a concrete demonstration that feasibility
+# is a property of the *task*, not just the data. But 97% still falls short of our 99% requirement.
 
 # %% [markdown]
 # ## Reformulate as a binary problem (1 vs. not-1)
@@ -148,28 +150,29 @@ labels_binary = labels_149 == 1
 print("Label counts:", np.unique(labels_binary, return_counts=True))
 
 ber_binary = ber_mst(embeddings_149, labels_binary)
-print("Maximum achievable accuracy (1 vs. not-1):", 1 - ber_binary["upper_bound"])
+print("Estimated lower end of the achievable (Bayes) accuracy (1 vs. not-1):", 1 - ber_binary["upper_bound"])
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
 assert 0.99 < 1 - ber_binary["upper_bound"] < 0.998
 
 # %% [markdown]
-# The binary formulation reaches about **99.5%**, which _does_ meet our requirement.
+# The estimate for the binary formulation reaches about **99.5%**, which *does* clear our requirement.
 
 # %% [markdown]
 # ## Summary
 #
 # BER lets us check feasibility _before_ investing in modeling. On raw-pixel MNIST:
 #
-# | task | classes | max achievable accuracy |
+# | task | classes | estimated lower end of the achievable (Bayes) accuracy |
 # | --- | --- | --- |
 # | all digits | 10 | ~94% |
 # | 1, 4, 9 | 3 | ~97% |
 # | 1 vs. not-1 | 2 | ~99.5% |
 #
-# Only the binary formulation clears a 99% requirement. When a task is infeasible at your target accuracy, BER can guide
-# you to reformulate it: narrowing the class set (or merging classes) raises the achievable ceiling.
+# Only the binary formulation's estimate clears a 99% requirement. When the estimate falls short of your target
+# accuracy, BER can guide you to reformulate the task: narrowing the class set (or merging classes) raises the
+# estimate of the achievable accuracy.
 
 # %% [markdown]
 # ## Next steps

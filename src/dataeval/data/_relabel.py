@@ -7,10 +7,11 @@ from typing import Any, Literal, TypeAlias, cast
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._experimental import experimental
 from dataeval._ontology import Ontology
 from dataeval.data._view import Operation, View
 from dataeval.exceptions import DeprecatedWarning, OntologyError
-from dataeval.protocols import Array, DatasetMetadata, ObjectDetectionTarget
+from dataeval.protocols import Array, ArrayLike, DatasetMetadata, ObjectDetectionTarget
 from dataeval.types._target import own_class_scores
 from dataeval.utils._array import argmax_label, as_numpy
 from dataeval.utils._mask import MaskedTarget, mask_metadata
@@ -241,6 +242,7 @@ class Relabel(Operation):
         self._dropped_indices: dict[int, DropReason] | None = None
         self._index2label: dict[int, str] | None = None
         self._score_width: int = 0
+        self._source_width: int = 0
 
     def _repr_overrides(self) -> dict[str, str]:
         return {"class_remap": f"<{len(self._class_remap)} entries>"}
@@ -304,6 +306,7 @@ class Relabel(Operation):
         # is the lazy transform ``View.map`` registers, so a property would rescan the
         # whole vocabulary on every read, of every pass, forever.
         self._score_width = max(self._index2label) + 1 if self._index2label else 0
+        self._source_width = max(source_index2label) + 1
         if self.on_unmatched == "raise" and self.dropped:
             names = ", ".join(sorted(self.dropped.values()))
             raise OntologyError(f"Source classes not expressible in target vocabulary: {names}")
@@ -347,6 +350,71 @@ class Relabel(Operation):
         if isinstance(target, Array):
             return image, self._conform_scores(target, self.mapping, self._score_width), metadata
         raise TypeError(f"Relabel does not support targets of type {type(target)}.")
+
+    @experimental
+    def fold_scores(self, scores: ArrayLike, view: View[Any] | None = None) -> NDArray[np.float64]:
+        """
+        Fold a model's class scores through this relabel so they match the relabeled dataset.
+
+        .. warning::
+           This feature is experimental and may change or be removed in future releases.
+
+        The scores are indexed by the *source* vocabulary, the one the model was trained
+        on, while the relabeled view's labels are in the target vocabulary. Columns of
+        source classes mapped to one target class are summed, columns of source classes
+        the relabel dropped are discarded, and the result is not renormalized, exactly as
+        the relabel folds a classification datum's own score vector.
+
+        Parameters
+        ----------
+        scores : ArrayLike
+            Class scores of shape ``(n, source_width)`` with ``source_width`` one more than
+            the source dataset's largest class index.
+        view : View or None, default None
+            The :class:`View` this operation was applied through. When given, ``scores``
+            has one row per item of ``view.source`` and the rows of items the relabel (or
+            an earlier operation) dropped are removed, so the result lines up with the
+            view. When None, rows pass through unchanged.
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Shape ``(n_kept, target_width)`` with ``target_width`` one more than the target
+            vocabulary's largest index.
+
+        Raises
+        ------
+        OntologyError
+            If the relabel has not been applied through a :class:`View`.
+        ValueError
+            If ``scores`` does not have ``source_width`` columns, or, with ``view``, one row
+            per item of ``view.source``.
+
+        Examples
+        --------
+        Evaluate a relabeled view with a model whose scores are over the source types:
+
+        >>> from dataeval.data import Relabel, View
+        >>> from dataeval.performance import Feasibility, TargetSpec
+        >>> relabel = Relabel(type_to_category, target=categories)  # doctest: +SKIP
+        >>> view = View(dataset, [relabel])  # doctest: +SKIP
+        >>> scores = model.predict_proba(embeddings)  # (len(dataset), n_types)  # doctest: +SKIP
+        >>> spec = TargetSpec("IC", "recall", 0.6, class_name="Tank", max_false_positive_rate=0.05)  # doctest: +SKIP
+        >>> result = Feasibility().evaluate(  # doctest: +SKIP
+        ...     view, target=[spec], predictions=relabel.fold_scores(scores, view=view)
+        ... )
+        """
+        mapping = self.mapping  # raises OntologyError before the relabel is applied
+        values = as_numpy(scores)
+        if values.ndim != 2 or values.shape[1] != self._source_width:
+            raise ValueError(
+                f"scores must have {self._source_width} columns, one per source class index; got shape {values.shape}."
+            )
+        if view is not None:
+            if len(values) != len(view.source):
+                raise ValueError(f"scores must have {len(view.source)} rows, one per source item; got {len(values)}.")
+            values = values[view.resolve_indices()]
+        return self._conform_scores(values, mapping, self._score_width)
 
     @staticmethod
     def _conform_scores(scores: Any, mapping: Mapping[int, int], width: int) -> NDArray[np.float64]:

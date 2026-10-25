@@ -14,10 +14,13 @@ from sklearn.neighbors import NearestNeighbors
 
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import ArrayND
 from dataeval.utils._array import as_numpy, flatten_samples
 
 _logger = get_logger(__name__)
+
+_GROUP_CAP = 256  # groups larger than this get their own search against everything outside them
 
 
 class MSTResult(TypedDict):
@@ -427,3 +430,87 @@ def compute_neighbors(
     # but we want neighbors from data_fit, not self-matches
     neighbors = _compute_nearest_neighbors(data_fit, data_query, k, algorithm=algorithm, return_distances=False)
     return neighbors.squeeze()
+
+
+def _first_other_group(
+    distances: NDArray[np.float64],
+    indices: NDArray[np.intp],
+    row_groups: NDArray[np.intp],
+    groups: NDArray[np.intp],
+    k: int,
+) -> tuple[NDArray[np.intp], NDArray[np.float64], NDArray[np.bool_]]:
+    """Keep the first ``k`` columns of each row whose neighbor sits outside the row's group."""
+    other = groups[indices] != row_groups[:, None]
+    order = np.argsort(~other, axis=1, kind="stable")[:, :k]
+    return (
+        np.take_along_axis(indices, order, axis=1),
+        np.take_along_axis(distances, order, axis=1),
+        np.take_along_axis(other, order, axis=1),
+    )
+
+
+def _search(fit: NDArray[np.float64], query: NDArray[np.float64], k: int) -> tuple[NDArray[Any], NDArray[Any]]:
+    """Return the ``k`` nearest rows of ``fit`` to each row of ``query``, nearest first, as (distances, indices)."""
+    model = NearestNeighbors(n_neighbors=min(k, len(fit)), n_jobs=get_max_processes()).fit(fit)
+    return model.kneighbors(query)
+
+
+def _fill_large_group(
+    data: NDArray[np.float64], codes: NDArray[np.intp], group: int, k: int, out: tuple[NDArray[Any], ...]
+) -> None:
+    """Search a large group's rows against everything outside it, writing into ``out`` in place."""
+    rows, pool = np.flatnonzero(codes == group), np.flatnonzero(codes != group)
+    if len(pool) == 0:
+        return
+    dist, idx = _search(data[pool], data[rows], k)
+    width = idx.shape[1]
+    out[0][rows, :width], out[1][rows, :width], out[2][rows, :width] = pool[idx], dist, True
+
+
+def grouped_neighbors(
+    embeddings: ArrayND[float], groups: ArrayND[Any], k: int
+) -> tuple[NDArray[np.intp], NDArray[np.float64], NDArray[np.bool_]]:
+    """
+    Find the ``k`` nearest neighbors of every sample from outside its own group.
+
+    Exclusion is by group, never by sklearn's self-exclusion, which can drop an exact duplicate instead of the query.
+    Groups up to 256 rows share one search for ``k`` plus the largest such group's size; each larger group is
+    searched against everything outside it.
+
+    Parameters
+    ----------
+    embeddings : ArrayND[float]
+        One row per sample.
+    groups : ArrayND
+        One group id per sample; any hashable values.
+    k : int
+        Number of neighbors per sample.
+
+    Returns
+    -------
+    tuple[NDArray[np.intp], NDArray[np.float64], NDArray[np.bool_]]
+        ``(indices, distances, valid)``, each of shape ``(n, k)``, nearest first. ``valid`` is False only where
+        fewer than ``k`` samples lie outside a row's group.
+
+    Raises
+    ------
+    ShapeMismatchError
+        If ``groups`` does not hold one id per sample.
+    """
+    data = flatten_samples(as_numpy(embeddings, dtype=np.float64))
+    codes = np.unique(as_numpy(groups), return_inverse=True)[1].reshape(-1)
+    if len(codes) != len(data):
+        raise ShapeMismatchError(f"Got {len(data)} embeddings for {len(codes)} group ids.")
+    sizes = np.bincount(codes)
+    indices = np.zeros((len(data), k), dtype=np.intp)
+    distances = np.full((len(data), k), np.inf)
+    valid = np.zeros((len(data), k), dtype=bool)
+    small = sizes[codes] <= _GROUP_CAP
+    if small.any():
+        dist, idx = _search(data, data[small], k + int(sizes[sizes <= _GROUP_CAP].max()))
+        found = _first_other_group(dist, idx, codes[small], codes, k)
+        width = found[0].shape[1]  # fewer than k when there are fewer samples than neighbors asked for
+        indices[small, :width], distances[small, :width], valid[small, :width] = found
+    for group in np.flatnonzero(sizes > _GROUP_CAP):
+        _fill_large_group(data, codes, int(group), k, (indices, distances, valid))
+    return indices, distances, valid

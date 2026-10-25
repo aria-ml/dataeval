@@ -5,12 +5,30 @@ __all__ = []
 import functools
 import importlib
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, TypeVar, overload
 
 from dataeval.exceptions import DeprecatedWarning, ExperimentalWarning
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+_QUIET: ContextVar[bool] = ContextVar("dataeval_experimental_quiet", default=False)
+
+
+@contextmanager
+def quiet_experimental() -> Iterator[None]:
+    """Silence DataEval's own experimental warnings in this context, leaving each once-per-process warning unspent.
+
+    For a public evaluator's internal calls: a ``catch_warnings`` filter would hide the warnings but still mark them
+    as given, so the user's own later call of the same experimental function would never warn.
+    """
+    token = _QUIET.set(True)
+    try:
+        yield
+    finally:
+        _QUIET.reset(token)
 
 
 def _make_warning_message(  # noqa: C901
@@ -77,7 +95,7 @@ def experimental(  # noqa: C901
             @functools.wraps(original_init)
             def new_init(self: Any, *args: Any, **kwargs: Any) -> None:
                 nonlocal warned
-                if not warned:
+                if not warned and not _QUIET.get():
                     warnings.warn(msg, ExperimentalWarning, stacklevel=2)
                     warned = True
                 original_init(self, *args, **kwargs)
@@ -89,7 +107,7 @@ def experimental(  # noqa: C901
         @functools.wraps(target)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             nonlocal warned
-            if not warned:
+            if not warned and not _QUIET.get():
                 warnings.warn(msg, ExperimentalWarning, stacklevel=2)
                 warned = True
             return target(*args, **kwargs)
