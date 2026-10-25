@@ -62,7 +62,7 @@ set_seed(0, all_generators=True)
 rng = np.random.default_rng(0)
 
 # %% [markdown]
-# ## Confidence/Uncertainty Drift (Using Entropy)
+# ## Confidence/uncertainty drift (using entropy)
 #
 # If a deployed model encounters data outside its training distribution, its predictions typically become
 # less confident (more uniform). We can calculate the {term}`Shannon entropy<Shannon Entropy>` of the predicted
@@ -104,7 +104,7 @@ print(f"Confidence Shift Detected: {result.drifted}")
 assert result.drifted
 
 # %% [markdown]
-# ## Marginal Class Probability Shift
+# ## Marginal class probability shift
 #
 # Sometimes the model remains confident, but the frequency with which it predicts certain classes changes.
 # You can pass the raw probability arrays `(N, C)` directly into the univariate detector. It will
@@ -131,7 +131,7 @@ assert result_marginal.drifted
 assert result_marginal.details["feature_drift"].any()
 
 # %% [markdown]
-# ## Joint Probability Shift (Multivariate)
+# ## Joint probability shift (multivariate)
 #
 # If the relationships or correlations between the predicted classes shift, univariate tests might miss it.
 # The {class}`.DriftDomainClassifier` treats the model outputs as features and trains a LightGBM classifier
@@ -149,7 +149,7 @@ print(f"Multivariate Shift Detected: {result_multivariate.drifted} (AUROC: {resu
 assert result_multivariate.drifted
 
 # %% [markdown]
-# ## Label Shift (Prior Shift) from Hard Predictions
+# ## Label shift (prior shift) from hard predictions
 #
 # If you don't even have probabilities — only discrete integer labels output by the model — you can still
 # detect label shift. Simply one-hot encode the predictions to create an `(N, C)` array where each row

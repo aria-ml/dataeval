@@ -25,7 +25,7 @@
 # Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [Data Scientist](../getting-started/roles/data_scientist.md)
 
 # %% [markdown]
-# ## What you'll do
+# ## What you will do
 #
 # - Construct [embeddings](../concepts/Embeddings.md) by inferencing the PASCAL VOC 2012 dataset through a model
 # - Analyze clustered embeddings to find
@@ -33,19 +33,19 @@
 # - Run additional analysis to find gaps in data
 #   [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space)
 #
-# ## What you'll learn
+# ## What you will learn
 #
 # - Learn to use cluster based algorithms to measure dataset quality without labels
 # - Learn to distinguish if an image is an outlier or is underrepresented
 # - Learn to determine if flagged images should be added or removed
 
 # %% [markdown]
-# ## What you'll need
+# ## What you will need
 #
 # - Basic familiarity with Python
 
 # %% [markdown]
-# ## Background
+# ## Introduction
 #
 # Before building predictive models, it's essential to identify outliers and ensure that data groups accurately reflect
 # the underlying distribution. When labels are unavailable due to things like unsupervised learning, initial data curation,

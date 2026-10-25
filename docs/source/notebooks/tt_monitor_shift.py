@@ -24,7 +24,7 @@
 #
 # Relevant personas: [ML Engineer](../getting-started/roles/ml_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 #
-# ## What you'll do
+# ## What you will do
 #
 # - Narrow a dataset to the classes your deployment monitors with a dataset view
 # - Construct [embeddings](../concepts/Embeddings.md) by inferencing images through a pretrained network
@@ -33,7 +33,7 @@
 # - Use chunked drift detection to monitor drift across data segments
 # - Compare the label distributions between a training and operational set, and see the check fail on a broken one
 #
-# ## What you'll learn
+# ## What you will learn
 #
 # - Learn the strengths and trade-offs of each drift detector
 # - Learn how to analyze embeddings for operational drift
@@ -42,7 +42,7 @@
 # - Learn how to use chunked drift detection for temporal monitoring
 # - Learn how to analyze label distributions, and what a parity failure looks like
 #
-# ## What you'll need
+# ## What you will need
 #
 # - Knowledge of Python
 # - Beginner knowledge of PyTorch or neural networks

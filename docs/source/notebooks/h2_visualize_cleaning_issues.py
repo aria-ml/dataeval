@@ -142,8 +142,8 @@ assert results.shape[0] == 404
 # - [Clustering](../concepts/Clustering.md) — Explore clustering concepts for grouping similar data samples.
 # - [Acting on Results](../concepts/ActingOnResults.md) — Learn strategies to address dataset imbalance, coverage gaps, and bias.
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
-# - [Introduction to data cleaning](./tt_clean_dataset.py) — Clean datasets by detecting corrupted images, outliers, and duplicates.
-# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Identify augmented or transformed duplicate images in a dataset.
+# - [Clean a dataset](./tt_clean_dataset.py) — Clean datasets by detecting corrupted images, outliers, and duplicates.
+# - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Identify augmented or transformed duplicate images in a dataset.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Configure custom image statistics for object detection dataset analysis.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster feature embeddings to inspect data grouping.
 # - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Extract and attach intrinsic image factors to dataset metadata.

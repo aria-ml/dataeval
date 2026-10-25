@@ -27,7 +27,7 @@
 #
 # Relevant personas: [ML Engineer](../getting-started/roles/ml_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md), [Data Scientist](../getting-started/roles/data_scientist.md)
 #
-# ## What you'll do
+# ## What you will do
 #
 # - Train different reconstruction models (AE, VAE) for OOD detection
 # - Use Gaussian Mixture Models (GMM) to enhance OOD detection
@@ -35,7 +35,7 @@
 # - Compare model performance on different OOD scenarios
 # - Visualize reconstruction quality and OOD scores
 #
-# ## What you'll learn
+# ## What you will learn
 #
 # - When to use Autoencoder (AE) vs Variational Autoencoder (VAE) for OOD detection
 # - How GMM in latent space improves OOD detection
@@ -43,7 +43,7 @@
 # - How to interpret OOD scores and set appropriate thresholds
 # - Different use cases for each model configuration
 #
-# ## What you'll need
+# ## What you will need
 #
 # - Knowledge of Python
 # - Basic understanding of PyTorch and neural networks
@@ -1047,7 +1047,7 @@ plt.show()
 # - When unsure, try both — as shown in this tutorial, the performance difference depends on the specific embedding space
 #   and data distribution
 #
-# #### **Quick decision table:**
+# #### Quick decision table
 #
 # | Your Situation                           | Recommended Method   | Why                                                  |
 # | ---------------------------------------- | -------------------- | ---------------------------------------------------- |
@@ -1058,7 +1058,7 @@ plt.show()
 # | Maximum accuracy (can train extensively) | **KNN or VAE + GMM** | KNN for strong embeddings, VAE+GMM for 30-50+ epochs |
 # | Limited computational resources          | **Standard AE**      | Fastest training, good baseline                      |
 #
-# #### **By application domain:**
+# #### By application domain
 #
 # | Domain               | Best Method        | Rationale                                                         |
 # | -------------------- | ------------------ | ----------------------------------------------------------------- |
@@ -1070,7 +1070,7 @@ plt.show()
 #
 # ### Implementation recommendations
 #
-# #### **For KNN (best overall)**
+# #### For KNN (best overall)
 #
 # ```python
 # # Train embedding model or use pretrained
@@ -1097,7 +1097,7 @@ plt.show()
 # - Embedding quality — invest in domain-specific pretrained models
 # - Distance metric — use cosine for normalized embeddings, Euclidean when magnitude matters
 #
-# #### **For standard AE (reliable baseline)**
+# #### For standard AE (reliable baseline)
 #
 # ```python
 # config = OODReconstruction.Config(
@@ -1110,7 +1110,7 @@ plt.show()
 #
 # **Key Success Factor**: Architecture design - match to your data type
 #
-# #### **For GMM methods (advanced)**
+# #### For GMM methods (advanced)
 #
 # ```python
 # # Add GMM to your model

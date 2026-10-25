@@ -26,7 +26,7 @@
 # Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 
 # %% [markdown]
-# ## What you'll do
+# ## What you will do
 #
 # - Use DataEval to identify bias and correlations in the [SeaDronesSee dataset](https://seadronessee.cs.uni-tuebingen.de/)
 # - Check what the default binning produced, and see which columns DataEval could not read
@@ -34,14 +34,14 @@
 # - Analyze the results using plots and tables
 
 # %% [markdown]
-# ## What you'll learn
+# ## What you will learn
 #
 # - You will see how to identify bias and correlations present in a dataset.
 # - You will understand the potential impact on your data and ways to mitigate them.
 # - You will learn to repair a column DataEval held back, rather than accepting the drop.
 
 # %% [markdown]
-# ## What you'll need
+# ## What you will need
 #
 # - Basic familiarity with Python
 # - Basic understanding of your dataset structure, including but not limited to its

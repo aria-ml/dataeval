@@ -229,7 +229,7 @@ lists them in one table.
 ### How-to guides
 
 - [How to create embeddings](../notebooks/h2_create_embeddings.py)
-- [Embed object detection crops and visualize class clusters](../notebooks/h2_embed_detection_crops.py)
+- [How to embed object detection crops and visualize class clusters](../notebooks/h2_embed_detection_crops.py)
 - [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
 - [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
 

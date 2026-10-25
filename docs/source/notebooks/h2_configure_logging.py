@@ -285,5 +285,5 @@ print("\nCleanup complete!")
 # %% [markdown]
 # ## Next steps
 #
-# - [Introduction to data cleaning](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
+# - [Clean a dataset](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
 # - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Set global default device, batch size, worker processes, and seed.

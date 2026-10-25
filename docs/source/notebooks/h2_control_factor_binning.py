@@ -95,7 +95,7 @@ winter_factors, winter_labels = collection(seed=0, mean_temp=-2.0)
 spring_factors, spring_labels = collection(seed=1, mean_temp=14.0)
 
 # %% [markdown]
-# ## 1. See what was decided for you
+# ## See what was decided for you
 #
 # {meth}`.Metadata.encoding` returns the map from a factor's values to its codes:
 # a {class}`.BinSpec` where the factor was cut, a {class}`.LevelSpec` where it was
@@ -134,7 +134,7 @@ print(f"spring temp_c: {np.round(spring.encoding('temp_c').edges, 1)}")
 warnings.filterwarnings("ignore", message=".*binned automatically")
 
 # %% [markdown]
-# ## 2. Declare the cut you actually mean
+# ## Declare the cut you actually mean
 #
 # `continuous_factor_bins` takes explicit edges - the boundaries that carry your
 # meaning - or a plain count when you only care about resolution. `factor_levels`
@@ -180,7 +180,7 @@ except ValueError as error:
     print(error)
 
 # %% [markdown]
-# ## 3. Ratify the cuts you do not have an opinion about
+# ## Ratify the cuts you do not have an opinion about
 #
 # You will not have a boundary in mind for every factor. `haze` is a case where
 # the automatic cut is *fine* - it just needs to stop moving.
@@ -200,7 +200,7 @@ print(f"codes unchanged: {np.array_equal(before, winter.factor_data)}")
 # `accept()` with no arguments ratifies everything still in the last category.
 
 # %% [markdown]
-# ## 4. Write it out for review
+# ## Write it out for review
 #
 # {meth}`.Metadata.export_encoding` writes the whole map as JSON with sorted keys
 # and a fixed indent. That is deliberate: a descriptor is policy, so it belongs in
@@ -220,7 +220,7 @@ print(json.dumps(json.loads(descriptor.read_text())["factors"]["temp_c"], indent
 # measurement.
 
 # %% [markdown]
-# ## 5. Encode the next dataset against it
+# ## Encode the next dataset against it
 #
 # Hand the descriptor - or the mapping {meth}`.Metadata.encoding` returns - to the
 # next collection. The cut is **reapplied, not refitted**: spring is 16 °C warmer,
@@ -248,7 +248,7 @@ result = Balance().evaluate(spring)
 print(f"on the result: {result.meta().state['encoding_digest']}")
 
 # %% [markdown]
-# ## 6. Hear about it when a cut stops fitting
+# ## Hear about it when a cut stops fitting
 #
 # A locked cut is reapplied even when the data has moved out from under it, which
 # is the intent - re-fitting is what locking it prevents - but it is worth
@@ -283,7 +283,7 @@ for warning in caught:
 # computed under the old codes stays attributable to them.
 
 # %% [markdown]
-# ## 7. Choose what the evaluator reads
+# ## Choose what the evaluator reads
 #
 # Recording the cut lets {class}`.Balance` do something it could not before:
 # honor it. Its `factor_source` decides, **per factor**, whether to score the
@@ -333,7 +333,7 @@ for source in ("auto", "coded", "values"):
 # `"auto"` consults, and {attr}`.FactorInfo.is_binned` is where it is recorded.
 
 # %% [markdown]
-# ## 8. Keep the record with the data
+# ## Keep the record with the data
 #
 # {meth}`.Metadata.save` carries the encoding into the archive, so a restored
 # instance reproduces its codes rather than re-deriving them. Without that, a
