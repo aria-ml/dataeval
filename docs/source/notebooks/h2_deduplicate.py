@@ -237,14 +237,6 @@ assert annotation_results.augmented().data()["item_indices"].item().to_list() ==
 # ## Next steps
 #
 # - [Acting on Results](../concepts/ActingOnResults.md) — Learn strategies for addressing dataset issues identified during evaluation.
-# - [Clustering](../concepts/Clustering.md) — Understand clustering techniques for grouping similar data points and detecting patterns.
 # - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data quality issues.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Evaluate bias and coverage across metadata factors in your dataset.
 # - [How to find duplicate video](./h2_deduplicate_video.py) — Find duplicate footage, train/test leakage, and redundant frames in video and MOT datasets.
 # - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
-# - [Clean a dataset](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors such as dimensions and pixel statistics to dataset metadata.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
-# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings and factors to discover structural groupings in your data.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Configure custom image statistics across full images, bounding boxes, and backgrounds.
-# - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py) — Plot and visualize dataset anomalies, duplicates, and quality issues.

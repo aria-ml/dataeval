@@ -185,12 +185,7 @@ assert len(duplicates_result.near) == 2
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset balance, coverage, and feature representation.
 # - [Embeddings](../concepts/Embeddings.md) — Understand feature extraction and vector embeddings for clustering.
-# - [Acting on Results](../concepts/ActingOnResults.md) — Apply remediation strategies after identifying dataset clusters and anomalies.
 # - [Data Integrity](../concepts/DataIntegrity.md) — Explore outlier and duplicate detection methodologies.
-# - [Distribution Shift](../concepts/DistributionShift.md) — Detect distribution shifts in clustered dataset representations.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate unlabeled image datasets using clustering and coverage metrics.
-# - [Clean a dataset](./tt_clean_dataset.py) — Clean image datasets by identifying corrupt, duplicate, or mislabeled samples.
 # - [How to identify duplicates](./h2_deduplicate.py) — Detect exact and near-duplicate images in dataset collections.
-# - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py) — Visualize data quality issues such as outliers and label noise.
