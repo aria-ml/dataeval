@@ -15,46 +15,16 @@
 
 # %% [markdown]
 # # How to measure named groups of channels
-
-# %% [markdown]
-# ## Problem statement
 #
-# When analyzing multispectral, hyperspectral, or augmented imagery (such as RGB with
-# near-infrared or LIDAR), you should measure statistics on specific band groups rather
-# than averaging all channels together. By default, `{func}.image_stats` averages all
-# bands, which can obscure critical channel-specific characteristics (e.g., fusing
-# near-infrared and visible ranges).
+# By default {func}`.image_stats` averages every band of an image together, which hides what each band says. In
+# multispectral and hyperspectral imagery, or RGB with near-infrared or LIDAR added, the bands carry different physical
+# measurements and often different value ranges. The `channels` argument names groups of bands, and each group is
+# measured on its own into prefixed columns that {class}`.Metadata` can take.
 #
-# In this guide, you will learn how to use the `channels` argument to define and name
-# groups of bands. You will measure each group separately and output them as distinct
-# columns that you can register with `{class}.Metadata`.
-
-# %% [markdown]
-# ### When to use
+# Use it when an image has more than three bands, or bands with different dynamic ranges.
 #
-# You should use this approach when your images contain channels representing distinct
-# physical measurements rather than standard colors, such as:
-#
-# - RGB augmented with near-infrared, thermal, elevation, or a LIDAR return.
-# - Multispectral or hyperspectral imagery, where bands group into meaningful ranges.
-# - Any sensor whose bands have different dynamic ranges, where a single scale is
-#   insufficient.
-#
-# You do not need this for standard 1-channel or 3-channel imagery, where
-# `{func}.image_stats` measures the image correctly without additional configuration.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A Python environment with `dataeval` installed.
-# 1. Imagery with more than three bands (this guide uses a synthetic dataset so you can
-#    run it anywhere).
-
-# %% [markdown]
-# ## Getting started
-#
-# First, you will import the required libraries to configure the environment and prepare
-# the data.
+# You need `dataeval`. This guide builds 24 synthetic scenes of red, green, blue (8-bit) and near-infrared (12-bit)
+# bands. Half the scenes are vegetated and differ only in the near-infrared band.
 
 # %% tags=["remove_cell"]
 try:
@@ -87,23 +57,7 @@ set_max_processes(4)
 logging.basicConfig(format="%(levelname)s: %(message)s", force=True)
 logging.getLogger("dataeval").setLevel(logging.WARNING)
 
-# %% [markdown]
-# ## Build a four-band dataset
-#
-# In this section, you will build a small synthetic dataset representing three visible
-# bands and one near-infrared band stacked into a single `uint16` array.
-#
-# You will configure the dataset with two distinct channel groups to demonstrate how
-# to handle differing dynamic ranges:
-# - The visible bands hold standard 8-bit values (ranging from 0 to 255).
-# - The near-infrared band represents a 12-bit sensor (ranging into the thousands).
-#
-# To simulate a target signal, half the scenes will represent vegetated areas (high
-# near-infrared reflectance) and half will represent bare ground. Because vegetation
-# appears identical to bare ground in visible light, you will search for the signal
-# in the near-infrared band.
-
-# %%
+# %% tags=["hide-input"]
 rng = np.random.default_rng(0)
 
 
@@ -136,10 +90,9 @@ dataset = BandCubes()
 print(f"{len(dataset)} scenes, each {dataset[0][0].shape} of dtype {dataset[0][0].dtype}")
 
 # %% [markdown]
-# ## What the unnamed measurement tells you
+# ## Measure the bands as one
 #
-# First, you will execute `{func}.image_stats` without the `channels` argument to see the
-# default behavior, which averages all bands together into a single measurement.
+# Without `channels`, every band is averaged into a single measurement.
 
 # %%
 stats = ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS | ImageStats.DIMENSION_DEPTH
@@ -150,28 +103,15 @@ for name, values in sorted(whole["stats"].items()):
     print(f"{name:12} first scene: {float(values[0]):10.2f}")
 
 # %% [markdown]
-# Running this computation leads to three incorrect measurements, though no errors are
-# raised:
-#
-# - **Incorrect depth**: You will see `depth` reports 12 because the container is sized for
-#   the largest band. The 8-bit visible bands are measured against an incorrect, larger
-#   scale.
-# - **Meaningless mean**: You will see `mean` averages both the 8-bit visible bands and
-#   the 12-bit near-infrared band, resulting in a value that does not represent any single
-#   physical unit.
-# - **Inaccurate brightness**: You will see `brightness` is near zero (black). Because the
-#   scale is anchored on the maximum value (4095), the visible pixels are mapped
-#   incorrectly.
-#
-# You will receive a logger warning that identifies the affected statistics and suggests
-# specifying `channels` to resolve the scaling discrepancy.
+# Nothing raises, but three values are wrong: `depth` reports 12 because the container is sized for the largest band,
+# `mean` mixes 8-bit and 12-bit values into a number with no unit, and `brightness` is near zero because the scale is
+# anchored on 4095. DataEval logs a warning naming the affected statistics and suggesting `channels`.
 
 # %% [markdown]
 # ## Name the band groups
 #
-# To measure bands individually or in specific subsets, you should pass a mapping of group
-# names to band indices using the `channels` argument. Each group is measured jointly,
-# and the resulting columns will be prefixed with the group's name.
+# Pass a mapping of group names to band indices. Each group is measured jointly and its columns are prefixed with the
+# group's name.
 
 # %%
 grouped = image_stats(
@@ -185,52 +125,15 @@ for name, values in sorted(grouped["stats"].items()):
     print(f"{name:16} first scene: {float(values[0]):10.2f}")
 
 # %% [markdown]
-# By grouping the channels, you will obtain correct measurements for each band range:
-#
-# - **Correct depth**: You will see `rgb_depth` is 8 and `nir_depth` is 12.
-# - **Comparable mean**: You will see `rgb_mean` is in standard visible-light units and
-#   comparable with other 8-bit imagery.
-# - **Accurate brightness**: You will see `rgb_brightness` is correctly scaled based on
-#   the visible bands.
-#
-# Note that the unprefixed columns remain in the output to represent the overall
-# image-level or band-invariant statistics.
-
-# %% [markdown]
-# ## Does the band carry the signal?
-#
-# To verify that the target signal is properly isolated, you will compare the mean values
-# of the visible and near-infrared bands across the two classes.
-
-# %%
-labels = np.array([dataset[i][1].argmax() for i in range(len(dataset))])
-comparison = pl.DataFrame({
-    "class": [dataset.index2label[int(label)] for label in labels],
-    "nir_mean": np.asarray(grouped["stats"]["nir_mean"], dtype=float),
-    "rgb_mean": np.asarray(grouped["stats"]["rgb_mean"], dtype=float),
-    "whole_mean": np.asarray(grouped["stats"]["mean"], dtype=float),
-})
-
-print(comparison.group_by("class").agg(pl.all().mean().round(1)).sort("class"))
-
-# %% [markdown]
-# In the printed summary, you will observe the following:
-#
-# - `nir_mean` successfully separates the vegetated and bare classes.
-# - `rgb_mean` shows no difference between classes, as expected.
-# - `whole_mean` separates the classes but produces an uninterpretable average value due
-#   to the combined ranges.
-#
-# You should use band-wise measurements to pinpoint where differences and signals exist
-# across your channels.
+# `rgb_depth` is 8 and `nir_depth` is 12, and `rgb_mean` is in the units of any 8-bit image. The unprefixed columns stay
+# for the whole image. Geometry such as `width` is not produced per group, because choosing bands does not change the
+# dimensions, and `channels` also composes with `per_background`, which adds `background_nir_mean`.
 
 # %% [markdown]
 # ## Hand the groups to Metadata
 #
-# You should register the computed statistics with `{class}.Metadata` to use them in
-# downstream tasks. You will pass the `{class}.StatsResult` to
-# `{meth}.Metadata.add_factors` to automatically align the band-specific statistics with
-# the dataset rows.
+# Pass the whole result to {meth}`.Metadata.add_factors` and each group's statistics land on the row they describe.
+# Vector-valued statistics such as `rgb_histogram` are skipped, because a factor must be one-dimensional.
 
 # %%
 metadata = Metadata(dataset)
@@ -252,19 +155,14 @@ print(
 )
 
 # %% [markdown]
-# Once registered, you will be able to analyze the band groups using other DataEval
-# tools like balance, diversity, and parity.
-#
-# Note: In DataEval v1.2, the `per_channel` argument was removed in favor of `channels`.
-# If you are migrating standard RGB imagery, you should use
-# `channels={"r": 0, "g": 1, "b": 2}`.
+# `nir_mean` separates the vegetated scenes from the bare ones, and `rgb_mean` does not. The whole-image `mean`
+# separates them too, but cannot say which band carries the signal.
 
 # %% [markdown]
-# ## Where a scene cannot supply a group
+# ## Handle scenes that lack a band
 #
-# To handle datasets where some scenes are missing specific bands, you should use the
-# same group definitions. In this example, you will add a three-band scene that lacks the
-# near-infrared channel and compute statistics again.
+# A scene does not have to carry every band. The second scene below has three bands, so it cannot supply the `nir`
+# group.
 
 # %%
 ragged = [dataset[0][0], dataset[1][0][:3]]
@@ -279,58 +177,16 @@ patchy = image_stats(
 print(pl.DataFrame({name: np.asarray(values, dtype=float) for name, values in sorted(patchy.items())}))
 
 # %% [markdown]
-# You will observe that for the scene lacking the channel, `nir_mean` is reported as `NaN`
-# and `nir_missing` is reported as `1.0`.
-#
-# Keep in mind the following behaviors:
-# - **Column Alignment**: Columns are never omitted; they remain aligned with all other
-#   records to ensure consistent indexing.
-# - **All-or-Nothing Measurement**: If a group is defined with multiple bands and any
-#   required band is missing, the entire group is marked as absent rather than partially
-#   measured.
-# - **Using Missing Indicators**: You should use `nir_missing` (which outputs `1.0` when
-#   a group is absent) to programmatically detect missing channels in your dataset.
+# The scene without the band gets `nan` for `nir_mean` and 1.0 for `nir_missing`. Columns are never dropped, so they
+# stay aligned with every other record, and a group missing any one of its bands is absent as a whole rather than partly
+# measured. Filter on `nir_missing` to find those scenes.
 
 # %% [markdown]
-# ## Combine band groups with the background
+# ## Declare ranges and choose statistics per group
 #
-# You should combine `channels` with spatial masking arguments like `per_background` to
-# analyze specific bands within localized regions. In this section, you will define
-# bounding boxes and calculate near-infrared statistics for the background area of the
-# image.
-
-# %%
-boxed = [(cube, [(4, 4, 16, 16)]) for cube in (dataset[0][0], dataset[1][0])]
-
-composed = image_stats(
-    [image for image, _ in boxed],
-    boxes=[boxes for _, boxes in boxed],
-    stats=ImageStats.PIXEL_MEAN,
-    per_target=False,
-    per_background=True,
-    normalize_pixel_values=False,
-    channels={"nir": 3},
-)["stats"]
-
-print(sorted(composed))
-
-# %% [markdown]
-# You will find the prefixed statistic `background_nir_mean` representing the
-# near-infrared average for pixels outside any bounding box.
-#
-# You should check `background_fraction` to ensure the background region covers a
-# sufficient proportion of the image before trusting background statistics.
-
-# %% [markdown]
-# ## Declare a range for a physical band
-#
-# For datasets with bands representing physical values (such as elevation, reflectance,
-# or temperature) rather than standard integer encodings, you should explicitly declare
-# their expected ranges. If a range is undefined, statistics requiring intervals will
-# output `NaN`.
-#
-# You will use the `{class}.ChannelGroup` wrapper to define the active channels and
-# specify their value ranges.
+# A band with physical units needs a declared range, or statistics that need an interval, such as entropy, return `nan`.
+# Wrap the band in {class}`.ChannelGroup` and give it a `value_range`. The unprefixed `entropy` is `nan` because the
+# whole image has no single range.
 
 # %%
 physical = np.stack([
@@ -352,41 +208,8 @@ for name, values in sorted(declared.items()):
     print(f"{name:20} {float(values[0]):.3f}")
 
 # %% [markdown]
-# You will observe that each band is binned over its declared interval, making the
-# entropy calculations comparable across runs. The unnamed `entropy` will return `NaN`
-# because the overall image lacks a single, coherent value range.
-
-# %% [markdown]
-# ## What is not measured per group
-#
-# Geometric statistics (such as width, height, and coordinates) are not calculated per
-# channel group because channel subsetting does not modify the image dimensions.
-
-# %%
-geometry = image_stats(
-    dataset,
-    stats=ImageStats.DIMENSION_WIDTH | ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH,
-    normalize_pixel_values=False,
-    channels={"rgb": [0, 1, 2], "nir": 3},
-)["stats"]
-
-print(sorted(geometry))
-
-# %% [markdown]
-# You will see that `width` and `channels` appear as single, unprefixed columns, whereas
-# `depth` appears per group (e.g., `rgb_depth`, `nir_depth`) because bands can use different
-# encodings.
-#
-# Note: You should be aware that multi-dimensional or vector-valued statistics (e.g.,
-# `rgb_histogram` and `nir_percentiles`) are dropped when you register results with
-# `{class}.Metadata` because metadata factors must be one-dimensional.
-
-# %% [markdown]
-# ## Ask a different question of each group
-#
-# If you want to compute different metrics for different channel groups, you should pass
-# `stats` as a mapping dictionary. In this mapping, keys represent the group names (or
-# `None` for image-wide statistics) and values specify the desired metrics.
+# To ask a different question of each group, pass `stats` as a mapping. Its keys must match the `channels` keys, with
+# `None` for statistics of the whole image, and geometry belongs under `None`. A group left out is not measured.
 
 # %%
 per_group = image_stats(
@@ -402,27 +225,62 @@ per_group = image_stats(
 
 print(sorted(per_group))
 
-# %% [markdown]
-# This mapping specifies the exact statistics computed for each view. You will observe that
-# any omitted view is not measured.
-#
-# You should adhere to two requirements when configuring the `stats` mapping:
-#
-# - **Keys Match Channels**: Your keys must match the defined `channels` keys. Discrepancies
-#   will result in configuration errors.
-# - **Geometry Key Placement**: You should request geometric statistics under the `None`
-#   key because they do not apply to specific channel groups. Asking for geometry in a group
-#   key will trigger a warning.
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+boxed = [(cube, [(4, 4, 16, 16)]) for cube in (dataset[0][0], dataset[1][0])]
+
+composed = image_stats(
+    [image for image, _ in boxed],
+    boxes=[boxes for _, boxes in boxed],
+    stats=ImageStats.PIXEL_MEAN,
+    per_target=False,
+    per_background=True,
+    normalize_pixel_values=False,
+    channels={"nir": 3},
+)["stats"]
+
+print(sorted(composed))
+geometry = image_stats(
+    dataset,
+    stats=ImageStats.DIMENSION_WIDTH | ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH,
+    normalize_pixel_values=False,
+    channels={"rgb": [0, 1, 2], "nir": 3},
+)["stats"]
+
+print(sorted(geometry))
+
+assert whole["stats"]["depth"][0] == 12
+assert grouped["stats"]["rgb_depth"][0] == 8
+assert grouped["stats"]["nir_depth"][0] == 12
+assert "mean" in grouped["stats"]
+assert "background_nir_mean" in composed
+assert {"width", "channels", "rgb_depth", "nir_depth"} <= set(geometry)
+assert not {"rgb_width", "nir_width"} & set(geometry)
+
+by_class = (
+    rows
+    .group_by("class_label")
+    .agg(pl.col("nir_mean").mean(), pl.col("rgb_mean").mean(), pl.col("mean").mean())
+    .sort("class_label")
+)
+assert by_class["mean"][1] > 2 * by_class["mean"][0]
+assert by_class["nir_mean"][1] > 3 * by_class["nir_mean"][0]
+assert abs(by_class["rgb_mean"][1] - by_class["rgb_mean"][0]) < 5
+assert {"nir_mean", "rgb_mean"} <= set(metadata.factor_names)
+
+assert np.isnan(patchy["nir_mean"][1])
+assert not np.isnan(patchy["nir_mean"][0])
+assert patchy["nir_missing"][0] == 0.0
+assert patchy["nir_missing"][1] == 1.0
+
+assert np.isnan(declared["entropy"][0])
+assert np.isfinite(declared["elevation_entropy"][0])
+assert np.isfinite(declared["instrument_entropy"][0])
+assert set(per_group) == {"width", "channels", "rgb_brightness", "rgb_xxhash", "nir_mean"}
 
 # %% [markdown]
 # ## Next steps
 #
-# ### Concepts
-#
 # - [Image Statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across channels.
-# - [Metadata Levels](../concepts/MetadataLevels.md) — Explore dataset, datum, and factor levels in DataEval metadata.
-#
-# ### How-to guides
-#
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Compute custom bounding box and image statistics for object detection tasks.
 # - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Add domain-specific intrinsic factors to Metadata for deeper analysis.

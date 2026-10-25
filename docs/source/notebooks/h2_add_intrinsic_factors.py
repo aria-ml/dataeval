@@ -15,51 +15,28 @@
 
 # %% [markdown]
 # # How to add intrinsic factors to Metadata
-
-# %% [markdown]
-# ## Problem statement
 #
-# When performing analysis on datasets,
-# [metadata](../concepts/DatasetBias.md#measuring-bias-mutual-information-and-evenness) may
-# sometimes be sparse or unavailable. Adding metadata to a dataset for analysis
-# may be necessary at times, and can come in the forms of calculated intrinsic
-# values or additional information originally unavailable on the source dataset.
+# Bias analysis needs factors to correlate with the labels, and a dataset often arrives with few or none.
+# {func}`.image_stats` measures intrinsic factors from the pixels, such as brightness, sharpness and contrast, and
+# {meth}`.Metadata.add_factors` attaches them to the {class}`.Metadata` so {class}`.Balance` and {class}`.Diversity` can
+# analyze them. See
+# [Dataset Bias and Coverage](../concepts/DatasetBias.md#measuring-bias-mutual-information-and-evenness).
 #
-# This guide will show you how to add in the calculated statistics from DataEval's
-# {func}`.image_stats` function to the metadata for bias analysis.
-
-# %% [markdown]
-# ### When to use
+# Use it when the dataset carries little or no metadata, or when you want to test a property it does not record.
 #
-# Adding metadata factors should be done when little or no metadata is available on the dataset, or to gain insights
-# specific to metadata of interest that is not present natively in the dataset metadata.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A dataset to analyze
-# 1. A Python environment with the following packages installed:
-#    - `dataeval`
-#    - `dataeval-plots[plotly]`
-#    - `maite-datasets`
-
-# %% [markdown]
-# ## Getting started
-#
-# First import the required libraries needed to set up the example.
+# You need `dataeval`, `dataeval-plots` and `maite-datasets`. This guide uses CIFAR-10.
 
 # %% tags=["remove_cell"]
 try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval dataeval-plots[plotly] maite-datasets
+    # %pip install -q dataeval dataeval-plots maite-datasets
 except Exception:
     pass
 
 # %%
 import dataeval_plots as dep
-import plotly.io as pio
 import polars as pl
 from maite_datasets.image_classification import CIFAR10
 
@@ -70,81 +47,52 @@ from dataeval.data import Limit, Shuffle, View
 from dataeval.flags import ImageStats
 
 _ = pl.Config.set_tbl_rows(-1)
-# Use plotly to render plots
 dep.set_default_backend("matplotlib")
-
-# Use the notebook renderer so JS is embedded
-pio.renderers.default = "notebook"
 
 # %% [markdown]
 # ## Load the dataset
 #
-# Begin by loading in the CIFAR-10 dataset.
-#
-# The CIFAR-10 dataset contains 60,000 images - 50,000 in the train set and 10,000 in the test set. We will use a shuffled
-# sample of 20,000 images from both sets.
+# Load a shuffled sample of 20,000 CIFAR-10 images and wrap it in a `Metadata`. Its only factor is `batch_num`, the
+# on-disk file each image came from.
 
 # %%
 # Load in the CIFAR10 dataset and limit to 20,000 images with random shuffling
 cifar10 = View(CIFAR10("data", image_set="base", download=True), [Limit(20000), Shuffle(seed=0)])
 print(cifar10)
 
-# %% [markdown]
-# ## Inspect the metadata
-#
-# You can begin by inspecting the available factor names in the dataset.
-
 # %%
 metadata = Metadata(cifar10)
 print(f"Factor names: {metadata.factor_names}")
 
 # %% [markdown]
-# A quick check of the {class}`.Balance` of the single factor will show no mutual information between the classes and the
-# `batch_num` which indicates the on-disk binary file the image was extracted from.
-
-# %%
-# Balance at index 0 is always class
-Balance().evaluate(metadata).balance[1]
-
-# %% [markdown]
-# ## Add image statistics to the metadata
+# ## Add image statistics as factors
 #
-# In order to perform additional bias analysis on the dataset when no meaningful metadata are provided, you will augment
-# the metadata with statistics of the images using the {func}`.image_stats` function.
-#
-# Begin by running `image_stats` for the `PIXEL` and `VISUAL` image stats for the dataset and adding the stats factors
-# to the `Metadata`.
+# Run `image_stats` for the `PIXEL` and `VISUAL` statistics and hand the whole result to `add_factors`. Passing the
+# result rather than its `stats` mapping also passes its source index, which places each value on the row it describes.
 
 # %%
 # Calculate pixel and visual statistics
 calc_results = image_stats(cifar10, stats=ImageStats.PIXEL | ImageStats.VISUAL)
 
-# Append the factors to the metadata. Handing over the whole result rather than its
-# "stats" mapping also hands over its source index, which places each value on the row
-# it describes -- the difference that matters on object detection, where a result spans
-# both the unit and instance levels.
+# Append the factors to the metadata
 metadata.add_factors(calc_results)
 
 # %% [markdown]
-# Next you will add the `image_stats` output to the metadata as factors, and exclude factors that are uniform or without
-# significance.
-#
-# Additionally, you will specify a binning strategy for continuous statistical factors, which are, for our purposes,
-# continuous. For this example, bin everything into 10 uniform-width bins.
+# `batch_num` names the file an image was stored in, not anything about the image, so exclude it. Bin each continuous
+# statistic into five uniform-width bins.
 
 # %%
 # Exclude the batch_num as it is not a relevant factor for bias analysis
 metadata.exclude = ["batch_num"]
 
-# Provide binning for the continuous statistical factors using 5 uniform-width bins for each factor
+# Bin each continuous statistic into 5 uniform-width bins
 keys = ("mean", "std", "var", "skew", "kurtosis", "entropy", "brightness", "darkness", "sharpness", "contrast", "zeros")
 metadata.continuous_factor_bins = dict.fromkeys(keys, 5)
 
 # %% [markdown]
-# ## Perform bias analysis
+# ## Check the balance
 #
-# Now you can run the bias analysis evaluators {class}`.Balance` and {class}`.Diversity` on the dataset metadata augmented
-# with intrinsic statistical factors.
+# {class}`.Balance` reports the mutual information between every pair of factors and between each factor and the class.
 
 # %%
 balance_output = Balance().evaluate(metadata)
@@ -153,33 +101,45 @@ balance_output = Balance().evaluate(metadata)
 dep.plot(balance_output)
 
 # %% [markdown]
-# Notice the very high mutual information between the variance and standard deviation of image intensities, which is
-# expected. Mean image intensity correlates with brightness, darkness, and contrast. However, none of the intrinsic
-# factors correlate strongly with class label.
+# Variance and standard deviation share nearly all their information, as expected, and mean intensity tracks brightness,
+# darkness and contrast. None of the statistics correlates strongly with the class label.
 
 # %%
 dep.plot(balance_output, plot_classwise=True)
 
 # %% [markdown]
-# Classwise balance also indicates minimal correlation of image statistics and individual classes, so no single
-# intrinsic factor separates one class from the rest of the subsampled dataset.
+# Classwise balance agrees: no single statistic separates one class from the rest.
+
+# %% [markdown]
+# ## Check the diversity
+#
+# {class}`.Diversity` measures how evenly each factor's bins are sampled.
 
 # %%
 diversity_output = Diversity().evaluate(metadata)
 dep.plot(diversity_output)
 
 # %% [markdown]
-# The diversity index also indicates uniform sampling of classes within the dataset. The apparently low diversity of
-# kurtosis across the dataset may indicate an inadequate binning strategy (for metric computation) given that the other
-# statistical moments appear to be more evenly distributed. Further investigation and iteration could be done to assess
-# sensitivity to binning strategy.
-#
-# You can now augment your datasets with additional metadata information, either from additional sources or using
-# `dataeval` statistical functions for insights into your data.
+# Classes are sampled uniformly. Kurtosis has the lowest diversity of the statistical moments, which may mean five
+# uniform bins fit it poorly; try a different binning to check.
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+pairs = balance_output.factors
+assert pairs.filter((pl.col("factor1") == "std") & (pl.col("factor2") == "var"))["mi_value"][0] > 0.9
+for other in ("brightness", "darkness", "contrast"):
+    assert pairs.filter((pl.col("factor1") == "mean") & (pl.col("factor2") == other))["is_correlated"][0]
+assert balance_output.balance["mi_value"][1:].max() < 0.1
+assert not balance_output.classwise["is_imbalanced"].any()
+
+spread = diversity_output.factors
+assert spread.filter(pl.col("factor_name") == "class_label")["diversity_value"][0] > 0.99
+moments = spread.filter(pl.col("factor_name").is_in(["mean", "std", "var", "skew", "kurtosis"]))
+assert moments.sort("diversity_value")["factor_name"][0] == "kurtosis"
 
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn how DataEval measures dataset balance and diversity.
-# - [Identify bias and correlations](./tt_identify_bias.py) — Identify bias and feature correlations across dataset factors.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Define custom image statistics for object detection bounding boxes.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
+# - [How to control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare the cuts you mean and apply them unchanged to the next dataset.
