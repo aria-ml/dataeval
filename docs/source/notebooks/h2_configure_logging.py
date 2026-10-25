@@ -15,32 +15,16 @@
 
 # %% [markdown]
 # # How to configure logging with DataEval
-
-# %% [markdown]
-# ## Problem statement
 #
-# DataEval uses Python's standard logging module to provide visibility into operations and debugging information. This
-# guide demonstrates how to configure logging to display messages in the console or save them to disk when using DataEval
-# functions.
-
-# %% [markdown]
-# ### When to use
+# DataEval logs through Python's standard `logging` module, on a `dataeval` logger and its subsystem loggers. Attach handlers to
+# send the messages to the console or to a file. DataEval primarily logs at the DEBUG, INFO and WARNING levels.
 #
-# - You want to see detailed information about DataEval operations
-# - You need to debug issues or understand internal processing
-# - You want to save logs to a file for later analysis
-# - You need different logging levels for different parts of your code
-
-# %% [markdown]
-# ### What you will need
+# Use this guide when you want to see what DataEval is doing, debug an issue, or save logs for later analysis.
 #
-# 1. A Python environment with dataeval installed
-# 1. Basic understanding of Python's logging module
+# You need `dataeval` and a basic understanding of Python's logging module. The examples run `ber_knn` and `ber_mst` on random
+# blobs.
 
-# %% [markdown]
-# ## Getting started
-
-# %%
+# %% tags=["remove_cell"]
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -52,32 +36,69 @@ except Exception:
 
 # %%
 import logging
-import os
+from pathlib import Path
 
 import sklearn.datasets as dsets
 
 from dataeval.core import ber_knn, ber_mst
 
-# %% [markdown]
-# ## Understanding logging levels
-#
-# Python's logging module supports several severity levels:
-#
-# - **DEBUG**: Detailed information, typically for diagnosing problems
-# - **INFO**: Confirmation that things are working as expected
-# - **WARNING**: An indication that something unexpected happened
-# - **ERROR**: A serious problem that prevented a function from completing
-# - **CRITICAL**: A very serious error
-#
-# DataEval primarily uses **DEBUG**, **INFO**, and **WARNING** levels for normal operation.
+# %% tags=["hide-input"]
+blobs = dsets.make_blobs(n_samples=100, centers=3, n_features=5, random_state=42)
+embeddings, labels = blobs[0], blobs[1]
 
 # %% [markdown]
-# ## Logger namespaces
+# ## Log to the console
 #
-# Every DataEval log record is emitted on `dataeval` or one of its subsystem loggers, so
-# configuring `dataeval` alone -- as the rest of this notebook does -- captures everything.
+# Attach a handler to the `dataeval` logger and set its level. INFO shows when each operation starts and finishes.
+
+# %%
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+
+dataeval_logger = logging.getLogger("dataeval")
+dataeval_logger.setLevel(logging.INFO)
+dataeval_logger.addHandler(console_handler)
+
+result = ber_knn(embeddings, labels, k=3)
+
+# %% [markdown]
+# Set the level to DEBUG for more detail:
+
+# %%
+dataeval_logger.setLevel(logging.DEBUG)
+result = ber_mst(embeddings, labels)
+
+# %% [markdown]
+# For a quick look, {func}`dataeval.log` attaches a verbose console handler in one call. Calling it again reuses that handler and
+# only sets the level.
+
+# %% [markdown]
+# ## Log to a file
 #
-# To narrow the output, set a level or attach a handler on a subsystem instead:
+# Add a file handler. Here the console keeps showing INFO while the file receives everything down to DEBUG.
+
+# %%
+console_handler.setLevel(logging.INFO)
+
+log_file = Path("dataeval_operations.log")
+file_handler = logging.FileHandler(log_file, mode="w")  # "a" appends instead
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+dataeval_logger.addHandler(file_handler)
+
+result = ber_knn(embeddings, labels, k=5)
+print(log_file.read_text())
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+assert "DEBUG" in log_file.read_text()
+log_file.unlink()
+
+# %% [markdown]
+# ## Narrow the output by subsystem
+#
+# Every DataEval log record is emitted on `dataeval` or one of its subsystem loggers, so configuring `dataeval` alone captures
+# everything. To narrow the output, set a level or attach a handler on a subsystem instead:
 #
 # | Namespace | Covers |
 # | --- | --- |
@@ -96,191 +117,20 @@ from dataeval.core import ber_knn, ber_mst
 # logging.getLogger("dataeval.metadata").setLevel(logging.DEBUG)
 # ```
 #
-# These names are chosen rather than derived from DataEval's file layout, so they are stable
-# across internal refactoring. A few -- `dataeval.metadata` and `dataeval.embeddings` among
-# them -- have no importable module of the same name; the logging namespace is independent of
-# the import namespace.
+# The names do not follow DataEval's file layout, and a few, such as `dataeval.metadata` and `dataeval.embeddings`, have no
+# importable module of the same name. Each record carries its file and line whichever logger it lands on. Include
+# `%(filename)s:%(lineno)s` in your formatter to see them.
+
+# %% [markdown]
+# ## Turn logging off
 #
-# Narrowing the namespace costs no detail, because each record carries its originating file
-# and line regardless of which logger it lands on. Include `%(filename)s:%(lineno)s` in your
-# formatter, as {func}`dataeval.log` does by default, to see it.
-
-# %% [markdown]
-# ## Logging to console
-#
-# This example demonstrates how to configure logging to display DataEval messages in the console.
-
-# %% [markdown]
-# ### Basic console logging (INFO level)
+# `logging.disable` silences every logger up to a level until you re-enable it.
 
 # %%
-# Create console handler with formatting
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-
-# %%
-# Configure logging to show INFO level messages to console
-dataeval_logger = logging.getLogger("dataeval")
-dataeval_logger.setLevel(logging.INFO)
-dataeval_logger.addHandler(console_handler)
-
-# %%
-# Create sample dataset
-blobs = dsets.make_blobs(n_samples=100, centers=3, n_features=5, random_state=42)
-embeddings, labels = blobs[0], blobs[1]
-
-print("Running ber_knn with INFO logging:\n")
-result = ber_knn(embeddings, labels, k=3)
-print(f"\nResult: {result}")
-
-# %% [markdown]
-# ### Detailed console logging (DEBUG level)
-#
-# For more detailed information, you can enable DEBUG level logging:
-
-# %% tags=["remove_cell"]
-# Clear previous handlers
-for handler in dataeval_logger.handlers[:]:
-    dataeval_logger.removeHandler(handler)
-
-# %%
-# Configure logging to show DEBUG level messages to console
-dataeval_logger = logging.getLogger("dataeval")
-dataeval_logger.setLevel(logging.DEBUG)
-dataeval_logger.addHandler(console_handler)
-
-# %%
-print("Running ber_mst with DEBUG logging:\n")
-result = ber_mst(embeddings, labels)
-print(f"\nResult: {result}")
-
-# %% [markdown]
-# ## Logging to disk
-#
-# This example demonstrates how to save DataEval logs to a file for later analysis.
-
-# %% [markdown]
-# ### Basic file logging
-#
-# Add the filename and filemode parameters to `logging.basicConfig`.
-
-# %%
-# Clear previous handlers
-for handler in dataeval_logger.handlers[:]:
-    dataeval_logger.removeHandler(handler)
-
-# %%
-# Configure logging to write to a file
-log_file = "dataeval_operations.log"
-
-# Create file handler with formatting
-file_handler = logging.FileHandler(log_file, mode="w")  # 'w' to overwrite, 'a' to append
-file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-
-dataeval_logger = logging.getLogger("dataeval")
-dataeval_logger.setLevel(logging.INFO)
-dataeval_logger.addHandler(file_handler)
-
-# %%
-print(f"Running operations with logging to {log_file}...\n")
-
-# Run multiple operations
-result1 = ber_mst(embeddings, labels)
-result2 = ber_knn(embeddings, labels, k=5)
-
-print(f"ber_mst result: {result1}")
-print(f"ber_knn result: {result2}")
-print(f"\nLogs have been saved to '{log_file}'")
-
-# Display the log file contents
-if os.path.exists(log_file):
-    print("\n--- Log File Contents ---")
-    with open(log_file) as f:
-        print(f.read())
-
-# %% [markdown]
-# ### Combined console and file logging
-#
-# You can log to both console and file simultaneously:
-
-# %% tags=["remove_cell"]
-# Clear previous handlers
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
-
-# %%
-# Create logger
-logger = logging.getLogger("dataeval")
-logger.setLevel(logging.DEBUG)
-
-# Create file handler (DEBUG level)
-log_file = "dataeval_detailed.log"
-file_handler = logging.FileHandler(log_file, mode="w")
-file_handler.setLevel(logging.DEBUG)
-file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-file_handler.setFormatter(file_formatter)
-
-# Create console handler (INFO level only)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_formatter = logging.Formatter("%(levelname)s - %(message)s")
-console_handler.setFormatter(console_formatter)
-
-# Add handlers to logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
-# %%
-print("Running with dual logging (INFO to console, DEBUG to file):\n")
-result = ber_knn(embeddings, labels, k=7)
-print(f"\nResult: {result}")
-print("\nNote: Console shows only INFO messages, but file contains DEBUG details too.")
-
-# Display the log file contents
-if os.path.exists(log_file):
-    print("\n--- Log File Contents ---")
-    with open(log_file) as f:
-        print(f.read())
-
-# %% [markdown]
-# ## Temporarily disabling logs
-
-# %%
-# Disable all logging at CRITICAL level and below
 logging.disable(logging.CRITICAL)
+result = ber_mst(embeddings, labels)  # nothing is logged
 
-# %%
-print("Running with logging disabled:\n")
-result = ber_mst(embeddings, labels)
-print(f"Result: {result}")
-print("(No log messages should appear above)\n")
-
-# %%
-# Re-enable logging
 logging.disable(logging.NOTSET)
-
-# %%
-print("Running with logging re-enabled:\n")
-result = ber_mst(embeddings, labels)
-print(f"Result: {result}")
-
-# %% [markdown]
-# ## Best practices
-#
-# 1. **Configure logging early**: Set up logging configuration at the start of your script or notebook
-#
-# 1. **Use file logging for production**: Console logging is great for development, but file logging is better for
-#    production environments
-
-# %% tags=["remove_cell"]
-# Clean up log files created during the notebook execution
-log_files = ["dataeval_operations.log", "dataeval_detailed.log"]
-for log_file in log_files:
-    if os.path.exists(log_file):
-        os.remove(log_file)
-        print(f"Removed {log_file}")
-
-print("\nCleanup complete!")
 
 # %% [markdown]
 # ## Next steps

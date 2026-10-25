@@ -117,7 +117,7 @@ with `postprocess_fn`.
     instances produce embeddings that are not comparable (fit once, share the
     instance) — and the vocabulary is a k-means fit, so reproducibility depends
     on the
-    [global seed](../notebooks/h2_configure_defaults.py#configuring-the-global-seed).
+    [global seed](../notebooks/h2_configure_defaults.py#set-the-seed).
     Fit it yourself on the images that should define the vocabulary. An unfitted
     instance fits on the data of its first call and raises a `UserWarning`. Inside
     {class}`.Embeddings` or {class}`.Duplicates` that call covers one batch, so

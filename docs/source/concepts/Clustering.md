@@ -150,7 +150,7 @@ classes lands in the range where cluster granularity tracks class granularity.
 Initialization is random, so the same embeddings cluster differently between
 runs, and anything consuming the assignments downstream inherits that. The
 global seed set by `dataeval.config.set_seed` is what pins them; the
-[Configuring the seed](../notebooks/h2_configure_defaults.py#configuring-the-global-seed)
+[Configuring the seed](../notebooks/h2_configure_defaults.py#set-the-seed)
 how-to covers doing it.
 
 **Clustering is embedding-dependent.** The clusters discovered by either

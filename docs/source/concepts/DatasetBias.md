@@ -514,7 +514,7 @@ To better understand what to do after assessing for bias, review the
 Mutual information estimates from {class}`.Balance` depend on a random seed and
 are consistent to $O(10^{-4})$ but not exactly reproducible across runs without
 fixing the seed. See the
-[Configuring the seed](../notebooks/h2_configure_defaults.py#configuring-the-global-seed)
+[Configuring the seed](../notebooks/h2_configure_defaults.py#set-the-seed)
 how-to for an example of how to set and use seeds in DataEval. For continuous
 metadata factors, KNN-based MI estimation introduces additional variance that
 grows with the number of neighbors $k$ relative to sample count.
