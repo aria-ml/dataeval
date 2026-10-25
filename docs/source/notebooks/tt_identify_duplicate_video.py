@@ -14,11 +14,46 @@
 # ---
 
 # %% [markdown]
-# # How to identify duplicate video
+# # Identify duplicate video
+#
+# This tutorial shows you how to find duplicate footage in a video dataset. You build a small dataset with known
+# duplicates, run each detection against it and read the results.
+#
+# Estimated time to complete: 15 minutes
+#
+# Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
+#
+# Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [ML Engineer](../getting-started/roles/ml_engineer.md)
+#
+# ## What you will do
+#
+# - Build a small video dataset with known duplicates
+# - Set `hash_radius` and `min_segment_frames` for video
+# - Triage the dataset with a per-sequence summary
+# - Find duplicate sequences and measure how much they overlap
+# - Detect train-test leakage
+# - Find redundant segments inside a sequence
+# - Detect repackaged or resampled footage
+# - Find duplicated annotations across tracks
+# - Map the results back to frames and decide what to do with them
+#
+# ## What you will learn
+#
+# - Why you find duplicate video by comparing sequences and not frames
+# - How `hash_radius` changes how much of a re-encoded copy `Duplicates` finds
+# - How to read `containment`, spans and `dup_type`
+# - How to turn each kind of finding into a curation decision
+#
+# ## What you will need
+#
+# - A Python environment with the following packages installed:
+#   - `dataeval`
+#   - `maite-datasets`
+# - No video of your own: this tutorial builds a small dataset in memory
 #
 
 # %% [markdown]
-# ## Problem statement
+# ## Introduction
 #
 # Deduplicating video is not the same as deduplicating images. The frames of a video are sequential and highly
 # correlated, so comparing frames alone cannot tell you whether two videos are the same video. You have to compare
@@ -31,29 +66,16 @@
 # - Is one object annotated twice, under two track identifiers?
 #
 # The {class}`~dataeval.quality.Duplicates` class answers these questions for a multi-object tracking (MOT) dataset.
-# In this guide you will build a small dataset with known duplicates, run each detection against it, and read the
+# In this tutorial you will build a small dataset with known duplicates, run each detection against it, and read the
 # results.
 #
-
-# %% [markdown]
-# ### When to use
-#
-# Use this guide when you work with full-motion video (FMV) or any multi-object tracking (MOT) dataset and you need to
+# Use this tutorial when you work with full-motion video (FMV) or any multi-object tracking (MOT) dataset and you need to
 # know what the dataset contains before you split it or train on it. For still images, use
 # [How to identify duplicates](./h2_deduplicate.py), which covers the same class on simpler, image-level cases.
 #
 
 # %% [markdown]
-# ### What you will need
-#
-# 1. A Python environment with the following packages installed:
-#    - dataeval
-#    - maite-datasets
-# 2. A multi-object tracking dataset
-#
-
-# %% [markdown]
-# ## Getting started
+# ## Setup
 #
 
 # %% tags=["remove_cell"]
@@ -93,7 +115,7 @@ set_max_processes(4)
 pl.Config.set_tbl_width_chars(160)
 
 # %% [markdown]
-# ## Building a dataset with known duplicates
+# ## Build a dataset with known duplicates
 #
 # FMV datasets with labeled duplicates are not readily available, so you will synthesize four short sequences. Each
 # one is a textured ground plane with two objects moving across it, and each one is given a different coarse layout.
@@ -228,7 +250,7 @@ train = VideoDataset(
 test = VideoDataset({"test_clip": transcode(frames_a[30:50], seed=3)}, dataset_id="test")
 
 # %% [markdown]
-# ## Adjusting settings for video datasets
+# ## Adjust the settings for video datasets
 #
 # `hash_radius` is the largest Hamming distance, in bits, at which two frame hashes still count as the same frame. It
 # defaults to `0`, an exact match across all 64 bits of the hash. That default suits still images, where a duplicated
@@ -300,7 +322,7 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
 #
 
 # %% [markdown]
-# ## Triaging the dataset
+# ## Triage the dataset
 #
 # Start with the per-sequence summary. It gives one row per sequence and tells you which sequences are worth
 # investigating.
@@ -334,7 +356,7 @@ display(summary)
 #
 
 # %% [markdown]
-# ## Identifying sequence-level duplicates
+# ## Identify sequence-level duplicates
 #
 # The summary tells you that a sequence shares content. It does not tell you which sequence it shares with, how much,
 # or where. The sequence-level rows answer that.
@@ -375,7 +397,7 @@ display(
 #
 
 # %% [markdown]
-# ## Detecting train-test leakage
+# ## Detect train-test leakage
 #
 # Footage shared between the training and test splits inflates your measured performance. Pass both splits to
 # `evaluate`, and the `dataset_indices` column records which split each side of a match came from.
@@ -417,7 +439,7 @@ for row in leakage.sequences.data().filter(pl.col("dataset_indices").list.n_uniq
 #
 
 # %% [markdown]
-# ## Identifying redundant video segments
+# ## Identify redundant video segments
 #
 # `redundant_fraction` tells you how much of a sequence repeats itself. To act on it you need the intervals. Filter
 # for the redundant rows and sort them by length.
@@ -454,7 +476,7 @@ display(summary.select("sequence", "redundant_fraction", "longest_run"))
 #
 
 # %% [markdown]
-# ## Detecting repackaged or resampled footage
+# ## Detect repackaged or resampled footage
 #
 # Segment matching looks for a constant frame offset between two sequences. Re-export or resample a video at another
 # frame rate and that offset drifts, so the shared footage arrives as fragments too short to report and the default
@@ -488,7 +510,7 @@ display(
 #
 
 # %% [markdown]
-# ## Identifying duplicated annotations
+# ## Identify duplicated annotations
 #
 # A track is one object followed across consecutive frames. Setting `levels="track"` hashes the cropped object images
 # instead of whole frames and looks for the same relationships between tracks that it looks for between sequences.
@@ -534,7 +556,7 @@ display(
 #
 
 # %% [markdown]
-# ## Mapping results back to the dataset
+# ## Map the results back to the dataset
 #
 # Every duplicate is reported in source-video coordinates, as a sequence index and frame numbers. To view the
 # duplicated frames, pull out a sequence, or build a split without them, pass those coordinates to
@@ -599,7 +621,7 @@ print(f"sequence {sequence} without the shared stretch: {len(without_leak)} of {
 #
 
 # %% [markdown]
-# ## Acting on the results
+# ## Act on the results
 #
 # The relationships map onto a handful of curation decisions:
 #
@@ -676,6 +698,14 @@ assert all(row == [0, 1] for row in tracked.tracks.data()["item_indices"].to_lis
 assert set(tracked.data()["level"].to_list()) == {"track"}
 
 # %% [markdown]
+# ## Conclusion
+#
+# You built a video dataset with known duplicates and ran `Duplicates` on it at the sequence, frame and track levels. You saw how
+# `hash_radius` changes what the evaluation finds in re-encoded footage, measured a train-test leak down to its frames, and
+# mapped each finding to a curation decision.
+#
+
+# %% [markdown]
 # ## Next steps
 #
 # - [How to identify duplicates](./h2_deduplicate.py) — The same class on still-image datasets.
@@ -683,3 +713,11 @@ assert set(tracked.data()["level"].to_list()) == {"track"}
 # - [How to build dataset views](./h2_build_dataset_views.py) — Compose filtered and transformed views over a dataset.
 # - [Validation and Trust](../concepts/ValidationAndTrust.md) — Build splits that hold up, and know what your evaluation is measuring.
 #
+
+# %% [markdown]
+# ## On your own
+#
+# To run the same analysis on your own footage, present it as a MAITE multi-object tracking dataset, as in the section "Build a
+# dataset with known duplicates". Start with `hash_radius=6` and keep the default `min_segment_frames` of `30` unless your
+# sequences are short. To check for leakage, pass your training and test splits to `evaluate` together, then read the
+# sequence-level rows first and the frame numbers behind them second.

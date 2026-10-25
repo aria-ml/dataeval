@@ -35,6 +35,7 @@ local checkout.
 ../notebooks/tt_analyze_by_custom_class_axis.py
 ../notebooks/tt_analyze_across_levels.py
 ../notebooks/tt_augmentation_duplicates.py
+../notebooks/tt_identify_duplicate_video.py
 ../notebooks/tt_compare_objects_to_surroundings.py
 ```
 
@@ -71,6 +72,10 @@ local checkout.
   - Learn how common torchvision augmentations like rotations, flips, and color
     jitter can be detected as near duplicates using D4 hashes and BoVW embeddings.
   - [![Open In Colab][colab-badge]][augs-colab]
+* - [](../notebooks/tt_identify_duplicate_video.py)
+  - Learn how to find duplicate video, train-test leakage and redundant footage in a
+    multi-object tracking dataset, and how to read what each detection reports.
+  - [![Open In Colab][colab-badge]][vdupe-colab]
 * - [](../notebooks/tt_compare_objects_to_surroundings.py)
   - Compare detections against their surroundings and against each other
     to find hard-to-see objects and background shortcuts.
@@ -88,6 +93,7 @@ local checkout.
 [axis-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_analyze_by_custom_class_axis.ipynb
 [levels-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_analyze_across_levels.ipynb
 [augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_augmentation_duplicates.ipynb
+[vdupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_identify_duplicate_video.ipynb
 [surr-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/tt_compare_objects_to_surroundings.ipynb
 
 <!-- markdownlint-enable MD053 -->
