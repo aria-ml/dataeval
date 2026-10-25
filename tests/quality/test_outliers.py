@@ -323,8 +323,8 @@ class TestOutliers:
 
     def test_outliers_from_clusters_no_outliers(self):
         """Test with well-clustered data that has no clear outliers."""
-        # Create tight cluster
-        embeddings = np.random.randn(10, 5) * 0.1
+        # Create tight cluster; seeded because an unlucky draw flags a point (about 1 seed in 60)
+        embeddings = np.random.default_rng(42).standard_normal((10, 5)) * 0.1
 
         # Create ClusterResult
         mock_cluster_result: ClusterResult = {
