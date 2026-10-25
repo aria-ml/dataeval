@@ -284,9 +284,10 @@ The notebook sources live as `py:percent` scripts in
 `docs/source/notebooks/`. To get runnable `.ipynb` files for local
 editing, choose one of:
 
-- **With nox (recommended):** `nox -s docsync` — bidirectional sync of
-  the `.py`/`.ipynb` pairs.
-- **With jupytext directly:** `jupytext --to notebook docs/source/notebooks/*.py`
+- **With nox (recommended):** `uv run nox -s docs` — builds the
+  documentation and writes a runnable `.ipynb` next to each script.
+- **With jupytext directly:** `jupytext --to notebook docs/source/notebooks/<name>.py`
+  converts one notebook, and `docs/source/notebooks/*.py` converts all of them.
 
 The generated `.ipynb` files are gitignored, so edits stay local to
 your checkout.
