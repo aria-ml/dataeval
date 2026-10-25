@@ -33,8 +33,6 @@
 #   metadata factors.
 # - You will aggregate per-detection analyses into per-image analyses with {meth}`.Metadata.agg`.
 # - You will create new metadata subsets two different ways: {meth}`.Metadata.where` and {meth}`.Metadata.having`.
-# - You will cache the whole metadata structure with {meth}`.Metadata.save`, so you can compute once and analyze
-#   every which way.
 
 # %% [markdown]
 # ## What you will learn
@@ -44,8 +42,6 @@
 # - You'll learn when to aggregate values upward, and why DataEval will not do it for you.
 # - You'll learn that a statistic measured over an object, over its whole image, and over the background behind it are
 #   three different factors that land at two different levels — and how to tell when the third one is worth reading.
-# - You'll learn why filtering metadata puts it out of sync with its own dataset, and how to bring the two back
-#   into sync.
 
 # %% [markdown]
 # ## What you will need
@@ -99,8 +95,7 @@ from dataeval import Metadata
 from dataeval.bias import Balance
 from dataeval.config import set_max_processes
 from dataeval.core import image_stats
-from dataeval.data import Indices, Limit, Shuffle, View
-from dataeval.exceptions import MetadataFormatError
+from dataeval.data import Limit, Shuffle, View
 from dataeval.flags import ImageStats
 
 # Read and measure four frames at a time rather than one. See the "Measure your own factors" section.
@@ -206,6 +201,77 @@ print(f"per detection n={len(per_detection):5d}  mean={per_detection.mean():.1f}
 # analyzing an object detection dataset, unrecognized aggregation bias can result in unexpected bias evaluation results.
 
 # %% [markdown]
+# (binning-levels)=
+# ### Binning follows the level
+#
+# Bias evaluators read bin codes and not values, so where the bin edges fall decides what every result means. DataEval
+# cuts each factor's bins at the factor's own level. The altitude edges are cut over the 200 image values and not over
+# the 1305 detection rows they propagate to, so crowded images do not pull the edges toward themselves, and an image
+# with no detections still gets a bin. The code is then propagated down, so an image's bin is the same number on the
+# image row and on every detection inside it. {attr}`.Metadata.factor_info` reports the level a factor was defined at,
+# which is also the level it was binned at.
+
+# %%
+info = metadata.factor_info["altitude"]
+print(f"altitude is defined at the {info.level!r} level, binned: {info.is_binned}")
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+from dataclasses import dataclass
+
+import numpy as np
+
+from dataeval.protocols import DatasetMetadata, DatumMetadata
+
+
+def edges(values):
+    cut = Metadata.from_factors(
+        {"altitude": values}, class_labels=np.zeros(len(values), dtype=int), auto_bin_method="uniform_count"
+    )
+    return np.array(cut.encoding("altitude").edges)
+
+
+# the edges come from the 200 image values and not from the 1305 detection rows
+image_values = metadata.rows_at("unit")["altitude"].to_numpy()
+detection_values = metadata.rows_at("instance")["altitude"].to_numpy()
+own = np.array(Metadata(dataset, auto_bin_method="uniform_count").encoding("altitude").edges)
+assert np.array_equal(own, edges(image_values))
+assert not np.array_equal(own, edges(detection_values))
+
+# an image's bin is the same number on its own row and on each of its detections
+by_item = dict(zip(metadata.rows_at("unit")["item_index"], metadata.rows_at("unit")["altitude↕"], strict=True))
+detections = metadata.rows_at("instance")
+assert all(by_item[item] == code for item, code in zip(detections["item_index"], detections["altitude↕"], strict=True))
+
+
+# an image with no detections still gets a bin
+@dataclass
+class BoxTarget:
+    boxes: np.ndarray
+    labels: np.ndarray
+    scores: np.ndarray
+
+
+class Sparse:
+    counts = (2, 1, 2, 0)
+    metadata = DatasetMetadata(id="sparse", index2label={0: "a", 1: "b"})
+
+    def __len__(self):
+        return len(self.counts)
+
+    def __getitem__(self, index):
+        count = self.counts[index]
+        target = BoxTarget(np.tile([[0.0, 0.0, 10.0, 10.0]], (count, 1)), np.arange(count) % 2, np.ones(count))
+        return np.zeros((3, 8, 8), np.uint8), target, DatumMetadata(id=index, altitude_m=float(100 * index))
+
+
+sparse = Metadata(Sparse(), auto_bin_method="uniform_count")
+info = sparse.factor_info["altitude_m"]
+column = "altitude_m↕" if info.is_binned else "altitude_m#" if info.is_digitized else "altitude_m"
+assert sparse.level_counts == {"unit": 4, "instance": 5}
+assert sparse.rows_at("unit")[column].null_count() == 0
+
+# %% [markdown]
 # ## Choose your level with `at()`
 #
 # {meth}`.Metadata.at` returns a copy of the metadata specified at the given level. The stored data does not change;
@@ -268,7 +334,7 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 # %% [markdown]
 # Two of SeaDrone's factors — `object_id` and `object_size` — belong to an annotated object rather than the image it
 # resides in. Setting `inherited=False` isolates these factors. This enables you to measure variation strictly among
-# the objects themselves, without the results being diluted by 18 replicated columns of image-level drone telemetry.
+# the objects themselves, without the results being diluted by the replicated columns of image-level drone telemetry.
 #
 # Together, these two parameters form a simple matrix (as detailed in
 # [Choosing which factors to analyze: inherited](../concepts/MetadataLevels.md#choosing-which-factors-to-analyze-inherited)).
@@ -276,8 +342,8 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 #
 # | view | `inherited=True` (default) | `inherited=False` |
 # | --- | --- | --- |
-# | `at("unit")` — 200 rows | 18 image factors | *the same 18* |
-# | `at("instance")` — 1305 rows | those 18 **+** `object_id`, `object_size` | `object_id`, `object_size` |
+# | `at("unit")` — 200 rows | the image factors | *the same* |
+# | `at("instance")` — 1305 rows | the image factors **+** `object_id`, `object_size` | `object_id`, `object_size` |
 #
 # The row count remains unaffected by `inherited`. At the coarsest level (`unit`), the two configurations yield
 # identical results because there is no higher level from which to inherit factors.
@@ -301,19 +367,10 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 # - `per_background` computes statistics over all pixels *outside* the bounding boxes (the scene minus the objects).
 #
 # ```{note}
-# This cell reads and measures 200 4K frames and takes a couple of minutes. It is by far the most expensive step in the
-# tutorial — and the reason the sample is capped at 200 — so the "Cache the metadata structure" section shows you how to
-# pay for it once.
-#
-# It is also the reason the first cell called {func}`.set_max_processes` with 4: {func}`.image_stats` reads each
-# frame independently, so it splits the work across worker processes. Four workers cut this step to roughly a third
-# of its single-process time, for a few hundred megabytes more memory — one frame's pixels are the largest thing any
-# worker holds, and the workers are forked, so most of what they occupy is shared with the parent rather than copied.
-#
-# Note that a positive count is taken literally rather than capped at your core count, so four workers are started
-# whether or not there are four cores to run them on. Pass a negative number to size the pool relative to the machine
-# instead — `-1` for one worker per core, `-2` to leave a core free — or leave it unset, the default, to keep
-# everything in one process.
+# This cell reads and measures 200 4K frames and takes a couple of minutes. It is the reason the sample is capped at 200, and the
+# reason the first cell called {func}`.set_max_processes` with 4: {func}`.image_stats` reads each frame independently, so it splits
+# the work across worker processes. [How to configure global DataEval defaults](./h2_configure_defaults.py) explains how to size
+# the pool.
 # ```
 
 # %%
@@ -367,85 +424,9 @@ print("\nand from the detection rows, where the image value propagates down:")
 print(metadata.rows_at("instance").select("item_index", "unit_sharpness", "instance_sharpness").head(3))
 
 # %% [markdown]
-# ### Inspect `background_fraction` to validate backgrounds
-#
-# When using `per_background`, DataEval always returns a `background_fraction` factor: the share of the image left
-# unmasked after the annotations are removed. This factor is essential for validation, because a background statistic
-# measured over a few percent of an image is noise wearing a measurement's clothes. Read `background_fraction` before
-# trusting any background measurement.
-
-# %%
-units = metadata.rows_at("unit")
-print(
-    units.select(
-        pl.col("unit_background_fraction").min().alias("smallest"),
-        pl.col("unit_background_fraction").median().alias("median"),
-    )
-)
-
-# %% [markdown]
-# The median image retains over 99% of its pixels for the background, and even the densest image retains 80%. Because
-# SeaDrone annotates small objects within large 4K frames, its background statistics are computed over plenty of
-# pixels. Conversely, if a dataset contains bounding boxes that cover most of the frame, the resulting low
-# `background_fraction` would render its background statistics unreliable.
-#
-# ### Analyze region differences
-#
-# With validated backgrounds, you can now compare the regions. Sharpness is a good first metric for aerial imagery,
-# because it tells you whether the objects are resolvable against the scene around them.
-
-# %%
-print(f"sharpness  object     : {metadata.rows_at('instance')['instance_sharpness'].mean():.1f}")
-print(f"           whole image: {units['unit_sharpness'].mean():.1f}")
-print(f"           background : {units['unit_background_sharpness'].mean():.1f}")
-
-# %% [markdown]
-# **The annotated objects are roughly 2.5× sharper than the scene around them.** The background (water) is smooth,
-# while the objects (swimmers or boats) produce high-frequency edges. That gap is the signal an object detector
-# lives on.
-#
-# Because of this gap, using an image-level sharpness threshold (e.g., to discard blurry frames) will predominantly
-# measure the sharpness of the water, not the objects. If you need to verify that your *objects* are resolvable, you
-# must read `instance_sharpness` — a separate factor at the detection level, and the only one that describes the
-# targets themselves.
-#
-# Measuring the background separately provides a secondary, subtler utility. Consider the relationship between the
-# background and the whole-image measurement:
-
-# %%
-sharper = units.select((pl.col("unit_sharpness") > pl.col("unit_background_sharpness")).sum()).item()
-print(f"images sharper as a whole than their own background: {sharper} / {len(units)}")
-
-# %% [markdown]
-# In 197 out of 200 images, the whole-image sharpness score exceeds the background-only score. Even though the
-# annotations occupy a median of only 0.5% of the total pixel area, they carry enough high-frequency edges to drag the
-# whole-image number measurably upward.
-#
-# This demonstrates why the background is worth isolating: `unit_sharpness` is contaminated by the very objects you
-# were trying to describe the scene around.
-#
-# ### When the background is not worth measuring
-#
-# Calculating `per_background` requires a masking pass over every image, which carries a computational cost, and it
-# does not always tell you anything new. Compare the same regional splits for brightness:
-
-# %%
-gap = (pl.col("unit_brightness") - pl.col("unit_background_brightness")).abs()
-
-print(f"brightness whole image: {units['unit_brightness'].mean():.1f}")
-print(f"           background : {units['unit_background_brightness'].mean():.1f}")
-print(f"largest gap on any single image: {units.select(gap.max()).item():.1f}")
-
-# %% [markdown]
-# The difference is negligible. Across all 200 images, the two brightness readings never diverge by more than
-# 2 gray levels.
-#
-# This occurs because brightness is an average over pixels. Masking out 0.5% of them leaves the mean virtually
-# unchanged, because the objects are a rounding error in the pixel count. Sharpness is not an average in that sense —
-# it responds to localized high-gradient extremes, so the same handful of object pixels moves it a lot.
-#
-# **`background_fraction` predicted both outcomes.** A statistic that averages over area needs the background to be a
-# meaningfully different area before it will report anything new; one that responds to extremes does not.
+# The three sharpness factors are measured over different regions of the same frame. `unit_background_fraction` says how
+# much of the frame the background covers, and it should be read before any background statistic.
+# [Compare objects to their surroundings](./tt_compare_objects_to_surroundings.py) compares the regions.
 
 # %% [markdown]
 # ## Aggregate values upward with `agg()`
@@ -602,94 +583,9 @@ high = metadata.where(pl.col("altitude") > 60, level="unit")
 print("altitude > 60 m:", high.level_counts)
 
 # %% [markdown]
-# ## Synchronize metadata with the dataset
-#
-# Filtering metadata only purges *rows* from the internal dataframes; it does not remove the underlying *items* from
-# the dataset object that the metadata is bound to. Consequently, all 200 original images remain in the dataset, and
-# anything subsequently computed from that dataset — embeddings above all — still describes the original 200.
-#
-# Pairing a filtered metadata object with an unfiltered dataset would be a silent misalignment. To prevent this,
-# DataEval flags filtered metadata instances. Evaluators that pair metadata with embeddings — {class}`.Outliers`,
-# {class}`.Coverage` and {class}`.Prioritize` — check that flag and refuse a filtered instance outright, rather than
-# trying to detect a mismatch that is undetectable in the dangerous case.
-
-# %%
-print("is_filtered:", high.is_filtered)
-
-# %% [markdown]
-# To synchronize the dataset with your filtered metadata, use {meth}`.Metadata.selected_items`. This method returns
-# the array of surviving item indices. By wrapping these indices in {class}`.Indices` and building a dataset
-# {class}`.View`, you establish a synchronized slice of the original dataset without modifying it.
-
-# %%
-items = high.selected_items()
-matching_dataset = View(dataset, Indices(items.tolist()))
-
-print("surviving items :", len(items))
-print("matching dataset:", len(matching_dataset))
-
-# %% [markdown]
-# Any metrics or embeddings derived from `matching_dataset` will now perfectly correspond row-for-row with the `high`
-# metadata instance.
-#
-# This synchronization succeeds only because the `high` filter was applied cleanly along item boundaries (the image
-# level). Conversely, the `where` filter in the "Subset populations using `where` and `having`" section kept 907 of 1305
-# detections while preserving all 200 images. A dataset can only return full images; it cannot selectively return "three
-# out of four" detections from a single frame. Rather than build a dataset slice that cannot correspond to its metadata,
-# `selected_items` enforces this boundary and raises when you ask it for one.
-
-# %%
-try:
-    swimmer_rows.selected_items()
-except ValueError as error:
-    print("as expected:", str(error).split(".")[0])
-
-# %% [markdown]
-# ## Cache the metadata structure
-#
-# Constructing the initial `Metadata` object was cheap because it parsed telemetry and annotation files, not pixel data.
-# The "Measure your own factors" section introduced the true bottleneck: reading all 200 high-resolution frames off
-# disk, decoding them, and measuring pixel statistics across three regions apiece. Every operation since has been
-# arithmetic over the resulting tabular rows.
-#
-# To avoid repeating this expensive work, use {meth}`.Metadata.save` to serialize the structure to disk, and
-# {meth}`.Metadata.load` to restore it.
-
-# %%
-enriched.save("./data/seadrone-metadata.dem")
-reloaded = Metadata.load("./data/seadrone-metadata.dem", dataset)
-
-print("levels     :", reloaded.levels)
-print("counts     :", reloaded.level_counts)
-print("agg factors:", sorted(set(reloaded.at("unit").factor_names) - set(metadata.at("unit").factor_names)))
-
-# %% [markdown]
-# The full structure survives serialization: both levels, the links between them, the intrinsic factors measured by
-# `image_stats`, and the upward derivations generated by `agg`. The minutes of pixel measurement are now a file
-# you can reload in well under a second.
-#
-# Notably, binning parameters are *not* baked into the serialization. The file stores raw factor values, so one file
-# serves whatever `continuous_factor_bins` you later want from it.
-#
-# ```{warning}
-# The serialization format is strictly a **computational cache, not an interchange format**. It mirrors DataEval's
-# internal layout, which may evolve between releases. Files written by an older version may be rejected by a newer
-# installation. This is an explicit safety mechanism: failing outright is preferable to silently injecting stale rows
-# into a mutated schema.
-#
-# Production scripts should wrap their loads in a `try` that catches {exc}`.MetadataFormatError`, to handle an
-# incompatible layout gracefully. If you require metadata that outlives a DataEval upgrade, write
-# {attr}`.Metadata.dataframe` to a Parquet file instead.
-# ```
-
-# %%
-try:
-    metadata = Metadata.load("./data/seadrone-metadata.dem", dataset)
-except MetadataFormatError:
-    metadata = Metadata(dataset)
-    metadata.save("./data/seadrone-metadata.dem")
-
-print("ready:", metadata.level_counts)
+# The dataset is untouched by a filter, so a filtered metadata no longer matches the dataset it was built from.
+# [How to keep metadata in sync with its dataset and cache it](./h2_sync_and_cache_metadata.py) shows how to realign the
+# two and how to cache the metadata.
 
 # %% [markdown]
 # ## What you learned
@@ -700,24 +596,21 @@ print("ready:", metadata.level_counts)
 # - {meth}`.Metadata.at` chooses the rows and `inherited` chooses the columns. The two are independent.
 # - {func}`.image_stats` measures intrinsic factors over up to three regions — object, whole image, and the
 #   background behind the annotations — and {meth}`.Metadata.add_factors` places each at its own level from the
-#   result's `source_index`. Read `background_fraction` before you read any background statistic.
+#   result's `source_index`.
 # - {meth}`.Metadata.agg` moves values up only when you ask, and refuses the cases where the answer would be weighted
 #   by fan-out. An averaged-up factor and a measured-whole factor are different columns on purpose.
 # - {class}`.Balance` runs at either level, but only after you name an axis it can condition on: the class label at
 #   `instance`, an aggregated factor such as `n_objects` at `unit`. The two answers describe different populations.
 # - {meth}`.Metadata.where` keeps matching rows; {meth}`.Metadata.having` keeps the entities that have a match. Both
 #   obey one rule: a row survives only if every ancestor it has survives.
-# - A filtered metadata no longer matches its dataset. {meth}`.Metadata.selected_items` realigns them, and refuses
-#   when no dataset subset corresponds.
-# - {meth}`.Metadata.save` caches the structure so the dataset is walked once.
 #
 # ## Next steps
 #
 # - [Metadata Levels](../concepts/MetadataLevels.md) — The full level model, including the four-level graph used by
 #   tracking datasets.
 # - [Identify bias and correlations](./tt_identify_bias.py) — The bias evaluators used here, in depth.
-# - [How to reason about factor binning across levels](./h2_bin_factors_by_level.py) — Why each factor is discretized at
-#   its own level, with the numbers.
+# - [How to keep metadata in sync with its dataset and cache it](./h2_sync_and_cache_metadata.py) — Realign a filtered
+#   metadata with its dataset and cache the metadata so it is built once.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — The
 #   `image_stats` flags and region switches from the "Measure your own factors" section, on their own terms.
 #

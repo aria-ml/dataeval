@@ -65,8 +65,8 @@ datasets for machine learning.
 ../notebooks/h2_custom_image_stats_object_detection.py
 ../notebooks/h2_measure_channel_groups.py
 ../notebooks/h2_add_intrinsic_factors.py
-../notebooks/h2_bin_factors_by_level.py
 ../notebooks/h2_control_factor_binning.py
+../notebooks/h2_sync_and_cache_metadata.py
 ../notebooks/h2_detect_undersampling.py
 ../notebooks/h2_wrap_dataframe_dataset.py
 ../notebooks/h2_metadata_from_dataframe.py
@@ -147,14 +147,14 @@ datasets for machine learning.
   - Apply DataEval's statistical outputs to
     DataEval's {class}`.Metadata` object for bias analysis
   - [![Open In Colab][colab-badge]][imd-colab]
-- - [](../notebooks/h2_bin_factors_by_level.py)
-  - Understand how factors are binned at their own level and
-    what that means for bias results
-  - [![Open In Colab][colab-badge]][bin-colab]
 - - [](../notebooks/h2_control_factor_binning.py)
   - Declare, review and reuse a factor's bin edges so results
     are comparable across collections
   - [![Open In Colab][colab-badge]][ctrl-colab]
+- - [](../notebooks/h2_sync_and_cache_metadata.py)
+  - Realign filtered metadata with its dataset, and cache the metadata
+    so it is built once
+  - [![Open In Colab][colab-badge]][sync-colab]
 - - [](../notebooks/h2_detect_undersampling.py)
   - Detect undersampled subsets of datasets
   - [![Open In Colab][colab-badge]][cov-colab]
@@ -193,8 +193,8 @@ datasets for machine learning.
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_custom_image_stats_object_detection.ipynb
 [band-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_measure_channel_groups.ipynb
 [imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_add_intrinsic_factors.ipynb
-[bin-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_bin_factors_by_level.ipynb
 [ctrl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_control_factor_binning.ipynb
+[sync-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_sync_and_cache_metadata.ipynb
 [cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_detect_undersampling.ipynb
 [wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_wrap_dataframe_dataset.ipynb
 [mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_metadata_from_dataframe.ipynb

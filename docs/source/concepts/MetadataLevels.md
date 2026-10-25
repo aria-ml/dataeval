@@ -1077,6 +1077,5 @@ level question.
 
 ### How-to guides
 
-- [How to bin factors by level](../notebooks/h2_bin_factors_by_level.py) — a worked
-  example of binning at a factor's own level, with the numbers that show why the
-  alternative distorts.
+- [How to keep metadata in sync with its dataset and cache it](../notebooks/h2_sync_and_cache_metadata.py)
+  — realigning filtered metadata with its dataset, and saving it so it is built once.
