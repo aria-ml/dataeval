@@ -588,6 +588,16 @@ print("altitude > 60 m:", high.level_counts)
 # two and how to cache the metadata.
 
 # %% [markdown]
+# ## Conclusion
+#
+# You built a {class}`.Metadata` object over an aerial object detection dataset and read one factor at two levels,
+# which showed that an image-level factor read from detection rows is weighted by the number of detections per image.
+# You chose rows with {meth}`.Metadata.at` and columns with `inherited`, measured the objects, the whole frames and
+# the background with {func}`.image_stats`, and aggregated detection values up to images with
+# {meth}`.Metadata.agg`. You then ran {class}`.Balance` at both levels and kept subsets of the dataset with
+# {meth}`.Metadata.where` and {meth}`.Metadata.having`.
+
+# %% [markdown]
 # ## What you learned
 #
 # - Metadata holds several levels at once, one kind of row per level, and `level_counts` tells you how many of each.

@@ -666,6 +666,14 @@ print(f"  Detected by combined method: {len(combined_detected)}")
 print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 
 # %% [markdown]
+# ## Conclusion
+#
+# You created a synthetic textured image and applied the torchvision transformations to it. You ran
+# {class}`.Duplicates` with D4 hashes, with a {class}`.BoVWExtractor` and with both together, compared which
+# transformations each setup grouped with the original image, and varied `cluster_sensitivity` to see how the
+# detections change.
+
+# %% [markdown]
 # ## Next steps
 #
 # - [Duplicates](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering) — Deep dive into duplicate detection using hashing and clustering algorithms.
