@@ -178,7 +178,5 @@ assert result_label.drifted
 #
 # - [Distribution Shift](../concepts/DistributionShift.md) — Explore types of distribution shift and strategies for detecting drift.
 # - [Divergence](../concepts/Divergence.md) — Learn about distance and divergence metrics used to compare distributions.
-# - [Detect drift with prediction uncertainty](./tt_detect_drift_with_uncertainty.py) — Monitor deployed models for drift using prediction uncertainty.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational streams over time.
 # - [How to detect drift using prediction uncertainty](./h2_detect_uncertainty_drift.py) — Calculate uncertainty metrics to monitor distribution changes.
-# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.

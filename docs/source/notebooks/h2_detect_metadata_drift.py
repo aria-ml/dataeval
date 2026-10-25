@@ -356,11 +356,8 @@ for year in ("2020", "2021"):
 # %% [markdown]
 # ## Next steps
 #
-# - [How to control factor binning](./h2_control_factor_binning.py) — Declare bin edges for
-#   consistent mapping.
 # - [How to trace findings](./h2_trace_findings_to_source.py) — Retrieve the specific frames
 #   associated with a drift finding.
-# - [How to lazy load images](./h2_lazy_load_images.py) — Speed up metadata extraction.
 # - [Monitoring tutorial](./tt_monitor_shift.py) — Analyze embedding-space drift.
 # - [Distribution shift](../concepts/DistributionShift.md) — Select drift detectors.
 # - [Metadata levels](../concepts/MetadataLevels.md) — Understand metadata views and levels.

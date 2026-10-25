@@ -340,15 +340,8 @@ output.inv_project([0.90, 0.93, 0.99])
 # ### Concepts
 #
 # - [Performance Limits](../concepts/PerformanceLimits.md) — Understand sufficiency curves and diminishing returns in dataset scaling.
-# - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional space.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias and coverage concepts in DataEval.
-#
-# ### Tutorials
-#
-# - [Clean a dataset](./tt_clean_dataset.py) — Identify and clean corrupted, duplicated, or mislabeled samples.
 #
 # ### How-to guides
 #
 # - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Measure Bayes Error Rate to evaluate classification task difficulty.
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented regions in dataset feature space.
-# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Configure global execution options including random seeds and execution devices.

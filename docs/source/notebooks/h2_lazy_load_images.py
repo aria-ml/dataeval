@@ -339,11 +339,6 @@ print(f"Computed stats over {stats_result['image_count']} images")
 # ### Concepts
 #
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias and coverage concepts in DataEval.
-# - [Acting on Results](../concepts/ActingOnResults.md) — Understand how to act on data evaluation findings and metrics.
-#
-# ### Tutorials
-#
-# - [Identify bias and correlations](./tt_identify_bias.py) — Walk through identifying dataset bias and attribute correlations in an image dataset.
 #
 # ### How-to guides
 #

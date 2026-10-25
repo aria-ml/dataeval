@@ -181,8 +181,5 @@ dep.plot(diversity_output)
 # ## Next steps
 #
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn how DataEval measures dataset balance and diversity.
-# - [Acting on Results](../concepts/ActingOnResults.md) — Understand strategies for resolving identified dataset issues.
-# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate unlabeled image datasets for bias and quality issues.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Identify bias and feature correlations across dataset factors.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Define custom image statistics for object detection bounding boxes.
-# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Set global default options and configurations in DataEval.
