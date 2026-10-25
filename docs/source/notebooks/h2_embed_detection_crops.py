@@ -14,10 +14,10 @@
 # ---
 
 # %% [markdown]
-# # Embed object detection crops and visualize class clusters
+# # How to embed object detection crops and visualize class clusters
 
 # %% [markdown]
-# ## Problem Statement
+# ## Problem statement
 #
 # DataEval's embedding-based tools — {class}`.Coverage`, {func}`.ber_mst`,
 # {class}`.Balance` — assume **one embedding per label**, which is the image-classification

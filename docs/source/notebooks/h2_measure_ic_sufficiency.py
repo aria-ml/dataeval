@@ -345,7 +345,7 @@ output.inv_project([0.90, 0.93, 0.99])
 #
 # ### Tutorials
 #
-# - [Introduction to data cleaning](./tt_clean_dataset.py) — Identify and clean corrupted, duplicated, or mislabeled samples.
+# - [Clean a dataset](./tt_clean_dataset.py) — Identify and clean corrupted, duplicated, or mislabeled samples.
 #
 # ### How-to guides
 #

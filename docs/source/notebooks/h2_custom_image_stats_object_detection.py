@@ -342,8 +342,8 @@ print(f"                back  ={units['unit_background_sharpness'].mean():.1f}")
 # - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level, target-level, and background-level statistics to identify data quality issues.
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Evaluate bias and coverage across metadata factors in your dataset.
 # - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across unit, instance, and background factors.
-# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
-# - [Introduction to data cleaning](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
+# - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
+# - [Clean a dataset](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
 # - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors such as dimensions and pixel statistics to dataset metadata.
 # - [How to bin factors by level](./h2_bin_factors_by_level.py) — Discretize continuous factor values into discrete bins for hierarchical analysis.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings and factors to discover structural groupings in your data.

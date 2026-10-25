@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # Beyond the Bounding Box: Comparing Objects to Their Surroundings
+# # Compare objects to their surroundings
 #
 # Learn how to isolate an object's statistics from its environment and identify potential background shortcuts.
 #
@@ -25,7 +25,7 @@
 # Relevant personas: [Data Scientist](../getting-started/roles/data_scientist.md), [ML Engineer](../getting-started/roles/ml_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 
 # %% [markdown]
-# ## What you'll do
+# ## What you will do
 #
 # - Compute image statistics for the whole frame, individual bounding boxes, and the masked background.
 # - Calculate a per-detection separation score to find camouflaged objects.
@@ -33,14 +33,14 @@
 # - Evaluate dataset balance and mutual information to detect background shortcut risks.
 
 # %% [markdown]
-# ## What you'll learn
+# ## What you will learn
 #
 # - Learn to separate hard-object detection challenges from hard-scene conditions.
 # - Learn to use scene-relative ratios to normalize objects across variable light.
 # - Learn to verify whether scenery content is acting as an unintended shortcut for your model.
 
 # %% [markdown]
-# ## What you'll need
+# ## What you will need
 #
 # - Environment Requirements
 #   - `dataeval` or `dataeval[all]`
@@ -48,7 +48,7 @@
 #   - `matplotlib`
 
 # %% [markdown]
-# ## Background
+# ## Introduction
 #
 # A detection's statistics describe the object *and* the conditions it was captured in,
 # mixed together. A swimmer photographed at noon and the same swimmer at dusk have
@@ -73,7 +73,7 @@
 # a swimmer a detector will miss.
 
 # %% [markdown]
-# ## Getting started
+# ## Setup
 
 # %%
 try:

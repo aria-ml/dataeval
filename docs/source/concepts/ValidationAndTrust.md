@@ -443,7 +443,7 @@ generally need both.
 ```{warning}
 The specific transformation-by-transformation behavior of each mode is
 demonstrated empirically in the
-[Detecting common augmentations as duplicates](../notebooks/tt_augmentation_duplicates.py)
+[Detect common augmentations as duplicates](../notebooks/tt_augmentation_duplicates.py)
 tutorial. Consult that notebook for the current results rather than relying on
 a summary table here — the behavior depends on hash size, cluster sensitivity,
 and the extractor in use, and a static table would go stale silently.

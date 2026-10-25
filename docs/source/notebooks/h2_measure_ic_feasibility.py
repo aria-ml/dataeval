@@ -182,7 +182,7 @@ assert 0.99 < 1 - ber_binary["upper_bound"] < 0.998
 #
 # ### Tutorials
 #
-# - [Introduction to data cleaning](./tt_clean_dataset.py) — Identify and clean corrupted, duplicated, or mislabeled samples.
+# - [Clean a dataset](./tt_clean_dataset.py) — Identify and clean corrupted, duplicated, or mislabeled samples.
 #
 # ### How-to guides
 #

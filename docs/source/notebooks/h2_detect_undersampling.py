@@ -261,8 +261,8 @@ assert (wonky / 20) > 0.4
 # - [Data Integrity](../concepts/DataIntegrity.md) — Overview of data quality and integrity checks.
 # - [Performance Limits](../concepts/PerformanceLimits.md) — Understand theoretical performance boundaries based on data coverage.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover structure, clusters, and coverage in unlabeled datasets.
-# - [Introduction to data cleaning](./tt_clean_dataset.py) — Detect duplicates, outliers, and corrupted samples in datasets.
-# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find augmented image pairs using duplicate detection.
+# - [Clean a dataset](./tt_clean_dataset.py) — Detect duplicates, outliers, and corrupted samples in datasets.
+# - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find augmented image pairs using duplicate detection.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Measure dataset bias, factor correlations, and class imbalances.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Apply clustering algorithms to identify groupings in embedded data.
 # - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.

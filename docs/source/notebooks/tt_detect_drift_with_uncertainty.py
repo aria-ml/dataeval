@@ -25,7 +25,7 @@
 #
 # Relevant personas: [ML Engineer](../getting-started/roles/ml_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 #
-# ## What you'll do
+# ## What you will do
 #
 # - Turn a pretrained object detector into a feature extractor with {class}`.TorchExtractor`
 # - Convert raw detection outputs into per-detection uncertainty with {class}`.UncertaintyExtractor`
@@ -33,13 +33,13 @@
 # - Break uncertainty down per predicted class with {class}`.ClasswiseUncertaintyExtractor`
 # - Detect drift on the uncertainty feature with {class}`.DriftWasserstein`
 #
-# ## What you'll learn
+# ## What you will learn
 #
 # - Learn how prediction uncertainty (entropy) can act as a drift feature without ground-truth labels
 # - Learn how to decode a detection model's raw output into per-detection class scores with a `postprocess_fn`
 # - Learn how a calibrated, validation-anchored detector separates benign variation from genuine drift
 #
-# ## What you'll need
+# ## What you will need
 #
 # - Knowledge of Python
 # - Beginner knowledge of PyTorch and object detection

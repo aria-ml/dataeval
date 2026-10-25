@@ -271,7 +271,7 @@ print(f"After context: {dataeval.config.get_seed()}")
 # %% [markdown]
 # ## Next steps
 #
-# - [Detecting common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
+# - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
 # - [Identify out-of-distribution samples](./tt_identify_ood_samples.py) — Detect samples that deviate significantly from the baseline training distribution.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational data over time.
 # - [How to configure logging with DataEval](./h2_configure_logging.py) — Set up console and file logging to monitor DataEval execution and debug operations.

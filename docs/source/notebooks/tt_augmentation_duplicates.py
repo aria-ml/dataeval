@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # Detecting common augmentations as duplicates
+# # Detect common augmentations as duplicates
 #
 # This tutorial demonstrates how DataEval's duplicate detection methods handle common torchvision augmentations.
 #
@@ -24,14 +24,14 @@
 #
 # Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [ML Engineer](../getting-started/roles/ml_engineer.md)
 #
-# ## What you'll do
+# ## What you will do
 #
 # - Create synthetic test images and apply 30+ torchvision transformations
 # - Run both D4 hash-based and BoVW embedding-based duplicate detection
 # - Compare which transformations each method catches or misses
 # - Tune detection sensitivity with the `cluster_sensitivity` parameter
 #
-# ## What you'll learn
+# ## What you will learn
 #
 # - Which augmentation types are detectable as near-duplicates (and which aren't)
 # - When to use D4 hashes vs BoVW embeddings for duplicate detection
@@ -48,7 +48,7 @@
 # **Key insight:** D4 hashes only handle the 8 symmetries of a square (0°, 90°, 180°, 270° + flips). BoVW using SIFT
 # features is invariant to **any** rotation angle, making it better for detecting arbitrarily rotated duplicates.
 #
-# ## What you'll need
+# ## What you will need
 #
 # - A Python environment with the following packages installed:
 #   - `dataeval`
@@ -68,7 +68,7 @@
 # 1. **Validate augmentation pipelines** - Ensure augmentations create sufficiently distinct images
 
 # %% [markdown]
-# ## Getting started
+# ## Setup
 #
 # Let's import the required libraries.
 

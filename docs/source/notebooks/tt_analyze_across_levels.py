@@ -23,7 +23,7 @@
 # Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [T&E Engineer](../getting-started/roles/te_engineer.md)
 
 # %% [markdown]
-# ## What you'll do
+# ## What you will do
 #
 # - You will build a {class}`.Metadata` object over an aerial object detection dataset and inspect the data levels
 #   found inside it.
@@ -37,7 +37,7 @@
 #   every which way.
 
 # %% [markdown]
-# ## What you'll learn
+# ## What you will learn
 #
 # - You'll learn why an image-level factor read from detection rows is weighted by detection count, and what that
 #   does to every statistic computed over it.
@@ -48,7 +48,7 @@
 #   into sync.
 
 # %% [markdown]
-# ## What you'll need
+# ## What you will need
 #
 # - Environment Requirements
 #   - `dataeval`
@@ -103,11 +103,11 @@ from dataeval.data import Indices, Limit, Shuffle, View
 from dataeval.exceptions import MetadataFormatError
 from dataeval.flags import ImageStats
 
-# Read and measure four frames at a time rather than one. See Step 5.
+# Read and measure four frames at a time rather than one. See the "Measure your own factors" section.
 set_max_processes(4)
 
 # %% [markdown]
-# ## Step 1: Load the data and inspect its levels
+# ## Load the data and inspect its levels
 #
 # You are going to work with SeaDrone, an aerial dataset in which a drone flies over water and annotates the swimmers,
 # boats and buoys it sees. Every image carries the drone's telemetry at the moment of capture — `altitude`, `speed`,
@@ -175,7 +175,7 @@ print(metadata.rows_at("instance").select("item_index", "class_label", "object_s
 # about six on average. That spreading out from images to detections is what the rest of this tutorial is about.
 
 # %% [markdown]
-# ## Step 2: Analyze the same factor at two levels
+# ## Analyze the same factor at two levels
 #
 # `altitude` is recorded once per image. But a detection can report an altitude too — the altitude of the image it was
 # found in. DataEval stores the value once and hands it down through a process called downwards propagation
@@ -206,7 +206,7 @@ print(f"per detection n={len(per_detection):5d}  mean={per_detection.mean():.1f}
 # analyzing an object detection dataset, unrecognized aggregation bias can result in unexpected bias evaluation results.
 
 # %% [markdown]
-# ## Step 3: Choose your level with `at()`
+# ## Choose your level with `at()`
 #
 # {meth}`.Metadata.at` returns a copy of the metadata specified at the given level. The stored data does not change;
 # what changes is which rows the array-shaped accessors project.
@@ -247,10 +247,11 @@ except ValueError as error:
 
 # %% [markdown]
 # An image holds several detections, or none, so there is no single class label to return. You will come back to this in
-# Step 7, where it turns bias analysis at the image level into an interesting question rather than an impossible one.
+# the "Ask a bias question at each level" section, where it turns bias analysis at the image level into an interesting
+# question rather than an impossible one.
 
 # %% [markdown]
-# ## Step 4: Isolate columns with `inherited`
+# ## Isolate columns with `inherited`
 #
 # While {meth}`.Metadata.at` selects the *rows* you analyze, the `inherited` parameter controls the *columns* (factors).
 #
@@ -282,7 +283,7 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 # identical results because there is no higher level from which to inherit factors.
 
 # %% [markdown]
-# ## Step 5: Measure your own factors
+# ## Measure your own factors
 #
 # Every factor analyzed so far is provided by the dataset itself. SeaDrone's telemetry files describe the drone's
 # state, and its annotation files declare the bounding boxes. Because these data points were recorded prior to
@@ -292,15 +293,17 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 # from the pixel data. You can specify which statistics to extract by providing {class}`.ImageStats` flags.
 #
 # For object detection datasets, {func}`.image_stats` measures these statistics across up to three distinct regions.
-# Selecting the correct region involves the same conceptual framing as choosing the metadata level in Step 2:
+# Selecting the correct region involves the same conceptual framing as choosing the metadata level in the "Analyze the
+# same factor at two levels" section:
 #
 # - `per_image` computes statistics over the entire image frame.
 # - `per_target` computes statistics strictly within each annotated bounding box.
 # - `per_background` computes statistics over all pixels *outside* the bounding boxes (the scene minus the objects).
 #
 # ```{note}
-# This cell reads and measures 200 4K frames and takes a couple of minutes. It is by far the most expensive step in
-# the tutorial — and the reason the sample is capped at 200 — so Step 10 shows you how to pay for it once.
+# This cell reads and measures 200 4K frames and takes a couple of minutes. It is by far the most expensive step in the
+# tutorial — and the reason the sample is capped at 200 — so the "Cache the metadata structure" section shows you how to
+# pay for it once.
 #
 # It is also the reason the first cell called {func}`.set_max_processes` with 4: {func}`.image_stats` reads each
 # frame independently, so it splits the work across worker processes. Four workers cut this step to roughly a third
@@ -349,8 +352,8 @@ print("dropped    :", metadata.dropped_factors)
 #   what `dropped_factors` reports, mapping each skipped factor name to the reason it was skipped.
 #
 # If you query the `instance_sharpness` column from the image-level view, the values will be null. Just as
-# `class_labels` could not summarize multiple objects per image in Step 3, there is no single "object sharpness" for
-# an image containing multiple varying detections.
+# `class_labels` could not summarize multiple objects per image in the "Choose your level with `at()`" section, there is
+# no single "object sharpness" for an image containing multiple varying detections.
 
 # %%
 print(
@@ -445,7 +448,7 @@ print(f"largest gap on any single image: {units.select(gap.max()).item():.1f}")
 # meaningfully different area before it will report anything new; one that responds to extremes does not.
 
 # %% [markdown]
-# ## Step 6: Aggregate values upward with `agg()`
+# ## Aggregate values upward with `agg()`
 #
 # By design, DataEval propagates values strictly *downward* through the hierarchy. It will not automatically average
 # object-level properties (such as bounding box size) and assign the result to the parent image. This prevents
@@ -480,12 +483,12 @@ print("altitude vs objects-per-image, correlation:")
 print(round(float(crowding.select(pl.corr("altitude", "n_objects")).item()), 3))
 
 # %% [markdown]
-# The positive correlation directly confirms the mechanism discussed in Step 2: higher flights frame more objects.
-# Because this dynamic is now quantified as a formal factor, you can condition on it, bin by it, or pass it to a bias
-# evaluator — which is exactly what the next step covers.
+# The positive correlation directly confirms the mechanism discussed in the "Analyze the same factor at two levels"
+# section: higher flights frame more objects. Because this dynamic is now quantified as a formal factor, you can
+# condition on it, bin by it, or pass it to a bias evaluator — which is exactly what the next step covers.
 #
 # Consider the second new factor: `mean_object_sharpness`. This is a **fourth** way of answering "how sharp is this
-# image?", separate from the three regional measurements in Step 5.
+# image?", separate from the three regional measurements in the "Measure your own factors" section.
 
 # %%
 print(
@@ -509,14 +512,15 @@ print(
 #
 # ```{note}
 # The `agg` method contains a deliberate restriction to prevent statistical distortion. It will refuse to aggregate a
-# factor that was *inherited* from above (e.g., averaging an image's altitude across all detections within it). Doing
-# so would weight each image by its detection count all over again, compounding the aggregation bias discussed in
-# Step 2. If you need to perform such an operation, pass `unique_by=` to name the entity that should be counted once.
-# This safeguard is not triggered when counting rows via `pl.len()`, as it reads no column values at all.
+# factor that was *inherited* from above (e.g., averaging an image's altitude across all detections within it). Doing so
+# would weight each image by its detection count all over again, compounding the aggregation bias discussed in the
+# "Analyze the same factor at two levels" section. If you need to perform such an operation, pass `unique_by=` to name
+# the entity that should be counted once. This safeguard is not triggered when counting rows via `pl.len()`, as it reads
+# no column values at all.
 # ```
 
 # %% [markdown]
-# ## Step 7: Ask a bias question at each level
+# ## Ask a bias question at each level
 #
 # The {class}`.Balance` evaluator calculates the normalized mutual information between each factor and a target
 # conditioning axis. When evaluating at the detection (`instance`) level, the standard target axis is the object's
@@ -531,10 +535,10 @@ print("\nobject_size, for comparison:")
 print(ranked.filter(pl.col("factor_name") == "object_size"))
 
 # %% [markdown]
-# As demonstrated in Step 3, evaluating at the image (`unit`) level yields an error because images lack a single class
-# label. To work around this, specify an alternative conditioning axis. By supplying the aggregated `n_objects` factor
-# to the `label=` parameter, you can measure what is associated with image density instead: "What factors correlate
-# most strongly with a crowded image?"
+# As demonstrated in the "Choose your level with `at()`" section, evaluating at the image (`unit`) level yields an error
+# because images lack a single class label. To work around this, specify an alternative conditioning axis. By supplying
+# the aggregated `n_objects` factor to the `label=` parameter, you can measure what is associated with image density
+# instead: "What factors correlate most strongly with a crowded image?"
 
 # %%
 per_image_balance = Balance(label="n_objects").evaluate(enriched.at("unit"))
@@ -559,7 +563,7 @@ print(per_image_balance.balance.sort("mi_value", descending=True).head(5))
 # population and name a valid conditioning axis for it.
 
 # %% [markdown]
-# ## Step 8: Subset populations using `where` and `having`
+# ## Subset populations using `where` and `having`
 #
 # Both {meth}`.Metadata.where` and {meth}`.Metadata.having` accept a Polars predicate and return a filtered `Metadata`
 # instance containing a subset of the rows. Their mechanical difference lies in **the hierarchical direction the filter
@@ -598,7 +602,7 @@ high = metadata.where(pl.col("altitude") > 60, level="unit")
 print("altitude > 60 m:", high.level_counts)
 
 # %% [markdown]
-# ## Step 9: Synchronize metadata with the dataset
+# ## Synchronize metadata with the dataset
 #
 # Filtering metadata only purges *rows* from the internal dataframes; it does not remove the underlying *items* from
 # the dataset object that the metadata is bound to. Consequently, all 200 original images remain in the dataset, and
@@ -629,10 +633,10 @@ print("matching dataset:", len(matching_dataset))
 # metadata instance.
 #
 # This synchronization succeeds only because the `high` filter was applied cleanly along item boundaries (the image
-# level). Conversely, the `where` filter in Step 8 kept 907 of 1305 detections while preserving all 200 images. A
-# dataset can only return full images; it cannot selectively return "three out of four" detections from a single
-# frame. Rather than build a dataset slice that cannot correspond to its metadata, `selected_items` enforces this
-# boundary and raises when you ask it for one.
+# level). Conversely, the `where` filter in the "Subset populations using `where` and `having`" section kept 907 of 1305
+# detections while preserving all 200 images. A dataset can only return full images; it cannot selectively return "three
+# out of four" detections from a single frame. Rather than build a dataset slice that cannot correspond to its metadata,
+# `selected_items` enforces this boundary and raises when you ask it for one.
 
 # %%
 try:
@@ -641,12 +645,12 @@ except ValueError as error:
     print("as expected:", str(error).split(".")[0])
 
 # %% [markdown]
-# ## Step 10: Cache the metadata structure
+# ## Cache the metadata structure
 #
-# Constructing the initial `Metadata` object was cheap because it parsed telemetry and annotation files, not pixel
-# data. Step 5 introduced the true bottleneck: reading all 200 high-resolution frames off disk, decoding them, and
-# measuring pixel statistics across three regions apiece. Every operation since has been arithmetic over the resulting
-# tabular rows.
+# Constructing the initial `Metadata` object was cheap because it parsed telemetry and annotation files, not pixel data.
+# The "Measure your own factors" section introduced the true bottleneck: reading all 200 high-resolution frames off
+# disk, decoding them, and measuring pixel statistics across three regions apiece. Every operation since has been
+# arithmetic over the resulting tabular rows.
 #
 # To avoid repeating this expensive work, use {meth}`.Metadata.save` to serialize the structure to disk, and
 # {meth}`.Metadata.load` to restore it.
@@ -715,7 +719,7 @@ print("ready:", metadata.level_counts)
 # - [How to reason about factor binning across levels](./h2_bin_factors_by_level.py) — Why each factor is discretized at
 #   its own level, with the numbers.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — The
-#   `image_stats` flags and region switches from Step 5, on their own terms.
+#   `image_stats` flags and region switches from the "Measure your own factors" section, on their own terms.
 #
 # ## On your own
 #

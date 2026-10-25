@@ -191,6 +191,6 @@ assert len(duplicates_result.near) == 2
 # - [Data Integrity](../concepts/DataIntegrity.md) — Explore outlier and duplicate detection methodologies.
 # - [Distribution Shift](../concepts/DistributionShift.md) — Detect distribution shifts in clustered dataset representations.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate unlabeled image datasets using clustering and coverage metrics.
-# - [Introduction to data cleaning](./tt_clean_dataset.py) — Clean image datasets by identifying corrupt, duplicate, or mislabeled samples.
+# - [Clean a dataset](./tt_clean_dataset.py) — Clean image datasets by identifying corrupt, duplicate, or mislabeled samples.
 # - [How to identify duplicates](./h2_deduplicate.py) — Detect exact and near-duplicate images in dataset collections.
 # - [How to visualize cleaning issues](./h2_visualize_cleaning_issues.py) — Visualize data quality issues such as outliers and label noise.

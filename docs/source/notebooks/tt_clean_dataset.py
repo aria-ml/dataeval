@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # Introduction to data cleaning
+# # Clean a dataset
 #
 # This tutorial walks through using DataEval to clean a dataset.
 #
@@ -25,19 +25,19 @@
 # Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md), [ML Engineer](../getting-started/roles/ml_engineer.md)
 
 # %% [markdown]
-# ## What you'll do
+# ## What you will do
 #
 # - You will use DataEval's cleaners to assess the 2012 VOC dataset.
 # - You will analyze the results through various plots and tables.
 
 # %% [markdown]
-# ## What you'll learn
+# ## What you will learn
 #
 # - You'll learn how to assess a dataset for extreme and/or redundant data points.
 # - You'll learn helpful questions to determine when to remove or collect additional data.
 
 # %% [markdown]
-# ## What you'll need
+# ## What you will need
 #
 # - Environment Requirements
 #   - `dataeval` or `dataeval[all]`
@@ -57,7 +57,7 @@
 # projects.
 
 # %% [markdown]
-# ## Getting started
+# ## Setup
 #
 # First import the required libraries needed to set up the example.
 
@@ -206,7 +206,7 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_result, metric, layout
 
 
 # %% [markdown]
-# ## Step 1: Understand the data
+# ## Understand the data
 
 # %% [markdown]
 # ### Load the data
@@ -290,7 +290,7 @@ plot_sample_images_by_class(ds, lstats["image_indices_per_class"])
 # Now, you can move on to identifying which images have a statistical difference from the rest of the images.
 
 # %% [markdown]
-# ## Step 2: Identify any outlying data points
+# ## Identify any outlying data points
 
 # %% [markdown]
 # ### Extreme/missing values
@@ -482,7 +482,7 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "sharpness", (1, 2))
 # your dataset's intended use.
 
 # %% [markdown]
-# ## Step 3: Identify duplicate data
+# ## Identify duplicate data
 
 # %% [markdown]
 # ### Duplicates
