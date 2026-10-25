@@ -473,8 +473,6 @@ assert all(report_by_class[c]["gap"] == "ok" for c in ["airplane", "cat", "dog",
 # - [Dataset bias and coverage](../concepts/DatasetBias.md) — Read about dispersion, isotropy, and representation metrics for assessing dataset coverage.
 # - [Assess data space tutorial](./tt_assess_data_space.py) — Discover coverage gaps, clusters, and outliers in unlabeled dataset embeddings.
 # - [Reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Map and validate dataset labels against a target domain ontology.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
-# - [Embed object detection crops](./h2_embed_detection_crops.py) — Extract feature embeddings for individual bounding box targets in detection datasets.
 
 # %% [markdown]
 # ## On your own

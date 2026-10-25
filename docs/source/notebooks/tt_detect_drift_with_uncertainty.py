@@ -345,8 +345,6 @@ print(f"SeaDrone     -> drift: {result_drone.drifted}  (ratio: {result_drone.dis
 # - [Taxonomy of shift](../concepts/DistributionShift.md#taxonomy-of-shift) — Read about shift types and when uncertainty-based detection is and isn't the right tool.
 # - [Monitor shift tutorial](./tt_monitor_shift.py) — Compare prediction uncertainty with feature-based drift detection on dataset embeddings.
 # - [Detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Apply uncertainty drift detection using a MAITE-wrapped model.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
-# - [Configure global DataEval defaults](./h2_configure_defaults.py) — Set global default configuration parameters like batch size and execution device.
 
 # %% [markdown]
 # ## On your own
