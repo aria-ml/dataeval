@@ -58,7 +58,6 @@ datasets for machine learning.
 ../notebooks/h2_embed_detection_crops.py
 ../notebooks/h2_cluster_analysis.py
 ../notebooks/h2_deduplicate.py
-../notebooks/h2_deduplicate_video.py
 ../notebooks/h2_find_factor_outliers.py
 ../notebooks/h2_find_conditional_outliers.py
 ../notebooks/h2_visualize_cleaning_issues.py
@@ -130,9 +129,6 @@ datasets for machine learning.
 - - [](../notebooks/h2_deduplicate.py)
   - Identify and remove duplicates from a PyTorch Dataset
   - [![Open In Colab][colab-badge]][dupe-colab]
-- - [](../notebooks/h2_deduplicate_video.py)
-  - Find duplicate video, train/test leakage, and redundant footage
-  - [![Open In Colab][colab-badge]][vdupe-colab]
 - - [](../notebooks/h2_find_factor_outliers.py)
   - Threshold metadata factors, each against its own level, and trace a
     flagged track back to the metadata
@@ -197,7 +193,6 @@ datasets for machine learning.
 [crop-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_embed_detection_crops.ipynb
 [clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_cluster_analysis.ipynb
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_deduplicate.ipynb
-[vdupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_deduplicate_video.ipynb
 [fout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_find_factor_outliers.ipynb
 [cout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_find_conditional_outliers.ipynb
 [clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_visualize_cleaning_issues.ipynb

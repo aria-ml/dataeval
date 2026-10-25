@@ -238,5 +238,5 @@ assert annotation_results.augmented().data()["item_indices"].item().to_list() ==
 #
 # - [Acting on Results](../concepts/ActingOnResults.md) — Learn strategies for addressing dataset issues identified during evaluation.
 # - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data quality issues.
-# - [How to find duplicate video](./h2_deduplicate_video.py) — Find duplicate footage, train/test leakage, and redundant frames in video and MOT datasets.
+# - [Identify duplicate video](./tt_identify_duplicate_video.py) — Find duplicate footage, train/test leakage, and redundant frames in video and MOT datasets.
 # - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
