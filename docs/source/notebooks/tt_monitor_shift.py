@@ -31,7 +31,6 @@
 # - Compare different drift detectors and understand their strengths
 # - Inspect detector-specific outputs for root-cause analysis
 # - Use chunked drift detection to monitor drift across data segments
-# - Compare the label distributions between a training and operational set, and see the check fail on a broken one
 #
 # ## What you will learn
 #
@@ -40,7 +39,6 @@
 # - Learn that an embedding encodes the whole image, not only the classes you kept
 # - Learn how to inspect per-feature and per-detector statistics
 # - Learn how to use chunked drift detection for temporal monitoring
-# - Learn how to analyze label distributions, and what a parity failure looks like
 #
 # ## What you will need
 #
@@ -60,9 +58,7 @@
 # [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main) computer vision dataset to detect drift
 # between the image distribution of the `train` split and the `val` split, which will represent an operational dataset in
 # this guide. Both splits are narrowed to the indoor concepts a deployed model would actually see, mirroring how you
-# monitor the slice your model serves rather than an entire benchmark. You will then determine if the labels within
-# these two datasets has high [parity](../concepts/DistributionShift.md#label-parity), or equivalent label
-# distributions.
+# monitor the slice your model serves rather than an entire benchmark.
 
 # %% [markdown]
 # ## Setup
@@ -86,9 +82,8 @@ from maite_datasets.object_detection import VOCDetection
 from torchvision.models import ResNet18_Weights, resnet18
 from torchvision.transforms.v2 import GaussianNoise
 
-from dataeval import Embeddings, Metadata
+from dataeval import Embeddings
 from dataeval.config import set_device, set_seed
-from dataeval.core import label_parity
 from dataeval.data import Relabel, View
 from dataeval.extractors import TorchExtractor
 from dataeval.shift import ChunkedDrift, DriftDomainClassifier, DriftKNeighbors, DriftMMD, DriftUnivariate
@@ -438,99 +433,6 @@ for name, detector in chunked_detectors.items():
 # %% [markdown]
 # The first two chunks (covering the clean 40%) should show no drift, while the later chunks (covering the noisy 60%)
 # should trigger drift alerts. This chunk-level view makes it easy to pinpoint _when_ in a data stream drift begins.
-#
-# Next you will look at the labels' distributions.
-
-# %% [markdown]
-# ## Evaluate parity
-
-# %% [markdown]
-# Instead of looking at the images, you can compare the distributions of the labels using a method called
-# [label parity](../concepts/DistributionShift.md#label-parity).\
-# There is parity between two sets of labels if the label frequencies are approximately equal.
-#
-# You will now compare the label distributions using the `label_parity` function. It is a symmetric two-sample test: the
-# null hypothesis is that both datasets draw their labels from one class distribution, and neither is treated as the
-# known population.
-#
-# A VOC image can hold several boxes, and the boxes in one image resemble each other, so the labels are not independent
-# draws. Pass the item each label came from as `expected_groups` and `observed_groups`, here `Metadata.item_indices`, and
-# the test counts images rather than boxes as its independent unit. Without them, the test would treat every box as its
-# own independent item and can report p-values that are too small. See
-# [label parity](../concepts/DistributionShift.md#label-parity) for details.
-
-# %%
-# Get the metadata for each view
-train_md = Metadata(train_view)
-operational_md = Metadata(operational_view)
-
-# One image holds several boxes, so group the labels by the image each came from
-label_parity(
-    train_md.class_labels,
-    operational_md.class_labels,
-    expected_groups=train_md.item_indices,
-    observed_groups=operational_md.item_indices,
-)
-
-# %% [markdown]
-# From the {func}`.label_parity` function, you can see that it calculated a p_value of ~**0.98** from a chi-squared of
-# ~**0.07**. Since this is close to 1.0, the test observed no difference between the two class distributions, and the
-# `score`, the effect size, is **0.0**. Because groups were given, `test` is `rao_scott_f`, which accounts for the boxes
-# inside an image resembling each other.
-#
-# Read this as *no shift observed*, not as proof of identical distributions: a non-significant result says only that the
-# samples did not show a shift at the power they had. Here `insufficient` is False, so the table is not too thin to
-# trust, and the test observed no shift in the monitored slice.
-
-# %% [markdown]
-# ### What a parity failure looks like
-#
-# A passing check is hard to interpret on its own, so it helps to see the alarm actually go off. You will build a
-# deliberately broken operational set and re-run the same check.
-#
-# Imagine an upstream annotation policy change: partway through deployment, the labeling team decides `sofa` is close
-# enough to `chair` and stops distinguishing them. Another {class}`.Relabel` expresses exactly that — two source
-# classes collapsing into one target concept.
-#
-# The important part is what does **not** change. Every image is still in the set and every box is still annotated;
-# only the names attached to them move. The drift detectors from earlier in this tutorial would see nothing at all
-# here, because the pixels feeding the embeddings are identical. Label parity is what catches this class of problem.
-
-# %%
-# An upstream policy stops distinguishing sofas from chairs -- the images are untouched
-policy_change = Relabel(
-    {"chair": "chair", "diningtable": "diningtable", "sofa": "chair", "tvmonitor": "tvmonitor"},
-    FURNITURE,
-)
-
-# Nest the change on the operational view rather than rebuilding it from the raw split
-poor_parity_view = View(operational_view, operations=[policy_change])
-poor_parity_md = Metadata(poor_parity_view)
-
-# Gather the counts of each label in the training and broken operational sets
-train_label_counts = np.bincount(np.asarray(train_md.class_labels), minlength=len(FURNITURE))
-poor_parity_label_counts = np.bincount(np.asarray(poor_parity_md.class_labels), minlength=len(FURNITURE))
-
-print(f"images:                   {len(operational_view)} -> {len(poor_parity_view)} (unchanged)")
-print(f"train label counts:       {train_label_counts}")
-print(f"poor parity label counts: {poor_parity_label_counts}")
-
-# %%
-label_parity(
-    train_md.class_labels,
-    poor_parity_md.class_labels,
-    expected_groups=train_md.item_indices,
-    observed_groups=poor_parity_md.item_indices,
-)
-
-# %% [markdown]
-# The p_value is now effectively **zero** (~3e-32), and the `score` has risen from 0.0 to ~**0.29**. Every `sofa` has
-# been counted as a `chair`, so one class is empty while another is inflated, and the two distributions **lack** parity.
-#
-# In a real deployment this is the signal to go looking for a cause before retraining on the operational data: an
-# annotation policy that changed underneath you, a class your model never sees anymore, or an operational mix that has
-# genuinely shifted. Each needs a different response, and each would leave the images themselves looking perfectly
-# normal.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -557,36 +459,11 @@ for name, result in chunked_results.items():
         f"{name} chunk pattern changed: {list(result.details['drifted'])}"
     )
 
-# "a p_value of ~0.98 ... close to 1.0", from the grouped Rao-Scott test
-parity_result = label_parity(
-    train_md.class_labels,
-    operational_md.class_labels,
-    expected_groups=train_md.item_indices,
-    observed_groups=operational_md.item_indices,
-)
-assert parity_result["test"] == "rao_scott_f"
-assert not parity_result["insufficient"]
-parity_p_value = parity_result["p_value"]
-assert parity_p_value > 0.9, f"label parity dropped to {parity_p_value}"
-
-# "The p_value is now effectively zero" -- and the contrived set must change labels only
-assert len(poor_parity_view) == len(operational_view), "the policy change should not drop images"
-assert len(poor_parity_md.class_labels) == len(operational_md.class_labels), "it should not drop annotations"
-poor_parity_result = label_parity(
-    train_md.class_labels,
-    poor_parity_md.class_labels,
-    expected_groups=train_md.item_indices,
-    observed_groups=poor_parity_md.item_indices,
-)
-poor_parity_p_value = poor_parity_result["p_value"]
-assert poor_parity_p_value < 0.01, f"contrived poor-parity set no longer trips the check: {poor_parity_p_value}"
-
 # %% [markdown]
 # ## Conclusion
 #
 # In this tutorial, you have learned to create embeddings from the VOC dataset, compare different drift detectors and
-# their unique outputs, use chunked monitoring to identify when drift begins, and calculate the parity of label
-# distributions for both a healthy and a deliberately broken operational set.
+# their unique outputs, and use chunked monitoring to identify when drift begins.
 #
 # Key takeaways:
 #
@@ -595,10 +472,9 @@ assert poor_parity_p_value < 0.01, f"contrived poor-parity set no longer trips t
 # - **DriftMMD** provides a single multivariate distance that captures complex distributional changes
 # - **DriftKNeighbors** offers fast, lightweight detection based on distance comparisons
 # - **Chunked monitoring** helps pinpoint _when_ drift begins in a data stream
-# - **Label parity** catches shifts the image detectors cannot see — the pixels can be identical while the labels move
 #
-# These are important steps when monitoring data, as drift and lack of parity can affect a model's ability to achieve
-# performance recorded during model training. When data drift is detected or the label distributions lack parity, it is a
+# These are important steps when monitoring data, as drift can affect a model's ability to achieve
+# performance recorded during model training. When data drift is detected, it is a
 # good idea to consider retraining the model and incorporating operational data into the dataset.
 
 # %% [markdown]
@@ -606,6 +482,7 @@ assert poor_parity_p_value < 0.01, f"contrived poor-parity set no longer trips t
 #
 # - [Distribution shift concepts](../concepts/DistributionShift.md) — Read about covariate shift, concept drift, and label parity in deployed ML models.
 # - [Identify out-of-distribution samples tutorial](./tt_identify_ood_samples.py) — Detect anomalous and out-of-distribution samples using autoencoders and k-NN.
+# - [How to measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
 # - [Display data distributions](./h2_measure_divergence.py) — Measure statistical divergence and plot distribution overlays between reference and target datasets.
 
 # %% [markdown]
