@@ -4287,9 +4287,10 @@ class Duplicates(Evaluator):
         caller, so it waits for a major release and is announced ahead of it.
 
         Tracking datasets are left to :func:`_warn_strict_radius`, which says something sharper --
-        for video the strict default does not miss relations, it measures them wrongly.
+        for video the strict default does not miss relations, it measures them wrongly. A run that
+        asks for no hash statistic never reads the radius, so nothing changes for that caller either.
         """
-        if tracking or self._radius_chosen or self.hash_radius != 0:
+        if tracking or self._radius_chosen or self.hash_radius != 0 or not self.flags & ImageStats.HASH:
             return
         warnings.warn(
             "The default value of hash_radius will change from 0 in a future major release, so "

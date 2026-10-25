@@ -2488,6 +2488,18 @@ class TestDefaultRadiusWarning:
         with pytest.warns(FutureWarning, match="hash_radius will change"):
             Duplicates(config=config).evaluate(self._images())
 
+    def test_a_run_without_a_hash_flag_is_left_alone(self, recwarn):
+        """The radius only compares hashes, so a run that takes none has nothing coming."""
+        detector = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0)
+        detector.evaluate(self._images())
+        assert self._futures(recwarn) == []
+
+    def test_a_hash_flag_beside_clustering_is_still_warned_about(self):
+        with pytest.warns(FutureWarning, match="hash_radius will change"):
+            Duplicates(flags=ImageStats.HASH_PHASH, extractor=FlattenExtractor(), cluster_sensitivity=1.0).evaluate(
+                self._images()
+            )
+
     def test_video_is_left_to_its_own_notice(self, recwarn):
         """For video the strict default does not miss relations, it measures them wrongly."""
         Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(make_tracking_dataset([_fills(10, 4)]))
