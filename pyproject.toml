@@ -229,6 +229,13 @@ torchvision = [
 [tool.uv.extra-build-dependencies]
 numba = ["tbb>=2021.6"]
 
+[tool.hatch.build]
+# CI keeps the uv cache in the project directory. `uv sync` extracts packages into it while hatchling walks the project to build
+# dataeval, and a directory that disappears mid-walk fails the build with FileNotFoundError. Without skip-excluded-dirs,
+# hatchling filters excluded paths only after it has walked into them.
+skip-excluded-dirs = true
+exclude = [".uv-cache"]
+
 [tool.hatch.build.targets.sdist]
 include = ["src/dataeval"]
 
