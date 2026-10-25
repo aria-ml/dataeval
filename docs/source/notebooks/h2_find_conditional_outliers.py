@@ -15,42 +15,15 @@
 
 # %% [markdown]
 # # How to find outliers that depend on their context
-
-# %% [markdown]
-# ## Problem statement
 #
-# Some values are ordinary across the whole dataset and wrong only in context: a car box the size of a truck, one
-# snowy frame in a clear video, a frame as bright as noon at 2 a.m., a large box near the horizon. A threshold fitted to
-# a whole level passes all of them, because each value is common somewhere.
+# Some values are ordinary across the whole dataset and wrong only in context. A threshold fitted to a whole level passes them,
+# because each value is common somewhere. {class}`~dataeval.quality.Outliers` judges a value against its context instead. See
+# [Data Integrity](../concepts/DataIntegrity.md).
 #
-# {class}`~dataeval.quality.Outliers` judges a value against its context with five arguments:
+# Use it after [How to find outliers in metadata factors](./h2_find_factor_outliers.py), when a single threshold per factor is not
+# enough.
 #
-# | Argument | Judges each value | Example |
-# | --- | --- | --- |
-# | `strata=` | within the rows that share a categorical value | a box against boxes of the same vehicle type |
-# | `factors=` with `strata=` | a categorical value by how rare it is in its stratum | a weather label against its video |
-# | `given=` | against rows with a similar value of another factor | brightness against frames of a similar hour |
-# | `combinations=` | as a pair of factors that are unusual together | box size and vertical position |
-# | `neighbors=` | against the rows before and after it in its sequence | a frame's exposure against the frames around it |
-
-# %% [markdown]
-# ### When to use
-#
-# Use this guide after [How to find outliers in metadata factors](./h2_find_factor_outliers.py), when a single
-# threshold per factor is not enough: your factors depend on a class, a video, a capture condition, or each other.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A python environment with the following packages installed:
-#    - dataeval
-#    - maite-datasets
-# 1. A `Metadata` with the factors you want to check
-
-# %% [markdown]
-# ## Getting started
-#
-# Import the required libraries.
+# You need `dataeval` and `maite-datasets`.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -90,13 +63,23 @@ from dataeval.types import SourceIndex
 pl.Config.set_tbl_width_chars(160)
 
 # %% [markdown]
-# ## Building a tracking dataset with known problems
+# ## Build an example with known problems
 #
-# The code below builds eight 200-frame videos. Each frame holds two cars and a truck, each on its own track, and video 3 also
-# holds a bus for its first 12 frames. Frame 120 of video 7 is stamped 3 hours late. The frames are blank: every check
-# in this guide reads factors, not pixels.
+# The example builds eight 200-frame videos of cars and a truck, with a bus in video 3 for 12 frames. Each argument gets one planted
+# problem:
+#
+# | Argument | Planted in the example |
+# | --- | --- |
+# | `strata=` | a car box the size of a truck |
+# | `factors=` with `strata=` | one snowy frame in a clear video |
+# | `given=` | a frame as bright as noon at 2 a.m. |
+# | `combinations=` | a large box near the horizon |
+# | `neighbors=` | a frame's exposure out of line with its video |
+#
+# The factors are `weather`, `hour`, `brightness` and `exposure` for each frame, and `vehicle`, `box_y` and `box_size` for each
+# detection.
 
-# %%
+# %% tags=["hide-input"]
 N_VIDEOS, N_FRAMES, HEIGHT, WIDTH = 8, 200, 72, 96
 BUS_VIDEO, BUS_FRAMES = 3, 12
 LATE_VIDEO, LATE_FRAME = 7, 120
@@ -161,34 +144,7 @@ class TrackingDataset:
 metadata = Metadata(TrackingDataset())
 print(metadata.level_counts)
 
-# %% [markdown]
-# ## Attaching the factors
-#
-# Attach the factors at the level they describe. `Metadata` orders frames by video, then frame, and detections by video,
-# frame, then track, so build each array in that order.
-#
-# Per frame (`unit`):
-#
-# - `weather`: `"snow"` throughout video 5 and `"clear"` elsewhere. Frame 80 of video 0 is planted as `"snow"`.
-# - `hour`: the capture hour. Video `v` covers hours `3v` to `3v + 3`.
-# - `brightness`: follows the daily cycle of `hour`. Frame 140 of video 0, at about 2 a.m., is planted at daylight level.
-# - `exposure`: about `8 + v` in video `v`. Frame 50 of video 4 is planted at 9.0, the exposure of video 1.
-#
-# Per detection (`instance`):
-#
-# - `vehicle`: the track's vehicle type.
-# - `box_y`: the box's vertical position, from 0 at the top of the frame to 1 at the bottom.
-# - `box_size`: grows with `box_y`, since nearer objects sit lower and look larger, and is twice as large for a truck.
-#   Two boxes are planted:
-#   - the car in video 2, frame 100, track 0, is truck-sized;
-#   - the car in video 6, frame 60, track 1, sits near the horizon at the size of a car near the bottom.
-#
-# `box_y` and `box_size` are fractions of the frame, so boxes from frames of different resolutions compare. For an
-# object detection dataset, {func}`~dataeval.core.image_stats` with `stats=ImageStats.DIMENSION_RELATIVE` and
-# `per_target=True` computes them from the boxes as `rel_offset_y` and `rel_size`. Attach its result with
-# `Metadata.add_factors`.
-
-# %%
+# %% tags=["hide-input"]
 rng = np.random.default_rng(0)
 
 video = np.repeat(np.arange(N_VIDEOS), N_FRAMES)
@@ -215,67 +171,48 @@ box_y[near_horizon], box_size[near_horizon] = 0.25, 0.02 + 0.08 * 0.85
 metadata.add_factors({"vehicle": vehicle, "box_y": box_y, "box_size": box_size}, level="instance")
 
 # %% [markdown]
-# ## Judging each value within a stratum
+# ## Judge each value within a stratum
 #
-# Thresholded over all detections, the truck-sized car passes: trucks of that size are common.
+# Thresholded over all detections, the truck-sized car passes, because trucks of that size are common.
 
 # %%
 boxes = ["box_size", "box_y"]
 display(Outliers().evaluate(metadata, levels="instance", factors=boxes).data())
 
 # %% [markdown]
-# Pass `strata=` to fit one threshold per value of a categorical factor. Each car is then judged against cars only.
-# The `population` column names the stratum a row was judged in. For a detection, `target_index` is its position in its
-# video.
+# Pass `strata=` to fit one threshold per value of a categorical factor, so each car is judged against cars only. A continuous factor
+# cannot be a stratum; use `given=`.
 
 # %%
 by_vehicle = Outliers().evaluate(metadata, levels="instance", factors=boxes, strata=["vehicle"])
 display(by_vehicle.data().select("item_index", "target_index", "metric_name", "metric_value", "bound", "population"))
 
 # %% [markdown]
-# A stratum takes its values from the level they live at, so a frame factor such as `weather` also stratifies the
-# detections in each frame. Several names cross: `strata=["vehicle", "weather"]` judges cars in snow apart from cars in
-# clear weather. A null value is a stratum of its own. A continuous factor is refused as a stratum; use `given=` for it.
-
-# %% [markdown]
-# ## Checking which populations were judged
-#
-# A threshold fitted to a few rows flags clean values, so `Outliers` fits one only to a population of at least 20 rows.
-# The bus stratum holds 12 detections. `result.populations` lists every population with its size and, where it was
-# not judged, the reason.
+# A threshold needs at least 20 rows. The bus stratum has 12 detections, so `populations` shows it was not judged. Check it before reading
+# an empty result as clean.
 
 # %%
 display(by_vehicle.populations)
 
 # %% [markdown]
-# A population below the minimum produces no findings. Check `populations` before reading an empty result as clean.
-
-# %% [markdown]
-# ## Finding rare categorical values
+# ### Find rare categorical values
 #
-# A categorical factor has no location or spread to threshold. With `strata=`, `Outliers` judges it by rarity instead:
-# a value is flagged when an exact binomial test shows it occurs in less than 5 % of its stratum, after correcting for
-# the number of values tested. Stratify the frames by video with the reserved `item_index` column and name the
-# categorical factor.
+# With `strata=`, `Outliers` judges a categorical factor by rarity: a value is flagged when an exact binomial test shows it occurs in
+# less than 5 % of its stratum. Stratify the frames by video with the reserved `item_index` column.
 
 # %%
 rare = Outliers().evaluate(metadata, levels="unit", factors=["weather"], strata=["item_index"])
 display(rare.data().select("item_index", "target_index", "observed", "population", "metric_value", "bound"))
 
 # %% [markdown]
-# The planted snow frame is flagged. `observed` holds the value, `metric_value` the upper confidence bound on its share
-# of the video, and `bound` the 5 % share it falls below. The snowy video is not flagged: snow is its common value.
-#
-# A value that is rare in every video is not flagged. That is a property of the whole dataset, which
-# {class}`~dataeval.bias.Balance` measures, not a defect in one frame. A stratum needs at least 93 rows before one
-# occurrence can be judged rare; smaller strata are listed in `populations`.
+# The planted snow frame is flagged and the snowy video is not, because snow is its common value. A stratum needs at least 93 rows
+# before one occurrence can be judged rare.
 
 # %% [markdown]
-# ## Judging one factor given another
+# ## Judge one factor given another
 #
-# Brightness depends on the hour, so a single threshold on brightness passes a daylight value at night. The hour is
-# continuous, so it cannot be a stratum: strata from hour bins would change with the bin edges. Pass `given=` to judge
-# `brightness` against the frames nearest in `hour`.
+# Brightness depends on the hour, so a single threshold passes a daylight value at night. Pass `given=` to judge `brightness` against
+# the frames nearest in `hour`.
 
 # %%
 with use_seed(0):
@@ -283,25 +220,21 @@ with use_seed(0):
 display(given_hour.data().select("item_index", "target_index", "metric_name", "metric_value", "bound", "method"))
 
 # %% [markdown]
-# `metric_value` is a robust z-score against the 30 or more frames nearest in hour, signed so a negative value is
-# darker than its neighbors. The planted frame sits at z ≈ 42. The second row is a clean frame slightly past the lower
-# bound; at 1,600 frames the default threshold flags about one clean frame. Read `metric_value` against `bound` to tell
-# them apart, or set a stricter threshold for this check only:
+# `metric_value` is a robust z-score against the nearest frames. The planted frame is flagged far past its bound.
+# A stricter threshold for this check only:
 
 # %%
 strict = given_hour.with_threshold({"brightness given hour": ("modzscore", 6.0)})
 display(strict.data().select("item_index", "target_index", "metric_name", "metric_value", "bound"))
 
 # %% [markdown]
-# `with_threshold` refits on the stored scores without scoring again. A key of the mapping names one check by its
-# `metric_name`; checks the mapping does not name keep the default.
+# `with_threshold` refits on the stored scores without scoring again.
 
 # %% [markdown]
-# ## Finding unusual combinations of factors
+# ## Find unusual combinations of factors
 #
-# A box near the horizon at the size of a nearby car has an ordinary size and an ordinary position. Only the pair is
-# unusual. Pass `combinations=` to score each named group of factors by its robust Mahalanobis distance, within each
-# stratum.
+# A box near the horizon at the size of a nearby car has an ordinary size and position, and only the pair is unusual. Pass
+# `combinations=` to score a group of factors by its robust Mahalanobis distance within each stratum.
 
 # %%
 with use_seed(0):
@@ -316,84 +249,32 @@ display(
 )
 
 # %% [markdown]
-# The box near the horizon (video 6) is flagged by the pair and by neither factor alone. The truck-sized car (video 2)
-# is flagged by the pair and by `box_size`. The third row is a clean box slightly past the bound.
-#
-# Pass `combinations="all"` to score every pair of factors at each level. It fits one robust covariance per pair per
-# stratum, so it is slow on many factors and strata; name the groups you care about when you can.
+# The box near the horizon (video 6) is flagged by the pair and by neither factor alone, and the truck-sized car (video 2) by the pair
+# and by `box_size`.
 
 # %% [markdown]
-# ## Comparing samples
+# ## Judge a value against its neighbors
 #
-# A factor can hold a list of values per row, such as the speeds measured along a track. Declare it with
-# `kinds={"speeds": "sample"}` and pass it as a group of one. Each track's speeds are compared with the population's by
-# Wasserstein distance, adjusted for the sample's length.
-
-# %%
-speeds = [rng.normal(1.0, 0.1, 40) for _ in range(metadata.level_counts["track"])]
-speeds[7] = np.r_[rng.normal(0.5, 0.05, 20), rng.normal(1.5, 0.05, 20)]  # video 2, track 1: two speeds
-metadata.add_factors({"speeds": pl.Series([s.tolist() for s in speeds])}, level="track")
-
-with use_seed(0):
-    sampled = Outliers().evaluate(metadata, levels="track", combinations=[("speeds",)], kinds={"speeds": "sample"})
-display(sampled.data().select("item_index", "target_index", "metric_name", "metric_value", "method"))
-
-# %% [markdown]
-# The track that switches between two speeds is flagged by `speeds`. The other rows are the short bus track, flagged by
-# the track factors `Metadata` derives, such as `track_length`: `levels="track"` also thresholds every ordered factor
-# at that level.
-
-# %% [markdown]
-# ## Judging a value against its neighbors along a sequence
-#
-# Exposure differs from video to video, so the planted frame in video 4, at the exposure of video 1, passes a threshold
-# fitted to all frames:
+# Exposure differs from video to video, so the planted frame in video 4 passes a threshold fitted to all frames:
 
 # %%
 print(len(Outliers().evaluate(metadata, levels="unit", factors=["exposure"])))
 
 # %% [markdown]
-# Pass `neighbors=` to compare each frame with up to five frames on each side of it in its video. A detection's factor
-# is compared along its track instead.
+# Pass `neighbors=` to compare each frame with up to five frames on each side of it in its video. A detection's factor is compared
+# along its track instead.
 
 # %%
 along = Outliers().evaluate(metadata, levels="unit", factors=["exposure"], neighbors=["exposure", "time_s"])
 display(along.data().select("item_index", "target_index", "metric_name", "metric_value", "bound", "method"))
 
-# %% [markdown]
-# `metric_value` is the frame's own value and `bound` the edge of what its neighbors allow, in the factor's units. The
-# planted exposure frame (video 4) sits far below its bound. The two other exposure rows are clean frames slightly past
-# theirs; read `metric_value` against `bound` to tell them apart. The late frame in video 7 has two rows: `neighbors`,
-# because its stamp is far from its neighbors', and `order`, because the stamps after it are earlier.
-#
-# A factor is checked for order when its dtype is a date, time or duration, or when it is named `time_s` or `pts`.
-# Cast a timestamp stored as a plain number under another name to `pl.Datetime` or `pl.Duration`.
-#
-# The check follows ramps and level changes, so a slow drift or a scene cut is not flagged. A run of more than five
-# out-of-place frames reads as a segment of its own and is not flagged either.
 
 # %% [markdown]
-# ## Changing the strata without rebuilding
-#
-# A result keeps what it needs to re-detect. `stratified` judges the same factors within other strata, and `itemwise`
-# removes the strata:
-
-# %%
-by_weather = by_vehicle.stratified(metadata, "weather")
-print(sorted(by_weather.populations["population"].cast(pl.Utf8).unique().to_list()))
-print(len(by_vehicle.itemwise()))
-
-# %% [markdown]
-# ## Reading a finding back to its row
-#
-# `outliers` maps each flagged row's address to the checks that flagged it. A detection is addressed as
-# `SourceIndex(video, target_index)`. Read its factors back from the metadata with the same two values:
-
-# %%
-print(combined.outliers)
-
-flagged = metadata.rows_at("instance").filter((pl.col("item_index") == 6) & (pl.col("target_index") == 181))
-display(flagged.select("item_index", "target_index", "track_id", "vehicle", "box_y", "box_size"))
+# `bound` is the edge of what the neighbors allow. The planted frame (video 4) sits far below it, and the late frame in video 7 has two
+# rows: `neighbors`, because its stamp is far from its neighbors', and `order`, because the stamps after it are earlier. A factor is
+# checked for order when it is a date, time or duration, or is named `time_s` or `pts`; cast other timestamps to `pl.Datetime` or
+# `pl.Duration`. A slow drift, a scene cut and a run of more
+# than five out-of-place frames are not flagged.
 
 
 # %% tags=["remove_cell"]
@@ -417,9 +298,8 @@ assert {(6, horizon_box.key), (2, large_box.key)} <= set(
     zip(pairs["item_index"].to_list(), pairs["target_index"].to_list(), strict=True)
 )
 assert horizon_box not in by_vehicle.outliers
+flagged = metadata.rows_at("instance").filter((pl.col("item_index") == 6) & (pl.col("target_index") == 181))
 assert flagged["target_index"].to_list() == [horizon_box.key]
-distribution = sampled.data().filter(pl.col("method") == "distribution")
-assert distribution.select("item_index", "target_index").rows() == [(2, 1)]
 assert len(Outliers().evaluate(metadata, levels="unit", factors=["exposure"])) == 0
 assert {(4, 50, "neighbors"), (7, 120, "neighbors"), (7, 120, "order")} <= set(
     along.data().select("item_index", "target_index", "method").rows()
@@ -429,8 +309,6 @@ assert along.data().filter(pl.col("metric_name") == "time_s along sequence")["ta
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md): the population floor, stratification, rarity, how combinations are
-#   flagged, and how a value is judged against its neighbors along a sequence.
-# - [How to find outliers in metadata factors](./h2_find_factor_outliers.py): thresholding single factors at each level.
-# - [How to trace findings to their source](./h2_trace_findings_to_source.py): retrieve the frame, track or detection a
-#   `SourceIndex` names.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Learn the population floor, stratification, rarity, combinations and neighbor checks.
+# - [How to find outliers in metadata factors](./h2_find_factor_outliers.py) — Threshold single factors at each level.
+# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or detection a `SourceIndex` names.

@@ -15,38 +15,16 @@
 
 # %% [markdown]
 # # How to find outliers in metadata factors
-
-# %% [markdown]
-# ## Problem statement
 #
-# Much of what describes a dataset never touches a pixel: sensor telemetry recorded with each frame, capture
-# conditions, and statistics you derived yourself, such as the per-track measurements
-# {func}`~dataeval.core.track_stats` produces. Each is a column of numbers with a distribution, and a value far outside
-# it is worth a look - a sensor that glitched for one frame, or a track whose annotation broke down.
+# Much of what describes a dataset never touches a pixel: sensor telemetry, capture conditions and derived statistics such as the
+# per-track measurements {func}`~dataeval.core.track_stats` produces. {class}`~dataeval.quality.Outliers` thresholds these columns
+# when you pass it a {class}`~dataeval.Metadata`, judging each factor against the rows at its own level: a track against other
+# tracks, a frame against other frames. See [Metadata Levels](../concepts/MetadataLevels.md).
 #
-# {class}`~dataeval.quality.Outliers` thresholds these columns directly when you pass it a {class}`~dataeval.Metadata`.
-# Each factor is judged against the rows at the level it was measured at: a track against other tracks, a frame against
-# other frames. A frame and a track are measured at different levels, so comparing them would answer the wrong question.
-
-# %% [markdown]
-# ### When to use
+# Use it when you have attached measurements to a `Metadata` and want each one checked the way `Outliers` checks image statistics.
+# On a multi-object tracking (MOT) dataset, the track level gives a re-annotation worklist.
 #
-# Use this guide when you have attached measurements to a `Metadata` - your own, or a statistic family DataEval
-# computed - and want each one checked the way `Outliers` checks image statistics. For a multi-object tracking (MOT)
-# dataset, the track level turns this into a re-annotation worklist: one row per suspicious track.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A python environment with the following packages installed:
-#    - dataeval
-#    - maite-datasets
-# 1. A dataset, or a `Metadata` with the factors you want to check
-
-# %% [markdown]
-# ## Getting started
-#
-# Let's import the required libraries.
+# You need `dataeval` and `maite-datasets`. This guide plants known defects in a synthetic tracking dataset.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -80,11 +58,10 @@ from dataeval.types import SourceIndex
 pl.Config.set_tbl_width_chars(160)
 
 # %% [markdown]
-# ## Building a tracking dataset with known problems
+# ## Build a tracking dataset with known problems
 #
-# No ready-made MOT dataset has labeled annotation defects, so this builds one: twelve 40-frame sequences, each holding
-# four vehicles that drift across the frame with a little observation noise. Three sequences carry a planted defect on
-# their track 0:
+# No ready-made MOT dataset has labeled annotation defects, so this builds one: twelve 40-frame sequences, each holding four vehicles
+# that drift across the frame. Three sequences carry a planted defect on their track 0:
 #
 # | Sequence | Defect | Where it should show |
 # | --- | --- | --- |
@@ -92,9 +69,9 @@ pl.Config.set_tbl_width_chars(160)
 # | 5 | one track id is used for two different objects, seen only at the start and the end | `gap_fraction` |
 # | 7 | the boxes jump around the object from frame to frame | `speed_variance` |
 #
-# The video frames are blank. Nothing here reads pixels: the track statistics come from the annotation.
+# The video frames are blank, because the track statistics come from the annotation.
 
-# %%
+# %% tags=["hide-input"]
 HEIGHT, WIDTH, N_FRAMES, N_SEQUENCES, N_TRACKS = 72, 96, 40, 12, 4
 rng = np.random.default_rng(0)
 
@@ -176,13 +153,11 @@ class TrackingDataset:
 dataset = TrackingDataset({2: "flicker", 5: "reused_id", 7: "jitter"})
 
 # %% [markdown]
-# ## Attaching the factors
+# ## Attach the factors
 #
-# Build the `Metadata`, then attach the factors to check, each at its own level. `track_stats` measures every track of
-# every sequence and lands at the track level, keyed by `track_id`.
-#
-# Add one factor of your own too: a per-frame exposure time from the sensor, at the frame (`unit`) level, with a
-# single glitched reading in frame 20 of sequence 2.
+# Build the `Metadata`, then attach the factors to check, each at its own level. `track_stats` measures every track of every sequence
+# and lands at the track level, keyed by `track_id`. Add one factor of your own: a per-frame exposure time from the sensor, at the
+# frame (`unit`) level, with a single glitched reading in frame 20 of sequence 2.
 
 # %%
 metadata = Metadata(dataset)
@@ -195,42 +170,24 @@ metadata.add_factors({"exposure_ms": exposure_ms}, level="unit")
 print(metadata.level_counts)
 
 # %% [markdown]
-# ## Which factors can be thresholded
+# ## Threshold the factors
 #
-# A threshold needs a quantity: a location and a spread. `Outliers` decides which factors are quantities from each
-# column's raw type, not from how `Metadata` chose to bin it:
+# `Outliers` decides which factors are quantities, with a location and a spread, from each column's raw type. **Ordered** factors (integers, floats, dates and durations) are thresholded, including counts such as `n_gaps`.
+# **Categorical** factors (strings, booleans, and integers with a declared vocabulary, such as the `labels` column of `track_stats`)
+# are not, and naming one raises a `ValueError`. Only raw values are read, never bin codes, so re-binning the metadata cannot change a
+# result.
 #
-# - **Ordered** - integers, floats, dates and durations - are thresholded. That includes integer counts such as
-#   `n_gaps`, which the binning heuristic calls discrete.
-# - **Categorical** - strings, booleans, and integers with a declared vocabulary - are not. `track_stats` declares its
-#   `labels` column a vocabulary, so a class id is never given a mean. `entry_at_edge` and `exit_at_edge` are booleans.
-#
-# Name a categorical factor and `Outliers` raises rather than returning a result:
-
-# %%
-try:
-    Outliers().evaluate(metadata, factors=["labels"])
-except ValueError as error:
-    print(error)
-
-# %% [markdown]
-# Only raw values are read - never bin codes - so re-binning the metadata cannot change a result.
-
-# %% [markdown]
-# ## Thresholding every factor
-#
-# With no `factors=`, every ordered factor at the levels you name is checked, each against the rows at its own level.
-# Name the levels with `levels=`: `("unit", "track")` checks the frame and track factors. Without `levels=`, only the
-# sequence and frame levels are checked, as `Duplicates` does. The `level` column says which population a row was
-# judged in.
+# With no `factors=`, every ordered factor at the levels you name with `levels=` is checked, each against the rows at its own level.
+# Without `levels=`, only the sequence and frame levels are checked, as `Duplicates` does. The `level` column says which population a
+# row was judged in.
 
 # %%
 result = Outliers().evaluate(metadata, levels=("unit", "track"))
 display(result.aggregate_by_metric())
 
 # %% [markdown]
-# Several track factors describe the same thing - `n_appearances`, `track_length` and `total_gap_length` all move when
-# a track loses frames - so one defect raises several rows. Name the factors to check to get one row per question.
+# Several track factors move together when a track loses frames (`n_appearances`, `track_length` and `total_gap_length`), so one
+# defect raises several rows. Name the factors to check to get one row per question.
 
 # %%
 signals = ["n_gaps", "gap_fraction", "speed_variance", "exposure_ms"]
@@ -245,12 +202,11 @@ display(focused.data().select("item_index", "target_index", "level", "metric_nam
 # - sequence 7, track 0 - `speed_variance`: boxes that jump from frame to frame
 # - sequence 2, frame 20 - `exposure_ms`: the glitched sensor reading, judged against frames, not tracks
 #
-# The two gap signals distinguish the defects: many short gaps is a track that keeps dropping out, one long gap is an
-# id that was reused. For a track row `target_index` holds the `track_id`, and for a frame row the frame's
-# `unit_index`.
+# Many short gaps mean a track that keeps dropping out, and one long gap an id that was reused. For a track row `target_index`
+# holds the `track_id`, and for a frame row the frame's `unit_index`.
 
 # %% [markdown]
-# ## Reading a finding back to its track
+# ## Read a finding back to its track
 #
 # `outliers` maps each flagged row's address to the metrics that flagged it. A track is addressed as
 # `SourceIndex(item, track_id, "track")`, which is enough to find it again in the metadata:
@@ -270,13 +226,15 @@ assert focused.outliers == {
     SourceIndex(2, 20, "unit"): ["exposure_ms"],
 }
 assert "labels" not in set(result.data()["metric_name"].cast(pl.Utf8))
+try:
+    Outliers().evaluate(metadata, factors=["labels"])
+    raise AssertionError("a categorical factor should be refused")
+except ValueError:
+    pass
 
 # %% [markdown]
 # ## Next steps
 #
 # - [Data Integrity](../concepts/DataIntegrity.md) — What makes a factor thresholdable, and why bins are never read.
-# - [Metadata Levels](../concepts/MetadataLevels.md) — Levels, keys, and the built-in track statistics.
-# - [How to find outliers that depend on their context](./h2_find_conditional_outliers.py) — Judge factors within
-#   strata, by rarity, given another factor, and in combination.
-# - [How to trace findings to their source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or detection a
-#   `SourceIndex` names.
+# - [How to find outliers that depend on their context](./h2_find_conditional_outliers.py) — Judge factors within strata, by rarity, given another factor, and in combination.
+# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or detection a `SourceIndex` names.
