@@ -15,28 +15,19 @@
 
 # %% [markdown]
 # # How to configure global DataEval defaults
-
-# %% [markdown]
-# ## Problem statement
 #
-# DataEval provides global configuration settings to control computational resources and hardware acceleration. This guide
-# shows how to configure the default PyTorch device, batch size, and the maximum number of worker processes.
-
-# %% [markdown]
-# ### When to use
+# DataEval keeps global settings for the compute it uses and for reproducibility: the PyTorch device, the default batch size, the
+# maximum number of worker processes and a seed. Set one once and every evaluator reads it. Each setting also has a context
+# manager that overrides it temporarily. The `dataeval.config` API reference lists every argument.
 #
-# - You need to specify GPU or CPU execution for PyTorch-based operations
-# - You want to set a global default batch size for data processing operations
-# - You want to control the number of parallel worker processes
-# - You need to optimize performance for your hardware configuration
-
-# %% [markdown]
-# ### What you will need
+# Use this guide when you want to:
 #
-# 1. A Python environment with dataeval installed
-
-# %% [markdown]
-# ## Getting started
+# - run on the CPU, a GPU or a specific GPU
+# - set a default batch size
+# - control the number of parallel worker processes
+# - make results reproducible
+#
+# You need `dataeval`.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -52,226 +43,105 @@ except Exception:
 import dataeval
 
 # %% [markdown]
-# ## Configuring the PyTorch device
-
-# %% [markdown]
-# DataEval provides configuration options for setting the PyTorch device to use within DataEval. See
-# [`torch.device`](https://docs.pytorch.org/docs/stable/tensor_attributes.html#torch.device) for more information.
-
-# %% [markdown]
-# ### Set the default device to CPU
+# ## Set the device
+#
+# Pass `"cpu"`, `"cuda"` or a specific GPU such as `"cuda:1"`. See
+# [`torch.device`](https://docs.pytorch.org/docs/stable/tensor_attributes.html#torch.device) for more information. Pass `None` to
+# reset to PyTorch's default device.
 
 # %%
 dataeval.config.set_device("cpu")
-
 print(f"Current device for DataEval: {dataeval.config.get_device()}")
 
-# %% [markdown]
-# ### Set the default device to CUDA GPU
-
-# %%
-dataeval.config.set_device("cuda")
-
-print(f"Current device for DataEval: {dataeval.config.get_device()}")
-
-# %% [markdown]
-# ### Set the default device to a specific CUDA GPU
-
-# %%
-dataeval.config.set_device("cuda:1")
-
-print(f"Current device for DataEval: {dataeval.config.get_device()}")
-
-# %% [markdown]
-# ### Reset the device to use PyTorch's default device
-
-# %%
 dataeval.config.set_device(None)
-
 print(f"Current device for DataEval: {dataeval.config.get_device()}")
 
 # %% [markdown]
-# ## Configuring the default batch size
-
-# %% [markdown]
-# DataEval allows setting a global default batch size for operations that process data in batches. The batch size must be
-# a positive integer.
+# ## Set the batch size
 #
-# Note that functions and methods that require a `batch_size` will fail if not provided and a global batch size is not
-# set.
-
-# %% [markdown]
-# ### Set the default batch size
+# The batch size must be a positive integer. A function that requires a `batch_size` fails if you do not pass one and no global
+# batch size is set.
 
 # %%
 dataeval.config.set_batch_size(64)
-
 print(f"Current batch size: {dataeval.config.get_batch_size()}")
 
-# %% [markdown]
-# ### Reset the batch size to unset
-
-# %%
 dataeval.config.set_batch_size(None)
 
-# When no batch size is set, get_batch_size() requires an explicit value
-print("Batch size has been unset")
-
 # %% [markdown]
-# ## Configuring maximum worker processes
-
-# %% [markdown]
-# DataEval follows the maximum worker configuration conventions used by
-# [`scikit-learn`](https://scikit-learn.org/stable/glossary.html#term-n_jobs) and
-# [`joblib`](https://joblib.readthedocs.io/en/stable/generated/joblib.Parallel.html).
-
-# %% [markdown]
-# ### Set the maximum number of worker processes
+# ## Set the maximum number of worker processes
+#
+# DataEval follows the conventions of [`scikit-learn`](https://scikit-learn.org/stable/glossary.html#term-n_jobs) and
+# [`joblib`](https://joblib.readthedocs.io/en/stable/generated/joblib.Parallel.html): `-1` uses all visible CPU cores and `None`
+# unsets the limit.
 
 # %%
 dataeval.config.set_max_processes(4)
 print(f"Max processes: {dataeval.config.get_max_processes()}")
 
-# %% [markdown]
-# ### Set the maximum number of workers to all visible cpu cores
-
-# %%
 dataeval.config.set_max_processes(-1)
 print(f"Max processes: {dataeval.config.get_max_processes()}")
 
-# %% [markdown]
-# ### Unset the maximum number of workers
-
-# %%
 dataeval.config.set_max_processes(None)
 print(f"Max processes: {dataeval.config.get_max_processes()}")
 
 # %% [markdown]
-# ## Configuring the global seed
-
-# %% [markdown]
-# DataEval uses a global seed to control randomness in operations that rely on random state, such as clustering (KMeans),
-# mutual information estimation, domain classification, data selection, and bag-of-visual-words extraction. Setting a seed
-# ensures reproducible results across runs.
-
-# %% [markdown]
-# ### Set the global seed
+# ## Set the seed
 #
-# This sets the seed used internally by DataEval functions that accept a `random_state` or seed parameter.
+# DataEval uses a global seed for operations that rely on random state, such as clustering (KMeans), mutual information
+# estimation, domain classification, data selection and bag-of-visual-words extraction. It passes the seed as the `random_state`
+# of internal library calls such as scikit-learn's `KMeans`, `KNeighborsClassifier` and `StratifiedKFold`.
+#
+# - `all_generators=True` also seeds NumPy (`np.random.seed`) and PyTorch (`torch.manual_seed`, `torch.cuda.manual_seed_all`).
+# - `deterministic=True` forces PyTorch to use deterministic algorithms, which can reduce performance and raises a `RuntimeError`
+#   for an operation with no deterministic implementation. Combine it with `all_generators=True` for full reproducibility.
+# - `set_seed(None)` resets all generators and disables deterministic algorithms, whatever the other arguments.
 
 # %%
 dataeval.config.set_seed(42)
-
 print(f"Current seed: {dataeval.config.get_seed()}")
 
-# %% [markdown]
-# ### Set the seed for all generators
-#
-# When `all_generators=True`, the seed is also applied to NumPy (`np.random.seed`) and PyTorch (`torch.manual_seed`,
-# `torch.cuda.manual_seed_all`). This is useful when you need full reproducibility across all numeric libraries, not just
-# DataEval's internal operations.
+dataeval.config.set_seed(42, all_generators=True, deterministic=True)
 
-# %%
+dataeval.config.set_seed(None)
+print(f"Current seed: {dataeval.config.get_seed()}")
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
 import numpy as np
 import torch
 
-# Set the seed with all_generators to seed NumPy and PyTorch
 dataeval.config.set_seed(42, all_generators=True)
-
-# Generate random values — these will be the same every time
-np_result = np.random.rand(3)
-torch_result = torch.rand(3)
-print(f"NumPy:   {np_result}")
-print(f"PyTorch: {torch_result}")
-
-# Reset and set the same seed again
+first = (np.random.rand(3), torch.rand(3))
 dataeval.config.set_seed(42, all_generators=True)
-
-# The same values are produced
-np_result_2 = np.random.rand(3)
-torch_result_2 = torch.rand(3)
-print(f"NumPy:   {np_result_2}")
-print(f"PyTorch: {torch_result_2}")
-
-assert np.array_equal(np_result, np_result_2)
-assert torch.equal(torch_result, torch_result_2)
-
-# %% [markdown]
-# Even without `all_generators`, the global seed is automatically passed as the `random_state` to internal library calls
-# such as scikit-learn's `KMeans`, `KNeighborsClassifier`, and `StratifiedKFold`, ensuring consistent results from
-# DataEval operations.
-#
-# ### Enable deterministic algorithms
-#
-# When `deterministic=True`, PyTorch is forced to use deterministic implementations of its algorithms via
-# `torch.use_deterministic_algorithms(True)`. This guarantees bitwise reproducibility for PyTorch operations, but may
-# reduce performance since some optimized (non-deterministic) algorithm implementations will be disabled. If no
-# deterministic implementation exists for an operation, PyTorch will raise a `RuntimeError`.
-#
-# This is most useful when combined with `all_generators=True` for full reproducibility.
-
-# %%
-dataeval.config.set_seed(42, all_generators=True, deterministic=True)
-
-print(f"Current seed: {dataeval.config.get_seed()}")
-
-# %% [markdown]
-# ### Reset the seed to unset
-#
-# Setting the seed to `None` always resets all generators (NumPy, PyTorch) and disables deterministic algorithms,
-# regardless of the other parameters.
-
-# %%
+second = (np.random.rand(3), torch.rand(3))
+assert np.array_equal(first[0], second[0])
+assert torch.equal(first[1], second[1])
 dataeval.config.set_seed(None)
 
-print(f"Current seed: {dataeval.config.get_seed()}")
-
 # %% [markdown]
-# ## Using temporary context managers
-
-# %% [markdown]
-# Temporarily override configuration settings using context managers:
+# ## Override a setting temporarily
+#
+# `use_device`, `use_batch_size`, `use_max_processes` and `use_seed` are context managers that restore the previous value when
+# the block exits.
+#
+# `use_seed` swaps only the seed DataEval hands to the estimators it calls, which is what `get_seed` returns. It leaves the NumPy
+# and PyTorch generators alone, because their state cannot be put back on exit. Use `set_seed(..., all_generators=True)` when a
+# block needs those seeded.
 
 # %%
 dataeval.config.set_batch_size(64)
-print(f"Before context: {dataeval.config.get_batch_size()}")
-
 with dataeval.config.use_batch_size(16):
-    print(f"Inside context: {dataeval.config.get_batch_size()}")
-    # Perform operations with batch_size=16
+    print(f"Inside the context: {dataeval.config.get_batch_size()}")
+print(f"After the context: {dataeval.config.get_batch_size()}")
 
-print(f"After context: {dataeval.config.get_batch_size()}")
-
-# %%
-dataeval.config.set_max_processes(8)
-print(f"Before context: {dataeval.config.get_max_processes()}")
-
-with dataeval.config.use_max_processes(2):
-    print(f"Inside context: {dataeval.config.get_max_processes()}")
-    # Perform operations with max_processes=2
-
-print(f"After context: {dataeval.config.get_max_processes()}")
-
-# %% [markdown]
-# `use_seed` swaps only the seed DataEval hands to the estimators it calls, which is what
-# `get_seed` returns. It deliberately leaves the NumPy and PyTorch generators alone: their
-# state cannot be put back on exit, so a scope that promised to restore it could not keep
-# that promise. Use `set_seed(..., all_generators=True)` when a block needs those seeded.
-
-# %%
 dataeval.config.set_seed(42)
-print(f"Before context: {dataeval.config.get_seed()}")
-
 with dataeval.config.use_seed(7):
-    print(f"Inside context: {dataeval.config.get_seed()}")
-    # Perform operations with seed=7
-
-print(f"After context: {dataeval.config.get_seed()}")
+    print(f"Inside the context: {dataeval.config.get_seed()}")
+print(f"After the context: {dataeval.config.get_seed()}")
 
 # %% [markdown]
 # ## Next steps
 #
 # - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
-# - [Identify out-of-distribution samples](./tt_identify_ood_samples.py) — Detect samples that deviate significantly from the baseline training distribution.
-# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational data over time.
 # - [How to configure logging with DataEval](./h2_configure_logging.py) — Set up console and file logging to monitor DataEval execution and debug operations.

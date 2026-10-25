@@ -15,58 +15,17 @@
 
 # %% [markdown]
 # # How to detect uncertainty drift with a MAITE model
-
-# %% [markdown]
-# ## Problem statement
 #
-# When a model is deployed, the model itself is a sensitive instrument for distribution shift: as operational data moves
-# into regions the model was not trained on, its predictions grow less confident. The
-# {term}`Shannon entropy<Shannon Entropy>` of the predicted class probabilities summarizes that confidence — low entropy
-# is a peaked, confident prediction; high entropy means the model is hedging. If the _distribution_ of per-prediction
-# entropy shifts upward, the model is increasingly operating in its uncertainty regions: a strong, **label-free** drift
-# signal. See the
-# [uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection) concept page for
-# the theory and trade-offs.
+# A deployed model is a sensitive instrument for distribution shift: as data moves into regions the model was not trained on, its
+# predictions grow less confident. An upward shift in the {term}`Shannon entropy<Shannon Entropy>` of the predicted probabilities
+# is a label-free drift signal. See [uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection).
+# A model that follows DataEval's ONNX/LiteRT contract needs no `postprocess_fn`, unlike the
+# [tutorial](./tt_detect_drift_with_uncertainty.py): {class}`.OnnxImageClassifier` and {class}`.ScoresExtractor` decode its predictions.
 #
-# To turn predictions into an uncertainty feature, DataEval needs to decode the model's raw output into a
-# `(n_predictions, n_classes)` array of class scores. The [drift-with-uncertainty
-# tutorial](./tt_detect_drift_with_uncertainty.py) does this by wrapping a model in {class}`.TorchExtractor` with a
-# hand-written `postprocess_fn` specific to that model's output format.
+# Use it to monitor a deployed ONNX or LiteRT model without operational labels, or to reuse a model that ships with a
+# `model-metadata.json`.
 #
-# This guide shows the alternative for models that conform to DataEval's **opinionated ONNX/LiteRT contract**: a
-# {class}`.OnnxImageClassifier` (a MAITE `image_classification.Model`) paired with {class}`.ScoresExtractor`
-# decodes the predictions for you — **no `postprocess_fn` required** — and feeds straight into {class}`.UncertaintyExtractor`
-# and a drift detector.
-
-# %% [markdown]
-# ### When to use
-#
-# Use the {class}`.OnnxImageClassifier` + {class}`.ScoresExtractor` path when you want to:
-#
-# - Monitor a deployed ONNX or LiteRT model for distribution shift without operational ground-truth labels
-# - Reuse a model that already ships with a `model-metadata.json` describing its input/output contract
-# - Avoid writing and maintaining a model-specific `postprocess_fn` to decode raw predictions
-#
-# The same pattern works for object detection with {class}`.OnnxObjectDetector`; {class}`.ScoresExtractor` flattens
-# per-detection scores so the rest of the workflow is identical.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. An ONNX (or LiteRT) model that conforms to the opinionated contract, plus its `model-metadata.json`. In production
-#    you bring your own; in the [Build a model](#build-a-conforming-model-for-the-demo) section below you export a small
-#    one so this guide is self-contained.
-# 1. A reference dataset (in-distribution) and an operational stream to monitor. This guide uses `MNIST` as
-#    in-distribution and `CIFAR-10` as the shifted stream.
-# 1. A Python environment with the following packages installed:
-#    - `dataeval[onnx]`
-#    - `maite-datasets`
-#    - `torch` (only to export the demo model)
-
-# %% [markdown]
-# ## Getting started
-#
-# Import the libraries needed for a minimal working example.
+# You need `dataeval[onnx]` and `maite-datasets`, and `torch` to export the demo model.
 
 # %% tags=["remove_cell"]
 try:
@@ -96,23 +55,15 @@ from dataeval.shift import DriftWasserstein
 set_seed(0, all_generators=True)
 
 # %% [markdown]
-# ## Build a conforming model for the demo
+# ## Prepare the model and its metadata
 #
-# {class}`.OnnxImageClassifier` wraps two artifacts you would normally already have for a deployed model:
-#
-# - the **model file** (`.onnx` or `.tflite` for {class}`.LiteRtImageClassifier`), and
-# - a **`model-metadata.json`** declaring the input/output contract — task, input channels and size, and the number of
-#   classes the model scores.
-#
-# Because this guide is self-contained, you quickly train a small MNIST classifier and export it. **This block is demo
-# scaffolding** — in your own workflow you would skip it and point {class}`.OnnxImageClassifier` at the model and
-# metadata you already have.
-#
-# The exported model emits a softmax `scores` output (probabilities), which is exactly what the opinionated
-# classification contract expects.
+# {class}`.OnnxImageClassifier` wraps two artifacts you would normally already have: the model file (`.onnx`, or `.tflite` for
+# {class}`.LiteRtImageClassifier`) and a `model-metadata.json` that declares the input and output contract. To stay
+# self-contained, this guide trains and exports a small MNIST classifier in the collapsed cells below. In your own workflow, skip
+# them and point the classifier at the model and metadata you already have.
 
 
-# %%
+# %% tags=["hide-input"]
 class TinyCNN(nn.Module):
     """A small MNIST classifier emitting raw logits."""
 
@@ -144,7 +95,7 @@ class WithSoftmax(nn.Module):
         return torch.softmax(self.base(x), dim=1)
 
 
-# %%
+# %% tags=["hide-input"]
 # Train the demo classifier on a small slice of MNIST (a few seconds on CPU).
 mnist_train = MNIST("./data", image_set="train", download=True)
 train_ids = np.random.default_rng(0).permutation(len(mnist_train))[:4000]
@@ -165,9 +116,8 @@ for _ in range(3):
 model.eval()
 
 # %% [markdown]
-# Export the trained model to ONNX and write the matching `model-metadata.json`. The metadata declares a single-channel
-# (`GRAYSCALE`) 28x28 input and 10 output classes — the contract {class}`.OnnxImageClassifier` reads to build model
-# input and validate output.
+# The exported model emits a softmax `scores` output, which is what the classification contract expects. The metadata declares a
+# single-channel (`GRAYSCALE`) 28x28 input and 10 output classes.
 
 # %%
 Path("data").mkdir(exist_ok=True)
@@ -203,17 +153,9 @@ _ = Path(metadata_path).write_text(
 # %% [markdown]
 # ## Load the datasets
 #
-# You need three exchangeable in-distribution slices plus a shifted stream:
-#
-# - **train** and **val** — two disjoint, same-distribution slices of MNIST; the train-vs-val distance calibrates the
-#   baseline for "normal" variation between in-distribution samples.
-# - **test** — a third disjoint MNIST slice held out from calibration; because it is exchangeable with train and val, the
-#   detector should report _no_ drift here.
-# - **cifar** — CIFAR-10 imagery, a genuinely shifted operational stream (natural color photos rather than handwritten
-#   digits); the detector should report drift here.
-#
-# The opinionated input builder handles the format differences automatically: CIFAR-10's RGB 32x32 images are converted
-# to grayscale and resized to the model's 28x28 input per the metadata contract — no manual preprocessing needed.
+# Two disjoint MNIST slices, **train** and **val**, calibrate the baseline for normal variation between same-distribution samples.
+# A third, **test**, should show no drift. **cifar** is CIFAR-10 imagery, a shifted operational stream that should. The model's
+# input builder converts CIFAR-10's RGB 32x32 images to the 28x28 grayscale that the metadata declares.
 
 # %%
 SAMPLES_PER_SPLIT = 200
@@ -236,17 +178,14 @@ print(f"train: {len(trainset)}  val: {len(valset)}  test: {len(testset)}  cifar:
 # %% [markdown]
 # ## Build the uncertainty feature extractor
 #
-# This is the core of the guide. Three small pieces compose into a single feature extractor:
+# Three pieces compose into one feature extractor:
 #
-# 1. {class}`.OnnxImageClassifier` loads the model and its metadata and runs inference, returning one
-#    `(n_classes,)` score array per image.
-# 1. {class}`.ScoresExtractor` adapts that MAITE `Model` into a {class}`~dataeval.protocols.FeatureExtractor`, stacking
-#    per-image scores into an `(n_images, n_classes)` array.
-# 1. {class}`.UncertaintyExtractor` converts each row of class probabilities into a single normalized-entropy value.
+# 1. {class}`.OnnxImageClassifier` loads the model and its metadata and returns one `(n_classes,)` score array per image.
+# 1. {class}`.ScoresExtractor` adapts that model into a {class}`~dataeval.protocols.FeatureExtractor`, stacking the scores into
+#    an `(n_images, n_classes)` array.
+# 1. {class}`.UncertaintyExtractor` converts each row of class probabilities into one normalized-entropy value.
 #
-# Note what is _absent_: there is no `postprocess_fn`. The opinionated classifier already speaks the
-# `(instances, classes)` contract {class}`.ScoresExtractor` expects, so the decoding the tutorial does by hand is handled
-# for you. Because the model outputs a softmax distribution, use `preds_type="probs"`.
+# Because the model outputs a softmax distribution, use `preds_type="probs"`.
 
 # %%
 classifier = OnnxImageClassifier(model_path, metadata_path)
@@ -256,9 +195,9 @@ uncertainty = UncertaintyExtractor(scores, preds_type="probs", normalize=True)
 print(uncertainty)
 
 # %% [markdown]
-# ## Compute uncertainty for each split
+# ## Compute and compare the uncertainty
 #
-# Calling the extractor on a dataset returns an `(n_images, 1)` array of normalized-entropy values — one per image.
+# Calling the extractor on a dataset returns an `(n_images, 1)` array of normalized entropy, one value per image.
 
 # %%
 h_train = uncertainty(trainset)
@@ -272,11 +211,8 @@ print(
 )
 
 # %% [markdown]
-# ### Visualize the uncertainty distributions
-#
-# An empirical CDF (ECDF) makes the shift easy to read: if the CIFAR-10 curve sits to the _right_ of the MNIST curves,
-# the model is systematically more uncertain on the shifted imagery. The in-distribution splits (train, val, test) should
-# overlap closely.
+# An empirical CDF (ECDF) makes the shift easy to read: if the CIFAR-10 curve sits to the right of the MNIST curves, the model is
+# more uncertain on the shifted imagery. The in-distribution splits should overlap closely.
 
 # %%
 plt.figure()
@@ -289,19 +225,15 @@ plt.legend()
 plt.show()
 
 # %% [markdown]
-# The MNIST splits cluster together while CIFAR-10 is visibly shifted toward higher entropy — exactly what you expect
-# from a classifier encountering data outside its training distribution.
+# The MNIST splits cluster together while CIFAR-10 is shifted toward higher entropy.
 
 # %% [markdown]
 # ## Detect drift with Wasserstein distance
 #
-# Eyeballing ECDFs is useful, but you want an automated decision. {class}`.DriftWasserstein` measures the
-# {term}`Wasserstein distance<Wasserstein Distance>` between the reference and incoming uncertainty distributions and
-# flags drift when that distance grows beyond a calibrated baseline.
-#
-# Unlike most detectors, `DriftWasserstein` takes **two** in-distribution references in `fit()`: a training set and a
-# validation set. The train-vs-validation distance defines the _normal_ amount of variation between two same-distribution
-# samples, so the detector only alarms when incoming data is more different from training than validation was.
+# {class}`.DriftWasserstein` measures the {term}`Wasserstein distance<Wasserstein Distance>` between the reference and incoming
+# uncertainty distributions and flags drift when it grows beyond a calibrated baseline. Unlike most detectors, it takes two
+# in-distribution references in `fit()`, a training set and a validation set. Their distance defines the normal variation between
+# two same-distribution samples, so the detector alarms only when incoming data differs from training more than validation did.
 
 # %%
 drift_detector = DriftWasserstein().fit(np.asarray(h_train), np.asarray(h_val))
@@ -313,9 +245,8 @@ result_cifar = drift_detector.predict(np.asarray(h_cifar))
 print(f"CIFAR-10       -> drift: {result_cifar.drifted}  (ratio: {result_cifar.distance:.2f})")
 
 # %% [markdown]
-# The held-out MNIST slice stays within the calibrated baseline (no drift), while CIFAR-10 exceeds it (drift detected).
-# The detector turned the visual gap in the ECDF into an automated, label-free alert — and you never had to write a
-# decoder for the model's output.
+# The held-out MNIST slice stays within the calibrated baseline (no drift), while CIFAR-10 exceeds it (drift detected). The detector
+# turned the visual gap in the ECDF into an automated, label-free alert.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###

@@ -15,38 +15,18 @@
 
 # %% [markdown]
 # # How to detect drift in metadata factors
-
-# %% [markdown]
-# ## Problem statement
 #
-# Embedding-space drift detection will report that features drifted but cannot explain what
-# changed. By analyzing metadata factors like altitude and camera angle, you will obtain
-# checkable, human-readable drift sentences.
+# Embedding-space drift detection reports that features drifted but not what changed. Metadata factors such as altitude and
+# camera angle give checkable, human-readable drift statements: a {class}`.Metadata` extractor plugs into a drift detector, and
+# the p-values map back to named factors. See [Distribution Shift](../concepts/DistributionShift.md).
 #
-# In this guide, you will integrate {class}`.Metadata` directly into a drift detector to
-# run a metadata drift pipeline end to end. You should then map the resulting p-values
-# back to the underlying metadata to isolate and verify the root cause of the drift.
-
-# %% [markdown]
-# ### When to use
+# Use it to:
 #
-# You should use this approach when you want to:
+# - monitor data collection conditions rather than raw pixel changes
+# - explain an embedding-space drift alarm with the recorded operational factors
+# - screen a new collection against a reference before spending GPU hours embedding it
 #
-# - Monitor data collection conditions rather than raw pixel changes.
-# - Explain an embedding-space drift alarm by mapping it to recorded operational factors.
-# - Screen a new collection against a reference before spending GPU hours embedding it.
-# - Produce human-interpretable drift reports to justify findings.
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. A dataset carrying metadata (this guide uses drone flight telemetry from SeaDrone).
-# 1. A Python environment with the following packages installed:
-#    - `dataeval`
-#    - `maite-datasets`
-
-# %% [markdown]
-# ## Getting started
+# You need `dataeval`, `maite-datasets` and a dataset that carries metadata. This guide uses SeaDrone flight telemetry.
 
 # %% tags=["remove_cell"]
 try:
@@ -67,18 +47,17 @@ from maite_datasets.object_detection import SeaDrone
 from dataeval import Metadata
 from dataeval.data import Indices, View
 from dataeval.shift import DriftUnivariate
-from dataeval.types import ParseDateTime, Remap
+from dataeval.types import Remap
 
 # Every factor is worth reading; this guide's whole point is the named rows.
 pl.Config.set_tbl_rows(20)
 
 # %% [markdown]
-# ## Load the dataset without decoding it
+# ## Split the dataset into two campaigns
 #
-# You should pass `lazy=True` to return image handles that decode only when requested.
-# This prevents unnecessary image loading, keeping data on disk and processing factors
-# directly from memory. You can read more about this technique in the [lazy loading
-# guide](./h2_lazy_load_images.py).
+# Pass `lazy=True` so that images decode only when requested. See
+# [How to delay image loading until needed](./h2_lazy_load_images.py). The flight telemetry includes altitude, gimbal
+# orientation and airframe type.
 
 # %%
 dataset = SeaDrone(root="./data", image_set="val", download=True, lazy=True)
@@ -89,14 +68,7 @@ for key, value in sorted(datum_metadata[0].items()):
     print(f"  {key:16s} {value!r}")
 
 # %% [markdown]
-# This flight telemetry includes variables like altitude, gimbal orientation, and airframe type.
-# You will use these operational conditions to phrase and detect dataset drift.
-
-# %% [markdown]
-# ## Split into two collection campaigns
-#
-# To establish a reference and operational pair, you will split the dataset using the
-# `date_time` factor, separating the frames into two collection campaigns a year apart.
+# Split on the `date_time` factor into a reference and an operational campaign a year apart.
 
 # %%
 year_of = [m["date_time"][:4] for m in datum_metadata]
@@ -107,12 +79,10 @@ print(f"reference   (2020): {len(reference):4d} frames")
 print(f"operational (2021): {len(operational):4d} frames")
 
 # %% [markdown]
-# ## Choose the level
+# ## Make both campaigns agree on the factor set
 #
-# Flight telemetry is recorded once per frame. Because object detection datasets default
-# to the instance level (one row per detection), you should set `view="unit"` to analyze
-# metadata at the image level. This prevents crowded frames from skewing the results.
-# See [Metadata levels](../concepts/MetadataLevels.md) for details on levels.
+# Flight telemetry is recorded once per frame, but object detection datasets default to one row per detection. Set `view="unit"`
+# to analyze the factors at the image level. See [Metadata levels](../concepts/MetadataLevels.md).
 
 # %%
 # `storage` names the folder each clip came from: it identifies the source rather than
@@ -123,32 +93,14 @@ EXCLUDE = ["storage"]
 print(Metadata(reference, view="unit", exclude=EXCLUDE).dropped_factors)
 
 # %% [markdown]
-# You should check {attr}`~.Metadata.dropped_factors` to see why certain factors are
-# excluded. Here, {class}`.Metadata` drops three columns for two reasons:
+# {attr}`~.Metadata.dropped_factors` shows why {class}`.Metadata` holds a column back:
 #
-# - `latitude` and `longitude` are **`mixed_types`**. Most rows hold a numeric coordinate,
-#   but 25 hold the letter `'N'` or `'E'`. The column has no single type, so DataEval holds
-#   it back instead of choosing a reading for you.
-# - `date_time` is **`cardinality_over_budget`**. Every row holds a different timestamp, so
-#   the column names its rows instead of grouping them. It is not numeric, so there is no
-#   order to cut it into groups along.
+# - `latitude` and `longitude` are **`mixed_types`**: most rows hold a number, but 25 hold the letter `'N'` or `'E'`.
+# - `date_time` is **`cardinality_over_budget`**: every row holds a different timestamp, so there is nothing to group.
 #
-# You do not have to accept either drop. {meth}`~.Metadata.repair` lets you declare the
-# reading that turns such a column into a factor, and you will use it twice in this guide.
-# You should handle the `mixed_types` pair now, before the comparison, for the reason below.
-
-# %% [markdown]
-# ## Make both campaigns agree on the factor set
-#
-# Whether a column is held back depends on the data you are reading, not on the extractor.
-# Only the 2020 rows carry the `'N'` and `'E'` values, so the reference holds `latitude` and
-# `longitude` back while the 2021 stream reads them as ordinary factors. One extractor then
-# produces two different factor sets.
-#
-# You should fix this before you run the detector. A feature-wise detector compares feature
-# 0 against feature 0, feature 1 against feature 1, and so on, so both sides must describe
-# the same factors in the same order. Declaring the repair up front guarantees that: the
-# reference reads those columns as numbers, and so does every stream you measure against it.
+# {meth}`~.Metadata.repair` declares the reading that turns such a column into a factor. Repair the `mixed_types` pair before you
+# compare: only the 2020 rows carry the letters, so the reference would hold `latitude` and `longitude` back while the 2021 stream
+# read them as factors, and a feature-wise detector needs the same factors on both sides, in the same order.
 
 # %%
 # The letters mean "no reading was taken", as `-1` does in this dataset's numeric columns.
@@ -162,15 +114,15 @@ COORDINATES = [
 print(Metadata(reference, view="unit", exclude=EXCLUDE).repair(COORDINATES).dropped_factors)
 
 # %% [markdown]
-# Only `date_time` is still dropped, and both campaigns now read the same fourteen factors.
+# Only `date_time` is still dropped, and both campaigns now read the same fourteen factors. To repair a column like `date_time`, see
+# [Identify bias and correlations](./tt_identify_bias.py).
 
 # %% [markdown]
-# ## Build the extractor and run the detector
+# ## Run the detector
 #
-# You will create a reusable {class}`.Metadata` extractor. The first call fits the reference
-# and records the cuts and vocabularies, ensuring that subsequent transformations map the
-# operational stream to the same bins. You should refer to the [factor binning guide]
-# (./h2_control_factor_binning.py) if you need to declare the cuts explicitly.
+# Build a reusable {class}`.Metadata` extractor. The first call fits the reference and records the cuts and vocabularies, so the
+# operational stream maps to the same bins. To declare the cuts yourself, see
+# [How to control and reuse a factor's binning](./h2_control_factor_binning.py).
 
 # %%
 extractor = Metadata(reference, view="unit", exclude=EXCLUDE).repair(COORDINATES)
@@ -183,11 +135,8 @@ p_values = np.asarray(result.details["p_vals"])
 print(f"drifted: {result.drifted}   {feature_drift.sum()} of {len(feature_drift)} factors")
 
 # %% [markdown]
-# ## Put names on the result
-#
-# Because {class}`.Metadata` implements the {class}`~dataeval.protocols.NamedFeatureExtractor`
-# protocol, you will map positional outputs (such as `p_vals`) directly to the names of the
-# corresponding metadata factors.
+# {class}`.Metadata` implements the {class}`~dataeval.protocols.NamedFeatureExtractor` protocol, so you can map positional
+# outputs such as `p_vals` to factor names.
 
 # %%
 factor_names = list(result.feature_names)
@@ -196,16 +145,12 @@ drift_table = pl.DataFrame({"factor": factor_names, "p_value": p_values, "drifte
 print(drift_table)
 
 # %% [markdown]
-# Fourteen named factors are reported. For example, `drone` does not register as drifted,
-# but `gimbal_pitch` drifts significantly at `p ≈ 1e-15`. Unlike embedding-space detectors,
-# you will see exactly which operational conditions changed.
+# Fourteen named factors are reported. `drone` does not register as drifted, but `gimbal_pitch` drifts at `p ≈ 1e-15`.
 
 # %% [markdown]
-# ## Go back to the source
+# ## Check a drifted factor against the source
 #
-# Since a p-value only indicates a distribution change, you should inspect the underlying
-# data to verify why a factor shifted. You can access raw and binned values directly from
-# {attr}`~.Metadata.dataframe` to verify the source of the drift.
+# A p-value only says that a distribution changed. The raw and binned values are in {attr}`~.Metadata.dataframe`.
 
 # %%
 rows = extractor.dataframe.filter(pl.col("level") == "unit")
@@ -213,8 +158,7 @@ print(rows.select("item_index", "altitude", "altitude↕", "gimbal_pitch", "gimb
 
 
 # %% [markdown]
-# You should inspect `gimbal_pitch` to determine if the camera angle really shifted or if
-# the telemetry logging changed.
+# Check whether the camera angle really shifted or the telemetry logging changed.
 
 
 # %%
@@ -233,16 +177,13 @@ def describe(key: str) -> None:
 describe("gimbal_pitch")
 
 # %% [markdown]
-# The camera did not move. The median angle remains nearly identical, but a quarter of the
-# 2021 frames failed to record telemetry and defaulted to `-1`. Since the binner treats
-# `-1` as a valid numeric value, a spurious drift alarm is triggered. You should identify
-# these telemetry logging failures rather than attributing the drift to camera movement.
+# The camera did not move. The median angle is nearly identical, but a quarter of the 2021 frames failed to record telemetry and
+# defaulted to `-1`. The binner treats `-1` as a valid number, so the alarm is spurious.
 
 # %% [markdown]
 # ## Fix the data, not the threshold
 #
-# Rather than adjusting the p-value threshold, you should filter out the missing telemetry
-# codes and re-evaluate the cleaned reference and operational datasets.
+# Filter out the missing telemetry codes and rerun both passes, instead of adjusting the threshold.
 
 # %%
 has_telemetry = [
@@ -270,10 +211,9 @@ comparison = before_df.join(after_df, on="factor", how="inner").with_columns(
 print(comparison.sort("changed", descending=True))
 
 # %% [markdown]
-# After filtering, you will see four verdicts flip. `gimbal_pitch` no longer registers as
-# drifted, which confirms the earlier result was a false alarm caused by missing data.
-# `drone` now registers as drifted, which shows a real change in the airframe mix that the
-# missing rows had hidden.
+# Four verdicts flip. `gimbal_pitch` no longer registers as drifted, so the earlier result was a false alarm caused by missing
+# data. `drone` now registers as drifted, a real change in the airframe mix that the missing rows had hidden. `width` and
+# `height` stop drifting.
 
 # %%
 for label, indices in by_year.items():
@@ -285,79 +225,26 @@ for label, indices in by_year.items():
     print(f"        altitude p25={np.percentile(altitudes, 25):5.1f}  p75={np.percentile(altitudes, 75):5.1f}")
 
 # %% [markdown]
-# You should verify these findings directly against the collection context:
-#
-# - **`drone` drifts** because the drone types changed between campaigns.
-# - **`width` and `height` stop drifting** because the surviving frames share the same resolution.
-# - **`altitude` continues to drift** on its range and spread, rather than its median.
-#
-# You will use `item_index` from {attr}`~.Metadata.dataframe` to locate the frames behind any
-# row, and you should use the [trace findings guide](./h2_trace_findings_to_source.py) to
-# retrieve and view them.
+# The collection context confirms each finding: `drone` drifts because the drone types changed, `width` and `height` stop drifting
+# because the surviving frames share one resolution, and `altitude` still drifts in range and spread more than in median. The
+# `item_index` column of {attr}`~.Metadata.dataframe` locates the frames behind any row, and
+# [How to trace a finding back to its source](./h2_trace_findings_to_source.py) retrieves and shows them.
 
-# %% [markdown]
-# ## Read the column that is still dropped
-#
-# One factor is still dropped: `date_time`, held back as `cardinality_over_budget`. You
-# repaired the `mixed_types` pair at the start because the comparison needed them. You
-# should check {attr}`~.Metadata.unusable` to see what is behind a drop and what you have to
-# write a repair against.
-
-# %%
-review = Metadata(reference, view="unit", exclude=EXCLUDE)
-for name, held in review.unusable.items():
-    values = held.distinct.get("text", ())
-    print(f"{name:10s} {held.reasons[0]:26s} repairable={held.repairable}")
-    print(f"{'':10s} counts={dict(held.counts)}  e.g. {values[:2]}")
-
-# %% [markdown]
-# `counts` reports every row as text and no mixture, so nothing about these values
-# disagrees. Every row just holds a different value, so the column names its rows instead of
-# grouping them. It needs a vocabulary, and {class}`~dataeval.types.ParseDateTime` gives it
-# one by reading each value as the period it falls in. You should read the distinct values
-# first to pick the format: these are ISO 8601 with microseconds, which is the default, so
-# you do not need to pass `format=`.
-#
-# You should choose the period carefully, because the campaigns are split by time. An
-# absolute period such as a month or a day separates them completely, which only restates
-# the split. A recurring position does not: every campaign has a 14:00, so
-# `every="hour_of_day"` asks whether the flying moved to a different part of the day.
-
-# %%
-READINGS = [*COORDINATES, ParseDateTime("date_time", every="hour_of_day")]
-
-repaired = Metadata(reference, view="unit", exclude=EXCLUDE).repair(READINGS)
-print("still dropped:", dict(repaired.dropped_factors))
-print("factors:      ", len(repaired.factor_names), "up from", len(factor_names))
-print("date_time now:", sorted(set(repaired.rows_at("unit")["date_time"].to_list())))
-
-# %% [markdown]
-# All three columns are factors now, and `date_time` holds the hour of the day each frame
-# was flown. A repair is a declaration, not a one-off edit to a dataframe. DataEval records
-# it on the metadata, so you can read it back from {attr}`~.Metadata.repairs`, store it with
-# {meth}`~.Metadata.save`, and apply it to next year's campaign without deciding it again.
-# You can drop a repair with {meth}`~.Metadata.unrepair`.
-
-# %%
-time_of_day = DriftUnivariate(method="ks", extractor=repaired).fit(reference).predict(operational)
-by_name = dict(zip(time_of_day.feature_names, np.asarray(time_of_day.details["p_vals"]), strict=True))
-print(f"date_time (hour of day)  p = {by_name['date_time']:.3e}")
-
-for year in ("2020", "2021"):
-    hours = Counter(int(m["date_time"][11:13]) for m in datum_metadata if m["date_time"][:4] == year)
-    print(f"  {year}  {dict(sorted(hours.items()))}")
-
-# %% [markdown]
-# The repaired factor reports a real change in collection conditions. The 2020 campaign flew
-# between 12:00 and 15:00, while 2021 started as early as 10:00 and moved most of its flying
-# an hour earlier. Time of day affects sun angle, sea state and thermal contrast, so this
-# tells you something about the collection that the first pass could not report at all.
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+assert len(factor_names) == 14
+assert feature_drift.sum() == 11
+drifted_before = dict(zip(factor_names, feature_drift, strict=True))
+assert drifted_before["gimbal_pitch"]
+assert not drifted_before["drone"]
+assert p_values[factor_names.index("gimbal_pitch")] < 1e-6
+missing_2021 = np.mean([m["gimbal_pitch"] == -1 for m, y in zip(datum_metadata, year_of, strict=True) if y == "2021"])
+assert 0.2 < missing_2021 < 0.3
+assert set(comparison.filter(pl.col("changed"))["factor"]) == {"drone", "gimbal_pitch", "height", "width"}
 
 # %% [markdown]
 # ## Next steps
 #
-# - [How to trace findings](./h2_trace_findings_to_source.py) — Retrieve the specific frames
-#   associated with a drift finding.
-# - [Monitoring tutorial](./tt_monitor_shift.py) — Analyze embedding-space drift.
-# - [Distribution shift](../concepts/DistributionShift.md) — Select drift detectors.
-# - [Metadata levels](../concepts/MetadataLevels.md) — Understand metadata views and levels.
+# - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across datasets.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and operational data.
+# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the specific frames associated with a drift finding.
