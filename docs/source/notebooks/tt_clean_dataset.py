@@ -317,8 +317,7 @@ print(f"Number of images with extreme values: {len(outlier_imgs)}")
 
 # %% [markdown]
 # This class can flag a lot of images, depending on how varied the dataset is and which method you use to define extreme
-# values. Using the zscore, it flagged 480 images across 15 metrics out of the 5717 images in the dataset. However,
-# switching the method can give different results.
+# values. Switching the method can give different results.
 
 # %%
 # List the metrics with an extreme value
@@ -354,6 +353,27 @@ outlier_imgs.aggregate_by_class(md)
 # requires understanding the dataset in question. For example, 36 low entropy images out of the 2000 for person might be
 # outliers while 28 low entropy images out of 300 for aeroplane might not be; low entropy might be an inherent
 # characteristic of the aeroplane class.
+
+# %% [markdown]
+# {meth}`.OutliersOutput.classwise` answers that caution directly. It fits the thresholds within each class, so an image
+# is flagged only when it is unusual for its own class. A class with fewer than 20 rows has too few to fit a threshold
+# and is not judged.
+
+# %%
+# Fit the thresholds within each class instead of across the whole dataset
+outlier_imgs_classwise = outlier_imgs.classwise(md)
+
+print(f"Number of images flagged globally  : {len(outlier_imgs)}")
+print(f"Number of images flagged per class : {len(outlier_imgs_classwise)}")
+
+# %% [markdown]
+# The two counts differ because each class sets its own thresholds. The classwise result supports the same aggregations
+# as the global one, such as `aggregate_by_class(md)`.
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+assert len(outlier_imgs_classwise) != len(outlier_imgs)
+assert not outlier_imgs_classwise.populations["judged"].all()
 
 # %% [markdown]
 # In order to understand the above table, you will plot sample images from a few of the metrics, specifically:

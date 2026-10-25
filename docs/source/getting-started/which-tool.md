@@ -40,7 +40,7 @@ See the [deduplication how-to guide](../notebooks/h2_deduplicate.py).
 Use {func}`.image_stats` to compute per-image statistics (brightness,
 contrast, sharpness, aspect ratio, entropy), then {class}`.Outliers` to flag
 images at the extremes of those distributions.
-See the [visualizing cleaning issues how-to guide](../notebooks/h2_visualize_cleaning_issues.py).
+See the [clean a dataset tutorial](../notebooks/tt_clean_dataset.py).
 
 ### Are there samples that are statistical outliers in embedding space?
 
