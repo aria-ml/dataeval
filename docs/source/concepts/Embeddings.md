@@ -159,6 +159,20 @@ image features. Select the layer before the classifier.
   the layer before the classifier and returns a model that outputs it, together
   with the layer name to give to `output_name`.
 
+### Put model preprocessing in the extractor
+
+Resizing to the model's input size, normalizing with the model's mean and standard deviation, and casting the data
+type adapt the images to the model. Give them to the extractor's `transforms=`, so that only the embeddings see them.
+Do not put them in the {class}`.View`. Every evaluator would see them, and {class}`.Outliers` would report brightness
+on normalized tensors, which are not numbers about your data. A transform that defines the dataset, such as the
+resolution you deploy at, goes in the view instead.
+[Image Statistics](ImageStatistics.md#transforms-and-the-statistics-they-invalidate) has the rule and the statistics
+each view operation invalidates.
+
+The same rule settles a case that looks like a view operation. A model that needs three channels from a one-channel
+dataset needs that conversion in `transforms=`. In the view, {class}`.SelectChannels` would state that your grayscale
+dataset is an RGB dataset, and `channels` would describe the model's input layer.
+
 ### Set the batch size
 
 `Embeddings` raises a `ValueError` when it finds no batch size in its own

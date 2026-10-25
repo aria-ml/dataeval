@@ -100,9 +100,9 @@ datasets for machine learning.
   - Create image embeddings with PyTorch, ONNX or a model-free extractor
   - [![Open In Colab][colab-badge]][onx-colab]
 - - [](../notebooks/h2_place_transforms.py)
-  - Decide whether a transform belongs in a {class}`.View` or in an
-    extractor's `transforms=`, and what to do about a
-    {class}`~dataeval.exceptions.StatsInvalidatedWarning`
+  - Respond to a {class}`~dataeval.exceptions.StatsInvalidatedWarning` by
+    moving the transform to the extractor, narrowing `flags=` or asserting
+    what the operation invalidates
   - [![Open In Colab][colab-badge]][xfrm-colab]
 
 :::

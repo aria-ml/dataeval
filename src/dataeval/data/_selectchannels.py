@@ -88,7 +88,8 @@ class SelectChannels(Operation):
 
     See Also
     --------
-    :doc:`/notebooks/h2_place_transforms` : choosing between a view operation and an extractor transform
+    :doc:`/concepts/ImageStatistics` : choosing between a view operation and an extractor transform
+    :doc:`/notebooks/h2_place_transforms` : responding to a StatsInvalidatedWarning
 
     Notes
     -----
