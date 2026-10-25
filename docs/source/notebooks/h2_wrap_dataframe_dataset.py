@@ -106,7 +106,8 @@ catalog.head()
 # %% [markdown]
 # The adapter returns an `(image, target, datum_metadata)` tuple for each item. The image is a channels-first
 # `(C, H, W)` array, the target is the one-hot label, and the datum metadata is a dict that must contain an `id`. The
-# `metadata` property describes the dataset as a whole, including the `index2label` mapping.
+# `metadata` property describes the dataset as a whole, including the `index2label` mapping. The parts that do not
+# depend on the task sit in a base class, which the detection adapter below reuses.
 
 
 # %%
@@ -115,8 +116,8 @@ def load_chw(path: str) -> NDArray[np.uint8]:
     return np.asarray(Image.open(path).convert("RGB"), dtype=np.uint8).transpose(2, 0, 1)
 
 
-class DataFrameICDataset:
-    """An image classification dataset with one DataFrame row per image."""
+class DataFrameDataset:
+    """The rows, the dataset metadata and the image loading that every DataFrame adapter shares."""
 
     def __init__(
         self,
@@ -135,6 +136,10 @@ class DataFrameICDataset:
 
     def _image(self, path: str) -> Any:
         return load_chw(path)
+
+
+class DataFrameICDataset(DataFrameDataset):
+    """An image classification dataset with one DataFrame row per image."""
 
     def __getitem__(self, index: int) -> tuple[Any, np.ndarray, DatumMetadata]:
         row = self._df.iloc[index]
@@ -168,7 +173,7 @@ od_catalog.head()
 # %% [markdown]
 # `__len__` counts images, not rows, and the target is an {obj}`.ObjectDetectionTarget`: `boxes` of shape `(N, 4)` in
 # `(x0, y0, x1, y1)` pixels, `labels` and `scores`. Any object with those attributes qualifies, so a small dataclass is
-# enough. The adapter reuses the classification one, groups the rows by image once, and converts each image's boxes.
+# enough. The adapter reuses the base class, groups the rows by image once, and converts each image's boxes.
 # Image-level factors go in as scalars and box-level factors as lists with one value per box.
 
 
@@ -180,7 +185,7 @@ class BoxTarget:
     scores: np.ndarray  # (N,) confidence per box; 1.0 for ground truth
 
 
-class DataFrameODDataset(DataFrameICDataset):
+class DataFrameODDataset(DataFrameDataset):
     """An object detection dataset with one DataFrame row per box."""
 
     def __init__(
@@ -199,7 +204,7 @@ class DataFrameODDataset(DataFrameICDataset):
     def __len__(self) -> int:
         return len(self._groups)
 
-    def __getitem__(self, index: int) -> tuple[Any, BoxTarget, DatumMetadata]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def __getitem__(self, index: int) -> tuple[Any, BoxTarget, DatumMetadata]:
         rows = self._groups[index]
         first = rows.iloc[0]
         x, y, w, h = (rows[col].to_numpy(dtype=np.float32) for col in ("x", "y", "w", "h"))
@@ -335,7 +340,9 @@ assert isinstance(od_target, ObjectDetectionTarget)
 assert od_image.shape == (3, 128, 128)
 assert od_target.boxes.shape == (len(od_target.labels), 4)
 assert len(od_dataset) == od_catalog["filepath"].nunique() < len(od_catalog)
-assert len(od_datum["occlusion"]) == len(od_target.labels)  # pyright: ignore[reportGeneralTypeIssues]
+occlusion = od_datum.get("occlusion")
+assert occlusion is not None
+assert len(occlusion) == len(od_target.labels)
 assert set(od_metadata.factor_names) == {"weather", "occlusion"}
 
 lazy_dataset = LazyICDataset(catalog, index2label, ["weather"])
