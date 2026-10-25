@@ -67,6 +67,14 @@ def get_logger(module: str) -> logging.Logger:
     return logging.getLogger(_ROOT)
 
 
+class ConsoleHandler(logging.StreamHandler):  # type: ignore[type-arg]
+    """The stream handler :func:`dataeval.log` attaches by default.
+
+    A distinct type, so a later call can find the handler an earlier call attached and reuse it
+    instead of stacking another.
+    """
+
+
 class LogMessage:
     """Deferred message callback for logging expensive messages."""
 

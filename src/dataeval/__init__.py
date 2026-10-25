@@ -43,8 +43,10 @@ def log(level: int = logging.DEBUG, handler: logging.Handler | None = None) -> N
     """
     Add a handler to the logger quickly for debugging.
 
-    Calling this more than once is idempotent: a handler equal to one already
-    attached to the logger is not added again, so log lines are not duplicated.
+    Calling this more than once is idempotent. With the default handler, a later call
+    reuses the handler an earlier call attached. A custom handler equal to one already
+    attached to the logger is not added again. Either way, log lines are not
+    duplicated, and each call sets the level.
 
     Parameters
     ----------
@@ -58,15 +60,21 @@ def log(level: int = logging.DEBUG, handler: logging.Handler | None = None) -> N
     """
     import logging
 
+    from dataeval._log import ConsoleHandler
+
     _logger = logging.getLogger(_ROOT)
     if handler is None:
-        handler = logging.StreamHandler()
+        handler = next((h for h in _logger.handlers if isinstance(h, ConsoleHandler)), None)
+    if handler is None:
+        handler = ConsoleHandler()
         handler.setFormatter(
             logging.Formatter(
                 "%(asctime)s %(levelname)-8s %(name)s.%(filename)s:%(lineno)s - %(funcName)10s() | %(message)s",
             ),
         )
-    if handler not in _logger.handlers:
+    attached = handler not in _logger.handlers
+    if attached:
         _logger.addHandler(handler)
     _logger.setLevel(level)
-    _logger.debug("Added logging handler %s to logger: %s", handler, _ROOT)
+    if attached:
+        _logger.debug("Added logging handler %s to logger: %s", handler, _ROOT)

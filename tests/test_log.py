@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import dataeval
-from dataeval._log import _NAMESPACES, get_logger
+from dataeval._log import _NAMESPACES, ConsoleHandler, get_logger
 from dataeval.types import Output, set_metadata
 
 # Matched against source text, so both patterns anchor on the assignment. A bare
@@ -41,6 +41,44 @@ def test_dataeval_log_idempotent():
         assert logger.handlers.count(handler) == 1
     finally:
         logger.removeHandler(handler)
+
+
+@pytest.fixture
+def clean_dataeval_logger():
+    """Give the test a ``dataeval`` logger with no default handler, and put back what it found."""
+    logger = logging.getLogger("dataeval")
+    level, handlers = logger.level, list(logger.handlers)
+    for handler in handlers:
+        if isinstance(handler, ConsoleHandler):
+            logger.removeHandler(handler)
+    yield logger
+    for handler in list(logger.handlers):
+        if handler not in handlers:
+            logger.removeHandler(handler)
+    for handler in handlers:
+        if handler not in logger.handlers:
+            logger.addHandler(handler)
+    logger.setLevel(level)
+
+
+@pytest.mark.required
+def test_dataeval_log_default_handler_is_not_stacked(clean_dataeval_logger):
+    """Calling log twice with the default handler attaches one handler, so each line prints once."""
+    dataeval.log(logging.INFO)
+    dataeval.log(logging.DEBUG)
+    attached = [h for h in clean_dataeval_logger.handlers if isinstance(h, ConsoleHandler)]
+    assert len(attached) == 1
+    assert clean_dataeval_logger.level == logging.DEBUG
+
+
+@pytest.mark.required
+def test_dataeval_log_default_handler_is_attached_again_after_removal(clean_dataeval_logger):
+    """A removed default handler is replaced by the next call, not skipped."""
+    dataeval.log()
+    (handler,) = [h for h in clean_dataeval_logger.handlers if isinstance(h, ConsoleHandler)]
+    clean_dataeval_logger.removeHandler(handler)
+    dataeval.log()
+    assert len([h for h in clean_dataeval_logger.handlers if isinstance(h, ConsoleHandler)]) == 1
 
 
 class TestGetLogger:
