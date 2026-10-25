@@ -15,45 +15,18 @@
 
 # %% [markdown]
 # # How to specify custom statistics on object detection datasets
+#
+# When you analyze an object detection dataset, you often need
+# [image statistics](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary) at three granularities: whole images,
+# individual bounding boxes, and the background that no box covers. {func}`.image_stats` with {class}`.ImageStats` flags measures each
+# region, and {class}`.Metadata` places every value on the row it describes.
+#
+# Use it when you want control over which statistics to compute, want to separate what was annotated from the scene it was annotated
+# in, or want to avoid computing statistics you do not need.
+#
+# You need `dataeval` and `maite-datasets`. This guide uses SeaDrone.
 
-# %% [markdown]
-# ## Problem statement
-#
-# When working with object detection datasets, you often need to analyze
-# [image statistics](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary) at different granularities:
-#
-# - Image-level statistics: Properties of entire images
-# - Target-level statistics: Properties of individual bounding boxes within images
-# - Background-level statistics: Properties of the pixels no bounding box covers
-#
-# This guide will show you how to use {func}`.image_stats` with custom {class}`.ImageStats` flags to capture statistics
-# on each of those three regions, and how to hand the result to {class}`.Metadata` so every value lands on the row it
-# describes.
-
-# %% [markdown]
-# ### When to use
-#
-# Use this approach when you need fine-grained control over which statistics to compute, especially when:
-#
-# - Working with object detection datasets with bounding boxes
-# - Analyzing both full images and cropped regions (boxes)
-# - Separating what was annotated from the scene it was annotated in
-# - Optimizing computation by selecting only relevant statistics
-
-# %% [markdown]
-# ### What you will need
-#
-# 1. An object detection dataset (we'll use SeaDrone from maite-datasets)
-# 1. A Python environment with the following packages installed:
-#    - `dataeval`
-#    - `maite-datasets`
-
-# %% [markdown]
-# ## Getting started
-#
-# First import the required libraries needed to set up the example.
-
-# %%
+# %% tags=["remove_cell"]
 try:
     import google.colab  # noqa: F401
 
@@ -79,10 +52,8 @@ set_max_processes(4)
 # %% [markdown]
 # ## Load the dataset
 #
-# Begin by loading an object detection dataset. For this example we are using SeaDrone, an object detection dataset
-# containing aerial images captured by drones over marine environments.
-#
-# We'll use a subset of the dataset to keep computation time reasonable.
+# SeaDrone is an object detection dataset of aerial images captured by drones over marine environments. A subset keeps the computation
+# time reasonable.
 
 # %%
 # Load the SeaDrone dataset
@@ -91,118 +62,16 @@ sd_dataset = SeaDrone(root="./data", image_set="val", download=True)
 # Limit to first 50 images for demonstration
 dataset = View(sd_dataset, Limit(50))
 
-print(f"Dataset size: {len(dataset)} images")
-print(f"Sample image shape: {dataset[0][0].shape}")
-print(f"Sample targets (boxes): {len(dataset[0][1].boxes)} boxes in first image")
 
 # %% [markdown]
-# ## Statistics on full images only
+# ## Compute the statistics
 #
-# Let's calculate statistics on the full images with a custom set of basic statistics.
+# Choose the statistics with {class}`.ImageStats` flags combined by `|`, and the regions with three arguments: `per_image` for whole
+# images, `per_target` for each bounding box, and `per_background` for the pixels no bounding box covers. Pass `normalize_pixel_values`
+# explicitly: its default changed to `False` in v1.1, and omitting it raises a deprecation warning.
 #
-# The {class}`.ImageStats` enum provides fine-grained control over which statistics to compute.
-#
-# You can combine flags using the `|` (bitwise OR) operator.
-#
-# `normalize_pixel_values` is passed explicitly throughout this guide. Its default changed to `False` in v1.1, and
-# omitting it raises a deprecation warning until the parameter settles.
-
-# %%
-# Calculate custom individual statistics for full images only (per_image=True, per_target=False)
-results_image_only = image_stats(
-    data=dataset,
-    stats=ImageStats.PIXEL_MEAN | ImageStats.DIMENSION_ASPECT_RATIO | ImageStats.VISUAL_SHARPNESS,
-    per_image=True,
-    per_target=False,
-    normalize_pixel_values=False,
-)
-
-print(f"Computed statistics: {list(results_image_only['stats'])}")
-print(f"\nNumber of results: {len(results_image_only['source_index'])}")
-print(f"Total images processed: {results_image_only['image_count']}")
-
-# %% [markdown]
-# ### Understanding SourceIndex
-#
-# The `source_index` field contains {class}`.SourceIndex` objects that track where each statistic came from:
-#
-# - `item`: The item index in the dataset
-# - `key`: The bounding box index (None for full images). `target` is its retired spelling.
-# - `level`: Which level `key` addresses, left unstated by `image_stats` — an unkeyed address is then the
-#   item level and a keyed one the label level
-#
-# That address is what lets a single result carry values measured over different regions without ever confusing
-# them. Band groups requested with `channels=` come back as columns rather than rows, so they need no slot of
-# their own.
-
-# %%
-# Display first 5 source indices
-print("First 5 SourceIndex entries (image-level only):")
-for i, src in enumerate(results_image_only["source_index"][:5]):
-    print(f"  {i}: item={src.item}, key={src.key}")
-
-print(f"\nAll entries have key=None: {all(src.key is None for src in results_image_only['source_index'])}")
-
-# %% [markdown]
-# ## Statistics on bounding boxes only
-#
-# Now let's compute statistics for just the bounding boxes within the images.
-
-# %%
-# Calculate basic pixel statistics for targets only (per_image=False, per_target=True)
-results_target_only = image_stats(
-    data=dataset,
-    stats=ImageStats.PIXEL_BASIC,
-    per_image=False,
-    per_target=True,
-    normalize_pixel_values=False,
-)
-
-print(f"Computed statistics: {list(results_target_only['stats'])}")
-print(f"Number of target-level results: {len(results_target_only['source_index'])}")
-print(f"Total targets processed: {sum(results_target_only['object_count'])}")
-
-# Display source indices for targets from first image
-print("\nSourceIndex entries for targets in first few images:")
-for i, src in enumerate(results_target_only["source_index"][:5]):
-    print(f"  {i}: image={src.item}, key={src.key}")
-
-# %% [markdown]
-# ## Statistics on both full images and bounding boxes
-#
-# We can also compute statistics at both levels simultaneously.
-
-# %%
-# Calculate basic dimension statistics for full images and boxes (per_image=True, per_target=True)
-results_both = image_stats(
-    data=dataset,
-    stats=ImageStats.DIMENSION_BASIC,
-    per_image=True,
-    per_target=True,
-    normalize_pixel_values=False,
-)
-
-print(f"Number of results (images + boxes): {len(results_both['source_index'])}")
-print(f"Total images processed: {results_both['image_count']}")
-print(f"Total boxes processed: {sum(results_both['object_count'])}")
-print(f"Statistics calculated for each image: {list(results_both['stats'])}")
-
-# Separate image-level and box-level results
-image_indices = [i for i, src in enumerate(results_both["source_index"]) if src.key is None]
-target_indices = [i for i, src in enumerate(results_both["source_index"]) if src.key is not None]
-
-print(f"\nImage-level results: {len(image_indices)}")
-print(f"Target-level results: {len(target_indices)}")
-
-# %% [markdown]
-# ## Statistics on the background
-#
-# The two regions above between them cover every annotated thing and every whole frame, but not the thing you often
-# actually want to characterize: **the scene an object was found in**. Set `per_background=True` to measure the pixels
-# that no bounding box covers.
-#
-# Background values are returned alongside the whole-image ones, on the same rows, under names prefixed with
-# `background_`. They are per-image values — the background is a property of the frame, not of anything inside it.
+# Background values are returned on the same rows as the whole-image ones, under names prefixed with `background_`. Each row carries a
+# {class}`.SourceIndex` with an `item` and a `key`: the key is the bounding box index, and `None` for a whole image.
 
 # %%
 results_background = image_stats(
@@ -217,17 +86,10 @@ results_background = image_stats(
 print(f"Computed statistics: {sorted(results_background['stats'])}")
 
 # %% [markdown]
-# Two constraints are worth knowing before you read any of those numbers.
-#
-# Only {attr}`.ImageStats.PIXEL` and {attr}`.ImageStats.VISUAL` statistics are computed for the background. A hash or a
-# dimension statistic in your flags is still computed for the image and its boxes and simply skipped for the background,
-# which has no meaningful hash and no geometry of its own.
-#
-# More importantly, `background_fraction` — the share of the image left unmasked — is always returned, and should be
-# read before the rest. **A background statistic measured over a few percent of an image is noise wearing a
-# measurement's clothes.** Boxes are rounded outwards and unioned into the mask, so the background excludes slightly
-# more than the annotations strictly cover; where boxes cover an image entirely, every background statistic for it is
-# NaN.
+# Only {attr}`.ImageStats.PIXEL` and {attr}`.ImageStats.VISUAL` statistics are computed for the background; a hash or dimension flag is
+# skipped for it. Read `background_fraction`, the share of the image left unmasked, before the rest: a background statistic measured
+# over a few percent of an image is unreliable, and where boxes cover an image entirely every background statistic for it is NaN. See
+# [Data Integrity](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
 
 # %%
 # The result spans image rows and target rows; only the image rows carry a background, so the
@@ -237,18 +99,14 @@ fraction = pl.Series(results_background["stats"]["background_fraction"]).drop_nu
 print(f"background_fraction: n={len(fraction)}  min={fraction.min():.3f}  median={fraction.median():.3f}")
 
 # %% [markdown]
-# On SeaDrone the annotations are tiny against a 4K frame, so nearly all of every image survives masking and the
-# background is measured over plenty of pixels. That is the comfortable case. A dataset whose boxes cover most of the
-# frame would report a small fraction here, and its background statistics should be treated with suspicion.
+# On SeaDrone the annotations are tiny against a 4K frame, so nearly all of every image survives masking. A dataset whose boxes cover
+# most of the frame would report a small fraction here.
 
 # %% [markdown]
-# ## Landing the results on the rows they describe
+# ## Land the results on the rows they describe
 #
-# Splitting a result by hand — the `image_indices` and `target_indices` comprehensions above — works, but it does not
-# scale past inspection, and it leaves you holding two arrays with no record of what they mean.
-#
-# {meth}`.Metadata.add_factors` does that split for you. Hand it the whole result rather than its `stats` mapping and
-# it reads the `source_index` too, placing each value on the row it belongs to.
+# {meth}`.Metadata.add_factors` places each value on the row it belongs to. Hand it the whole result rather than its `stats` mapping, so
+# it reads the `source_index` too.
 
 # %%
 metadata = Metadata(dataset)
@@ -266,8 +124,8 @@ print("new factors :", sorted(set(metadata.factor_names) - supplied))
 # - `unit_sharpness` — measured over each whole image
 # - `unit_background_sharpness` — measured over each image's unannotated pixels
 #
-# The background factors carry `unit_` because that is where they live: one value per image. Anything DataEval could
-# not place — a background value on a detection row, which does not exist — is recorded rather than silently kept.
+# The background factors carry `unit_` because they live there: one value per image. A value DataEval cannot place, such as a
+# background value on a detection row, is recorded under `dropped_factors`.
 
 # %%
 print("dropped:", metadata.dropped_factors)
@@ -280,7 +138,7 @@ print(
 )
 
 # %% [markdown]
-# Reading those two sharpness columns against each other is the whole point of computing the background separately.
+# Compare the whole-image and background sharpness:
 
 # %%
 units = metadata.rows_at("unit")
