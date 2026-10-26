@@ -308,6 +308,34 @@ output.inv_project([0.90, 0.93, 0.99])
 # With a value of "-1" samples, the projection shows that given the current model, hitting an accuracy of 99% is
 # improbable.
 
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Verify the learning curve: five runs over ten steps up to the 2,500 training images, and the model learns
+metrics = {"Accuracy", "AUROC", "TPR at 0.5 Fixed FPR"}
+curve = output.to_dataframe()
+assert set(curve.columns) == {"step", *metrics}
+assert curve.height == 10
+assert curve["step"][-1] == len(train_ds) == 2500
+assert {name: measure.shape for name, measure in output.measures.items()} == dict.fromkeys(metrics, (5, 10))
+assert curve["Accuracy"][-1] > curve["Accuracy"][0]
+assert curve["Accuracy"][-1] > 0.85
+
+# Verify the projections: valid values that do not fall as the dataset grows
+projected = output.project([1000, 2500, 5000])
+assert projected["step"].to_list() == [1000, 2500, 5000]
+for metric in metrics:
+    values = projected[metric].to_list()
+    assert min(values) >= 0
+    assert max(values) <= 1
+    assert values == sorted(values)
+
+# Verify that 99% accuracy is out of reach for this model while 90% is not
+needed = output.inv_project([0.90, 0.93, 0.99])
+assert needed["target"].to_list() == [0.90, 0.93, 0.99]
+assert needed["Accuracy"][2] == -1
+assert needed["Accuracy"][0] > 0
+assert needed["TPR at 0.5 Fixed FPR"][0] > 0
+
 # %% [markdown]
 # ## Next steps
 #

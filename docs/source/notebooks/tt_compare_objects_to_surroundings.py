@@ -481,6 +481,80 @@ print(classwise)
 #   background numbers mean anything, and on datasets with large objects it will vary far
 #   more than it does here.
 
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Verify the statistics and where they landed: no background on a detection
+assert set(stats["stats"]) == {
+    "brightness",
+    "contrast",
+    "size",
+    "rel_size",
+    "background_brightness",
+    "background_contrast",
+    "background_fraction",
+}
+assert "instance_background_brightness" in metadata.dropped_factors
+
+# Verify that masking barely changes the scene on SeaDrone: the median image is over 99% background
+assert np.median(coverage.to_numpy()) > 0.99
+assert coverage.to_numpy().min() > 0.9
+assert np.abs(units["unit_background_brightness"].to_numpy() - units["unit_brightness"].to_numpy()).mean() < 1.0
+
+# Verify the separation table that the text reads
+sep = {row["class_name"]: row for row in by_class.iter_rows(named=True)}
+assert {name for name, row in sep.items() if row["mean_separation"] < 0} == {"buoy"}
+assert abs(sep["buoy"]["mean_separation"] + 6.8) < 0.1
+assert abs(sep["buoy"]["sd"] - 7.4) < 0.1
+assert min(sep, key=lambda name: sep[name]["sd"]) == "buoy"
+assert max(sep, key=lambda name: sep[name]["mean_separation"]) == "boat"
+assert max(sep, key=lambda name: sep[name]["median_px"]) == "boat"
+assert abs(sep["life_saving_appliances"]["mean_separation"] - 8.8) < 0.1
+assert sep["life_saving_appliances"]["median_px"] == 195
+assert min(sep, key=lambda name: sep[name]["median_px"]) == "life_saving_appliances"
+assert sorted(sep, key=lambda name: -sep[name]["median_px"])[:2] == ["boat", "jetski"]
+assert min(sep, key=lambda name: abs(sep[name]["mean_separation"])) == "jetski"
+assert abs(sep["jetski"]["mean_separation"] - 1.6) < 0.1
+assert all(sep[name]["sd"] > sep[name]["mean_separation"] for name in ("jetski", "life_saving_appliances"))
+assert (sep["buoy"]["n"], sep["jetski"]["n"], sep["life_saving_appliances"]["n"], sep["boat"]["n"]) == (11, 7, 8, 213)
+
+# Verify the near-zero detections: one of the 11 buoys, and mostly the two best-separated classes
+assert camouflaged.filter(pl.col("class_name") == "buoy").height == 1
+best_two = sorted(sep, key=lambda name: -sep[name]["mean_separation"])[:2]
+assert set(best_two) == {"boat", "swimmer"}
+assert camouflaged.filter(pl.col("class_name").is_in(best_two)).height > camouflaged.height / 2
+
+# Verify the ratio table: only buoys sit below 1.0 on brightness, every class below 1.0 on contrast, and the largest class covers 0.2%
+ratio = {row["class_name"]: row for row in comparison.iter_rows(named=True)}
+assert {name for name, row in ratio.items() if row["brightness_vs_image"] < 1.0} == {"buoy"}
+assert all(row["contrast_vs_image"] < 1.0 for row in ratio.values())
+assert abs(max(row["size_vs_image"] for row in ratio.values()) - 0.002) < 0.0005
+assert sorted(sep, key=lambda name: sep[name]["mean_separation"]) == [
+    "buoy",
+    "jetski",
+    "life_saving_appliances",
+    "swimmer",
+    "boat",
+]
+assert sorted(ratio, key=lambda name: ratio[name]["brightness_vs_image"]) == [
+    "buoy",
+    "life_saving_appliances",
+    "jetski",
+    "swimmer",
+    "boat",
+]
+
+# Verify the balance findings: one flagged cell, a clean background fraction and unflagged background contrast
+cells = {(row["class_name"], row["factor_name"]): row for row in classwise.iter_rows(named=True)}
+flagged = [key for key, row in cells.items() if row["is_imbalanced"]]
+assert flagged == [("buoy", "unit_background_brightness")]
+brightness = {name: cells[(name, "unit_background_brightness")]["mi_value"] for name in sep}
+assert abs(brightness["buoy"] - 0.329) < 0.02
+assert brightness["buoy"] > 2 * max(value for name, value in brightness.items() if name != "buoy")
+assert brightness["buoy"] > 8 * max(brightness["boat"], brightness["swimmer"])
+assert abs(cells[("buoy", "unit_background_contrast")]["mi_value"] - 0.225) < 0.02
+assert abs(cells[("jetski", "unit_background_contrast")]["mi_value"] - 0.257) < 0.02
+assert max(row["mi_value"] for (_, factor), row in cells.items() if factor == "unit_background_fraction") < 0.05
+
 # %% [markdown]
 # ## Conclusion
 #

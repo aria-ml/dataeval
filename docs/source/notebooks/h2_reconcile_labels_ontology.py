@@ -210,6 +210,55 @@ watercraft = ontology.subtree("watercraft")
 print(repr(watercraft))
 print("ids:", sorted(watercraft.ids))
 
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Verify the match report: "rowboat" is not in the ontology and the other classes resolved
+assert dict(result["matched"]) == {"sedan": "sedan", "pickup truck": "pickup truck", "fighter jet": "fighter jet"}
+assert list(result["unmatched"]) == ["rowboat"]
+assert not result["ambiguous"]
+assert all(part in repr(ontology) for part in ("10 concepts", "1 roots", "6 leaves", "0 external"))
+
+# Verify the recovered hierarchy and the pairwise relations
+assert result["ancestor_paths"] == {
+    "sedan": ["land vehicle", "vehicle"],
+    "pickup truck": ["land vehicle", "vehicle"],
+    "fighter jet": ["aircraft", "vehicle"],
+}
+assert result["relations"][("sedan", "pickup truck")] == "sibling"
+assert result["relations"][("sedan", "fighter jet")] == "sibling"  # a shared ancestor is enough
+
+# Verify that induced_edges collapses the intermediate concepts
+edges = label_reconciliation(["vehicle", "land vehicle", "sedan"], ontology)["induced_edges"]
+assert edges == [("vehicle", "land vehicle"), ("land vehicle", "sedan")]
+assert label_reconciliation(["vehicle", "sedan"], ontology)["induced_edges"] == [("vehicle", "sedan")]
+
+# Verify that a synonym resolves to the canonical concept
+assert owl_ontology.find("F-16") == ("http://example.org/cv#FighterJet",)
+assert (concept.label, concept.synonyms) == ("Fighter Jet", ("F-16", "Viper"))
+
+# Verify that the incomplete ontology keeps "warship" as an external reference, and only for "Frigate"
+assert subset.external_ids == ("warship",)
+assert subset_result["external_ancestors"] == {"Frigate": ["warship"]}
+
+# Verify the hierarchy queries and the subtree
+assert ontology.ancestors("sedan") == ("land vehicle", "vehicle")
+assert ontology.siblings("sedan") == ("pickup truck",)
+assert ontology.depth_of("sedan") == 2
+assert set(ontology.descendants("vehicle")) == {
+    "land vehicle",
+    "watercraft",
+    "aircraft",
+    "sedan",
+    "pickup truck",
+    "frigate",
+    "cargo ship",
+    "airliner",
+    "fighter jet",
+}
+assert set(ontology.leaves) == {"sedan", "pickup truck", "frigate", "cargo ship", "airliner", "fighter jet"}
+assert sorted(watercraft.ids) == ["cargo ship", "frigate", "watercraft"]
+assert watercraft.roots == ("watercraft",)
+
 # %% [markdown]
 # ## Next steps
 #

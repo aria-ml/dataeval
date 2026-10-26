@@ -149,6 +149,27 @@ print(f"mean sharpness  object={metadata.rows_at('instance')['instance_sharpness
 print(f"                image ={units['unit_sharpness'].mean():.1f}")
 print(f"                back  ={units['unit_background_sharpness'].mean():.1f}")
 
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Verify the statistics and the regions they were measured over
+import numpy as np
+
+assert set(results_background["stats"]) == {"sharpness", "background_sharpness", "background_fraction"}
+assert fraction.to_numpy().min() > 0.9  # nearly all of every image survives masking on SeaDrone
+assert np.median(fraction.to_numpy()) > 0.99
+
+# Verify where the values landed: three sharpness factors and a background fraction, and no background on a detection
+assert metadata.levels == ("unit", "instance")
+assert metadata.level_counts["unit"] == len(dataset) == 50
+assert metadata.level_counts["instance"] > 50
+assert set(metadata.factor_names) - supplied == {
+    "instance_sharpness",
+    "unit_sharpness",
+    "unit_background_sharpness",
+    "unit_background_fraction",
+}
+assert "instance_background_sharpness" in metadata.dropped_factors
+
 # %% [markdown]
 # ## Next steps
 #
