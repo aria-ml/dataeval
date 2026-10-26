@@ -69,8 +69,8 @@
 # In this tutorial you will build a small dataset with known duplicates, run each detection against it, and read the
 # results.
 #
-# Use this tutorial when you work with full-motion video (FMV) or any multi-object tracking (MOT) dataset and you need to
-# know what the dataset contains before you split it or train on it. For still images, use
+# Use this tutorial when you work with full-motion video (FMV) or any multi-object tracking (MOT) dataset and you need
+# to know what the dataset contains before you split it or train on it. For still images, use
 # [How to identify duplicates](./h2_deduplicate.py), which covers the same class on simpler, image-level cases.
 #
 
@@ -160,7 +160,7 @@ def transcode(frames: list[np.ndarray], seed: int) -> list[np.ndarray]:
 
 # %% [markdown]
 # A MAITE multi-object tracking datum is a `(VideoStream, MultiobjectTrackingTarget, metadata)` tuple. The video
-# stream is an iterable of frames rather than an indexable sequence. Reaching frame _k_ means decoding every frame
+# stream is an iterable of frames rather than an indexable sequence. Reaching frame k means decoding every frame
 # before it, so DataEval streams video sequentially instead of indexing into it.
 #
 
@@ -470,7 +470,7 @@ display(runs.head(4))
 display(summary.select("sequence", "redundant_fraction", "longest_run"))
 
 # %% [markdown]
-# A static run of _k_ frames can be cut to a single frame without losing content, and `redundant_frames` counts what
+# A static run of k frames can be cut to a single frame without losing content, and `redundant_frames` counts what
 # that would save. Check before you cut: dwell time can be signal, and a tracker trained only on moving objects can
 # fail on stationary ones.
 #
@@ -700,9 +700,9 @@ assert set(tracked.data()["level"].to_list()) == {"track"}
 # %% [markdown]
 # ## Conclusion
 #
-# You built a video dataset with known duplicates and ran `Duplicates` on it at the sequence, frame and track levels. You saw how
-# `hash_radius` changes what the evaluation finds in re-encoded footage, measured a train-test leak down to its frames, and
-# mapped each finding to a curation decision.
+# You built a video dataset with known duplicates and ran `Duplicates` on it at the sequence, frame and track levels.
+# You saw how `hash_radius` changes what the evaluation finds in re-encoded footage, measured a train-test leak down to
+# its frames, and mapped each finding to a curation decision.
 #
 
 # %% [markdown]
@@ -718,7 +718,7 @@ assert set(tracked.data()["level"].to_list()) == {"track"}
 # %% [markdown]
 # ## On your own
 #
-# To run the same analysis on your own footage, present it as a MAITE multi-object tracking dataset, as in the section "Build a
-# dataset with known duplicates". Start with `hash_radius=6` and keep the default `min_segment_frames` of `30` unless your
-# sequences are short. To check for leakage, pass your training and test splits to `evaluate` together, then read the
-# sequence-level rows first and the frame numbers behind them second.
+# To run the same analysis on your own footage, present it as a MAITE multi-object tracking dataset, as in the section
+# "Build a dataset with known duplicates". Start with `hash_radius=6` and keep the default `min_segment_frames` of `30`
+# unless your sequences are short. To check for leakage, pass your training and test splits to `evaluate` together, then
+# read the sequence-level rows first and the frame numbers behind them second.
