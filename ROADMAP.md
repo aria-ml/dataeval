@@ -104,8 +104,9 @@ finely binned factor no longer reports a correlation with everything.
 **Theme: video-ready metadata.** v1.1 introduced the metadata levels; v1.2 makes them
 carry analysis. Factors roll up from frame to track to sequence, the bias statistics stop
 reading 300 frames of one clip as 300 independent samples, and the quality evaluators
-read metadata at every level. Most of this is already merged. The release waits only on
-the items that would otherwise change a public API after it ships.
+read metadata at every level. Most of this is already merged. The release waits on the
+items that would otherwise change a public API after it ships, and on two correctness
+fixes.
 
 ### Metadata across levels
 
@@ -161,20 +162,31 @@ the items that would otherwise change a public API after it ships.
 - Bag-of-visual-words extraction runs on threads and scales with `set_max_processes`.
 - **Breaking:** Python 3.11 or later is required, and the functionality deprecated in v1.1
   is removed.
+- **Announced:** `Duplicates` warns that its image `hash_radius` default changes from 0.
+  The default itself changes in v2.0.
 
 ### Remaining before release
 
 - Metadata in `Outliers` (in review), and restraint when a level has too few rows to
   threshold.
-- A settled frame-selection API: one entry point where `Duplicates` currently takes both a
-  `frame_sample` and a `FrameSelector`, and defined semantics for chaining selectors.
-- The announced change to the image `hash_radius` default in `Duplicates`, and
-  rotation- and flip-invariant (D4) hashes reaching sequence, segment, and track matching.
+- A settled frame-selection API. Chaining selectors is done (`Chain`); what remains is
+  removing `frame_sample` from `Duplicates`, so frames are selected through
+  `SequenceFrames` everywhere.
+- A video default for `hash_radius` in `Duplicates`. Left unset, the radius is 6 for
+  video and 0 for images, and the output records the radius used. This is separate from
+  the image default announced above, which waits for v2.0.
+- Frame views keep the source video as the independent unit, so the bias statistics over
+  a `SequenceFrames` view count videos rather than frames.
+- Ego motion stops trusting a compromise between a moving object and the background. This
+  is time-boxed: if no rule meets the bar, v1.2 ships with the limit documented.
 
 ### Moved out of v1.2
 
 The August revision of this roadmap planned more for v1.2 than the release above holds.
 
+- **After v1.2:** rotation- and flip-invariant (D4) hashes reaching sequence, segment, and
+  track matching in `Duplicates`. It adds relations without changing an API, so it can
+  land in any later release.
 - **To v1.3:** container and codec metadata, video quality statistics, video-aware
   splitting, ego-motion removal, MOT labeling error detection, and import and startup
   cost.
