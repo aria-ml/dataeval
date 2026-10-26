@@ -157,7 +157,7 @@ print(f"{len(dataset)} images, factors: {metadata.factor_names}")
 
 # %% [markdown]
 # The `id` names the datum rather than describing it, so DataEval keeps it out of the factors on its own. The factors
-# are exactly the metadata columns the adapter exposed.
+# are the metadata columns the adapter exposed.
 
 # %% [markdown]
 # ## Wrap an object detection catalog

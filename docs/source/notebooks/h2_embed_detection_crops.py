@@ -69,10 +69,10 @@ print(ds)
 # %% [markdown]
 # ## Focus on a few classes
 #
-# VOC has 20 classes; coloring every crop of all of them at once is hard to read. Pick a
+# VOC has 20 classes. Coloring every crop of all of them at once is hard to read. Pick a
 # handful of visually distinct classes and keep only their detections with
-# {class}`.Filter` (applied through {class}`.View`). This also keeps the example fast
-# — fewer classes means fewer crops to embed and project. Skip this step to use the whole
+# {class}`.Filter` (applied through {class}`.View`). This also keeps the example fast.
+# Fewer classes means fewer crops to embed and project. Skip this step to use the whole
 # dataset.
 
 # %%
@@ -88,9 +88,9 @@ print(f"{len(focused)} images contain at least one of {focus_classes}")
 # %% [markdown]
 # ## Wrap the boxes as a classification dataset
 #
-# {class}`.DetectionCrops` turns each kept detection into one classification datum — the
+# {class}`.DetectionCrops` turns each kept detection into one classification datum: the
 # cropped box region, labeled with the detection's class. The result satisfies the
-# image-classification shape, so it drops straight into {class}`.Embeddings` and the rest of
+# image-classification shape, so it goes directly into {class}`.Embeddings` and the rest of
 # DataEval, with crops aligned 1:1 to labels.
 #
 # By default each crop is the box squared by extending into the surrounding image
@@ -107,11 +107,11 @@ print(f"crops (one per detection): {len(crops)}  |  dropped (too small): {crops.
 #
 # Embed every crop with a
 # [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html).
-# An unmodified ResNet18 *outputs* 1000 ImageNet class logits, but you want its learned
-# features, not its classifier — so rather than swapping in a new head, point
+# An unmodified ResNet18 outputs 1000 ImageNet class logits, but you want its learned
+# features, not its classifier. So rather than swapping in a new head, point
 # {class}`.TorchExtractor` at the penultimate global-average-pool layer with
 # `layer_name="avgpool"`. The extractor registers a forward hook and captures that layer's
-# output — a 512-dimensional feature vector — for each crop. Its transforms resize and
+# output, a 512-dimensional feature vector, for each crop. Its transforms resize and
 # normalize each crop for the model, and {class}`.Embeddings` runs the crops through in
 # batches.
 
@@ -128,8 +128,8 @@ print("embedding shape:", embeddings.shape)
 
 # %% [markdown]
 # Read the per-crop class labels from a {class}`.Metadata` built over the crop view. Because
-# the crops *are* an image-classification dataset, `class_labels` lines up 1:1 with the
-# embeddings — exactly what every per-(image, label) tool expects.
+# the crops are an image-classification dataset, `class_labels` lines up 1:1 with the
+# embeddings. This is what every per-(image, label) tool expects.
 
 # %%
 metadata = Metadata(crops)
@@ -140,7 +140,7 @@ print("labels:", len(metadata.class_labels), "| embeddings:", len(embeddings))
 #
 # Project the 512-dimensional crop embeddings down to 2D and color each point by its class.
 # t-SNE groups visually similar crops together, so well-separated classes form distinct
-# clouds while confusable ones overlap — a quick read on how discriminable the object
+# clouds while confusable ones overlap. This gives a quick read on how discriminable the object
 # classes are in this embedding space. Hover and zoom to explore.
 
 # %%
@@ -158,9 +158,9 @@ assert embeddings.shape[0] == len(crops) == len(metadata.class_labels)  # crops 
 assert set(np.unique(metadata.class_labels)).issubset(set(focus_indices))  # only the focus classes remain
 
 # %% [markdown]
-# Classes that occupy their own region are easy for a model to tell apart from the others;
-# classes whose clouds overlap share visual features and are where confusion (and
-# irreducible error) lives. Swapping `method="tsne"` for `"umap"` or `"pca"` gives a
+# Classes that occupy their own region are easy for a model to tell apart from the others.
+# Classes whose clouds overlap share visual features and are where confusion (and
+# irreducible error) occurs. Swapping `method="tsne"` for `"umap"` or `"pca"` gives a
 # different view of the same embeddings.
 
 # %% [markdown]

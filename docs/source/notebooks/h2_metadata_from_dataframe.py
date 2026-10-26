@@ -46,12 +46,12 @@ from dataeval.protocols import MetadataLike
 #
 # `MetadataLike` is four properties:
 #
-# - `factor_names` - the names of the metadata factors
-# - `factor_data` - a `(n_samples, n_factors)` integer array of *discretized*
+# - `factor_names`: the names of the metadata factors
+# - `factor_data`: a `(n_samples, n_factors)` integer array of discretized
 #   factor values (continuous factors must be pre-binned to integers)
-# - `class_labels` - one label per sample
-# - `is_binned` - a flag per factor, same length as `factor_names`: `True` where
-#   you produced that factor's integers by cutting a range into bins, `False`
+# - `class_labels`: one label per sample
+# - `is_binned`: a flag per factor, same length as `factor_names`. It is `True` where
+#   you produced that factor's integers by cutting a range into bins, and `False`
 #   where each integer stands for a value of its own (a category, a count)
 #
 # ```{note}
@@ -66,16 +66,16 @@ from dataeval.protocols import MetadataLike
 # The adapter discretizes the factor columns, the one preprocessing step the protocol
 # requires:
 #
-# - **Discrete factors** (categorical or already-integer) are integer-encoded with
+# - Discrete factors (categorical or already-integer) are integer-encoded with
 #   `pandas.factorize`.
-# - **Continuous factors** are binned into integer codes with `pandas.cut`; you
+# - Continuous factors are binned into integer codes with `pandas.cut`. You
 #   choose the number of bins per factor, which controls how finely the range is
 #   grouped.
 #
-# Only the columns you pass become factors - any other column in the DataFrame is
-# ignored. `item_indices` maps each row back to a source image: for a classification
-# table (one row per image) the mapping is 1:1; for an object detection table (one
-# row per box) several rows share an image.
+# Only the columns you pass become factors. Any other column in the DataFrame is
+# ignored. `item_indices` maps each row back to a source image. For a classification
+# table (one row per image), the mapping is 1:1. For an object detection table (one
+# row per box), several rows share an image.
 
 
 # %%
@@ -155,7 +155,7 @@ class DataFrameMetadata:
 # %% [markdown]
 # ## Apply the adapter to an image classification DataFrame
 #
-# A classification catalog has **one row per image**: the label plus any metadata
+# A classification catalog has one row per image: the label plus any metadata
 # factors. Here `weather` is categorical (discrete) and `altitude_m` is continuous.
 
 # %% tags=["hide-input"]
@@ -200,7 +200,7 @@ print(ic_balance.balance)
 # %% [markdown]
 # ## Apply the adapter to an object detection DataFrame
 #
-# An object detection catalog in *long* format has **one row per box**. Each row
+# An object detection catalog in long format has one row per box. Each row
 # carries its image's factors, so `factor_data` and `class_labels` are naturally
 # per-detection. The extra step is `item_indices`, which records the image each
 # box belongs to.
@@ -244,7 +244,7 @@ print(f"Unique source images: {len(np.unique(od_meta.item_indices))}")
 print(f"factor_data shape:    {od_meta.factor_data.shape}")
 
 # %% [markdown]
-# The same evaluator works unchanged - it operates on the per-detection factors
+# The same evaluator works unchanged. It operates on the per-detection factors
 # and labels.
 
 # %%

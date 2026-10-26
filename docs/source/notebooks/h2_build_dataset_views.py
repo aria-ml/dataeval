@@ -48,7 +48,7 @@ set_seed(0)  # For reproducibility
 # %% [markdown]
 # ## Create a view
 #
-# We use the MNIST test split (10,000 handwritten digits).
+# You use the MNIST test split (10,000 handwritten digits).
 
 # %%
 mnist = MNIST("./data", image_set="test", download=True)
@@ -56,8 +56,8 @@ print("source dataset size:", len(mnist))
 print("source vocabulary:", mnist.metadata.get("index2label"))
 
 # %% [markdown]
-# A {class}`.View` takes a dataset and a list of operations. It behaves like a dataset —
-# `len()`, indexing, and iteration all work — but nothing is copied, and the source is
+# A {class}`.View` takes a dataset and a list of operations. It behaves like a dataset:
+# `len()`, indexing, and iteration all work. Nothing is copied, and the source is
 # untouched.
 
 # %%
@@ -75,11 +75,11 @@ assert len(mnist) == 10000
 # %% [markdown]
 # The built-in operations:
 #
-# | operation | what it does |
+# | Operation | What it does |
 # | --- | --- |
 # | {class}`.Filter` | keep datums matching classes and/or a metadata-factor predicate, and drop the detections or tracks that do not match |
 # | {class}`.ClassBalance` | resample to a balanced class distribution, optionally to a target size |
-# | {class}`.Limit` | cap to the first *n* of the current selection |
+# | {class}`.Limit` | cap to the first n of the current selection |
 # | {class}`.Shuffle` | randomize order, optionally seeded |
 # | {class}`.Reverse` | reverse the current order |
 # | {class}`.Indices` | keep the given source indices |
@@ -88,7 +88,7 @@ assert len(mnist) == 10000
 # %% [markdown]
 # ## Order the operations
 #
-# Operations run **in the order you list them**, and each one sees the result of the previous.
+# Operations run in the order you list them, and each one sees the result of the previous.
 # The same two operations in opposite orders answer different questions.
 
 # %%
@@ -104,8 +104,8 @@ assert len(limit_then_filter) < len(filter_then_limit) == 500
 
 # %% [markdown]
 # Because each operation applies to the current selection, an operation can appear more than
-# once. This pipeline takes a reproducible random sample *from a specific window* of the
-# dataset — something a single pass could not express.
+# once. This pipeline takes a reproducible random sample from a specific window of the
+# dataset, which a single pass could not express.
 
 # %%
 windowed = View(mnist, operations=[Limit(2000), Shuffle(seed=0), Limit(10)])
@@ -119,11 +119,11 @@ assert all(i < 2000 for i in windowed.resolve_indices())
 # %% [markdown]
 # ### Operations see the result of earlier operations
 #
-# Operations that inspect the data read it *through* the operations before them. That means a
-# filter placed after a relabeling step matches against the **new** vocabulary, not the
+# Operations that inspect the data read it through the operations before them. That means a
+# filter placed after a relabeling step matches against the new vocabulary, not the
 # original one.
 #
-# Here we collapse the ten digits into `even`/`odd` with {class}`.Relabel`, then filter on the
+# Here you collapse the ten digits into `even`/`odd` with {class}`.Relabel`, then filter on the
 # relabeled classes.
 
 # %%
@@ -154,7 +154,7 @@ assert source_digits(filter_first) == [0]
 assert len(relabel_first) > len(filter_first)
 
 # %% [markdown]
-# With `Relabel` first, class `0` means the **new** vocabulary's `even`, so every even digit
+# With `Relabel` first, class `0` means the new vocabulary's `even`, so every even digit
 # is kept. With `Filter` first, class `0` still means the source digit `zero`, so only zeros
 # survive.
 
@@ -164,13 +164,13 @@ assert len(relabel_first) > len(filter_first)
 # Subclass {class}`.Operation` and implement `apply(view)`. Inside `apply` you have three
 # levers, and you may use any combination of them:
 #
-# | lever | how | use it for |
+# | Lever | How | Use it for |
 # | --- | --- | --- |
 # | cardinality / order | set `view.selection` | filtering, reordering, limiting, resampling |
 # | content | `view.map(fn)` | rewriting each datum |
 # | metadata | override `apply_metadata()` | rewriting dataset-level metadata |
 #
-# `view.selection` is the list of surviving *source* indices. `view.map(fn)` registers a
+# `view.selection` is the list of surviving source indices. `view.map(fn)` registers a
 # per-datum transform that is applied lazily on access; pass `where={...}` to target only
 # specific source indices. If your operation reads each datum's target, set the class
 # attribute `requires` so the view can validate the dataset shape up front.
@@ -211,9 +211,9 @@ assert custom.resolve_indices() == list(range(0, 100, 10))
 assert np.array_equal(np.asarray(custom[0][0]), 255 - np.asarray(mnist[0][0]))
 
 # %% [markdown]
-# Note that `Invert` never touched the data while building the view — it only *registered* a
+# `Invert` never touched the data while building the view. It only registered a
 # transform, which runs when an item is read. Operations that filter must read the data to
-# decide what to keep, so they scan once at construction; pure transforms stay free until
+# decide what to keep, so they scan once at construction. Pure transforms stay free until
 # access.
 
 # %% [markdown]
