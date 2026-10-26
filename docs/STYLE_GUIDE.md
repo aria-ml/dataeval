@@ -62,8 +62,12 @@ guide may not follow it yet. Bring a page into line when you edit its prose.
 | A figurative heading, such as a numbered "lens" | A heading that names what the section does |
 | Commented-out code or links left in a notebook | Remove them. Keep a commented alternative only when the text explains it |
 
-The only em dash allowed is the separator in a Next steps entry (see the Next steps section). Review checks all of the
-above.
+The only em dash allowed is the separator in a Next steps entry (see the Next steps section).
+
+`tests/test_notebook_structure.py` fails on an em dash outside a Next steps entry, a contraction, "we", "us" and "our",
+"corpus", and "simply", "genuinely", "quietly", "exactly" and "on your behalf", in the Markdown cells of a notebook. It
+skips code spans, roles, link targets, math and fenced code. Review checks the rest, and checks the concept and
+getting-started pages, which the test does not read.
 
 ### Emphasis
 
@@ -73,6 +77,10 @@ for a list-item label, a heading or stress. Use `*` for emphasis markup and neve
 
 These rules cover the cells of a table too. Do not bold a row label, and do not put an em dash in a cell. Write a column
 heading in sentence case, with a capital on the first word only.
+
+`tests/test_notebook_structure.py` fails on italics, on a bold label that starts a list item or a paragraph
+(`**Label:** text`), on a bold row label in a table and on a column heading in title case. Review checks that bold
+marks the first mention of a term that the page defines.
 
 ### Claims, numbers and limits
 
@@ -395,7 +403,7 @@ Run the checks that apply before you open a merge request.
 | Command | What it checks |
 | ------- | -------------- |
 | `uv run nox -s lint` | `ruff`, `codespell` (American spelling) and `typos` |
-| `uv run nox -s test -- tests/test_doc_markup.py tests/test_doc_cross_references.py tests/test_deprecated_docs.py tests/test_quickstart.py tests/test_notebook_structure.py --cov-fail-under=0` | reST roles in Markdown, fence closing, role targets, deprecated documentation, the quickstart code, and the headings, template sections and Next steps of the notebooks |
+| `uv run nox -s test -- tests/test_doc_markup.py tests/test_doc_cross_references.py tests/test_deprecated_docs.py tests/test_quickstart.py tests/test_notebook_structure.py --cov-fail-under=0` | reST roles in Markdown, fence closing, role targets, deprecated documentation, the quickstart code, and the headings, template sections, Next steps, voice and emphasis of the notebooks |
 | `uv run nox -s type` | `pyright` over `src`, `tests`, `verification` and `docs/source/notebooks`. Run it after you change a code cell in a notebook or a test, because it checks them too |
 | `npx --yes markdownlint-cli2 '*.md' 'docs/**/*.md' '#node_modules'` | The Markdown rules that CI enforces, such as 120 columns, one blank line between blocks and no repeated heading in a page. Run it after every change to a `.md` file. It needs Node, and `npx` fetches the tool on first use |
 | `uv run nox -s docs` | Converts the notebooks, executes the ones whose code cells changed, runs their assertions and builds the site with `--fail-on-warning`, which catches broken links, anchors and toctree entries |
@@ -406,9 +414,10 @@ Run the checks that apply before you open a merge request.
 A single run of the documentation tests with `--no-cov` exits non-zero even when every test passes, so use
 `--cov-fail-under=0` as shown.
 
-What is not automated today: voice, emphasis, contractions, what a heading or a Next steps description says, the choice
-of Next steps links, the `See this in practice` lists of the concept pages, the 600-word limit (it warns) and the width
-of notebook text. A reviewer checks them.
+What is not automated today: how plain and directive a sentence is, whether bold marks a first mention, what a heading
+or a Next steps description says, the choice of Next steps links, the `See this in practice` lists of the concept
+pages, the voice of the concept and getting-started pages, the 600-word limit (it warns) and the width of notebook
+text. A reviewer checks them.
 
 A notebook that needs more memory than your machine has cannot execute in your local docs build. Run its cells one at
 a time instead, and rely on the CI docs job for the full run. Say in the merge request what you could and could not

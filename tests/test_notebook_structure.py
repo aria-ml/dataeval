@@ -10,10 +10,13 @@ catch by eye:
 * Tutorials: the opening and three metadata lines, and the template sections in order.
 * How-tos: no boilerplate or teaching headings, at most five steps and a lead of at most 120 words.
 * Next steps: the entry form, the counts the guide allows and a link text that is the title of its target.
+* Voice: no em dash outside a Next steps entry, contraction, first person, "corpus", stress word or italics, no bold
+  label or bold table row label, and sentence case in table column headings.
 
 A how-to over 600 words warns and does not fail, because the guide leaves that limit to review.
 
-Voice, emphasis, contractions, descriptions and what a section teaches stay with review.
+The voice checks skip code spans, roles, link targets, math and fenced code. How plain a sentence is, whether bold marks
+the first mention of a term, descriptions, the width of the text and what a section teaches stay with review.
 """
 
 import functools
@@ -98,6 +101,36 @@ METADATA_LINES = {
 }
 METADATA_PREFIXES = ("Estimated time", "Relevant ML stages", "Relevant personas")
 ENTRY = re.compile(r"^- \[(?P<title>[^\]]+)\]\((?P<target>[^)]+)\) — (?P<description>\S.*)$")
+
+# The voice rules read prose, so a line loses what is not prose before they look at it.
+NOT_PROSE = [
+    re.compile(p) for p in (r"https?://\S+", r"\]\([^)]*\)", r"\{[a-z]+\}`[^`]*`", r"`[^`\n]*`", r"\$[^$\n]+\$")
+]
+ENTRY_SEPARATOR = re.compile(r"(?<=\)) —")
+VOICE_RULES = [
+    ("em dash, the only one allowed is the separator of a Next steps entry", re.compile("—")),
+    (
+        "contraction, write it out",
+        re.compile(
+            r"\b(?:\w+n[’']t|\w+[’'](?:ll|re|ve|d|m)|(?:it|that|there|here|what|who|he|she|let|how)[’']s)\b", re.I
+        ),
+    ),
+    ("first person, address the reader as 'you'", re.compile(r"\b(?:[Ww]e|us|[Oo]urs?|[Oo]urselves)\b")),
+    ("'corpus', say dataset", re.compile(r"\bcorpus\b|\bcorpora\b", re.I)),
+    ("stress word, delete it", re.compile(r"\b(?:simply|genuinely|quietly|exactly)\b|\bon your behalf\b", re.I)),
+    (
+        "italics, delete the markup",
+        re.compile(
+            r"(?<![\w*\\])\*(?![\s*])[^*\n]+?(?<![\s*\\])\*(?![\w*])|(?<![\w_])_(?![\s_])[^_\n]+?(?<![\s_])_(?![\w_])"
+        ),
+    ),
+    (
+        "bold label, bold only a term at its first mention",
+        re.compile(r"^\s*(?:(?:[-*+]|\d+\.)\s+)?\*\*[^*]+?(?::\*\*|\*\*\s*(?::|—))"),
+    ),
+    ("bold row label in a table", re.compile(r"^\s*\|\s*\*\*")),
+]
+TABLE_SEPARATOR = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$")
 
 
 @dataclass(frozen=True)
@@ -360,6 +393,45 @@ def next_steps_problems(nb: Notebook) -> list[str]:
     return problems
 
 
+def _markdown_lines(nb: Notebook) -> list[tuple[str, str]]:
+    """Each Markdown line outside a code fence with the H2 section it sits in."""
+    out: list[tuple[str, str]] = []
+    section, fenced = "", False
+    for line in nb.lines:
+        text = line.text
+        if text.lstrip().startswith("```"):
+            fenced = not fenced
+        elif not fenced:
+            match = HEADING.match(text)
+            section = match.group(2) if match and len(match.group(1)) == 2 else section
+            out.append((text, section))
+    return out
+
+
+def _prose(text: str, section: str) -> str:
+    """A line without the code, roles, link targets and math that the voice rules do not cover."""
+    text = ENTRY_SEPARATOR.sub("", text, count=1) if section == "Next steps" else text
+    for pattern in NOT_PROSE:
+        text = pattern.sub("", text)
+    return text
+
+
+def voice_problems(nb: Notebook) -> list[str]:
+    """Voice and emphasis rules of the guide that a pattern can check, and table headings in title case."""
+    lines = _markdown_lines(nb)
+    problems: list[str] = []
+    for text, section in lines:
+        if HEADING.match(text):
+            continue
+        prose = _prose(text, section)
+        problems.extend(f"{rule}: {text.strip()[:90]}" for rule, pattern in VOICE_RULES if pattern.search(prose))
+    for (head, _), (separator, _) in zip(lines, lines[1:], strict=False):
+        if head.lstrip().startswith("|") and TABLE_SEPARATOR.match(separator):
+            cells = [cell.strip() for cell in head.strip().strip("|").split("|")]
+            problems.extend(f"table column heading is not sentence case: {c}" for c in cells if _title_cased(c))
+    return problems
+
+
 def _report(check: str, problems: dict[str, list[str]]) -> str:
     lines = [f"{check}:"]
     for name, items in problems.items():
@@ -446,6 +518,50 @@ def test_the_checks_are_wired_up():
     assert f"link text 'Wrong text' is not the title '{real.h1}' of ./{real.name}" in next_steps_problems(wrong)
     right = parse("h2_link.py", link.format(text=real.h1, name=real.name))
     assert not any("link text" in problem for problem in next_steps_problems(right))
+
+
+@pytest.mark.required
+def test_the_voice_checks_are_wired_up():
+    """Guard against a voice rule silently matching nothing, and against flagging what is not prose."""
+    bad = parse(
+        "h2_voice.py",
+        "# %% [markdown]\n# # How to sound right\n#\n"
+        "# We don't write this way — it is *loud* and _also loud_, so simply stop. A corpus is not a dataset.\n"
+        "# - **Label:** a bold list label\n"
+        "#\n# | **Row label** | Used With Python |\n# | --- | --- |\n# | a | b |\n",
+    )
+    found = voice_problems(bad)
+    for expected in (
+        "em dash",
+        "contraction, write it out: We don't",
+        "first person",
+        "'corpus', say dataset",
+        "stress word",
+        "italics, delete the markup",
+        "bold label",
+        "bold row label in a table",
+        "table column heading is not sentence case: Used With Python",
+    ):
+        assert any(expected in problem for problem in found), f"{expected!r} not reported in {found}"
+    assert sum("italics" in problem for problem in found) == 1, "one line holds both markups"
+
+    good = parse(
+        "h2_voice.py",
+        "# %% [markdown]\n# # How to sound right\n#\n"
+        "# The dataset's page has `don't`, {class}`.Coverage` and [a link](./a_b_c.py) to read.\n"
+        "# A **codebook** is a term that the page defines, and 2 * 3 * 4 is a product. Read https://example.com/a_b_c.\n"
+        "#\n# ```text\n# We don't — *loud*\n# ```\n"
+        "#\n# | Column heading | Another heading |\n# | --- | --- |\n# | a | b |\n"
+        "#\n# ## Next steps\n#\n# - [Title](./x.py) — Description.\n",
+    )
+    assert voice_problems(good) == []
+
+
+@pytest.mark.required
+def test_voice_follows_the_style_guide():
+    """Prose has no em dash, contraction, first person, 'corpus', stress word or italics, and uses bold plainly."""
+    failures = _failures(voice_problems)
+    assert not failures, _report("Voice problems", failures)
 
 
 @pytest.mark.required

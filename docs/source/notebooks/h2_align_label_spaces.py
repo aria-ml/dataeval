@@ -87,8 +87,8 @@ print("mergeability:    ", result["mergeability"])
 
 # %% [markdown]
 # `"spaceship"` is out-of-vocabulary, so the source is only partially
-# expressible in the reference. On a structureless source this matches
-# {func}`.label_reconciliation` exactly: the equivalence `class_remap` is
+# expressible in the reference. On a structureless source this gives the same result as
+# {func}`.label_reconciliation`: the equivalence `class_remap` is
 # the matched set:
 
 # %%

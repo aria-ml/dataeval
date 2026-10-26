@@ -458,7 +458,7 @@ display(runs.head(4))
 
 # %% [markdown]
 # The longest run is the 20 frames of sequence 2, at a `mean_distance` of `0.0`. That is the camera dwell, where the
-# same frame repeats exactly. The shorter runs sit at 2 to 4 bits, which is slow footage rather than a held camera.
+# same frame repeats. The shorter runs sit at 2 to 4 bits, which is slow footage rather than a held camera.
 # Treat the two differently: a dwell costs you storage and annotation for frames that add nothing, while slow footage
 # is still moving and still carries information.
 #

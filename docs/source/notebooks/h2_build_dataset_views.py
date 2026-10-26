@@ -16,7 +16,7 @@
 # %% [markdown]
 # # How to build dataset views with View and Operation
 #
-# Analysis rarely runs on a dataset exactly as it ships. {class}`.View` builds a curated version of it without copying: it
+# Analysis rarely runs on a dataset as it ships. {class}`.View` builds a curated version of it without copying: it
 # applies an ordered pipeline of {class}`.Operation` steps lazily and works anywhere a dataset does.
 #
 # Use a view when you need:
