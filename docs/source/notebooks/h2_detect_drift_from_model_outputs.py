@@ -119,8 +119,8 @@ assert result_marginal.details["feature_drift"].any()
 #
 # If the relationships or correlations between the predicted classes shift, univariate tests might miss it.
 # The {class}`.DriftDomainClassifier` treats the model outputs as features and trains a LightGBM classifier
-# to separate the baseline predictions from the incoming predictions. If the classifier achieves a high AUROC
-# (e.g., > 0.55), the distributions are distinct enough to flag drift.
+# to separate the baseline predictions from the incoming predictions. If the AUROC of the classifier exceeds the
+# threshold of the detector (0.55 by default), the distributions are distinct enough to flag drift.
 
 # %%
 detector_multivariate = DriftDomainClassifier().fit(prev_probs)

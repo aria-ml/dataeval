@@ -28,7 +28,7 @@
 # - find outliers and duplicates in your dataset
 #
 # You need a two-dimensional array of samples and features, such as flattened images or, preferably, image embeddings with a
-# feature dimension of 1000 or fewer. The example needs `dataeval` and `matplotlib`.
+# feature dimension below 500. The example needs `dataeval` and `matplotlib`.
 
 # %% tags=["remove_cell"]
 try:

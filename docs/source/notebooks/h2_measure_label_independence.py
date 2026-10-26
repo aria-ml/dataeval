@@ -88,6 +88,8 @@ print(
 # TEST ASSERTION CELL ###
 assert 0 <= results["chi_squared"] < 4
 assert 0.9 < results["p_value"] <= 1.0
+assert abs(results["chi_squared"] - 2.93) < 0.01  # the text quotes about 2.93
+assert abs(results["p_value"] - 0.97) < 0.01  # and about 0.97
 
 # %% [markdown]
 # ## Next steps

@@ -16,11 +16,12 @@
 # %% [markdown]
 # # How to detect uncertainty drift with a MAITE model
 #
-# A deployed model is a sensitive instrument for distribution shift: as data moves into regions the model was not trained on, its
-# predictions grow less confident. An upward shift in the {term}`Shannon entropy<Shannon Entropy>` of the predicted probabilities
-# is a label-free drift signal. See [uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection).
-# A model that follows DataEval's ONNX/LiteRT contract needs no `postprocess_fn`, unlike the
-# [tutorial](./tt_detect_drift_with_uncertainty.py): {class}`.OnnxImageClassifier` and {class}`.ScoresExtractor` decode its predictions.
+# As data moves into regions that a deployed model was not trained on, its predictions grow less confident. An upward
+# shift in the {term}`Shannon entropy<Shannon Entropy>` of the predicted probabilities is a label-free drift signal. See
+# [uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection). A model that
+# follows DataEval's ONNX/LiteRT contract needs no `postprocess_fn`, unlike the
+# [tutorial](./tt_detect_drift_with_uncertainty.py): {class}`.OnnxImageClassifier` and {class}`.ScoresExtractor` decode
+# its predictions.
 #
 # Use it to monitor a deployed ONNX or LiteRT model without operational labels, or to reuse a model that ships with a
 # `model-metadata.json`.

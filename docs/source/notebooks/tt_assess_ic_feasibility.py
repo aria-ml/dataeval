@@ -53,7 +53,7 @@
 #   - `scikit-learn`
 #   - `torchvision`
 # - About 450 MB of downloads: the images (about 100 MB) and a pretrained image model (about 330 MB)
-# - A GPU is optional. It makes the image summaries much faster to compute
+# - A GPU is optional. It makes the embeddings much faster to create
 
 # %% [markdown]
 # ## Introduction
@@ -181,12 +181,12 @@ print(f"Training split: {len(train):,} images. Test split: {len(test):,} images.
 print(f"Vehicle types: {len(test.index2label)}")
 
 # %% [markdown]
-# ## Summarize each image as numbers
+# ## Create an embedding for each image
 #
 # Your model, DataEval's built-in models and the search for repeated images all read
-# [embeddings](../concepts/Embeddings.md). An embedding is a list of numbers for each image that a pretrained image
-# model computes to summarize what the image shows. Similar-looking images get similar lists. You use ViT-B/16, from
-# `torchvision`, and keep its 768 numbers.
+# [embeddings](../concepts/Embeddings.md). An embedding is a vector that a pretrained image model creates for each
+# image to capture what the image shows. Similar-looking images get similar vectors. You use ViT-B/16, from
+# `torchvision`, and keep its 768-dimensional output.
 #
 # DataEval assumes the image model was chosen without the evaluation images' labels. ViT-B/16 was chosen over ResNet18
 # and ResNet50 by **cross-validation** on the training split. Cross-validation trains on four fifths, scores on the last
@@ -196,12 +196,12 @@ print(f"Vehicle types: {len(test.index2label)}")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 weights = ViT_B_16_Weights.DEFAULT
 backbone = vit_b_16(weights=weights, progress=False)
-backbone.heads = torch.nn.Sequential()  # an empty head keeps the 768-number summary, not a 1,000-class answer
+backbone.heads = torch.nn.Sequential()  # an empty head keeps the 768-dimensional embedding, not a 1,000-class answer
 extractor = TorchExtractor(backbone, transforms=weights.transforms(), device=device)
 
 train_x = np.asarray(Embeddings(train, extractor=extractor, batch_size=128))
 test_x = np.asarray(Embeddings(test, extractor=extractor, batch_size=128))
-print(f"Each image is now {train_x.shape[1]} numbers")
+print(f"Each image is now a {train_x.shape[1]}-dimensional embedding")
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -220,7 +220,7 @@ assert test_x.shape == (1621, 768)
 # :::{dropdown} How the repeats are found
 # DataEval's {class}`.Duplicates` compares image fingerprints, which catch exact copies and resaved or resized ones. They
 # miss some crops, padded borders, watermarks and mirror images, so two images also count as repeats when their
-# summaries have a **cosine similarity** (1 means identical) of at least 0.95. Check what that threshold catches before
+# embeddings have a **cosine similarity** (1 means identical) of at least 0.95. Check what that threshold catches before
 # reusing it with another image model or dataset.
 # :::
 
@@ -232,10 +232,10 @@ for items, splits in zip(found["item_indices"], found["dataset_indices"], strict
     ids = [item + split * len(train) for item, split in zip(items, splits, strict=True)]  # number training images first
     pairs += [(ids[0], other) for other in ids[1:]]
 
-# Summaries at cosine similarity >= 0.95, which for summaries scaled to length 1 is a distance <= sqrt(2 - 2 * 0.95)
-summaries = np.vstack([train_x, test_x])
-summaries /= np.linalg.norm(summaries, axis=1, keepdims=True)
-links = radius_neighbors_graph(summaries, radius=np.sqrt(2 - 2 * 0.95))
+# Embeddings at cosine similarity >= 0.95, which for embeddings scaled to length 1 is a distance <= sqrt(2 - 2 * 0.95)
+unit_embeddings = np.vstack([train_x, test_x])
+unit_embeddings /= np.linalg.norm(unit_embeddings, axis=1, keepdims=True)
+links = radius_neighbors_graph(unit_embeddings, radius=np.sqrt(2 - 2 * 0.95))
 links = links + coo_matrix((np.ones(len(pairs)), tuple(zip(*pairs, strict=True))), shape=links.shape)
 
 # A family is every image linked to another by either kind of repeat
@@ -267,10 +267,11 @@ assert not np.isin(test_family[keep], train_family).any()  # no family shared wi
 # %% [markdown]
 # ## Train your model
 #
-# Your model is a **logistic regression**. It is a simple classifier that learns, from the training images' summaries, a
-# score between 0 and 1 for each of the 24 vehicle types, and answers with the highest. You set aside about one fifth of
-# the training images, the **calibration** images, for choosing the tank rule later, and keep each family of repeats on
-# one side. The model trains once on the rest and is then **frozen**. It answers all three questions unchanged.
+# Your model is a **logistic regression**. It is a simple classifier that learns, from the embeddings of the training
+# images, a score between 0 and 1 for each of the 24 vehicle types, and answers with the highest. You set aside about
+# one fifth of the training images, the **calibration** images, for choosing the tank rule later, and keep each family
+# of repeats on one side. The model trains once on the rest and is then **frozen**. It answers all three questions
+# unchanged.
 
 # %%
 train_y = np.asarray(Metadata(train).class_labels)
@@ -333,11 +334,11 @@ feasibility = Feasibility(alpha=0.05 / 3, seed=42)  # for all three planned call
 # %% [markdown]
 # ## Check the vehicle type requirement
 #
-# The call passes the kept test images, their summaries, your model's scores and a record of how it was built:
+# The call passes the kept test images, their embeddings, your model's scores and a record of how it was built:
 #
 # - `predictions` holds your model's 24 scores for each kept image, in image order. DataEval scores the model on the
 #   evaluation images only.
-# - `provenance` records how the model was built. `reads="representation"` declares that it reads only the summaries.
+# - `provenance` records how the model was built. `reads="representation"` declares that it reads only the embeddings.
 #   DataEval records these declarations as assumptions and does not verify them.
 
 # %%
@@ -650,7 +651,7 @@ dep.plot(tank_result, plot_evidence=True)
 # Repeat the assessment on your own classification dataset:
 #
 # - Write down every requirement before you run anything, and give them one error budget with `alpha`.
-# - Compute embeddings for your images with a pretrained model, and pass them to `Feasibility.evaluate` with your
+# - Create embeddings for your images with a pretrained model, and pass them to `Feasibility.evaluate` with your
 #   dataset.
 # - Train your model on images that `Feasibility` never sees, freeze it, and pass its class scores as `predictions=`
 #   with a `provenance` that records how you built it.

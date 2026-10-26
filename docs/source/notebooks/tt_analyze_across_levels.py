@@ -54,7 +54,7 @@
 #   - `dataeval`
 #   - `maite-datasets`
 # - Basic familiarity with [polars](https://docs.pola.rs) expressions
-# - Roughly 300 MB of disk for the dataset download
+# - Roughly 1.1 GB of disk for the dataset download
 #
 # Reading [Metadata Levels](../concepts/MetadataLevels.md) first is helpful but not required. This tutorial builds the
 # same ideas from data.

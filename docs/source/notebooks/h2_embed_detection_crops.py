@@ -158,9 +158,8 @@ assert embeddings.shape[0] == len(crops) == len(metadata.class_labels)  # crops 
 assert set(np.unique(metadata.class_labels)).issubset(set(focus_indices))  # only the focus classes remain
 
 # %% [markdown]
-# Classes that occupy their own region are easy for a model to tell apart from the others.
-# Classes whose clouds overlap share visual features and are where confusion (and
-# irreducible error) occurs. Swapping `method="tsne"` for `"umap"` or `"pca"` gives a
+# Classes that occupy their own region are easy for a model to tell apart from the others. Classes whose clouds overlap
+# share visual features and are where confusion occurs. Swapping `method="tsne"` for `"umap"` or `"pca"` gives a
 # different view of the same embeddings.
 
 # %% [markdown]

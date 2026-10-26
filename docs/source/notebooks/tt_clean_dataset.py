@@ -543,7 +543,7 @@ display(results)
 # There are, however, near duplicates detected by phash and dhash.
 
 # %%
-_ = plot(ds, figsize=(12, 6), indices=(1548, 1561))
+plot(ds, figsize=(12, 6), indices=(1548, 1561))
 
 # %% [markdown]
 # The image is a near duplicate: image 1561 is a grayscale version of image 1548.
