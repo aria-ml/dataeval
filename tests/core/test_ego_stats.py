@@ -369,7 +369,7 @@ class TestAmbiguityGate:
 
     def test_too_few_outliers_is_not_ambiguous(self):
         pts = lattice()
-        assert not _is_ambiguous(pts, affine_flow(pts), np.zeros(len(pts), bool))
+        assert not _is_ambiguous(affine_flow(pts), np.zeros(len(pts), bool))
 
 
 class TestTemporalGate:

@@ -112,10 +112,11 @@ class CameraTravel(FrameSelector):
     still go unkept for its whole length. A smaller switch of field of view, such as 1.5x, can read as a zoom.
 
     **A burned-in overlay reads as scene content.** Without ``mask``, a dense one, such as a HUD of
-    telemetry text, can make a pan read as slower or still, so frames are kept too sparsely or not at
-    all across it, and a light one gets pans refused, so its frames are kept unmeasured. ``mask``
-    excludes it, and also drops samples within 32 px of it at the 360 px processing size, so movers
-    weigh more in what is left, and one covering about a fifth of the frame can be read as the camera.
+    telemetry text, can drag a pan's reading slower, so frames are kept too sparsely across it, or
+    split it into two motions, which is refused, so its frames are kept unmeasured; a light one gets
+    pans refused too. ``mask`` excludes it, and also drops samples within 32 px of it at the 360 px
+    processing size, so movers weigh more in what is left, and one holding most of what is left can
+    be read as the camera.
 
     **No reading is no evidence of no motion.** These keep the frame, marked
     :attr:`~dataeval.data.FrameVerdict.unmeasured`, and restart the travel there:

@@ -91,6 +91,22 @@ _MIN_FLOW_SIDE = 32
 # frame dropped. A pan read 4 px off has a median score of 0.86, so a mid-size misread can pass.
 _MIN_AGREEMENT = 0.80
 
+# The two-motion test (`_two_motion`, #1577): how much better, per frame of `gap`, "camera + one translating mover"
+# must explain the samples than the single fit explains its own inliers. Measured on synthetic still-camera movers,
+# real pans under dense overlays and 4,578 pairs of real drone footage at gap 1: a ratio of 2 refused a correct
+# 0.5-degree yaw at a 60-degree field of view (ratio 2.4), 3 refused none of those guards, and higher let compromises
+# through. It catches a mover's pull only once that pull stands about 15 times above the flow noise, so a slow mover
+# in noisy footage can still drag a still camera into a trusted zoom of a pixel or two.
+_TWO_MOTION_RATIO = 3.0
+# The inlier residual (processed px) at or below which a fit is taken as exact and the test does not run.
+_TWO_MOTION_FLOOR = 0.1
+# Assignment-and-refit rounds the two-motion split takes before using its last assignment.
+_TWO_MOTION_ITERATIONS = 4
+
+# How close, in processed px, a rejected sample must sit to its group's median flow to count toward the group's
+# coherence in `_is_ambiguous`, when the group's own robust spread is tighter than this.
+_COHERENCE_TOL = 0.5
+
 
 def _require_cv2() -> ModuleType:
     """Import OpenCV, naming the extra that provides it.
@@ -395,11 +411,7 @@ def _classify_motion(div: float, curl: float, t0_mag: float, half_diagonal: floa
     return "complex" if ranked[-1] < 1.4 * ranked[-2] else max(speeds, key=lambda k: speeds[k])
 
 
-def _is_ambiguous(
-    pts: NDArray[np.float64],
-    flow: NDArray[np.float64],
-    outlier: NDArray[np.bool_],
-) -> bool:
+def _is_ambiguous(flow: NDArray[np.float64], outlier: NDArray[np.bool_]) -> bool:
     """Whether the rejected samples form a coherent motion of their own.
 
     A single frame pair cannot always tell the camera from a mover. If a mover fills much
@@ -407,11 +419,92 @@ def _is_ambiguous(
     object produce the same flow. What tells a genuine mover from that tie is whether the
     rejected samples agree among themselves. When they do, the pair has two consistent
     readings and no way to choose between them, so the pair is refused.
+
+    They agree where most of them sit within `_COHERENCE_TOL` (or their own robust spread, if
+    wider) of their median flow. The floor keeps flow noise at a mover's edges, or a background
+    whose flow is exactly zero, from making a coherent group look scattered.
     """
     if outlier.mean() <= 0.30 or int(outlier.sum()) < _MIN_SAMPLES:
         return False
-    second = _fit_irls(pts[outlier], flow[outlier])
-    return second is not None and bool((second.weights > _INLIER_WEIGHT).mean() > 0.60)
+    deviation = np.hypot(*(flow[outlier] - np.median(flow[outlier], axis=0)).T)
+    return bool((deviation < max(_robust_cutoff(deviation), _COHERENCE_TOL)).mean() > 0.60)
+
+
+def _two_motion(
+    pts: NDArray[np.float64],
+    flow: NDArray[np.float64],
+    resid: NDArray[np.float64],
+    outlier: NDArray[np.bool_],
+    gap: int,
+) -> bool:
+    """Whether the samples are better read as two motions than as the one the fit settled on.
+
+    A mover holding a large share of the samples can pull the fit to a compromise between it and
+    the background: a motion neither makes, which explains both badly and so leaves few outliers
+    for `_is_ambiguous` to judge. A correct fit explains its own inliers to the noise floor, and a
+    compromise explains nobody well. So the samples are split into a camera group, fitted with an
+    affine, and a mover group, read as one translation, each sample taking whichever explains it
+    better. The split starts from the side of the fit's residuals along their principal direction,
+    where a compromise leaves the two motions pointing opposite ways, and alternates assignment and
+    refit. The pair has two motions where that split explains the samples `_TWO_MOTION_RATIO` times
+    `gap` better than the fit, whose residuals are `resid`, explains its own inliers, and the fit is
+    not exact (its inlier residual is above `_TWO_MOTION_FLOOR`).
+
+    The ratio scales with `gap` because what the affine leaves out of a real camera's motion, such
+    as parallax, grows with the frames between a pair while flow noise does not; a mover's pull on
+    the fit grows the same way, so it is judged per frame either way.
+    """
+    single = float(np.median(np.hypot(*resid[~outlier].T))) if (~outlier).any() else 0.0
+    if single <= _TWO_MOTION_FLOOR:
+        return False
+    two = _two_motion_residual(pts, flow, resid)
+    return two is not None and single > _TWO_MOTION_RATIO * gap * two
+
+
+def _two_motion_residual(
+    pts: NDArray[np.float64],
+    flow: NDArray[np.float64],
+    resid: NDArray[np.float64],
+) -> float | None:
+    """Median residual of the best camera-plus-one-translation split of the samples, or None if none.
+
+    Seeded from the side of the single fit's residuals `resid` along their principal direction,
+    then alternating assignment and refit for at most `_TWO_MOTION_ITERATIONS` rounds. None where a
+    group falls under `_MIN_SAMPLES` or the camera group admits no affine fit.
+    """
+    direction = np.linalg.eigh(resid.T @ resid)[1][:, -1]
+    camera = resid @ direction > 0
+    camera = camera if camera.sum() >= (~camera).sum() else ~camera
+    nearest = None
+    for _ in range(_TWO_MOTION_ITERATIONS):
+        step = _reassign(pts, flow, camera)
+        if step is None:
+            return None
+        assigned, nearest = step
+        if np.array_equal(assigned, camera):
+            break
+        camera = assigned
+    return None if nearest is None else float(np.median(nearest))
+
+
+def _reassign(
+    pts: NDArray[np.float64],
+    flow: NDArray[np.float64],
+    camera: NDArray[np.bool_],
+) -> tuple[NDArray[np.bool_], NDArray[np.float64]] | None:
+    """One round of the split: refit both groups, then give each sample to whichever explains it better.
+
+    Returns the new camera group and each sample's residual under the model that took it, or None
+    where a group falls under `_MIN_SAMPLES` or the camera group admits no affine fit.
+    """
+    if int((~camera).sum()) < _MIN_SAMPLES or int(camera.sum()) < _MIN_SAMPLES:
+        return None
+    affine = _fit_irls(pts[camera], flow[camera])
+    if affine is None:
+        return None
+    affine_resid = np.hypot(*affine.residuals(pts, flow).T)
+    mover_resid = np.hypot(*(flow - np.median(flow[~camera], axis=0)).T)
+    return affine_resid <= mover_resid, np.minimum(affine_resid, mover_resid)
 
 
 def _photometric_agreement(
@@ -551,6 +644,11 @@ def _pair_ego(
     agreement = np.nan
     if frames is not None:
         agreement = _photometric_agreement(fit, pts, ~outlier, *frames, overlay=overlay)
+    degenerate = fit.condition < 1e-12
+    ambiguous = _is_ambiguous(flow, outlier)
+    # The two-motion test is the costliest check, and only matters for a pair nothing else refuses.
+    if not (ambiguous or degenerate or border_capture or agreement < _MIN_AGREEMENT):
+        ambiguous = _two_motion(pts, flow, resid, outlier, gap)
 
     return _PairReading(
         div=div,
@@ -562,9 +660,9 @@ def _pair_ego(
         foe_x=foe_x,
         foe_y=foe_y,
         motion=_classify_motion(div, curl, t0_mag, half_diagonal, static_px),
-        degenerate=fit.condition < 1e-12,
+        degenerate=degenerate,
         border_capture=border_capture,
-        ambiguous=_is_ambiguous(pts, flow, outlier),
+        ambiguous=ambiguous,
         mover_frac=float(outlier.mean()),
         mover_speed=float(np.median(speed[outlier])) if outlier.any() else np.nan,
         agreement=agreement,
@@ -731,7 +829,9 @@ class EgoFactors(TypedDict):
     told apart from a mover abstains rather than contributing a wrong number, and a roll-up's
     coverage threshold gates on those abstentions. ``mover_frac``, ``mover_speed`` and
     ``ego_trusted`` are not nulled. Those three are most informative on a pair that was
-    refused because a mover dominated it.
+    refused because a mover dominated it. A pair refused because the fit settled between two
+    motions reports no mover (``mover_frac`` near 0, ``mover_speed`` NaN): the compromise rejects
+    none of the mover's samples.
 
     Attributes
     ----------
@@ -762,8 +862,9 @@ class EgoFactors(TypedDict):
     ego_trusted : Sequence[bool]
         Whether this frame's camera estimate can be trusted. False where any of these holds:
 
-        - the camera could not be told apart from an independent mover, or a mover filling the
-          middle of the frame captured the fit;
+        - the camera could not be told apart from an independent mover, a mover filling the
+          middle of the frame captured the fit, or the fit settled between the camera's motion
+          and a large mover's, which the samples read better as two motions;
         - the fitted camera motion does not explain the new frame, as across a hard cut, a large
           field-of-view switch or a misread fast pan, or nothing in the frame confirms the fit,
           as on a nearly textureless noisy frame;
@@ -1221,17 +1322,22 @@ def ego_stats(
     different resolutions.
 
     **Overlays.** A burned-in overlay does not move with the scene. Without `mask`, a light one
-    refuses pans and a dense one can read a pan as a trusted slower pan or a still camera. With
-    `mask`, samples within 32 px of the overlay, at `proc_short_side`, are left out too, so a mask
-    leaves less of the frame than its area suggests, and `mover_frac` is over the samples kept.
-    Movers are judged against what is left, so one covering about a fifth of the frame can be read
-    as the camera. A masked pair is refused where its samples, or the fit's inliers, do not spread
-    across the frame.
+    refuses pans, and a dense one drags a pan's reading toward a still camera: a mild drag stays
+    trusted, and one that splits the samples into two motions is refused. With `mask`, samples
+    within 32 px of the overlay, at `proc_short_side`, are left out too, so a mask leaves less of
+    the frame than its area suggests, and `mover_frac` is over the samples kept. A masked pair is
+    refused where its samples, or the fit's inliers, do not spread across the frame.
+
+    **Movers.** A mover that pulls the fit toward its own motion is refused, as two motions, once
+    its pull stands well above the flow noise; a slow mover in noisy footage can still drag a still
+    camera into a trusted zoom of a pixel or two. One that holds most of the samples the fit sees,
+    with a mask most of what the mask leaves, can be read as the camera: a single pair cannot tell
+    the two apart, and the temporal gate catches such a mover only when it is brief.
 
     **Cost.** Linear in frames measured. Per pair, optical flow takes a third to a half of the
-    time, and the robust fit and the check that it explains the new frame share the rest. Flow
-    and that check are roughly linear in pixels at `proc_short_side`, so lower `proc_short_side`
-    before lowering `grid_target`.
+    time, and the robust fit, the two-motion test and the check that the fit explains the new
+    frame share the rest. Flow and that last check are roughly linear in pixels at
+    `proc_short_side`, so lower `proc_short_side` before lowering `grid_target`.
 
     **Parallelism.** Sequences are measured concurrently, one per worker thread, when
     :func:`~dataeval.config.set_max_processes` allows more than one worker. Each worker

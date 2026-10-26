@@ -303,7 +303,11 @@ class TestOverlay:  # real optical flow, under a burned-in HUD
         stream = hud_pan(8, 13)
         masked = SequenceFrames(_dataset_of([stream]), CameraTravel(0.045, mask=DENSE))
         assert _kept(masked)[0] == [0, 4, 8, 12]
-        assert len(_kept(SequenceFrames(_dataset_of([stream]), CameraTravel(0.045)))[0]) < 4
+        # Unmasked, the overlay splits each pair into two motions, so the pan is refused (#1577) and every frame is kept
+        # unmeasured, rather than kept too sparsely on a trusted slow reading.
+        positions, _, unmeasured = _kept(SequenceFrames(_dataset_of([stream]), CameraTravel(0.045)))
+        assert positions == list(range(13))
+        assert unmeasured == [False] + [True] * 12
 
     def test_pairs_the_mask_refuses_are_kept_unmeasured(self):
         positions, _, unmeasured = _kept(SequenceFrames(_dataset_of([hud_pan(8, 8)]), CameraTravel(0.045, mask=CORNER)))

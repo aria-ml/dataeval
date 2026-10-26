@@ -919,8 +919,10 @@ statistical and computational.
     flow fields)
   - Measures **apparent** motion, so it cannot distinguish a moving camera from
     a scene moving coherently against a still one. A pair is refused rather than
-    guessed when the camera can't be told apart from an independent mover, or a
-    mover captures the fit; when the fitted motion doesn't explain the new frame
+    guessed when the camera can't be told apart from an independent mover, a
+    mover captures the fit, or the fit settles between the camera's motion and a
+    large mover's, which the samples read better as two motions; when the fitted
+    motion doesn't explain the new frame
     (a hard cut, a large field-of-view switch, a misread fast pan) or nothing in
     the frame confirms it (a nearly textureless noisy frame); when the pair can't
     be read (the frames differ in size, a processed side is under 32 px, or a
@@ -938,10 +940,15 @@ statistical and computational.
     normalizing; the rates are. A reading is attributed to the *later* frame of
     the pair it was measured from, so the leading `gap` frames of every sequence
     carry no reading. A burned-in overlay (a HUD, telemetry text) reads as scene
-    content: a light one gets pans refused, and a dense one can read a pan as a
-    trusted slower pan or a still camera. Passing the overlay as `mask=` excludes
-    it. Movers are then judged against what the mask leaves, so one covering
-    about a fifth of the frame can be read as the camera.
+    content: a light one gets pans refused, and a dense one drags a pan's reading
+    toward a still camera, which stays trusted when the drag is mild and is
+    refused when it splits the samples into two motions. Passing the overlay as
+    `mask=` excludes it. A mover pulling the fit toward its own motion is refused
+    once its pull stands well above the flow noise, so a slow mover in noisy
+    footage can still read as a trusted zoom of a pixel or two. A mover holding
+    most of the samples the fit sees (with a mask, most of what the mask leaves)
+    can be read as the camera; one pair cannot tell the two apart, and the
+    temporal gate catches it only when it is brief.
 - - {func}`.phash`, {func}`.phash_d4`, {func}`.dhash`, {func}`.dhash_d4`,
     {func}`.xxhash`
   - Perceptual hashing ([Zauner, 2010](DataIntegrity.md#references)); xxHash
