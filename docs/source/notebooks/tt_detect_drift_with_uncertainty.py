@@ -124,8 +124,8 @@ set_batch_size(32)
 # - The drone split is SeaDrone maritime imagery, a shifted operational stream. The detector should report drift here.
 #
 # To keep the tutorial fast, you cap each split to a small random subset with {class}`.View` and {class}`.Limit`. Both
-# datasets are already used by other guides, so they are typically cached locally. Raise `SAMPLES_PER_SPLIT` (or drop
-# the `Select` wrappers) to run on more data.
+# datasets are already used by other guides, so they are typically cached locally. Raise `SAMPLES_PER_SPLIT` to run on
+# more data.
 
 # %%
 SAMPLES_PER_SPLIT = 200
@@ -270,8 +270,9 @@ plt.show()
 #
 # {class}`.ClasswiseUncertaintyExtractor` groups detections by their predicted class, so you can see which classes the
 # model is most uncertain about and not only the aggregate. A detection is assigned to every class whose confidence is
-# within a ratio `threshold` of its top class. The detector predicts across all 80 COCO classes, so to keep the figure
-# legible you plot only the few most frequently predicted classes and overlay the SeaDrone distribution for reference.
+# within a ratio `threshold` of its top class. The detector can predict any of the 80 COCO classes, so to keep the
+# figure legible you plot only the few most frequently predicted classes and overlay the SeaDrone distribution for
+# reference.
 
 # %%
 TOP_K_CLASSES = 6

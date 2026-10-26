@@ -58,7 +58,7 @@
 # 1. Standard autoencoder (AE): simple reconstruction-based detection using mean squared error
 # 1. Variational autoencoder (VAE): a probabilistic approach with a regularized latent space
 # 1. AE with GMM: enhanced detection by modeling the latent space with Gaussian Mixture Models
-# 1. VAE with GMM: probabilistic encoding combined with GMM for reliable detection
+# 1. VAE with GMM: probabilistic encoding combined with GMM density estimation
 #
 # Distance-based methods:
 #
@@ -213,7 +213,8 @@ plt.show()
 # samples are from their nearest neighbors in the training data. Samples that are far from all training samples are
 # likely OOD.
 #
-# Use it as a fast baseline for OOD detection without model training, with interpretable distance-based scoring.
+# Use it as a baseline for OOD detection with interpretable distance-based scoring. It needs embeddings from a model,
+# and the cells below train a small CNN to produce them.
 #
 # :::{note}
 # KNN performance depends on the quality of the embeddings you provide:
@@ -452,11 +453,11 @@ else:
 # %% [markdown]
 # ## Variational autoencoder (VAE) for OOD detection
 #
-# VAEs learn a probabilistic latent representation, which provides better generalization and more structured latent
-# spaces compared to standard AEs. This can improve OOD detection, especially when in-distribution data has high
-# variability.
+# VAEs learn a probabilistic latent representation, which gives a more structured latent space than a standard AE.
 #
-# Use it when you need a more robust latent representation or when your in-distribution data has significant variance.
+# Use it when you need that latent representation or when your in-distribution data has significant variance. In this
+# tutorial the plain VAE flags fewer OOD samples than the other detectors on the rotated digits and on digits 8-9. The
+# "Comparing use cases" section shows the rates.
 
 # %%
 # Create and configure the VAE
@@ -495,13 +496,13 @@ print(f"Average score (OOD): {vae_result_ood.instance_score.mean():.4f}")
 # reconstruction error with density estimation using **sensor fusion**: both components are standardized (z-score
 # normalized) and combined with configurable weighting.
 #
-# Use it when you need higher detection accuracy and have complex in-distribution data that naturally clusters into
-# multiple groups.
+# Use it when your in-distribution data is complex and naturally clusters into multiple groups. On the rotated digits in
+# this tutorial, the two GMM detectors flag the most OOD samples.
 #
 # :::{note}
-# The GMM fusion parameters (`gmm_weight` and `gmm_score_mode`) significantly impact performance. The default
-# `gmm_weight=0.7` favors the GMM component, which typically works well. Experiment with values in [0.5, 0.9] for your
-# data.
+# The GMM fusion parameters (`gmm_weight` and `gmm_score_mode`) set how the reconstruction score and the GMM score
+# combine into the final score. The default `gmm_weight` is 0.5, which weights the two scores equally. This tutorial
+# sets it to 0.7, which favors the GMM component. Experiment with values in [0.5, 0.9] for your data.
 # :::
 
 # %%
@@ -551,13 +552,11 @@ print(f"Average score (in-dist): {ae_gmm_result_in.instance_score.mean():.4f}")
 print(f"Average score (OOD): {ae_gmm_result_ood.instance_score.mean():.4f}")
 
 # %% [markdown]
-# ## VAE with GMM for maximum robustness
+# ## VAE with GMM for OOD detection
 #
-# Combining VAE's probabilistic latent space with GMM density estimation provides the most sophisticated OOD detection
-# approach. This is particularly effective when you need high reliability and have sufficient computational resources.
-#
-# Use it in production systems where false negatives (missing OOD samples) are costly, and you need maximum detection
-# reliability.
+# This detector combines the probabilistic latent space of a VAE with GMM density estimation. In this tutorial it is one
+# of the two detectors that flag the most OOD samples on the rotated digits. On digits 8-9, KNN with cosine distance
+# flags the most.
 
 # %%
 # Create VAE with GMM density network

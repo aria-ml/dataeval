@@ -108,8 +108,8 @@ set_max_processes(4)
 # %% [markdown]
 # ## Load the data and inspect its levels
 #
-# You will work with SeaDrone, an aerial dataset in which a drone flies over water and annotates the swimmers, boats and
-# buoys it sees. Every image carries the drone's telemetry at the moment of capture (`altitude`, `speed` and
+# You will work with SeaDrone, an aerial dataset in which a drone flies over water and captures images of the swimmers,
+# boats and buoys it sees. Every image carries the drone's telemetry at the moment of capture (`altitude`, `speed` and
 # `gimbal_pitch`), and every annotated object carries its own `object_size`.
 #
 # If this data is already on your computer, change `"./data"` to wherever it is stored and set `download` to `False`.
@@ -171,7 +171,8 @@ print(metadata.rows_at("instance").select("item_index", "class_label", "object_s
 # %% [markdown]
 # Notice the difference between the two `item_index` columns. The first three detections all come from image 0,
 # because one image may hold many detections. Across these 200 images there are 1305 detections, so an image holds
-# about six on average. That spreading out from images to detections is what the rest of this tutorial is about.
+# about six and a half on average. That spreading out from images to detections is what the rest of this tutorial is
+# about.
 
 # %% [markdown]
 # ## Analyze the same factor at two levels
@@ -200,9 +201,9 @@ print(f"per detection n={len(per_detection):5d}  mean={per_detection.mean():.1f}
 # weights each flight by how many things it happened to see.
 #
 # This aggregation bias affects more than altitude. Any image-level factor computed from detection rows is skewed by
-# object frequency, and the skew carries into downstream metrics: the correlation metrics reported by `Balance`, the bin
-# thresholds for continuous factors and the class distributions evaluated by `Diversity`. In an object detection
-# dataset, unrecognized aggregation bias can produce unexpected bias evaluation results.
+# object frequency, and the skew carries into downstream metrics: the correlation metrics reported by `Balance` and the
+# class distributions evaluated by `Diversity`. In an object detection dataset, unrecognized aggregation bias can
+# produce unexpected bias evaluation results.
 
 # %% [markdown]
 # (binning-levels)=
@@ -467,7 +468,7 @@ print("altitude vs objects-per-image, correlation:")
 print(round(float(crowding.select(pl.corr("altitude", "n_objects")).item()), 3))
 
 # %% [markdown]
-# The positive correlation confirms the mechanism discussed in the "Analyze the same factor at two levels" section:
+# The positive correlation supports the mechanism discussed in the "Analyze the same factor at two levels" section:
 # higher flights frame more objects. Because this dynamic is now quantified as a factor, you can condition on it, bin by
 # it, or pass it to a bias evaluator. The next section passes it to one.
 #
@@ -483,9 +484,9 @@ print(
 )
 
 # %% [markdown]
-# Three of these columns are direct pixel measurements, whereas one is an aggregated summary. `unit_sharpness` and
-# `unit_background_sharpness` were measured over literal regions of the image. In contrast, `mean_object_sharpness` is
-# the average of the detection rows contained within the image.
+# Of the three sharpness columns, two are direct pixel measurements and one is an aggregated summary. `unit_sharpness`
+# and `unit_background_sharpness` were measured over literal regions of the image. In contrast, `mean_object_sharpness`
+# is the average of the detection rows contained within the image.
 #
 # Consider rows 1 and 2. Image 1's `mean_object_sharpness` of 61.7 is the sharpness of a single detected object. Image
 # 2's score of 33.1 averages five object measurements. Both report a single float, and only the companion `n_objects`
@@ -603,8 +604,8 @@ print("altitude > 60 m:", high.level_counts)
 # ## What you learned
 #
 # - Metadata holds several levels at once, one kind of row per level, and `level_counts` tells you how many of each.
-# - An image-level factor read from detection rows is weighted by detections per image. That weighting reshapes bin
-#   edges, correlations, and diversity scores.
+# - An image-level factor read from detection rows is weighted by detections per image. That weighting reshapes
+#   correlations and diversity scores. It does not move bin edges, because DataEval cuts them at the factor's own level.
 # - {meth}`.Metadata.at` chooses the rows and `inherited` chooses the columns. The two are independent.
 # - {func}`.image_stats` measures intrinsic factors over up to three regions (object, whole image, and the background
 #   behind the annotations), and {meth}`.Metadata.add_factors` places each at its own level from the result's

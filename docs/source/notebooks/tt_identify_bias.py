@@ -397,9 +397,10 @@ dep.plot(div, plot_classwise=True, figsize=(12, 5))
 # `swimmer` was spread over the different types of drone. This can result in subtle differences in the images that a
 # model can pick up, which is an opportunity for shortcut learning.
 #
-# The other factors with concerning diversity values are `object_size` and `altitude` (which were discussed above), and
-# `gimbal_pitch`, with a low 0.17 for `life_saving_appliances`, which means that the images show this class from a near
-# constant perspective.
+# The other factors with concerning diversity values are `object_size`, `altitude` and `gimbal_pitch`. Overall,
+# `object_size` is near 1, but the classwise plot shows it low, from 0.21 to 0.41, for every class except `swimmer`.
+# The `altitude` factor was discussed above. The `gimbal_pitch` factor has a low 0.17 for `life_saving_appliances`,
+# which means that the images show this class from a near constant perspective.
 #
 # Because many of the other factors have a large amount of missing metadata, it is hard to say how much their different
 # aspects could contribute to bias and shortcut learning.
@@ -525,6 +526,9 @@ drone = [v for (c, f), v in by_div.items() if f == "drone"]
 assert abs(max(drone) - 0.55) < 0.02
 assert abs(min(drone) - 0.10) < 0.02
 assert abs(by_div[("life_saving_appliances", "gimbal_pitch")] - 0.17) < 0.02
+size_diversity = {c: v for (c, f), v in by_div.items() if f == "object_size"}
+assert all(0.2 < v < 0.45 for c, v in size_diversity.items() if c != "swimmer")
+assert size_diversity["swimmer"] > 0.7
 
 # %% [markdown]
 # ## Conclusion
