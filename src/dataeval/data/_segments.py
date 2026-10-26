@@ -255,6 +255,11 @@ class VideoSegments(AnnotatedDataset[MultiobjectTrackingDatum]):
         return self._timestamps
 
     @property
+    def _source_items(self) -> NDArray[np.intp]:
+        """The source video behind each segment -- the private hook ``root_items`` walks."""
+        return self.segment_map[:, 0]
+
+    @property
     def segment_map(self) -> NDArray[np.intp]:
         """Array of shape ``(K, 3)`` containing ``(source index, start, end)`` for each segment."""
         return self._segment_map

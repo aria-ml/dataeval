@@ -6,8 +6,10 @@ import pytest
 
 from dataeval import Metadata
 from dataeval.bias._parity import Parity
+from dataeval.data import SequenceFrames
 from tests.conftest import MockICDataset, MockMetadata, to_metadata
 from tests.core.test_rao_scott import seq_gap
+from tests.data.test_frames import _FakeFrameTarget, make_dataset_of
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
@@ -545,6 +547,36 @@ class TestSamplingUnit:
         out = Parity().from_metadata(md)
         assert (out.group_source, out.group_level, out.test) == ("level", md.item_level, "rao_scott_f")
         assert (out.n_rows, out.n_groups) == (1000, 200)
+
+    @pytest.mark.filterwarnings("ignore:.*binned automatically:UserWarning")
+    def test_frame_view_counts_videos_not_frames(self):
+        """A factor that splits the classes across two videos is two observations, however many frames each has."""
+        index2label = {0: "a", 1: "b"}
+
+        def frame(label):
+            box = np.array([[1.0, 2.0, 9.0, 10.0]], dtype=np.float32)
+            return _FakeFrameTarget(np.array([0]), box, np.ones(1, dtype=np.float32), np.array([label]))
+
+        dataset = make_dataset_of([[frame(0)] * 30, [frame(1)] * 30])
+        dataset.metadata["index2label"] = index2label  # type: ignore[index]
+        site = np.repeat([0, 1], 30)
+        frames = Metadata(SequenceFrames(dataset))
+        frames.add_factors({"site": site}, level="unit")
+
+        out = Parity().from_metadata(frames)
+        assert (out.group_source, out.group_level, out.test) == ("source", None, "rao_scott_f")
+        assert (out.n_rows, out.n_groups) == (60, 2)
+        site_row = out.factors.filter(pl.col("factor_name") == "site")
+        # Two videos cannot support a grouped test: the factor is untestable, never associated.
+        assert site_row["status"].to_list() == ["untestable"]
+        assert np.isnan(site_row["p_value"][0])
+
+        independent = Metadata.from_factors({"site": site}, class_labels=np.repeat([0, 1], 30), index2label=index2label)
+        flat = Parity(assume_independent=True).from_metadata(independent)
+        flat_row = flat.factors.filter(pl.col("factor_name") == "site")
+        assert (flat.group_source, flat.test, flat.n_groups) == ("rows", "pearson", 60)
+        assert flat_row["status"].to_list() == ["associated"]
+        assert flat_row["p_value"][0] < 0.05
 
     def test_bare_container_requires_declaration(self):
         rng = np.random.default_rng(0)

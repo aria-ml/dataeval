@@ -175,6 +175,14 @@ vision datasets the rows are often dependent:
 - A crowded scene puts many detections at one level of a factor, so a few
   images can supply most of a level's rows.
 
+The same holds when the rows come from a derived view of a dataset. The frames
+of a `SequenceFrames` view are not independent samples of their video, and the
+crops of a `DetectionCrops` view are not independent samples of their image.
+Parity groups such rows by the video or image they came from, however the view
+was thinned or reordered, and reports `group_source="source"`. A video
+contributes one unit whether the view keeps all of its frames or every other
+one.
+
 Dependent rows carry less information than the same number of independent rows,
 and a test that treats them as independent overstates the evidence. The table
 below gives false-positive rates at α = 0.05 of a row-level chi-squared test and
@@ -258,9 +266,16 @@ in {attr}`~.ParityOutput.group_source` and the level it grouped by in
 - - Input
   - Grouped by
   - `group_source`
-- - A {class}`.Metadata` whose `item_indices` map several rows to one item, at
-    any view: detections, frames, tracks, or item ids repeated at the item
-    level
+- - A {class}`.Metadata` over a derived view: a `SequenceFrames`, a
+    `DetectionCrops`, a `View` or a {func}`.merge_datasets` of either, or a
+    `View` or merge that repeats items of a plain dataset
+  - The root source item behind each row: the video for frames, the image for
+    crops, the dataset item for a `View` or merge that repeats items
+  - `"source"`, with no `group_level`, when some source item stands behind more
+    than one item; otherwise the rows group as any other {class}`.Metadata`
+- - Any other {class}`.Metadata` whose `item_indices` map several rows to one
+    item, at any view: detections, frames, tracks, or item ids repeated at the
+    item level
   - The dataset item each row belongs to: the image for object detection, the
     sequence for tracking and video
   - `"level"`, with `group_level` naming the item level

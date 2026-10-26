@@ -257,6 +257,10 @@ def _manifest(md: "Metadata", store: LevelStore) -> dict[str, Any]:
         "partial_factors": bool(md._partial_factors),
         "is_filtered": bool(md._is_filtered),
         "cut_below_items": bool(md._cut_below_items),
+        # Always written, null when the dataset was not a derived view, so that the key's absence
+        # marks an archive from before source groups were recorded. `load` refuses one of those
+        # that came from frames or crops, whose rows would otherwise read as independent.
+        "root_items": None if md._root_items is None else md._root_items.tolist(),
     }
 
 
@@ -404,6 +408,66 @@ def _reject_schema_drift(manifest: Mapping[str, Any], schema: FactorLevelSchema)
             f"dataeval declares levels {levels[1]} with edges {edges[1]} for task "
             f"{manifest.get('task')!r}. Rebuild the metadata from its dataset and save it again.",
         )
+
+
+def _reject_unrecorded_groups(manifest: Mapping[str, Any], structurer: Structurer, store: LevelStore) -> None:
+    """Refuse an archive from a derived view that was saved before source groups were recorded.
+
+    Both ``SequenceFrames`` and ``DetectionCrops`` write ``source_id`` into every item's datum
+    metadata, and it lands as a column of the item level. A file without the ``root_items`` key
+    whose item level holds one was probably saved from a derived view and would restore with each
+    frame or crop standing alone. A plain dataset that happens to carry its own ``source_id`` is
+    refused too, which costs its owner a rebuild and never restores the wrong grouping silently.
+    A ``from_factors`` archive is never refused, because it has no dataset to rebuild from.
+
+    Raises
+    ------
+    MetadataFormatError
+        When the key is absent and the item level has a ``source_id`` column.
+    """
+    if (
+        manifest.get("task") != "factors"
+        and "root_items" not in manifest
+        and "source_id" in store.frame(structurer.item_level).columns
+    ):
+        raise MetadataFormatError(
+            "This file was probably saved from a derived view (frames or crops) before source groups were "
+            "recorded, or its dataset's own items carry a source_id. Restoring it could treat every frame or "
+            "crop as independent. Rebuild the metadata from its dataset and save it again.",
+        )
+
+
+def _recorded_root_items(
+    manifest: Mapping[str, Any], store: LevelStore, item_level: FactorLevel
+) -> NDArray[np.intp] | None:
+    """Read the archive's root items back as a read-only array, or None where it recorded none.
+
+    One entry per dataset item, so an unfiltered file must hold exactly ``count`` of them. A
+    filtered file's ``count`` is the surviving items while its map still spans the whole
+    dataset, so there the check is that every row's item has an entry.
+
+    Raises
+    ------
+    MetadataFormatError
+        When the map does not fit the rows it describes.
+    """
+    recorded = manifest.get("root_items")
+    if recorded is None:
+        return None
+    roots = np.asarray(recorded, dtype=np.intp)
+    frame = store.frame(item_level)
+    top = int(frame["item_index"].max()) if frame.height else -1  # type: ignore[arg-type]
+    if (
+        roots.ndim != 1
+        or top >= len(roots)
+        or (not manifest.get("is_filtered") and len(roots) != int(manifest["count"]))
+    ):
+        raise MetadataFormatError(
+            f"This file records {len(roots)} root item(s) for {manifest['count']} dataset item(s); "
+            "the file is inconsistent. Rebuild the metadata from its dataset and save it again.",
+        )
+    roots.flags.writeable = False
+    return roots
 
 
 def _read_frame(archive: zipfile.ZipFile, name: str, height: int) -> pl.DataFrame:
@@ -575,6 +639,7 @@ def _adopt_manifest(md: "Metadata", manifest: Mapping[str, Any], structurer: Str
     # set has been rebuilt and can say whether the reading gave it a vocabulary.
     held = {name for columns in md._unusable_values.values() for name in columns}
     md._repaired = held & set(md._store.columns)
+    md._root_items = _recorded_root_items(manifest, store, structurer.item_level)
     md._is_filtered = bool(manifest["is_filtered"])
     md._cut_below_items = bool(manifest["cut_below_items"])
     # Not written, and said so rather than answered as an empty dataset would be.
@@ -681,6 +746,7 @@ def restore(md: "Metadata", path: Path | str) -> None:
             structurer = _structurer_from(manifest)
             _reject_schema_drift(manifest, structurer.levels)
             store = _store_from(archive, manifest, structurer.levels)
+            _reject_unrecorded_groups(manifest, structurer, store)
     except zipfile.BadZipFile as exc:
         raise MetadataFormatError(f"Not a dataeval metadata file: {exc}") from exc
     except KeyError as exc:

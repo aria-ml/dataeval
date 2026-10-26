@@ -66,7 +66,11 @@ class BalanceOutput(DictOutput):
 
           The chance correction uses effective entity counts when factors are defined
           at coarser hierarchy levels than the current view, preventing artificial
-          correlation from repeated rows.
+          correlation from repeated rows. Over a derived view, such as
+          :class:`~dataeval.data.DetectionCrops` or :class:`~dataeval.data.SequenceFrames`,
+          a factor (or the labels) that never changes within a source image or video counts
+          its source groups rather than its crops or frames, since those rows are not
+          independent samples of it.
 
           .. versionchanged:: 1.2
               Pairs of factors defined above the level being read score lower, and

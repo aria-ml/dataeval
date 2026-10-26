@@ -8,8 +8,11 @@ from pydantic import BaseModel
 
 from dataeval import Metadata
 from dataeval._helpers import apply_config, axis_vocabulary, get_overrides, independence_groups
+from dataeval.data import DetectionCrops, Indices, SequenceFrames, Stride, View
 from tests.bias.test_balance import _sequences
 from tests.conftest import MockMetadata, to_metadata
+from tests.data.test_crops import _simple_dataset
+from tests.data.test_frames import make_dataset
 
 
 class _Config(BaseModel):
@@ -128,6 +131,114 @@ class TestEffectiveEntityCounts:
         assert effective_entity_counts(metadata, SimpleNamespace(level="unit"), ["w"]) is None  # type: ignore[arg-type]
 
 
+def _counts(md, names, label=None):
+    """What Balance asks for: the counts over the label axis and the named factors."""
+    from dataeval._helpers import effective_entity_counts, resolve_label_axis
+
+    return effective_entity_counts(md, resolve_label_axis(md, label), names)
+
+
+def _with_frame_labels(labels_by_video):
+    """A frame view of videos with one detection per frame, labeled as given."""
+    from tests.data.test_frames import _FakeFrameTarget, make_dataset_of
+
+    def target(label):
+        return _FakeFrameTarget(
+            track_ids=np.zeros(1, dtype=np.int64),
+            boxes=np.array([[0.0, 0.0, 4.0, 4.0]], dtype=np.float32),
+            scores=np.ones(1, dtype=np.float32),
+            labels=np.array([label]),
+        )
+
+    return make_dataset_of([[target(label) for label in labels] for labels in labels_by_video])
+
+
+def _drifting_frames():
+    """A frame view with a per-frame ``drift`` that is cut to one bin per video, and a per-video ``tag``."""
+    md = Metadata(SequenceFrames(make_dataset()[0]), continuous_factor_bins={"drift": 2})
+    drift = np.r_[np.linspace(0.01, 0.06, 6), 100 + np.linspace(0.01, 0.04, 4)]
+    md.add_factors({"drift": drift, "tag": np.array([5.5] * 6 + [7.5] * 4)}, level="unit")
+    return md
+
+
+def _codes_constant_per_video(md, factor):
+    """Whether the factor's codes (what Balance bins to) hold one value in every video."""
+    codes = md.factor_data[:, md.factor_names.index(factor)]
+    by_video = np.asarray(md._root_items)[md.item_indices]
+    return all(len(set(codes[by_video == video])) == 1 for video in (0, 1))
+
+
+@pytest.mark.required
+class TestEffectiveEntityCountsOverDerivedViews:
+    def test_effective_counts_over_frame_view(self):
+        """A factor constant within each video counts videos; one that varies counts frames."""
+        md = Metadata(SequenceFrames(make_dataset()[0]))  # 10 frames in 2 videos, 2 detections each
+        counts = _counts(md, ["sequence_n_frames", "frame"])
+        assert counts is not None
+        assert counts.tolist() == [2, 2, 10]  # the single class is constant within a video too
+
+    def test_binned_per_frame_factor_still_counts_frames(self):
+        """A bin can hide a change within a video; constancy is read from the values, not the bins."""
+        md = Metadata(SequenceFrames(make_dataset()[0]), continuous_factor_bins={"drift": 2})
+        drift = np.r_[np.linspace(0.01, 0.06, 6), 100 + np.linspace(0.01, 0.04, 4)]
+        md.add_factors({"drift": drift}, level="unit")
+        codes = md.factor_data[:, md.factor_names.index("drift")]
+        by_video = np.asarray(md._root_items)[md.item_indices]
+        assert all(len(set(codes[by_video == video])) == 1 for video in (0, 1))  # the bins are constant
+        counts = _counts(md, ["drift"])
+        assert counts is not None
+        assert counts.tolist() == [2, 10]
+
+    def test_label_axis_constant_and_varying(self):
+        constant = _counts(Metadata(SequenceFrames(make_dataset()[0])), ["sequence_n_frames"])
+        assert constant is not None
+        assert constant[0] == 2  # one class: constant within each video
+        md = Metadata(SequenceFrames(_with_frame_labels([[0, 1, 0], [0, 1]])))
+        varying = _counts(md, ["sequence_n_frames"])
+        assert varying is not None
+        assert varying.tolist() == [5, 2]  # labels change within a video: the level-based count
+
+    def test_derived_axis_is_read_from_values_not_codes(self):
+        """An axis cut to one bin per video still changes within it, so it counts frames."""
+        md = _drifting_frames()
+        assert _codes_constant_per_video(md, "drift")
+        counts = _counts(md, ["sequence_n_frames"], label="drift")
+        assert counts is not None
+        assert counts.tolist() == [10, 2]
+
+    def test_derived_axis_of_a_video_constant_factor_counts_videos(self):
+        counts = _counts(_drifting_frames(), ["frame"], label="tag")
+        assert counts is not None
+        assert counts.tolist() == [2, 10]
+
+    def test_classed_by_axis_is_read_from_values_not_codes(self):
+        base = _drifting_frames()
+        assert _codes_constant_per_video(base, "drift")
+        counts = _counts(base.classed_by("drift"), ["sequence_n_frames"])
+        assert counts is not None
+        assert counts.tolist() == [10, 2]
+
+    def test_classed_by_a_video_constant_factor_counts_videos(self):
+        counts = _counts(_drifting_frames().classed_by("tag"), ["frame"])
+        assert counts is not None
+        assert counts.tolist() == [2, 10]
+
+    def test_crops_count_images_for_an_image_constant_factor(self):
+        md = Metadata(DetectionCrops(_simple_dataset()))  # 5 crops in 3 images
+        counts = _counts(md, ["source_id", "target"])
+        assert counts is not None
+        assert counts.tolist() == [5, 3, 5]
+
+    def test_a_plain_dataset_is_counted_by_level_alone(self):
+        md = Metadata(_sequences(3, 4))
+        md.add_factors({"weather": np.arange(3)}, level="sequence")
+        assert md.item_level is not None
+        assert md._root_items is None
+        counts = _counts(md, ["weather"])
+        assert counts is not None
+        assert counts.tolist() == [12, 3]
+
+
 def _bare(item_indices=None, n=5):
     """A container with no levels of its own, optionally declaring ``item_indices``."""
     return MockMetadata(
@@ -197,6 +308,54 @@ class TestIndependenceGroups:
 
         unique = Metadata.from_factors(factors, class_labels=labels, item_indices=np.arange(5))
         assert independence_groups(unique, assume_independent=False).source == "rows"
+
+    @pytest.mark.parametrize(("selector", "videos"), [(None, [0] * 6 + [1] * 4), (Stride(2), [0, 0, 0, 1, 1])])
+    def test_frame_view_groups_by_video(self, selector, videos):
+        """Two detections per frame: every row takes its frame's video, never the frame."""
+        md = Metadata(SequenceFrames(make_dataset()[0], *(() if selector is None else (selector,))))
+        result = independence_groups(md, assume_independent=False)
+        assert (result.source, result.level) == ("source", None)
+        assert result.groups is not None
+        np.testing.assert_array_equal(result.groups, np.repeat(videos, 2))
+        assert len(np.unique(result.groups)) == 2
+
+    def test_crop_view_groups_by_image(self):
+        md = Metadata(DetectionCrops(_simple_dataset()))
+        result = independence_groups(md, assume_independent=False)
+        assert (result.source, result.level) == ("source", None)
+        assert result.groups is not None
+        np.testing.assert_array_equal(result.groups, [0, 0, 1, 2, 2])
+
+    def test_view_over_crops_follows_the_rows_kept(self):
+        view = View(DetectionCrops(_simple_dataset()), Indices([4, 3, 0]))
+        result = independence_groups(Metadata(view), assume_independent=False)
+        assert result.source == "source"
+        assert result.groups is not None
+        np.testing.assert_array_equal(result.groups, [2, 2, 0])
+
+    def test_derived_view_with_one_row_per_root_item_is_rows(self):
+        view = View(DetectionCrops(_simple_dataset()), Indices([0, 2, 3]))
+        result = independence_groups(Metadata(view), assume_independent=False)
+        assert (result.groups, result.source, result.level) == (None, "rows", None)
+
+    def test_root_items_win_over_the_declaration(self):
+        md = Metadata(DetectionCrops(_simple_dataset()))
+        assert independence_groups(md, assume_independent=True).source == "source"
+
+    def test_empty_derived_view_is_rows_like_empty_metadata(self):
+        empty = Metadata(View(SequenceFrames(make_dataset()[0]), Indices([])), task="OD")
+        result = independence_groups(empty, assume_independent=False)
+        assert (result.groups, result.source, result.level) == (None, "rows", None)
+
+    def test_view_over_plain_dataset_with_repeats_groups_copies(self):
+        """Copies of one item are one unit; a view holding one row per item leaves the rows independent."""
+        repeated = independence_groups(Metadata(View(_simple_dataset(), Indices([0, 0, 1]))), assume_independent=False)
+        assert repeated.source == "source"
+        assert repeated.groups is not None
+        np.testing.assert_array_equal(repeated.groups, [0, 0, 0, 0, 1])
+
+        once = independence_groups(Metadata(View(_simple_dataset(), Indices([1]))), assume_independent=False)
+        assert (once.groups, once.source) == (None, "rows")
 
     def test_custom_item_indices(self):
         result = independence_groups(_bare([0, 0, 1, 1, 2]), assume_independent=False)

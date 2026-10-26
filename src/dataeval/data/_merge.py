@@ -155,6 +155,15 @@ class _MergedDataset(AnnotatedDataset[_TDatum]):
     def metadata(self) -> DatasetMetadata:
         return self._metadata
 
+    @property
+    def _merged_parts(self) -> tuple[tuple[AnnotatedDataset[_TDatum], int], ...]:
+        """Each merged dataset with the length this merge indexes it by, in order.
+
+        The private hook that walks a merge of derived views to its root items. The lengths are the ones fixed at
+        construction, which ``__getitem__`` reads by, so the walk splits positions exactly as reading them does.
+        """
+        return tuple(zip(self._datasets, self._lengths, strict=True))
+
     def __len__(self) -> int:
         return sum(self._lengths)
 
@@ -218,6 +227,13 @@ def merge_datasets(
     distinguishable — the merged view is itself a dataset, and
     :class:`~dataeval.Metadata` reads the ``id`` as the item's identity. A datum that
     carries no ``id`` is passed through untouched.
+
+    A merge of frame or crop views keeps their grouping for :class:`~dataeval.bias.Parity` and
+    :class:`~dataeval.bias.Balance`: frames still group by their video and crops by their image,
+    and views built over the same dataset object share its videos or images. A dataset merged more
+    than once, directly or through a view of it such as an augmented copy
+    (``merge_datasets(ds, View(ds, ...))``), groups its copies the same way, since a copy is not an
+    independent sample. Separately loaded copies of the same data are told apart, as two sources.
 
     .. versionchanged:: 1.2
         Each datum's ``id`` is prefixed with its source dataset's position. v1.1 passed
