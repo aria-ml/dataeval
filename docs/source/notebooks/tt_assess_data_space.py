@@ -374,7 +374,7 @@ assert len(cov["uncovered_indices"]) > 0
 #
 # - Applied cluster-based feature space metrics ({func}`.cluster`, {class}`.Outliers`, {func}`.coverage_adaptive`) to evaluate unlabeled imagery.
 # - Differentiated between corrupt/irrelevant outliers (candidates for pruning) and underrepresented operational edge cases (candidates for targeted collection).
-# - Combined density and coverage metrics to prioritize dataset enrichment.
+# - Combined outlier and coverage flags to choose between removing images and collecting more data.
 
 # %% [markdown]
 # ## Next steps

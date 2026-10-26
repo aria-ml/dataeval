@@ -348,8 +348,8 @@ print(coverage.data().select(["class", "count", "dispersion", "isotropy", "near_
 # %% [markdown]
 # Three classes look healthy by count, yet each trips a different signal while the other two signals stay normal:
 #
-# - `ship` has dispersion an order of magnitude below the rest: its 300 images collapse into a tiny region of the space,
-#   so the class is clustered.
+# - `ship` has dispersion of 0.16, against 0.75 to 1.10 for every other class: its 300 images collapse into a tiny
+#   region of the space, so the class is clustered.
 # - `automobile` has normal dispersion but isotropy near zero: it spreads out, yet all along a single axis, because the
 #   interpolation gave it one degree of freedom.
 # - `truck` has normal dispersion and isotropy but a high near-duplicate fraction (about a third): that share of it sits
@@ -446,6 +446,13 @@ assert report_by_class["truck"]["gap"] == "deduplicate (repeated frames)"  # hig
 assert report_by_class["automobile"]["gap"] == "vary the axis (one-dimensional)"  # low isotropy
 assert all(report_by_class[c]["gap"] == "ok" for c in ["airplane", "cat", "dog", "deer"])  # the varied classes
 
+# the sizes the text quotes
+coverage_by_class = {row["class"]: row for row in cov.iter_rows(named=True)}
+assert coverage_by_class["ship"]["dispersion"] < 0.2
+assert all(0.7 < row["dispersion"] < 1.2 for name, row in coverage_by_class.items() if name != "ship")
+assert coverage_by_class["automobile"]["isotropy"] < 0.05
+assert 0.3 < coverage_by_class["truck"]["near_duplicate_fraction"] < 0.35
+
 # %% [markdown]
 # Each check caught a gap the others missed:
 #
@@ -460,7 +467,7 @@ assert all(report_by_class[c]["gap"] == "ok" for c in ["airplane", "cat", "dog",
 # %% [markdown]
 # ## Conclusion
 #
-# In this tutorial you turned a set of counts that looked healthy into a concrete, prioritized collection plan. You saw
+# In this tutorial you turned a set of counts that looked healthy into a concrete collection plan. You saw
 # that "is my dataset complete?" is two questions: {class}`.Representation` answered which categories you have against
 # an {class}`.Ontology`, and {class}`.Coverage` answered how varied each one is along three independent axes
 # (dispersion, isotropy, near-duplicate fraction). Each axis surfaces a gap that the counts, the ontology, and the other
