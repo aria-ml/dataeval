@@ -16,9 +16,8 @@
 # %% [markdown]
 # # Identify out-of-distribution samples
 #
-# This guide demonstrates how to identify
-# [out-of-distribution](../concepts/DistributionShift.md#out-of-distribution-detection) (OOD) samples using
-# reconstruction-based methods with different model architectures.
+# Learn how to identify [out-of-distribution](../concepts/DistributionShift.md#out-of-distribution-detection) (OOD)
+# samples using reconstruction-based methods with different model architectures, and distance-based methods.
 #
 # Estimated time to complete: 15 minutes
 #
@@ -50,37 +49,37 @@
 # %% [markdown]
 # ## Introduction
 #
-# Out-of-distribution (OOD) detection is critical for ensuring model reliability in production. When models encounter data
-# that differs significantly from their training distribution, predictions become unreliable. This tutorial demonstrates
-# six different approaches to OOD detection:
+# Out-of-distribution (OOD) detection helps ensure model reliability in production. When models encounter data that
+# differs significantly from their training distribution, predictions become unreliable. This tutorial covers six
+# approaches to OOD detection.
 #
-# **Reconstruction-Based Methods:**
+# Reconstruction-based methods:
 #
-# 1. **Standard Autoencoder (AE)**: Simple reconstruction-based detection using mean squared error
-# 1. **Variational Autoencoder (VAE)**: Probabilistic approach with regularized latent space
-# 1. **AE with GMM**: Enhanced detection by modeling latent space with Gaussian Mixture Models
-# 1. **VAE with GMM**: Combining probabilistic encoding with GMM for robust detection
+# 1. Standard autoencoder (AE): simple reconstruction-based detection using mean squared error
+# 1. Variational autoencoder (VAE): a probabilistic approach with a regularized latent space
+# 1. AE with GMM: enhanced detection by modeling the latent space with Gaussian Mixture Models
+# 1. VAE with GMM: probabilistic encoding combined with GMM for reliable detection
 #
-# **Distance-Based Methods:**
+# Distance-based methods:
 #
-# 1. **KNN with Cosine Distance**: Measures angular similarity in learned [embeddings](../concepts/Embeddings.md)
-# 1. **KNN with Euclidean Distance**: Measures straight-line distance in learned embeddings
+# 1. KNN with cosine distance: measures angular similarity in learned [embeddings](../concepts/Embeddings.md)
+# 1. KNN with Euclidean distance: measures straight-line distance in learned embeddings
 #
-# For this tutorial, you'll use the MNIST dataset of handwritten digits. You'll train models to recognize digits 0-7 and
-# test their ability to detect digits 8-9 as out-of-distribution samples.
+# For this tutorial, you will use the MNIST dataset of handwritten digits. You will train models to recognize digits 0-7
+# and test their ability to detect digits 8-9 as out-of-distribution samples.
 
 # %% [markdown]
 # ## Setup
 #
-# First, install the required packages and import necessary libraries.
+# Install the required packages and import the libraries you need.
 
 # %% [markdown]
 # ### Important note on expected results
 #
-# OOD detection performance depends on how different the OOD data is from the in-distribution data. This tutorial trains on digits
-# 0-7 and treats digits 8-9 as out of distribution. That is a hard case: digit 8 shares circular shapes with 0 and 6, and digit 9
-# shares curves with 3 and 5. The threshold of each detector is set so that about 95% of in-distribution samples are accepted. The
-# "Comparing use cases" section adds an easy and a medium case.
+# OOD detection performance depends on how different the OOD data is from the in-distribution data. This tutorial trains
+# on digits 0-7 and treats digits 8-9 as out of distribution. That is a hard case: digit 8 shares circular shapes with 0
+# and 6, and digit 9 shares curves with 3 and 5. The threshold of each detector is set so that about 95% of
+# in-distribution samples are accepted. The "Comparing use cases" section adds an easy and a medium case.
 
 # %%
 try:
@@ -121,7 +120,7 @@ print(f"Using device: {device}")
 # %% [markdown]
 # ## Prepare the data
 #
-# You'll load the MNIST dataset and split it into in-distribution (digits 0-7) and out-of-distribution (digits 8-9)
+# You will load the MNIST dataset and split it into in-distribution (digits 0-7) and out-of-distribution (digits 8-9)
 # samples.
 
 
@@ -210,22 +209,24 @@ plt.show()
 # %% [markdown]
 # ## K-nearest neighbors (KNN) for OOD detection
 #
-# KNN-based OOD detection is a simple yet effective approach that utilizes a pretrained model to create learned
-# embeddings. It works by measuring how far test samples are from their nearest neighbors in the training data. Samples
-# that are far from all training samples are likely OOD.
+# KNN-based OOD detection uses a pretrained model to create learned embeddings. It works by measuring how far test
+# samples are from their nearest neighbors in the training data. Samples that are far from all training samples are
+# likely OOD.
 #
-# **Use Case**: Fast baseline for OOD detection without model training, interpretable distance-based scoring.
+# Use it as a fast baseline for OOD detection without model training, with interpretable distance-based scoring.
 #
-# > **⚠️ Important Note on Embeddings**: KNN performance depends entirely on the quality of the embeddings you provide:
+# :::{note}
+# KNN performance depends on the quality of the embeddings you provide:
 #
-# - **Better embeddings = better OOD detection**: Use task-specific, well-trained models
-# - **For images**: ResNets, Vision Transformers (ViT), CLIP, or custom CNNs trained on similar data
-# - **For text**: BERT, sentence transformers, domain-specific language models
-# - **For time series**: LSTMs, Transformers trained on temporal data
-# - **For tabular**: MLPs or autoencoders trained on your feature space
+# - Better embeddings give better OOD detection, so use task-specific, well-trained models
+# - For images, use ResNets, Vision Transformers (ViT), CLIP, or custom CNNs trained on similar data
+# - For text, use BERT, sentence transformers, or domain-specific language models
+# - For time series, use LSTMs or Transformers trained on temporal data
+# - For tabular data, use MLPs or autoencoders trained on your feature space
+# :::
 #
-# This tutorial trains a simple CNN for demonstration, but using pretrained models (e.g., ImageNet-pretrained ResNet)
-# would likely improve results significantly.
+# This tutorial trains a simple CNN for demonstration, but using pretrained models (for example, an ImageNet-pretrained
+# ResNet) would likely improve the results.
 
 
 # %%
@@ -350,9 +351,9 @@ print(f"Average score (OOD): {knn_cos_result_ood.instance_score.mean():.4f}")
 # %% [markdown]
 # ### KNN with Euclidean distance
 #
-# Euclidean distance measures the straight-line distance between points in the embedding space. Unlike cosine similarity,
-# which only considers the angle between vectors, Euclidean distance also accounts for their magnitude. This makes it
-# better suited for embeddings where the scale of the vectors carries meaningful information.
+# Euclidean distance measures the straight-line distance between points in the embedding space. Unlike cosine
+# similarity, which only considers the angle between vectors, Euclidean distance also accounts for their magnitude. This
+# makes it better suited for embeddings where the scale of the vectors carries meaningful information.
 
 # %%
 # Create KNN detector with Euclidean distance
@@ -381,20 +382,21 @@ print(f"Average score (OOD): {knn_euc_result_ood.instance_score.mean():.4f}")
 # ## Standard autoencoder (AE) for OOD detection
 #
 # The simplest approach uses a standard autoencoder that learns to reconstruct normal (in-distribution) images. When
-# presented with OOD data, reconstruction error increases, signaling anomalous samples.
+# presented with OOD data, reconstruction error increases, which signals anomalous samples.
 #
-# **Use Case**: Fast, simple OOD detection when you have well-separated distributions and don't need probabilistic
+# Use it for fast, simple OOD detection when your distributions are well separated and you do not need probabilistic
 # interpretations.
 #
-# > **⚠️ Important Note on Model Architecture**: This tutorial uses a simple, generic AE architecture provided by DataEval
-# > for demonstration purposes. In production:
+# :::{note}
+# This tutorial uses a simple, generic AE architecture provided by DataEval for demonstration purposes. In production:
 #
-# - **Design architectures for your data type**: CNNs for images, LSTMs/Transformers for sequences, MLPs for tabular data
-# - **Match complexity to your problem**: Deeper networks for complex data, simpler for basic patterns
-# - **Tune hyperparameters**: Latent dimension size, layer widths, activation functions, etc.
-# - **Your model choice significantly impacts OOD detection performance**
+# - Design architectures for your data type: CNNs for images, LSTMs or Transformers for sequences, MLPs for tabular data
+# - Match the complexity to your problem: deeper networks for complex data, simpler ones for basic patterns
+# - Tune hyperparameters such as the latent dimension size, layer widths and activation functions
+# - Your model choice significantly impacts OOD detection performance
+# :::
 #
-# The DataEval `OODReconstruction` class works with any PyTorch model you provide—customize it for best results.
+# The DataEval `OODReconstruction` class works with any PyTorch model you provide. Customize it for best results.
 
 # %%
 # Create and configure the autoencoder
@@ -450,11 +452,11 @@ else:
 # %% [markdown]
 # ## Variational autoencoder (VAE) for OOD detection
 #
-# VAEs learn a probabilistic latent representation, which provides better generalization and more structured latent spaces
-# compared to standard AEs. This can improve OOD detection, especially when in-distribution data has high variability.
+# VAEs learn a probabilistic latent representation, which provides better generalization and more structured latent
+# spaces compared to standard AEs. This can improve OOD detection, especially when in-distribution data has high
+# variability.
 #
-# **Use Case**: When you need a more robust latent representation or when your in-distribution data has significant
-# variance.
+# Use it when you need a more robust latent representation or when your in-distribution data has significant variance.
 
 # %%
 # Create and configure the VAE
@@ -493,12 +495,14 @@ print(f"Average score (OOD): {vae_result_ood.instance_score.mean():.4f}")
 # reconstruction error with density estimation using **sensor fusion**: both components are standardized (z-score
 # normalized) and combined with configurable weighting.
 #
-# **Use Case**: When you need higher detection accuracy and have complex in-distribution data that naturally clusters into
+# Use it when you need higher detection accuracy and have complex in-distribution data that naturally clusters into
 # multiple groups.
 #
-# > **⚠️ Important**: GMM fusion parameters (`gmm_weight` and `gmm_score_mode`) significantly impact performance. The
-# > default `gmm_weight=0.7` favors the GMM component, which typically works well. Experiment with values in [0.5, 0.9]
-# > for your data.
+# :::{note}
+# The GMM fusion parameters (`gmm_weight` and `gmm_score_mode`) significantly impact performance. The default
+# `gmm_weight=0.7` favors the GMM component, which typically works well. Experiment with values in [0.5, 0.9] for your
+# data.
+# :::
 
 # %%
 # Create AE with GMM density network
@@ -552,7 +556,7 @@ print(f"Average score (OOD): {ae_gmm_result_ood.instance_score.mean():.4f}")
 # Combining VAE's probabilistic latent space with GMM density estimation provides the most sophisticated OOD detection
 # approach. This is particularly effective when you need high reliability and have sufficient computational resources.
 #
-# **Use Case**: Production systems where false negatives (missing OOD samples) are costly, and you need maximum detection
+# Use it in production systems where false negatives (missing OOD samples) are costly, and you need maximum detection
 # reliability.
 
 # %%
@@ -594,7 +598,7 @@ print(f"Average score (OOD): {vae_gmm_result_ood.instance_score.mean():.4f}")
 # %% [markdown]
 # ## Compare all methods
 #
-# Now let's visualize and compare the performance of all six approaches.
+# Now visualize and compare the performance of all six approaches.
 
 # %%
 # Summary comparison
@@ -682,17 +686,18 @@ plt.show()
 # %% [markdown]
 # ### Interpreting score distributions
 #
-# Look at how far apart the blue (in-distribution) and red (OOD) histograms sit. Clear separation means the detector tells the two
-# apart, and overlap means it cannot. The printed average scores show that every detector scores the OOD samples higher than the
-# in-distribution samples on average. The overlap is large here because digits 8 and 9 share features with the training digits.
+# Look at how far apart the blue (in-distribution) and red (OOD) histograms sit. Clear separation means the detector
+# tells the two apart, and overlap means it cannot. The printed average scores show that every detector scores the OOD
+# samples higher than the in-distribution samples on average. The overlap is large here because digits 8 and 9 share
+# features with the training digits.
 
 # %% [markdown]
 # ## Visualize reconstructions
 #
-# Let's examine how reconstruction-based models reconstruct in-distribution vs out-of-distribution samples. Good OOD
+# Examine how reconstruction-based models reconstruct in-distribution and out-of-distribution samples. Good OOD
 # detection should show clear degradation in reconstruction quality for OOD samples.
 #
-# Note: KNN doesn't use reconstruction, so we'll focus on the autoencoder-based methods here.
+# Note: KNN does not use reconstruction, so this section focuses on the autoencoder-based methods.
 
 
 # %%
@@ -759,59 +764,62 @@ plt.show()
 #
 # What to observe:
 #
-# - **Columns**: Original image, AE reconstruction, VAE+GMM reconstruction
-# - **Rows 1-2**: In-distribution samples (digits 5 and 4)
-# - **Rows 3-4**: Out-of-distribution samples (digit 8)
+# - The columns show the original image, the AE reconstruction and the VAE+GMM reconstruction.
+# - Rows 1-2 are in-distribution samples (digits 5 and 4).
+# - Rows 3-4 are out-of-distribution samples (digit 8).
 #
 # Expected reconstruction behavior:
 #
-# - **In-dist**: Model has learned these patterns → good reconstruction → low error
-# - **OOD**: Model hasn't seen these patterns → worse reconstruction → high error
+# - In-distribution samples: the model has learned these patterns, so you expect good reconstruction and low error.
+# - OOD samples: the model has not seen these patterns, so you expect worse reconstruction and high error.
 #
-# Note: The degree of degradation depends on similarity between in-dist and OOD:
+# Note: The degree of degradation depends on the similarity between the in-distribution and OOD data:
 #
-# - Digits 8 and 9 share some features with 0-7 (curves, circles)
-# - So reconstructions may still look reasonable but will have higher error
-# - More distinct OOD data (e.g., letters instead of digits) would show clearer degradation
+# - Digits 8 and 9 share some features with 0-7 (curves, circles).
+# - So reconstructions may still look reasonable but will have higher error.
+# - More distinct OOD data (for example, letters instead of digits) would show clearer degradation.
 
 # %% [markdown]
 # ## Comparing use cases - when does each method excel?
 #
-# > **⚠️ IMPORTANT**: Results Reflect Limited Training & Generic Models
+# :::{note}
+# The results reflect limited training and generic models.
+# :::
 #
 # This comparison uses:
 #
-# - **Only 3 epochs** for AE/VAE training and KNN embedding model training (production typically needs 10-50+ epochs)
-# - **Small sample size**: 10K training, 3K test samples
-# - **Generic model architectures**: Simple CNNs not optimized for MNIST
-# - **Fast demonstration** prioritized over optimal performance
+# - Only 3 epochs for AE/VAE training and KNN embedding model training (production typically needs 10-50+ epochs)
+# - A small sample size: 10K training, 3K test samples
+# - Generic model architectures: simple CNNs not optimized for MNIST
+# - A fast demonstration, prioritized over optimal performance
 #
-# **What this means:**
+# This means:
 #
-# - Results show what happens with _minimal_ training and _generic_ models (useful for quick prototypes)
-# - **Model architecture matters**: Custom architectures designed for your data type (images, time series, tabular) will
+# - The results show what happens with minimal training and generic models, which is useful for quick prototypes
+# - Model architecture matters: custom architectures designed for your data type (images, time series, tabular) will
 #   perform significantly better
-# - With proper training/tuning and domain-specific architectures, the performance rankings may change significantly
+# - With proper training and tuning and domain-specific architectures, the performance rankings may change significantly
 # - Use these results as a starting point, not definitive guidance
 #
-# > **💡 Key Insight**: The AE, VAE, and GMM methods use **models you provide**. Performance heavily depends on:
+# :::{note}
+# The AE, VAE, and GMM methods use models you provide. Performance heavily depends on:
 #
 # - Choosing appropriate architectures for your data type and complexity
 # - Proper hyperparameter tuning (latent dimensions, layer sizes, activation functions)
 # - Sufficient training epochs and data
 # - Appropriate loss functions and regularization
+# :::
 #
-# The simple models used here serve as examples—real applications should use architectures targeted to the specific
+# The simple models used here serve as examples. Real applications should use architectures targeted to the specific
 # scenario.
 #
-# Let's test each method on different OOD scenarios to understand their strengths and weaknesses in this limited-training
-# setting.
+# Test each method on different OOD scenarios to see its strengths and weaknesses in this limited-training setting.
 #
-# We'll create three different OOD scenarios with increasing difficulty:
+# You create three OOD scenarios with increasing difficulty:
 #
-# 1. **Easy OOD**: CIFAR10 natural images (converted to grayscale 28x28) - completely different from digits
-# 1. **Medium OOD**: Rotated digits - same objects, different orientation
-# 1. **Hard OOD**: Digits 8-9 - similar features to training data (current scenario)
+# 1. Easy OOD: CIFAR10 natural images (converted to grayscale 28x28), which are completely different from digits
+# 1. Medium OOD: rotated digits, which are the same objects in a different orientation
+# 1. Hard OOD: digits 8-9 have features similar to the training data (the current scenario)
 
 # %%
 # Create different OOD scenarios
@@ -933,8 +941,8 @@ for model_name, rates in results_matrix.items():
     print(f"{model_name:15}" + "".join(f"{rates[name]:>19.1f}%" for name in scenario_names))
 
 # %% [markdown]
-# - Detection falls as the OOD data gets closer to the training data: every detector flags more of the CIFAR10 images than of the
-#   digits 8-9, and every detector flags more than 80% of the CIFAR10 images.
+# - Detection falls as the OOD data gets closer to the training data: every detector flags more of the CIFAR10 images
+#   than of the digits 8-9, and every detector flags more than 80% of the CIFAR10 images.
 # - On the rotated digits, the two detectors with a GMM head flag the most and the plain VAE flags the fewest.
 # - On digits 8-9, KNN with cosine distance flags the most and the plain VAE flags the fewest.
 #
@@ -960,14 +968,15 @@ assert min(hard, key=lambda model: hard[model]) == "VAE"
 # %% [markdown]
 # ## Conclusion
 #
-# You fit six out-of-distribution detectors on MNIST digits 0-7: {class}`.OODKNeighbors` with cosine and with Euclidean distance, and
-# {class}`.OODReconstruction` with an autoencoder, a variational autoencoder, and each of those with a Gaussian mixture head. You
-# then scored digits 8-9 and two easier scenarios with each.
+# You fit six out-of-distribution detectors on MNIST digits 0-7: {class}`.OODKNeighbors` with cosine and with Euclidean
+# distance, and {class}`.OODReconstruction` with an autoencoder, a variational autoencoder, and each of those with a
+# Gaussian mixture head. You then scored digits 8-9 and two easier scenarios with each.
 #
-# The detection rates above belong to this data and to three epochs of training. How each detector behaves on yours depends on its
-# embeddings or architecture, so run the comparison on a sample of your own data.
-# [Out-of-distribution detection](../concepts/DistributionShift.md#out-of-distribution-detection) describes the methods, and
-# [How to create embeddings](./h2_create_embeddings.py) shows how to build the embeddings that the KNN detectors need.
+# The detection rates above belong to this data and to three epochs of training. How each detector behaves on yours
+# depends on its embeddings or architecture, so run the comparison on a sample of your own data.
+# [Out-of-distribution detection](../concepts/DistributionShift.md#out-of-distribution-detection) describes the methods,
+# and [How to create embeddings](./h2_create_embeddings.py) shows how to build the embeddings that the KNN detectors
+# need.
 
 # %% [markdown]
 # ## Next steps
@@ -982,13 +991,13 @@ assert min(hard, key=lambda model: hard[model]) == "VAE"
 # Once you are familiar with DataEval and data monitoring, run this analysis using your own reference and operational
 # datasets.
 #
-# Experiment with:
+# Experiment with these changes:
 #
-# - **Better embeddings for KNN**: ResNet, ViT, CLIP, or domain-specific pretrained models
-# - **Distance metrics**: Compare cosine vs Euclidean on your embeddings to find the best fit
-# - **More training**: Train the models for more epochs and compare the rates
-# - **GMM tuning**: Try different `gmm_weight` and `n_gmm` values
-# - **Custom architectures**: Design models for your specific data type (not generic examples)
-# - **Different OOD scenarios**: Test on your own data with varying difficulty levels
-# - **Threshold adjustment**: Tune `threshold_perc` for your false positive tolerance
-# - **Transfer learning**: Use pretrained models instead of training from scratch
+# - Try better embeddings for KNN: ResNet, ViT, CLIP, or domain-specific pretrained models
+# - Compare cosine and Euclidean distance on your embeddings to find the best fit
+# - Train the models for more epochs and compare the rates
+# - Try different `gmm_weight` and `n_gmm` values
+# - Design custom architectures for your specific data type, and not generic examples
+# - Test different OOD scenarios on your own data, with varying difficulty levels
+# - Tune `threshold_perc` for your false positive tolerance
+# - Use pretrained models instead of training from scratch

@@ -16,8 +16,8 @@
 # %% [markdown]
 # # Detect drift with prediction uncertainty
 #
-# This guide shows how to monitor a deployed object detector for distribution shift using the model's own prediction
-# uncertainty as the drift signal.
+# Learn how to monitor a deployed object detector for distribution shift, using the model's own prediction uncertainty
+# as the drift signal.
 #
 # Estimated time to complete: 10 minutes
 #
@@ -48,30 +48,29 @@
 # %% [markdown]
 # ## Introduction
 #
-# Most drift detectors compare the _features_ of incoming data against a reference set (see the
-# [monitoring tutorial](./tt_monitor_shift.py)). But when you have a deployed model, the model itself is a sensitive
-# instrument: as operational data moves into regions the model was not trained on, its predictions become less confident.
+# Most drift detectors compare the features of incoming data against a reference set (see the
+# [monitoring tutorial](./tt_monitor_shift.py)). A deployed model gives you another signal: as operational data moves
+# into regions that the model was not trained on, its predictions become less confident.
 #
-# For a classifier — or, here, the classification head of an object detector — confidence can be summarized by the
+# You can summarize the confidence of a classifier, or here of the classification head of an object detector, as the
 # {term}`Shannon entropy<Shannon Entropy>` of the predicted class probabilities. Low entropy means a confident, peaked
-# prediction; high
-# entropy means the model is hedging across classes. If the _distribution_ of per-detection entropy shifts upward on
-# operational data, the model is increasingly operating in its uncertainty regions — a strong, label-free signal that the
-# data has drifted. See the
-# [uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection) concept page for
-# the theory and trade-offs.
+# prediction. High entropy means the model spreads its confidence across classes. If the distribution of per-detection
+# entropy shifts upward on operational data, the model is operating more often in regions where it is uncertain. That is
+# a label-free signal that the data has drifted. See the
+# [uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection) concept page
+# for the theory and trade-offs.
 #
 # In this tutorial you will use a pretrained [YOLOv8](https://docs.ultralytics.com/models/yolov8/) detector and the
-# [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main) dataset as in-distribution data. You will
-# then treat the [SeaDrone](https://seadronessee.cs.uni-tuebingen.de/) maritime detection dataset as a shifted
-# operational stream — top-down, drone-captured imagery over open water, a domain the everyday-object detector's training
-# never covered — and confirm that its prediction uncertainty has drifted while a held-out slice of in-distribution VOC
-# data has not.
+# [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main) dataset as in-distribution data. You
+# will then treat the [SeaDrone](https://seadronessee.cs.uni-tuebingen.de/) maritime detection dataset as a shifted
+# operational stream. It is top-down, drone-captured imagery over open water, a domain that the training of the
+# everyday-object detector never covered. You will confirm that its prediction uncertainty has drifted while a held-out
+# slice of in-distribution VOC data has not.
 
 # %% [markdown]
 # ## Setup
 #
-# You'll begin by importing the necessary libraries for this tutorial.
+# Begin by importing the libraries that this tutorial uses.
 
 # %% tags=["remove_cell"]
 try:
@@ -106,26 +105,26 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 set_batch_size(32)
 
 # %% [markdown]
-# > **More on device and batch size**
-# >
-# > The device is the piece of hardware where the model and data live in memory; if a GPU is available this notebook uses
-# > it, otherwise the CPU. The batch size set above is the default I/O chunk size DataEval uses when streaming images
-# > through an extractor. For more on these global settings, see the
-# > [configuration defaults how-to](./h2_configure_defaults.py).
+# :::{note}
+# The device is the piece of hardware where the model and data live in memory. If a GPU is available this notebook uses
+# it, and otherwise the CPU. The batch size set above is the default I/O chunk size that DataEval uses when streaming
+# images through an extractor. For more on these global settings, see the
+# [configuration defaults how-to](./h2_configure_defaults.py).
+# :::
 
 # %% [markdown]
 # ## Load the datasets
 #
 # You need two in-distribution references plus a held-out in-distribution set and a shifted set:
 #
-# - **train** and **val** — two disjoint, same-distribution slices of VOC; the train-vs-val distance calibrates the
-#   detector's baseline for "normal" variation between in-distribution samples.
-# - **test** — a third disjoint VOC slice, held out from calibration; because it is _exchangeable_ with train and val,
-#   the detector should report _no_ drift here.
-# - **drone** — SeaDrone maritime imagery, a genuinely shifted operational stream; the detector should report drift here.
+# - The train and val splits are two disjoint, same-distribution slices of VOC. The train-versus-val distance calibrates
+#   the detector's baseline for "normal" variation between in-distribution samples.
+# - The test split is a third disjoint VOC slice, held out from calibration. It is exchangeable with train and val, so
+#   the detector should report no drift here.
+# - The drone split is SeaDrone maritime imagery, a shifted operational stream. The detector should report drift here.
 #
-# To keep the tutorial fast, each split is capped to a small random subset with {class}`.View` and {class}`.Limit`.
-# Both datasets are already used by other guides, so they are typically cached locally. Raise `SAMPLES_PER_SPLIT` (or drop
+# To keep the tutorial fast, you cap each split to a small random subset with {class}`.View` and {class}`.Limit`. Both
+# datasets are already used by other guides, so they are typically cached locally. Raise `SAMPLES_PER_SPLIT` (or drop
 # the `Select` wrappers) to run on more data.
 
 # %%
@@ -168,17 +167,17 @@ plt.show()
 # %% [markdown]
 # ## Build the uncertainty feature extractor
 #
-# DataEval turns any model into a feature extractor via {class}`.TorchExtractor`. To extract _uncertainty_ from a
-# detection model you need two small adapter functions:
+# DataEval turns any model into a feature extractor via {class}`.TorchExtractor`. To extract uncertainty from a
+# detection model, you need two small adapter functions:
 #
-# - a **`transforms`** function that prepares each image for the model (resize to the model's input size and scale pixel
+# - a `transforms` function that prepares each image for the model (resize to the model's input size and scale pixel
 #   values to `[0, 1]`), and
-# - a **`postprocess_fn`** that decodes the model's raw output into a `(n_detections, n_classes)` array of per-detection
+# - a `postprocess_fn` that decodes the model's raw output into a `(n_detections, n_classes)` array of per-detection
 #   class scores.
 #
-# The `postprocess_fn` is the bridge between a model's idiosyncratic output format and the generic
-# `(instances, classes)` shape that {class}`.UncertaintyExtractor` consumes. The decoder below is specific to YOLOv8's
-# raw output; a different detector would need its own.
+# The `postprocess_fn` converts the output format of a model into the generic `(instances, classes)` shape that
+# {class}`.UncertaintyExtractor` consumes. The decoder below is specific to YOLOv8's raw output. A different detector
+# needs its own.
 
 
 # %%
@@ -225,17 +224,17 @@ scores = TorchExtractor(
 uncertainty = UncertaintyExtractor(scores, preds_type="logits", normalize=True)
 
 # %% [markdown]
-# > **Why `batch_size` on the extractor?**
-# >
-# > `TorchExtractor`'s `batch_size` is the model's _forward-pass_ batch size — how many images go through the network at
-# > once — which is distinct from the I/O chunk size `Embeddings` uses to stream data from disk. Setting it bounds GPU
-# > memory during inference regardless of how large each I/O chunk is.
+# :::{note}
+# The `batch_size` of `TorchExtractor` is the forward-pass batch size of the model: the number of images that go through
+# the network at once. It is distinct from the I/O chunk size that `Embeddings` uses to stream data from disk. Setting
+# it bounds GPU memory during inference regardless of how large each I/O chunk is.
+# :::
 
 # %% [markdown]
 # ## Compute uncertainty for each split
 #
-# Calling the extractor on a dataset returns an `(n_detections, 1)` array of normalized-entropy values — one per detection
-# across every image in the split.
+# Calling the extractor on a dataset returns an `(n_detections, 1)` array of normalized-entropy values, one for each
+# detection across every image in the split.
 
 # %%
 h_train = uncertainty(trainset)
@@ -248,7 +247,7 @@ print(f"detections -> train: {len(h_train)}  val: {len(h_val)}  test: {len(h_tes
 # %% [markdown]
 # ### Visualize the uncertainty distributions
 #
-# An empirical CDF (ECDF) makes the shift easy to read: if the SeaDrone curve sits to the _right_ of the VOC curves, the
+# An empirical CDF (ECDF) makes the shift easy to read: if the SeaDrone curve sits to the right of the VOC curves, the
 # detector is systematically more uncertain on the shifted imagery. The in-distribution splits (train, val, test) should
 # overlap closely.
 
@@ -263,16 +262,16 @@ plt.legend()
 plt.show()
 
 # %% [markdown]
-# The VOC splits cluster together while the SeaDrone distribution is visibly shifted toward higher entropy — exactly the
-# behavior you would expect from a detector encountering data outside its training distribution.
+# The VOC splits cluster together while the SeaDrone distribution is visibly shifted toward higher entropy. This is the
+# behavior you would expect from a detector that encounters data outside its training distribution.
 
 # %% [markdown]
 # ### Break uncertainty down per predicted class
 #
-# {class}`.ClasswiseUncertaintyExtractor` groups detections by their predicted class, so you can see _which_ classes the
-# model is most uncertain about rather than only the aggregate. A detection is assigned to every class whose confidence is
+# {class}`.ClasswiseUncertaintyExtractor` groups detections by their predicted class, so you can see which classes the
+# model is most uncertain about and not only the aggregate. A detection is assigned to every class whose confidence is
 # within a ratio `threshold` of its top class. The detector predicts across all 80 COCO classes, so to keep the figure
-# legible we plot only the few most frequently predicted classes and overlay the SeaDrone distribution for reference.
+# legible you plot only the few most frequently predicted classes and overlay the SeaDrone distribution for reference.
 
 # %%
 TOP_K_CLASSES = 6
@@ -300,10 +299,10 @@ plt.show()
 # {term}`Wasserstein distance<Wasserstein Distance>` between the reference and incoming uncertainty distributions and
 # flags drift when that distance grows beyond a calibrated baseline.
 #
-# Unlike most detectors, `DriftWasserstein` takes **two** in-distribution references in `fit()`: a training set and a
-# validation set. The train-vs-validation distance defines the _normal_ amount of variation between two same-distribution
-# samples, so the detector only alarms when incoming data is more different from training than validation was. This
-# calibration is what lets it ignore benign sampling noise.
+# Unlike most detectors, `DriftWasserstein` takes two in-distribution references in `fit()`: a training set and a
+# validation set. The train-versus-validation distance defines the normal amount of variation between two
+# same-distribution samples, so the detector only alarms when incoming data is more different from training than
+# validation was. This calibration lets it ignore benign sampling noise.
 
 # %%
 drift_detector = DriftWasserstein().fit(np.asarray(h_train), np.asarray(h_val))
@@ -361,12 +360,12 @@ assert result_test.distance < drift_detector.ratio_threshold < result_drone.dist
 # validation-calibrated {class}`.DriftWasserstein` detector to distinguish benign variation (a held-out VOC slice) from
 # genuine shift (SeaDrone imagery).
 #
-# Key takeaways:
+# You learned four things:
 #
-# - **Prediction uncertainty is a label-free drift feature** — no operational ground truth required
-# - **A `postprocess_fn` adapts any model's raw output** into the `(instances, classes)` shape DataEval consumes
-# - **`DriftWasserstein` calibrates against a validation set**, so it alarms on real shift rather than sampling noise
-# - **Per-class breakdowns** reveal _which_ classes drive the uncertainty, not just the aggregate
+# - Prediction uncertainty is a label-free drift feature, so you do not need operational ground truth.
+# - A `postprocess_fn` adapts the raw output of any model to the `(instances, classes)` shape that DataEval consumes.
+# - `DriftWasserstein` calibrates against a validation set, so it alarms on real shift and not on sampling noise.
+# - Per-class breakdowns show which classes drive the uncertainty, and not only the aggregate.
 
 # %% [markdown]
 # ## Next steps
@@ -380,6 +379,6 @@ assert result_test.distance < drift_detector.ratio_threshold < result_drone.dist
 #
 # Once you are comfortable with the workflow, adapt it to your own deployed model:
 #
-# - **Swap the model**: any classifier or detector works — supply a `postprocess_fn` for its output format
-# - **Swap the operational data**: point the drone split at your real incoming data stream
-# - **Tune sensitivity**: adjust `DriftWasserstein(ratio_threshold=...)` to trade off false alarms against missed drift
+# - Swap the model for any classifier or detector, and supply a `postprocess_fn` for its output format
+# - Point the drone split at your real incoming data stream
+# - Adjust `DriftWasserstein(ratio_threshold=...)` to trade off false alarms against missed drift

@@ -16,7 +16,7 @@
 # %% [markdown]
 # # Monitor shifts in operational data
 #
-# This guide provides a beginner friendly introduction on monitoring post deployment data shifts.
+# Learn the basics of monitoring data shifts after deployment.
 #
 # Estimated time to complete: 15 minutes
 #
@@ -48,22 +48,20 @@
 # %% [markdown]
 # ## Introduction
 #
-# Monitoring is a critical step in the [AI/ML lifecycle](../getting-started/roles/ML_Lifecycle.md). When a model is
-# deployed, data can, and generally will, [drift](../concepts/DistributionShift.md) from the distribution on which the
-# model was originally trained. One critical step in AI T&E is the detection of changes in the operational distribution so
-# that they may be proactively addressed. While some change might not affect performance, significant deviation is often
-# associated with model degradation.
+# Monitoring is a step in the [AI/ML lifecycle](../getting-started/roles/ML_Lifecycle.md). When a model is deployed,
+# data can, and generally will, [drift](../concepts/DistributionShift.md) from the distribution on which the model was
+# originally trained. Detecting changes in the operational distribution is part of AI T&E, so that you can address them
+# early. Some change might not affect performance, but significant deviation is often associated with model degradation.
 #
-# For this tutorial, you will use the popular
-# [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main) computer vision dataset to detect drift
-# between the image distribution of the `train` split and the `val` split, which will represent an operational dataset in
-# this guide. Both splits are narrowed to the indoor concepts a deployed model would actually see, mirroring how you
-# monitor the slice your model serves rather than an entire benchmark.
+# In this tutorial, you will use the [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main)
+# computer vision dataset to detect drift between the image distribution of the `train` split and the `val` split, which
+# represents an operational dataset. Both splits are narrowed to the indoor concepts that a deployed model would see,
+# which mirrors how you monitor the slice your model serves and not an entire benchmark.
 
 # %% [markdown]
 # ## Setup
 #
-# You'll begin by importing the necessary libraries for this tutorial.
+# Begin by importing the libraries that this tutorial uses.
 
 # %% tags=["remove_cell"]
 try:
@@ -99,23 +97,23 @@ set_device(device)
 set_seed(213, all_generators=True)
 
 # %% [markdown]
-# > **More on device**
-# >
-# > The device is set above as it will be used in subsequent steps. The device is the piece of hardware where the model,
-# > data, and other related objects are stored in memory. If a GPU is available, this notebook will use that hardware
-# > rather than the CPU. To force running only on the CPU, change `device` to `"cpu"` For more information, see the
-# > [PyTorch device page](https://pytorch.org/tutorials/recipes/recipes/changing_default_device.html).
+# :::{note}
+# The device is set above because later steps use it. The device is the piece of hardware where the model, data, and
+# other related objects are stored in memory. If a GPU is available, this notebook uses it and not the CPU. To force
+# running only on the CPU, change `device` to `"cpu"`. For more information, see the
+# [PyTorch device page](https://pytorch.org/tutorials/recipes/recipes/changing_default_device.html).
+# :::
 
 # %% [markdown]
 # ## Construct embeddings
 #
-# Rather than compare raw pixels, you'll work in [embedding](../concepts/Embeddings.md) space: a compact feature vector
-# per image that keeps drift detection fast and memory-light without sacrificing accuracy.
+# Rather than compare raw pixels, you will work in [embedding](../concepts/Embeddings.md) space: a compact feature
+# vector per image that keeps drift detection fast and memory-light without sacrificing accuracy.
 #
 # ### Download VOC dataset
 #
-# Download the `train` and `val` splits of the 2012 VOC dataset — `val` stands in for the operational data you'd see
-# after deployment.
+# Download the `train` and `val` splits of the 2012 VOC dataset. The `val` split stands in for the operational data that
+# you would see after deployment.
 
 # %%
 # Load the training dataset
@@ -139,12 +137,12 @@ print(f"Image 0 shape: {operational_ds[0][0].shape}")
 # {class}`.Relabel` conforms a dataset to a target vocabulary. The four concepts below are kept, every other VOC class
 # is out-of-vocabulary and gets dropped, and any image left with no labels drops along with them.
 #
-# > **The view narrows labels, not pixels**
-# >
-# > A kept image is one that *contains* indoor furniture. Most of them also contain people, bottles, or pets, and
-# > those objects are still in the frame. Embeddings are computed from the whole image, so each vector encodes the
-# > entire scene rather than only the four classes you kept. Keep this in mind whenever you monitor embeddings: the
-# > vector reflects everything the camera saw, not just what you labeled.
+# :::{note}
+# The view narrows the labels, not the pixels. A kept image is one that contains indoor furniture. Most of them also
+# contain people, bottles, or pets, and those objects are still in the frame. Embeddings are computed from the whole
+# image, so each vector encodes the entire scene and not only the four classes you kept. Keep this in mind whenever you
+# monitor embeddings: the vector reflects everything the camera saw, and not only what you labeled.
+# :::
 #
 # > For other ways to reshape a dataset in place, see [Build dataset views](./h2_build_dataset_views.py).
 
@@ -167,9 +165,9 @@ print(f"vocabulary:  {train_view.metadata.get('index2label')}")
 #
 # Reduce each image to a feature vector with a
 # [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
-# Torchvision: point a {class}`.TorchExtractor` at its penultimate `avgpool` layer (its learned features, not the
-# 1000-class logits), give it the model's standard resize-and-normalize preprocessing as `transforms`, and run each split
-# through {class}`.Embeddings`. Keeping the `transforms` in a variable lets you reuse them further down.
+# Torchvision. Point a {class}`.TorchExtractor` at its penultimate `avgpool` layer (its learned features, not the
+# 1000-class logits), and give it the standard resize-and-normalize preprocessing of the model as `transforms`. Then run
+# each split through {class}`.Embeddings`. Keeping the `transforms` in a variable lets you reuse them further down.
 #
 # For other ways to build embeddings, see [How to create embeddings](./h2_create_embeddings.py).
 
@@ -184,7 +182,7 @@ operational_embs = Embeddings(operational_view, extractor=extractor, batch_size=
 
 # %% [markdown]
 # Each image is now a single feature vector instead of a full-resolution image, which speeds up the drift algorithms
-# below without impacting the accuracy of the results.
+# below without affecting the accuracy of the results.
 
 # %%
 print(f"({len(train_embs)}, {train_embs[0].shape})")  # (1163, shape)
@@ -193,45 +191,44 @@ print(f"({len(operational_embs)}, {operational_embs[0].shape})")  # (1173, shape
 # %% [markdown]
 # ## Understanding drift detectors
 #
-# Before testing for drift, it helps to understand the different approaches available. Each detector has distinct
-# strengths that make it better suited for certain scenarios. This tutorial uses four detectors that represent
-# fundamentally different strategies for detecting distributional change.
+# Before you test for drift, it helps to understand the approaches available. Each detector has strengths that suit
+# certain scenarios. This tutorial uses four detectors that take different strategies to detect distributional change.
 #
-# | Detector                        | Approach                                         | Strengths                                   | Best For                              |
+# | Detector                        | Approach                                         | Strengths                                   | Best for                              |
 # | ------------------------------- | ------------------------------------------------ | ------------------------------------------- | ------------------------------------- |
-# | {class}`.DriftUnivariate` (CVM) | Statistical test per feature                     | Fast, interpretable per-feature results     | Identifying _which_ features drifted  |
+# | {class}`.DriftUnivariate` (CVM) | Statistical test per feature                     | Fast, interpretable per-feature results     | Identifying which features drifted    |
 # | {class}`.DriftMMD`              | Kernel-based multivariate test                   | Captures feature dependencies               | High-dimensional data, complex shifts |
-# | {class}`.DriftDomainClassifier` | Trains a classifier to distinguish distributions | Feature importances for root-cause analysis | Understanding _why_ drift occurred    |
+# | {class}`.DriftDomainClassifier` | Trains a classifier to distinguish distributions | Feature importances for root-cause analysis | Understanding why drift occurred      |
 # | {class}`.DriftKNeighbors`       | Compares k-NN distances                          | Lightweight and fast                        | Quick monitoring checks               |
 #
-# > **Other univariate methods**
-# >
-# > `DriftUnivariate` supports several statistical tests beyond CVM, including Kolmogorov-Smirnov (`ks`), Mann-Whitney U
-# > (`mwu`), Anderson-Darling (`anderson`), and Baumgartner-Weiss-Schindler (`bws`). Each has different sensitivity
-# > characteristics — see the [drift concept page](../concepts/DistributionShift.md#drift-detection) for details.
+# :::{note}
+# `DriftUnivariate` supports several statistical tests beyond CVM, including Kolmogorov-Smirnov (`ks`), Mann-Whitney U
+# (`mwu`), Anderson-Darling (`anderson`), and Baumgartner-Weiss-Schindler (`bws`). Each has different sensitivity
+# characteristics. See the [drift concept page](../concepts/DistributionShift.md#drift-detection) for details.
+# :::
 
 # %% [markdown]
 # ## Test for drift
 #
-# In this step, you will be checking for drift between the training embeddings and the operational embeddings from before.
-# If drift is detected, a model trained on this training data should be retrained with new operational data. This can help
-# mitigate performance degradation in a deployed model. Visit our [About Drift](../concepts/DistributionShift.md) page to
+# In this step, you will check for drift between the training embeddings and the operational embeddings from before. If
+# drift is detected, retrain a model that was trained on this training data with new operational data. This can help
+# mitigate performance degradation in a deployed model. See the [About Drift](../concepts/DistributionShift.md) page to
 # learn more.
 #
 # ### Drift detectors
 #
-# DataEval offers several drift detectors. This tutorial demonstrates four that each take a different approach:
+# DataEval offers several drift detectors. This tutorial uses four that each take a different approach:
 # {class}`.DriftUnivariate`, {class}`.DriftMMD`, {class}`.DriftDomainClassifier`, and {class}`.DriftKNeighbors`.
 #
-# Since each detector outputs a binary decision on whether drift is detected, a **majority vote** can be used to make the
-# determination of drift.\
+# Since each detector outputs a binary decision on whether drift is detected, you can use a **majority vote** to decide
+# whether the data has drifted.\
 # To learn more about these algorithms, see the
 # [theory behind drift detection](../concepts/DistributionShift.md#taxonomy-of-shift) concept page.
 #
 # ### Fit the detectors
 #
-# Each drift detector needs a reference set that the operational set will be compared against. In the following code, you
-# will set the reference data to the training embeddings.
+# Each drift detector needs a reference set that the operational set will be compared against. In the following code,
+# you will set the reference data to the training embeddings.
 
 # %%
 # A type alias for all of the drift detectors
@@ -248,7 +245,7 @@ detectors: dict[str, DriftDetector] = {
 # %% [markdown]
 # ### Make predictions
 #
-# Now that the detectors are setup, predictions can be made against the operational embeddings you made earlier.
+# Now that the detectors are set up, you can make predictions against the operational embeddings you made earlier.
 
 # %%
 # Iterate and print the name of the detector class and its boolean drift prediction
@@ -257,16 +254,13 @@ clean_results = {name: detector.predict(operational_embs) for name, detector in 
 print("\n".join(f"{res[0]} detected drift? {res[1].drifted}" for res in clean_results.items()))
 
 # %% [markdown]
-# Did you expect these results?
-#
 # There is no drift detected between the train and operational embeddings because they come from very similar
 # distributions.\
-# Ideally, your training data and your validation data, which we used as operational, come from the same distribution.
-# This is the purpose of [data splitters](https://scikit-learn.org/stable/api/sklearn.model_selection.html#splitters).
+# Ideally, your training data and your validation data, which this tutorial uses as operational data, come from the same
+# distribution. This is the purpose of
+# [data splitters](https://scikit-learn.org/stable/api/sklearn.model_selection.html#splitters).
 #
-# So how do we know if the detectors can detect drift?
-#
-# Well, add some random Gaussian noise to the operational embeddings and find out.
+# To check that the detectors can detect drift, add some random Gaussian noise to the operational embeddings.
 
 # %%
 # Define transform with added gaussian noise
@@ -286,13 +280,13 @@ print("\n".join(f"{det[0]} detected drift? {det[1].predict(noisy_embs).drifted}"
 # Now drift is detected!
 #
 # Adding Gaussian noise was enough to cause a noticeable change in the drift detectors, but this is not always the case.
-# There are many [types of drift](../concepts/DistributionShift.md#taxonomy-of-shift) that data can and will experience.
+# Data can experience many [types of drift](../concepts/DistributionShift.md#taxonomy-of-shift).
 
 # %% [markdown]
 # ### Inspecting detector outputs
 #
-# Each detector doesn't just report whether drift occurred — it provides statistics that reveal _different things_ about
-# the drift. Let's look at what each detector tells us.
+# Each detector reports whether drift occurred and also provides statistics that reveal different things about the
+# drift. The next cells show what each detector tells you.
 
 # %%
 # Store results for inspection
@@ -301,8 +295,8 @@ results = {name: detector.predict(noisy_embs) for name, detector in detectors.it
 # %% [markdown]
 # #### DriftUnivariate: per-feature analysis
 #
-# The univariate detector tests each feature independently and reports which features drifted and their p-values. This is
-# useful for identifying _which_ dimensions of the embedding space shifted.
+# The univariate detector tests each feature independently and reports which features drifted and their p-values. This
+# is useful for identifying which dimensions of the embedding space shifted.
 
 # %%
 cvm_result = results["CVM"]
@@ -318,8 +312,9 @@ print(f"Max feature p-value: {max(cvm_details['p_vals']):.6f}")
 # %% [markdown]
 # #### DriftDomainClassifier: feature importances
 #
-# The domain classifier trains a model to distinguish reference from test data and reports how important each feature was
-# in making that distinction. High AUROC means the distributions are easily separable — a strong signal of drift.
+# The domain classifier trains a model to distinguish reference from test data and reports how important each feature
+# was in making that distinction. High AUROC means the distributions are easily separable, which is a strong signal of
+# drift.
 
 # %%
 mvdc_result = results["MVDC"]
@@ -364,27 +359,28 @@ print(f"MMD² threshold:  {mmd_details['distance_threshold']:.6f}")
 print(f"P-value:         {mmd_details['p_val']:.6f}")
 
 # %% [markdown]
-# Each detector reveals a different facet of drift: the univariate detector pinpoints _which_ features changed, the domain
-# classifier shows _which features matter most_ for distinguishing the distributions, the k-NN detector quantifies _how
-# far_ the data moved, and MMD provides a single _multivariate distance_ between the distributions.
+# Each detector reveals a different aspect of drift. The univariate detector pinpoints which features changed, the
+# domain classifier shows which features matter most for distinguishing the distributions, the k-NN detector quantifies
+# how far the data moved, and MMD provides a single multivariate distance between the distributions.
 
 # %% [markdown]
 # ### Choosing the right detector
 #
 # The best detector depends on what you need to know:
 #
-# - **Which features drifted?** Use {class}`.DriftUnivariate` — it provides per-feature p-values and drift flags
-# - **Why did drift occur?** Use {class}`.DriftDomainClassifier` — its feature importances show what drives the shift
-# - **How sensitive to multivariate changes?** Use {class}`.DriftMMD` — it captures complex dependencies between features
-# - **Need fast, lightweight checks?** Use {class}`.DriftKNeighbors` — simple distance comparison with minimal overhead
-# - **Want robust detection?** Use multiple detectors with a **majority vote** to reduce false positives
+# - To see which features drifted, use {class}`.DriftUnivariate`. It provides per-feature p-values and drift flags.
+# - To see why drift occurred, use {class}`.DriftDomainClassifier`. Its feature importances show what drives the shift.
+# - For sensitivity to multivariate changes, use {class}`.DriftMMD`. It captures complex dependencies between features.
+# - For fast, lightweight checks, use {class}`.DriftKNeighbors`. It is a simple distance comparison with minimal
+#   overhead.
+# - For more reliable detection, use several detectors with a majority vote to reduce false positives.
 
 # %% [markdown]
 # ### Monitor drift over time with chunking
 #
-# In real deployments, operational data arrives in batches over time. Rather than comparing all operational data at once,
-# you can use **chunking** to split the data into segments and monitor how drift evolves across each chunk. This helps
-# identify _when_ drift begins to appear.
+# In real deployments, operational data arrives in batches over time. Rather than comparing all operational data at
+# once, you can use **chunking** to split the data into segments and monitor how drift evolves across each chunk. This
+# helps identify when drift begins to appear.
 #
 # DataEval's drift detectors support chunking through the `chunk_count` or `chunk_size` parameters on `fit()`. During
 # fitting, the detector establishes a baseline by computing the metric across chunks of the reference data. During
@@ -393,9 +389,9 @@ print(f"P-value:         {mmd_details['p_val']:.6f}")
 #
 # #### Simulate gradual drift onset
 #
-# To illustrate how chunking reveals _when_ drift begins, you will build a combined dataset where the first 40% of samples
-# are clean operational embeddings and the remaining 60% are noisy. This simulates a scenario where data quality degrades
-# partway through a monitoring window.
+# To illustrate how chunking reveals when drift begins, you will build a combined dataset where the first 40% of samples
+# are clean operational embeddings and the remaining 60% are noisy. This simulates a scenario where data quality
+# degrades partway through a monitoring window.
 
 # %%
 # Build a combined array: first 40% clean, last 60% noisy
@@ -432,7 +428,7 @@ for name, detector in chunked_detectors.items():
 
 # %% [markdown]
 # The first two chunks (covering the clean 40%) should show no drift, while the later chunks (covering the noisy 60%)
-# should trigger drift alerts. This chunk-level view makes it easy to pinpoint _when_ in a data stream drift begins.
+# should trigger drift alerts. This chunk-level view makes it easy to pinpoint when in a data stream drift begins.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -462,20 +458,19 @@ for name, result in chunked_results.items():
 # %% [markdown]
 # ## Conclusion
 #
-# In this tutorial, you have learned to create embeddings from the VOC dataset, compare different drift detectors and
-# their unique outputs, and use chunked monitoring to identify when drift begins.
+# In this tutorial, you created embeddings from the VOC dataset, compared drift detectors and their outputs, and used
+# chunked monitoring to identify when drift begins.
 #
-# Key takeaways:
+# You learned these points:
 #
-# - **DriftUnivariate** reveals _which_ features drifted through per-feature statistical tests
-# - **DriftDomainClassifier** explains _why_ drift occurred through feature importances
-# - **DriftMMD** provides a single multivariate distance that captures complex distributional changes
-# - **DriftKNeighbors** offers fast, lightweight detection based on distance comparisons
-# - **Chunked monitoring** helps pinpoint _when_ drift begins in a data stream
+# - `DriftUnivariate` reveals which features drifted through per-feature statistical tests
+# - `DriftDomainClassifier` explains why drift occurred through feature importances
+# - `DriftMMD` provides a single multivariate distance that captures complex distributional changes
+# - `DriftKNeighbors` offers fast, lightweight detection based on distance comparisons
+# - Chunked monitoring helps pinpoint when drift begins in a data stream
 #
-# These are important steps when monitoring data, as drift can affect a model's ability to achieve
-# performance recorded during model training. When data drift is detected, it is a
-# good idea to consider retraining the model and incorporating operational data into the dataset.
+# Drift can affect the ability of a model to achieve the performance recorded during model training. When you detect
+# data drift, consider retraining the model and incorporating operational data into the dataset.
 
 # %% [markdown]
 # ## Next steps
@@ -490,11 +485,11 @@ for name, result in chunked_results.items():
 # Once you are familiar with DataEval and data monitoring, run this analysis using your own reference and operational
 # datasets.
 #
-# Experiment with:
+# Experiment with these changes:
 #
-# - **Different embeddings for KNN**: ResNet, ViT, CLIP, or domain-specific pretrained models
-# - **Custom architectures**: Design models for your specific data type (not generic examples)
-# - **Different drift scenarios**: Test on your own data with varying difficulty levels
-# - **Wider operational domains**: This tutorial monitors a narrow slice, which keeps the reference distribution tight
-#   and makes injected noise easy to spot. Expect weaker, noisier signals as the monitored domain broadens — drop the
+# - Try different embeddings for KNN: ResNet, ViT, CLIP, or domain-specific pretrained models
+# - Design custom architectures for your specific data type, and not generic examples
+# - Test different drift scenarios on your own data, with varying difficulty levels
+# - Widen the operational domain. This tutorial monitors a narrow slice, which keeps the reference distribution tight
+#   and makes injected noise easy to spot. Expect weaker, noisier signals as the monitored domain broadens. Drop the
 #   view above to run the same analysis across all 20 VOC classes and compare.
