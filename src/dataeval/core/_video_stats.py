@@ -30,9 +30,9 @@ from dataeval.types import Aggregator, SourceIndex
 _logger = get_logger(__name__)
 
 _Plan = Sequence[tuple[type[VideoCalculator], VideoStats]]
-#: Count statistics, declared so an empty or NaN-free column stays int64.
+# Count statistics, declared so an empty or NaN-free column stays int64.
 _INTEGER_STATS = frozenset({"n_frames", "longest_run"})
-#: Label statistics, declared so an empty column stays object and a missing label stays None.
+# Label statistics, declared so an empty column stays object and a missing label stays None.
 _OBJECT_STATS = frozenset({"motion_mode"})
 
 

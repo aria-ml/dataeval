@@ -19,8 +19,8 @@ from dataeval.utils._mask import MaskedTarget, mask_metadata
 from dataeval.utils.data import DatasetKind
 from dataeval.utils.preprocessing import normalize_image_shape
 
-#: Sample stride for the missing-``id`` content-hash fallback: enough pixels to separate
-#: datums, few enough that the hash is not the cost of the transform.
+# Sample stride for the missing-``id`` content-hash fallback: enough pixels to separate
+# datums, few enough that the hash is not the cost of the transform.
 _CONTENT_HASH_STRIDE = 7
 
 

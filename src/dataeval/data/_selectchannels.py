@@ -18,8 +18,8 @@ from dataeval.utils.preprocessing import _validate_index_selection, normalize_im
 
 ChannelSelection: TypeAlias = "Sequence[int] | Literal['gray', 'rgb']"
 
-#: Rec. 601 luma coefficients, matching
-#: :func:`~dataeval.utils.preprocessing.to_canonical_grayscale`.
+# Rec. 601 luma coefficients, matching
+# :func:`~dataeval.utils.preprocessing.to_canonical_grayscale`.
 _REC601 = np.array([0.299, 0.587, 0.114], dtype=np.float64)
 
 

@@ -27,7 +27,7 @@ from dataeval.utils.preprocessing import normalize_image_shape, to_canonical_gra
 
 T = TypeVar("T")
 
-#: Readings column holding :attr:`VideoClock.order`, the key temporal reductions order by.
+# Readings column holding :attr:`VideoClock.order`, the key temporal reductions order by.
 CLOCK = "__clock"
 
 

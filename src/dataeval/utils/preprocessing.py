@@ -549,7 +549,7 @@ class ValueRange:
         return cls(np.nan, float(np.nanmin(values)), float(np.nanmax(values)))
 
 
-#: The answer where no interval could be established — see :func:`get_value_range` Notes.
+# The answer where no interval could be established — see :func:`get_value_range` Notes.
 _UNKNOWN_RANGE = ValueRange(np.nan, np.nan, np.nan)
 
 

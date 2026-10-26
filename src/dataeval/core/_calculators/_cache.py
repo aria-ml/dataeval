@@ -15,10 +15,10 @@ from dataeval.utils.preprocessing import (
     rescale,
 )
 
-#: Bit depth of the range a visual statistic is read against — see `CalculatorCache.perceptual`.
+# Bit depth of the range a visual statistic is read against — see `CalculatorCache.perceptual`.
 _DISPLAY_DEPTH = 8
 
-#: Distinct values that range holds, which is how many bins count all of them.
+# Distinct values that range holds, which is how many bins count all of them.
 _DISPLAY_LEVELS = 2**_DISPLAY_DEPTH
 
 

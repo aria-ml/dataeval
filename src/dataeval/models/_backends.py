@@ -94,9 +94,9 @@ class OnnxBackend:
         return {name: np.asarray(arr) for name, arr in zip(self.output_names, outputs, strict=True)}
 
 
-#: Interpreter providers tried in order. `ai_edge_litert` is what `dataeval[litert]`
-#: installs and is the supported successor to the standalone `tflite_runtime` wheel;
-#: the other two stay as fallbacks for environments that already carry them.
+# Interpreter providers tried in order. `ai_edge_litert` is what `dataeval[litert]`
+# installs and is the supported successor to the standalone `tflite_runtime` wheel;
+# the other two stay as fallbacks for environments that already carry them.
 _LITERT_MODULES = ("ai_edge_litert.interpreter", "tflite_runtime.interpreter", "tensorflow.lite")
 
 

@@ -20,12 +20,12 @@ from dataeval.types import FactorLevel, SourceIndex
 # label end without a dataset to resolve against.
 LABEL_KIND = "instance"
 
-#: Which level names each task understands. Image spellings are the ones that shipped; a tracking
-#: dataset uses the names :class:`~dataeval.Metadata` gives its levels.
+# Which level names each task understands. Image spellings are the ones that shipped; a tracking
+# dataset uses the names :class:`~dataeval.Metadata` gives its levels.
 IMAGE_LEVEL_NAMES = ("item", "target")
 TRACKING_LEVEL_NAMES = ("sequence", "unit", "track", "instance")
 
-#: Levels measured per detection rather than per whole frame.
+# Levels measured per detection rather than per whole frame.
 TARGET_LEVELS = frozenset({"target", "instance", "track"})
 
 

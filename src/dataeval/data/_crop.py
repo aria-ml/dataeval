@@ -13,10 +13,10 @@ from dataeval.utils._array import as_numpy
 from dataeval.utils.data import DatasetKind
 from dataeval.utils.preprocessing import normalize_image_shape
 
-#: Cropping reframes the image, so every dimension statistic describes the region rather
-#: than the source. Channel count and bit depth are untouched — a crop is a slice, not a
-#: resample — and ``PIXEL``/``VISUAL`` are deliberately absent: cropping out an overlay
-#: *improves* those statistics, which is the reason to do it.
+# Cropping reframes the image, so every dimension statistic describes the region rather
+# than the source. Channel count and bit depth are untouched — a crop is a slice, not a
+# resample — and ``PIXEL``/``VISUAL`` are deliberately absent: cropping out an overlay
+# *improves* those statistics, which is the reason to do it.
 _INVALIDATES = ImageStats.DIMENSION & ~(ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH)
 
 

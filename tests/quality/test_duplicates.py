@@ -3135,7 +3135,7 @@ def relabeled_box_pair(get_mock_od_dataset):
     return get_mock_od_dataset([image, image.copy()], [[0], [1]], [[[0, 0, 5, 5]], [[0, 0, 5, 5]]])
 
 
-#: The columns `aggregate_by_pair` grew for the annotation axis, and nothing else may move.
+# The columns `aggregate_by_pair` grew for the annotation axis, and nothing else may move.
 DIVERGENCE_COLUMNS = [
     "frames_compared",
     "frames_differing",

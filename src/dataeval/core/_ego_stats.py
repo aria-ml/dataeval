@@ -60,35 +60,35 @@ _logger = get_logger(__name__)
 FlowMethod = Literal["dis", "lk"]
 """Which optical flow estimator to use: dense DIS, or sparse Lucas-Kanade on a lattice."""
 
-#: Tukey biweight tuning constant, giving 95% efficiency against Gaussian noise.
+# Tukey biweight tuning constant, giving 95% efficiency against Gaussian noise.
 _TUKEY_C = 4.685
-#: Scale factor turning a median absolute deviation into a Gaussian-consistent sigma.
+# Scale factor turning a median absolute deviation into a Gaussian-consistent sigma.
 _MAD_TO_SIGMA = 1.4826
-#: Weight above which a sample counts as an inlier to the fit it was weighted against.
+# Weight above which a sample counts as an inlier to the fit it was weighted against.
 _INLIER_WEIGHT = 0.05
-#: Smallest number of flow samples an affine fit is attempted on. A fit from 3 samples
-#: would be exactly determined.
+# Smallest number of flow samples an affine fit is attempted on. A fit from 3 samples
+# would be exactly determined.
 _MIN_SAMPLES = 12
-#: Smallest processed side, in pixels, that a frame pair is read at. Measured on OpenCV 4.11.0, DIS fails on
-#: some shapes with a side under 32 px, raising or crashing the process natively depending on the aspect ratio.
-#: As (height, width), (31, 640) raises and (10, 64) and (28, 512) crash, while (31, 31), (31, 55), (16, 28),
-#: (16, 64) and (28, 48) run. At 32 px or more nothing failed at any width up to 16384, or with the axes
-#: transposed. The rule covers both estimators, so there is one rule: Lucas-Kanade never failed, but a frame
-#: that small gives no reliable motion either way.
+# Smallest processed side, in pixels, that a frame pair is read at. Measured on OpenCV 4.11.0, DIS fails on
+# some shapes with a side under 32 px, raising or crashing the process natively depending on the aspect ratio.
+# As (height, width), (31, 640) raises and (10, 64) and (28, 512) crash, while (31, 31), (31, 55), (16, 28),
+# (16, 64) and (28, 48) run. At 32 px or more nothing failed at any width up to 16384, or with the axes
+# transposed. The rule covers both estimators, so there is one rule: Lucas-Kanade never failed, but a frame
+# that small gives no reliable motion either way.
 _MIN_FLOW_SIDE = 32
-#: Smallest inlier normalized cross-correlation, taken at half resolution, between the new frame and the previous frame
-#: warped by the fitted camera motion for a pair to be trusted. Measured on OpenCV 4.11.0 over 11 real photos:
-#: - motion under blur, JPEG q25, flicker, or noise sigma 10 on both frames scores 0.90 and up, and correct readings of
-#:   scenes cut to a tenth of their contrast (std 1.6 to 8) under noise sigma 1 to 4 on both frames 0.86 and up;
-#: - hard cuts score -0.18 to 0.24, fast pans misread by 17 px or more 0.53 at most, and 2x field-of-view switches
-#:   0.749 at most.
-#: So 0.80 sits about 0.05 from either side: above every switch, and below the lowest correct reading, 0.857.
-#: Noise on both frames is the hard case. A full-resolution check, calibrated with noise on one frame, refused 35 of 53
-#: of those low-contrast readings under noise sigma 2 to 4. What 0.80 still refuses wrongly is a large mover over
-#: repetitive texture, a scene whose contrast the noise matches (std 0.8 to 4 under noise sigma 4 refuses 11 of 11), and
-#: a fast pan at a wide field of view over fine texture, whose perspective the affine fit leaves out (9 of 70 pans at 60
-#: to 90 degrees and 1.5 to 4 degrees a frame, 4 of 10 at 90 degrees and 3). Each costs a frame left unmeasured, never a
-#: frame dropped. A pan read 4 px off has a median score of 0.86, so a mid-size misread can pass.
+# Smallest inlier normalized cross-correlation, taken at half resolution, between the new frame and the previous frame
+# warped by the fitted camera motion for a pair to be trusted. Measured on OpenCV 4.11.0 over 11 real photos:
+# - motion under blur, JPEG q25, flicker, or noise sigma 10 on both frames scores 0.90 and up, and correct readings of
+#   scenes cut to a tenth of their contrast (std 1.6 to 8) under noise sigma 1 to 4 on both frames 0.86 and up;
+# - hard cuts score -0.18 to 0.24, fast pans misread by 17 px or more 0.53 at most, and 2x field-of-view switches
+#   0.749 at most.
+# So 0.80 sits about 0.05 from either side: above every switch, and below the lowest correct reading, 0.857.
+# Noise on both frames is the hard case. A full-resolution check, calibrated with noise on one frame, refused 35 of 53
+# of those low-contrast readings under noise sigma 2 to 4. What 0.80 still refuses wrongly is a large mover over
+# repetitive texture, a scene whose contrast the noise matches (std 0.8 to 4 under noise sigma 4 refuses 11 of 11), and
+# a fast pan at a wide field of view over fine texture, whose perspective the affine fit leaves out (9 of 70 pans at 60
+# to 90 degrees and 1.5 to 4 degrees a frame, 4 of 10 at 90 degrees and 3). Each costs a frame left unmeasured, never a
+# frame dropped. A pan read 4 px off has a median score of 0.86, so a mid-size misread can pass.
 _MIN_AGREEMENT = 0.80
 
 
@@ -797,8 +797,8 @@ EgoStatsResult: TypeAlias = FactorResult[EgoFactors]
 """Per-frame camera ego-motion. Values under ``stats``. See :class:`EgoFactors`."""
 
 
-#: Share of a sequence's frames that must carry a trusted reading for a roll-up to answer.
-#: Below this the sequence abstains, which is the sequence-level form of refusing a pair.
+# Share of a sequence's frames that must carry a trusted reading for a roll-up to answer.
+# Below this the sequence abstains, which is the sequence-level form of refusing a pair.
 _TRUST_COVERAGE = 0.25
 
 
@@ -807,16 +807,16 @@ def _roll(how: str, *factors: str, suffix: str | None = None) -> Aggregator:
     return Aggregator(how, "unit", "sequence", factors, min_coverage=_TRUST_COVERAGE, suffix=suffix)
 
 
-#: How per-frame camera measurements summarize over a whole sequence.
+# How per-frame camera measurements summarize over a whole sequence.
 #:
-#: Declared beside the measurement because the producer is what knows the reductions: that
-#: a rate accumulates as a total rather than averaging, that a motion label reduces by
-#: plurality, and how much of a sequence must be trustworthy before a summary means
-#: anything.
+# Declared beside the measurement because the producer is what knows the reductions: that
+# a rate accumulates as a total rather than averaging, that a motion label reduces by
+# plurality, and how much of a sequence must be trustworthy before a summary means
+# anything.
 #:
-#: Names come from the reduction, which keeps the operation legible in the column. The one
-#: exception is ``abs_sum``, which reads as an implementation detail rather than a
-#: measurement, so those two columns carry an ``excursion`` suffix instead.
+# Names come from the reduction, which keeps the operation legible in the column. The one
+# exception is ``abs_sum``, which reads as an implementation detail rather than a
+# measurement, so those two columns carry an ``excursion`` suffix instead.
 EGO_AGGREGATIONS: tuple[Aggregator, ...] = (
     _roll("median", "pan_speed", "zoom_rate", "roll_rate", "shear_rate", "mover_frac", "mover_speed"),
     _roll("variability", "pan_x", "pan_y"),
@@ -892,15 +892,15 @@ def _flow_frame(view: FrameView) -> _FlowFrame | None:
     return _FlowFrame(view.gray_small, (int(view.pixels.shape[-1]), int(view.pixels.shape[-2])))
 
 
-#: How far, in processed pixels, a sample can sit from the overlay and still be too near to trust.
+# How far, in processed pixels, a sample can sit from the overlay and still be too near to trust.
 _MASK_MARGIN = 32
-#: Fewest quadrants of the frame that must each hold `_SUPPORT_SAMPLES` of a masked pair's kept samples. Fitted
-#: from one corner's samples, a 2% zoom or a 1 degree roll reads as a trusted pan of 1 to 3 px.
+# Fewest quadrants of the frame that must each hold `_SUPPORT_SAMPLES` of a masked pair's kept samples. Fitted
+# from one corner's samples, a 2% zoom or a 1 degree roll reads as a trusted pan of 1 to 3 px.
 _SUPPORT_QUADRANTS = 3
-#: Fewest kept samples a quadrant must hold to count toward `_SUPPORT_QUADRANTS`.
+# Fewest kept samples a quadrant must hold to count toward `_SUPPORT_QUADRANTS`.
 _SUPPORT_SAMPLES = 3
-#: Farthest a masked pair's image center may sit from the fit's inliers, as a Mahalanobis distance over
-#: their spread. The dense HUD's half-frame support scores about 3.6, and inliers in one corner 12 to 14.
+# Farthest a masked pair's image center may sit from the fit's inliers, as a Mahalanobis distance over
+# their spread. The dense HUD's half-frame support scores about 3.6, and inliers in one corner 12 to 14.
 _MAX_CENTER_LEVERAGE = 5.0
 
 

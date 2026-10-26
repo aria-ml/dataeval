@@ -21,7 +21,7 @@ from dataeval.core._hash_index import _popcount, _prepare
 
 _logger = get_logger(__name__)
 
-#: Hamming radius, in bits, within which neighboring frames count as carrying nothing new.
+# Hamming radius, in bits, within which neighboring frames count as carrying nothing new.
 DEFAULT_REDUNDANCY_RADIUS = 4
 
 

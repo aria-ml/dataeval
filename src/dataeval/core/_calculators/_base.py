@@ -36,8 +36,8 @@ class ViewKind(Flag):
     BAND = auto()
 
 
-#: Every view, for a statistic that is a NaN-aware reduction over the values themselves —
-#: a masked region is simply not counted and a band subset is a different set to reduce.
+# Every view, for a statistic that is a NaN-aware reduction over the values themselves —
+# a masked region is simply not counted and a band subset is a different set to reduce.
 ALL_VIEWS = ViewKind.WHOLE | ViewKind.MASK | ViewKind.BAND
 
 

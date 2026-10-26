@@ -29,8 +29,8 @@ from dataeval.core._hash_index import _popcount
 
 _logger = get_logger(__name__)
 
-#: Cells of the accumulated-cost matrix an unbanded alignment may build. Two 4 000-frame runs sit
-#: just inside it. Past this the answer is not worth the wait, and ``band`` is the way through.
+# Cells of the accumulated-cost matrix an unbanded alignment may build. Two 4 000-frame runs sit
+# just inside it. Past this the answer is not worth the wait, and ``band`` is the way through.
 _MAX_CELLS = 16_000_000
 
 _METRICS = ("hamming", "cosine", "euclidean")

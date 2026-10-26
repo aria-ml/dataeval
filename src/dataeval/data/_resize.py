@@ -18,15 +18,15 @@ from dataeval.utils.preprocessing import crop_with_fill, normalize_image_shape
 
 ResizeMode: TypeAlias = Literal["stretch", "pad", "crop"]
 
-#: Every dimension statistic reports the resize target rather than the source, and
-#: ``sharpness`` measures the interpolation kernel. Channel count survives; ``HASH`` is
-#: deliberately absent, since resize-then-phash is a *better* near-duplicate check across
-#: heterogeneous source resolutions.
+# Every dimension statistic reports the resize target rather than the source, and
+# ``sharpness`` measures the interpolation kernel. Channel count survives; ``HASH`` is
+# deliberately absent, since resize-then-phash is a *better* near-duplicate check across
+# heterogeneous source resolutions.
 _BASE_INVALIDATES = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.VISUAL_SHARPNESS
 
-#: Letterbox padding adds a block of flat fill pixels, which moves every percentile-derived
-#: visual statistic, the pixel histogram and the entropy read off it, and every spread and
-#: shape moment of the pixel distribution.
+# Letterbox padding adds a block of flat fill pixels, which moves every percentile-derived
+# visual statistic, the pixel histogram and the entropy read off it, and every spread and
+# shape moment of the pixel distribution.
 _PAD_INVALIDATES = (
     ImageStats.PIXEL_ZEROS
     | ImageStats.PIXEL_HISTOGRAM
@@ -41,9 +41,9 @@ _PAD_INVALIDATES = (
     | ImageStats.VISUAL_PERCENTILES
 )
 
-#: ``fill="mean"`` pads with the content's own per-channel mean, so the mean is preserved by
-#: construction. ``fill="zero"`` is not a second-order effect: letterboxing a 2:1 source into
-#: a square canvas makes half the pixels zero and halves ``mean``.
+# ``fill="mean"`` pads with the content's own per-channel mean, so the mean is preserved by
+# construction. ``fill="zero"`` is not a second-order effect: letterboxing a 2:1 source into
+# a square canvas makes half the pixels zero and halves ``mean``.
 _ZERO_FILL_INVALIDATES = ImageStats.PIXEL_MEAN
 
 

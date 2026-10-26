@@ -2672,12 +2672,12 @@ _PAIR_SCHEMA: dict[str, pl.DataType | type] = {
     "tracks_split": pl.Int64,
 }
 
-#: The divergence fields a flagged pair carries, read off the TypedDict itself so the pair rows
-#: cannot drift from what :func:`~dataeval.core.annotation_divergence` actually reports.
+# The divergence fields a flagged pair carries, read off the TypedDict itself so the pair rows
+# cannot drift from what :func:`~dataeval.core.annotation_divergence` actually reports.
 _DIVERGENCE_FIELDS = tuple(AnnotationDivergence.__annotations__)
 
-#: Pairs one ``aggregate_by_pair`` call may expand to. A group of n members implies n(n-1)/2, so a
-#: single cluster of near-identical frames reaches this long before the row count does.
+# Pairs one ``aggregate_by_pair`` call may expand to. A group of n members implies n(n-1)/2, so a
+# single cluster of near-identical frames reaches this long before the row count does.
 _MAX_PAIR_EXPANSION = 2_000_000
 
 

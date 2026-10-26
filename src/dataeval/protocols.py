@@ -699,14 +699,14 @@ class CodedMetadataLike(LabelsLike, Protocol):
         ...
 
 
-#: The coded channel under its original name. A **plain alias**, not a union: it is used
-#: as a base class as well as an annotation -- ``class Mine(MetadataLike)`` appears in this
-#: module's own doctest -- and only aliasing the class object keeps both usages working.
+# The coded channel under its original name. A **plain alias**, not a union: it is used
+# as a base class as well as an annotation -- ``class Mine(MetadataLike)`` appears in this
+# module's own doctest -- and only aliasing the class object keeps both usages working.
 MetadataLike: TypeAlias = CodedMetadataLike
 
-#: Either representation, for the consumers that genuinely take both. Spelled as a union
-#: rather than as a third protocol so that a container satisfying either one is accepted
-#: without having to declare anything new, and so that ``isinstance`` against it works.
+# Either representation, for the consumers that genuinely take both. Spelled as a union
+# rather than as a third protocol so that a container satisfying either one is accepted
+# without having to declare anything new, and so that ``isinstance`` against it works.
 AnyMetadataLike: TypeAlias = CodedMetadataLike | ValuedMetadataLike
 
 
