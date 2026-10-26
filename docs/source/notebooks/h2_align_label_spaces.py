@@ -237,4 +237,4 @@ for name, labels in sources.items():
 #
 # - [Ontology](../concepts/Ontology.md) — Learn about the taxonomic model, correspondences, relations, matchers, and mergeability.
 # - [Distribution Shift](../concepts/DistributionShift.md) — Understand distributional differences between sources that remain after label alignment.
-# - [How to reconcile label spaces with an ontology](./h2_reconcile_labels_ontology.py) — Reconcile structureless label lists against a reference ontology.
+# - [How to reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Match class names against a reference ontology and recover their hierarchy.

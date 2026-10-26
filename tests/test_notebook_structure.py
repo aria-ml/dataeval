@@ -9,13 +9,14 @@ catch by eye:
 * Titles: ``How to <verb> ...`` for a how-to and an imperative phrase for a tutorial.
 * Tutorials: the opening and three metadata lines, and the template sections in order.
 * How-tos: no boilerplate or teaching headings, at most five steps and a lead of at most 120 words.
-* Next steps: the entry form and the counts the guide allows.
+* Next steps: the entry form, the counts the guide allows and a link text that is the title of its target.
 
 A how-to over 600 words warns and does not fail, because the guide leaves that limit to review.
 
-Voice, emphasis, contractions, link text, descriptions and what a section teaches stay with review.
+Voice, emphasis, contractions, descriptions and what a section teaches stay with review.
 """
 
+import functools
 import re
 import warnings
 from collections.abc import Callable
@@ -287,6 +288,42 @@ def howto_problems(nb: Notebook) -> list[str]:
     return problems
 
 
+def _slug(heading: str) -> str:
+    """The anchor MyST gives a heading: lower case, punctuation dropped, each space a hyphen."""
+    return re.sub(r"\s", "-", re.sub(r"[^\w\s-]", "", heading.replace("`", "").lower()))
+
+
+@functools.cache
+def _headings_of(path: Path) -> tuple[tuple[int, str], ...]:
+    if path.suffix == ".py":
+        return parse(path.name, path.read_text()).headings
+    headings: list[tuple[int, str]] = []
+    fence = 0
+    for line in path.read_text().split("\n"):
+        ticks = re.match(r"^\s*(`{3,})(.*)$", line)
+        if fence:
+            fence = 0 if ticks and len(ticks[1]) >= fence and not ticks[2].strip() else fence
+        elif ticks:
+            fence = len(ticks[1])
+        elif match := HEADING.match(line):
+            headings.append((len(match[1]), match[2].replace("’", "'")))
+    return tuple(headings)
+
+
+def expected_title(target: str) -> str | None:
+    """The link text for a Next steps target: the heading an anchor names, else the H1 of the page.
+
+    Only a local notebook or Markdown page has a title to check. Any other target returns None.
+    """
+    page, _, anchor = target.partition("#")
+    path = (NOTEBOOK_DIR / page).resolve()
+    if not page.endswith((".py", ".md")) or not path.is_file():
+        return None
+    headings = _headings_of(path)
+    named = next((text for _, text in headings if anchor and _slug(text) == anchor), None)
+    return named or next((text for level, text in headings if level == 1), None)
+
+
 def next_steps_problems(nb: Notebook) -> list[str]:
     if "Next steps" not in nb.sections(2):
         return ["missing section: Next steps"]
@@ -308,6 +345,9 @@ def next_steps_problems(nb: Notebook) -> list[str]:
             continue
         if not match["description"].endswith("."):
             problems.append(f"description is not a sentence ending in a period: {entry[:80]}")
+        title = expected_title(match["target"])
+        if title and match["title"] != title:
+            problems.append(f"link text '{match['title']}' is not the title '{title}' of {match['target']}")
         target = match["target"].split("#")[0]
         concepts += "/concepts/" in target
         notebooks += target.endswith(".py")
@@ -390,6 +430,20 @@ def test_the_checks_are_wired_up():
         "metadata line missing or malformed: personas",
     ):
         assert any(expected in problem for problem in found), f"{expected!r} not reported in {found}"
+
+    assert _slug("Feature extractors: a dependency of both layers") == "feature-extractors-a-dependency-of-both-layers"
+    assert _slug("Bayes error rate — the irreducible floor") == "bayes-error-rate--the-irreducible-floor"
+    assert expected_title("https://example.com/page.md") is None
+    real = NOTEBOOKS[0]
+    section = real.headings[1][1]
+    assert expected_title(f"./{real.name}") == real.h1
+    assert expected_title(f"./{real.name}#{_slug(section)}") == section, "an anchor names its heading"
+    assert expected_title(f"./{real.name}#no-such-heading") == real.h1, "an unknown anchor falls back to the page title"
+    link = "# %% [markdown]\n# # How to link\n\n# %% [markdown]\n# ## Next steps\n#\n# - [{text}](./{name}) — Entry.\n"
+    wrong = parse("h2_link.py", link.format(text="Wrong text", name=real.name))
+    assert f"link text 'Wrong text' is not the title '{real.h1}' of ./{real.name}" in next_steps_problems(wrong)
+    right = parse("h2_link.py", link.format(text=real.h1, name=real.name))
+    assert not any("link text" in problem for problem in next_steps_problems(right))
 
 
 @pytest.mark.required

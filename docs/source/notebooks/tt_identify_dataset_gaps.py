@@ -469,10 +469,10 @@ assert all(report_by_class[c]["gap"] == "ok" for c in ["airplane", "cat", "dog",
 # %% [markdown]
 # ## Next steps
 #
-# - [Ontology concepts](../concepts/Ontology.md) — Learn how hierarchies and taxons organize dataset class labels and target scopes.
-# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Read about dispersion, isotropy, and representation metrics for assessing dataset coverage.
-# - [Assess data space tutorial](./tt_assess_data_space.py) — Discover coverage gaps, clusters, and outliers in unlabeled dataset embeddings.
-# - [Reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Map and validate dataset labels against a target domain ontology.
+# - [Ontology](../concepts/Ontology.md) — Learn how hierarchies and taxons organize dataset class labels and target scopes.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Read about dispersion, isotropy, and representation metrics for assessing dataset coverage.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover coverage gaps, clusters, and outliers in unlabeled dataset embeddings.
+# - [How to reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Map and validate dataset labels against a target domain ontology.
 
 # %% [markdown]
 # ## On your own

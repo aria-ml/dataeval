@@ -710,7 +710,8 @@ assert set(tracked.data()["level"].to_list()) == {"track"}
 #
 # - [How to identify duplicates](./h2_deduplicate.py) — The same class on still-image datasets.
 # - [Data Integrity](../concepts/DataIntegrity.md) — Image-level and target-level statistics for finding data quality issues.
-# - [How to build dataset views](./h2_build_dataset_views.py) — Compose filtered and transformed views over a dataset.
+# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Filter, balance, reorder or
+#   relabel a dataset without copying it.
 # - [Validation and Trust](../concepts/ValidationAndTrust.md) — Build splits that hold up, and know what your evaluation is measuring.
 #
 

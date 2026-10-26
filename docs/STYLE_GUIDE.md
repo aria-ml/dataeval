@@ -188,7 +188,8 @@ documentation prose:
 - [Embeddings](../concepts/Embeddings.md) — Learn what embeddings represent and how they are used across DataEval.
 ```
 
-`tests/test_notebook_structure.py` checks the first two rules below and the entry form. Review checks the rest.
+`tests/test_notebook_structure.py` checks the entry form, the first two rules below and the link text. Review checks the
+rest.
 
 Rules:
 
@@ -202,8 +203,9 @@ Rules:
 - Leave out a link the body already makes for a side detail, such as an optional setting or an alternative way to do
   the step. Keep the topic's concept page and the natural next task even when the body links them. Leave out a link to
   a notebook about an unrelated evaluator and a link to a notebook that is going to be removed.
-- Use the exact title of the target page as the link text, and a one-sentence description. A tutorial and a how-to use
-  the same form.
+- Use the exact title of the target page as the link text, and a one-sentence description. When the link has an
+  anchor, use the heading that the anchor names, as the page shows it. Do not repeat the link text in the description.
+  A tutorial and a how-to use the same form.
 
 ## Write the code cells
 
@@ -329,8 +331,9 @@ private member fails it, so write a private name as plain code, such as `_bin`.
 
 - Link to a notebook by its source path: `./h2_create_embeddings.py` from another notebook and
   `../notebooks/h2_create_embeddings.py` from a concept page. Never link to the `.html` or `.ipynb` file.
-- Use the exact title of the target page as the link text. When you retitle a page, search for the old title and
-  update every link that repeats it.
+- Use the exact title of the target page as the link text, or the heading that an anchor names. When you retitle a page,
+  search for the old title and update every link that repeats it. `tests/test_notebook_structure.py` checks the links
+  in Next steps.
 - Heading anchors are generated to depth 4, and the docs build fails on a missing anchor. Prefer a link to a page over
   a link to a section of a notebook. Links from outside the documentation to a section cannot be checked, and they
   break when you rename the heading.
@@ -390,6 +393,8 @@ Run the checks that apply before you open a merge request.
 | ------- | -------------- |
 | `uv run nox -s lint` | `ruff`, `codespell` (American spelling) and `typos` |
 | `uv run nox -s test -- tests/test_doc_markup.py tests/test_doc_cross_references.py tests/test_deprecated_docs.py tests/test_quickstart.py tests/test_notebook_structure.py --cov-fail-under=0` | reST roles in Markdown, fence closing, role targets, deprecated documentation, the quickstart code, and the headings, template sections and Next steps of the notebooks |
+| `uv run nox -s type` | `pyright` over `src`, `tests`, `verification` and `docs/source/notebooks`. Run it after you change a code cell in a notebook or a test, because it checks them too |
+| `npx --yes markdownlint-cli2 '*.md' 'docs/**/*.md' '#node_modules'` | The Markdown rules that CI enforces, such as 120 columns, one blank line between blocks and no repeated heading in a page. Run it after every change to a `.md` file. It needs Node, and `npx` fetches the tool on first use |
 | `uv run nox -s docs` | Converts the notebooks, executes the ones whose code cells changed, runs their assertions and builds the site with `--fail-on-warning`, which catches broken links, anchors and toctree entries |
 | `uv run nox -s docs -- skip` | The same build without executing notebooks, for a change to prose only |
 | `uv run nox -e docs -- clean` | Clears the notebook cache and re-executes everything, for a library change that could alter outputs |
@@ -398,8 +403,9 @@ Run the checks that apply before you open a merge request.
 A single run of the documentation tests with `--no-cov` exits non-zero even when every test passes, so use
 `--cov-fail-under=0` as shown.
 
-What is not automated today: voice, emphasis, contractions, what a heading or a Next steps entry says, the choice of
-Next steps links, the 600-word limit (it warns) and the width of notebook text. A reviewer checks them.
+What is not automated today: voice, emphasis, contractions, what a heading or a Next steps description says, the choice
+of Next steps links, the `See this in practice` lists of the concept pages, the 600-word limit (it warns) and the width
+of notebook text. A reviewer checks them.
 
 A notebook that needs more memory than your machine has cannot execute in your local docs build. Run its cells one at
 a time instead, and rely on the CI docs job for the full run. Say in the merge request what you could and could not

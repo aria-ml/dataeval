@@ -616,8 +616,8 @@ display(duplicates)
 # ## Next steps
 #
 # - [Data Integrity](../concepts/DataIntegrity.md) — Understand core principles of dataset integrity, duplicates, and outliers.
-# - [Assess the data space](./tt_assess_data_space.py) — Evaluate coverage, bias, and dimensionality across dataset splits.
-# - [Identify and remove duplicates from a PyTorch Dataset](./h2_deduplicate.py) — Remove exact, duplicate, or near-duplicate images from datasets.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate coverage, bias, and dimensionality across dataset splits.
+# - [How to identify duplicates](./h2_deduplicate.py) — Remove exact, duplicate, or near-duplicate images from datasets.
 
 # %% [markdown]
 # ## On your own

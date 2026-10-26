@@ -658,9 +658,9 @@ Balance().evaluate(custom_metadata)
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset bias concepts](../concepts/DatasetBias.md) — Learn about normalized mutual information and diversity indices for measuring dataset bias.
-# - [Add intrinsic factors](./h2_add_intrinsic_factors.py) — Apply statistical image metrics as intrinsic factors in dataset metadata.
-# - [Measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about normalized mutual information and diversity indices for measuring dataset bias.
+# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Measure brightness, sharpness and other image statistics and add them to the metadata.
+# - [How to measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
 
 # %% [markdown]
 # ## On your own

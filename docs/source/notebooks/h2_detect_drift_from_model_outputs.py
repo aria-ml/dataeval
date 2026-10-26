@@ -162,4 +162,4 @@ assert result_label.drifted
 #
 # - [Distribution Shift](../concepts/DistributionShift.md) — Explore types of distribution shift and strategies for detecting drift.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational streams over time.
-# - [How to detect drift using prediction uncertainty](./h2_detect_uncertainty_drift.py) — Calculate uncertainty metrics to monitor distribution changes.
+# - [How to detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Calculate uncertainty metrics to monitor distribution changes.

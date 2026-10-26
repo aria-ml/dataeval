@@ -204,5 +204,5 @@ assert bovw_embeddings.shape == (100, 64)
 # ## Next steps
 #
 # - [Embeddings](../concepts/Embeddings.md) — Learn what embeddings represent and how they are used across DataEval.
-# - [Validation and Trust](../concepts/ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers) — See what each extractor embeds and how each can mislead a metric.
+# - [Feature extractors: a dependency of both layers](../concepts/ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers) — See what each extractor embeds and how each can mislead a metric.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings to find groups, outliers and duplicates.

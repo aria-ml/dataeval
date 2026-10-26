@@ -384,10 +384,11 @@ assert len(cov["uncovered_indices"]) > 0
 # %% [markdown]
 # ## Next steps
 #
-# - [Clustering Concept Page](../concepts/Clustering.md) — Mathematical foundations of minimum spanning tree linkage clustering.
-# - [Dataset Bias and Coverage Concept Page](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Deep dive into coverage geometry and feature space density.
-# - [Identify outliers and anomalies with clustering](./h2_cluster_analysis.py) — How-to guide on clustering workflows.
-# - [Detect undersampled subsets of datasets](./h2_detect_undersampling.py) — How-to guide on locating low-density data clusters.
+# - [Clustering](../concepts/Clustering.md) — Mathematical foundations of minimum spanning tree linkage clustering.
+# - [Measuring coverage: geometry in embedding space](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Read how naive and adaptive coverage find the images in sparse regions of the space.
+# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster a dataset and find outliers and near duplicates
+#   in the clusters.
+# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find the regions of a dataset that few images cover.
 
 # %% [markdown]
 # ## On your own

@@ -343,8 +343,8 @@ print(f"SeaDrone     -> drift: {result_drone.drifted}  (ratio: {result_drone.dis
 # ## Next steps
 #
 # - [Taxonomy of shift](../concepts/DistributionShift.md#taxonomy-of-shift) — Read about shift types and when uncertainty-based detection is and isn't the right tool.
-# - [Monitor shift tutorial](./tt_monitor_shift.py) — Compare prediction uncertainty with feature-based drift detection on dataset embeddings.
-# - [Detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Apply uncertainty drift detection using a MAITE-wrapped model.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Compare prediction uncertainty with feature-based drift detection on dataset embeddings.
+# - [How to detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Test the entropy of a MAITE model's predictions for drift.
 
 # %% [markdown]
 # ## On your own
