@@ -108,7 +108,7 @@ dep.plot(balance_output)
 dep.plot(balance_output, plot_classwise=True)
 
 # %% [markdown]
-# Classwise balance agrees: no single statistic separates one class from the rest.
+# Classwise balance agrees. No single statistic separates one class from the rest.
 
 # %% [markdown]
 # ## Check the diversity
@@ -121,7 +121,7 @@ dep.plot(diversity_output)
 
 # %% [markdown]
 # Classes are sampled uniformly. Kurtosis has the lowest diversity of the statistical moments, which may mean five
-# uniform bins fit it poorly; try a different binning to check.
+# uniform bins fit it poorly. Try a different binning to check.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###

@@ -86,7 +86,7 @@ for name, spec in winter.encoding().items():
     print(f"{name:8} {type(spec).__name__:10} provenance={spec.provenance}")
 
 # %% [markdown]
-# `temp_c` reads `edges` and `site` reads `declared`. `haze` is still `derived`: no claim was made about it, and
+# `temp_c` reads `edges` and `site` reads `declared`. `haze` is still `derived`. No claim was made about it, and
 # DataEval warns that it binned the factor automatically. Pass `strict=True` alongside `factor_levels` when the
 # vocabulary is closed, and a value outside it is an error instead of being appended:
 
@@ -130,7 +130,7 @@ print(json.dumps(json.loads(descriptor.read_text())["factors"]["temp_c"], indent
 
 # %% [markdown]
 # {meth}`.Metadata.save` also carries the encoding, so a restored instance reproduces its codes instead of re-deriving
-# them. What you pass to {meth}`.Metadata.load` still wins; the archive only fills in the factors you say nothing about.
+# them. What you pass to {meth}`.Metadata.load` still wins. The archive only fills in the factors you say nothing about.
 
 # %%
 archive = workspace / "winter.dem"
@@ -144,7 +144,7 @@ print(f"digest: {restored.encoding_digest == winter.encoding_digest}")
 # ## Apply it to the next collection
 #
 # Hand the descriptor, or the mapping `encoding()` returns, to the next collection. The cut is reapplied rather than
-# refitted: spring is 16 °C warmer and the freezing boundary stays where you put it. {attr}`.Metadata.encoding_digest`
+# refitted. Spring is 16 °C warmer, and the freezing boundary stays where you put it. {attr}`.Metadata.encoding_digest`
 # is a short hash of the whole encoding, and it rides along on every evaluator result under
 # `result.meta().state["encoding_digest"]`. Two datasets sharing a digest were encoded identically.
 
@@ -165,8 +165,8 @@ print(f"on the result: {result.meta().state['encoding_digest']}")
 # %% [markdown]
 # ## Watch for a cut that stops fitting
 #
-# A locked cut is reapplied even when the data has moved out from under it, and a cut whose bins the data no longer
-# reaches says so:
+# A locked cut is reapplied even when the data has shifted away from it, and a cut whose bins the data no longer reaches
+# says so:
 
 # %%
 with warnings.catch_warnings(record=True) as caught:
@@ -184,9 +184,9 @@ for warning in caught:
 
 # %% [markdown]
 # A cut that fits is silent. DataEval also reports an encoding finer than the sample can support, whether it came as a
-# bin count or a declared vocabulary, and names no replacement count on purpose;
+# bin count or a declared vocabulary, and names no replacement count on purpose.
 # [Binning](../concepts/Binning.md#a-fine-cut-costs-the-same-correlation-from-the-other-side) has the measurements.
-# Neither report refits anything: {meth}`.Metadata.reencode` is the explicit request, and it returns a new instance so a
+# Neither report refits anything. {meth}`.Metadata.reencode` is the explicit request, and it returns a new instance so a
 # result computed under the old codes stays attributable to them.
 
 # %% tags=["remove_cell"]

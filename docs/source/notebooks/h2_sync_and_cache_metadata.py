@@ -113,9 +113,9 @@ print("counts :", reloaded.level_counts)
 # one file serves whatever `continuous_factor_bins` you want from it.
 #
 # ```{warning}
-# The file is a cache and not an interchange format. It mirrors DataEval's internal layout, which may change between releases, and a
-# newer installation may reject a file written by an older one. Catch {exc}`.MetadataFormatError` and rebuild. To keep metadata
-# across an upgrade, write {attr}`.Metadata.dataframe` to a Parquet file.
+# The file is a cache and not an interchange format. It mirrors DataEval's internal layout, which may change between
+# releases, and a newer installation may reject a file written by an older one. Catch {exc}`.MetadataFormatError` and
+# rebuild. To keep metadata across an upgrade, write {attr}`.Metadata.dataframe` to a Parquet file.
 # ```
 
 # %%

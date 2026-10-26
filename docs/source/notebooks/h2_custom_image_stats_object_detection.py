@@ -17,12 +17,12 @@
 # # How to specify custom statistics on object detection datasets
 #
 # When you analyze an object detection dataset, you often need
-# [image statistics](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary) at three granularities: whole images,
-# individual bounding boxes, and the background that no box covers. {func}`.image_stats` with {class}`.ImageStats` flags measures each
-# region, and {class}`.Metadata` places every value on the row it describes.
+# [image statistics](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary) at three granularities:
+# whole images, individual bounding boxes, and the background that no box covers. {func}`.image_stats` with
+# {class}`.ImageStats` flags measures each region, and {class}`.Metadata` places every value on the row it describes.
 #
-# Use it when you want control over which statistics to compute, want to separate what was annotated from the scene it was annotated
-# in, or want to avoid computing statistics you do not need.
+# Use it when you want control over which statistics to compute, want to separate what was annotated from the scene it
+# was annotated in, or want to avoid computing statistics you do not need.
 #
 # You need `dataeval` and `maite-datasets`. This guide uses SeaDrone.
 
@@ -52,8 +52,8 @@ set_max_processes(4)
 # %% [markdown]
 # ## Load the dataset
 #
-# SeaDrone is an object detection dataset of aerial images captured by drones over marine environments. A subset keeps the computation
-# time reasonable.
+# SeaDrone is an object detection dataset of aerial images captured by drones over marine environments. A subset keeps
+# the computation time reasonable.
 
 # %%
 # Load the SeaDrone dataset
@@ -66,12 +66,14 @@ dataset = View(sd_dataset, Limit(50))
 # %% [markdown]
 # ## Compute the statistics
 #
-# Choose the statistics with {class}`.ImageStats` flags combined by `|`, and the regions with three arguments: `per_image` for whole
-# images, `per_target` for each bounding box, and `per_background` for the pixels no bounding box covers. Pass `normalize_pixel_values`
-# explicitly: its default changed to `False` in v1.1, and omitting it raises a deprecation warning.
+# Choose the statistics with {class}`.ImageStats` flags combined by `|`, and the regions with three arguments:
+# `per_image` for whole images, `per_target` for each bounding box, and `per_background` for the pixels no bounding box
+# covers. Pass `normalize_pixel_values` explicitly. Its default changed to `False` in v1.1, and omitting it raises a
+# deprecation warning.
 #
-# Background values are returned on the same rows as the whole-image ones, under names prefixed with `background_`. Each row carries a
-# {class}`.SourceIndex` with an `item` and a `key`: the key is the bounding box index, and `None` for a whole image.
+# Background values are returned on the same rows as the whole-image ones, under names prefixed with `background_`. Each
+# row carries a {class}`.SourceIndex` with an `item` and a `key`. The key is the bounding box index, and `None` for a
+# whole image.
 
 # %%
 results_background = image_stats(
@@ -86,9 +88,10 @@ results_background = image_stats(
 print(f"Computed statistics: {sorted(results_background['stats'])}")
 
 # %% [markdown]
-# Only {attr}`.ImageStats.PIXEL` and {attr}`.ImageStats.VISUAL` statistics are computed for the background; a hash or dimension flag is
-# skipped for it. Read `background_fraction`, the share of the image left unmasked, before the rest: a background statistic measured
-# over a few percent of an image is unreliable, and where boxes cover an image entirely every background statistic for it is NaN. See
+# Only {attr}`.ImageStats.PIXEL` and {attr}`.ImageStats.VISUAL` statistics are computed for the background. A hash or
+# dimension flag is skipped for it. Read `background_fraction`, the share of the image left unmasked, before the rest. A
+# background statistic measured over a few percent of an image is unreliable, and where boxes cover an image entirely
+# every background statistic for it is NaN. See
 # [Data Integrity](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
 
 # %%
@@ -99,14 +102,14 @@ fraction = pl.Series(results_background["stats"]["background_fraction"]).drop_nu
 print(f"background_fraction: n={len(fraction)}  min={fraction.min():.3f}  median={fraction.median():.3f}")
 
 # %% [markdown]
-# On SeaDrone the annotations are tiny against a 4K frame, so nearly all of every image survives masking. A dataset whose boxes cover
-# most of the frame would report a small fraction here.
+# On SeaDrone the annotations are tiny against a 4K frame, so nearly all of every image survives masking. A dataset
+# whose boxes cover most of the frame would report a small fraction here.
 
 # %% [markdown]
 # ## Land the results on the rows they describe
 #
-# {meth}`.Metadata.add_factors` places each value on the row it belongs to. Hand it the whole result rather than its `stats` mapping, so
-# it reads the `source_index` too.
+# {meth}`.Metadata.add_factors` places each value on the row it belongs to. Hand it the whole result rather than its
+# `stats` mapping, so it reads the `source_index` too.
 
 # %%
 metadata = Metadata(dataset)
@@ -120,12 +123,12 @@ print("new factors :", sorted(set(metadata.factor_names) - supplied))
 # %% [markdown]
 # One `sharpness` statistic became three factors, each named for the level it landed at:
 #
-# - `instance_sharpness` — measured over each annotated object
-# - `unit_sharpness` — measured over each whole image
-# - `unit_background_sharpness` — measured over each image's unannotated pixels
+# - `instance_sharpness`: measured over each annotated object
+# - `unit_sharpness`: measured over each whole image
+# - `unit_background_sharpness`: measured over each image's unannotated pixels
 #
-# The background factors carry `unit_` because they live there: one value per image. A value DataEval cannot place, such as a
-# background value on a detection row, is recorded under `dropped_factors`.
+# The background factors carry `unit_` because they live there, with one value per image. A value DataEval cannot place,
+# such as a background value on a detection row, is recorded under `dropped_factors`.
 
 # %%
 print("dropped:", metadata.dropped_factors)
