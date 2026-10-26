@@ -100,8 +100,6 @@ _BOUNDS = [
     (Duplicates.Config, "verify_alignment", 0, -1),
     (Duplicates.Config, "min_segment_frames", 1, 0),
     (Duplicates.Config, "min_track_frames", 1, 0),
-    (Duplicates.Config, "frame_sample", 1, 0),
-    (Duplicates.Config, "frame_sample", 0.5, 0.0),
     (Outliers.Config, "n_clusters", 1, 0),
     (Outliers.Config, "batch_size", 1, 0),
     (Coverage.Config, "num_observations", 1, 0),

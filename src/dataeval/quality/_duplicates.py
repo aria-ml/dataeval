@@ -33,7 +33,7 @@ from dataeval.core import (
     sequence_fingerprint,
 )
 from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
-from dataeval.data import AllFrames, FrameRate, FrameSelector, SequenceFrames, Stride
+from dataeval.data import SequenceFrames
 from dataeval.data._frames import frame_numbers_at
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
@@ -91,16 +91,6 @@ DEFAULT_DUPLICATES_MIN_TRACK_FRAMES = 5
 # Cells one sequence pair's warping may build. Two 4 000-frame runs sit just inside it; past that
 # the pair costs more than the relation is worth and is logged rather than waited on.
 _ALIGNMENT_CELLS = 16_000_000
-FrameSample: TypeAlias = "int | float | FrameSelector | None"
-"""How much of a video to look at: a frame stride, a target frame rate, or a selector.
-
-``int`` and ``float`` are not interchangeable here and the union is not redundant: an integer is a
-*stride in frames* and a float is a *rate in frames per second*, which is a distinction
-:func:`_resolve_selector` makes at runtime.
-"""
-
-DEFAULT_DUPLICATES_FRAME_SAMPLE: FrameSample = None
-
 
 _BASIC_HASH_METHODS = frozenset({"phash", "dhash"})
 _D4_HASH_METHODS = frozenset({"phash_d4", "dhash_d4"})
@@ -323,17 +313,6 @@ def _describes_whole_data(levels: frozenset[str]) -> bool:
     both emission points, so the two axes apply the same test.
     """
     return bool(levels & _ANNOTATION_LEVELS)
-
-
-def _resolve_selector(frame_sample: FrameSample) -> FrameSelector:
-    """Turn the `frame_sample` policy into the mechanism that carries it out."""
-    if frame_sample is None:
-        return AllFrames()
-    if isinstance(frame_sample, FrameSelector):
-        return frame_sample
-    if isinstance(frame_sample, bool):
-        raise TypeError(f"frame_sample must be a frame stride, a target fps, or a FrameSelector; got {frame_sample!r}.")
-    return Stride(int(frame_sample)) if isinstance(frame_sample, int) else FrameRate(float(frame_sample))
 
 
 # ---------------------------------------------------------------------------
@@ -2353,11 +2332,13 @@ def _yields_frames(data: Any) -> bool:
 
 def _as_frames(
     data: Any,
-    frame_sample: FrameSample,
     caller: str,
     hash_radius: int = DEFAULT_DUPLICATES_HASH_RADIUS,
 ) -> _FrameView:
     """Present a tracking dataset as its frames, leaving anything else alone.
+
+    A raw tracking dataset is wrapped with every frame; a :class:`~dataeval.data.SequenceFrames`
+    is measured as given, so its selector alone decides which frames take part.
 
     Returns the dataset to measure and, for a tracking dataset, the maps from each flattened frame
     position back to ``(sequence, position)`` and from each detection to the track holding it. The
@@ -2369,18 +2350,10 @@ def _as_frames(
     """
     if isinstance(data, SequenceFrames):
         frames = data
-        if frame_sample is not None:
-            _logger.warning(
-                "%s: frame_sample=%r is ignored because the dataset is already a SequenceFrames, "
-                "whose own selector (%r) decides which frames take part.",
-                caller,
-                frame_sample,
-                frames.selector,
-            )
     elif not _is_tracking(data):
         return _FrameView(data, None, None)
     else:
-        frames = SequenceFrames(data, _resolve_selector(frame_sample))
+        frames = SequenceFrames(data)
 
     _warn_strict_radius(hash_radius, caller)
 
@@ -2432,7 +2405,6 @@ def _numbered(frame_map: NDArray[np.intp] | None, views: Sequence[Any]) -> NDArr
 
 def _as_frames_multi(
     datasets: Sequence[Any],
-    frame_sample: FrameSample,
     caller: str,
     hash_radius: int = DEFAULT_DUPLICATES_HASH_RADIUS,
 ) -> _FrameView:
@@ -2441,7 +2413,7 @@ def _as_frames_multi(
     The two cannot share one result: a frame view's item index names a frame and an image
     dataset's names an image, so the groups would address different things under one column.
     """
-    prepared = [_as_frames(dataset, frame_sample, caller, hash_radius) for dataset in datasets]
+    prepared = [_as_frames(dataset, caller, hash_radius) for dataset in datasets]
     maps = [view.frame_map for view in prepared]
     if any(frame_map is None for frame_map in maps) != all(frame_map is None for frame_map in maps):
         raise ValueError(
@@ -4063,18 +4035,6 @@ class Duplicates(Evaluator):
         they read. Has no effect on image datasets.
 
         .. versionadded:: 1.2
-    frame_sample : int or float or FrameSelector or None, default None
-        How much of each video to look at. None measures every frame. An ``int`` is a stride in
-        frames (``5`` keeps every fifth); a ``float`` is a target rate in frames per second
-        (``2.0`` keeps about two a second, read from each frame's own timestamps, which is what
-        makes it comparable across videos captured at different rates). A
-        :class:`~dataeval.data.FrameSelector` is used as given, so
-        :class:`~dataeval.data.Redundancy` and any custom rule reach this the same way.
-
-        Thinning changes what every count is over: an unweighted read of a thinned view describes
-        the frames kept rather than the source stream. Has no effect on image datasets.
-
-        .. versionadded:: 1.2
     extractor : FeatureExtractor, optional
         Feature extractor for cluster-based duplicate detection. Must be provided
         together with cluster_sensitivity to enable clustering. When provided alone
@@ -4123,8 +4083,6 @@ class Duplicates(Evaluator):
         matching is off.
     min_track_frames : int
         Shortest stretch two tracks may share and still be reported, in detections.
-    frame_sample : int or float or FrameSelector or None
-        Which frames of a video take part: a frame stride, a target frame rate, or a selector.
 
     References
     ----------
@@ -4204,11 +4162,6 @@ class Duplicates(Evaluator):
         min_track_frames : int, default 5
             Shortest stretch two tracks may share and still be reported, in detections. Computed
             only when ``per_target=True``. Tracking datasets only.
-        frame_sample : int or float or FrameSelector or None, default None
-            Which frames of a video take part. An ``int`` is a stride in frames, a ``float`` a
-            target frame rate in frames per second, and a
-            :class:`~dataeval.data.FrameSelector` is used as given. None measures every frame.
-            Tracking datasets only.
         extractor : FeatureExtractor or None, default None
             Feature extractor for cluster-based duplicate detection.
         batch_size : int or None, default None
@@ -4230,8 +4183,6 @@ class Duplicates(Evaluator):
         segment_offset_tolerance: NonNegativeInt = DEFAULT_DUPLICATES_SEGMENT_OFFSET_TOLERANCE
         verify_alignment: NonNegativeInt | None = DEFAULT_DUPLICATES_VERIFY_ALIGNMENT
         min_track_frames: PositiveInt = DEFAULT_DUPLICATES_MIN_TRACK_FRAMES
-        # A stride of at least one frame, or a positive rate in frames per second.
-        frame_sample: PositiveInt | PositiveFloat | FrameSelector | None = DEFAULT_DUPLICATES_FRAME_SAMPLE
 
     stats: StatsResult
     flags: ImageStats
@@ -4244,7 +4195,6 @@ class Duplicates(Evaluator):
     segment_offset_tolerance: int
     verify_alignment: int | None
     min_track_frames: int
-    frame_sample: FrameSample
     extractor: FeatureExtractor | None
     batch_size: int | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
@@ -4263,7 +4213,6 @@ class Duplicates(Evaluator):
         segment_offset_tolerance: int | None = None,
         verify_alignment: int | None = None,
         min_track_frames: int | None = None,
-        frame_sample: FrameSample = None,
         extractor: FeatureExtractor | None = None,
         batch_size: int | None = None,
         cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
@@ -4573,7 +4522,6 @@ class Duplicates(Evaluator):
             "segment_offset_tolerance",
             "verify_alignment",
             "min_track_frames",
-            "frame_sample",
             "encoding_digest",
         ]
     )
@@ -4605,6 +4553,10 @@ class Duplicates(Evaluator):
 
             A plain array or list of image arrays also structurally satisfies
             :class:`~dataeval.protocols.Dataset` and is accepted directly.
+
+            A multi-object-tracking dataset is measured frame by frame, every frame. To measure
+            fewer, pass a :class:`~dataeval.data.SequenceFrames` whose selector chooses them, such
+            as ``SequenceFrames(dataset, Stride(5))``; the execution record names that selector.
 
             A :class:`~dataeval.Metadata` instance is also accepted directly without a
             dataset. In that case, ``duplicate_factors`` is required. Results are reported
@@ -4828,7 +4780,7 @@ class Duplicates(Evaluator):
 
         # Bound to a new name rather than over `data`: for a tracking dataset this is the frame
         # view, which is image-shaped, and rebinding the parameter would keep its declared type.
-        measured, frame_map, track_map = _as_frames(data, self.frame_sample, type(self).__name__, self.hash_radius)
+        measured, frame_map, track_map = _as_frames(data, type(self).__name__, self.hash_radius)
 
         # Read off the targets before any hashing, and whether or not there is any. The annotation
         # axis costs no decode. So a cluster-only run has the same claim on it as a hashing one.
@@ -4931,9 +4883,7 @@ class Duplicates(Evaluator):
                 "cluster_sensitivity must be provided for cluster-based detection.",
             )
 
-        measured, frame_map, track_map = _as_frames_multi(
-            datasets, self.frame_sample, type(self).__name__, self.hash_radius
-        )
+        measured, frame_map, track_map = _as_frames_multi(datasets, type(self).__name__, self.hash_radius)
 
         # Hash-based: compute stats per dataset, delegate to from_stats
         calc_results: list[StatsResult] = []

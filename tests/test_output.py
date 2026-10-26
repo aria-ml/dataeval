@@ -144,6 +144,60 @@ class TestStateIsReadFromTheInstance:
         assert _Late().evaluate().meta().state == {"computed": "after"}
 
 
+class _Chosen:
+    """A dataset whose items a rule chose, as a frame view is."""
+
+    _provenance = "Chosen: len=2, selector=EveryOther()"
+
+    def __len__(self) -> int:
+        return 2
+
+
+class _Forwarding:
+    """A wrapper that forwards attribute reads to the dataset inside it."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+
+    def __len__(self) -> int:
+        return 2
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+class _Records:
+    @set_metadata
+    def evaluate(self, data: Any, *other: Any, level: str | None = None) -> MockOutput:
+        return MockOutput(1, True, "a")
+
+
+@pytest.mark.required
+class TestRecordsNameTheRuleThatChoseTheItems:
+    def test_a_dataset_with_a_rule_is_recorded_by_it(self):
+        assert _Records().evaluate(_Chosen()).meta().arguments["data"] == "Chosen: len=2, selector=EveryOther()"
+
+    def test_a_forwarding_wrapper_is_recorded_as_itself(self):
+        assert _Records().evaluate(_Forwarding(_Chosen())).meta().arguments["data"] == "_Forwarding: len=2"
+
+    def test_each_extra_dataset_is_recorded_under_its_own_parameter(self):
+        arguments = _Records().evaluate(_Chosen(), _Chosen(), _Forwarding(_Chosen())).meta().arguments
+        assert arguments["other"] == ["Chosen: len=2, selector=EveryOther()", "_Forwarding: len=2"]
+        assert arguments["level"] == "NoneType"  # how a record spells an unset default, not the third dataset
+
+    def test_keywords_and_no_extra_datasets(self):
+        arguments = _Records().evaluate(_Chosen(), level="item").meta().arguments
+        assert arguments == {"data": "Chosen: len=2, selector=EveryOther()", "other": [], "level": "item"}
+
+    def test_an_argument_that_cannot_be_described_raises(self):
+        class _Unsized:
+            def __len__(self) -> int:
+                raise TypeError("no length")
+
+        with pytest.raises(TypeError, match="no length"):
+            _Records().evaluate(_Unsized())
+
+
 @pytest.mark.required
 class TestCollectionOutput:
     dict_data = {"mock_key": 1.0}
