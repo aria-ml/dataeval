@@ -16,7 +16,7 @@
 # %% [markdown]
 # # Clean a dataset
 #
-# This tutorial walks through using DataEval to clean a dataset.
+# Learn how to clean a dataset with DataEval.
 #
 # Estimated time to complete: 15 minutes
 #
@@ -28,38 +28,36 @@
 # ## What you will do
 #
 # - You will use DataEval's cleaners to assess the 2012 VOC dataset.
-# - You will analyze the results through various plots and tables.
+# - You will analyze the results with plots and tables.
 
 # %% [markdown]
 # ## What you will learn
 #
-# - You'll learn how to assess a dataset for extreme and/or redundant data points.
-# - You'll learn helpful questions to determine when to remove or collect additional data.
+# - You will learn how to assess a dataset for extreme or redundant data points.
+# - You will learn which questions to ask to decide when to remove or collect additional data.
 
 # %% [markdown]
 # ## What you will need
 #
-# - Environment Requirements
+# - Environment requirements
 #   - `dataeval` or `dataeval[all]`
 
 # %% [markdown]
 # ## Introduction
 #
-# Exploratory Data Analysis (EDA) is an approach to analyzing data sets to summarize the main characteristics and identify
-# incongruencies in the data. Before diving into machine learning or statistical modeling, it is crucial to understand the
-# data you are working with. EDA helps in understanding the patterns, detecting anomalies, checking assumptions, and
-# determining relationships in the data.
+# Exploratory data analysis (EDA) summarizes the main characteristics of a dataset and identifies inconsistencies in the
+# data. Before you move on to machine learning or statistical modeling, you need to understand the data you are working
+# with. EDA helps you find patterns, detect anomalies, check assumptions and determine relationships in the data.
 #
-# One of the most important aspects of EDA is [data cleaning](../concepts/DataIntegrity.md). A portion of DataEval is
-# dedicated to being able to identify duplicates and
-# [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings) as well as data points that
-# have missing or too many extreme values. These techniques help ensure that you only include high quality data for your
-# projects.
+# [Data cleaning](../concepts/DataIntegrity.md) is one of the most important parts of EDA. DataEval can identify
+# duplicates and [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings), as well as
+# data points that have missing values or too many extreme values. These techniques help you include only high quality
+# data in your projects.
 
 # %% [markdown]
 # ## Setup
 #
-# First import the required libraries needed to set up the example.
+# Import the libraries that the example needs.
 
 # %% tags=["remove_cell"]
 try:
@@ -211,15 +209,15 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_result, metric, layout
 # %% [markdown]
 # ### Load the data
 #
-# You are going to work with the PASCAL VOC 2012 dataset. This dataset is a small curated dataset that was used for a
-# computer vision competition. The images were used for classification, object detection, and segmentation. This dataset
-# was chosen because it has multiple classes and images with a variety of sizes and objects.
+# You are going to work with the PASCAL VOC 2012 dataset, a small curated dataset that was used for a computer vision
+# competition. Its images were used for classification, object detection, and segmentation. The dataset has multiple
+# classes and images with a variety of sizes and objects, which is why this tutorial uses it.
 #
-# If this data is already on your computer you can change the file location from `"./data"` to wherever the data is
-# stored. Just remember to also change the download value from `True` to `False`.
+# If this data is already on your computer, you can change the file location from `"./data"` to wherever the data is
+# stored. Also change the download value from `True` to `False`.
 #
-# For the sake of ensuring that this tutorial runs quickly on most computers, you are going to analyze only the training
-# set of the data, which is a little under 6000 images.
+# To keep this tutorial fast on most computers, you are going to analyze only the training set of the data, which is a
+# little under 6000 images.
 
 # %%
 # Download the data and then load it as a torch Tensor
@@ -229,8 +227,8 @@ print(ds)
 # %% [markdown]
 # ### Inspect the data
 #
-# As this data was used for a computer vision competition, it will most likely have very few issues, but it is always
-# worth it to check. Many of the large webscraped datasets available for use do contain image issues. Verifying in the
+# Because this data was used for a computer vision competition, it will most likely have very few issues, but it is
+# always worth checking. Many of the large webscraped datasets available for use contain image issues. Verifying at the
 # beginning that you have a high quality dataset is always easier than finding out later that you trained a model on a
 # dataset with erroneous images or a set of splits with leakage.
 
@@ -256,38 +254,33 @@ pl.DataFrame({
 # `cow`, `sheep`, and `bus` are the classes with least number of objects, while `bus`, `train`, and `cow` are the classes
 # with the least number of images.
 #
-# This table helps point out the wide variation in
+# This table shows wide variation in the number of classes per image, the number of objects per image and the number of
+# objects of each class per image.
 #
-# - the number of classes per image,
-# - the number of objects per image,
-# - and the number of objects of each class per image.
-#
-# This highlights an important concept -
+# These differences point to an important concept,
 # [class balance](../concepts/DatasetBias.md#correcting-for-imbalance-classbalance). A dataset that is imbalanced can
-# result in a model that chooses the more prominent class more often just because there are more samples in that class. To
-# explore this concept further, see the bias tutorial in the [Next Steps](#next-steps) section at the end of this
+# result in a model that chooses the more prominent class more often only because there are more samples in that class.
+# To explore this concept further, see the bias tutorial in the [Next steps](#next-steps) section at the end of this
 # tutorial.
 #
-# Now that the metadata has been examined, it's important to inspect random images to get an idea of the variety of
-# backgrounds, the range of colors, the locations of objects in images, and how often an image is seen with a single
-# object versus multiple objects.
+# Now that you have examined the metadata, inspect random images to get an idea of the variety of backgrounds, the range
+# of colors, the locations of objects in images, and how often an image shows a single object versus multiple objects.
 
 # %%
 plot_sample_images_by_class(ds, lstats["image_indices_per_class"])
 
 # %% [markdown]
-# Plotting the images displays the variety in the images, including image sizes, image brightness, object sizes,
-# backgrounds, number of objects in the image, and even the lack of color in a few images which are black and white.
+# The plot shows the variety in the images, including image sizes, image brightness, object sizes, backgrounds, the
+# number of objects in the image, and the lack of color in a few black and white images.
 #
-# This is where DataEval comes in. It's designed to help you make sense of the many different aspects that affect building
-# representative datasets and robust models.
+# DataEval helps you make sense of the many aspects that affect building representative datasets and robust models.
 
 # %% [markdown]
-# In addition to making sure that you understand the structure of the labels and have visualized some of the images from
-# the dataset, you can also visualize the data distribution across different statistics such as the image size or the
-# pixel mean. In order to view these distributions, you have to use DataEval's stat functions and plot the results.
+# Besides making sure that you understand the structure of the labels and have visualized some of the images from the
+# dataset, you can visualize the data distribution across statistics such as the image size or the pixel mean. To view
+# these distributions, use DataEval's stat functions and plot the results.
 #
-# Now, you can move on to identifying which images have a statistical difference from the rest of the images.
+# Now you can identify which images differ statistically from the rest of the images.
 
 # %% [markdown]
 # ## Identify any outlying data points
@@ -295,10 +288,10 @@ plot_sample_images_by_class(ds, lstats["image_indices_per_class"])
 # %% [markdown]
 # ### Extreme/missing values
 #
-# Here you will detect and identify the images associated with the extreme values from DataEval's stat functions. To
-# detect these extreme values, you will use the {class}`.Outliers` class. The `Outliers` class has multiple methods to
-# determine the extreme values, which are discussed in the [Data Cleaning explanation](../concepts/DataIntegrity.md). For
-# this guide, you will use the "zscore" as the Z score defines outliers in a normal distribution.
+# Here you will identify the images with extreme values from DataEval's stat functions. To detect these extreme values,
+# you will use the {class}`.Outliers` class. The `Outliers` class has multiple methods to determine the extreme values,
+# which are discussed in the [Data Cleaning explanation](../concepts/DataIntegrity.md). For this guide, you will use the
+# "zscore" because the Z score defines outliers in a normal distribution.
 #
 # The output of the `Outliers` class contains a DataFrame with columns for image_id, metric_name, and metric_value for
 # each flagged outlier.
@@ -325,34 +318,34 @@ outlier_imgs.aggregate_by_metric()
 
 # %% [markdown]
 # Digging into the flagged images and organizing them by category shows that the metric with the most extreme values is
-# "size" while "sharpness" has the least number of extreme values.
+# "size" while "sharpness" has the fewest.
 #
-# `Outliers` is designed to flag any images on the edge of each metric's data distribution. Some images will get flagged
-# as an outlier by multiple metrics, while others will get flagged by only a single metric. It is then up to you, the
-# user, to shift through the information provided by the result from `Outliers`.
+# `Outliers` flags any image on the edge of each metric's data distribution. Some images are flagged as an outlier by
+# multiple metrics, while others are flagged by only a single metric. It is then up to you to sift through the
+# information in the result from `Outliers`.
 #
-# Part of exploring the results includes displaying how the flagged images are spread across the 20 classes.
+# Exploring the results also includes displaying how the flagged images are spread across the 20 classes.
 
 # %%
 # List the outliers by class label
 outlier_imgs.aggregate_by_class(md)
 
 # %% [markdown]
-# Some of the trends to note from the table above which splits the issues by class and metric:
+# The table above splits the issues by class and metric. It shows these trends:
 #
 # - An image with an unusual aspect ratio is most likely to contain a bottle or person.
 # - An image with an issue in brightness is most likely to contain an aeroplane.
 # - An image with an issue in darkness is most likely to be a person.
 # - Images with high contrast are likely to fall within 1 of 4 classes: bottle, cat, chair, person.
-# - Images with low entropy (think image with constant pixels) are likely to fall within 1 of 4 classes: aeroplane, bird,
+# - Images with low entropy (images with constant pixels) are likely to fall within 1 of 4 classes: aeroplane, bird,
 #   bottle, person.
-# - Unusual skew and kurtosis images follow a similar trend as entropy.
+# - Unusual skew and kurtosis images follow a similar trend to entropy.
 # - Every class has images with size issues.
 #
-# Something to remember is that there are different number of images for each class and that effective use of this tool
-# requires understanding the dataset in question. For example, 36 low entropy images out of the 2000 for person might be
-# outliers while 28 low entropy images out of 300 for aeroplane might not be; low entropy might be an inherent
-# characteristic of the aeroplane class.
+# Remember that the number of images differs by class and that effective use of this tool requires understanding the
+# dataset in question. For example, 36 low entropy images out of the 2000 for person might be outliers, while 28 low
+# entropy images out of 300 for aeroplane might not be. Low entropy might be an inherent characteristic of the aeroplane
+# class.
 
 # %% [markdown]
 # {meth}`.OutliersOutput.classwise` answers that caution directly. It fits the thresholds within each class, so an image
@@ -376,7 +369,7 @@ assert len(outlier_imgs_classwise) != len(outlier_imgs)
 assert not outlier_imgs_classwise.populations["judged"].all()
 
 # %% [markdown]
-# In order to understand the above table, you will plot sample images from a few of the metrics, specifically:
+# To understand the table above, you will plot sample images for these metrics:
 #
 # - entropy
 # - size
@@ -384,30 +377,30 @@ assert not outlier_imgs_classwise.populations["judged"].all()
 # - sharpness
 #
 # Entropy, variance, standard deviation, kurtosis, and skew all measure (in different ways) how much change there is
-# across the pixels in the image, and entropy will be the easiest to understand.
+# across the pixels in the image, and entropy is the easiest to understand.
 #
-# Size, width, height, and aspect ratio are all interrelated and size has the most extreme images from those.
+# Size, width, height, and aspect ratio are interrelated, and size has the most extreme images among those.
 #
-# Zeros is a category unto itself but it is closely related to brightness, contrast, darkness, and mean. Zeros measures
+# Zeros is a category of its own, but it is closely related to brightness, contrast, darkness, and mean. Zeros measures
 # the percentage of pixels with a zero value compared to the average image.
 #
-# Sharpness is also in its own category and it measures the perceived edges in an image.
+# Sharpness is also a category of its own. It measures the perceived edges in an image.
 
 # %% [markdown]
 # (questions)=
 #
 # #### Questions
 #
-# When looking at these images, you want to think about the following questions:
+# When you look at these images, consider these questions:
 #
 # - Does this image represent something that would be expected in operation?
 # - Is there commonality to the objects in the images?
 # - Is there commonality to the backgrounds of the images?
 # - Is there commonality to the class of objects in the images?
 #
-# Asking these questions will help you notice things like all objects being located on the leftside of the image or all
-# the images of a specific class have a specific background. Training a model with data that has commonalities can cause
-# your model to develop biases or limit your model's ability to generalize to non-training data.
+# Asking these questions helps you notice problems such as all objects being located on the left side of the image or
+# all the images of a specific class having a specific background. Training a model with data that has commonalities can
+# cause your model to develop biases or limit your model's ability to generalize to non-training data.
 
 # %% [markdown]
 # ### Entropy
@@ -425,9 +418,9 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "entropy", (1, 4))
 # expected use case. Similarly, darker images may indicate low-light conditions, which could suggest either operational
 # relevance (e.g., night operations) or anomalies that need to be addressed.
 #
-# To refine your dataset, decide whether these flagged images represent scenarios that align with your goals. If they do,
-# consider collecting more data with similar characteristics to balance your dataset. If not, these images may be excluded
-# as outliers.
+# To refine your dataset, decide whether these flagged images represent scenarios that match your goals. If they do,
+# consider collecting more data with similar characteristics to balance your dataset. If not, these images may be
+# excluded as outliers.
 
 # %% [markdown]
 # ### Aspect ratio
@@ -438,12 +431,12 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "aspect_ratio", (1, 4))
 
 # %% [markdown]
 # Flagged images for aspect ratio often include examples where the objects in the image are unusually wide or tall
-# relative to the rest of the dataset. For instance, bottle images might by cropped tall.
+# relative to the rest of the dataset. For instance, bottle images might be cropped tall.
 #
 # If your workflow involves preprocessing images to a uniform size, verify that resizing does not distort important
-# details. For example, cropping could remove key parts of the image, while resizing could stretch or compress objects.
-# Alternatively, if you plan to filter images based on size, ensure this doesn’t introduce bias—for example, by
-# disproportionately excluding images of certain classes or contexts.
+# details. For example, cropping could remove relevant parts of the image, while resizing could stretch or compress
+# objects. Alternatively, if you plan to filter images based on size, ensure that this does not introduce bias, for
+# example by disproportionately excluding images of certain classes or contexts.
 #
 # After evaluating the flagged images, you may notice that dimensional discrepancies are common across multiple classes,
 # as shown in the earlier table. This observation suggests that these issues are a general feature of the dataset, and
@@ -490,8 +483,8 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "sharpness", (1, 2))
 # %% [markdown]
 # ## Cleaning summary
 #
-# The Outliers class identifies images that deviate significantly from the dataset's overall distribution. While it cannot
-# determine operational relevance, it highlights patterns that may require further investigation.
+# The Outliers class identifies images that deviate significantly from the dataset's overall distribution. While it
+# cannot determine operational relevance, it shows patterns that may require further investigation.
 #
 # For example, flagged images might reflect real-world scenarios underrepresented in your dataset, such as night
 # operations or objects photographed from unusual angles. Alternatively, they may reveal anomalies, such as artifacts from
@@ -507,8 +500,8 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "sharpness", (1, 2))
 # %% [markdown]
 # ### Duplicates
 #
-# Now that you know how to identify poor quality images in your dataset, another important aspect of data cleaning is
-# detecting and removing any duplicates.
+# Now that you know how to identify poor quality images in your dataset, another important part of data cleaning is
+# detecting and removing duplicates.
 #
 # The `Duplicates` class identifies both exact duplicates and potential (near) duplicates. Potential duplicates can occur
 # in a variety of ways:
@@ -536,17 +529,17 @@ results = dups.evaluate(ds, per_target=False)
 display(results)
 
 # %% [markdown]
-# As expected there are no exact duplicate images in this dataset, since it was curated for a specific competition. But
-# there are near duplicates detected by phash and dhash.
+# As expected, there are no exact duplicate images in this dataset, since it was curated for a specific competition.
+# There are, however, near duplicates detected by phash and dhash.
 
 # %%
 _ = plot(ds, figsize=(12, 6), indices=(1548, 1561))
 
 # %% [markdown]
-# As you can see, the image is indeed a near duplicate; image 1561 is a grayscale version of image 1548.
+# The image is a near duplicate: image 1561 is a grayscale version of image 1548.
 
 # %% [markdown]
-# To highlight the abilities of the `Duplicates` class, you will add some duplicates to the dataset and then rerun the
+# To show what the `Duplicates` class can do, you will add some duplicates to the dataset and then rerun the
 # `Duplicates` class.
 
 # %%
@@ -575,18 +568,16 @@ duplicates = dups.from_stats([dups.stats, dupes_stats])
 display(duplicates)
 
 # %% [markdown]
-# As shown above, the `Duplicates` class identified all images from the second dataset as exact or near duplicates. The
-# results are returned as a DataFrame where each row is a duplicate group with columns for group_id, level, dup_type
-# (exact/near), item_indices, methods, orientation, and dataset_indices (for cross-dataset results).
+# The `Duplicates` class identified all images from the second dataset as exact or near duplicates. It returns the
+# results as a DataFrame where each row is a duplicate group with columns for group_id, level, dup_type (exact/near),
+# item_indices, methods, orientation, and dataset_indices (for cross-dataset results).
 #
-# - **Exact duplicates**: Images 23 and 46 from dataset 0 are identified as exact duplicates of images 0 and 1 from
-#   dataset 1 respectively.
-# - **Same-orientation near duplicates**: Images 5 and 4376 from dataset 0 are identified as near duplicates of images 2
-#   and 3 from dataset 1 (cropped versions). These are detected by both basic hashes (phash, dhash) and D4 hashes.
-# - **Rotated/flipped duplicates**: Images 100 and 200 from dataset 0 are identified as duplicates of images 4 and 5 from
-#   dataset 1 (rotated and mirrored+rotated versions). These are detected **only** by D4 hashes (phash_d4, dhash_d4)
-#   because the basic perceptual hashes are orientation-sensitive. The orientation column shows "rotated" for these
-#   groups.
+# - Images 23 and 46 from dataset 0 are identified as exact duplicates of images 0 and 1 from dataset 1 respectively.
+# - Images 5 and 4376 from dataset 0 are identified as near duplicates, with the same orientation, of images 2 and 3
+#   from dataset 1 (cropped versions). Both basic hashes (phash, dhash) and D4 hashes detect them.
+# - Images 100 and 200 from dataset 0 are identified as rotated or flipped duplicates of images 4 and 5 from dataset 1
+#   (rotated and mirrored+rotated versions). Only D4 hashes (phash_d4, dhash_d4) detect them, because the basic
+#   perceptual hashes are orientation-sensitive. The orientation column shows "rotated" for these groups.
 #
 # By using `ImageStats.HASH` (which computes both basic and D4 hashes), you can distinguish between same-orientation
 # duplicates and rotated/flipped duplicates by checking the methods and orientation columns. This is useful when you want
@@ -599,18 +590,17 @@ display(duplicates)
 # %% [markdown]
 # ## Conclusion
 #
-# Through this process, you've learned how to use DataEval's `Outliers` class to identify and analyze images that deviate
-# from the overall distribution of your dataset and DataEval's `Duplicates` class to identify exact and near duplicates.
-# By examining the images flagged by the different metrics, you gained a deeper understanding of potential issues within
-# your dataset.
+# You used DataEval's `Outliers` class to identify and analyze images that deviate from the overall distribution of your
+# dataset, and DataEval's `Duplicates` class to identify exact and near duplicates. By examining the images flagged by
+# the different metrics, you learned about potential issues within your dataset.
 
 # %% [markdown]
 # ## What you learned
 #
-# - **Underrepresented classes** that may require additional data collection.
-# - **Inconsistencies in image characteristics**, such as brightness, sharpness, or size, which could affect model
+# - Some classes are underrepresented and may require additional data collection.
+# - Image characteristics such as brightness, sharpness, or size can be inconsistent, which could affect model
 #   performance.
-# - **Duplicate data** that can affect model performance.
+# - Duplicate data can affect model performance.
 
 # %% [markdown]
 # ## Next steps
@@ -622,9 +612,9 @@ display(duplicates)
 # %% [markdown]
 # ## On your own
 #
-# Now that you've gone through a tutorial on exploring a dataset, try going through the tutorial again with the test set,
-# full dataset, or even your own dataset. One thing to look for when checking other sets of data is to observe how the
-# stats of each grouping of data changes or doesn't change.
+# Now that you have completed a tutorial on exploring a dataset, repeat it with the test set, the full dataset or your
+# own dataset. When you check other sets of data, observe how the stats of each grouping of data change or stay the
+# same.
 #
-# You can also play around with the different statistical methods that the `Outlier` class employs to see how the method
-# affects the number and type of issues detected.
+# You can also try the different statistical methods that the `Outliers` class uses to see how the method affects the
+# number and type of issues detected.

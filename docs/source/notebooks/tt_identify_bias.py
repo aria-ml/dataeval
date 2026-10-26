@@ -51,29 +51,28 @@
 # ## Introduction
 #
 # Identifying any biases or correlations present in a dataset is essential to accurately interpreting your model's
-# performance and its ability to generalize to new data. A common cause of poor generalization is shortcut learning —
-# where a model uses secondary or background information to make predictions — which is enabled or exacerbated by dataset
-# sampling biases.
+# performance and its ability to generalize to new data. A common cause of poor generalization is shortcut learning,
+# where a model uses secondary or background information to make predictions. Dataset sampling biases enable or
+# exacerbate it.
 #
 # ### Bias and correlations
 #
-# Understanding biases or correlations present in your dataset is a key component to creating meaningful data splits. Bias
-# in data can lead to misleading conclusions and poor model performance on operational data. There are many different
-# [types of bias](https://arxiv.org/abs/1908.09635). A few of these biases occur during data collection, others occur
-# during dataset development, others occur during model development, while others are a result of the user.
+# Understanding biases or correlations present in your dataset is an important part of creating meaningful data splits.
+# Bias in data can lead to misleading conclusions and poor model performance on operational data. There are many
+# different [types of bias](https://arxiv.org/abs/1908.09635). Some biases occur during data collection, some during
+# dataset development, some during model development, and some are a result of the user.
 #
-# Not all forms of bias directly affect the dataset and in order to address the biases that do, you have to make a few
-# assumptions:
+# Not all forms of bias directly affect the dataset. To address the biases that do, you have to make a few assumptions:
 #
 # 1. All desired classes are present.
 # 1. All available metadata is provided.
 # 1. The metadata has been recorded correctly.
 #
-# If any of the above assumptions are violated, then the analysis will not be accurate. When using your own data, you
-# should verify the above assumptions.
+# If any of these assumptions is violated, the analysis will not be accurate. When you use your own data, verify these
+# assumptions.
 #
-# This guide does not focus on eliminating all bias, rather it focuses on identifying the bias that can be found when
-# developing a dataset.
+# This guide focuses on identifying the bias that you can find when developing a dataset. It does not eliminate all
+# bias.
 #
 # ### DataEval metrics
 #
@@ -86,13 +85,13 @@
 # The `Diversity` evaluator measures the evenness or uniformity of the sampling of metadata factors over a dataset using
 # the inverse Simpson index or Shannon index.
 #
-# These techniques help ensure that when you split the data for your projects, you minimize things like shortcut learning
-# and leakage between training and testing sets.
+# These techniques help you minimize things like shortcut learning and leakage between training and testing sets when
+# you split the data for your projects.
 
 # %% [markdown]
 # ## Setup
 #
-# You'll begin by importing the necessary libraries to walk through this guide.
+# You will begin by importing the libraries that this guide uses.
 
 # %% tags=["remove_cell"]
 try:
@@ -128,15 +127,16 @@ pio.renderers.default = "notebook"
 # %% [markdown]
 # ## Load the data
 #
-# You are going to work with the SeaDronesSee object detection dataset. This dataset is a UAV dataset aimed at helping develop
-# systems for Search and Rescue using UAVs in maritime scenarios. It was used for a computer vision competition in 2023.
-# This dataset was chosen because it has multiple classes, imagery collected from multiple UAVs, and the dataset contains metadata.
+# You are going to work with the SeaDronesSee object detection dataset, a UAV dataset aimed at helping develop systems
+# for search and rescue using UAVs in maritime scenarios. It was used for a computer vision competition in 2023. This
+# tutorial uses it because it has multiple classes and imagery collected from multiple UAVs, and because it contains
+# metadata.
 #
 # If this data is already on your computer you can change the file location from `"./data"` to wherever the data is
 # stored. If not, make sure you set the `root` path to be wherever you would like the dataset to be downloaded.
 #
-# For the sake of ensuring that this tutorial runs quickly on most computers, you are going to analyze only the validation
-# dataset, which is a little over 1500 images.
+# To keep this tutorial fast on most computers, you are going to analyze only the validation dataset, which is a little
+# over 1500 images.
 
 # %%
 # Download the validation dataset and verify the size of the loaded dataset
@@ -144,13 +144,13 @@ ds = SeaDrone(root="./data", download=True, image_set="val", lazy=True)
 len(ds)
 
 # %% [markdown]
-# Before moving on, verify that the above code cell printed out 1547 for the size of the dataset.
+# Before you move on, verify that the code cell above printed 1547 for the size of the dataset.
 #
-# This ensures that everything is working as needed for the tutorial.
+# This confirms that everything works as the tutorial needs.
 #
 # :::{note}
-# If it didn't, make sure that you have an up-to-date version of maite-datasets (_needs to be >=0.0.17_ )
-# and if you are all up-to-date and still having issues see the [contributing guide for bug reports](../getting-started/contributing.md).
+# If it did not, make sure that you have an up-to-date version of maite-datasets (it must be `>=0.0.17`), and if you are
+# up to date and still have issues, see the [contributing guide for bug reports](../getting-started/contributing.md).
 # :::
 
 # %% [markdown]
@@ -274,50 +274,48 @@ for name in repaired.factor_names:
 # The {class}`.Balance` class measures correlational relationships between metadata factors and classes in a dataset. It
 # analyzes the metadata factors against both the classes and other factors to identify relationships.
 #
-# The results can be retrieved using the _balance_ and _factors_ attributes of the output.
+# You can retrieve the results with the `balance` and `factors` attributes of the output.
 
 # %%
 bal = Balance().evaluate(metadata)
 
 # %% [markdown]
-# The information provided by `Balance` may be visually understood with a heat map.
+# You can see the information that `Balance` provides in a heat map.
 
 # %%
 dep.plot(bal, figsize=(10, 10))
 
 # %% [markdown]
-# The heatmap has one large block in it. The flight telemetry - *gimbal_pitch*, *gimbal_heading*,
-# *compass_heading*, _altitude_, _latitude_, _longitude_ and _speed_ - is correlated with almost
-# everything, at 0.79 to 1.00 within the block, and highest wherever _latitude_ or _longitude_ is one of
-# the pair. Nothing else comes close, and *object_size* is correlated with nothing at all.
+# The heatmap has one large block. The flight telemetry (`gimbal_pitch`, `gimbal_heading`, `compass_heading`,
+# `altitude`, `latitude`, `longitude` and `speed`) is correlated with almost everything, at 0.79 to 1.00 within the
+# block, and highest wherever `latitude` or `longitude` is one of the pair. Nothing else comes close, and `object_size`
+# is correlated with nothing.
 #
-# You should not read that block as physics. Those columns share their **missing rows**: the same 454
-# frames, 29% of the dataset, record no altitude, no gimbal pitch and no coordinates, and *compass_heading*,
-# *gimbal_heading* and _speed_ are unrecorded on almost exactly the same rows. A factor that is
-# "unrecorded here, unrecorded there" tracks every other factor with the same gaps, so `altitude` at 0.99
-# with `latitude` mostly says the telemetry failed together, not that altitude predicts position. You can
-# see this because the missing readings have bins of their own; left as ordinary numbers they would have
-# been mixed in with real readings and this structure would not have been visible.
+# Do not read that block as physics. Those columns share their missing rows: the same 454 frames, 29% of the dataset,
+# record no altitude, no gimbal pitch and no coordinates, and `compass_heading`, `gimbal_heading` and `speed` are
+# unrecorded on almost the same rows. A factor that is unrecorded on the same rows as another tracks that factor, so
+# `altitude` at 0.99 with `latitude` mostly says the telemetry failed together, not that altitude predicts position. You
+# can see this because the missing readings have bins of their own. Left as ordinary numbers, they would have been mixed
+# in with real readings and this structure would not have been visible.
 #
-# _Latitude_ and _longitude_ sit at 1.00 for a related reason. Each has one group holding every real
-# coordinate and one holding the missing readings, so both columns carry the same information, which is
-# whether a position was recorded. They are one column twice.
+# The pair `latitude` and `longitude` sits at 1.00 for a related reason. Each has one group holding every real
+# coordinate and one holding the missing readings, so both columns carry the same information: whether a position was
+# recorded.
 #
-# _Drone_ and *storage* are also at 1.00, and *storage* and *date_time* at 0.99. *Storage* names the folder
-# a clip came from, so it is standing in for the collection session: which airframe flew, and when.
+# The pair `drone` and `storage` is also at 1.00, and `storage` and `date_time` are at 0.99. The `storage` factor names
+# the folder a clip came from, so it stands in for the collection session: which airframe flew, and when.
 #
-# The two correlations against *class_label* are the ones that matter, and they are the two largest in
-# that row:
+# The two correlations against `class_label` matter most, and they are the two largest in that row:
 #
-# - **_Storage_ at 0.34.** Which session an image came from predicts what is in it, so the sessions were
-#   not balanced across classes. That is a collection problem rather than a property of the imagery.
-# - **_Object_size_ at 0.29.** This is bounding box bias - a model can learn the class from the size of the
-#   object. It carries more weight than the number alone suggests, because *object_size* is the one factor
-#   correlated with nothing else: it has no other factor to borrow the signal from.
+# - `storage` at 0.34. The session an image came from predicts what is in it, so the sessions were not balanced across
+#   classes. That is a collection problem rather than a property of the imagery.
+# - `object_size` at 0.29. This is bounding box bias: a model can learn the class from the size of the object. It
+#   carries more weight than the number alone suggests, because `object_size` is the one factor correlated with nothing
+#   else, so it has no other factor to borrow the signal from.
 #
 # Every other factor falls to 0.14 or below.
 #
-# Let's investigate this further to see if these biases hold across all classes or are concentrated in a few.
+# Next, check whether these biases hold across all classes or are concentrated in a few.
 
 # %%
 dep.plot(bal, plot_classwise=True, figsize=(12, 5))
@@ -325,25 +323,23 @@ dep.plot(bal, plot_classwise=True, figsize=(12, 5))
 # %% [markdown]
 # The classwise heatmap splits each of those findings by class.
 #
-# The bounding box bias sits mainly in _boat_ (0.33), _buoy_ (0.28) and _swimmer_ (0.25). Those are the
-# classes whose objects appear at a narrow range of sizes.
+# The bounding box bias sits mainly in `boat` (0.33), `buoy` (0.28) and `swimmer` (0.25). Those are the classes whose
+# objects appear at a narrow range of sizes.
 #
-# The session bias sits mainly in *life_saving_appliances* (0.37) and _buoy_ (0.36), which are the two
-# flagged as imbalanced. Those classes were captured in a subset of the sessions rather than across all
-# of them, so a model can pick them out from whatever the session has in common - the airframe, the
-# resolution, the light - instead of from the object.
+# The session bias sits mainly in `life_saving_appliances` (0.37) and `buoy` (0.36), which are the two flagged as
+# imbalanced. Those classes were captured in a subset of the sessions rather than across all of them, so a model can
+# pick them out from whatever the session has in common (the airframe, the resolution, the light) instead of from the
+# object.
 #
-# *Date_time*, which you repaired into the hour of the day, tells the same story more narrowly: it reaches
-# 0.28 on *life_saving_appliances* and falls to 0.12 or below on everything else. That class was largely
-# collected at particular times, so a model could guess it from brightness or contrast rather than from
-# the object itself.
+# The `date_time` factor, which you repaired into the hour of the day, tells the same story more narrowly. It reaches
+# 0.28 on `life_saving_appliances` and falls to 0.12 or below on every other class. That class was largely collected at
+# particular times, so a model could guess it from brightness or contrast rather than from the object itself.
 #
-# To fix the bounding box bias, collect more images at different distances from the object, so that each
-# object appears at a range of sizes.
-# To fix the session bias, collect every class across every session rather than concentrating a class in a
-# few, and collect *life_saving_appliances* and _jetski_ at varying times of day.
+# To fix the bounding box bias, collect more images at different distances from the object, so that each object appears
+# at a range of sizes. To fix the session bias, collect every class across every session rather than concentrating a
+# class in a few, and collect `life_saving_appliances` and `jetski` at varying times of day.
 #
-# Next, let's assess if there is any additional bias by analyzing the datasets diversity.
+# Next, assess whether there is any additional bias by analyzing the dataset's diversity.
 
 # %% [markdown]
 # ## Assess dataset diversity
@@ -351,70 +347,68 @@ dep.plot(bal, plot_classwise=True, figsize=(12, 5))
 # %% [markdown]
 # The {class}`.Diversity` evaluator measures the evenness or uniformity of the sampling of metadata factors over a
 # dataset. Values near 1 indicate uniform sampling, while values near 0 indicate imbalanced sampling, e.g. all values
-# taking a single value. For more information see the [Diversity](../concepts/DatasetBias.md) concept page.
+# taking a single value. For more information, see the [Diversity](../concepts/DatasetBias.md) concept page.
 #
-# The results can be retrieved using the _diversity_index_ attribute of the output.
+# You can retrieve the results with the `diversity_index` attribute of the output.
 
 # %%
 div = Diversity().evaluate(metadata)
 
 # %% [markdown]
-# It's often easiest to see the differences between the different factors when visualizing them using a bar chart
-# to show the factor-class analysis.
+# It is often easiest to see the differences between factors in a bar chart of the factor-class analysis.
 
 # %%
 dep.plot(div, figsize=(10, 6))
 
 # %% [markdown]
-# In the results above, there are many factors that have values over 0.5 indicating a small potential for bias,
-# and _speed_ and *object_size* have values near 1, meaning that there is relatively little or no sampling bias in these factors.
+# In the results above, many factors have values over 0.5, which indicates a small potential for bias, and `speed` and
+# `object_size` have values near 1, which means that there is relatively little or no sampling bias in these factors.
 #
-# The categories of most interest are those that are between 0.4 and 0.1 because this region represents skewed value
+# The factors of most interest have values between 0.4 and 0.1, because this region represents skewed value
 # distributions for the factor.
 #
-# The following factors fall into this category:
+# The following factors fall in this range:
 #
-# - *class_label*
-# - _altitude_
-# - _height_
-# - _width_
+# - `class_label`
+# - `altitude`
+# - `height`
+# - `width`
 #
-# These factors contain sampling bias which means that there is significantly more of one value in that category than others.
-# For instance, the *class_label* factor highlights that there is unevenness in the number of data points per class.
+# These factors contain sampling bias, which means that one value occurs significantly more often than the others. For
+# instance, `class_label` shows that there is unevenness in the number of data points per class.
 #
-# Whether you need to do anything about the low values in _height_ and _width_, depend on many factors including
-# how you perform your pre-processing steps before the model sees the image and whether or not the less common image sizes
-# contain only a select number of classes instead of all classes.
-# The low value in _altitude_ explains a little why there is a large correlation between *class_label* and *object_size* -
-# there isn't very much variety in altitude.
+# Whether you need to do anything about the low values in `height` and `width` depends on many things, including how you
+# perform your pre-processing steps before the model sees the image and whether the less common image sizes contain only
+# some classes instead of all classes. The low value in `altitude` explains a little of why there is a large correlation
+# between `class_label` and `object_size`: there is little variety in altitude.
 #
-# The diversity function also analyzes metadata factors by individual classes to assess
-# uniformity of metadata factors within a class. This can help identify specific class biases which may occur.
-# You can visualize the classwise results by setting the `plot_classwise` parameter to True.
+# Diversity also analyzes metadata factors by individual class, to assess the uniformity of metadata factors within a
+# class. This can help identify specific class biases. Set the `plot_classwise` parameter to `True` to visualize the
+# classwise results.
 
 # %%
 dep.plot(div, plot_classwise=True, figsize=(12, 5))
 
 # %% [markdown]
-# These results expand the above results on a classwise basis.
+# These results extend the results above to each class.
 #
-# Things to look for here are large variances for a given factor across the different classes. For example, _drone_ has
-# values ranging from 0.55 to 0.10, which means that most of the images of _buoy_ and *life_saving_appliances* were
-# taken with a specific drone, while _swimmer_ was spread out over the different types of drone. This can result in subtle
-# differences in the images that a model can pick up leading to an opportunity for shortcut learning.
+# Look for large variances in a factor across the classes. For example, `drone` has values ranging from 0.55 to 0.10,
+# which means that most of the images of `buoy` and `life_saving_appliances` were taken with a specific drone, while
+# `swimmer` was spread over the different types of drone. This can result in subtle differences in the images that a
+# model can pick up, which is an opportunity for shortcut learning.
 #
-# The other categories with concerning diversity values are *object_size* and _altitude_ (which were discussed above), and
-# *gimbal_pitch* with that low 0.17 value for *life_saving_appliances* meaning that the images have a near constant perspective of this class.
+# The other factors with concerning diversity values are `object_size` and `altitude` (which were discussed above), and
+# `gimbal_pitch`, with a low 0.17 for `life_saving_appliances`, which means that the images show this class from a near
+# constant perspective.
 #
-# Due to the large number of missing metadata in many of the other categories, its hard to say how much the different
-# aspects of the categories could be contributing to bias and shortcut learning.
+# Because many of the other factors have a large amount of missing metadata, it is hard to say how much their different
+# aspects could contribute to bias and shortcut learning.
 
 # %% [markdown]
 # ## Evaluate a derived factor
 #
-# Every correction above was a declaration - a record that DataEval applies, stores and replays for you.
-# That covers most of what a dataset needs, but not everything. A factor derived from two other columns
-# has no record that describes it.
+# Every correction above was a declaration: a record that DataEval applies, stores and replays for you. That covers most
+# of what a dataset needs, but not everything. A factor derived from two other columns has no record that describes it.
 #
 # For those cases, DataEval accepts anything that satisfies the {class}`.CodedMetadataLike` protocol. You
 # can bin the data yourself and pass the result to the same evaluators. You should use this only when a
@@ -422,9 +416,9 @@ dep.plot(div, plot_classwise=True, figsize=(12, 5))
 # hand-built array does not.
 
 # %% [markdown]
-# The shell needs five members: the binned factor array, the class labels, the label lookup, the factor
-# names, and which factors are binned. The example below builds a factor from two others - the ratio of an
-# object's size to the altitude it was seen from - and passes it to the same evaluator you used above.
+# The shell needs five members: the binned factor array, the class labels, the label lookup, the factor names, and which
+# factors are binned. The example below builds a factor from two others, the ratio of an object's size to the altitude
+# it was seen from, and passes it to the same evaluator you used above.
 
 
 # %%
@@ -548,8 +542,8 @@ assert abs(by_div[("life_saving_appliances", "gimbal_pitch")] - 0.17) < 0.02
 #
 # - `storage` is the strongest predictor of class, and it stands in for the collection session. This is session bias.
 #   `life_saving_appliances` and `buoy` were captured in a subset of the sessions.
-# - `object_size` is the second strongest, and it is the only factor that borrows no signal from any other. This is bounding
-#   box bias, and it makes `object_size` the cleanest shortcut on offer.
+# - `object_size` is the second strongest, and it is the only factor that borrows no signal from any other. This is
+#   bounding box bias, and it makes `object_size` the cleanest shortcut in this dataset.
 # - 29% of frames record no altitude, gimbal pitch or position, and they are the same frames each time. Any conclusion drawn
 #   from those factors describes the recorded subset only.
 
@@ -563,5 +557,5 @@ assert abs(by_div[("life_saving_appliances", "gimbal_pitch")] - 0.17) < 0.02
 # %% [markdown]
 # ## On your own
 #
-# Once you are familiar with DataEval and dataset analysis, you will want to run this analysis on your own dataset. When
-# you do, make sure that you analyze all of your data and not just the training set.
+# Once you are familiar with DataEval and dataset analysis, run this analysis on your own dataset. Analyze all of your
+# data and not only the training set.
