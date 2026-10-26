@@ -16,7 +16,7 @@
 # %% [markdown]
 # # Assess an unlabeled data space
 #
-# This guide provides a beginner friendly introduction to exploratory data analysis when labels are not available.
+# This tutorial is a beginner-friendly introduction to exploratory data analysis when labels are not available.
 #
 # Estimated time to complete: 10 minutes
 #
@@ -35,9 +35,9 @@
 #
 # ## What you will learn
 #
-# - Learn to use cluster based algorithms to measure dataset quality without labels
-# - Learn to distinguish if an image is an outlier or is underrepresented
-# - Learn to determine if flagged images should be added or removed
+# - Learn to use cluster-based algorithms to measure dataset quality without labels
+# - Learn to distinguish whether an image is an outlier or is underrepresented
+# - Learn to determine whether flagged images should be added or removed
 
 # %% [markdown]
 # ## What you will need
@@ -47,25 +47,24 @@
 # %% [markdown]
 # ## Introduction
 #
-# Before building predictive models, it's essential to identify outliers and ensure that data groups accurately reflect
-# the underlying distribution. When labels are unavailable due to things like unsupervised learning, initial data curation,
-# or expensive annotations, analysis can still be done on the images alone. We do this by considering images to be
-# geometric points in a high-dimensional abstract space called _feature space_. By understanding how the data examples are
-# distributed in feature space, you will become able to make the assessments you need.
+# Before you build predictive models, identify outliers and check that data groups accurately reflect the underlying
+# distribution. When labels are unavailable, for example in unsupervised learning, initial data curation or when
+# annotations are expensive, you can still analyze the images alone. To do this, treat each image as a geometric point
+# in a high-dimensional abstract space called **feature space**. Once you understand how the images are distributed in
+# feature space, you can make the assessments you need.
 #
-# Specifically by grouping data points (i.e. images) into [clusters](../concepts/Clustering.md), you can explore the
-# natural structure of the dataset to reveal hidden patterns and potential anomalies. Measuring coverage goes a step
-# further by quantifying how well the clusters represent the entire dataset to ensure that no significant portion of the
-# feature space is being overlooked.
+# Group the images into [clusters](../concepts/Clustering.md) to explore the natural structure of the dataset and reveal
+# patterns and potential anomalies. Measuring coverage goes a step further: it quantifies how well the clusters
+# represent the entire dataset, so that no significant portion of the feature space is overlooked.
 #
-# These techniques are critical for evaluating the quality and representativeness of your data, helping to avoid biases
-# and missing information or overfitting issues in your models. By understanding the space your data occupies and how it
-# groups, you can build more robust and reliable models that generalize well in real-world applications.
+# Use these techniques to evaluate the quality and representativeness of your data and to avoid biases, missing
+# information and overfitting in your models. When you understand the space your data occupies and how it groups, you
+# can build more reliable models that generalize well in real-world applications.
 
 # %% [markdown]
 # ## Setup
 #
-# First import the required libraries needed to set up the example.
+# Import the libraries that the example needs.
 
 # %% tags=["remove_cell"]
 try:
@@ -108,21 +107,21 @@ set_max_processes(4)
 # :::{note}
 #
 # The device is the piece of hardware where the model, data, and other related objects are stored in memory. If a GPU is
-# available, this notebook will use that hardware rather than the CPU. To force running only on the CPU, change `device`
-# to `"cpu"` For more information, see the
+# available, this notebook uses it instead of the CPU. To run only on the CPU, change `device` to `"cpu"`. For more
+# information, see the
 # [PyTorch device page](https://pytorch.org/tutorials/recipes/recipes/changing_default_device.html).
 # :::
 
 # %% [markdown]
 # ## Construct embeddings
 #
-# Rather than analyze raw pixels, you'll work in [embedding](../concepts/Embeddings.md) space: one feature vector per
-# image, with far fewer values than the image itself, which keeps the downstream algorithms fast and memory-light.
+# Rather than analyze raw pixels, you will work in [embedding](../concepts/Embeddings.md) space: one feature vector per
+# image, with far fewer values than the image itself, which keeps the downstream algorithms fast and light on memory.
 #
 # ### Download VOC dataset
 #
-# Download train split with `VOCDetection` from `maite_datasets` — 5717 images with a varying number of targets each.
-# You can also run this tutorial with your own MAITE-compliant dataset.
+# Download the train split with `VOCDetection` from `maite_datasets`. It has 5717 images with a varying number of
+# targets each. You can also run this tutorial with your own MAITE-compliant dataset.
 
 # %%
 # Load the training dataset
@@ -155,9 +154,9 @@ print("embedding shape:", embeddings.shape)
 # %% [markdown]
 # ## Cluster the embeddings
 #
-# In this section, you will use the embeddings you generated to create clusters. A cluster is a group of images that have
-# similar characteristics. Based on this information, images can be found that are either too similar or too dissimilar.
-# Both cases can lead to performance degradation of downstream tasks such as data analysis or model training.
+# In this section, you will use the embeddings you generated to create clusters. A cluster is a group of images that
+# have similar characteristics. The clusters let you find images that are either too similar or too dissimilar. Both
+# cases can degrade downstream tasks such as data analysis or model training.
 #
 # ### Create clusters
 #
@@ -168,41 +167,41 @@ print("embedding shape:", embeddings.shape)
 output = cluster(embeddings)
 
 # %% [markdown]
-# You have successfully clustered your image embeddings! The `ClusterResult` contains several keys related to clusters
-# such as the minimum spanning tree and linkage array. For this tutorial, you can use the `Outliers` detector's
-# `from_clusters` method to analyze the quality of the dataset. For additional use cases, additional benefits, and even
-# alternative methods, read more [about clustering](../concepts/Clustering.md) in DataEval's documentation.
+# You have clustered your image embeddings. The `ClusterResult` contains several keys related to clusters, such as the
+# minimum spanning tree and linkage array. For this tutorial, you can use the `Outliers` detector's `from_clusters`
+# method to analyze the quality of the dataset. For additional use cases, additional benefits and alternative methods,
+# read more [about clustering](../concepts/Clustering.md) in DataEval's documentation.
 
 # %% [markdown]
 # ## Visualize the outputs
 #
-# While generating the clusters, individual samples can be analyzed using DataEval's detector classes to identify
-# potential outliers or duplicates. In this section, you will look at flagged images and decide on corrective measures to
-# improve the quality of the data.
+# Once you have generated the clusters, you can analyze individual samples with DataEval's detector classes to identify
+# potential outliers or duplicates. In this section, you will look at the flagged images and decide on corrective
+# measures to improve the quality of the data.
 #
-# Let's take a quick look at the categories of flagged images:
+# The flagged images fall into two categories:
 #
 # - duplicates
 # - outliers
 #
-# Let's take a look at each of these in turn.
+# Look at each of these in turn.
 #
 # ### Duplicates
 #
 # The `Duplicates` detector's `from_clusters` method can identify data points that are within certain distances from each
 # other in the embedding space.
 #
-# For this tutorial, we will not focus on duplicates as no exact duplicates are found in the PASCAL 2012 VOC dataset.
+# This tutorial does not focus on duplicates, because no exact duplicates are found in the PASCAL 2012 VOC dataset.
 #
 # ### Outliers
 #
 # Outliers are individual data points that did not fit within the radius of any cluster. The `Outliers` detector's
 # `from_clusters` method uses adaptive distance-based detection that accounts for varying cluster densities.
 #
-# It is important to identify outliers as they can skew the training distribution away from the operational distribution,
-# which can lead to performance degradation.
+# Identify outliers because they can skew the training distribution away from the operational distribution, which can
+# lead to performance degradation.
 #
-# Let's see how many images were flagged by using the `Outliers` detector.
+# Use the `Outliers` detector to see how many images it flags.
 
 # %%
 # Use the Outliers.from_clusters() method
@@ -215,8 +214,7 @@ outliers = result.aggregate_by_item()["item_index"].to_list()
 print(f"Number of outliers: {len(outliers)}")
 
 # %% [markdown]
-# That is a reasonable number of outliers to investigate. A quick calculation of the percent of outliers in the dataset
-# can be done.
+# That is a reasonable number of outliers to investigate. Calculate the percent of outliers in the dataset.
 
 # %%
 print(f"Percent of outliers: {(100 * len(outliers) / len(dataset)):.2f}%")
@@ -224,20 +222,19 @@ print(f"Percent of outliers: {(100 * len(outliers) / len(dataset)):.2f}%")
 # %% [markdown]
 # ### Outlier inspection questions
 #
-# When looking at these images, you want to think about the following questions:
+# When you look at these images, ask yourself the following questions:
 #
 # - Does this image represent something that would be expected in operation?
 # - Is there commonality to the objects in the images?
 # - Is there commonality to the backgrounds of the images?
 # - Is there commonality to the class of objects in the images?
 #
-# Asking these questions will help you notice things like all objects being located on the left side of the image or all
-# the images of a specific class having a specific background. Training a model with data that has commonalities can cause
-# your model to develop biases or limit your model's ability to generalize to non-training data.
+# These questions help you notice patterns such as all objects being located on the left side of the image or all the
+# images of a specific class having a specific background. Training a model on data that has such commonalities can
+# cause the model to develop biases or limit its ability to generalize to non-training data.
 #
-# You are free to choose which set of images you would like to examine. Take a moment to swap out the different indices
-# when calling `dep.plot()` by uncommenting your preferred indices calculation. You can also adjust the `count` parameter
-# if you would like to see more examples.
+# Choose which set of images to examine. Swap the indices in the call to `dep.plot()` by uncommenting your preferred
+# indices calculation. You can also adjust the `count` parameter to see more examples.
 
 # %%
 # To use the flagged outliers, uncomment the line below
@@ -261,55 +258,54 @@ dep.plot(
 # %% [markdown]
 # ## Analyze the flagged images
 #
-# Visualization is a great way to catch initial differences between images in a dataset. However, it is only a preliminary
-# step into identifying the root cause of an outlier. Several initial questions can be asked to ensure outliers are
-# handled properly and represent the underlying distribution of the data.
+# Visualization is a useful way to catch initial differences between images in a dataset. However, it is only a
+# preliminary step toward identifying the root cause of an outlier. Ask a few initial questions to ensure that outliers
+# are handled properly and represent the underlying distribution of the data.
 #
 # ### Initial questions
 #
-# When looking at the above samples, here is a shortlist of questions you should use to determine the appropriate data
-# cleaning step:
+# Use this shortlist of questions on the samples above to determine the appropriate data cleaning step:
 #
 # 1. Are there unexpected artifacts in the image?
-#    - **Examples**: Data collection, processing, and visualization can cause discoloration, blurriness, etc.
-#    - **Solution**: Ensure images are normalized with the right values, channel order is correct, color scheme is
-#      consistent
-#    - See our in-depth [Data Cleaning Guide](./tt_clean_dataset.py) to explore these types of outliers
+#    - Examples: Data collection, processing, and visualization can cause discoloration, blurriness, etc.
+#    - Solution: Ensure that images are normalized with the right values, that the channel order is correct and that the
+#      color scheme is consistent
+#    - See the in-depth [Data Cleaning Guide](./tt_clean_dataset.py) to explore these types of outliers
 # 2. Do you have enough data?
-#    - **Examples**: Fewer data points in each cluster can lead to higher deviation and more outliers
-#    - **Solution**: Adding more data can help make the clusters more robust to the variations in images
+#    - Examples: Fewer data points in each cluster can lead to higher deviation and more outliers
+#    - Solution: Adding more data can help make the clusters more robust to the variations in images
 # 3. Do the images provide useful information?
-#    - **Examples**: Image attributes like number of duplicates, pixel intensity, etc. can cause the clusterer to become
+#    - Examples: Image attributes like number of duplicates, pixel intensity, etc. can cause the clusterer to become
 #      biased to the wrong information
-#    - **Solution**: Determine if the data represents the whole operational distribution
-#    - This solution will be explored in the following section
+#    - Solution: Determine whether the data represents the whole operational distribution
+#    - The following section explores this solution
 #
 # This is only a shortlist of potential causes for outliers based on pixel values. Over time you will add more questions
 # and solutions that suit your specific needs.
 #
 # ### Outliers and edge cases
 #
-# The most common way to clean data is to remove the outliers entirely. This provides an easy and efficient way to
-# stabilize the training distribution. However, this can lead to shortages of data, class imbalances, and a loss of
-# potentially useful information. It is also important to remember that outliers and edge cases are different. Edge cases
-# are statistically rare events that _are_ relevant to the downstream task. This is why it is important to carefully look
-# at outliers to ensure they are irrelevant.
+# The most common way to clean data is to remove the outliers entirely. This is an easy and efficient way to stabilize
+# the training distribution. However, it can lead to shortages of data, class imbalances, and a loss of potentially
+# useful information. Remember that outliers and edge cases are different. Edge cases are statistically rare events that
+# are relevant to the downstream task. So look at outliers carefully to ensure that they are irrelevant.
 #
-# One way to determine if an image is relevant even when the total distribution considers it an outlier is to measure its
-# coverage.
+# One way to determine whether an image is relevant even when the total distribution considers it an outlier is to
+# measure its coverage.
 
 # %% [markdown]
 # ## Measure image coverage
 #
 # {term}`Coverage` is the measurement of the representation of an image's variations in a feature space. When an image
-# does not have enough variations, it is _underrepresented_. In this section, you will test for any gaps in the coverage
-# of the dataset to find underrepresented images.
+# does not have enough variations, it is **underrepresented**. In this section, you will test for any gaps in the
+# coverage of the dataset to find underrepresented images.
 #
 # ### Calculate coverage
 #
-# The {func}`.coverage_adaptive` function will return a list of image indices that it finds to be underrepresented. This means it
-# does not have enough similar images around it. This should sound familiar as outliers have a very similar situation.
-# However, underrepresented images should be handled differently than outliers. More on this in the next section.
+# The {func}`.coverage_adaptive` function returns a list of the image indices that it finds to be underrepresented. Such
+# an image does not have enough similar images around it. This may sound familiar, because outliers are in a similar
+# situation. However, you should handle underrepresented images differently than outliers. The next section explains
+# how.
 #
 # Coverage expects embeddings between 0 and 1. Passing `force_unit_interval=True` rescales them for you.
 
@@ -338,8 +334,8 @@ assert np.array_equal(np.sort(labeled.uncovered_indices), np.sort(cov["uncovered
 dep.plot(dataset, indices=cov["uncovered_indices"][:3], figsize=(10, 3))
 
 # %% [markdown]
-# Now you have seen a few examples of images that were flagged as uncovered. You will compare this information with the
-# outliers found earlier to determine which actions should be taken.
+# You have now seen a few examples of images that were flagged as uncovered. Compare this information with the outliers
+# found earlier to determine which actions to take.
 
 # %%
 uncovered_outliers = set(cov["uncovered_indices"].tolist()).intersection(set(outliers))
@@ -355,25 +351,24 @@ assert len(cov["uncovered_indices"]) > 0
 # %% [markdown]
 # ## Handling flagged images
 #
-# You now have enough information to determine what should be done with these images. If they are both flagged as outliers
-# and underrepresented, handle them first as missing coverage and then as outliers if solutions cannot be acted on.
+# You now have enough information to decide what to do with these images. If an image is flagged as both an outlier and
+# underrepresented, handle it first as missing coverage, and then as an outlier if the solutions cannot be acted on.
 #
 # ### Missing coverage
 #
-# For the images with a gap in coverage, the characteristics of the individual images need additional samples. This can be
-# done by collecting more images of similar information (pose, scene, color, labels if available) or through additional
-# augmentations.
+# The characteristics of the images with a gap in coverage need additional samples. Collect more images with similar
+# information (pose, scene, color, labels if available) or add augmentations.
 #
 # ### Handling outliers
 #
-# Outliers can be handled by additional sampling but typically are removed as they either do not contain enough relevant
-# information or would cause a shift in the underlying distribution if similar items were added.
+# You can handle outliers with additional sampling, but they are typically removed because they either do not contain
+# enough relevant information or would shift the underlying distribution if you added similar items.
 
 # %% [markdown]
 # ## Conclusion
 #
-# In this tutorial you have learned to create image embeddings for more efficient calculations, to use cluster based
-# algorithms to find outliers, to check for gaps in coverage on PASCAL VOC imagery, and to make decisions on possible solutions.
+# In this tutorial you created image embeddings for more efficient calculations, used cluster-based algorithms to find
+# outliers, checked for gaps in coverage on PASCAL VOC imagery, and made decisions on possible solutions.
 #
 # ## What you learned
 #
@@ -393,5 +388,5 @@ assert len(cov["uncovered_indices"]) > 0
 # %% [markdown]
 # ## On your own
 #
-# Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. When you do, make sure
-# that you analyze all of your data and not just the training set.
+# Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. Analyze all of your data
+# and not only the training set.

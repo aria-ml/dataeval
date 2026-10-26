@@ -17,8 +17,8 @@
 # (custom-class-axis)=
 # # Analyze bias against a custom class axis
 #
-# This tutorial shows you how to condition DataEval's bias evaluators on an environmental factor and not on the object classes. You
-# create a dataset in which class and weather are tangled together, then separate the two.
+# This tutorial shows you how to condition DataEval's bias evaluators on an environmental factor and not on the object
+# classes. You create a dataset in which class and weather are correlated, then separate the two.
 #
 # Estimated time to complete: 15 minutes
 #
@@ -53,11 +53,10 @@
 # %% [markdown]
 # ## Introduction
 #
-# DataEval evaluators — including {class}`.Balance`, {class}`.Diversity`,
-# {class}`.Parity`, {class}`.Coverage`, and {func}`.split_dataset` — condition
-# on dataset class labels by default. In many datasets, bias and underrepresentation
-# are driven not by object classes, but by environmental or operational factors
-# such as weather, sensor type, time of day, or collection site.
+# DataEval evaluators, including {class}`.Balance`, {class}`.Diversity`, {class}`.Parity`, {class}`.Coverage`, and
+# {func}`.split_dataset`, condition on dataset class labels by default. In many datasets, bias and underrepresentation
+# are driven not by object classes, but by environmental or operational factors such as weather, sensor type, time of
+# day, or collection site.
 #
 # {meth}`.Metadata.classed_by` allows you to pivot the class axis to one or more
 # metadata factors. The target factor's discrete levels become the new class labels,
@@ -109,8 +108,9 @@ from dataeval.protocols import DatasetMetadata, DatumMetadata
 #
 # Two correlations are intentionally structured into the dataset:
 #
-# - **Class and weather co-occurrence:** Foggy images contain mostly trucks, while clear images contain mostly people.
-# - **Weather and altitude correlation:** Foggy images are captured at high altitude (300–400m), while clear and rainy images are captured at low altitude (50–200m).
+# - Class and weather co-occur. Foggy images contain mostly trucks, while clear images contain mostly people.
+# - Weather and altitude are correlated. Foggy images are captured at high altitude (300–400m), while clear and rainy
+#   images are captured at low altitude (50–200m).
 #
 # Because `truck` co-occurs with `foggy`, a standard class-conditional evaluation
 # will confound altitude with class. By using a custom class axis, you will show
@@ -291,7 +291,7 @@ print(Balance().evaluate(by_weather_per_image).balance)
 # You can inspect {attr}`.ClassAxis.rows_per_group_entity` to verify the fan-out ratio between rows and entities:
 #
 # - In the detection view (`instance`), image-level factors are replicated across detections (fan-out > 1.0), weighting crowded images more heavily.
-# - In the image view (`unit`), each image is counted exactly once (fan-out = 1.0).
+# - In the image view (`unit`), each image is counted once (fan-out = 1.0).
 
 # %%
 print(
