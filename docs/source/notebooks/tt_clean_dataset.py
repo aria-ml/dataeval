@@ -251,8 +251,8 @@ pl.DataFrame({
 # Of the classes, `person` is the class with the highest total object count followed by `chair` and `car`, while `person`,
 # `chair`, and `dog` are the classes with the highest number of images.
 #
-# `cow`, `sheep`, and `bus` are the classes with least number of objects, while `bus`, `train`, and `cow` are the classes
-# with the least number of images.
+# `bus`, `train`, and `cow` are the classes with the fewest objects, while `cow`, `sheep`, and `bus` are the classes with
+# the fewest images.
 #
 # This table shows wide variation in the number of classes per image, the number of objects per image and the number of
 # objects of each class per image.
@@ -365,6 +365,16 @@ print(f"Number of images flagged per class : {len(outlier_imgs_classwise)}")
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
+# Verify the class counts that the text reads from the label statistics table
+objects = {ds.index2label[k]: lstats["label_counts_per_class"][k] for k in ds.index2label}
+images = {ds.index2label[k]: lstats["image_counts_per_class"][k] for k in ds.index2label}
+assert 5000 < len(ds) < 6000
+assert len(objects) == 20
+assert sorted(objects, key=lambda name: -objects[name])[:3] == ["person", "chair", "car"]
+assert sorted(images, key=lambda name: -images[name])[:3] == ["person", "chair", "dog"]
+assert sorted(objects, key=lambda name: objects[name])[:3] == ["bus", "train", "cow"]
+assert sorted(images, key=lambda name: images[name])[:3] == ["cow", "sheep", "bus"]
+
 assert len(outlier_imgs_classwise) != len(outlier_imgs)
 assert not outlier_imgs_classwise.populations["judged"].all()
 
