@@ -55,10 +55,9 @@ pl.Config.set_tbl_rows(20)
 # %% [markdown]
 # ## Split the dataset into two campaigns
 #
-# Pass `lazy=True` so that images decode only when requested. See
-# the [Defer image decoding](./h2_wrap_dataframe_dataset.py#defer-image-decoding) step of how to wrap a DataFrame as a dataset.
-# The flight telemetry includes altitude, gimbal
-# orientation and airframe type.
+# Pass `lazy=True` so that images decode only when requested. See the
+# [Defer image decoding](./h2_wrap_dataframe_dataset.py#defer-image-decoding) step of how to wrap a DataFrame as a
+# dataset. The flight telemetry includes altitude, gimbal orientation and airframe type.
 
 # %%
 dataset = SeaDrone(root="./data", image_set="val", download=True, lazy=True)
@@ -96,8 +95,8 @@ print(Metadata(reference, view="unit", exclude=EXCLUDE).dropped_factors)
 # %% [markdown]
 # {attr}`~.Metadata.dropped_factors` shows why {class}`.Metadata` holds a column back:
 #
-# - `latitude` and `longitude` are **`mixed_types`**: most rows hold a number, but 25 hold the letter `'N'` or `'E'`.
-# - `date_time` is **`cardinality_over_budget`**: every row holds a different timestamp, so there is nothing to group.
+# - `latitude` and `longitude` are `mixed_types`: most rows hold a number, but 25 hold the letter `'N'` or `'E'`.
+# - `date_time` is `cardinality_over_budget`: every row holds a different timestamp, so there is nothing to group.
 #
 # {meth}`~.Metadata.repair` declares the reading that turns such a column into a factor. Repair the `mixed_types` pair before you
 # compare: only the 2020 rows carry the letters, so the reference would hold `latitude` and `longitude` back while the 2021 stream

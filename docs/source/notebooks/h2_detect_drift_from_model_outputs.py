@@ -49,11 +49,11 @@ rng = np.random.default_rng(0)
 # ## Detect confidence drift with entropy
 #
 # If a deployed model encounters data outside its training distribution, its predictions typically become
-# less confident (more uniform). We can calculate the {term}`Shannon entropy<Shannon Entropy>` of the predicted
+# less confident (more uniform). You can calculate the {term}`Shannon entropy<Shannon Entropy>` of the predicted
 # probabilities and test for an upward shift in that distribution.
 #
-# First, let's simulate some historical probabilities (confident, peaked distributions) and some drifted
-# probabilities (less confident, flatter distributions).
+# First, simulate some historical probabilities (confident, peaked distributions) and some drifted probabilities (less
+# confident, flatter distributions).
 
 # %%
 num_samples = 1000
@@ -135,9 +135,9 @@ assert result_multivariate.drifted
 # %% [markdown]
 # ## Detect label shift from hard predictions
 #
-# If you don't even have probabilities — only discrete integer labels output by the model — you can still
-# detect label shift. Simply one-hot encode the predictions to create an `(N, C)` array where each row
-# has a single `1` and the rest are `0`. The univariate detector will then compare the predicted class proportions.
+# If you do not have probabilities, only discrete integer labels output by the model, you can still detect label shift.
+# One-hot encode the predictions to create an `(N, C)` array where each row has a single `1` and the rest are `0`. The
+# univariate detector will then compare the predicted class proportions.
 
 # %%
 # Convert our probabilities to hard predictions (argmax)

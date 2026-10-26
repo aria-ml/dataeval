@@ -153,9 +153,10 @@ _ = Path(metadata_path).write_text(
 # %% [markdown]
 # ## Load the datasets
 #
-# Two disjoint MNIST slices, **train** and **val**, calibrate the baseline for normal variation between same-distribution samples.
-# A third, **test**, should show no drift. **cifar** is CIFAR-10 imagery, a shifted operational stream that should. The model's
-# input builder converts CIFAR-10's RGB 32x32 images to the 28x28 grayscale that the metadata declares.
+# Two disjoint MNIST slices, `train` and `val`, calibrate the baseline for normal variation between same-distribution
+# samples. A third, `test`, should show no drift. The `cifar` split is CIFAR-10 imagery, a shifted operational stream
+# that should. The model's input builder converts CIFAR-10's RGB 32x32 images to the 28x28 grayscale that the metadata
+# declares.
 
 # %%
 SAMPLES_PER_SPLIT = 200

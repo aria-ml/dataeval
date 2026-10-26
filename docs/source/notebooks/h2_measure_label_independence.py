@@ -43,8 +43,7 @@ from dataeval.core import label_parity
 # %% [markdown]
 # ## Load the data
 #
-# While you can use your own dataset, for this example we imported the `MNIST` dataset and will use it going forward. It
-# was imported from the DataEval utils package.
+# While you can use your own dataset, this example uses the `MNIST` dataset, imported from the DataEval utils package.
 
 # %%
 train_ds = MNIST("./data", image_set="train", download=True)
@@ -60,11 +59,11 @@ test_labels = test_md.class_labels
 # %% [markdown]
 # ## Evaluate label statistical independence
 #
-# Now, let's look at how to use DataEval's label statistics analyzer. Using the {func}`.label_parity` function, compute
-# the chi-squared value of the hypothesis that test_ds has the same class distribution as train_ds by specifying the
-# labels of the two datasets to be compared. It also returns the p-value of the test.
+# Use the {func}`.label_parity` function to compute the chi-squared value of the hypothesis that `test_ds` has the same
+# class distribution as `train_ds`. Specify the labels of the two datasets to compare. The function also returns the
+# p-value of the test.
 #
-# The test needs to know which labels are independent of each other. In `MNIST` every image carries exactly one label,
+# The test needs to know which labels are independent of each other. In `MNIST` every image carries a single label,
 # so each label is its own independent item, and you declare that with `assume_independent=True`. For object detection
 # or tracking datasets, where one image or sequence contributes many labels, you would instead pass the item each label
 # came from as `expected_groups` and `observed_groups`, for example `Metadata.item_indices`. See
@@ -78,9 +77,9 @@ print(
 )
 
 # %% [markdown]
-# The chi-squared value is about **2.93** and the p-value is about **0.97**. A p-value this close to 1.0 means the test
+# The chi-squared value is about 2.93 and the p-value is about 0.97. A p-value this close to 1.0 means the test
 # observed no difference between the `MNIST` train and test class distributions. That is the absence of an observed
-# shift, not proof that the distributions match: it says the samples did not show a shift at the power they had. The
+# shift, not proof that the distributions match. It says the samples did not show a shift at the power they had. The
 # result also carries a `score`, the effect size, which is 0.0 here because the bias-corrected measure finds no
 # association between dataset and class. `insufficient` is False because the table is not too thin to trust, and `test`
 # reads `pearson` because no groups were given.

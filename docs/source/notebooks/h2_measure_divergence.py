@@ -48,7 +48,7 @@ from dataeval.extractors import FlattenExtractor
 # %% [markdown]
 # ## Load the data
 #
-# Load the MNIST data and create the training dataset. For the purposes of this example, we will use subsets of the
+# Load the MNIST data and create the training dataset. For the purposes of this example, you will use subsets of the
 # training (4000) data.
 #
 # The embeddings here are the flattened pixels of each image, made by a {class}`.FlattenExtractor`. Flattened pixels are
@@ -70,7 +70,7 @@ embeddings = np.asarray(Embeddings(train_view, extractor=extractor, batch_size=6
 # %% [markdown]
 # ## Calculate the initial divergence
 #
-# Let's calculate the divergence using nearest neighbor disagreements between the first 2000 images and the second 2000
+# Calculate the divergence using nearest neighbor disagreements between the first 2000 images and the second 2000
 # images from this sample.
 
 # %%
@@ -90,7 +90,7 @@ print(div)
 # %% [markdown]
 # ## Load the corrupted data
 #
-# Now let's load in a corrupted mnist dataset.
+# Load a corrupted MNIST dataset.
 
 # %%
 corrupted_ds = MNIST(root="./data", image_set="train", corruption="translate", download=True)
@@ -102,7 +102,7 @@ corrupted_emb = np.asarray(Embeddings(corrupted_view, extractor=extractor, batch
 # %% [markdown]
 # ## Calculate the corrupted divergence
 #
-# Now lets calculate the divergence between this corrupted dataset and the original images
+# Calculate the divergence between this corrupted dataset and the original images.
 
 # %%
 div = divergence_fnn(data_a, corrupted_emb)
@@ -115,8 +115,8 @@ assert corrupted_emb.shape == (2000, 784)
 assert div["divergence"] > 0.95
 
 # %% [markdown]
-# We conclude that the translated MNIST images differ from the original images far more than two samples of the original
-# images differ from each other.
+# The comparison shows that the translated MNIST images differ from the original images far more than two samples of the
+# original images differ from each other.
 
 # %% [markdown]
 # ## Next steps
