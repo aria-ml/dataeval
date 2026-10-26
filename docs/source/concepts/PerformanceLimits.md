@@ -79,7 +79,7 @@ classifier, or a detector that uses context the crop leaves out, can score highe
 
 UAP is marked experimental and may change in future releases.
 
-### Feasibility — determinations with evidence
+### Feasibility: determinations with evidence
 
 {class}`.Feasibility` asks, for each target (a metric, its details and a threshold), whether the evidence demonstrates
 that the threshold is reachable on the population the data represents, rules it out under recorded assumptions, or
@@ -165,8 +165,8 @@ voting an even $k$ votes like $k - 1$):
 $$\hat{e}_\text{lower} = \frac{\hat{e}_\text{upper}}{1 + a_k}$$
 
 where $a_k$ is the tighter of $1/\sqrt{k}$ (Renggli et al., 2021) and, for odd
-$k \ge 5$, Devroye's (1981) constant. Otherwise — $k$ of 1 or 2, or more than
-two classes — Cover & Hart's inequality is inverted on the 1-NN error, the same
+$k \ge 5$, Devroye's (1981) constant. Otherwise, for $k$ of 1 or 2 or for more than
+two classes, Cover & Hart's inequality is inverted on the 1-NN error, the same
 formula as the MST case. The lower bound never exceeds the upper bound.
 
 The two estimators are complementary. The MST estimator uses global structure
@@ -212,11 +212,11 @@ $$E[b_m] \le 1 - \max_k P(Y = k \mid x),$$
 the error of the best answer to that input. Averaged over inputs, the mean consensus value lower-bounds the Bayes
 risk, so one minus a lower endpoint on it is an accuracy ceiling. Feasibility forms panels two ways:
 
-- **Repeated labels** (`replicas=`): an input's own labels form its panel, so the ceiling bounds every model that
+- Repeated labels (`replicas=`): an input's own labels form its panel, so the ceiling bounds every model that
   reads the input.
-- **Local panels**: on single-label data, Feasibility fits a label-blind k-means partition of the representation on
+- Local panels: on single-label data, Feasibility fits a label-blind k-means partition of the representation on
   a fit split, then draws disjoint panels of $m$ different audit images within each cell. Their labels are draws from
-  the cell's label distribution, so their consensus bounds the error of the best *single answer per cell*. The cells
+  the cell's label distribution, so their consensus bounds the error of the best single answer per cell. The cells
   are pooled by post-stratification. This pooling is DataEval's own construction on the DFE panels (C3), proved with
   two Hoeffding (1963) steps in the Notes of {func}`.local_panel_bound`:
 
@@ -269,7 +269,7 @@ other declared class. In this release a recall target is refused on grouped (vid
 vocabulary, so a requirement on a coarser class follows a `Relabel`
 (see [Decision arrays and folded scores](#decision-arrays-and-folded-scores)).
 
-**Witness and certification.** A frozen witness gives a decision $d_i$ for each audit item: the top class of its
+A frozen witness gives a decision $d_i$ for each audit item: the top class of its
 scores, or the supplied class decision. With $P$ the audit items labeled $c$ and $N$ the others, it gets two exact
 binomial endpoints, each at half the (target, source) claim's share of `alpha`: a lower endpoint on recall, from the
 decisions $d_i = c$ among $P$, and an upper endpoint on the false-positive rate, from those among $N$. Given the labels,
@@ -282,7 +282,7 @@ supports neither a demonstration nor an `evidence_conflict`, but both of its bou
 `aggregate_by_evidence()`. Without audit positives or without audit negatives, the corresponding endpoint is
 unavailable.
 
-**Ceiling.** The cost-weighted consensus constructions that bound AP bound a recall target too. For a positive cost
+The cost-weighted consensus constructions that bound AP bound a recall target too. For a positive cost
 $\lambda_j$ at a slope change of the consensus, a local panel or replica route gives $\ell_j$, a lower bound on
 $\inf_h [P(y = c, h \ne c) + \lambda_j P(y \ne c, h = c)]$. A model with recall $r \ge r_0$ and false-positive rate
 $f \le f_0$ has $\pi(1 - r) + \lambda_j (1 - \pi) f \le \pi(1 - r_0) + \lambda_j (1 - \pi) f_0$, where $\pi$ is the
@@ -298,8 +298,8 @@ $$
 Each bracket increases in $\pi$ when $\ell_j > \lambda_j f_0$, so its maximum sits at $\pi^+$; it decreases when
 $\ell_j < \lambda_j f_0$, so the maximum sits at $\pi^-$ (and is unbounded, reported as 1, when $\pi^- = 0$); and it is
 the constant $1 - \lambda_j f_0$ when they are equal. Which prevalence end is conservative depends on the cost, so the
-lower prevalence endpoint is required, where an AP ceiling needs only the upper one. The target is excluded exactly
-when $U_r < r_0$, and then the five determination rules apply unchanged. The claim's share of `alpha` is split equally
+lower prevalence endpoint is required, where an AP ceiling needs only the upper one. The target is excluded if and only
+if $U_r < r_0$, and then the five determination rules apply unchanged. The claim's share of `alpha` is split equally
 over the positive costs and the two prevalence endpoints. The raw `costs` and `risk_lower` of a recall ceiling drop the
 cost 0 that an AP ceiling keeps, since a cost-0 risk is trivially 0 and bounds nothing.
 
@@ -327,7 +327,7 @@ A model's scores follow the vocabulary it was trained on. When a requirement is 
 relabel the dataset with {class}`.Relabel` (for instance with an ontology that maps vehicle types to categories) and
 fold the model's scores through the same map with `Relabel.fold_scores(scores, view=view)`. Columns of source classes
 that map to one target class are summed, columns of classes the relabel drops are discarded, nothing is renormalized
-(exactly as `Relabel` folds a classification datum's own score vector), and with `view` the rows of dropped items are
+(as `Relabel` folds a classification datum's own score vector), and with `view` the rows of dropped items are
 removed so the result lines up with the relabeled view's items. The result has one column per target class index.
 
 #### One error budget per call
@@ -359,23 +359,23 @@ that matches decides:
 | 5 | `unresolved` | Otherwise | No claim is made. No ceiling at the judged scope or broader is available and informative, and no eligible witness reaches the threshold; the reason says which, and ceilings narrower than the judged scope remain evidence only. |
 
 Rules 2 and 3 cannot both match without rule 1 matching first: a witness at or above the threshold would exceed a
-ceiling below it. An endpoint is *unavailable* when it cannot be computed (too few units, no complete panel, a missing
-declared bound), and *uninformative* when it is valid but trivial: a ceiling at the metric's maximum of 1, or a witness
-at its minimum of 0. Neither can make a ceiling decide rule 4. For a recall target, a witness counts in these rules
-only when it is certified at the false-positive limit, and the endpoint compared with the threshold or a ceiling is its
-recall endpoint (see [Recall at a false-positive limit](#recall-at-a-false-positive-limit)).
+ceiling below it. An endpoint is **unavailable** when it cannot be computed (too few units, no complete panel, a
+missing declared bound), and **uninformative** when it is valid but trivial: a ceiling at the metric's maximum of 1, or
+a witness at its minimum of 0. Neither can make a ceiling decide rule 4. For a recall target, a witness counts in these
+rules only when it is certified at the false-positive limit, and the endpoint compared with the threshold or a ceiling
+is its recall endpoint (see [Recall at a false-positive limit](#recall-at-a-false-positive-limit)).
 
 The **recorded assumptions** are these; each evidence item lists the ones it relies on in `details["assumptions"]`:
 
-- *Labels follow the annotation protocol.* Every claim, ceiling or witness, concerns the labels the annotation
+- Labels follow the annotation protocol. Every claim, ceiling or witness, concerns the labels the annotation
   protocol produces, not physical truth. A replica ceiling records that the replicas and the primary labels follow one
   protocol, each an independent label of the item, so that it and the witnesses, scored on primary labels, concern the
   same target.
-- *Replicas are a random sample.* The items with replicas are a random sample of the population, so a replica ceiling
+- Replicas are a random sample. The items with replicas are a random sample of the population, so a replica ceiling
   describes the population and not only those items.
-- *The representation is independent of the audit labels.* The extractor or embeddings were fitted and selected
+- The representation is independent of the audit labels. The extractor or embeddings were fitted and selected
   without the audit units' labels. You declare this; Feasibility records it for local panels and built-in witnesses.
-- *The allowances hold for their scopes.* β and Γ, when given, are bounds you supply. Feasibility assumes them and
+- The allowances hold for their scopes. β and Γ, when given, are bounds you supply. Feasibility assumes them and
   does not estimate them.
 
 Grouped (video) data and sampling plans record more: annotators labeled the replicas with the same video context;
@@ -410,11 +410,11 @@ fills the `ceiling` column: a restricted ceiling is always reported as restricte
 
 The allowances bridge the scopes, in risk units:
 
-- **β** (`allowances={"beta": ...}`, a scalar) bounds how much a model reading the representation can improve on one
+- β (`allowances={"beta": ...}`, a scalar) bounds how much a model reading the representation can improve on one
   fixed answer inside a cell. It must be a justified bound: β = 0 asserts that no model reading the representation
   beats one fixed answer per cell. A per-cell β would refer to the cells of the internal partition, which are not
   exposed, so this release rejects it.
-- **Γ** (`"gamma"`, a scalar, given with β) bounds how much reading the full input can lower the best risk below what
+- Γ (`"gamma"`, a scalar, given with β) bounds how much reading the full input can lower the best risk below what
   the representation allows.
 
 A witness can demonstrate a target only if it belongs to the judged scope's class. The built-in witnesses read the
@@ -470,7 +470,7 @@ When unlabeled items were excluded, the evidence covers labeled items only. That
 of the evidence, so it never displaces the factor: the recommendation ends with a note to label the excluded items to
 extend the result to the full dataset. The `labels_conditioned` value stays in the column's enum but is not produced.
 
-**Suggested minimum.** When the deciding ceiling's point estimate is already below the threshold, or the best witness's
+When the deciding ceiling's point estimate is already below the threshold, or the best witness's
 above it, the endpoint misses only by its confidence radius. `suggested_minimum` inverts that radius at the observed
 mean and variance: it is the number of independent units behind the endpoint at which it would cross the threshold if
 those rates hold. For local panels and witnesses those are audit-split units (the audit is half of the independent units
@@ -545,7 +545,7 @@ resolution at small $n$ where the curve changes fastest.
 
 ## When to use it
 
-**BER** should be run during dataset readiness assessment, before any significant model development investment.
+BER should be run during dataset readiness assessment, before any significant model development investment.
 Compare both bounds against the operational accuracy requirement: an upper bound within the allowance shows the
 requirement is reachable; a lower bound beyond it suggests the constraint is in the data, for that representation.
 
@@ -553,14 +553,14 @@ BER is also useful as a comparative metric across dataset versions. If a new
 data collection campaign was intended to reduce class overlap, a lower BER
 upper bound after the collection is quantitative evidence that it succeeded.
 
-**UAP** should be used in object detection programs where mAP is the
+UAP should be used in object detection programs where mAP is the
 acceptance criterion, and where you want evidence of what the classification
 part of the problem reaches before investing in detector training. Because it
 requires running a classifier on bounding box crops rather than a full
 detector, it is substantially cheaper to compute than training and evaluating
 an object detector.
 
-**Feasibility** is for classification decisions that need a proof behind them: before model development, to learn
+Feasibility is for classification decisions that need a proof behind them: before model development, to learn
 whether the evidence rules a requirement out or already shows it reachable, and once a model exists, to show on held-out
 data that it meets the requirement. Put every target into one call, so they share one error budget, and pass your
 model's class scores, or its class decisions, as `predictions=` with its provenance. Without repeated labels or
@@ -628,7 +628,7 @@ Feasibility is experimental, and its first release leaves out several things:
 - A recall target is for image classification only: it is refused on grouped (video) data, with
   `false_positive_scope="each_class"` (one limit per other class) and as a mapping key. It covers one class at one
   operating point; a second operating point needs its own call. Feasibility judges whether the requirement is
-  reachable; it does not evaluate or accept a model, and an uncertified witness is simply not evidence for it.
+  reachable; it does not evaluate or accept a model, and an uncertified witness is not evidence for it.
 
 Its bounds can be wide. A panel's consensus sits below the risk it bounds, more so for small panels, and more data
 does not remove that gap; only the confidence radii shrink with more units. Every claim is about the population of
@@ -669,14 +669,14 @@ mismatch between train and test — the projection will be optimistic.
 
 ### Tutorials
 
-- [Feasibility tutorial](../notebooks/tt_assess_ic_feasibility.py) — whether
+- [Assess whether a classification requirement is reachable](../notebooks/tt_assess_ic_feasibility.py) — whether
   vehicle type, vehicle category and tank requirements are reachable on
   MilitaryVehicles, the evidence behind each determination, and how to change a
   question the evidence cannot answer
 
 ### How-to guides
 
-- [How to measure classification feasibility (BER)](../notebooks/h2_measure_ic_feasibility.py)
+- [How to determine image classification feasibility](../notebooks/h2_measure_ic_feasibility.py)
 - [How to measure data sufficiency](../notebooks/h2_measure_ic_sufficiency.py)
 - [How to create embeddings](../notebooks/h2_create_embeddings.py)
 

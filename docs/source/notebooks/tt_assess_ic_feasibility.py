@@ -16,6 +16,9 @@
 # %% [markdown]
 # # Assess whether a classification requirement is reachable
 #
+# This tutorial uses {class}`~dataeval.performance.Feasibility` to decide whether three requirements for a military
+# vehicle classifier are reachable on the `MilitaryVehicles` images.
+#
 # Estimated time to complete: 30 minutes
 #
 # Relevant ML stages: [Model Development](../getting-started/roles/ML_Lifecycle.md#model-development)
@@ -57,17 +60,17 @@
 #
 # Your program is building a system that names the military vehicle in a photo, and wants to know whether its
 # requirement is reachable before paying for model development. {class}`~dataeval.performance.Feasibility` answers for
-# each requirement: the evidence shows it met (*demonstrated*), shows it cannot be met under the assumptions it records
-# (*ruled out*), or cannot decide yet (*insufficient evidence*). The decision stays yours. `Feasibility` is experimental
-# and may change in future releases.
+# each requirement. The evidence shows it met (**demonstrated**), shows it cannot be met under the assumptions it
+# records (**ruled out**), or cannot decide yet (**insufficient evidence**). The decision stays yours. `Feasibility` is
+# experimental and may change in future releases.
 #
-# When the evidence cannot decide, you can *change the question*: ask a different, clearly stated one that the mission
+# When the evidence cannot decide, you can **change the question**: ask a different, clearly stated one that the mission
 # would accept, and report the answer as an answer to that question.
 
 # %% [markdown]
-# ## The three answers
+# ### Preview the three answers
 #
-# The tutorial reaches these answers; the sections after this one show how.
+# The sections after the setup show how the tutorial reaches these answers.
 #
 # | Question | Answer | Why |
 # | --- | --- | --- |
@@ -78,23 +81,24 @@
 # "Insufficient evidence" describes the requirement, not the model: the evidence neither shows the requirement met nor
 # rules it out.
 #
-# These answers illustrate the procedure and do not confirm the requirements: the stated confidence assumes no
+# These answers illustrate the procedure and do not confirm the requirements. The stated confidence assumes that no
 # evaluation image was used to train or choose a model, or to set a requirement, and this tutorial tried its thresholds
 # and tank rule on these test images first. A formal check needs evaluation images nobody has looked at.
 
 # %% [markdown]
-# ## How to read the output
+# ### Read the printout
 #
 # DataEval reports two kinds of bounds. Each holds at the stated confidence: at 95%, the chance that any bound in the
 # evaluation is wrong is at most 5%.
 #
-# - **Lower confidence bound** (from a model you tested): the model's accuracy on new images from the same population
-#   is at least this. It sits below the accuracy observed on the evaluation images, to allow for sampling.
-# - **Upper confidence bound** (from a ceiling): no model of the stated kind exceeds this accuracy on new images from
-#   the same population, under the recorded assumptions.
+# - The **lower confidence bound** comes from a model you tested: the model's accuracy on new images from the same
+#   population is at least this number. It sits below the accuracy observed on the evaluation images, to allow for
+#   sampling.
+# - The **upper confidence bound** comes from a **ceiling**: no model of the stated kind exceeds this accuracy on new
+#   images from the same population, under the recorded assumptions.
 #
-# *New images from the same population* means images like these, gathered the same way. *Allowing for sampling* means
-# allowing for luck in which images were drawn. A *ceiling* comes from the labels: where look-alike images carry
+# **New images from the same population** means images like these, gathered the same way. **Allowing for sampling**
+# means allowing for luck in which images were drawn. A ceiling comes from the labels: where look-alike images carry
 # different labels, a model that must answer them alike cannot get them all right. For false alarms, less is better, so
 # a tested model gets a "no more than" number for them.
 #
@@ -102,15 +106,15 @@
 #
 # | In the printout | In plain words |
 # | --- | --- |
-# | Tank: ≥90% recall, ≤5% false positives | Finds at least 90% of the tanks (*recall*) while calling at most 5% of the other vehicles tanks (*false positives*, or false alarms). |
+# | Tank: ≥90% recall, ≤5% false positives | Finds at least 90% of the tanks (**recall**) while calling at most 5% of the other vehicles tanks (**false positives**, or false alarms). |
 # | demonstrated ✓ | A model you tested is shown to meet the requirement. |
 # | insufficient evidence ? | The evidence cannot decide either way yet. |
-# | models that may use the whole image | The kind of model a bound speaks for, its *scope*. Every requirement here is judged for these. |
+# | models that may use the whole image | The kind of model a bound speaks for, its **scope**. Every requirement here is judged for these. |
 # | group-based ceiling | An upper bound for models that give one answer per group of look-alike images; it says nothing about a model that tells them apart. |
 # | not counted | A tested model whose false alarms are not shown within the limit. Its numbers cannot show the requirement met. |
 # | All bounds hold together at 98.3% confidence | The chance that any bound in this printout is wrong is at most about 1.7%. |
 # | They assume no evaluation image was used… | The confidence holds only if the evaluation images played no part in building a model or setting a requirement. |
-# | evaluation images | The images DataEval holds back to score every model once (the *audit*). |
+# | evaluation images | The images DataEval holds back to score every model once (the **audit**). |
 # | Next, Notes | What could settle an undecided requirement; the models' observed scores and narrower bounds. |
 
 # %% [markdown]
@@ -164,7 +168,7 @@ from dataeval.quality import Duplicates
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 # %% [markdown]
-# ## The data
+# ## Load the data
 #
 # `MilitaryVehicles`, from `maite-datasets`, has photos of 24 types of military vehicle, such as the T-72 tank or the
 # BTR-80 armored personnel carrier, in a training split and a test split. Each type belongs to one of 7 categories:
@@ -181,12 +185,12 @@ print(f"Vehicle types: {len(test.index2label)}")
 #
 # Your model, DataEval's built-in models and the search for repeated images all read
 # [embeddings](../concepts/Embeddings.md): for each image, a list of numbers that a pretrained image model computes to
-# summarize what the image shows. Similar-looking images get similar lists. We use ViT-B/16, from `torchvision`, and
+# summarize what the image shows. Similar-looking images get similar lists. You use ViT-B/16, from `torchvision`, and
 # keep its 768 numbers.
 #
-# DataEval assumes the image model was chosen without the evaluation images' labels. We chose ViT-B/16 over ResNet18 and
-# ResNet50 by *cross-validation* on the training split: train on four fifths, score on the last fifth, five times over.
-# An earlier, exploratory comparison also looked at the test images.
+# DataEval assumes the image model was chosen without the evaluation images' labels. ViT-B/16 was chosen over ResNet18
+# and ResNet50 by **cross-validation** on the training split: train on four fifths, score on the last fifth, five times
+# over. An earlier, exploratory comparison also looked at the test images.
 
 # %%
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -209,14 +213,14 @@ assert test_x.shape == (1621, 768)
 # ## Remove repeated images
 #
 # Some test images repeat a training image: copies, crops, padded or watermarked versions and mirror images. A model can
-# score well on those by remembering, which makes it look better than it is. And DataEval treats every evaluation image
-# as a separate example, which two copies of one photo are not. So we sort all the images into *families* of repeats,
-# remove every test image whose family includes a training image, and keep one image per remaining family.
+# score well on those by remembering, which makes it look better than it is. DataEval also treats every evaluation image
+# as a separate example, which two copies of one photo are not. So the images are sorted into **families** of repeats,
+# every test image whose family includes a training image is removed, and one image per remaining family is kept.
 #
 # :::{dropdown} How the repeats are found
-# DataEval's {class}`.Duplicates` compares image fingerprints, which catch exact copies and resaved or resized ones.
-# They miss some crops, padded borders, watermarks and mirror images, so we also count two images as repeats when their
-# summaries have a *cosine similarity* (1 means identical) of at least 0.95. Check what that threshold catches before
+# DataEval's {class}`.Duplicates` compares image fingerprints, which catch exact copies and resaved or resized ones. They
+# miss some crops, padded borders, watermarks and mirror images, so two images also count as repeats when their
+# summaries have a **cosine similarity** (1 means identical) of at least 0.95. Check what that threshold catches before
 # reusing it with another image model or dataset.
 # :::
 
@@ -263,10 +267,10 @@ assert not np.isin(test_family[keep], train_family).any()  # no family shared wi
 # %% [markdown]
 # ## Train your model
 #
-# Your model is a *logistic regression*: a simple classifier that learns, from the training images' summaries, a score
+# Your model is a **logistic regression**: a simple classifier that learns, from the training images' summaries, a score
 # between 0 and 1 for each of the 24 vehicle types, and answers with the highest. About one fifth of the training
-# images, the *calibration* images, are set aside for choosing the tank rule later, with each family of repeats kept on
-# one side. The model trains once on the rest and is then *frozen*: it answers all three questions unchanged.
+# images, the **calibration** images, are set aside for choosing the tank rule later, with each family of repeats kept
+# on one side. The model trains once on the rest and is then **frozen**: it answers all three questions unchanged.
 
 # %%
 train_y = np.asarray(Metadata(train).class_labels)
@@ -285,12 +289,12 @@ assert not np.isin(train_family[calibration_rows], train_family[fit_rows]).any()
 assert model.classes_.tolist() == list(range(24))  # score columns are the vehicle types in index order
 
 # %% [markdown]
-# ## What each set of images is for
+# ## Assign a job to each set of images
 #
 # | Images | Job |
 # | --- | --- |
 # | About four fifths of the training split | Train your model. |
-# | About one fifth of the training split, the calibration images | Choose the tank decision rule, in the third question. |
+# | About one fifth of the training split, the calibration images | Choose the tank decision rule, in the "Check the tank requirement" section. |
 # | The kept test images, about 1,480 | Passed to `Feasibility`, which splits them in half at random. |
 # | Half of those | Train DataEval's built-in models, and sort the images into groups of similar-looking images. |
 # | The other half, about 740, the *evaluation images* | Score every model, once. All the reported numbers come from these images. |
@@ -301,16 +305,17 @@ assert model.classes_.tolist() == list(range(24))  # score columns are the vehic
 # %% [markdown]
 # ## Plan the questions before you look
 #
-# The program's requirement is to **name the vehicle type correctly for at least 60% of new images**. With 24 look-alike
-# types the evidence may not show that, so before running anything the team writes down every requirement it will ask,
-# including two the mission would genuinely accept:
+# The program's requirement is to name the vehicle type correctly for at least 60% of new images. With 24 look-alike
+# types the evidence may not show that. Before you run anything, write down every requirement you will ask, including
+# two that the mission would accept:
 #
-# 1. **Vehicle type:** name the right type, out of 24, for at least 60% of new images.
-# 2. **Vehicle category:** name the right category, out of 7, for at least 60% of new images. Telling a tank from an
-#    armored personnel carrier helps even when the exact model is unclear.
-# 3. **Tanks:** find at least 90% of the tanks, while calling at most 5% of the other vehicles tanks.
+# - Vehicle type: name the right type, out of 24, for at least 60% of new images.
+# - Vehicle category: name the right category, out of 7, for at least 60% of new images. Telling a tank from an armored
+#   personnel carrier helps even when the exact model is unclear.
+# - Tanks: find at least 90% of the tanks, while calling at most 5% of the other vehicles tanks.
 #
-# Each has its own answer; an answer to the second or third says nothing about the first.
+# Each has its own answer. An answer to the category or tank requirement says nothing about the vehicle type
+# requirement.
 #
 # `alpha` caps the chance that a call's bounds are wrong through bad luck in which images became evaluation images. The
 # three calls share one 5% budget: each runs at `alpha = 0.05 / 3` with the same `seed`, so all three pick the same
@@ -326,7 +331,7 @@ assert model.classes_.tolist() == list(range(24))  # score columns are the vehic
 feasibility = Feasibility(alpha=0.05 / 3, seed=42)  # for all three planned calls: a third of the budget each, one seed
 
 # %% [markdown]
-# ## Question 1: the vehicle type
+# ## Check the vehicle type requirement
 #
 # The call passes the kept test images, their summaries, your model's scores and a record of how it was built:
 #
@@ -377,20 +382,20 @@ group_based = bounds.filter(source="group-based ceiling")["bound"].item()
 assert 0.51 < group_based < 0.60  # "about 55%"; below 60%, so it "would rule that out" at its scope
 
 # %% [markdown]
-# The answer is *insufficient evidence*. Your model named the right type for about half of the evaluation images.
+# The answer is "insufficient evidence". Your model named the right type for about half of the evaluation images.
 # Allowing for sampling, DataEval can say only that it gets at least roughly 40 to 45% right on new images. Nothing
 # rules 60% out either: the group-based ceiling, about 55%, speaks only for models that give one answer per group, and
 # your model tells individual images apart.
 #
 # "Next" says what could settle it. More evaluation images would not help, because the observed score is already below
 # 60%. A stronger model could show 60% met; repeated labels could rule it out. The printout's third line states the
-# assumption behind its confidence, which this tutorial does not fully meet. Here, the team turns to the questions it
+# assumption behind its confidence, which this tutorial does not fully meet. Next, you ask the other questions you
 # planned.
 
 # %% [markdown]
-# ## Question 2: the vehicle category
+# ## Check the vehicle category requirement
 #
-# Same images, same frozen model, a coarser question:
+# This question uses the same images and the same frozen model, with coarser labels:
 #
 # - {class}`.Relabel` changes each image's label from its type to its category, using the dataset's own `hierarchy`,
 #   read with {meth}`.Ontology.from_hierarchy`.
@@ -424,9 +429,9 @@ assert yours["n"] == EVALUATION
 assert 0.65 < yours["observed"] < 0.74  # "about 70%"
 
 # %% [markdown]
-# The answer is *demonstrated*. Your model named the right category for about 70% of the evaluation images. Allowing for
+# The answer is "demonstrated". Your model named the right category for about 70% of the evaluation images. Allowing for
 # sampling, it gets at least about 65% right on new images, which meets 60%. This rests on your declared provenance: the
-# model was trained without the evaluation images and frozen before scoring them. Removing the repeats we could find
+# model was trained without the evaluation images and frozen before scoring them. Removing the repeats that were found
 # supports the first part.
 #
 # In the chart, the blue zone holds the requirements the evidence demonstrates, up to your model's "at least" number;
@@ -436,14 +441,14 @@ assert 0.65 < yours["observed"] < 0.74  # "about 70%"
 dep.plot(category_result)
 
 # %% [markdown]
-# ## Question 3: tanks
+# ## Check the tank requirement
 #
 # The tank requirement has two numbers, and both must hold for one way of deciding: find at least 90% of the tanks
-# (*recall*) while calling at most 5% of the other vehicles tanks (*false positives*).
+# (recall) while calling at most 5% of the other vehicles tanks (false positives).
 #
 # Your model's usual answer is the category with the highest score. To call fewer vehicles tanks, the system can answer
-# "Tank" only when the Tank score reaches a *threshold*, and otherwise give the highest-scoring other category. A higher
-# threshold means fewer false alarms and more missed tanks. Choosing it takes four steps:
+# "Tank" only when the Tank score reaches a **threshold**, and otherwise give the highest-scoring other category. A
+# higher threshold means fewer false alarms and more missed tanks. Choosing it takes four steps:
 #
 # 1. State the requirement first, as above.
 # 2. Choose the threshold on training images only, by a rule declared before looking: on the calibration images, the
@@ -559,7 +564,7 @@ for result in (type_result, category_result, tank_result):
     assert result.determinations["suggested_minimum"].to_list() == [None]
 
 # %% [markdown]
-# The answer is *insufficient evidence*. The rule found only about half of the tanks among the evaluation images, far
+# The answer is "insufficient evidence". The rule found only about half of the tanks among the evaluation images, far
 # below 90%, so it cannot show the requirement met whatever its false alarms. "Next" says so first: more evaluation
 # images would not help at the observed scores.
 #
@@ -569,21 +574,21 @@ for result in (type_result, category_result, tank_result):
 # lower threshold that found more tanks would usually also call more of the other vehicles tanks.
 
 # %% [markdown]
-# ## What to do next
+# ## Choose what to do next
 #
 # The `recommendation` column of each result's `determinations` details the "Next" line's routes:
 #
-# - **To show a requirement met: a stronger model.** Only a tested model's "at least" number can show it met, so you
+# - To show a requirement met, test a stronger model. Only a tested model's "at least" number can show it met, so you
 #   need one that scores well above the requirement on the evaluation images (for the tanks, with false alarms shown
 #   within 5%). These calls spent the whole 5% budget, so judge it on fresh evaluation images.
-# - **To rule it out: repeated labels.** Have several people label a random subset of the images independently and pass
-#   their labels as `replicas=`. Where they disagree, no single answer matches every label, so the labels give a ceiling
-#   for models that may use the whole image.
-# - **To rule it out: allowances.** `allowances={"beta": ..., "gamma": ...}` extend the group-based ceiling on accuracy
-#   to models that may use the whole image. An allowance is a bound you assert and DataEval cannot check; see [what an
-#   allowance asserts](../concepts/FeasibilityEvidence.md#allowances).
-# - **Ask a narrower question.** The key `"accuracy/partition_restricted"` asks whether a model that gives one answer
-#   per group can reach 60%. The group-based ceiling, about 55%, would rule that out under the recorded assumptions, but
+# - To rule a requirement out, collect repeated labels. Have several people label a random subset of the images
+#   independently and pass their labels as `replicas=`. Where they disagree, no single answer matches every label, so
+#   the labels give a ceiling for models that may use the whole image.
+# - To rule a requirement out, assert allowances. `allowances={"beta": ..., "gamma": ...}` extend the group-based
+#   ceiling on accuracy to models that may use the whole image. An allowance is a bound you assert and DataEval cannot
+#   check; see [what an allowance asserts](../concepts/FeasibilityEvidence.md#allowances).
+# - Ask a narrower question. The key `"accuracy/partition_restricted"` asks whether a model that gives one answer per
+#   group can reach 60%. The group-based ceiling, about 55%, would rule that out under the recorded assumptions, but
 #   says nothing about a model like yours. It too would need planning and its own share of the budget.
 #
 # When a model's observed score already meets the requirement and only the allowance for sampling holds it back,
@@ -591,11 +596,11 @@ for result in (type_result, category_result, tank_result):
 # requirement. `Feasibility` evaluates on half of the images you pass, so supply about twice that many.
 
 # %% [markdown]
-# ## Optional: inspect the evidence
+# ## Inspect the evidence
 #
-# `aggregate_by_evidence` lists every bound of a call, one row per source and bound. For the tank requirement, each
-# tested model has two rows: a lower bound on the share of tanks it finds (`recall`) and an upper bound on the share of
-# other vehicles it calls tanks (`false_positive_rate`).
+# This section is optional. `aggregate_by_evidence` lists every bound of a call, one row per source and bound. For the
+# tank requirement, each tested model has two rows: a lower bound on the share of tanks it finds (`recall`) and an upper
+# bound on the share of other vehicles it calls tanks (`false_positive_rate`).
 
 # %%
 columns = ["source", "quantity", "bound_type", "bound", "observed", "n", "information_scope"]
@@ -613,8 +618,8 @@ assert by_source["group-based ceiling", "recall"]["information_scope"] == "parti
 # %% [markdown]
 # `observed` is a model's score on the `n` evaluation images. DataEval's two built-in models answer with the
 # highest-scoring category. They find about three quarters of the tanks, but their false alarms could be as high as 25
-# to 30% (k-NN) and about 15% (linear probe), so neither counts. [Feasibility
-# Evidence](../concepts/FeasibilityEvidence.md) explains how each bound is built.
+# to 30% (k-NN) and about 15% (linear probe), so neither counts.
+# [Feasibility Evidence](../concepts/FeasibilityEvidence.md) explains how each bound is built.
 #
 # In the evidence chart, each row is one source: the dot is its score on the evaluation images and the tick its "at
 # least" number. Sources that are not counted, and the group-based ceiling, are drawn faint.
@@ -623,23 +628,32 @@ assert by_source["group-based ceiling", "recall"]["information_scope"] == "parti
 dep.plot(tank_result, plot_evidence=True)
 
 # %% [markdown]
-# ## Summary
+# ## Conclusion
 #
 # The vehicle type at 60% could not be answered. Changing the question gave one requirement the evidence demonstrates,
 # the vehicle category, and one whose shortfall says what to do next, the tanks. The three answers hold together at 95%
 # confidence for new images from the same population, and they rest on your model's declared provenance. Because this
-# tutorial tried its thresholds and rules on these test images, they illustrate the procedure; a formal check needs
+# tutorial tried its thresholds and rules on these test images, they illustrate the procedure. A formal check needs
 # fresh evaluation images.
 
 # %% [markdown]
 # ## Next steps
 #
-# - [Performance Limits](../concepts/PerformanceLimits.md) — The determinations, information scopes and
-#   recommendations of `Feasibility`, alongside other ways to judge how well any model could do and how much data a
-#   model needs.
-# - [Feasibility Evidence](../concepts/FeasibilityEvidence.md) — Every evidence kind, how its bounds are built and
-#   what its `details` hold.
-# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Estimate, from the image
-#   summaries, the lowest error rate any model could reach on these classes.
-# - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project how a
-#   model's accuracy grows as it trains on more images.
+# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand the determinations, information scopes and recommendations of `Feasibility`.
+# - [Feasibility Evidence](../concepts/FeasibilityEvidence.md) — Learn how each kind of evidence is built and what its details hold.
+# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Estimate the Bayes error rate with `ber_mst` and check an accuracy requirement against it.
+# - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model performance curves as a function of dataset size.
+
+# %% [markdown]
+# ## On your own
+#
+# Repeat the assessment on your own classification dataset:
+#
+# - Write down every requirement before you run anything, and give them one error budget with `alpha`.
+# - Compute embeddings for your images with a pretrained model, and pass them to `Feasibility.evaluate` with your
+#   dataset.
+# - Train your model on images that `Feasibility` never sees, freeze it, and pass its class scores as `predictions=`
+#   with a `provenance` that records how you built it.
+# - Remove the repeats between your training and evaluation images, as in the "Remove repeated images" section.
+# - Use evaluation images that nobody has looked at, so the stated confidence holds.
+# - If a requirement stays undecided, follow the "Choose what to do next" section.

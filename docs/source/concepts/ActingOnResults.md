@@ -1,9 +1,9 @@
 # Acting on Results
 
 DataEval produces evidence and judgment calls, not decisions. Every evaluator
-returns evidence — scores, indices, p-values, bounds — and many add a judgment
-call on top of it, such as a flag or a determination. None of them makes the
-decision for you. That decision requires understanding what the result means in
+returns evidence, such as scores, indices, p-values and bounds, and many add a
+judgment call on top of it, such as a flag or a determination. None of them makes
+the decision for you. That decision requires understanding what the result means in
 the context of your program, your data collection constraints, and your
 performance requirements.
 
@@ -14,13 +14,13 @@ interact with another. Use this page as a reference: when a diagnostic produces
 a result you need to act on, find the relevant section and understand your
 options before committing to a course of action.
 
-One framing applies across all of it: DataEval finds *evidence* and makes
+One framing applies across all of it: DataEval finds evidence and makes
 judgment calls on it. The final decision is always yours. A high BER lower bound
-is evidence that class overlap may be irreducible — it is not proof that your
+is evidence that class overlap may be irreducible. It is not proof that your
 requirement is unachievable. A detected duplicate is evidence of potential
-redundancy — it is not an instruction to delete. A {class}`.Feasibility`
+redundancy. It is not an instruction to delete. A {class}`.Feasibility`
 determination is a judgment on the evidence it cites, under its recorded
-assumptions — it is not a decision to build or to stop. Every DataEval output is
+assumptions. It is not a decision to build or to stop. Every DataEval output is
 a prompt to investigate, not a verdict.
 
 ## Data Integrity findings
@@ -506,8 +506,8 @@ collection: acquiring more data for the underrepresented classes.
 ### BER upper and lower bounds
 
 {func}`.ber_mst` and {func}`.ber_knn` return upper and lower bounds on the
-Bayes Error Rate — the irreducible classification error given the current
-feature representation — and the two bounds point in different directions. The
+Bayes Error Rate, the irreducible classification error given the current
+feature representation, and the two bounds point in different directions. The
 {func}`.ber_knn` upper bound is an error a nearest-neighbor classifier already
 achieves, so an upper bound within your operational error allowance shows the
 requirement is reachable. The lower bound is what suggests a requirement is out
@@ -515,8 +515,8 @@ of reach: if it exceeds the allowance, no classifier reading this feature space
 is expected to meet the requirement. It is an asymptotic estimate, so treat it as
 evidence rather than proof.
 
-**The BER lower bound exceeds the requirement.** This does not mean the task is
-impossible — it means it is out of reach with the current data and feature
+If the BER lower bound exceeds the requirement, this does not mean the task is
+impossible. It means it is out of reach with the current data and feature
 representation. Three levers are available:
 
 1. **Better embeddings**: if the current feature representation conflates
