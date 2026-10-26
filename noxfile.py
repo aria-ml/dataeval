@@ -285,6 +285,7 @@ def verify(session: nox.Session) -> None:
     session.run(
         "pytest",
         "verification/",
+        "-q",
         "--tb=short",
         f"--junitxml=output/verify.{python_version}.xml",
         *session.posargs,
