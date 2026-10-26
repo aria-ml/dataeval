@@ -41,6 +41,14 @@ docs:
     - uv run --no-project python docs/notebook_cache_inputs.py record
     - bash docs/harbor-datasets-cache.sh push
     - bash docs/push-docs-cache.sh
+  after_script:
+    # The Kubernetes cache helper can run as a different uid. Hugging Face tree
+    # metadata is created as 0600, so make the dataset cache readable first.
+    - |
+      if [ -d docs/source/notebooks/data ]; then
+        chmod -R a+rX docs/source/notebooks/data
+      fi
+    - !reference [.nox, after_script]
   cache:
     # uv cache, shared with the other .nox jobs (same key derived from uv.lock).
     - key:

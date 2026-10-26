@@ -1,5 +1,6 @@
 """Exercise docs cache invalidation against real Git checkouts and saved manifests."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -85,18 +86,25 @@ def checkout(tmp_path: Path) -> Path:
 def test_shared_execution_input_changes_require_clean_build(checkout: Path, name: str):
     with (checkout / name).open("a") as stream:
         stream.write("\n# changed\n")
-    assert run(checkout, "check").returncode == 1
+    result = run(checkout, "check")
+    assert result.returncode == 1
+    assert f"File changed: {name}" in result.stdout
+    assert "All notebooks will be re-executed" in result.stdout
 
 
 @pytest.mark.parametrize("name", ["src/dataeval/new_module.py", "docs/source/notebooks/models/new_weights"])
 def test_new_execution_input_requires_clean_build(checkout: Path, name: str):
     write(checkout, name)
-    assert run(checkout, "check").returncode == 1
+    result = run(checkout, "check")
+    assert result.returncode == 1
+    assert f"File added: {name}" in result.stdout
 
 
 def test_deleted_execution_input_requires_clean_build(checkout: Path):
     (checkout / "src/dataeval/example.py").unlink()
-    assert run(checkout, "check").returncode == 1
+    result = run(checkout, "check")
+    assert result.returncode == 1
+    assert "File removed: src/dataeval/example.py" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -115,19 +123,65 @@ def test_notebook_prose_tests_and_generated_files_do_not_force_clean_build(check
     assert run(checkout, "check").returncode == 0
 
 
-@pytest.mark.parametrize("value", [None, "invalid json", "{}"])
-def test_legacy_or_invalid_manifest_requires_clean_build(checkout: Path, value: str | None):
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        (None, "Missing execution-input manifest"),
+        ("invalid json", "Invalid execution-input manifest"),
+        ("{}", "Invalid execution-input manifest"),
+        ("[]", "Invalid execution-input manifest"),
+        ('{"files": [], "environment": {}}', "Invalid execution-input manifest"),
+        ('{"files": {"src/example.py": null}, "environment": {}}', "Invalid execution-input manifest"),
+    ],
+)
+def test_legacy_or_invalid_manifest_requires_clean_build(checkout: Path, value: str | None, reason: str):
     manifest = checkout / MANIFEST
     if value is None:
         manifest.unlink()
     else:
         manifest.write_text(value)
-    assert run(checkout, "check").returncode == 1
+    result = run(checkout, "check")
+    assert result.returncode == 1
+    assert reason in result.stdout
+    assert "All notebooks will be re-executed" in result.stdout
+
+
+def test_unreadable_manifest_explains_why_cache_cannot_be_validated(checkout: Path):
+    manifest = checkout / MANIFEST
+    manifest.unlink()
+    manifest.mkdir()
+    result = run(checkout, "check")
+    assert result.returncode == 1
+    assert f"Cannot read execution-input manifest: {MANIFEST}" in result.stdout
 
 
 @pytest.mark.parametrize("name", ["DOCS_PYTHON_VERSION", "DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "DOCS_RUNNER_TAG"])
 def test_execution_environment_changes_require_clean_build(checkout: Path, name: str):
-    assert run(checkout, "check", **{name: "different"}).returncode == 1
+    previous = json.loads((checkout / MANIFEST).read_text())["environment"][name]
+    result = run(checkout, "check", **{name: "different"})
+    assert result.returncode == 1
+    assert f"Environment changed: {name}: {previous!r} -> 'different'" in result.stdout
+
+
+def test_cache_miss_reports_all_changes_and_restored_source(checkout: Path):
+    write(checkout, "src/dataeval/example.py", "changed\n")
+    write(checkout, "src/dataeval/new_module.py")
+    (checkout / "uv.lock").unlink()
+    write(checkout, "docs/source/.jupyter_cache/.cache_source", "docs-artifacts/main\n")
+    result = run(checkout, "check", DOCS_PYTHON_VERSION="different")
+    assert result.returncode == 1
+    assert "Restored cache source: docs-artifacts/main" in result.stdout
+    assert "File changed: src/dataeval/example.py" in result.stdout
+    assert "File added: src/dataeval/new_module.py" in result.stdout
+    assert "File removed: uv.lock" in result.stdout
+    assert "Environment changed: DOCS_PYTHON_VERSION:" in result.stdout
+
+
+def test_cache_hit_reports_reuse(checkout: Path):
+    result = run(checkout, "check")
+    assert result.returncode == 0
+    assert "reusing cached outputs" in result.stdout
+    assert "cache miss" not in result.stdout
 
 
 def test_missed_builds_remain_invalid_until_a_successful_build_records_inputs(checkout: Path):

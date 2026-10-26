@@ -56,6 +56,38 @@ def execution_inputs(root: Path) -> dict:
     }
 
 
+def cache_miss_reasons(previous: object, current: dict) -> list[str]:
+    """Describe differences without exposing long, unhelpful file hashes."""
+    if (
+        not isinstance(previous, dict)
+        or previous.keys() != current.keys()
+        or any(
+            not isinstance(previous[group], dict)
+            or any(not isinstance(key, str) or not isinstance(value, str) for key, value in previous[group].items())
+            for group in current
+        )
+    ):
+        return ["Invalid execution-input manifest: expected 'files' and 'environment' mappings of strings."]
+
+    reasons = []
+    old_files, new_files = previous["files"], current["files"]
+    for name in sorted(old_files.keys() | new_files.keys()):
+        if name not in old_files:
+            reasons.append(f"File added: {name}")
+        elif name not in new_files:
+            reasons.append(f"File removed: {name}")
+        elif old_files[name] != new_files[name]:
+            reasons.append(f"File changed: {name}")
+
+    old_env, new_env = previous["environment"], current["environment"]
+    for name in sorted(old_env.keys() | new_env.keys()):
+        if name not in old_env or name not in new_env or old_env[name] != new_env[name]:
+            before = repr(old_env[name]) if name in old_env else "<missing>"
+            after = repr(new_env[name]) if name in new_env else "<missing>"
+            reasons.append(f"Environment changed: {name}: {before} -> {after}")
+    return reasons
+
+
 def main() -> int:
     """Check before building, or record the inputs after a successful build."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -73,12 +105,28 @@ def main() -> int:
 
     try:
         previous = json.loads(manifest.read_text())
-    except (OSError, ValueError):
-        previous = None
-    if previous == current:
-        print("Notebook execution inputs match; reusing cached outputs.")
-        return 0
-    print("Notebook execution inputs changed or are missing; a clean build is required.")
+    except FileNotFoundError:
+        reasons = [f"Missing execution-input manifest: {MANIFEST}"]
+    except OSError as error:
+        reasons = [f"Cannot read execution-input manifest: {MANIFEST} ({error})"]
+    except ValueError as error:
+        reasons = [f"Invalid execution-input manifest: {MANIFEST} ({error})"]
+    else:
+        if previous == current:
+            print("Notebook execution inputs match; reusing cached outputs.")
+            return 0
+        reasons = cache_miss_reasons(previous, current)
+
+    print("Notebook execution cache miss; a clean build is required.")
+    try:
+        source = manifest.with_name(".cache_source").read_text().strip()
+    except OSError:
+        source = ""
+    if source:
+        print(f"  Restored cache source: {source}")
+    for reason in reasons:
+        print(f"  - {reason}")
+    print("All notebooks will be re-executed because the shared execution inputs could not be validated.")
     return 1
 
 
