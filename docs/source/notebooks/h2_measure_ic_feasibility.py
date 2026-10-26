@@ -139,6 +139,9 @@ assert 0.99 < 1 - ber_binary["upper_bound"] < 0.998
 # %% [markdown]
 # ## Next steps
 #
-# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand Bayes Error Rate and theoretical performance ceilings for classification tasks.
-# - [Assess whether a classification requirement is reachable](./tt_assess_ic_feasibility.py) — Judge whether classification requirements are reachable, with the evidence behind each answer.
-# - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model performance curves as a function of dataset size.
+# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand Bayes Error Rate and theoretical performance
+#   ceilings for classification tasks.
+# - [Assess whether a classification requirement is reachable](./tt_assess_ic_feasibility.py) — Judge whether
+#   classification requirements are reachable, with the evidence behind each answer.
+# - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model
+#   performance curves as a function of dataset size.

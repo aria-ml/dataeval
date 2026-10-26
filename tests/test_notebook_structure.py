@@ -12,11 +12,13 @@ catch by eye:
 * Next steps: the entry form, the counts the guide allows and a link text that is the title of its target.
 * Voice: no em dash outside a Next steps entry, contraction, first person, "corpus", stress word or italics, no bold
   label or bold table row label, and sentence case in table column headings.
+* Width: no Markdown line over 120 columns, counting the ``# `` of the file. A table row, a metadata line of a
+  tutorial and a line that is one unbreakable token, such as a URL, pass.
 
 A how-to over 600 words warns and does not fail, because the guide leaves that limit to review.
 
 The voice checks skip code spans, roles, link targets, math and fenced code. How plain a sentence is, whether bold marks
-the first mention of a term, descriptions, the width of the text and what a section teaches stay with review.
+the first mention of a term, descriptions and what a section teaches stay with review.
 """
 
 import functools
@@ -38,6 +40,7 @@ MAX_HOWTO_WORDS = 600
 NEXT_STEPS_RANGE = {"tutorial": (2, 4), "how-to": (2, 3)}
 MAX_CONCEPT_LINKS = 2
 MAX_NOTEBOOK_LINKS = 2
+MAX_LINE_COLUMNS = 120
 
 # The tutorial sections in the order the guide gives them. "What you learned" is optional.
 TUTORIAL_SECTIONS = [
@@ -130,6 +133,7 @@ VOICE_RULES = [
     ),
     ("bold row label in a table", re.compile(r"^\s*\|\s*\*\*")),
 ]
+UNBREAKABLE = re.compile(r"^\s*(?:(?:[-*+]|\d+[.)])\s+)?\S+$")
 TABLE_SEPARATOR = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$")
 
 
@@ -432,6 +436,21 @@ def voice_problems(nb: Notebook) -> list[str]:
     return problems
 
 
+def width_problems(nb: Notebook) -> list[str]:
+    """Markdown lines over 120 columns in the file, which counts the ``# `` that ``Line.text`` leaves out.
+
+    A table row passes, as it does for markdownlint, and so does a line that is one unbreakable token, such as a URL.
+    The three metadata lines of a tutorial stay on one line each, so they pass too.
+    """
+    problems: list[str] = []
+    for line in nb.lines:
+        raw = f"# {line.text}" if line.text else "#"
+        exempt = line.text.startswith(("|", *METADATA_PREFIXES)) or UNBREAKABLE.match(line.text)
+        if len(raw) > MAX_LINE_COLUMNS and not exempt:
+            problems.append(f"{len(raw)} columns, wrap at {MAX_LINE_COLUMNS}: {line.text.strip()[:70]}")
+    return problems
+
+
 def _report(check: str, problems: dict[str, list[str]]) -> str:
     lines = [f"{check}:"]
     for name, items in problems.items():
@@ -555,6 +574,34 @@ def test_the_voice_checks_are_wired_up():
         "#\n# ## Next steps\n#\n# - [Title](./x.py) — Description.\n",
     )
     assert voice_problems(good) == []
+
+
+@pytest.mark.required
+def test_the_width_check_is_wired_up():
+    """Guard against the width check matching nothing, or flagging a table row, a lone URL or a line at the limit."""
+    words = " ".join(["word"] * 30)
+    url_line = f"word https://example.com/{'a' * 110}"
+    text = (
+        "# %% [markdown]\n# # How to wrap\n#\n"
+        f"# {'x' * 118}\n"  # 120 columns with the '# ' is allowed
+        f"# {words}\n"
+        f"# | {words} | y |\n"
+        f"# https://example.com/{'a' * 130}\n"
+        f"# - https://example.com/{'a' * 130}\n"
+        f"# Relevant personas: {words}\n"
+        f"# {url_line}\n"
+    )
+    assert width_problems(parse("h2_wrap.py", text)) == [
+        f"{len(words) + 2} columns, wrap at 120: {words[:70]}",
+        f"{len(url_line) + 2} columns, wrap at 120: {url_line[:70]}",
+    ]
+
+
+@pytest.mark.required
+def test_markdown_cells_wrap_at_120_columns():
+    """No Markdown line of a tutorial or how-to is over 120 columns, as for the Markdown pages."""
+    failures = _failures(width_problems)
+    assert not failures, _report("Lines over 120 columns", failures)
 
 
 @pytest.mark.required

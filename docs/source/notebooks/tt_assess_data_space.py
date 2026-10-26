@@ -188,8 +188,8 @@ output = cluster(embeddings)
 #
 # ### Duplicates
 #
-# The `Duplicates` detector's `from_clusters` method can identify data points that are within certain distances from each
-# other in the embedding space.
+# The `Duplicates` detector's `from_clusters` method can identify data points that are within certain distances from
+# each other in the embedding space.
 #
 # This tutorial does not focus on duplicates, because no exact duplicates are found in the PASCAL 2012 VOC dataset.
 #
@@ -372,18 +372,23 @@ assert len(cov["uncovered_indices"]) > 0
 #
 # ## What you learned
 #
-# - Applied cluster-based feature space metrics ({func}`.cluster`, {class}`.Outliers`, {func}`.coverage_adaptive`) to evaluate unlabeled imagery.
-# - Differentiated between corrupt/irrelevant outliers (candidates for pruning) and underrepresented operational edge cases (candidates for targeted collection).
+# - Applied cluster-based feature space metrics ({func}`.cluster`, {class}`.Outliers`, {func}`.coverage_adaptive`) to
+#   evaluate unlabeled imagery.
+# - Differentiated between corrupt/irrelevant outliers (candidates for pruning) and underrepresented operational edge
+#   cases (candidates for targeted collection).
 # - Combined outlier and coverage flags to choose between removing images and collecting more data.
 
 # %% [markdown]
 # ## Next steps
 #
 # - [Clustering](../concepts/Clustering.md) — Mathematical foundations of minimum spanning tree linkage clustering.
-# - [Measuring coverage: geometry in embedding space](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Read how naive and adaptive coverage find the images in sparse regions of the space.
+# - [Measuring coverage: geometry in embedding
+#   space](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Read how naive and adaptive
+#   coverage find the images in sparse regions of the space.
 # - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster a dataset and find outliers and near duplicates
 #   in the clusters.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find the regions of a dataset that few images cover.
+# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find the regions of a dataset that few
+#   images cover.
 
 # %% [markdown]
 # ## On your own

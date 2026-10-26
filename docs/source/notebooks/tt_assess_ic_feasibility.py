@@ -218,8 +218,8 @@ assert test_x.shape == (1621, 768)
 # remove every test image whose family includes a training image, and keep one image per remaining family.
 #
 # :::{dropdown} How the repeats are found
-# DataEval's {class}`.Duplicates` compares image fingerprints, which catch exact copies and resaved or resized ones. They
-# miss some crops, padded borders, watermarks and mirror images, so two images also count as repeats when their
+# DataEval's {class}`.Duplicates` compares image fingerprints, which catch exact copies and resaved or resized ones.
+# They miss some crops, padded borders, watermarks and mirror images, so two images also count as repeats when their
 # embeddings have a **cosine similarity** (1 means identical) of at least 0.95. Check what that threshold catches before
 # reusing it with another image model or dataset.
 # :::
@@ -640,10 +640,14 @@ dep.plot(tank_result, plot_evidence=True)
 # %% [markdown]
 # ## Next steps
 #
-# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand the determinations, information scopes and recommendations of `Feasibility`.
-# - [Feasibility Evidence](../concepts/FeasibilityEvidence.md) — Learn how each kind of evidence is built and what its details hold.
-# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Estimate the Bayes error rate with `ber_mst` and check an accuracy requirement against it.
-# - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model performance curves as a function of dataset size.
+# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand the determinations, information scopes and
+#   recommendations of `Feasibility`.
+# - [Feasibility Evidence](../concepts/FeasibilityEvidence.md) — Learn how each kind of evidence is built and what its
+#   details hold.
+# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Estimate the Bayes error rate
+#   with `ber_mst` and check an accuracy requirement against it.
+# - [How to measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model
+#   performance curves as a function of dataset size.
 
 # %% [markdown]
 # ## On your own

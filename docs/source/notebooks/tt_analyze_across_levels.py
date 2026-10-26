@@ -342,9 +342,9 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 # resides in. Setting `inherited=False` isolates these factors. This enables you to measure variation among the objects
 # themselves, without the results being diluted by the replicated columns of image-level drone telemetry.
 #
-# Together, these two parameters form a simple matrix (as detailed in
-# [Choosing which factors to analyze: inherited](../concepts/MetadataLevels.md#choosing-which-factors-to-analyze-inherited)).
-# The view defines the rows, `inherited` restricts the columns, and the intersection dictates the analysis scope:
+# Together, these two parameters form a simple matrix (as detailed in [Choosing which factors to analyze:
+# inherited](../concepts/MetadataLevels.md#choosing-which-factors-to-analyze-inherited)). The view defines the rows,
+# `inherited` restricts the columns, and the intersection dictates the analysis scope:
 #
 # | View | `inherited=True` (default) | `inherited=False` |
 # | --- | --- | --- |

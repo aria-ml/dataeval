@@ -537,15 +537,20 @@ assert max(row["mi_value"] for (_, factor), row in cells.items() if factor == "u
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Learn about the full statistics vocabulary and what per_background computes.
-# - [Metadata Levels](../concepts/MetadataLevels.md) — Understand why the background is stored at the unit level and how it reaches instance rows.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Learn how to choose flags and read source_index for object detection statistics.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Learn about the full statistics vocabulary and what per_background
+#   computes.
+# - [Metadata Levels](../concepts/MetadataLevels.md) — Understand why the background is stored at the unit level and how
+#   it reaches instance rows.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Learn
+#   how to choose flags and read source_index for object detection statistics.
 #
 # %% [markdown]
 # ## On your own
 #
 # Try applying these scene-relative analysis techniques to your own dataset:
 #
-# - Test `image_stats` with `per_background=True` on a dataset with larger or more frequent target objects to see how `background_fraction` behaves when targets occupy a larger portion of the frame.
-# - Divide `instance_` statistics by their `unit_` counterparts to compare targets across scenes captured under varying environmental conditions (e.g. lighting or weather).
+# - Test `image_stats` with `per_background=True` on a dataset with larger or more frequent target objects to see how
+#   `background_fraction` behaves when targets occupy a larger portion of the frame.
+# - Divide `instance_` statistics by their `unit_` counterparts to compare targets across scenes captured under varying
+#   environmental conditions (e.g. lighting or weather).
 # - Run {class}`.Balance` on your own dataset to verify whether background factors correlate with target class labels.

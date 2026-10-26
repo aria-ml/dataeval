@@ -16,17 +16,17 @@
 # %% [markdown]
 # # How to reconcile labels against an ontology
 #
-# A dataset's class names belong to a domain taxonomy: "sedan" and "pickup truck" are both land vehicles, and "fighter jet" is
-# an aircraft. {func}`.label_reconciliation` matches class names against a reference {class}`.Ontology` and recovers their
-# place in its hierarchy. See [Ontology](../concepts/Ontology.md).
+# A dataset's class names belong to a domain taxonomy: "sedan" and "pickup truck" are both land vehicles, and "fighter
+# jet" is an aircraft. {func}`.label_reconciliation` matches class names against a reference {class}`.Ontology` and
+# recovers their place in its hierarchy. See [Ontology](../concepts/Ontology.md).
 #
 # Use it when you have a set of class names and a reference ontology, and you want to:
 #
 # - check which names map to known concepts, and which are unmatched or ambiguous
 # - recover each class's is-a path and its relationships to the other classes
 #
-# Matching is exact on preferred labels, synonyms and ids, and an unmatched label means "not found," not "invalid." Reading
-# RDF, OWL or JSON-LD needs `dataeval[ontology]`.
+# Matching is exact on preferred labels, synonyms and ids, and an unmatched label means "not found," not "invalid."
+# Reading RDF, OWL or JSON-LD needs `dataeval[ontology]`.
 
 # %% tags=["remove_cell"]
 try:

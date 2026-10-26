@@ -17,13 +17,14 @@
 # # How to detect undersampled data subsets
 #
 # Most computer vision datasets have many images, but some subsets, such as a label or a style within a label, can be
-# undersampled. [Coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) analysis finds this
-# regional sparsity, and the {class}`.Coverage` evaluator returns example images that have few similar instances in the dataset.
+# undersampled. [Coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) analysis finds
+# this regional sparsity, and the {class}`.Coverage` evaluator returns example images that have few similar instances in
+# the dataset.
 #
 # Use it when you have many images but only a small fraction from certain regimes or labels.
 #
-# You need an image classification dataset, a model that turns each image into an embedding, `dataeval` and `tabulate`. This
-# guide uses an autoencoder trained on MNIST, which stands in for your own model.
+# You need an image classification dataset, a model that turns each image into an embedding, `dataeval` and `tabulate`.
+# This guide uses an autoencoder trained on MNIST, which stands in for your own model.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -104,9 +105,9 @@ subset = View(train_ds, Limit(2000))
 #
 # In this how-to, you use an autoencoder to reduce the dimension of the MNIST images.
 #
-# The autoencoder stands in for the model that you would use on your own data. Any extractor works, such as a pre-trained
-# network or an autoencoder trained on your dataset. The [Embeddings](../concepts/Embeddings.md#choose-an-extractor)
-# page lists the extractors.
+# The autoencoder stands in for the model that you would use on your own data. Any extractor works, such as a
+# pre-trained network or an autoencoder trained on your dataset. The
+# [Embeddings](../concepts/Embeddings.md#choose-an-extractor) page lists the extractors.
 
 
 # %% tags=["hide-input"]
@@ -237,6 +238,9 @@ assert (wonky / 20) > 0.4
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias, representation, and coverage geometry.
-# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover structure, clusters, and coverage in unlabeled datasets.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias, representation, and coverage
+#   geometry.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover structure, clusters, and coverage in
+#   unlabeled datasets.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free
+#   extractor.

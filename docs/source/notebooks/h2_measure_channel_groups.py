@@ -281,6 +281,9 @@ assert set(per_group) == {"width", "channels", "rgb_brightness", "rgb_xxhash", "
 # %% [markdown]
 # ## Next steps
 #
-# - [Image Statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across channels.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Compute custom bounding box and image statistics for object detection tasks.
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Add domain-specific intrinsic factors to Metadata for deeper analysis.
+# - [Image Statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across
+#   channels.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) —
+#   Compute custom bounding box and image statistics for object detection tasks.
+# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Add domain-specific intrinsic factors to
+#   Metadata for deeper analysis.

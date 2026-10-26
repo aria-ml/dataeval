@@ -16,8 +16,8 @@
 # %% [markdown]
 # # How to create embeddings
 #
-# Most DataEval analyses that group or compare images start from [embeddings](../concepts/Embeddings.md), one vector for each
-# image. You choose an extractor, then pass the dataset and the extractor to {class}`.Embeddings`.
+# Most DataEval analyses that group or compare images start from [embeddings](../concepts/Embeddings.md), one vector for
+# each image. You choose an extractor, then pass the dataset and the extractor to {class}`.Embeddings`.
 #
 # Use this guide when you want to:
 #
@@ -70,8 +70,9 @@ print(f"Shape of the first image: {subset[0][0].shape}")
 # {class}`.Embeddings`. Two arguments of the extractor decide what the embeddings are:
 #
 # - `transforms` applies the preprocessing the model was trained with. Torchvision publishes it with the weights.
-# - `layer_name` selects the layer whose output becomes the embedding. Without it, the extractor returns the model output,
-#   which for ResNet18 is 1000 ImageNet class scores and not image features. `avgpool` is the layer before the classifier.
+# - `layer_name` selects the layer whose output becomes the embedding. Without it, the extractor returns the model
+#   output, which for ResNet18 is 1000 ImageNet class scores and not image features. `avgpool` is the layer before the
+#   classifier.
 #
 # `batch_size` on `Embeddings` sets how many images are loaded and encoded at a time. It does not change the embeddings
 # except for differences in the last digits, which come from floating-point rounding.
@@ -97,8 +98,8 @@ print(f"Embeddings shape: {torch_embeddings.shape}")
 # Export the pre-trained ResNet18 to ONNX. If you already have an ONNX model, skip the export and start at
 # `to_encoding_model`.
 #
-# Export a fresh copy of the weights. `TorchExtractor` moves the model it receives to the configured device, so the model
-# above is not the one to export.
+# Export a fresh copy of the weights. `TorchExtractor` moves the model it receives to the configured device, so the
+# model above is not the one to export.
 
 # %%
 model_path = Path("data") / "resnet18.onnx"
@@ -195,8 +196,8 @@ assert bovw_embeddings.shape == (100, 64)
 # :::{note}
 #
 # `Embeddings` stores one row for each image. An extractor that returns one row for each detection, such as a detection
-# model wrapped in {class}`.ScoresExtractor`, cannot be wrapped in it, and `Embeddings` raises an error when the number of
-# rows differs from the number of images. Give those extractors straight to a drift detector.
+# model wrapped in {class}`.ScoresExtractor`, cannot be wrapped in it, and `Embeddings` raises an error when the number
+# of rows differs from the number of images. Give those extractors straight to a drift detector.
 #
 # :::
 
@@ -204,5 +205,8 @@ assert bovw_embeddings.shape == (100, 64)
 # ## Next steps
 #
 # - [Embeddings](../concepts/Embeddings.md) — Learn what embeddings represent and how they are used across DataEval.
-# - [Feature extractors: a dependency of both layers](../concepts/ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers) — See what each extractor embeds and how each can mislead a metric.
-# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings to find groups, outliers and duplicates.
+# - [Feature extractors: a dependency of both
+#   layers](../concepts/ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers) — See what each extractor
+#   embeds and how each can mislead a metric.
+# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings to find groups, outliers and
+#   duplicates.

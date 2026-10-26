@@ -16,13 +16,14 @@
 # %% [markdown]
 # # How to configure logging with DataEval
 #
-# DataEval logs through Python's standard `logging` module, on a `dataeval` logger and its subsystem loggers. Attach handlers to
-# send the messages to the console or to a file. DataEval primarily logs at the DEBUG, INFO and WARNING levels.
+# DataEval logs through Python's standard `logging` module, on a `dataeval` logger and its subsystem loggers. Attach
+# handlers to send the messages to the console or to a file. DataEval primarily logs at the DEBUG, INFO and WARNING
+# levels.
 #
 # Use this guide when you want to see what DataEval is doing, debug an issue, or save logs for later analysis.
 #
-# You need `dataeval` and a basic understanding of Python's logging module. The examples run `ber_knn` and `ber_mst` on random
-# blobs.
+# You need `dataeval` and a basic understanding of Python's logging module. The examples run `ber_knn` and `ber_mst` on
+# random blobs.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -69,8 +70,8 @@ dataeval_logger.setLevel(logging.DEBUG)
 result = ber_mst(embeddings, labels)
 
 # %% [markdown]
-# For a quick look, {func}`dataeval.log` attaches a verbose console handler in one call. Calling it again reuses that handler and
-# only sets the level.
+# For a quick look, {func}`dataeval.log` attaches a verbose console handler in one call. Calling it again reuses that
+# handler and only sets the level.
 
 # %% [markdown]
 # ## Log to a file
@@ -97,8 +98,8 @@ log_file.unlink()
 # %% [markdown]
 # ## Narrow the output by subsystem
 #
-# Every DataEval log record is emitted on `dataeval` or one of its subsystem loggers, so configuring `dataeval` alone captures
-# everything. To narrow the output, set a level or attach a handler on a subsystem instead:
+# Every DataEval log record is emitted on `dataeval` or one of its subsystem loggers, so configuring `dataeval` alone
+# captures everything. To narrow the output, set a level or attach a handler on a subsystem instead:
 #
 # | Namespace | Covers |
 # | --- | --- |
@@ -117,8 +118,8 @@ log_file.unlink()
 # logging.getLogger("dataeval.metadata").setLevel(logging.DEBUG)
 # ```
 #
-# The names do not follow DataEval's file layout, and a few, such as `dataeval.metadata` and `dataeval.embeddings`, have no
-# importable module of the same name. Each record carries its file and line whichever logger it lands on. Include
+# The names do not follow DataEval's file layout, and a few, such as `dataeval.metadata` and `dataeval.embeddings`, have
+# no importable module of the same name. Each record carries its file and line whichever logger it lands on. Include
 # `%(filename)s:%(lineno)s` in your formatter to see them.
 
 # %% [markdown]
@@ -135,5 +136,7 @@ logging.disable(logging.NOTSET)
 # %% [markdown]
 # ## Next steps
 #
-# - [Clean a dataset](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates, outliers, and corrupted data.
-# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Set global default device, batch size, worker processes, and seed.
+# - [Clean a dataset](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates,
+#   outliers, and corrupted data.
+# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Set global default device, batch size,
+#   worker processes, and seed.

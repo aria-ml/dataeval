@@ -16,12 +16,12 @@
 # %% [markdown]
 # # How to find outliers that depend on their context
 #
-# Some values are ordinary across the whole dataset and wrong only in context. A threshold fitted to a whole level passes them,
-# because each value is common somewhere. {class}`~dataeval.quality.Outliers` judges a value against its context instead. See
-# [Data Integrity](../concepts/DataIntegrity.md).
+# Some values are ordinary across the whole dataset and wrong only in context. A threshold fitted to a whole level
+# passes them, because each value is common somewhere. {class}`~dataeval.quality.Outliers` judges a value against its
+# context instead. See [Data Integrity](../concepts/DataIntegrity.md).
 #
-# Use it after [How to find outliers in metadata factors](./h2_find_factor_outliers.py), when a single threshold per factor is not
-# enough.
+# Use it after [How to find outliers in metadata factors](./h2_find_factor_outliers.py), when a single threshold per
+# factor is not enough.
 #
 # You need `dataeval` and `maite-datasets`.
 
@@ -65,8 +65,8 @@ pl.Config.set_tbl_width_chars(160)
 # %% [markdown]
 # ## Build an example with known problems
 #
-# The example builds eight 200-frame videos of cars and a truck, with a bus in video 3 for 12 frames. Each argument gets one planted
-# problem:
+# The example builds eight 200-frame videos of cars and a truck, with a bus in video 3 for 12 frames. Each argument gets
+# one planted problem:
 #
 # | Argument | Planted in the example |
 # | --- | --- |
@@ -76,8 +76,8 @@ pl.Config.set_tbl_width_chars(160)
 # | `combinations=` | a large box near the horizon |
 # | `neighbors=` | a frame's exposure out of line with its video |
 #
-# The factors are `weather`, `hour`, `brightness` and `exposure` for each frame, and `vehicle`, `box_y` and `box_size` for each
-# detection.
+# The factors are `weather`, `hour`, `brightness` and `exposure` for each frame, and `vehicle`, `box_y` and `box_size`
+# for each detection.
 
 # %% tags=["hide-input"]
 N_VIDEOS, N_FRAMES, HEIGHT, WIDTH = 8, 200, 72, 96
@@ -188,8 +188,8 @@ by_vehicle = Outliers().evaluate(metadata, levels="instance", factors=boxes, str
 display(by_vehicle.data().select("item_index", "target_index", "metric_name", "metric_value", "bound", "population"))
 
 # %% [markdown]
-# A threshold needs at least 20 rows. The bus stratum has 12 detections, so `populations` shows it was not judged. Check it before reading
-# an empty result as clean.
+# A threshold needs at least 20 rows. The bus stratum has 12 detections, so `populations` shows it was not judged. Check
+# it before reading an empty result as clean.
 
 # %%
 display(by_vehicle.populations)
@@ -197,22 +197,22 @@ display(by_vehicle.populations)
 # %% [markdown]
 # ### Find rare categorical values
 #
-# With `strata=`, `Outliers` judges a categorical factor by rarity: a value is flagged when an exact binomial test shows it occurs in
-# less than 5 % of its stratum. Stratify the frames by video with the reserved `item_index` column.
+# With `strata=`, `Outliers` judges a categorical factor by rarity: a value is flagged when an exact binomial test shows
+# it occurs in less than 5 % of its stratum. Stratify the frames by video with the reserved `item_index` column.
 
 # %%
 rare = Outliers().evaluate(metadata, levels="unit", factors=["weather"], strata=["item_index"])
 display(rare.data().select("item_index", "target_index", "observed", "population", "metric_value", "bound"))
 
 # %% [markdown]
-# The planted snow frame is flagged and the snowy video is not, because snow is its common value. A stratum needs at least 93 rows
-# before one occurrence can be judged rare.
+# The planted snow frame is flagged and the snowy video is not, because snow is its common value. A stratum needs at
+# least 93 rows before one occurrence can be judged rare.
 
 # %% [markdown]
 # ## Judge one factor given another
 #
-# Brightness depends on the hour, so a single threshold passes a daylight value at night. Pass `given=` to judge `brightness` against
-# the frames nearest in `hour`.
+# Brightness depends on the hour, so a single threshold passes a daylight value at night. Pass `given=` to judge
+# `brightness` against the frames nearest in `hour`.
 
 # %%
 with use_seed(0):
@@ -233,8 +233,8 @@ display(strict.data().select("item_index", "target_index", "metric_name", "metri
 # %% [markdown]
 # ## Find unusual combinations of factors
 #
-# A box near the horizon at the size of a nearby car has an ordinary size and position, and only the pair is unusual. Pass
-# `combinations=` to score a group of factors by its robust Mahalanobis distance within each stratum.
+# A box near the horizon at the size of a nearby car has an ordinary size and position, and only the pair is unusual.
+# Pass `combinations=` to score a group of factors by its robust Mahalanobis distance within each stratum.
 
 # %%
 with use_seed(0):
@@ -249,8 +249,8 @@ display(
 )
 
 # %% [markdown]
-# The box near the horizon (video 6) is flagged by the pair and by neither factor alone, and the truck-sized car (video 2) by the pair
-# and by `box_size`.
+# The box near the horizon (video 6) is flagged by the pair and by neither factor alone, and the truck-sized car
+# (video 2) by the pair and by `box_size`.
 
 # %% [markdown]
 # ## Judge a value against its neighbors
@@ -261,8 +261,8 @@ display(
 print(len(Outliers().evaluate(metadata, levels="unit", factors=["exposure"])))
 
 # %% [markdown]
-# Pass `neighbors=` to compare each frame with up to five frames on each side of it in its video. A detection's factor is compared
-# along its track instead.
+# Pass `neighbors=` to compare each frame with up to five frames on each side of it in its video. A detection's factor
+# is compared along its track instead.
 
 # %%
 along = Outliers().evaluate(metadata, levels="unit", factors=["exposure"], neighbors=["exposure", "time_s"])
@@ -309,6 +309,8 @@ assert along.data().filter(pl.col("metric_name") == "time_s along sequence")["ta
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Learn the population floor, stratification, rarity, combinations and neighbor checks.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Learn the population floor, stratification, rarity, combinations
+#   and neighbor checks.
 # - [How to find outliers in metadata factors](./h2_find_factor_outliers.py) — Threshold single factors at each level.
-# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or detection a `SourceIndex` names.
+# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or
+#   detection a `SourceIndex` names.

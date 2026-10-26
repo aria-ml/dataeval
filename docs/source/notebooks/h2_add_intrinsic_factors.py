@@ -140,6 +140,9 @@ assert moments.sort("diversity_value")["factor_name"][0] == "kurtosis"
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
-# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
-# - [How to control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare the cuts you mean and apply them unchanged to the next dataset.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact
+#   model reliability.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
+#   dataset bias.
+# - [How to control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare the cuts you mean and apply
+#   them unchanged to the next dataset.

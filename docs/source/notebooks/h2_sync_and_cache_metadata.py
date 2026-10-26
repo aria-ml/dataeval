@@ -143,5 +143,7 @@ assert reloaded.rows_at("instance")["item_index"].to_list() == metadata.rows_at(
 # ## Next steps
 #
 # - [Metadata Levels](../concepts/MetadataLevels.md) — Explore dataset, datum, and factor levels in DataEval metadata.
-# - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across unit, instance, and background factors.
-# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view transformations.
+# - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across
+#   unit, instance, and background factors.
+# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view
+#   transformations.

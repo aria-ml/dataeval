@@ -222,6 +222,9 @@ assert any("bins unused" in str(warning.message) for warning in caught)
 # %% [markdown]
 # ## Next steps
 #
-# - [Binning](../concepts/Binning.md) — Understand how binning choices change bias scores and when a cut is a claim about the world.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
-# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
+# - [Binning](../concepts/Binning.md) — Understand how binning choices change bias scores and when a cut is a claim
+#   about the world.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact
+#   model reliability.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
+#   dataset bias.

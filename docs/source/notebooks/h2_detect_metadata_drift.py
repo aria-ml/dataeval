@@ -16,9 +16,9 @@
 # %% [markdown]
 # # How to detect drift in metadata factors
 #
-# Embedding-space drift detection reports that features drifted but not what changed. Metadata factors such as altitude and
-# camera angle give checkable, human-readable drift statements: a {class}`.Metadata` extractor plugs into a drift detector, and
-# the p-values map back to named factors. See [Distribution Shift](../concepts/DistributionShift.md).
+# Embedding-space drift detection reports that features drifted but not what changed. Metadata factors such as altitude
+# and camera angle give checkable, human-readable drift statements: a {class}`.Metadata` extractor plugs into a drift
+# detector, and the p-values map back to named factors. See [Distribution Shift](../concepts/DistributionShift.md).
 #
 # Use it to:
 #
@@ -81,8 +81,8 @@ print(f"operational (2021): {len(operational):4d} frames")
 # %% [markdown]
 # ## Make both campaigns agree on the factor set
 #
-# Flight telemetry is recorded once per frame, but object detection datasets default to one row per detection. Set `view="unit"`
-# to analyze the factors at the image level. See [Metadata levels](../concepts/MetadataLevels.md).
+# Flight telemetry is recorded once per frame, but object detection datasets default to one row per detection. Set
+# `view="unit"` to analyze the factors at the image level. See [Metadata levels](../concepts/MetadataLevels.md).
 
 # %%
 # `storage` names the folder each clip came from: it identifies the source rather than
@@ -98,9 +98,10 @@ print(Metadata(reference, view="unit", exclude=EXCLUDE).dropped_factors)
 # - `latitude` and `longitude` are `mixed_types`: most rows hold a number, but 25 hold the letter `'N'` or `'E'`.
 # - `date_time` is `cardinality_over_budget`: every row holds a different timestamp, so there is nothing to group.
 #
-# {meth}`~.Metadata.repair` declares the reading that turns such a column into a factor. Repair the `mixed_types` pair before you
-# compare: only the 2020 rows carry the letters, so the reference would hold `latitude` and `longitude` back while the 2021 stream
-# read them as factors, and a feature-wise detector needs the same factors on both sides, in the same order.
+# {meth}`~.Metadata.repair` declares the reading that turns such a column into a factor. Repair the `mixed_types` pair
+# before you compare: only the 2020 rows carry the letters, so the reference would hold `latitude` and `longitude` back
+# while the 2021 stream read them as factors, and a feature-wise detector needs the same factors on both sides, in the
+# same order.
 
 # %%
 # The letters mean "no reading was taken", as `-1` does in this dataset's numeric columns.
@@ -114,14 +115,14 @@ COORDINATES = [
 print(Metadata(reference, view="unit", exclude=EXCLUDE).repair(COORDINATES).dropped_factors)
 
 # %% [markdown]
-# Only `date_time` is still dropped, and both campaigns now read the same fourteen factors. To repair a column like `date_time`, see
-# [Identify bias and correlations](./tt_identify_bias.py).
+# Only `date_time` is still dropped, and both campaigns now read the same fourteen factors. To repair a column like
+# `date_time`, see [Identify bias and correlations](./tt_identify_bias.py).
 
 # %% [markdown]
 # ## Run the detector
 #
-# Build a reusable {class}`.Metadata` extractor. The first call fits the reference and records the cuts and vocabularies, so the
-# operational stream maps to the same bins. To declare the cuts yourself, see
+# Build a reusable {class}`.Metadata` extractor. The first call fits the reference and records the cuts and
+# vocabularies, so the operational stream maps to the same bins. To declare the cuts yourself, see
 # [How to control and reuse a factor's binning](./h2_control_factor_binning.py).
 
 # %%
@@ -135,8 +136,8 @@ p_values = np.asarray(result.details["p_vals"])
 print(f"drifted: {result.drifted}   {feature_drift.sum()} of {len(feature_drift)} factors")
 
 # %% [markdown]
-# {class}`.Metadata` implements the {class}`~dataeval.protocols.NamedFeatureExtractor` protocol, so you can map positional
-# outputs such as `p_vals` to factor names.
+# {class}`.Metadata` implements the {class}`~dataeval.protocols.NamedFeatureExtractor` protocol, so you can map
+# positional outputs such as `p_vals` to factor names.
 
 # %%
 factor_names = list(result.feature_names)
@@ -177,8 +178,8 @@ def describe(key: str) -> None:
 describe("gimbal_pitch")
 
 # %% [markdown]
-# The camera did not move. The median angle is nearly identical, but a quarter of the 2021 frames failed to record telemetry and
-# defaulted to `-1`. The binner treats `-1` as a valid number, so the alarm is spurious.
+# The camera did not move. The median angle is nearly identical, but a quarter of the 2021 frames failed to record
+# telemetry and defaulted to `-1`. The binner treats `-1` as a valid number, so the alarm is spurious.
 
 # %% [markdown]
 # ## Fix the data, not the threshold
@@ -211,9 +212,9 @@ comparison = before_df.join(after_df, on="factor", how="inner").with_columns(
 print(comparison.sort("changed", descending=True))
 
 # %% [markdown]
-# Four verdicts flip. `gimbal_pitch` no longer registers as drifted, so the earlier result was a false alarm caused by missing
-# data. `drone` now registers as drifted, a real change in the airframe mix that the missing rows had hidden. `width` and
-# `height` stop drifting.
+# Four verdicts flip. `gimbal_pitch` no longer registers as drifted, so the earlier result was a false alarm caused by
+# missing data. `drone` now registers as drifted, a real change in the airframe mix that the missing rows had hidden.
+# `width` and `height` stop drifting.
 
 # %%
 for label, indices in by_year.items():
@@ -225,9 +226,9 @@ for label, indices in by_year.items():
     print(f"        altitude p25={np.percentile(altitudes, 25):5.1f}  p75={np.percentile(altitudes, 75):5.1f}")
 
 # %% [markdown]
-# The collection context confirms each finding: `drone` drifts because the drone types changed, `width` and `height` stop drifting
-# because the surviving frames share one resolution, and `altitude` still drifts in range and spread more than in median. The
-# `item_index` column of {attr}`~.Metadata.dataframe` locates the frames behind any row, and
+# The collection context confirms each finding: `drone` drifts because the drone types changed, `width` and `height`
+# stop drifting because the surviving frames share one resolution, and `altitude` still drifts in range and spread more
+# than in median. The `item_index` column of {attr}`~.Metadata.dataframe` locates the frames behind any row, and
 # [How to trace a finding back to its source](./h2_trace_findings_to_source.py) retrieves and shows them.
 
 # %% tags=["remove_cell"]
@@ -245,6 +246,9 @@ assert set(comparison.filter(pl.col("changed"))["factor"]) == {"drone", "gimbal_
 # %% [markdown]
 # ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across datasets.
-# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and operational data.
-# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the specific frames associated with a drift finding.
+# - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across
+#   datasets.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and
+#   operational data.
+# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the specific frames
+#   associated with a drift finding.

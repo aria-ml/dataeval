@@ -65,7 +65,8 @@
 #
 # You should use a custom class axis when:
 #
-# - You need to evaluate balance, diversity, or parity across environmental or operational conditions (such as weather, site, or sensor platform).
+# - You need to evaluate balance, diversity, or parity across environmental or operational conditions (such as weather,
+#   site, or sensor platform).
 # - A class and an environmental factor co-occur, and you need to determine which one drives an observed imbalance.
 # - You want to identify uncollected or undersampled combinations of conditions across multiple metadata factors.
 # - You need to perform bias analysis at the image or video level on multi-object datasets.
@@ -208,7 +209,8 @@ print(f"class axis: {metadata.class_axis} ({metadata.class_axis_source})")
 # %% [markdown]
 # ## Pivot to a single metadata factor
 #
-# Call {meth}`.Metadata.classed_by` to create a copy of the metadata configured with a new class axis. The original metadata object remains unchanged.
+# Call {meth}`.Metadata.classed_by` to create a copy of the metadata configured with a new class axis. The original
+# metadata object remains unchanged.
 
 # %%
 by_weather = metadata.classed_by("weather")
@@ -222,7 +224,8 @@ print(f"original: {metadata.class_axis} ({metadata.class_axis_source})")
 #
 # 1. `class_labels` contains the integer codes of the new axis (`weather`) rather than the original class labels.
 # 2. `index2label` maps those codes to group names (`clear`, `rainy`, `foggy`).
-# 3. The pivoted factor (`weather`) is removed from `factor_names` to prevent self-correlation, and the original label set is added as a factor named `class`.
+# 3. The pivoted factor (`weather`) is removed from `factor_names` to prevent self-correlation, and the original label
+#    set is added as a factor named `class`.
 
 # %%
 print(f"before: {list(metadata.factor_names)}")
@@ -231,14 +234,16 @@ print(f"after:  {list(by_weather.factor_names)}")
 # %% [markdown]
 # ## Evaluate balance across the custom axis
 #
-# You will now evaluate {class}`.Balance` against the `weather` axis. Because the original class labels are now a factor named `class`, you can measure how much weather correlates with the object classes present.
+# You will now evaluate {class}`.Balance` against the `weather` axis. Because the original class labels are now a factor
+# named `class`, you can measure how much weather correlates with the object classes present.
 
 # %%
 result = Balance().evaluate(by_weather)
 print(result.balance)
 
 # %% [markdown]
-# In the output above, both `class` and `altitude_m` show strong mutual information with `weather`, indicating that weather is correlated with both the object class mix and flight altitude.
+# In the output above, both `class` and `altitude_m` show strong mutual information with `weather`, indicating that
+# weather is correlated with both the object class mix and flight altitude.
 #
 # Running {class}`.Balance` on the original metadata displays the same correlation from the class perspective:
 
@@ -248,7 +253,8 @@ print(Balance().evaluate(metadata).balance)
 # %% [markdown]
 # ## Disentangle class and metadata associations
 #
-# While overall balance scores indicate that an association exists, `classwise` metrics reveal which specific groups drive the relationship.
+# While overall balance scores indicate that an association exists, `classwise` metrics reveal which specific groups
+# drive the relationship.
 #
 # Inspect the `altitude_m` rows from the default class-conditional evaluation:
 
@@ -257,7 +263,9 @@ default = Balance().evaluate(metadata)
 print(default.classwise.filter(pl.col("factor_name") == "altitude_m"))
 
 # %% [markdown]
-# In the default class-conditional view, `truck` is flagged as imbalanced against altitude. Because trucks predominantly appear in foggy weather (which is flown at high altitude), the class-conditional view attributes the altitude imbalance directly to `truck`.
+# In the default class-conditional view, `truck` is flagged as imbalanced against altitude. Because trucks predominantly
+# appear in foggy weather (which is flown at high altitude), the class-conditional view attributes the altitude
+# imbalance directly to `truck`.
 #
 # Now inspect the same factor under the `weather` class axis:
 
@@ -265,14 +273,19 @@ print(default.classwise.filter(pl.col("factor_name") == "altitude_m"))
 print(result.classwise.filter(pl.col("factor_name") == "altitude_m"))
 
 # %% [markdown]
-# Under the `weather` axis, `foggy` scores `1.0`: within this dataset, foggy conditions deterministically identify high-altitude flights.
+# Under the `weather` axis, `foggy` scores `1.0`: within this dataset, foggy conditions deterministically identify
+# high-altitude flights.
 #
-# The class-conditional view can only attribute variation to class labels. When a class co-occurs with an environmental condition, any effect caused by that condition is reported as class imbalance. Pivoting to a metadata axis allows you to isolate whether the imbalance originates from the class label or from the environmental factor.
+# The class-conditional view can only attribute variation to class labels. When a class co-occurs with an environmental
+# condition, any effect caused by that condition is reported as class imbalance. Pivoting to a metadata axis allows you
+# to isolate whether the imbalance originates from the class label or from the environmental factor.
 
 # %% [markdown]
 # ## Evaluate metadata at the image level with at()
 #
-# In object detection datasets, class labels exist at the detection (`instance`) level, while factors like `weather` exist at the image (`unit`) level. Evaluating the default metadata at the unit level fails because an image containing multiple detections does not have a single class label:
+# In object detection datasets, class labels exist at the detection (`instance`) level, while factors like `weather`
+# exist at the image (`unit`) level. Evaluating the default metadata at the unit level fails because an image containing
+# multiple detections does not have a single class label:
 
 # %%
 try:
@@ -281,7 +294,8 @@ except ValueError as error:
     print(f"class axis: {error}")
 
 # %% [markdown]
-# Because `weather` is defined for every image, pivoting to `weather` allows you to evaluate bias at the unit level directly:
+# Because `weather` is defined for every image, pivoting to `weather` allows you to evaluate bias at the unit level
+# directly:
 
 # %%
 by_weather_per_image = metadata.at("unit").classed_by("weather")
@@ -290,7 +304,8 @@ print(Balance().evaluate(by_weather_per_image).balance)
 # %% [markdown]
 # You can inspect {attr}`.ClassAxis.rows_per_group_entity` to verify the fan-out ratio between rows and entities:
 #
-# - In the detection view (`instance`), image-level factors are replicated across detections (fan-out > 1.0), weighting crowded images more heavily.
+# - In the detection view (`instance`), image-level factors are replicated across detections (fan-out > 1.0), weighting
+#   crowded images more heavily.
 # - In the image view (`unit`), each image is counted once (fan-out = 1.0).
 
 # %%
@@ -304,7 +319,8 @@ print(
 )
 
 # %% [markdown]
-# Note that `class` is absent when pivoting at the unit level, as multi-detection images have no single class label. If you need a unit-level class summary, you can aggregate labels with {meth}`.Metadata.agg`.
+# Note that `class` is absent when pivoting at the unit level, as multi-detection images have no single class label. If
+# you need a unit-level class summary, you can aggregate labels with {meth}`.Metadata.agg`.
 
 # %%
 print(f"detections view factors: {list(by_weather.factor_names)}")
@@ -313,7 +329,8 @@ print(f"images view factors:     {list(by_weather_per_image.factor_names)}")
 # %% [markdown]
 # ## Create composite axes to identify missing combinations
 #
-# You can pass multiple factor names to {meth}`.Metadata.classed_by` to construct a composite class axis. The resulting groups represent all observed combinations, formatted as `factor1 × factor2`.
+# You can pass multiple factor names to {meth}`.Metadata.classed_by` to construct a composite class axis. The resulting
+# groups represent all observed combinations, formatted as `factor1 × factor2`.
 #
 # By crossing factors, you can inspect which combinations exist in your data and which are missing:
 
@@ -329,14 +346,20 @@ print(f"\ncells present: {len(cells.index2label)} of {3 * 3} possible")
 # %% [markdown]
 # ## Test the observed combinations with Parity and Diversity
 #
-# In this dataset, only 5 of 9 possible weather and altitude combinations are present: there is no low-altitude fog and no high-altitude clear weather.
+# In this dataset, only 5 of 9 possible weather and altitude combinations are present: there is no low-altitude fog and
+# no high-altitude clear weather.
 #
 # This reveals specific operational gaps for future data collection:
 #
 # - The data gap is a specific factor combination (`foggy × low altitude`) rather than a missing class.
-# - As long as these cells remain empty, model performance under foggy conditions cannot be separated from model performance at high altitude.
+# - As long as these cells remain empty, model performance under foggy conditions cannot be separated from model
+#   performance at high altitude.
 #
-# The listing above is how you find absent combinations. {class}`.Parity` cannot: it tests the combinations that occur in the data, so a combination with no images has no cell to test. Parity answers a different question about the combinations that do exist. Once `weather` and `altitude_m` form the class axis, the remaining image-level factor is `time_of_day`. Parity tests whether it is spread across the five present cells as independence predicts, and which of those cells hold too few images to judge:
+# The listing above is how you find absent combinations. {class}`.Parity` cannot: it tests the combinations that occur
+# in the data, so a combination with no images has no cell to test. Parity answers a different question about the
+# combinations that do exist. Once `weather` and `altitude_m` form the class axis, the remaining image-level factor is
+# `time_of_day`. Parity tests whether it is spread across the five present cells as independence predicts, and which of
+# those cells hold too few images to judge:
 
 # %%
 parity = Parity().evaluate(cells)
@@ -348,12 +371,16 @@ print(f"\nactionable cells: {parity.cells['is_actionable'].sum()}")
 print(findings.select("level", "class_name", "status", "observed", "expected", "p_value_adjusted"))
 
 # %% [markdown]
-# Each row of {attr}`.ParityOutput.cells` is one `time_of_day` level in one weather and altitude cell, with its `status`:
+# Each row of {attr}`.ParityOutput.cells` is one `time_of_day` level in one weather and altitude cell, with its
+# `status`:
 #
-# - The factor test is `inconclusive`: it finds no association between `time_of_day` and the cells (adjusted p-value of 0.63, score 0.0), but part of its table is too thin to count that as a negative result.
-# - Four cells are `too_thin`: day and night in the two mid-altitude cells, which hold only 5 and 7 images. They are not findings, however small their p-values. Collect more images there to find out.
+# - The factor test is `inconclusive`: it finds no association between `time_of_day` and the cells (adjusted p-value of
+#   0.63, score 0.0), but part of its table is too thin to count that as a negative result.
+# - Four cells are `too_thin`: day and night in the two mid-altitude cells, which hold only 5 and 7 images. They are not
+#   findings, however small their p-values. Collect more images there to find out.
 # - No cell is `underrepresented` or `overrepresented`, so no cell is actionable. The other six cells are `no_finding`.
-# - The images are the independent unit here, so `group_source` is `rows` and the ungrouped Pearson test runs. On a detection-level view, Parity groups detections by image instead.
+# - The images are the independent unit here, so `group_source` is `rows` and the ungrouped Pearson test runs. On a
+#   detection-level view, Parity groups detections by image instead.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -365,7 +392,8 @@ assert not parity.cells["is_actionable"].any()
 assert (parity.group_source, parity.test) == ("rows", "pearson")
 
 # %% [markdown]
-# Similarly, you can evaluate {class}`.Diversity` across categorical factor combinations such as `weather` and `time_of_day`:
+# Similarly, you can evaluate {class}`.Diversity` across categorical factor combinations such as `weather` and
+# `time_of_day`:
 
 # %%
 by_conditions = metadata.classed_by("weather", "time_of_day")
@@ -387,7 +415,9 @@ print(f"fan-out:     {axis.rows_per_group_entity:.2f} rows per {axis.level}")
 print(f"vocabulary:  {axis.vocabulary}")
 
 # %% [markdown]
-# In automated evaluation pipelines, you should check `axis.source == "derived"` to confirm whether results were computed against a custom metadata axis rather than standard class labels. These parameters are also recorded in `result.meta().state`:
+# In automated evaluation pipelines, you should check `axis.source == "derived"` to confirm whether results were
+# computed against a custom metadata axis rather than standard class labels. These parameters are also recorded in
+# `result.meta().state`:
 
 # %%
 print({k: v for k, v in result.meta().state.items() if k.startswith("class_axis")})
@@ -395,7 +425,8 @@ print({k: v for k, v in result.meta().state.items() if k.startswith("class_axis"
 # %% [markdown]
 # ## Apply custom class axes to splitting and coverage
 #
-# Because `classed_by` updates both `class_labels` and `index2label`, any downstream function that operates on class labels uses the new axis automatically.
+# Because `classed_by` updates both `class_labels` and `index2label`, any downstream function that operates on class
+# labels uses the new axis automatically.
 #
 # For example, {func}`.split_dataset` will stratify folds across `weather` instead of object classes:
 
@@ -411,29 +442,33 @@ print(f"stratified on: {splits.class_axis.name} ({splits.class_axis.source})")
 # - {meth}`.OutliersOutput.aggregate_by_class` groups outlier metrics by the custom axis.
 # - {class}`.Representation` requires ontology-aligned class labels and will reject a derived class axis.
 #
-# Custom class axes persist across view operations ({meth}`.Metadata.at`, {meth}`.Metadata.where`, {meth}`.Metadata.having`, and {meth}`.Metadata.agg`). However, like filters and view transformations, custom class axes are not serialized by {meth}`.Metadata.save`.
+# Custom class axes persist across view operations ({meth}`.Metadata.at`, {meth}`.Metadata.where`,
+# {meth}`.Metadata.having`, and {meth}`.Metadata.agg`). However, like filters and view transformations, custom class
+# axes are not serialized by {meth}`.Metadata.save`.
 
 # %% [markdown]
 # ## Conclusion
 #
-# You created a dataset in which class, weather and altitude are correlated, and pivoted the class axis to weather. Against the weather
-# axis, you saw that the altitude imbalance the class view attributes to trucks follows the weather. You evaluated the factors per image,
-# listed the combinations of weather and altitude that the data never covers, tested the combinations that exist with `Parity`, checked
-# which axis a result used, and stratified a split on it.
+# You created a dataset in which class, weather and altitude are correlated, and pivoted the class axis to weather.
+# Against the weather axis, you saw that the altitude imbalance the class view attributes to trucks follows the weather.
+# You evaluated the factors per image, listed the combinations of weather and altitude that the data never covers,
+# tested the combinations that exist with `Parity`, checked which axis a result used, and stratified a split on it.
 #
 
 # %% [markdown]
 # ## Next steps
 #
-# - [How to control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare explicit bin edges for consistent factor levels across collections.
+# - [How to control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare explicit bin edges for
+#   consistent factor levels across collections.
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Measure coverage across custom groups and
 #   classes.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about mutual information, parity, and diversity metrics.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about mutual information, parity, and diversity
+#   metrics.
 
 # %% [markdown]
 # ## On your own
 #
-# To run the same analysis on your own dataset, build a `Metadata` for it that holds the environmental factors you suspect. Compare
-# `Balance().evaluate(metadata)` with `Balance().evaluate(metadata.classed_by("<factor>"))` for each suspect factor. Use
-# `metadata.at("unit")` when the factor is recorded per image and your dataset has several detections per image. Pass several factor
-# names to `classed_by` to list the combinations that your data never covers.
+# To run the same analysis on your own dataset, build a `Metadata` for it that holds the environmental factors you
+# suspect. Compare `Balance().evaluate(metadata)` with `Balance().evaluate(metadata.classed_by("<factor>"))` for each
+# suspect factor. Use `metadata.at("unit")` when the factor is recorded per image and your dataset has several
+# detections per image. Pass several factor names to `classed_by` to list the combinations that your data never covers.

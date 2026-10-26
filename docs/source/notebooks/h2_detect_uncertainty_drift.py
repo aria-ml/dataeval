@@ -58,10 +58,10 @@ set_seed(0, all_generators=True)
 # %% [markdown]
 # ## Prepare the model and its metadata
 #
-# {class}`.OnnxImageClassifier` wraps two artifacts you would normally already have: the model file (`.onnx`, or `.tflite` for
-# {class}`.LiteRtImageClassifier`) and a `model-metadata.json` that declares the input and output contract. To stay
-# self-contained, this guide trains and exports a small MNIST classifier in the collapsed cells below. In your own workflow, skip
-# them and point the classifier at the model and metadata you already have.
+# {class}`.OnnxImageClassifier` wraps two artifacts you would normally already have: the model file (`.onnx`, or
+# `.tflite` for {class}`.LiteRtImageClassifier`) and a `model-metadata.json` that declares the input and output
+# contract. To stay self-contained, this guide trains and exports a small MNIST classifier in the collapsed cells below.
+# In your own workflow, skip them and point the classifier at the model and metadata you already have.
 
 
 # %% tags=["hide-input"]
@@ -117,8 +117,8 @@ for _ in range(3):
 model.eval()
 
 # %% [markdown]
-# The exported model emits a softmax `scores` output, which is what the classification contract expects. The metadata declares a
-# single-channel (`GRAYSCALE`) 28x28 input and 10 output classes.
+# The exported model emits a softmax `scores` output, which is what the classification contract expects. The metadata
+# declares a single-channel (`GRAYSCALE`) 28x28 input and 10 output classes.
 
 # %%
 Path("data").mkdir(exist_ok=True)
@@ -182,9 +182,10 @@ print(f"train: {len(trainset)}  val: {len(valset)}  test: {len(testset)}  cifar:
 #
 # Three pieces compose into one feature extractor:
 #
-# 1. {class}`.OnnxImageClassifier` loads the model and its metadata and returns one `(n_classes,)` score array per image.
-# 1. {class}`.ScoresExtractor` adapts that model into a {class}`~dataeval.protocols.FeatureExtractor`, stacking the scores into
-#    an `(n_images, n_classes)` array.
+# 1. {class}`.OnnxImageClassifier` loads the model and its metadata and returns one `(n_classes,)` score array per
+#    image.
+# 1. {class}`.ScoresExtractor` adapts that model into a {class}`~dataeval.protocols.FeatureExtractor`, stacking the
+#    scores into an `(n_images, n_classes)` array.
 # 1. {class}`.UncertaintyExtractor` converts each row of class probabilities into one normalized-entropy value.
 #
 # Because the model outputs a softmax distribution, use `preds_type="probs"`.
@@ -213,8 +214,8 @@ print(
 )
 
 # %% [markdown]
-# An empirical CDF (ECDF) makes the shift easy to read: if the CIFAR-10 curve sits to the right of the MNIST curves, the model is
-# more uncertain on the shifted imagery. The in-distribution splits should overlap closely.
+# An empirical CDF (ECDF) makes the shift easy to read: if the CIFAR-10 curve sits to the right of the MNIST curves, the
+# model is more uncertain on the shifted imagery. The in-distribution splits should overlap closely.
 
 # %%
 plt.figure()
@@ -232,10 +233,11 @@ plt.show()
 # %% [markdown]
 # ## Detect drift with Wasserstein distance
 #
-# {class}`.DriftWasserstein` measures the {term}`Wasserstein distance<Wasserstein Distance>` between the reference and incoming
-# uncertainty distributions and flags drift when it grows beyond a calibrated baseline. Unlike most detectors, it takes two
-# in-distribution references in `fit()`, a training set and a validation set. Their distance defines the normal variation between
-# two same-distribution samples, so the detector alarms only when incoming data differs from training more than validation did.
+# {class}`.DriftWasserstein` measures the {term}`Wasserstein distance<Wasserstein Distance>` between the reference and
+# incoming uncertainty distributions and flags drift when it grows beyond a calibrated baseline. Unlike most detectors,
+# it takes two in-distribution references in `fit()`, a training set and a validation set. Their distance defines the
+# normal variation between two same-distribution samples, so the detector alarms only when incoming data differs from
+# training more than validation did.
 
 # %%
 drift_detector = DriftWasserstein().fit(np.asarray(h_train), np.asarray(h_val))
@@ -247,8 +249,8 @@ result_cifar = drift_detector.predict(np.asarray(h_cifar))
 print(f"CIFAR-10       -> drift: {result_cifar.drifted}  (ratio: {result_cifar.distance:.2f})")
 
 # %% [markdown]
-# The held-out MNIST slice stays within the calibrated baseline (no drift), while CIFAR-10 exceeds it (drift detected). The detector
-# turned the visual gap in the ECDF into an automated, label-free alert.
+# The held-out MNIST slice stays within the calibrated baseline (no drift), while CIFAR-10 exceeds it (drift detected).
+# The detector turned the visual gap in the ECDF into an automated, label-free alert.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -259,6 +261,9 @@ assert not result_test.drifted
 # %% [markdown]
 # ## Next steps
 #
-# - [Uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection) — Explore Uncertainty-based drift detection.
-# - [Detect drift with prediction uncertainty](./tt_detect_drift_with_uncertainty.py) — Monitor deployed object detectors for drift using prediction uncertainty.
-# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.
+# - [Uncertainty-based drift detection](../concepts/DistributionShift.md#uncertainty-based-drift-detection) — Explore
+#   Uncertainty-based drift detection.
+# - [Detect drift with prediction uncertainty](./tt_detect_drift_with_uncertainty.py) — Monitor deployed object
+#   detectors for drift using prediction uncertainty.
+# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics
+#   between baseline and operational data distributions.

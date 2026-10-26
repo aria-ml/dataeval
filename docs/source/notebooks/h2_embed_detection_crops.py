@@ -16,14 +16,14 @@
 # %% [markdown]
 # # How to embed object detection crops and visualize class clusters
 #
-# DataEval's embedding-based tools, {class}`.Coverage`, {func}`.ber_mst` and {class}`.Balance`, assume one embedding per label,
-# the image-classification shape. An object detection image holds many objects of different classes, so one whole-image
-# embedding cannot be colored by one class. {class}`.DetectionCrops` presents the ground-truth boxes as an
+# DataEval's embedding-based tools, {class}`.Coverage`, {func}`.ber_mst` and {class}`.Balance`, assume one embedding per
+# label, the image-classification shape. An object detection image holds many objects of different classes, so one
+# whole-image embedding cannot be colored by one class. {class}`.DetectionCrops` presents the ground-truth boxes as an
 # image-classification dataset, one crop per detection, so every per-(image, label) tool works on it unchanged. See
 # [Performance Limits](../concepts/PerformanceLimits.md).
 #
-# Use it when you want to embed the objects in a detection dataset, for example to see how the classes cluster in embedding
-# space.
+# Use it when you want to embed the objects in a detection dataset, for example to see how the classes cluster in
+# embedding space.
 #
 # You need `dataeval`, `dataeval-plots`, `maite-datasets` and `torchvision`.
 
@@ -167,4 +167,5 @@ assert set(np.unique(metadata.class_labels)).issubset(set(focus_indices))  # onl
 #
 # - [Embeddings](../concepts/Embeddings.md) — Feature vectors extracted per crop for evaluation and analysis.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Embed, project, and reason about a dataset end to end.
-# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Put crop embeddings through BER to bound achievable classification accuracy.
+# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Put crop embeddings through
+#   BER to bound achievable classification accuracy.

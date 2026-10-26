@@ -16,10 +16,10 @@
 # %% [markdown]
 # # How to detect distribution shift from precomputed model outputs
 #
-# In many production monitoring environments you have no access to the model, its weights or the original training data, only
-# logs of what the model output over time: class probabilities, logits, embeddings or hard prediction labels. DataEval's
-# drift detectors accept raw arrays, so you can pass those outputs to `.fit()` and `.predict()` without wrapping a model in a
-# `FeatureExtractor`.
+# In many production monitoring environments you have no access to the model, its weights or the original training data,
+# only logs of what the model output over time: class probabilities, logits, embeddings or hard prediction labels.
+# DataEval's drift detectors accept raw arrays, so you can pass those outputs to `.fit()` and `.predict()` without
+# wrapping a model in a `FeatureExtractor`.
 #
 # Use this guide when you want to detect different types of shift from precomputed predictions alone.
 #
@@ -160,6 +160,9 @@ assert result_label.drifted
 # %% [markdown]
 # ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md) — Explore types of distribution shift and strategies for detecting drift.
-# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational streams over time.
-# - [How to detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Calculate uncertainty metrics to monitor distribution changes.
+# - [Distribution Shift](../concepts/DistributionShift.md) — Explore types of distribution shift and strategies for
+#   detecting drift.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational
+#   streams over time.
+# - [How to detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Calculate uncertainty
+#   metrics to monitor distribution changes.

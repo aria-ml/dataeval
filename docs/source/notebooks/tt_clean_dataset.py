@@ -248,11 +248,11 @@ pl.DataFrame({
 # %% [markdown]
 # The above table shows that this dataset has a total of 20 classes.
 #
-# Of the classes, `person` is the class with the highest total object count followed by `chair` and `car`, while `person`,
-# `chair`, and `dog` are the classes with the highest number of images.
+# Of the classes, `person` is the class with the highest total object count followed by `chair` and `car`, while
+# `person`, `chair`, and `dog` are the classes with the highest number of images.
 #
-# `bus`, `train`, and `cow` are the classes with the fewest objects, while `cow`, `sheep`, and `bus` are the classes with
-# the fewest images.
+# `bus`, `train`, and `cow` are the classes with the fewest objects, while `cow`, `sheep`, and `bus` are the classes
+# with the fewest images.
 #
 # This table shows wide variation in the number of classes per image, the number of objects per image and the number of
 # objects of each class per image.
@@ -450,8 +450,8 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "aspect_ratio", (1, 4))
 #
 # After evaluating the flagged images, you may notice that dimensional discrepancies are common across multiple classes,
 # as shown in the earlier table. This observation suggests that these issues are a general feature of the dataset, and
-# dropping all size outliers might be an appropriate step. However, be cautious and verify whether this action creates any
-# imbalances.
+# dropping all size outliers might be an appropriate step. However, be cautious and verify whether this action creates
+# any imbalances.
 
 # %% [markdown]
 # ### Zeros
@@ -462,16 +462,17 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "zeros", (1, 4))
 
 # %% [markdown]
 # Images flagged for zeros typically feature large regions of completely black or gray pixels. Some of these may also
-# appear in grayscale. These characteristics could indicate issues like underexposed photos, scanning errors, or specific
-# use cases.
+# appear in grayscale. These characteristics could indicate issues like underexposed photos, scanning errors, or
+# specific use cases.
 #
 # Grayscale images, in particular, might stand out if the rest of your dataset is primarily in color. Check whether
-# grayscale images are relevant to your operational scenario or whether they are artifacts of the data collection process.
+# grayscale images are relevant to your operational scenario or whether they are artifacts of the data collection
+# process.
 #
-# For instance, if grayscale images are operationally irrelevant, consider removing them. However, if grayscale scenarios
-# are possible, ensure that you have sufficient representation of these types of images to train a robust model.
-# Similarly, dark images with many zero-value pixels may indicate rare but valid scenarios (e.g., nighttime operations) or
-# irrelevant anomalies.
+# For instance, if grayscale images are operationally irrelevant, consider removing them. However, if grayscale
+# scenarios are possible, ensure that you have sufficient representation of these types of images to train a robust
+# model. Similarly, dark images with many zero-value pixels may indicate rare but valid scenarios (e.g., nighttime
+# operations) or irrelevant anomalies.
 
 # %% [markdown]
 # ### Sharpness
@@ -487,8 +488,8 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "sharpness", (1, 2))
 #
 # Evaluate whether these highly detailed images are typical of your use case. If they are uncommon in your operational
 # scenario, they might skew your model's ability to generalize. In such cases, consider excluding these images.
-# Conversely, if they are operationally relevant, ensure that similar images are sufficiently represented in your dataset
-# to prevent biases.
+# Conversely, if they are operationally relevant, ensure that similar images are sufficiently represented in your
+# dataset to prevent biases.
 
 # %% [markdown]
 # ## Cleaning summary
@@ -497,8 +498,8 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "sharpness", (1, 2))
 # cannot determine operational relevance, it shows patterns that may require further investigation.
 #
 # For example, flagged images might reflect real-world scenarios underrepresented in your dataset, such as night
-# operations or objects photographed from unusual angles. Alternatively, they may reveal anomalies, such as artifacts from
-# the data collection process.
+# operations or objects photographed from unusual angles. Alternatively, they may reveal anomalies, such as artifacts
+# from the data collection process.
 #
 # By reviewing flagged images for multiple metrics and examples, you can better understand how the Outliers class
 # identifies extremes. This hands-on exploration helps you decide whether to include or exclude specific images based on
@@ -513,8 +514,8 @@ plot_sample_outlier_images_by_metric(ds, outlier_imgs, "sharpness", (1, 2))
 # Now that you know how to identify poor quality images in your dataset, another important part of data cleaning is
 # detecting and removing duplicates.
 #
-# The `Duplicates` class identifies both exact duplicates and potential (near) duplicates. Potential duplicates can occur
-# in a variety of ways:
+# The `Duplicates` class identifies both exact duplicates and potential (near) duplicates. Potential duplicates can
+# occur in a variety of ways:
 #
 # - Intentional perturbations
 #   - Images with varying brightness
@@ -590,8 +591,8 @@ display(duplicates)
 #   perceptual hashes are orientation-sensitive. The orientation column shows "rotated" for these groups.
 #
 # By using `ImageStats.HASH` (which computes both basic and D4 hashes), you can distinguish between same-orientation
-# duplicates and rotated/flipped duplicates by checking the methods and orientation columns. This is useful when you want
-# to:
+# duplicates and rotated/flipped duplicates by checking the methods and orientation columns. This is useful when you
+# want to:
 #
 # - Keep one version of each rotated duplicate set
 # - Identify images that may have been augmented with rotations
@@ -615,8 +616,10 @@ display(duplicates)
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Understand core principles of dataset integrity, duplicates, and outliers.
-# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate coverage, bias, and dimensionality across dataset splits.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Understand core principles of dataset integrity, duplicates, and
+#   outliers.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate coverage, bias, and dimensionality across
+#   dataset splits.
 # - [How to identify duplicates](./h2_deduplicate.py) — Remove exact, duplicate, or near-duplicate images from datasets.
 
 # %% [markdown]

@@ -146,8 +146,9 @@ assert len(deduplicated_ds) == len(duplicates_ds) - len(duplicates)
 #   ways.
 # - `augmented()`: items sharing one annotation over different pixels, the signature of a synthetic copy.
 #
-# Build a tiny object detection dataset with four items to see both. Items 0 and 1 have identical pixels and two different
-# boxes, a divergent pair. Items 2 and 3 have the same box over two independently sampled images, an augmented pair.
+# Build a tiny object detection dataset with four items to see both. Items 0 and 1 have identical pixels and two
+# different boxes, a divergent pair. Items 2 and 3 have the same box over two independently sampled images, an augmented
+# pair.
 
 
 # %% tags=["hide-input"]
@@ -217,6 +218,9 @@ assert annotation_results.augmented().data()["item_indices"].item().to_list() ==
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data quality issues.
-# - [Identify duplicate video](./tt_identify_duplicate_video.py) — Find duplicate footage, train/test leakage, and redundant frames in video and MOT datasets.
-# - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created through synthetic transformations and augmentations.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data
+#   quality issues.
+# - [Identify duplicate video](./tt_identify_duplicate_video.py) — Find duplicate footage, train/test leakage, and
+#   redundant frames in video and MOT datasets.
+# - [Detect common augmentations as duplicates](./tt_augmentation_duplicates.py) — Find near-identical images created
+#   through synthetic transformations and augmentations.

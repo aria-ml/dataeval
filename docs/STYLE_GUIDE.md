@@ -96,8 +96,10 @@ marks the first mention of a term that the page defines.
 ### Line length and Markdown
 
 - Wrap Markdown at 120 columns. Tables are exempt (`.markdownlint-cli2.yaml`).
-- Wrap the Markdown cells of a notebook at 120 columns. No tool checks this, because `ruff` ignores line length in
-  `docs/source/notebooks`, so review checks it.
+- Wrap the Markdown cells of a notebook at 120 columns, counting the `#` and the space that start each line. `ruff`
+  ignores line length in `docs/source/notebooks`, so `tests/test_notebook_structure.py` checks it. It skips a table row,
+  the three metadata lines of a tutorial, which stay on one line each, and a line that is one unbreakable token, such
+  as a long URL.
 - Run `uv run nox -s lint` before you push. It runs `ruff`, `codespell` and `typos`.
 
 ## Structure a tutorial
@@ -403,7 +405,7 @@ Run the checks that apply before you open a merge request.
 | Command | What it checks |
 | ------- | -------------- |
 | `uv run nox -s lint` | `ruff`, `codespell` (American spelling) and `typos` |
-| `uv run nox -s test -- tests/test_doc_markup.py tests/test_doc_cross_references.py tests/test_deprecated_docs.py tests/test_quickstart.py tests/test_notebook_structure.py --cov-fail-under=0` | reST roles in Markdown, fence closing, role targets, deprecated documentation, the quickstart code, and the headings, template sections, Next steps, voice and emphasis of the notebooks |
+| `uv run nox -s test -- tests/test_doc_markup.py tests/test_doc_cross_references.py tests/test_deprecated_docs.py tests/test_quickstart.py tests/test_notebook_structure.py --cov-fail-under=0` | reST roles in Markdown, fence closing, role targets, deprecated documentation, the quickstart code, and the headings, template sections, Next steps, voice, emphasis and line width of the notebooks |
 | `uv run nox -s type` | `pyright` over `src`, `tests`, `verification` and `docs/source/notebooks`. Run it after you change a code cell in a notebook or a test, because it checks them too |
 | `npx --yes markdownlint-cli2 '*.md' 'docs/**/*.md' '#node_modules'` | The Markdown rules that CI enforces, such as 120 columns, one blank line between blocks and no repeated heading in a page. Run it after every change to a `.md` file. It needs Node, and `npx` fetches the tool on first use |
 | `uv run nox -s docs` | Converts the notebooks, executes the ones whose code cells changed, runs their assertions and builds the site with `--fail-on-warning`, which catches broken links, anchors and toctree entries |
@@ -416,8 +418,7 @@ A single run of the documentation tests with `--no-cov` exits non-zero even when
 
 What is not automated today: how plain and directive a sentence is, whether bold marks a first mention, what a heading
 or a Next steps description says, the choice of Next steps links, the `See this in practice` lists of the concept
-pages, the voice of the concept and getting-started pages, the 600-word limit (it warns) and the width of notebook
-text. A reviewer checks them.
+pages, the voice of the concept and getting-started pages and the 600-word limit (it warns). A reviewer checks them.
 
 A notebook that needs more memory than your machine has cannot execute in your local docs build. Run its cells one at
 a time instead, and rely on the CI docs job for the full run. Say in the merge request what you could and could not
