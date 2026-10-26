@@ -157,9 +157,9 @@ plt.show()
 # %% [markdown]
 # ## Move between levels
 #
-# A `SourceItem` knows the rows around it. {meth}`.SourceItem.at` climbs to a containing row and {meth}`.SourceItem.within` descends to
-# the rows inside one. Video has four levels, and a frame and a track both carry keys that only the level tells apart; see
-# [Metadata levels](../concepts/MetadataLevels.md).
+# A `SourceItem` knows the rows around it. {meth}`.SourceItem.at` climbs to a containing row and
+# {meth}`.SourceItem.within` descends to the rows inside one. Video has four levels, and a frame and a track both carry
+# keys that only the level tells apart. See [Metadata levels](../concepts/MetadataLevels.md).
 
 # %%
 scene = found.at("unit")

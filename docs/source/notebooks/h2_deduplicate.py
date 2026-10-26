@@ -55,8 +55,8 @@ set_max_processes(4)
 #
 # Load the MNIST data and create the dataset.
 #
-# The MNIST dataset contains 70,000 images - 60,000 in the train set and 10,000 in the test set. For the purposes of this
-# demonstration, we are just going to use the test set.
+# The MNIST dataset contains 70,000 images, 60,000 in the train set and 10,000 in the test set. This demonstration uses
+# only the test set.
 
 # %%
 # Load in the mnist dataset
@@ -66,7 +66,7 @@ testing_dataset = MNIST(root="./data/", image_set="test", download=True)
 labels = Metadata(testing_dataset).class_labels
 
 # %% [markdown]
-# Because the MNIST dataset does not contain any exact duplicates we are going to adjust the dataset to include some.
+# The MNIST dataset does not contain any exact duplicates, so you adjust the dataset to include some.
 
 # %% tags=["hide-input"]
 # Creating some indices to duplicate
@@ -85,7 +85,7 @@ duplicates_ds = View(testing_dataset, Indices(indices_with_duplicates))
 # %% [markdown]
 # ## Find the duplicates
 #
-# Now we are asking our Duplicates class to find the needle in the haystack. There are only 4 exact duplicates.
+# Ask the `Duplicates` class to find the duplicates. There are only 4 exact duplicates.
 
 # %%
 # Initialize the Duplicates class to begin to identify duplicate images.
@@ -101,10 +101,10 @@ results = identifyDuplicates.evaluate(duplicates_ds)
 display(results)
 
 # %% [markdown]
-# The `Duplicates` class was able to find all 4 exact duplicates out of the 10,000 samples.
+# The `Duplicates` class found all 4 exact duplicates out of the 10,000 samples.
 #
-# It also found several sets of images that are very closely related to each other, and since we are using hand written
-# digits we would expect it to find some images that were nearly identical.
+# It also found several sets of images that are very closely related to each other. With hand written digits, you would
+# expect it to find some images that are nearly identical.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -139,11 +139,12 @@ assert len(deduplicated_ds) == len(duplicates_ds) - len(duplicates)
 # ## Find annotation duplicates
 #
 # MNIST has no object detection targets, so everything above compared pixels only. When a dataset does carry targets
-# (boxes and labels), `Duplicates` also digests the annotation itself - on by default, no argument needed - and two
+# (boxes and labels), `Duplicates` also digests the annotation itself, which is on by default and needs no argument. Two
 # accessors narrow the result to the annotation-driven relations:
 #
-# - `divergent()` - items whose annotation was checked and found to disagree: one collect labeled two different ways.
-# - `augmented()` - items sharing one annotation over different pixels: the signature of a synthetic copy.
+# - `divergent()`: items whose annotation was checked and found to disagree, meaning one collect labeled two different
+#   ways.
+# - `augmented()`: items sharing one annotation over different pixels, the signature of a synthetic copy.
 #
 # Build a tiny object detection dataset with four items to see both. Items 0 and 1 have identical pixels and two different
 # boxes, a divergent pair. Items 2 and 3 have the same box over two independently sampled images, an augmented pair.
@@ -194,14 +195,14 @@ annotation_ds = TinyObjectDetectionDataset(annotation_images, annotation_boxes, 
 annotation_results = Duplicates(hash_radius=0).evaluate(annotation_ds)
 
 # %% [markdown]
-# `divergent()` finds the pair whose pixels matched but whose annotation did not - a label-quality issue, not a
+# `divergent()` finds the pair whose pixels matched but whose annotation did not. That is a label-quality issue, not a
 # redundancy one.
 
 # %%
 display(annotation_results.divergent())
 
 # %% [markdown]
-# `augmented()` finds the pair whose annotation matched but whose pixels did not - a synthetic copy's signature.
+# `augmented()` finds the pair whose annotation matched but whose pixels did not. That is a synthetic copy's signature.
 
 # %%
 display(annotation_results.augmented())

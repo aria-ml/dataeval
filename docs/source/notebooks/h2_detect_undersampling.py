@@ -155,7 +155,7 @@ class Autoencoder(nn.Module):
 
 
 # %% [markdown]
-# For computational reasons, we will simply load the trained autoencoder.
+# For computational reasons, you load the trained autoencoder.
 
 # %%
 # The trained autoencoder was trained for 1000 epochs
@@ -164,7 +164,7 @@ model = Autoencoder()
 model.load_state_dict(sd)
 
 # %% [markdown]
-# For the purposes of this example, we will take only the first 2000 entries of the data.
+# For this example, you take only the first 2000 entries of the data.
 
 # %%
 # Create extractor using the autoencoder's encoder portion
@@ -178,7 +178,7 @@ labels = metadata.class_labels
 # %% [markdown]
 # ## Visualize the embeddings
 #
-# To visualize the encodings, we will use TSNE on them to view separation.
+# To visualize the encodings, you use TSNE on them to view separation.
 
 # %%
 # Visualize 10d as 2d with TSNE
@@ -198,8 +198,8 @@ ax.legend(*scatter.legend_elements(), loc="upper right", ncols=2)
 plt.show()
 
 # %% [markdown]
-# Some good separation, but you can see a few images in the "gaps". This could be an artifact of dimension reduction, or
-# suggest that we have poor coverage for some covariates.
+# There is some good separation, but you can see a few images in the "gaps". This could be an artifact of dimension
+# reduction, or suggest that the dataset has poor coverage for some covariates.
 
 # %% [markdown]
 # ## Measure the coverage
@@ -222,8 +222,8 @@ for count, i in enumerate(axs):
     i.title.set_text(int(labels[idx]))
 
 # %% [markdown]
-# {class}`.Coverage` identified that in this set of 2000 images, there is potential under-coverage when it comes to
-# wonky 2s and 7s. Other digits have some undercovered instances, but they could be outliers.
+# {class}`.Coverage` identified that in this set of 2000 images, there is potential under-coverage for wonky 2s and 7s.
+# Other digits have some undercovered instances, but they could be outliers.
 #
 # {class}`.Coverage` also reports coverage for each class. See
 # [Identify gaps in a labeled dataset](./tt_identify_dataset_gaps.py).

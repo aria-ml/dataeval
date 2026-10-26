@@ -65,7 +65,7 @@ pl.Config.set_tbl_width_chars(160)
 #
 # | Sequence | Defect | Where it should show |
 # | --- | --- | --- |
-# | 2 | the track is annotated on every other frame only - flickering | `n_gaps` and `gap_fraction` |
+# | 2 | the track is annotated on every other frame only (flickering) | `n_gaps` and `gap_fraction` |
 # | 5 | one track id is used for two different objects, seen only at the start and the end | `gap_fraction` |
 # | 7 | the boxes jump around the object from frame to frame | `speed_variance` |
 #
@@ -197,10 +197,10 @@ display(focused.data().select("item_index", "target_index", "level", "metric_nam
 # %% [markdown]
 # Each planted defect is flagged, and nothing else is:
 #
-# - sequence 2, track 0 - `n_gaps` and `gap_fraction`: the flickering track, with 19 gaps covering half its span
-# - sequence 5, track 0 - `gap_fraction` only: one id spanning two objects, a single gap covering most of its span
-# - sequence 7, track 0 - `speed_variance`: boxes that jump from frame to frame
-# - sequence 2, frame 20 - `exposure_ms`: the glitched sensor reading, judged against frames, not tracks
+# - sequence 2, track 0 (`n_gaps` and `gap_fraction`): the flickering track, with 19 gaps covering half its span
+# - sequence 5, track 0 (`gap_fraction` only): one id spanning two objects, a single gap covering most of its span
+# - sequence 7, track 0 (`speed_variance`): boxes that jump from frame to frame
+# - sequence 2, frame 20 (`exposure_ms`): the glitched sensor reading, judged against frames, not tracks
 #
 # Many short gaps mean a track that keeps dropping out, and one long gap an id that was reused. For a track row `target_index`
 # holds the `track_id`, and for a frame row the frame's `unit_index`.

@@ -180,8 +180,8 @@ boxes = ["box_size", "box_y"]
 display(Outliers().evaluate(metadata, levels="instance", factors=boxes).data())
 
 # %% [markdown]
-# Pass `strata=` to fit one threshold per value of a categorical factor, so each car is judged against cars only. A continuous factor
-# cannot be a stratum; use `given=`.
+# Pass `strata=` to fit one threshold per value of a categorical factor, so each car is judged against cars only. A
+# continuous factor cannot be a stratum. Use `given=`.
 
 # %%
 by_vehicle = Outliers().evaluate(metadata, levels="instance", factors=boxes, strata=["vehicle"])
@@ -270,11 +270,11 @@ display(along.data().select("item_index", "target_index", "metric_name", "metric
 
 
 # %% [markdown]
-# `bound` is the edge of what the neighbors allow. The planted frame (video 4) sits far below it, and the late frame in video 7 has two
-# rows: `neighbors`, because its stamp is far from its neighbors', and `order`, because the stamps after it are earlier. A factor is
-# checked for order when it is a date, time or duration, or is named `time_s` or `pts`; cast other timestamps to `pl.Datetime` or
-# `pl.Duration`. A slow drift, a scene cut and a run of more
-# than five out-of-place frames are not flagged.
+# `bound` is the edge of what the neighbors allow. The planted frame (video 4) sits far below it, and the late frame in
+# video 7 has two rows: `neighbors`, because its stamp is far from its neighbors', and `order`, because the stamps after
+# it are earlier. A factor is checked for order when it is a date, time or duration, or is named `time_s` or `pts`. Cast
+# other timestamps to `pl.Datetime` or `pl.Duration`. A slow drift, a scene cut and a run of more than five out-of-place
+# frames are not flagged.
 
 
 # %% tags=["remove_cell"]
