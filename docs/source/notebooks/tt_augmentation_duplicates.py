@@ -16,7 +16,7 @@
 # %% [markdown]
 # # Detect common augmentations as duplicates
 #
-# This tutorial demonstrates how DataEval's duplicate detection methods handle common torchvision augmentations.
+# Learn how DataEval's duplicate detection methods handle common torchvision augmentations.
 #
 # Estimated time to complete: 10 minutes
 #
@@ -39,14 +39,15 @@
 #
 # ### Quick reference: detection methods
 #
-# | Method                             | Best For                                  | Speed   | Rotation Invariant      |
-# | ---------------------------------- | ----------------------------------------- | ------- | ----------------------- |
-# | **D4 Hashes** (phash_d4, dhash_d4) | Detecting rotated/flipped copies          | Fast    | **Only 90° increments** |
-# | **BoVWExtractor**                  | Semantic similarity, different viewpoints | Slower  | **Any angle**           |
-# | **Basic Hashes** (phash, dhash)    | Same-orientation near-duplicates          | Fastest | No                      |
+# | Method                         | Best for                                  | Speed   | Rotation invariant  |
+# | ------------------------------ | ----------------------------------------- | ------- | ------------------- |
+# | D4 Hashes (phash_d4, dhash_d4) | Detecting rotated/flipped copies          | Fast    | Only 90° increments |
+# | BoVWExtractor                  | Semantic similarity, different viewpoints | Slower  | Any angle           |
+# | Basic Hashes (phash, dhash)    | Same-orientation near-duplicates          | Fastest | No                  |
 #
-# **Key insight:** D4 hashes only handle the 8 symmetries of a square (0°, 90°, 180°, 270° + flips). BoVW using SIFT
-# features is invariant to **any** rotation angle, making it better for detecting arbitrarily rotated duplicates.
+# D4 hashes handle only the 8 symmetries of a square: the rotations by 0°, 90°, 180° and 270°, each with and without a
+# flip. BoVW with SIFT features is invariant to rotation by any angle, so it can detect duplicates that are rotated by an
+# arbitrary angle.
 #
 # ## What you will need
 #
@@ -59,18 +60,18 @@
 # %% [markdown]
 # ## Introduction
 #
-# Data augmentation is a common technique in deep learning, but augmented images can inadvertently appear in both training
-# and test sets, or be saved as "new" images when they're really transformations of existing ones. Understanding which
-# augmentations are detectable as near-duplicates helps you:
+# Data augmentation is common in deep learning. Augmented images can end up in both the training and test sets, or be
+# saved as "new" images when they are transformations of existing ones. Knowing which augmentations are detectable as
+# near duplicates helps you:
 #
-# 1. **Identify data leakage** - Find augmented copies that leaked between train/test splits
-# 1. **Clean datasets** - Remove redundant transformed images
-# 1. **Validate augmentation pipelines** - Ensure augmentations create sufficiently distinct images
+# 1. Find augmented copies that leaked between the train and test splits
+# 1. Remove redundant transformed images from a dataset
+# 1. Check that an augmentation pipeline creates sufficiently distinct images
 
 # %% [markdown]
 # ## Setup
 #
-# Let's import the required libraries.
+# Import the required libraries.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -104,8 +105,8 @@ config.set_seed(42)
 # %% [markdown]
 # ## Creating test data
 #
-# We'll create a synthetic image with rich texture patterns that SIFT can detect. Then we'll apply various torchvision
-# transformations to test detection capabilities.
+# You will create a synthetic image with texture patterns that SIFT can detect, and then apply torchvision
+# transformations to it to test detection.
 
 
 # %%
@@ -191,22 +192,22 @@ plt.show()
 # %% [markdown]
 # ## Defining Torchvision transformations
 #
-# We'll test a comprehensive set of common torchvision transformations, organized by category:
+# You will test common torchvision transformations, organized by category:
 #
-# | Category        | Transformations                     |
-# | --------------- | ----------------------------------- |
-# | **Geometric**   | Rotation, Flip, Affine, Perspective |
-# | **Color**       | ColorJitter, Grayscale, Invert      |
-# | **Blur**        | GaussianBlur                        |
-# | **Crop/Resize** | RandomCrop, Resize, CenterCrop      |
-# | **Severe**      | RandomErasing                       |
+# | Category    | Transformations                     |
+# | ----------- | ----------------------------------- |
+# | Geometric   | Rotation, Flip, Affine, Perspective |
+# | Color       | ColorJitter, Grayscale, Invert      |
+# | Blur        | GaussianBlur                        |
+# | Crop/Resize | RandomCrop, Resize, CenterCrop      |
+# | Severe      | RandomErasing                       |
 #
-# **Important setup notes:**
+# Two choices in the setup affect the results:
 #
-# - We use `expand=True` with a resize-back step for rotation transforms so that the full rotated content is preserved (no
-#   black corners or clipped content).
-# - We use `fill=128` (gray) instead of the default `fill=0` (black) where fill is unavoidable. Black fill creates strong
-#   artificial edges that SIFT detects, corrupting the BoVW histogram.
+# - You use `expand=True` with a resize-back step for the rotation transforms, so the full rotated content is preserved
+#   (no black corners or clipped content).
+# - You use `fill=128` (gray) instead of the default `fill=0` (black) where a fill is unavoidable. Black fill creates
+#   strong artificial edges that SIFT detects, which corrupts the BoVW histogram.
 
 # %%
 FILL = 128  # Gray fill avoids artificial SIFT edges that black (0) would create
@@ -330,8 +331,8 @@ plt.show()
 # %% [markdown]
 # ## Running near-duplicate detection
 #
-# We'll use both hash-based detection (D4 hashes) and BoVWExtractor to compare their effectiveness on different
-# transformations.
+# You will run hash-based detection with D4 hashes and detection with `BoVWExtractor`, and compare how well each finds
+# the different transformations.
 
 # %%
 # Method 1: D4 Hash-based detection (rotation/flip invariant at 90° increments)
@@ -400,7 +401,7 @@ else:
 # %% [markdown]
 # ## Analyzing detection results by transformation type
 #
-# Let's analyze which transformations were detected as near-duplicates.
+# Check which transformations the detectors found as near duplicates.
 
 
 # %%
@@ -519,8 +520,8 @@ visualize_category(missed_by_both, "MISSED by Both Methods")
 # %% [markdown]
 # ## Adjusting detection sensitivity
 #
-# The `cluster_sensitivity` parameter controls how strict the near-duplicate detection is. Let's see how different
-# thresholds affect detection.
+# The `cluster_sensitivity` parameter controls how strict near-duplicate detection is. Run the detector at different
+# thresholds to see how they change what it finds.
 
 # %%
 # Test different cluster thresholds
@@ -683,5 +684,5 @@ print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 # %% [markdown]
 # ## On your own
 #
-# Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. When you do, make sure
-# that you analyze all of your data and not just the training set.
+# Once you are familiar with DataEval and data analysis, run this analysis on your own dataset. Analyze all of your data
+# and not only the training set.

@@ -71,6 +71,9 @@ Do not use italics for emphasis. Use bold only at the first mention of a term th
 for a list-item label, a heading or stress. Use `*` for emphasis markup and never `_`, because a dunder such as
 `__init__` is itself valid strong emphasis (`.markdownlint-cli2.yaml` enforces this).
 
+These rules cover the cells of a table too. Do not bold a row label, and do not put an em dash in a cell. Write a column
+heading in sentence case, with a capital on the first word only.
+
 ### Claims, numbers and limits
 
 - State every limit, assumption and caveat the reader needs, in plain words. Do not soften or remove a hedge when you
@@ -414,8 +417,9 @@ run.
 ## Review a prose-only change
 
 A change that only rewrites wording must leave these unchanged in every notebook: code cells, headings, link targets,
-roles, labels, numbers and tables. It must also leave the three tutorial metadata lines and the Next steps separators
-as they are.
+roles, labels, numbers and the values in tables. It must also leave the three tutorial metadata lines and the Next
+steps separators as they are. The emphasis and the column heading case of a table follow the rules above, so the pass may
+change them.
 
 Compare the before and after trees to confirm it. Read the diff for sentences that gained a condition or lost a hedge.
 "We recommend using image embeddings" becoming "Use image embeddings if you can" adds a condition and is a wording
