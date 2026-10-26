@@ -483,7 +483,6 @@ for name, result in chunked_results.items():
 # - [Distribution shift concepts](../concepts/DistributionShift.md) — Read about covariate shift, concept drift, and label parity in deployed ML models.
 # - [Identify out-of-distribution samples tutorial](./tt_identify_ood_samples.py) — Detect anomalous and out-of-distribution samples using autoencoders and k-NN.
 # - [How to measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two datasets to assess class representation.
-# - [Display data distributions](./h2_measure_divergence.py) — Measure statistical divergence and plot distribution overlays between reference and target datasets.
 
 # %% [markdown]
 # ## On your own

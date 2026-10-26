@@ -20,7 +20,7 @@
 # [out-of-distribution](../concepts/DistributionShift.md#out-of-distribution-detection) (OOD) samples using
 # reconstruction-based methods with different model architectures.
 #
-# Estimated time to complete: 10-15 minutes
+# Estimated time to complete: 15 minutes
 #
 # Relevant ML stages: [Monitoring](../getting-started/roles/ML_Lifecycle.md#monitoring),
 # [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)

@@ -120,7 +120,8 @@ Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md)
 ```
 
 List one or more personas, separated by commas. Base the estimate on how long the notebook takes to execute in the
-docs build and on tutorials of similar length. Review checks the structure.
+docs build and on tutorials of similar length. `tests/test_notebook_structure.py` checks the opening, the metadata
+lines and the order of the sections.
 
 ## Structure a how-to
 
@@ -154,7 +155,8 @@ Keep a how-to short (review):
 - A how-to that needs more than the budget because it carries two tasks or several alternative paths is two how-tos. A
   how-to that has to teach a concept to be useful is a tutorial.
 
-No test checks the length yet, so review checks it.
+`tests/test_notebook_structure.py` fails on a lead over 120 words, on more than five steps and on a boilerplate or
+teaching heading, and warns on more than 600 words of prose. Review checks the rest.
 
 ## Write headings
 
@@ -174,7 +176,8 @@ These rules apply to every heading in a notebook. Apply them to the headings of 
 When you refer to a section in prose, name it: `see the "Measure your own factors" section`. Do not refer to it by
 number.
 
-No test checks headings yet, so review checks them.
+`tests/test_notebook_structure.py` checks the case, numbering, plain-text, title and template-heading rules. Review
+checks that each heading names what the reader does.
 
 ## Write the Next steps section
 
@@ -185,10 +188,11 @@ documentation prose:
 - [Embeddings](../concepts/Embeddings.md) — Learn what embeddings represent and how they are used across DataEval.
 ```
 
-Rules (review):
+`tests/test_notebook_structure.py` checks the first two rules below and the entry form. Review checks the rest.
 
-- List two to four entries in a tutorial and two or three in a how-to. Some older notebooks have more. Trim them when
-  you edit those notebooks.
+Rules:
+
+- List two to four entries in a tutorial and two or three in a how-to.
 - Include at most two concept pages and at most two notebooks.
 - Choose the concept page of the evaluator or topic the notebook is about. Add a second only when the notebook relies
   on a second distinct idea. Leave out general pages, such as Acting on Results or Data Integrity, unless they are the
@@ -385,7 +389,7 @@ Run the checks that apply before you open a merge request.
 | Command | What it checks |
 | ------- | -------------- |
 | `uv run nox -s lint` | `ruff`, `codespell` (American spelling) and `typos` |
-| `uv run nox -s test -- tests/test_doc_markup.py tests/test_doc_cross_references.py tests/test_deprecated_docs.py tests/test_quickstart.py --cov-fail-under=0` | reST roles in Markdown, fence closing, role targets, deprecated documentation and the quickstart code |
+| `uv run nox -s test -- tests/test_doc_markup.py tests/test_doc_cross_references.py tests/test_deprecated_docs.py tests/test_quickstart.py tests/test_notebook_structure.py --cov-fail-under=0` | reST roles in Markdown, fence closing, role targets, deprecated documentation, the quickstart code, and the headings, template sections and Next steps of the notebooks |
 | `uv run nox -s docs` | Converts the notebooks, executes the ones whose code cells changed, runs their assertions and builds the site with `--fail-on-warning`, which catches broken links, anchors and toctree entries |
 | `uv run nox -s docs -- skip` | The same build without executing notebooks, for a change to prose only |
 | `uv run nox -e docs -- clean` | Clears the notebook cache and re-executes everything, for a library change that could alter outputs |
@@ -394,8 +398,8 @@ Run the checks that apply before you open a merge request.
 A single run of the documentation tests with `--no-cov` exits non-zero even when every test passes, so use
 `--cov-fail-under=0` as shown.
 
-What is not automated today: voice, emphasis, contractions, heading style, the structure tables, the Next steps rules
-and the width of notebook text. A reviewer checks them.
+What is not automated today: voice, emphasis, contractions, what a heading or a Next steps entry says, the choice of
+Next steps links, the 600-word limit (it warns) and the width of notebook text. A reviewer checks them.
 
 A notebook that needs more memory than your machine has cannot execute in your local docs build. Run its cells one at
 a time instead, and rely on the CI docs job for the full run. Say in the merge request what you could and could not
