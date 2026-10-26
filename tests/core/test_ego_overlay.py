@@ -10,6 +10,7 @@ from dataeval.core._ego_stats import (
     _MASK_MARGIN,
     FlowMethod,
     _as_mask,
+    _biweight_weights,
     _clear_of_overlay,
     _fit_irls,
     _flow_estimator,
@@ -19,6 +20,8 @@ from dataeval.core._ego_stats import (
     _OverlayMask,
     _pair_ego,
     _photometric_agreement,
+    _robust_cutoff,
+    _two_motion,
     ego_stats,
 )
 from dataeval.core._video_stats import video_stats
@@ -140,11 +143,11 @@ class TestMaskFit:
         assert near[180 + _MASK_MARGIN, 320 + _MASK_MARGIN]  # square, as the probe measured
 
 
-def _pair(frames, mask=None, flow: FlowMethod = "dis"):
+def _pair(frames, mask=None, flow: FlowMethod = "dis", gap: int = 1):
     est = _flow_estimator(flow)
     previous, current = (_FlowFrame(f.pixels[0], (WIDTH, HEIGHT)) for f in frames[:2])
     fitted = None if mask is None else _OverlayMask(mask, "mask").fit((WIDTH, HEIGHT), (HEIGHT, WIDTH))
-    return _measure_pair(est, previous, current, 40, 1, mask=fitted)
+    return _measure_pair(est, previous, current, 40, gap, mask=fitted)
 
 
 def _about_center(*motions):
@@ -160,11 +163,10 @@ def _about_center(*motions):
 
 class TestMaskedPair:
     @pytest.mark.parametrize("seed", range(3))
-    def test_a_dense_overlay_reads_a_slow_pan_as_trusted_without_a_mask(self, seed):  # pins decision 5
+    def test_a_dense_overlay_pan_is_refused_without_a_mask(self, seed):  # decision 5, revised by #1577
+        """The slow reading a dense overlay drags a pan to is a compromise of two motions, so it is refused."""
         reading = _pair(hud_pan(8, 2, seed=seed))
-        assert reading is not None
-        assert reading.trusted
-        assert abs(reading.t0x) < 6.0
+        assert reading is None or not reading.trusted
 
     @pytest.mark.parametrize("seed", range(3))
     @pytest.mark.parametrize("shift", [8, -8, 24, -24])
@@ -237,6 +239,135 @@ class TestMaskedPair:
         assert _photometric_agreement(fit, pts, inlier, p, c, 16, overlay=fitted.overlay) >= 0.99
 
 
+def _paste(img, obj, x, y):
+    """Paste ``obj`` with its top-left at (x, y), clipped to the frame."""
+    h, w = obj.shape
+    sx, sy, dx0, dy0 = max(0, -x), max(0, -y), max(0, x), max(0, y)
+    dx1, dy1 = min(WIDTH, x + w), min(HEIGHT, y + h)
+    if dx1 > dx0 and dy1 > dy0:
+        img[dy0:dy1, dx0:dx1] = obj[sy : sy + dy1 - dy0, sx : sx + dx1 - dx0]
+
+
+def _still_mover(rect, v, *, seed=0, draw=None):
+    """A still camera over texture, with a textured object at ``rect`` (x, y, w, h) moving ``v`` px."""
+    x0, y0, w, h = rect
+    background, obj = texture(seed, blur=4), texture(seed + 1000, size=(h, w), blur=4)
+    frames = []
+    for k, (dx, dy) in enumerate(((0, 0), v)):
+        img = background.copy()
+        _paste(img, obj, x0 + dx, y0 + dy)
+        frames.append(FakeFrame(draw(img) if draw else img, k))
+    return frames
+
+
+def _split(pts, flow):
+    """The camera fit's residuals and outliers, as `_pair_ego` passes them, for a hand-built flow field."""
+    fit = _fit_irls(pts, flow)
+    assert fit is not None
+    resid = fit.residuals(pts, flow)
+    speed = np.hypot(*resid.T)
+    return resid, _biweight_weights(speed, _robust_cutoff(speed)) <= 0.05
+
+
+def _lattice_points():
+    ys, xs = np.mgrid[8:HEIGHT:16, 8:WIDTH:16]
+    return np.c_[xs.ravel(), ys.ravel()].astype(np.float64)
+
+
+def _with_flow_noise(flow, sigma=0.2, seed=0):
+    """``flow`` plus the per-sample noise real optical flow carries, so the two-motion split actually runs."""
+    return flow + np.random.default_rng(seed).normal(0, sigma, flow.shape)
+
+
+def _noisy(frames, sigma, seed=0):
+    """``frames`` with independent Gaussian pixel noise on each."""
+    rng = np.random.default_rng(seed)
+    return [
+        FakeFrame(
+            np.clip(f.pixels[0] + rng.normal(0, sigma, f.pixels[0].shape), 0, 255).astype(np.uint8), f.frame_index
+        )
+        for f in frames
+    ]
+
+
+def _yaw(degrees, fov_degrees=60, seed=0):
+    """A camera turning ``degrees`` in place over a far textured plane: a homography the affine fit leaves out."""
+    big = texture(seed, size=(2 * HEIGHT, 2 * WIDTH), blur=4)
+    focal = (WIDTH / 2) / np.tan(np.radians(fov_degrees) / 2)
+    k = np.array([[focal, 0, WIDTH / 2], [0, focal, HEIGHT / 2], [0, 0, 1]])
+    shift = np.array([[1, 0, -WIDTH / 2], [0, 1, -HEIGHT / 2], [0, 0, 1]], float)
+    frames = []
+    for i, angle in enumerate((0.0, np.radians(degrees))):
+        turn = np.array([[np.cos(angle), 0, np.sin(angle)], [0, 1, 0], [-np.sin(angle), 0, np.cos(angle)]])
+        frames.append(FakeFrame(cv2.warpPerspective(big, k @ turn @ np.linalg.inv(k) @ shift, (WIDTH, HEIGHT)), i))
+    return frames
+
+
+class TestTwoMotions:
+    """#1577: a still camera with a coherent mover holding up to half the samples is never a trusted motion."""
+
+    @pytest.mark.parametrize(
+        ("rect", "v", "mask"),
+        [
+            ((425, 30, 200, 207), (0, 8), DENSE),  # 18% under the dense mask; main read a trusted 1.9 px zoom
+            ((320, 0, 320, 274), (8, 0), DENSE),  # 38% under the dense mask; main read a trusted 8 px pan
+            ((320, 0, 320, 360), (8, 0), None),  # half the frame, no mask; main read a trusted 6.9 px zoom
+        ],
+    )
+    def test_a_still_camera_with_a_mover_is_static_or_refused(self, rect, v, mask):
+        reading = _pair(_still_mover(rect, v, draw=hud if mask is not None else None), mask)
+        assert reading is None or not reading.trusted or reading.motion == "static"
+
+    def test_two_translations_split_in_half_are_two_motions(self):
+        pts = _lattice_points()
+        flow = _with_flow_noise(np.where((pts[:, 0] >= WIDTH / 2)[:, None], [8.0, 0.0], [0.0, 0.0]))
+        assert _two_motion(pts, flow, *_split(pts, flow), 1)
+
+    def test_a_pure_zoom_is_one_motion(self):
+        pts = _lattice_points()
+        flow = _with_flow_noise(0.02 * (pts - [WIDTH / 2, HEIGHT / 2]))
+        assert not _two_motion(pts, flow, *_split(pts, flow), 1)
+
+    def test_a_pan_with_a_small_mover_is_one_motion(self):
+        pts = _lattice_points()
+        mover = pts[:, 0] < 0.15 * WIDTH
+        flow = _with_flow_noise(np.where(mover[:, None], [-3.0, 2.0], [5.0, 0.0]))
+        assert not _two_motion(pts, flow, *_split(pts, flow), 1)
+
+    def test_a_split_is_judged_per_frame_of_gap(self):
+        """A split about 4.8 times better than the fit is two motions over one frame, but not over three.
+
+        What the affine leaves out of a real camera's motion, such as parallax, grows with the frames between a pair;
+        flow noise does not. So a split this strong over three frames is a third as strong per frame.
+        """
+        pts = _lattice_points()
+        flow = _with_flow_noise(np.where((pts[:, 0] >= WIDTH / 2)[:, None], [6.0, 0.0], [0.0, 0.0]))
+        split = _split(pts, flow)
+        assert _two_motion(pts, flow, *split, 1)
+        assert not _two_motion(pts, flow, *split, 3)
+
+    def test_a_yaw_at_a_wide_field_of_view_is_trusted(self):
+        """A correct reading the two-motion split explains only about 2.4 times better than the fit: under the bar."""
+        reading = _pair(_yaw(0.5))
+        assert reading is not None
+        assert reading.trusted
+
+    def test_a_slow_half_frame_mover_in_noisy_footage_is_refused(self):
+        """A 5 px mover in noisy frames, whose split is about 4.5 times better than the fit: over the bar."""
+        reading = _pair(_noisy(_still_mover((320, 0, 320, 360), (5, 0)), 3))
+        assert reading is not None
+        assert reading.ambiguous
+
+    def test_a_mover_across_a_wider_gap_is_still_refused(self):
+        """A half-frame mover at 4 px a frame over three frames: judged per frame, it is still two motions.
+
+        Faster than this, the compromise fails the photometric agreement check first, which refuses it anyway.
+        """
+        reading = _pair(_still_mover((320, 0, 320, 360), (12, 0)), gap=3)
+        assert reading is not None
+        assert reading.ambiguous
+
+
 def _pans(frames, **kwargs):
     """The ``pan_x`` and ``ego_trusted`` columns of frames 1 onward."""
     stats = ego_stats(frames, **kwargs)["stats"]
@@ -259,11 +390,8 @@ class TestMaskedEgoStats:
             assert all(stats["ego_trusted"][1:])
             np.testing.assert_allclose(stats["pan_x"][1:], shift, atol=0.5)
 
-    def test_without_a_mask_the_dense_overlay_reads_slow_and_trusted(self):  # spec test 1, decision 5
-        stats = ego_stats(hud_pan(8, 6))["stats"]
-        trusted = [x for x, ok in zip(stats["pan_x"][1:], stats["ego_trusted"][1:], strict=True) if ok]
-        assert trusted
-        assert all(abs(x) < 6.0 for x in trusted)
+    def test_without_a_mask_the_dense_overlay_pan_is_refused(self):  # spec test 1, decision 5, revised by #1577
+        assert not any(ego_stats(hud_pan(8, 6))["stats"]["ego_trusted"][1:])
 
     @pytest.mark.parametrize("shift", [8, -8, 24])
     def test_lucas_kanade_reads_the_masked_pan(self, shift):  # spec test 5

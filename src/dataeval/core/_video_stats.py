@@ -170,11 +170,11 @@ def video_stats(
     ego_mask : ArrayLike or None, default None
         A 2D (height, width) image of a burned-in overlay such as a HUD, where nonzero marks the
         overlay, as ``mask`` in :func:`ego_stats`. The `EGO` statistics read the camera from the rest
-        of the frame. Without it, a dense overlay can read a pan as slower or still, and a light one
-        gets pans refused, which skews the `EGO` summaries or leaves them NaN. A mask also drops
-        samples within 32 px of the overlay, at `ego_proc_short_side`, and movers are judged against
-        what is left, so one covering about a fifth of the frame can be read as the camera. Ignored
-        unless `stats` selects an `EGO` statistic.
+        of the frame. Without it, a dense overlay drags a pan's reading slower, or splits it into two
+        motions that are refused, and a light one gets pans refused, which skews the `EGO` summaries
+        or leaves them NaN. A mask also drops samples within 32 px of the overlay, at
+        `ego_proc_short_side`, and movers are judged against what is left, so one holding most of
+        what is left can be read as the camera. Ignored unless `stats` selects an `EGO` statistic.
     progress_callback : ProgressCallback or None, default None
         Called once per finished video with the count so far and the total.
 
