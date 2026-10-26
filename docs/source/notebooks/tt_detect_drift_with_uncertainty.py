@@ -324,6 +324,35 @@ print(f"SeaDrone     -> drift: {result_drone.drifted}  (ratio: {result_drone.dis
 # The held-out VOC slice stays within the calibrated baseline (no drift), while the SeaDrone data exceeds it (drift
 # detected). The detector turned the visual gap you saw in the ECDF into an automated, label-free alert.
 
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Verify the splits and the feature: one normalized entropy value in [0, 1] for each detection
+assert (len(trainset), len(valset), len(testset), len(droneset)) == (SAMPLES_PER_SPLIT,) * 4
+for h in (h_train, h_val, h_test, h_drone):
+    assert h.ndim == 2
+    assert h.shape[1] == 1
+    assert h.min() >= 0
+    assert h.max() <= 1 + 1e-6
+
+# Verify the picture the text describes: the VOC splits cluster together and SeaDrone is shifted toward higher entropy
+medians = {
+    name: float(np.median(h)) for name, h in (("train", h_train), ("val", h_val), ("test", h_test), ("drone", h_drone))
+}
+voc = [medians["train"], medians["val"], medians["test"]]
+assert max(voc) - min(voc) < 0.02
+assert medians["drone"] > 2 * max(voc)
+
+# Verify the per-class breakdown: the most frequently predicted classes, in order, out of at most the 80 COCO classes
+assert len(top_classes) == TOP_K_CLASSES
+sizes = [len(Hc_train[cl]) for cl in top_classes]
+assert sizes == sorted(sizes, reverse=True)
+assert len(Hc_train) <= 80
+
+# Verify the drift decisions: no drift on the held-out VOC slice, drift on SeaDrone, either side of the ratio threshold
+assert not result_test.drifted
+assert result_drone.drifted
+assert result_test.distance < drift_detector.ratio_threshold < result_drone.distance
+
 # %% [markdown]
 # ## Conclusion
 #

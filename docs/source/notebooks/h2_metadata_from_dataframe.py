@@ -251,6 +251,29 @@ print(f"factor_data shape:    {od_meta.factor_data.shape}")
 od_balance = Balance().evaluate(od_meta)
 print(od_balance.balance)
 
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Verify that both adapters satisfy the protocol and discretize the factors
+for meta, catalog in ((ic_meta, ic_catalog), (od_meta, od_catalog)):
+    assert isinstance(meta, MetadataLike)
+    assert meta.factor_names == ["weather", "altitude_m"]
+    assert meta.is_binned == [False, True]
+    assert meta.factor_data.shape == (len(catalog), 2)
+    assert meta.factor_data.dtype.kind == "i"
+    assert meta.class_labels.shape == (len(catalog),)
+    assert set(meta.factor_data[:, 0]) == {0, 1, 2}  # three weather values
+    assert meta.factor_data[:, 1].min() >= 0  # four altitude bins
+    assert meta.factor_data[:, 1].max() <= 3
+
+# Verify the item indices: one image for each row in classification, several rows for an image in detection
+assert np.array_equal(ic_meta.item_indices, np.arange(len(ic_catalog)))
+assert len(np.unique(od_meta.item_indices)) == 40
+assert len(od_meta.class_labels) == len(od_catalog) > 40
+
+# Verify that Balance scored the class and both factors on both tables
+for balance in (ic_balance, od_balance):
+    assert set(balance.balance["factor_name"].to_list()) == {"class_label", "weather", "altitude_m"}
+
 # %% [markdown]
 # ## Next steps
 #

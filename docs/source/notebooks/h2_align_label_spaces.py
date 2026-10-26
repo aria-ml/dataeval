@@ -232,6 +232,48 @@ for name, labels in sources.items():
     r = label_alignment(labels, reference)
     print(f"{name:>10}: class_remap={dict(r['class_remap'])}  mergeability={r['mergeability']}")
 
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+# Verify the alignment of a list of class names: exact matches, an out-of-vocabulary class and a partial verdict
+first = label_alignment(["sedan", "truck", "spaceship"], reference)
+assert [(c.source, c.relation, c.target, c.matcher) for c in first["correspondences"]] == [
+    ("sedan", "equivalent", "sedan", "exact"),
+    ("truck", "equivalent", "truck", "exact"),
+]
+assert dict(first["class_remap"]) == {"sedan": "sedan", "truck": "truck"}
+assert tuple(first["unaligned_source"]) == ("spaceship",)
+assert first["mergeability"] == "partial"
+assert dict(first["class_remap"]) == dict(rec["matched"])  # the same as label_reconciliation on a structureless source
+
+# Verify that a coarser source is flagged broader and kept out of class_remap
+assert {(c.source, c.target) for c in coarse["correspondences"] if c.relation == "broader"} == {
+    ("car", "sedan"),
+    ("car", "suv"),
+}
+assert dict(coarse["class_remap"]) == {"car": "car"}
+
+# Verify that a finer source is coarsened, which is lossy
+assert {(c.source, c.relation, c.target) for c in result["correspondences"]} == {
+    ("car", "equivalent", "car"),
+    ("sedan", "narrower", "car"),
+}
+assert dict(result["class_remap"]) == {"car": "car", "sedan": "car"}
+assert result["mergeability"] == "lossy"
+
+# Verify the fuzzy matcher: it satisfies the protocol, accepts the near misses and withholds the rest
+assert isinstance(FuzzyMatcher(), Matcher)
+assert {c.source: c.target for c in fuzzy["correspondences"]} == {
+    "motorcyle": "motorcycle",
+    "sedans": "sedan",
+    "truck pickup": "pickup truck",
+}
+assert all(c.matcher == "fuzzy" and c.confidence >= 0.85 for c in fuzzy["correspondences"])
+assert tuple(fuzzy["unaligned_source"]) == ("stop sign",)
+
+# Verify that each source expresses itself in the shared reference vocabulary
+for labels in sources.values():
+    assert set(label_alignment(labels, reference)["class_remap"].values()) <= set(reference.ids)
+
 # %% [markdown]
 # ## Next steps
 #
