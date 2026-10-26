@@ -200,7 +200,7 @@ print(f"mean |background - whole image| brightness: {drift:.3f}")
 # must watch for images whose fraction approaches 0.
 
 # %% [markdown]
-# ## Question 1: target vs background
+# ## Compare each target with its background
 #
 # Because unit-level factors propagate down to the instance rows beneath them, one frame
 # holds each detection's own brightness *beside* the brightness of the scene behind it.
@@ -331,7 +331,7 @@ print(camouflaged.group_by("class_name").agg(pl.len().alias("n")).sort("n", desc
 print(camouflaged.select("item_index", "target_index", "class_name", "separation").head(8))
 
 # %% [markdown]
-# ## Question 2: target vs target
+# ## Compare targets with each other
 #
 # Comparing detections to each other has a trap in it: raw statistics are dominated by
 # the conditions of the image each detection came from. Two boats in different lighting
@@ -371,7 +371,7 @@ print(comparison)
 # 0.2% of the frame it was found in.
 
 # %% [markdown]
-# ## Does the background predict the class?
+# ## Check whether the background predicts the class
 #
 # The two questions meet here. If the scene behind an object carries information about
 # *which* class it is, a model can score well by reading the water instead of the object -
@@ -480,6 +480,14 @@ print(classwise)
 # - **Always read `background_fraction` first.** It decides whether the rest of the
 #   background numbers mean anything, and on datasets with large objects it will vary far
 #   more than it does here.
+
+# %% [markdown]
+# ## Conclusion
+#
+# You computed image statistics for the whole frame, for each bounding box and for the background with
+# {func}`.image_stats` and placed them on the metadata. You scored how far each detection sits from its
+# surroundings, compared detections across scenes as ratios to their frames, and ran {class}`.Balance` to see whether
+# the background carries information about the class.
 
 # %% [markdown]
 # ## Next steps

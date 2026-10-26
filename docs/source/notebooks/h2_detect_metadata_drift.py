@@ -184,7 +184,7 @@ describe("gimbal_pitch")
 # %% [markdown]
 # ## Fix the data, not the threshold
 #
-# Filter out the missing telemetry codes and rerun both passes, instead of adjusting the threshold.
+# Filter out the missing telemetry codes and rerun both passes.
 
 # %%
 has_telemetry = [

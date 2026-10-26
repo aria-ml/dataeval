@@ -17,7 +17,7 @@
 # # How to keep metadata in sync with its dataset and cache it
 #
 # Filtering {class}`.Metadata` with {meth}`.Metadata.where` or {meth}`.Metadata.having` removes rows from the metadata
-# but no items from the dataset it is bound to, so anything computed from the dataset, embeddings above all, no longer
+# but nothing from its dataset, so anything computed from the dataset, embeddings above all, no longer
 # lines up with it. {meth}`.Metadata.selected_items` returns the items that survived so you can build a matching
 # {class}`.View`, and {meth}`.Metadata.save` caches the metadata so it is built once. See
 # [Metadata Levels](../concepts/MetadataLevels.md).
