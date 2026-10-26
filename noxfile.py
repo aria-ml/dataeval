@@ -375,7 +375,7 @@ def docs(session: nox.Session) -> None:
         cache_dir = "docs/source/.jupyter_cache"
         session.log(f"Clearing jupyter cache at {cache_dir} to force re-execution...")
         session.run("rm", "-rf", cache_dir, external=True)
-    elif not skip_notebooks:
+    elif not skip_notebooks and not os.environ.get("DOCS_CACHE_RESTORED"):
         # Fetch cached notebook results from orphan artifact branch
         session.run("bash", "docs/fetch-docs-cache.sh", external=True)
 

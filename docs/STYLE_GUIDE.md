@@ -428,6 +428,6 @@ change that alters the meaning.
 - Make one deliverable for each merge request. Do not bundle unrelated documentation changes, because they become one
   changelog line.
 - Write each commit message as one line, `[docs] Subject`, with no body and no trailer.
-- Add `+skipdocsclean` to the title or the description when no code cell and no library behavior changed. The main
-  pipeline then reuses the notebook cache.
+- Leave the cache alone. The main pipeline reuses cached notebook outputs unless a code cell or a shared execution
+  input such as `src/` changed.
 - List the checks you ran and the ones you could not run.

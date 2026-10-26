@@ -17,11 +17,6 @@ variables:
   GIT_CONFIG_KEY_0: safe.directory
   GIT_CONFIG_VALUE_0: $CI_PROJECT_DIR
   RELEASE_BRANCH_PATTERN: '/^release\/v.*/'
-  # Commits to main normally force a full notebook re-execution (DOCS_CLEAN
-  # below). Putting +skipdocsclean in the commit message drops that, so the docs
-  # build reuses the cached notebook outputs from docs-artifacts/main and only
-  # re-executes notebooks whose code actually changed.
-  DOCS_SKIP_CLEAN_PATTERN: '/\+skipdocsclean/'
 
 .python_versions: &python_versions
   - PYTHON_VERSION: ['3.11', '3.12', '3.13', '3.14']
@@ -196,13 +191,13 @@ stages:
     # A version tag republishes the notebooks to docs-artifacts/<tag>, which is where the
     # colab links rewritten by scripts/release.py point.
     - if: $CI_COMMIT_TAG
-    # Build off the cache instead of re-executing every notebook. Scheduled
-    # pipelines (the nightly cache refresh) ignore the marker so the cache still
-    # gets rebuilt from scratch on its usual cadence.
-    - if: $CI_PIPELINE_SOURCE != 'schedule' && $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_MESSAGE =~ $DOCS_SKIP_CLEAN_PATTERN
-    - if: $CI_COMMIT_BRANCH == 'main'
+    # Keep the scheduled clean rebuild for changes outside the repository
+    # (datasets, model downloads, etc.). Other builds validate the restored
+    # cache's execution inputs in the docs job before reusing notebook outputs.
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_CLEAN: '-- clean'
+    - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
@@ -210,6 +205,12 @@ stages:
           - src/**/*
           - docs/**/*
           - uv.lock
+          - pyproject.toml
+          - noxfile.py
+          - .cuda-version
+          - .gitlab-ci.yml
+          - .gitlab/ci/base.yml
+          - .gitlab/ci/docs.yml
           - '*.md'
 
 # Any merge request, regardless of which files changed. The preview site is

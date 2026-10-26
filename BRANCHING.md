@@ -313,21 +313,11 @@ links, and the tag pushed alongside it already runs everything a release needs.
 | [`validate_commit_prefix.py`](.gitlab/scripts/validate_commit_prefix.py) | Enforce MR title prefixes             | CI                  |
 | [`push_verification.py`](.gitlab/scripts/push_verification.py)           | Publish verification artifacts        | CI                  |
 
-### Commit Message Triggers
+### Docs Notebook Cache
 
-| Marker           | Effect                                                                   |
-| ---------------- | ------------------------------------------------------------------------ |
-| `+skipdocsclean` | Build docs from the cached notebook outputs instead of re-executing them |
-
-Commits to `main` normally run the docs build with `nox -e docs -- clean`, which wipes the Jupyter cache and
-re-executes every notebook. Adding `+skipdocsclean` to the commit message drops the `clean`, so the build pulls
-`.jupyter_cache` from the `docs-artifacts/main` branch and only re-executes notebooks whose code cells
-changed. The docs still build and publish -- only the notebook execution is avoided.
-
-Use it for commits that cannot change notebook output (CI config, packaging, prose-only doc edits). The
-marker has to appear in the *merge commit* message, which GitLab composes from the MR title and description,
-so putting `+skipdocsclean` in either one works. Scheduled pipelines ignore the marker, so the nightly cache
-refresh still rebuilds from scratch.
+The docs build reuses cached notebook outputs and re-executes only the notebooks whose code cells changed. It runs
+every notebook again when a shared input changes (`src/`, the lock file, the docs CI configuration and similar), and
+in the scheduled nightly build. [`docs/CACHE_MANAGEMENT.md`](docs/CACHE_MANAGEMENT.md) lists the inputs.
 
 ### What Requires Manual Action
 

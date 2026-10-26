@@ -97,8 +97,11 @@ permissions:
 The `docs` job in `.gitlab/ci/docs.yml`:
 
 1. **before_script**: Install dependencies (uv, nox)
-1. **script**: Build docs with nox (nox internally calls `fetch-docs-cache.sh`)
-1. **after_script**: Push cache using `push-docs-cache.sh` (only on main/release branches)
+1. Restore notebook outputs with `fetch-docs-cache.sh`, then compare the saved execution inputs with the checkout
+1. Build docs with nox, using `clean` if the inputs differ or this is a scheduled main build
+1. Record execution inputs after the build succeeds, then push the cache and generated notebooks with `push-docs-cache.sh`
+
+The job sets `DOCS_CACHE_RESTORED=1` so nox uses the cache that was checked instead of fetching it again.
 
 ```yaml
 variables:
@@ -109,16 +112,40 @@ variables:
 
 ### When Cache is Pushed
 
-Cache is pushed to artifact branches only for:
+Successful GitLab docs builds push cache to:
 
-- `main` branch
-- `release/*` branches
+- `docs-artifacts/main` for main
+- `docs-artifacts/<branch>` for merge request branches
+- `docs-artifacts/<tag>` for tags, including version tags used by Colab links
 
-This prevents proliferation of artifact branches for short-lived feature branches.
+Release branches only publish to a version tag on HEAD. Orphaned feature artifact branches are removed after merge.
 
 ### Cache Invalidation
 
-The cache is automatically updated on every docs build for tracked branches. To manually clear cache:
+Normal main, merge request, and tag builds reuse cached notebook outputs when their execution inputs match.
+Jupyter's code-cell hashes decide which individual notebooks need execution, so a notebook edit reruns that notebook
+without clearing every other result. Prose edits reuse existing outputs; Sphinx still rebuilds the site.
+
+`docs/notebook_cache_inputs.py` stores `execution-inputs.json` inside `.jupyter_cache` after a successful GitLab build.
+It compares file contents and execution settings against that restored manifest, rather than just the previous commit.
+Canceled or skipped builds therefore cannot hide changes that the saved cache has never executed against.
+
+A clean run is required when any shared execution input changes:
+
+- Library files under `src/`
+- `uv.lock`, `pyproject.toml`, `noxfile.py`, or `.cuda-version`
+- Docs CI configuration (`.gitlab-ci.yml`, `.gitlab/ci/base.yml`, `.gitlab/ci/docs.yml`)
+- Sphinx configuration, dataset helpers, notebook model files, Jupytext configuration, or cache-checking scripts
+- The docs Python version, device extras, or runner tag
+
+The exact input paths and environment variables are listed in `docs/notebook_cache_inputs.py`.
+Generated and ignored files such as `_version.py` and bytecode do not invalidate the cache. An older cache without
+a manifest requires one clean build to initialize it. The `+skipdocsclean` commit marker is no longer needed.
+
+Scheduled main builds (`DOCS_NIGHTLY`) still force a clean run to refresh external datasets and model downloads.
+To request a clean build manually, set the pipeline variable `DOCS_CLEAN` to `-- clean`.
+
+To remove the saved cache entirely:
 
 ```bash
 # Delete the artifact branch
