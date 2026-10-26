@@ -288,29 +288,57 @@ def _record_source(result: Output[Any], values: Sequence[Any]) -> None:
         object.__setattr__(result, "_dataset", datasets[0] if len(datasets) == 1 else None)
 
 
-def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | None = None) -> Callable[_P, _R]:  # noqa: C901
+def _fmt(v: Any) -> Any:
+    """Describe one argument or state value for an execution record, without holding on to it."""
+    if np.isscalar(v):
+        return v
+    if hasattr(v, "shape"):
+        return f"{v.__class__.__name__}: shape={v.shape}"
+    # A dataset whose items a rule chose names the rule, so the record says which items were
+    # measured and not only how many. Looked up on the class, so a wrapper that forwards
+    # attributes is not mistaken for the dataset it wraps.
+    if getattr(type(v), "_provenance", None) is not None:
+        return v._provenance
+    if hasattr(v, "__len__"):
+        return f"{v.__class__.__name__}: len={len(v)}"
+    return f"{v.__class__.__name__}"
+
+
+def _recorded_arguments(signature: inspect.Signature, bound: inspect.BoundArguments) -> dict[str, Any]:
+    """Describe a bound call's arguments for its execution record, each under its own parameter.
+
+    Bound the way Python binds them: zipping the positional arguments onto the parameter names put
+    a third dataset of ``evaluate(data, *other, levels=...)`` under ``levels``. Extra positionals
+    are listed under their parameter; extra keywords sit beside the named ones, as they always have.
+    """
+    bound.apply_defaults()
+    arguments: dict[str, Any] = {}
+    for name, parameter in signature.parameters.items():
+        value = bound.arguments.get(name)
+        if parameter.kind is inspect.Parameter.VAR_POSITIONAL:
+            arguments[name] = [_fmt(v) for v in value or ()]
+        elif parameter.kind is inspect.Parameter.VAR_KEYWORD:
+            arguments.update({key: _fmt(v) for key, v in (value or {}).items()})
+        else:
+            arguments[name] = _fmt(value)
+    return arguments
+
+
+def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | None = None) -> Callable[_P, _R]:
     """Stamp Output classes with runtime metadata."""
     if fn is None:
         return partial(set_metadata, state=state)  # type: ignore
 
     @wraps(fn)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-        def fmt(v: Any) -> Any:
-            if np.isscalar(v):
-                return v
-            if hasattr(v, "shape"):
-                return f"{v.__class__.__name__}: shape={v.shape}"
-            if hasattr(v, "__len__"):
-                return f"{v.__class__.__name__}: len={len(v)}"
-            return f"{v.__class__.__name__}"
-
-        # Collect function metadata
-        # set all params with defaults then update params with mapped arguments and explicit keyword args
-        fn_params = inspect.signature(fn).parameters
-        arguments = {k: None if v.default is inspect.Parameter.empty else v.default for k, v in fn_params.items()}
-        arguments.update(zip(fn_params, args, strict=False))
-        arguments.update(kwargs)
-        arguments = {k: fmt(v) for k, v in arguments.items()}
+        # A call that cannot bind is one ``fn`` refuses with its own error, so it is handed to ``fn``.
+        # Only the binding is guarded: an argument that fails to describe itself still raises.
+        signature = inspect.signature(fn)
+        try:
+            bound = signature.bind_partial(*args, **kwargs)
+        except TypeError:
+            return fn(*args, **kwargs)
+        arguments = _recorded_arguments(signature, bound)
         is_method = "self" in arguments
         module = args[0].__class__.__module__ if is_method else fn.__module__.removeprefix("src.")
         class_prefix = f".{args[0].__class__.__name__}." if is_method else "."
@@ -343,7 +371,7 @@ def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | N
         # Still an unguarded lookup. A name in ``state`` that the class does not carry is a
         # typo in the decorator, and recording it as ``None`` writes a plausible-looking
         # null into every result rather than saying so.
-        state_attrs = {k: fmt(getattr(args[0], k)) for k in state or []} if is_method else {}
+        state_attrs = {k: _fmt(getattr(args[0], k)) for k in state or []} if is_method else {}
 
         # Update output with recorded metadata
         metadata = ExecutionMetadata(name, time, duration, arguments, state_attrs, __version__)

@@ -1339,17 +1339,45 @@ class TestTrackingDispatch:
             [(0, 1), (0, 3)],
         ]
 
-    def test_frame_sample_thins_the_scan(self):
-        dataset = make_tracking_dataset([list(range(10, 100, 10))])
-        assert len(Duplicates(frame_sample=3).evaluate(dataset).data()) >= 0
-        frames = SequenceFrames(dataset, Stride(3))
-        assert len(frames) == 3
+    def test_frame_sample_is_gone(self):
+        """Frames are chosen by wrapping the dataset in a SequenceFrames, the one door every tool shares."""
+        with pytest.raises(TypeError, match="frame_sample"):
+            Duplicates(frame_sample=3)  # type: ignore[call-arg]
+        with pytest.raises(ValueError, match="frame_sample"):
+            Duplicates.Config(frame_sample=3)  # type: ignore[call-arg]
 
-    def test_frame_sample_accepts_a_selector_directly(self):
-        dataset = make_tracking_dataset([[10, 20, 30, 40]])
-        result = Duplicates(flags=ImageStats.HASH_XXHASH, frame_sample=FrameIndices({0: [0, 2]})).evaluate(dataset)
-        assert result.hash_radius == 0
-        assert len(result) == 0  # frames 0 and 2 differ
+    def test_a_selector_thins_the_scan(self):
+        dataset = make_tracking_dataset([[10, 20, 10, 30, 10, 40, 10, 50, 10]])
+        thinned = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(SequenceFrames(dataset, Stride(2)))
+        assert thinned.exact == [[(0, 0), (0, 2), (0, 4), (0, 6), (0, 8)]]
+        assert thinned.aggregate_by_sequence()["n_frames"].item() == 5
+
+    def test_a_selector_chooses_the_frames(self):
+        dataset = make_tracking_dataset([[10, 20, 10, 40]])
+        evaluator = Duplicates(flags=ImageStats.HASH_XXHASH)
+        assert len(evaluator.evaluate(dataset)) > 0  # every frame: frames 0 and 2 repeat
+        assert len(evaluator.evaluate(SequenceFrames(dataset, FrameIndices({0: [0, 1]})))) == 0  # only 0 and 1
+
+    def test_a_long_selector_is_recorded_short(self):
+        dataset = make_tracking_dataset([[10] * 400])
+        frames = SequenceFrames(dataset, FrameIndices({0: list(range(0, 400, 2))}))
+        recorded = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(frames).meta().arguments["data"]
+        assert recorded.startswith("SequenceFrames: len=200, selector=FrameIndices(")
+        assert len(recorded) < 300
+
+    def test_the_execution_record_names_the_frame_selector(self):
+        dataset = make_tracking_dataset([[10, 20, 10, 20]])
+        meta = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(SequenceFrames(dataset, Stride(2))).meta()
+        assert "selector=Stride(step=2" in meta.arguments["data"]
+        assert "frame_sample" not in meta.state
+
+    def test_the_record_names_every_datasets_selector(self):
+        a, b, c = (make_tracking_dataset([[10, 20, 10, 20]]) for _ in range(3))
+        views = SequenceFrames(b, Stride(2)), SequenceFrames(c, Stride(1))
+        arguments = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(a, *views).meta().arguments
+        named = [("Stride(step=2" in s, "Stride(step=1" in s) for s in arguments["other"]]
+        assert named == [(True, False), (False, True)]
+        assert arguments["levels"] == "NoneType"  # the unset default, not the third dataset
 
     def test_an_already_wrapped_frame_view_passes_through(self):
         dataset = make_tracking_dataset([[10, 20, 10]])
@@ -1479,7 +1507,8 @@ class TestAggregateBySequence:
         """Thinning changes the denominator, which is why n_frames is reported beside it."""
         dataset = make_tracking_dataset([[10] * 8])
         full = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(dataset).aggregate_by_sequence()
-        thinned = Duplicates(flags=ImageStats.HASH_XXHASH, frame_sample=2).evaluate(dataset).aggregate_by_sequence()
+        thinned_view = SequenceFrames(dataset, Stride(2))
+        thinned = Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(thinned_view).aggregate_by_sequence()
         assert full["n_frames"].item() == 8
         assert thinned["n_frames"].item() == 4
         assert full["redundant_fraction"].item() == pytest.approx(7 / 8)
@@ -2715,7 +2744,7 @@ class TestAnnotationDigests:
         bboxes = [[[0, 0, 5, 5]], [[0, 0, 5, 5]], [[1, 1, 6, 6]]]
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        measured, _, _ = _as_frames(dataset, None, "test")
+        measured, _, _ = _as_frames(dataset, "test")
         digests = _annotation_digests(measured)
 
         assert len(digests) == len(dataset)
@@ -2726,7 +2755,7 @@ class TestAnnotationDigests:
     def test_empty_for_a_dataset_with_no_annotation(self):
         """A plain image dataset makes the annotation axis self-disable rather than error."""
         dataset = MockDataset()
-        measured, _, _ = _as_frames(dataset, None, "test")
+        measured, _, _ = _as_frames(dataset, "test")
         assert _annotation_digests(measured) == {}
 
     def test_multi_dataset_digests_use_one_flattened_numbering(self, get_mock_od_dataset):
@@ -2743,7 +2772,7 @@ class TestAnnotationDigests:
         )
         second = get_mock_od_dataset([np.zeros((3, 16, 16))], [[0]], [[[0, 0, 5, 5]]])
 
-        measured, _, _ = _as_frames_multi([first, second], None, "test")
+        measured, _, _ = _as_frames_multi([first, second], "test")
         digests = _annotation_digests(measured)
 
         assert len(digests) == 3
@@ -2818,7 +2847,7 @@ class TestAnnotationDigests:
         `_annotation_digests` also stays on the target side, through `source` and `frame_map`,
         the same route `SequenceFrames.track_map` takes. One digest per sequence, not per frame.
         """
-        measured, _, _ = _as_frames(self._undecodable_tracking_dataset([[0, 0]]), None, "test")
+        measured, _, _ = _as_frames(self._undecodable_tracking_dataset([[0, 0]]), "test")
         digests = _annotation_digests(measured)
 
         assert len(digests) == 1
@@ -2835,7 +2864,7 @@ class TestAnnotationDigests:
         one that just repeats the same detection every frame.
         """
         dataset = self._undecodable_tracking_dataset([[0, 0], [0, 1]])
-        measured, _, _ = _as_frames(dataset, None, "test")
+        measured, _, _ = _as_frames(dataset, "test")
         digests = _annotation_digests(measured)
 
         assert set(digests) == {0, 2}  # one representative frame per sequence

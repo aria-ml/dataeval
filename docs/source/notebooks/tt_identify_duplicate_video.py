@@ -560,7 +560,7 @@ display(
 #
 # Every duplicate is reported in source-video coordinates, as a sequence index and frame numbers. To view the
 # duplicated frames, pull out a sequence, or build a split without them, pass those coordinates to
-# {class}`~dataeval.data.FrameIndices`, which `frame_sample` accepts.
+# {class}`~dataeval.data.FrameIndices`, a selector that {class}`~dataeval.data.SequenceFrames` accepts.
 #
 # ```{note}
 # `Duplicates` reports frame numbers (each frame's `frame_index`), while `FrameIndices` takes stream positions. A
@@ -630,7 +630,7 @@ print(f"sequence {sequence} without the shared stretch: {len(without_leak)} of {
 # | `containment` near `[1.0, 1.0]` between two sequences | The same footage stored twice. Keep one, preferring the copy with better annotations.                                     |
 # | Lopsided `containment` across two splits              | Leakage. Cut the shared frames from the test split, or split by sequence instead.                                         |
 # | A `segment` shared by two sequences in one split      | A reused clip. Keep one copy of the stretch, or keep both and make sure the split keeps them together.                    |
-# | High `redundant_fraction`                             | Thin the sequence with `frame_sample` rather than deleting frames, after checking that the dwell is not itself signal.    |
+# | High `redundant_fraction`                             | Thin the sequence with `SequenceFrames(..., Redundancy())` rather than deleting frames, once the dwell is not signal.     |
 # | An `aligned` relationship                             | Repackaged or resampled footage. Treat the aligned stretch as a duplicate of the source.                                  |
 # | A track match across two sequences                    | Shared footage, not a labeling error. Remove the reused clip, or record it if the objects were pasted in as augmentation. |
 # | A track match inside one sequence                     | Two identifiers on one object. Merge them in the annotations.                                                             |

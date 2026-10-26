@@ -45,6 +45,9 @@ from dataeval.utils.preprocessing import BoundingBox, normalize_image_shape
 
 _logger = get_logger(__name__)
 
+# Longest selector repr an execution record keeps; past it the record says the rest was cut.
+_PROVENANCE_CHARS = 200
+
 RESERVED_FACTORS: frozenset[str] = frozenset({
     "id",
     "source_id",
@@ -427,6 +430,18 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
     def __repr__(self) -> str:
         return f"SequenceFrames(dataset={self._dataset!r}, selector={self._selector!r})"
+
+    @property
+    def _provenance(self) -> str:
+        """How an execution record names this view: its length and the selector that chose its frames.
+
+        Capped, because a :class:`~dataeval.data.FrameIndices` replaying a recorded selection spells
+        out every position it keeps, and the record also goes into the log.
+        """
+        selector = repr(self._selector)
+        if len(selector) > _PROVENANCE_CHARS:
+            selector = f"{selector[: _PROVENANCE_CHARS - 3]}..."
+        return f"{type(self).__name__}: len={len(self)}, selector={selector}"
 
     def __str__(self) -> str:
         title = "SequenceFrames Dataset"
