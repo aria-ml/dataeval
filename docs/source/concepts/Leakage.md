@@ -181,6 +181,13 @@ the number of evaluations against any fixed holdout, refresh test sets
 periodically, and budget test-set access deliberately, as in the reusable-holdout
 mechanism of [Dwork et al. (2015)](#ref4).
 
+## See this in practice
+
+### Tutorials
+
+- [Identify duplicate video](../notebooks/tt_identify_duplicate_video.py) — finding train-test leakage between the
+  sequences of a tracking dataset.
+
 ## References
 
 1. [Kapoor, S., & Narayanan, A. (2022). Leakage and the reproducibility crisis

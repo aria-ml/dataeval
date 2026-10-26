@@ -201,12 +201,12 @@ into a test report.
 
 ### How-to guides
 
-- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
+- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
 - [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 
 ### Tutorials
 
-- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.py) —
+- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py) —
   coverage gaps and embedding-space decisions
 
 ## References

@@ -163,3 +163,12 @@ reason to prefer the curated operations.
 - {doc}`DataIntegrity` — the evaluators these statistics feed
 - {func}`~dataeval.core.image_stats` — the flags and their parameters
 - {class}`~dataeval.flags.ImageStats` — the full statistic list
+
+## See this in practice
+
+### How-to guides
+
+- [How to measure named groups of channels](../notebooks/h2_measure_channel_groups.py) — naming groups of bands so
+  that each group is measured separately.
+- [How to respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) — what an operation invalidates
+  and the three ways to respond.

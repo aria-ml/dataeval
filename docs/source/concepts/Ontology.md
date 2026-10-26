@@ -545,9 +545,16 @@ model is queried with rather than a fixed integer label map.
 - [How to reconcile labels against an ontology](../notebooks/h2_reconcile_labels_ontology.py)
   — build an ontology, reconcile a dataset's class names, and explore the
   recovered hierarchy.
-- [How to align label spaces](../notebooks/h2_align_label_spaces.py) — map one
+- [How to align two label spaces](../notebooks/h2_align_label_spaces.py) — map one
   vocabulary onto another, read the typed correspondences, and get a mergeability
   verdict.
+- [How to conform and merge datasets with different label vocabularies](../notebooks/h2_conform_and_merge_datasets.py)
+  — conforming an incoming dataset to a reference vocabulary and merging the two.
+
+### Tutorials
+
+- [Identify gaps in a labeled dataset](../notebooks/tt_identify_dataset_gaps.py) — an ontology, label counts and
+  embeddings combined into one per-class gap report.
 
 ## References
 

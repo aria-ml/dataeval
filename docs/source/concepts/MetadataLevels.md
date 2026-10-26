@@ -1074,8 +1074,12 @@ level question.
   everything on this page worked end to end on an aerial detection dataset: the same
   factor reporting two distributions, `at` and `inherited`, `agg`, `where` versus
   `having`, and the bias question that can only be asked once a level is chosen.
+- [Compare objects to their surroundings](../notebooks/tt_compare_objects_to_surroundings.py) — the background is
+  stored at the unit level and reaches the instance rows beneath it.
 
 ### How-to guides
 
 - [How to keep metadata in sync with its dataset and cache it](../notebooks/h2_sync_and_cache_metadata.py)
   — realigning filtered metadata with its dataset, and saving it so it is built once.
+- [How to trace a finding back to its source](../notebooks/h2_trace_findings_to_source.py) — retrieving the image,
+  frame, track or detection that a finding's `SourceIndex` names.

@@ -563,18 +563,22 @@ effective groups at each level; see
 
 ### How-to guides
 
-- [How to add intrinsic metadata factors](../notebooks/h2_add_intrinsic_factors.py)
+- [How to add intrinsic factors to Metadata](../notebooks/h2_add_intrinsic_factors.py)
 - [How to measure label independence](../notebooks/h2_measure_label_independence.py)
-- [How to detect undersampling](../notebooks/h2_detect_undersampling.py)
-- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
+- [How to detect undersampled data subsets](../notebooks/h2_detect_undersampling.py)
+- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
 - [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+- [How to build a MetadataLike object from a DataFrame](../notebooks/h2_metadata_from_dataframe.py)
+- [How to build dataset views with View and Operation](../notebooks/h2_build_dataset_views.py)
 
 ### Tutorials
 
-- [Identifying bias tutorial](../notebooks/tt_identify_bias.py) — end-to-end
+- [Identify bias and correlations](../notebooks/tt_identify_bias.py) — end-to-end
   walkthrough of balance and diversity analysis on a realistic dataset
-- [Assessing data space tutorial](../notebooks/tt_assess_data_space.py) —
+- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py) —
   coverage and completeness analysis in practice
+- [Identify gaps in a labeled dataset](../notebooks/tt_identify_dataset_gaps.py) — label-space and embedding-space
+  gaps in a labeled dataset
 
 ## References
 
