@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.infrastructure
+
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs" / "source"
 

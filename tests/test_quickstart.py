@@ -19,6 +19,8 @@ import pytest
 
 from dataeval.quality import DuplicatesOutput
 
+pytestmark = pytest.mark.infrastructure
+
 QUICKSTART = Path(__file__).resolve().parent.parent / "docs" / "source" / "getting-started" / "quickstart.md"
 FENCE = re.compile(r"^```python\n(.*?)^```", re.DOTALL | re.MULTILINE)
 

@@ -16,6 +16,8 @@ import pytest
 
 import dataeval
 
+pytestmark = pytest.mark.infrastructure
+
 DIRECTIVE = ".. deprecated::"
 
 

@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.infrastructure
+
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = "docs/notebook_cache_inputs.py"
 MANIFEST = "docs/source/.jupyter_cache/execution-inputs.json"
