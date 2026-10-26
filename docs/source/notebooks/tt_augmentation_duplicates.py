@@ -33,9 +33,9 @@
 #
 # ## What you will learn
 #
-# - Which augmentation types are detectable as near-duplicates (and which aren't)
-# - When to use D4 hashes vs BoVW embeddings for duplicate detection
-# - How D4 and BoVW have complementary strengths that improve coverage when combined
+# - Which of the transformations each method detects on one test image
+# - How D4 hashes and BoVW embeddings differ on the same transformations
+# - How the combined detector compares with either method alone
 #
 # ### Quick reference: detection methods
 #
@@ -193,13 +193,13 @@ plt.show()
 #
 # We'll test a comprehensive set of common torchvision transformations, organized by category:
 #
-# | Category        | Transformations                     | Expected Detection                |
-# | --------------- | ----------------------------------- | --------------------------------- |
-# | **Geometric**   | Rotation, Flip, Affine, Perspective | High (SIFT is geometry-invariant) |
-# | **Color**       | ColorJitter, Grayscale, Invert      | Medium (depends on intensity)     |
-# | **Blur/Noise**  | GaussianBlur, Noise                 | Medium to Low                     |
-# | **Crop/Resize** | RandomCrop, Resize, CenterCrop      | Medium (depends on overlap)       |
-# | **Severe**      | RandomErasing, Heavy distortion     | Low (features destroyed)          |
+# | Category        | Transformations                     |
+# | --------------- | ----------------------------------- |
+# | **Geometric**   | Rotation, Flip, Affine, Perspective |
+# | **Color**       | ColorJitter, Grayscale, Invert      |
+# | **Blur**        | GaussianBlur                        |
+# | **Crop/Resize** | RandomCrop, Resize, CenterCrop      |
+# | **Severe**      | RandomErasing                       |
 #
 # **Important setup notes:**
 #
@@ -224,7 +224,7 @@ def _rotate_and_resize(degrees):
 
 # Define transformation categories
 transformations = {
-    # Geometric transformations - SIFT should handle these well
+    # Geometric transformations
     "Rotation 15°": _rotate_and_resize(15),
     "Rotation 45°": _rotate_and_resize(45),
     "Rotation 90°": _rotate_and_resize(90),
@@ -235,7 +235,7 @@ transformations = {
     "Affine (rotate+scale)": T.RandomAffine(degrees=_n(15), scale=(0.8, 1.2), fill=FILL),
     "Perspective (mild)": T.RandomPerspective(distortion_scale=0.2, p=1.0, fill=FILL),
     "Perspective (strong)": T.RandomPerspective(distortion_scale=0.5, p=1.0, fill=FILL),
-    # Color transformations - may or may not be detected
+    # Color transformations
     "Brightness +30%": T.ColorJitter(brightness=(1.3, 1.3)),
     "Brightness -30%": T.ColorJitter(brightness=(0.7, 0.7)),
     "Contrast +50%": T.ColorJitter(contrast=(1.5, 1.5)),
@@ -253,7 +253,7 @@ transformations = {
     "Random Crop (80%)": T.Compose([T.RandomCrop(180), T.Resize(IMG_SIZE)]),
     "Resize Down+Up": T.Compose([T.Resize(112), T.Resize(IMG_SIZE)]),
     "Resize Down+Up (severe)": T.Compose([T.Resize(56), T.Resize(IMG_SIZE)]),
-    # Severe transformations - likely to break detection
+    # Severe transformations
     "Random Erasing (10%)": T.RandomErasing(p=1.0, scale=(0.02, 0.1)),
     "Random Erasing (33%)": T.RandomErasing(p=1.0, scale=(0.2, 0.33)),
     # Combinations (common augmentation pipelines)
@@ -558,52 +558,89 @@ for i in range(1, len(images) - 2):
 print("=" * 90)
 
 # %% [markdown]
-# ## Key findings and recommendations
+# ## Key findings
 #
-# ### Transformations detected as near-duplicates
+# These results are for one test image and one random seed. The cell groups the transformations into families and counts
+# how many of each family every detector found.
+
+# %%
+FAMILIES = (
+    ("Rotation", "Rotation"),
+    ("Horizontal Flip", "Flip"),
+    ("Vertical Flip", "Flip"),
+    ("Affine", "Affine"),
+    ("Perspective", "Perspective"),
+    ("Brightness", "Color"),
+    ("Contrast", "Color"),
+    ("Saturation", "Color"),
+    ("Hue", "Color"),
+    ("Full ColorJitter", "Color"),
+    ("Grayscale", "Grayscale"),
+    ("Color Invert", "Invert"),
+    ("Gaussian Blur", "Blur"),
+    ("Center Crop", "Crop"),
+    ("Random Crop", "Crop"),
+    ("Resize", "Resize"),
+    ("Random Erasing", "Erasing"),
+    ("Augment", "Pipeline"),
+)
+
+
+def family(label: str) -> str:
+    """Name the family of a transformation from the start of its label."""
+    return next(name for prefix, name in FAMILIES if label.startswith(prefix))
+
+
+counts: dict[str, list[int]] = {}
+for i in range(1, len(images) - 2):
+    row = counts.setdefault(family(labels[i]), [0, 0, 0, 0])
+    row[0] += 1
+    row[1] += i in d4_detected
+    row[2] += i in bovw_detected
+    row[3] += i in combined_detected
+
+print(f"{'Family':<12} {'Tested':>6} {'D4':>4} {'BoVW':>5} {'Combined':>9}")
+for name, (tested, d4, bovw, combined) in counts.items():
+    print(f"{name:<12} {tested:>6} {d4:>4} {bovw:>5} {combined:>9}")
+print(
+    f"{'Total':<12} {len(transformations):>6} {len(d4_detected):>4} {len(bovw_detected):>5} {len(combined_detected):>9}"
+)
+
+# %% [markdown]
+# On this image:
 #
-# | Transformation Type                    | D4 Hash | BoVW    | Notes                                                                     |
-# | -------------------------------------- | ------- | ------- | ------------------------------------------------------------------------- |
-# | **Rotation (90° increments)**          | Yes     | Yes     | Both methods detect 90° and 180° reliably                                 |
-# | **Rotation (arbitrary angles)**        | No      | Yes     | BoVW's SIFT features are rotation-invariant at any angle                  |
-# | **Horizontal/Vertical Flip**           | Yes     | No      | BoVW clusters flips separately from the original; D4 is designed for this |
-# | **Perspective**                        | No      | Yes     | BoVW detects both mild and strong perspective distortion                  |
-# | **Affine (rotate+translate)**          | No      | Yes     | BoVW handles combined rotation and translation                            |
-# | **Brightness / Contrast / Saturation** | Partial | Partial | Both detect some color shifts; depends on which channel is affected       |
-# | **Grayscale**                          | No      | Yes     | SIFT operates on luminance, so grayscale conversion preserves features    |
-# | **Color Inversion**                    | Yes     | Yes     | Both methods detect inversion                                             |
-# | **Gaussian Blur (mild)**               | Yes     | Yes     | Both methods tolerate mild blur                                           |
-# | **Gaussian Blur (strong)**             | Yes     | No      | D4 hashes are more resilient to strong blur than SIFT                     |
-# | **Resize Down+Up**                     | No      | Yes     | BoVW detects mild resolution loss; both miss severe downsampling          |
+# - D4 hashes detect the 90° and 180° rotations and both flips, and BoVW detects neither flip.
+# - BoVW detects the 15° and 45° rotations, which D4 hashes miss.
+# - No detector, alone or combined, detects the center or random crops or the random erasing transformations.
+# - The combined detector finds more than either method alone, including some transformations that neither finds alone.
+# - No transformation is detected at a `cluster_sensitivity` of 0.75, and the number found never falls as the threshold rises.
 #
-# ### Transformations missed by both methods
-#
-# | Transformation Type              | Why Missed                                                                        |
-# | -------------------------------- | --------------------------------------------------------------------------------- |
-# | **Hue shift / Full ColorJitter** | Changes pixel values enough to alter both hashes and SIFT descriptors             |
-# | **All crops (center, random)**   | Removes too much content; remaining features don't match the full-image histogram |
-# | **Severe downsampling**          | Destroys fine-grained SIFT keypoints and alters hash signatures                   |
-# | **Random erasing**               | Destroys local features in erased regions                                         |
-# | **Affine (rotate+scale)**        | Combined scaling with rotation changes SIFT descriptor distributions              |
-#
-# ### Complementary strengths
-#
-# A key finding is that D4 hashes and BoVW have **complementary** detection strengths:
-#
-# - **D4 detects but BoVW misses**: Flips, brightness reduction, strong blur
-# - **BoVW detects but D4 misses**: Arbitrary rotations, perspective, affine, grayscale, mild resize, contrast shifts
-#
-# The combined method detected **22 out of 30** transformations (73%) by merging groups across both methods.
-#
-# ### Recommendations
-#
-# 1. **Use both methods together** for best coverage — they complement each other well
-# 1. **For detecting rotated copies**: D4 hashes handle 90° increments and flips; add BoVW for arbitrary angles
-# 1. **For data augmentation validation**: Use BoVW with a higher `cluster_sensitivity` (1.5–2.0) to catch subtle
-#    duplicates
-# 1. **For large datasets**: Start with fast D4 hashes, then run BoVW on remaining candidates
-# 1. **Adjust `cluster_sensitivity`**: Lower (1.0–1.25) for strict matching, higher (1.5–2.0) for permissive — note that
-#    no transformations are detected at 0.75
+# The lists show how to compare the methods on a dataset. They are not a ranking of the methods: the counts change with
+# the image, the transformation parameters and the thresholds.
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
+position = {name: i for i, name in enumerate(labels)}
+assert {position[name] for name in ("Rotation 90°", "Rotation 180°", "Horizontal Flip", "Vertical Flip")} <= d4_detected
+assert not {position["Horizontal Flip"], position["Vertical Flip"]} & bovw_detected
+assert {position["Rotation 15°"], position["Rotation 45°"]} <= bovw_detected
+assert not {position["Rotation 15°"], position["Rotation 45°"]} & d4_detected
+never = {
+    position[name]
+    for name in (
+        "Center Crop (80%)",
+        "Center Crop (50%)",
+        "Random Crop (80%)",
+        "Random Erasing (10%)",
+        "Random Erasing (33%)",
+    )
+}
+assert not never & combined_detected
+assert len(combined_detected) > max(len(d4_detected), len(bovw_detected))
+assert combined_detected - d4_detected - bovw_detected
+found = [len(threshold_results[t]) for t in thresholds]
+assert found[0] == 0
+assert found == sorted(found)
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
