@@ -91,7 +91,7 @@
 # and leakage between training and testing sets.
 
 # %% [markdown]
-# ## Importing the necessary libraries
+# ## Setup
 #
 # You'll begin by importing the necessary libraries to walk through this guide.
 

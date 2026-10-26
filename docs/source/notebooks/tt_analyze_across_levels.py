@@ -16,6 +16,9 @@
 # %% [markdown]
 # # Analyze a dataset across its levels
 #
+# Learn how metadata holds the images and the objects of a dataset together and how to analyze a factor at the level
+# you choose.
+#
 # Estimated time to complete: 30 minutes
 #
 # Relevant ML stages: [Data Engineering](../getting-started/roles/ML_Lifecycle.md#data-engineering)
@@ -74,7 +77,7 @@
 # or introducing aggregation bias.
 
 # %% [markdown]
-# ### Setup
+# ## Setup
 #
 # You'll begin by importing the libraries used throughout this tutorial.
 
@@ -621,8 +624,6 @@ print("altitude > 60 m:", high.level_counts)
 # - [Identify bias and correlations](./tt_identify_bias.py) — The bias evaluators used here, in depth.
 # - [How to keep metadata in sync with its dataset and cache it](./h2_sync_and_cache_metadata.py) — Realign a filtered
 #   metadata with its dataset and cache the metadata so it is built once.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — The
-#   `image_stats` flags and region switches from the "Measure your own factors" section, on their own terms.
 #
 # ## On your own
 #
