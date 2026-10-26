@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.infrastructure
+
 NOTEBOOK_DIR = Path(__file__).resolve().parent.parent / "docs" / "source" / "notebooks"
 
 MAX_LEAD_WORDS = 120

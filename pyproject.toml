@@ -291,6 +291,7 @@ markers = [
   "cuda: marks tests that require cuda",
   "ffmpeg: marks integration tests that run against ffmpeg-generated video fixtures",
   "performance: marks verification tests that time workloads or measure memory",
+  "infrastructure: marks tests of the documentation and repository tooling, which need the source checkout and git",
 ]
 
 [tool.coverage.run]
