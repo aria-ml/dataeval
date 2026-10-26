@@ -641,14 +641,17 @@ high-dimensional embeddings.
 ### How-to guides
 
 - [How to create embeddings](../notebooks/h2_create_embeddings.py)
+- [How to detect drift in metadata factors](../notebooks/h2_detect_metadata_drift.py)
+- [How to detect uncertainty drift with a MAITE model](../notebooks/h2_detect_uncertainty_drift.py)
+- [How to detect distribution shift from precomputed model outputs](../notebooks/h2_detect_drift_from_model_outputs.py)
 
 ### Tutorials
 
-- [Monitoring distribution shift tutorial](../notebooks/tt_monitor_shift.py) —
+- [Monitor shifts in operational data](../notebooks/tt_monitor_shift.py) —
   end-to-end walkthrough of drift detection on operational data
-- [Detecting drift with prediction uncertainty tutorial](../notebooks/tt_detect_drift_with_uncertainty.py) —
+- [Detect drift with prediction uncertainty](../notebooks/tt_detect_drift_with_uncertainty.py) —
   monitoring a deployed detector's own uncertainty with `DriftWasserstein`
-- [Identifying out-of-distribution samples tutorial](../notebooks/tt_identify_ood_samples.py) —
+- [Identify out-of-distribution samples](../notebooks/tt_identify_ood_samples.py) —
   comparison of reconstruction and distance-based OOD detection methods
 
 ## References

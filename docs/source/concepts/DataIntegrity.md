@@ -994,15 +994,20 @@ it, and reads a run of more than five departing frames as a segment.
 
 ### How-to guides
 
-- [How to detect and remove duplicates](../notebooks/h2_deduplicate.py)
+- [How to identify duplicates](../notebooks/h2_deduplicate.py)
 - [How to find outliers in metadata factors](../notebooks/h2_find_factor_outliers.py)
 - [How to find outliers that depend on their context](../notebooks/h2_find_conditional_outliers.py)
-- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
+- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
+- [How to specify custom statistics on object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py)
 
 ### Tutorials
 
-- [Data cleaning tutorial](../notebooks/tt_clean_dataset.py) — end-to-end
+- [Clean a dataset](../notebooks/tt_clean_dataset.py) — end-to-end
   walkthrough of integrity assessment on a realistic dataset
+- [Compare objects to their surroundings](../notebooks/tt_compare_objects_to_surroundings.py) — comparing a
+  detection's statistics with its background and with other detections
+- [Identify duplicate video](../notebooks/tt_identify_duplicate_video.py) — finding duplicate sequences and redundant
+  footage in a tracking dataset
 
 ## References
 

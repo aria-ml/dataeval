@@ -245,17 +245,17 @@ lists them in one table.
 - [How to create embeddings](../notebooks/h2_create_embeddings.py)
 - [How to embed object detection crops and visualize class clusters](../notebooks/h2_embed_detection_crops.py)
 - [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
-- [How to perform cluster analysis](../notebooks/h2_cluster_analysis.py)
+- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
 
 ### Tutorials
 
-- [Identify bias and correlations tutorial](../notebooks/tt_identify_bias.py) —
+- [Identify bias and correlations](../notebooks/tt_identify_bias.py) —
   acting on balance and diversity findings
-- [Assessing the data space tutorial](../notebooks/tt_assess_data_space.py) —
+- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py) —
   coverage gaps and embedding-space decisions
-- [Monitoring distribution shift tutorial](../notebooks/tt_monitor_shift.py) —
+- [Monitor shifts in operational data](../notebooks/tt_monitor_shift.py) —
   responding to drift detection
-- [Identifying OOD samples tutorial](../notebooks/tt_identify_ood_samples.py) —
+- [Identify out-of-distribution samples](../notebooks/tt_identify_ood_samples.py) —
   responding to OOD detection
 
 ## References

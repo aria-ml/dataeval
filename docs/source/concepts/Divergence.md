@@ -160,7 +160,7 @@ samples are sparse relative to the dimensionality of the embedding space.
 
 ### How-to guides
 
-- [How to measure distributional divergence](../notebooks/h2_measure_divergence.py)
+- [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
 
 ## References
 
