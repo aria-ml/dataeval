@@ -17,7 +17,7 @@
 # # How to conform and merge datasets with different label vocabularies
 #
 # A second, incoming dataset can arrive labeled under a different scheme: different class names, reordered indices and an
-# overlapping but not identical set of classes. You cannot simply concatenate it with your reference dataset, because index `0`
+# overlapping but not identical set of classes. You cannot concatenate it with your reference dataset, because index `0`
 # might mean `"sedan"` in one and `"submarine"` in the other. This guide conforms the incoming dataset to the reference
 # vocabulary, an {class}`.Ontology`, with {func}`.label_alignment` and {class}`.Relabel`, then merges the two with
 # {func}`.merge_datasets`. See [ontology alignment](./h2_align_label_spaces.py).
@@ -48,7 +48,7 @@ from dataeval.data import Relabel, View, merge_datasets
 from dataeval.protocols import DatasetMetadata
 
 # %% [markdown]
-# Conforming and merging act purely on **labels** and `index2label`, so the images
+# Conforming and merging act only on labels and `index2label`, so the images
 # are irrelevant here. The example uses a small in-memory dataset with blank images. A real
 # {class}`~dataeval.protocols.AnnotatedDataset` (e.g. a `maite-datasets` loader or
 # your own) works identically.
@@ -81,9 +81,9 @@ def labels_from_counts(counts: dict[str, int], index2label: dict[int, str]) -> l
 # %% [markdown]
 # ## Define the reference vocabulary
 #
-# The reference vocabulary is an {class}`.Ontology` — the label space everything will
+# The reference vocabulary is an {class}`.Ontology`, the label space everything will
 # be expressed in. Here is a taxonomy of vessels grouped by domain (air / land /
-# water). Note it has **no** undersea branch: `"submarine"` is therefore
+# water). Note that it has no undersea branch: `"submarine"` is therefore
 # out-of-vocabulary and will be dropped when conforming.
 
 # %%
@@ -98,9 +98,9 @@ print("reference vocabulary:", {i: reference_ontology.concept(c).label for i, c 
 # %% [markdown]
 # ## Conform the reference dataset
 #
-# Our reference data uses its **own** label ordering. We align its class names to the
-# ontology and conform it. Every class is in the vocabulary, so this is lossless — it
-# just re-expresses the labels in the reference's index space.
+# The reference data uses its own label ordering. You align its class names to the
+# ontology and conform it. Every class is in the vocabulary, so this is lossless: it
+# re-expresses the labels in the reference's index space.
 
 # %%
 REFERENCE_VOCAB = {0: "sedan", 1: "pickup truck", 2: "frigate", 3: "cargo ship"}
@@ -119,10 +119,10 @@ print("reference now uses the vocabulary:", reference.metadata.get("index2label"
 # %% [markdown]
 # ## Align the incoming labels to the reference vocabulary
 #
-# The incoming data uses a **different, reordered** `index2label` (note `submarine`
+# The incoming data uses a different, reordered `index2label` (note `submarine`
 # is index `0` here), and an overlapping-but-different class set: `sedan` and
 # `frigate` overlap the reference, `fighter jet` is new (but in the vocabulary), and
-# `submarine` is **not** in the reference vocabulary at all.
+# `submarine` is not in the reference vocabulary.
 
 # %%
 INCOMING_VOCAB = {0: "submarine", 1: "frigate", 2: "sedan", 3: "fighter jet"}
@@ -134,8 +134,8 @@ incoming = ToyDataset(
 print("incoming vocabulary:", incoming.metadata.get("index2label"))
 
 # %% [markdown]
-# {func}`.label_alignment` relates the incoming class *names* to the reference
-# ontology. Matching is by name, so the reordered indices are irrelevant — `sedan`,
+# {func}`.label_alignment` relates the incoming class names to the reference
+# ontology. Matching is by name, so the reordered indices are irrelevant: `sedan`,
 # `frigate`, and `fighter jet` map by equivalence, while `submarine` is
 # out-of-vocabulary.
 
@@ -180,7 +180,7 @@ counts = Counter(index2label[int(np.argmax(datum[1]))] for datum in merged)
 print("per-class counts:", dict(counts))
 
 # %% [markdown]
-# Conforming first is what makes the merge sound. Merging the datasets *before*
+# Conforming first is what makes the merge sound. Merging the datasets before
 # conforming raises a `ValueError`, because their label vocabularies do not line up.
 
 # %% tags=["remove_cell"]

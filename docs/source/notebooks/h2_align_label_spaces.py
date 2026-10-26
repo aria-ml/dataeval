@@ -44,7 +44,7 @@ from dataeval.core import label_alignment
 # %% [markdown]
 # ## Define a reference vocabulary
 #
-# Alignment maps a source onto a *target* — the reference vocabulary everything is
+# Alignment maps a source onto a target, the reference vocabulary everything is
 # expressed in. Here is a small two-level reference taxonomy, built dependency-free
 # with {meth}`.Ontology.from_hierarchy`.
 
@@ -66,7 +66,7 @@ result = label_alignment(["sedan", "truck", "spaceship"], reference)
 print("keys:", list(result))
 
 # %% [markdown]
-# Each accepted mapping is a {class}`.Correspondence` — a typed
+# Each accepted mapping is a {class}`.Correspondence`, a typed
 # ⟨source, target, relation, confidence⟩ tuple, with a note of the matcher that
 # produced it:
 
@@ -77,7 +77,7 @@ for c in result["correspondences"]:
 # %% [markdown]
 # `class_remap` is the actionable artifact: the `source -> target` rewrite for the
 # correspondences that license one (equivalence and coarsening). `unaligned_source`
-# and `unaligned_target` are read *open-world* — an unaligned concept is
+# and `unaligned_target` are read open-world: an unaligned concept is
 # out-of-vocabulary with respect to the other side, not invalid.
 
 # %%
@@ -86,9 +86,9 @@ print("unaligned_source:", result["unaligned_source"])
 print("mergeability:    ", result["mergeability"])
 
 # %% [markdown]
-# `"spaceship"` is out-of-vocabulary, so the source is only **partially**
+# `"spaceship"` is out-of-vocabulary, so the source is only partially
 # expressible in the reference. On a structureless source this matches
-# {func}`.label_reconciliation` exactly — the equivalence `class_remap` *is*
+# {func}`.label_reconciliation` exactly: the equivalence `class_remap` is
 # the matched set:
 
 # %%
@@ -100,7 +100,7 @@ print("reconciliation matched:", dict(rec["matched"]))
 # %% [markdown]
 # ## Reason across granularity
 #
-# The *relation* on each correspondence, not just the pairing, says what the data
+# The relation on each correspondence, not just the pairing, says what the data
 # permits. [Ontology](../concepts/Ontology.md) explains the asymmetry between
 # coarsening and splitting.
 #
@@ -108,8 +108,8 @@ print("reconciliation matched:", dict(rec["matched"]))
 #
 # A model that only predicts `"car"` cannot be scored against the reference's
 # `"sedan"`/`"suv"` ground truth without acknowledging that `"car"` spans both.
-# `label_alignment` flags this with `broader` correspondences (diagnostics — they are
-# deliberately **excluded** from `class_remap`, because splitting a coarse label into
+# `label_alignment` flags this with `broader` correspondences (they are diagnostics, and are
+# deliberately excluded from `class_remap`, because splitting a coarse label into
 # finer ones is not licensed by the relation alone).
 
 # %%
@@ -121,7 +121,7 @@ print("class_remap:", dict(coarse["class_remap"]), "| mergeability:", coarse["me
 # %% [markdown]
 # ### Source finer than target → `narrower` (safe coarsening)
 #
-# The reverse direction *is* safe: every sedan is a car, so a fine source class can
+# The reverse direction is safe: every sedan is a car, so a fine source class can
 # always be coarsened up to a more general target. Here the reference is coarse
 # (`car` is a leaf) and the source is fine.
 
@@ -135,9 +135,9 @@ for c in result["correspondences"]:
 print("class_remap:", dict(result["class_remap"]), "| mergeability:", result["mergeability"])
 
 # %% [markdown]
-# `"sedan"` is coarsened to `"car"` — valid, but now `"sedan"` and `"car"` both map
-# to `"car"` and can no longer be told apart, so the source is only **lossily**
-# expressible, and its `mergeability` is `lossy`. (A source is *lossless* only when its `class_remap` is
+# `"sedan"` is coarsened to `"car"`. That is valid, but now `"sedan"` and `"car"` both map
+# to `"car"` and can no longer be told apart, so the source is only lossily
+# expressible, and its `mergeability` is `lossy`. (A source is lossless only when its `class_remap` is
 # injective.)
 
 # %% [markdown]
@@ -191,7 +191,7 @@ class FuzzyMatcher:
 
 
 # %% [markdown]
-# It satisfies the {class}`.Matcher` protocol structurally — no inheritance needed:
+# It satisfies the {class}`.Matcher` protocol structurally, so it needs no inheritance:
 
 # %%
 from dataeval.protocols import Matcher
@@ -211,14 +211,14 @@ for c in fuzzy["correspondences"]:
 print("unaligned_source:", fuzzy["unaligned_source"])
 
 # %% [markdown]
-# A proposal below the acceptance threshold is **withheld** rather than guessed, so
+# A proposal below the acceptance threshold is withheld rather than guessed, so
 # alignment favors precision over recall and leaves `"stop sign"` unaligned for
 # inspection.
 
 # %% [markdown]
 # ## Align more than two sources
 #
-# To relate *several* sources, align each one to a single shared **reference
+# To relate several sources, align each one to a single shared **reference
 # (pivot)** vocabulary rather than every pair. Correspondences between sources are
 # then read off through the pivot, and the per-source `class_remap`s express them all in
 # one label space.

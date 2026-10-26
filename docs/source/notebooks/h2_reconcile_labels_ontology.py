@@ -66,9 +66,8 @@ print(ontology)
 # %% [markdown]
 # ## Reconcile a dataset's class names
 #
-# Pass your class names — typically `index2label.values()` — to
-# {func}`.label_reconciliation`. Here the label set includes a class that isn't in
-# the ontology.
+# Pass your class names, typically `index2label.values()`, to {func}`.label_reconciliation`. Here the label set
+# includes a class that is not in the ontology.
 
 # %%
 index2label = {0: "sedan", 1: "pickup truck", 2: "fighter jet", 3: "rowboat"}
@@ -76,9 +75,8 @@ index2label = {0: "sedan", 1: "pickup truck", 2: "fighter jet", 3: "rowboat"}
 result = label_reconciliation(index2label.values(), ontology)
 
 # %% [markdown]
-# The return value is a {class}`.LabelReconciliationResult` — a `TypedDict` whose
-# keys fall into two groups: a *match report* (`matched`, `unmatched`,
-# `ambiguous`) and the recovered *hierarchy* of the matched classes
+# The return value is a {class}`.LabelReconciliationResult`, a `TypedDict` whose keys fall into two groups: a match
+# report (`matched`, `unmatched`, `ambiguous`) and the recovered hierarchy of the matched classes
 # (`ancestor_paths`, `external_ancestors`, `induced_edges`, `relations`).
 
 # %%
@@ -93,7 +91,7 @@ print("unmatched:", result["unmatched"])
 print("ambiguous:", result["ambiguous"])
 
 # %% [markdown]
-# `"rowboat"` is flagged as `unmatched` — it isn't a concept in this ontology.
+# `"rowboat"` is flagged as `unmatched`. It is not a concept in this ontology.
 # The remaining classes resolved to concepts. The result also recovers hierarchy
 # information for the matched classes.
 
@@ -153,8 +151,8 @@ print(owl_ontology)
 # %% [markdown]
 # Concepts are identified by their IRI, while labels and synonyms are used for
 # matching. `find` resolves a name (case-insensitively) across preferred labels,
-# synonyms, and exact ids — so an annotator's `"F-16"` resolves to the canonical
-# *Fighter Jet* concept:
+# synonyms, and exact ids, so an annotator's `"F-16"` resolves to the canonical
+# "Fighter Jet" concept:
 
 # %%
 print("find('F-16'):", owl_ontology.find("F-16"))
@@ -168,10 +166,9 @@ print("definition:", concept.definition)
 # ## Work with an incomplete ontology
 #
 # Ontologies are frequently distributed as subsets, where a concept's parent is
-# referenced but not itself included. DataEval keeps these as *external
-# references* rather than failing — they still participate in hierarchy queries, and
-# {func}`.label_reconciliation` reports where a class's is-a path is truncated via
-# `external_ancestors`.
+# referenced but not itself included. DataEval keeps these as external references rather than failing. They still
+# participate in hierarchy queries, and {func}`.label_reconciliation` reports where a class's is-a path is truncated
+# via `external_ancestors`.
 
 # %%
 subset = Ontology([

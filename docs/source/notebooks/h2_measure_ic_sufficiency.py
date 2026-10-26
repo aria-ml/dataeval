@@ -87,12 +87,12 @@ pio.renderers.default = "notebook"
 # %% [markdown]
 # ## Load the data and create the model
 #
-# Before calculating the sufficiency of a dataset, the dataset must be loaded and the model architecture defined. We will
-# walk through these in the following steps.
+# Before you calculate the sufficiency of a dataset, load the dataset and define the model architecture. The following
+# steps walk through both.
 #
 # ### Loading MNIST data
 #
-# Load the MNIST data and split it into training and test datasets. For this notebook, we will use subsets of the training
+# Load the MNIST data and split it into training and test datasets. For this notebook, you use subsets of the training
 # (2500) and test (500) data.
 
 # %%
@@ -111,7 +111,7 @@ test_ds = View(MNIST("./data", image_set="test", transforms=transforms, download
 # %% [markdown]
 # ### Creating a PyTorch model
 #
-# Next, we define the network architecture that will be trained and then evaluated throughout the sufficiency calculation.
+# Next, define the network architecture that the sufficiency calculation trains and then evaluates throughout.
 
 
 # %%
@@ -146,9 +146,9 @@ model: Net = cast(Net, torch.compile(Net().to(device)))
 # metrics, loss functions, optimizers, model architectures, input sizes, etc.
 #
 # To allow the Sufficiency class to handle this situation, DataEval uses
-# [_Protocols_](https://typing.python.org/en/latest/spec/protocol.html). Sufficiency requires two specific protocols
+# [protocols](https://typing.python.org/en/latest/spec/protocol.html). Sufficiency requires two specific protocols
 # called {class}`.TrainingStrategy` and {class}`.EvaluationStrategy`.\
-# Below we will define the strategies that align with this notebook and combine them into a {class}`.Sufficiency.Config`
+# Below, you define the strategies that align with this notebook and combine them into a {class}`.Sufficiency.Config`
 # that can be given to the `Sufficiency` class.
 #
 # ### Training strategy
@@ -226,7 +226,7 @@ class MNISTEvaluationStrategy:
 # ### Reset strategy
 #
 # The `Sufficiency` class requires a `reset_strategy` that resets the model's parameters between runs. This ensures each
-# run starts from a fresh initialization. Here's a simple implementation for PyTorch models:
+# run starts from a fresh initialization. Here is a simple implementation for PyTorch models:
 
 
 # %%
@@ -270,7 +270,7 @@ suff = Sufficiency(
 )
 
 # %% [markdown]
-# Now we can evaluate the metric to train the models and produce the learning curve.
+# Now evaluate the metric to train the models and produce the learning curve.
 
 # %%
 # Train & test model
@@ -290,14 +290,14 @@ for plot in dep.plot(output, backend="plotly"):
     display(plot)
 
 # %% [markdown]
-# Using these learning curves, we can project performance under much larger datasets (with the same models).
+# Using these learning curves, you can project performance under much larger datasets (with the same models).
 
 # %% [markdown]
 # ## Predict sample requirements
 #
-# We can also predict the amount of training samples required to achieve specific performance thresholds.
+# You can also predict the amount of training samples required to achieve specific performance thresholds.
 #
-# Let's say we wanted to see how many samples are needed to hit 90%, 93%, and 99% accuracy, area under the receiver
+# Suppose you want to see how many samples are needed to hit 90%, 93%, and 99% accuracy, area under the receiver
 # operating characteristic, and true positive rate at a fixed false positive rate of 0.5.
 
 # %%
