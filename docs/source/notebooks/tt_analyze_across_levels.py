@@ -578,7 +578,7 @@ print("having    :", swimmer_images.level_counts)
 # ```
 #
 # A filter at the image level propagates downward: if you keep only high-altitude images, you keep the detections
-# contained in those frames.
+# contained in those frames, and no others.
 
 # %%
 high = metadata.where(pl.col("altitude") > 60, level="unit")
