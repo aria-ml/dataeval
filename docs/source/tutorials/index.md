@@ -24,7 +24,7 @@ See [Running notebooks locally](#running-notebooks-locally) at the
 bottom of this page for how to generate runnable `.ipynb` files in your
 local checkout.
 
-## **Data engineering**
+## Data engineering
 
 ```{toctree}
 :hidden:
@@ -45,12 +45,12 @@ local checkout.
 :header-rows: 0
 
 * - [](../notebooks/tt_clean_dataset.py)
-  - Learn about the impacts of unstructured, raw data and how to transform it
-    into a reliable, robust dataset.
+  - Learn how to find extreme and redundant images with {class}`.Outliers` and {class}`.Duplicates`, and how
+    to decide whether to remove them or collect more data.
   - [![Open In Colab][colab-badge]][eda-colab]
 * - [](../notebooks/tt_assess_data_space.py)
-  - Learn how to fix and prevent gaps in data to develop more reliable and
-    robust models.
+  - Learn how to cluster the embeddings of an unlabeled dataset to find outliers and underrepresented images,
+    and how to decide whether to add or remove them.
   - [![Open In Colab][colab-badge]][dataspace-colab]
 * - [](../notebooks/tt_identify_dataset_gaps.py)
   - Combine an ontology, labels, and embeddings to find label-space and
@@ -101,7 +101,7 @@ local checkout.
 
 <!-- END DATA ENGINEERING -->
 
-## **Model development**
+## Model development
 
 ```{toctree}
 :hidden:
@@ -130,7 +130,7 @@ local checkout.
 
 <!-- END MODEL DEVELOPMENT -->
 
-## **Monitoring**
+## Monitoring
 
 ```{toctree}
 :hidden:
@@ -146,15 +146,16 @@ local checkout.
 :header-rows: 0
 
 * - [](../notebooks/tt_monitor_shift.py)
-  - Learn how to analyze incoming data against training data to ensure deployed
-    models stay reliable and robust.
+  - Learn how to compare drift detectors on image embeddings, read what each one reports, and monitor drift
+    across chunks of incoming data.
   - [![Open In Colab][colab-badge]][monitoring-colab]
 * - [](../notebooks/tt_detect_drift_with_uncertainty.py)
   - Learn how to monitor a deployed detector for drift using its own prediction
     uncertainty as a label-free signal.
   - [![Open In Colab][colab-badge]][uncertainty-drift-colab]
 * - [](../notebooks/tt_identify_ood_samples.py)
-  - Identify out-of-distribution samples in incoming data
+  - Learn how to fit reconstruction-based and nearest-neighbor detectors on in-distribution images and compare
+    how many out-of-distribution images each one flags.
   - [![Open In Colab][colab-badge]][iood-colab]
 ```
 

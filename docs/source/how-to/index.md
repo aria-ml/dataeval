@@ -46,7 +46,7 @@ environment.
 [hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_configure_defaults.ipynb
 [log-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_configure_logging.ipynb
 
-## Data Engineering
+## Data engineering
 
 These guides cover tasks related to preparing, cleaning, exploring, and curating
 datasets for machine learning.
@@ -54,29 +54,29 @@ datasets for machine learning.
 ```{toctree}
 :hidden:
 
+../notebooks/h2_wrap_dataframe_dataset.py
+../notebooks/h2_metadata_from_dataframe.py
+../notebooks/h2_build_dataset_views.py
 ../notebooks/h2_create_embeddings.py
 ../notebooks/h2_embed_detection_crops.py
+../notebooks/h2_place_transforms.py
 ../notebooks/h2_cluster_analysis.py
 ../notebooks/h2_deduplicate.py
 ../notebooks/h2_find_factor_outliers.py
 ../notebooks/h2_find_conditional_outliers.py
 ../notebooks/h2_trace_findings_to_source.py
+../notebooks/h2_detect_undersampling.py
+../notebooks/h2_add_intrinsic_factors.py
 ../notebooks/h2_custom_image_stats_object_detection.py
 ../notebooks/h2_measure_channel_groups.py
-../notebooks/h2_add_intrinsic_factors.py
 ../notebooks/h2_control_factor_binning.py
 ../notebooks/h2_sync_and_cache_metadata.py
-../notebooks/h2_detect_undersampling.py
-../notebooks/h2_wrap_dataframe_dataset.py
-../notebooks/h2_metadata_from_dataframe.py
-../notebooks/h2_build_dataset_views.py
-../notebooks/h2_place_transforms.py
 ../notebooks/h2_reconcile_labels_ontology.py
 ../notebooks/h2_align_label_spaces.py
 ../notebooks/h2_conform_and_merge_datasets.py
 ```
 
-### Data Preparation
+### Data preparation
 
 :::{list-table}
 :widths: 30 50 20
@@ -98,6 +98,9 @@ datasets for machine learning.
 - - [](../notebooks/h2_create_embeddings.py)
   - Create image embeddings with PyTorch, ONNX or a model-free extractor
   - [![Open In Colab][colab-badge]][onx-colab]
+- - [](../notebooks/h2_embed_detection_crops.py)
+  - Embed object detection box crops and visualize class clusters
+  - [![Open In Colab][colab-badge]][crop-colab]
 - - [](../notebooks/h2_place_transforms.py)
   - Respond to a {class}`~dataeval.exceptions.StatsInvalidatedWarning` by
     moving the transform to the extractor, narrowing `flags=` or asserting
@@ -106,20 +109,18 @@ datasets for machine learning.
 
 :::
 
-### Data Exploration
+### Data quality
 
 :::{list-table}
 :widths: 30 50 20
 :header-rows: 0
 
-- - [](../notebooks/h2_embed_detection_crops.py)
-  - Embed object detection box crops and visualize class clusters
-  - [![Open In Colab][colab-badge]][crop-colab]
 - - [](../notebooks/h2_cluster_analysis.py)
-  - Identify outliers and anomalies with clustering algorithms
+  - Cluster a dataset and find outliers and near duplicates in the clusters
   - [![Open In Colab][colab-badge]][clst-colab]
 - - [](../notebooks/h2_deduplicate.py)
-  - Identify and remove duplicates from a PyTorch Dataset
+  - Find exact and near-duplicate images, and object detection items that share or disagree on an
+    annotation
   - [![Open In Colab][colab-badge]][dupe-colab]
 - - [](../notebooks/h2_find_factor_outliers.py)
   - Threshold metadata factors, each against its own level, and trace a
@@ -133,16 +134,29 @@ datasets for machine learning.
   - Retrieve the image, frame, track or detection a finding's
     {class}`.SourceIndex` names
   - [![Open In Colab][colab-badge]][trace-colab]
+- - [](../notebooks/h2_detect_undersampling.py)
+  - Detect undersampled subsets of datasets
+  - [![Open In Colab][colab-badge]][cov-colab]
+
+:::
+
+### Metadata and bias
+
+:::{list-table}
+:widths: 30 50 20
+:header-rows: 0
+
+- - [](../notebooks/h2_add_intrinsic_factors.py)
+  - Measure intrinsic factors such as brightness and sharpness with {func}`.image_stats` and
+    add them to {class}`.Metadata` for bias analysis
+  - [![Open In Colab][colab-badge]][imd-colab]
 - - [](../notebooks/h2_custom_image_stats_object_detection.py)
-  - Customize calculation of image stats on an object detection dataset
+  - Measure image statistics over the whole image, the bounding boxes and the background of an
+    object detection dataset
   - [![Open In Colab][colab-badge]][calc-colab]
 - - [](../notebooks/h2_measure_channel_groups.py)
   - Measure named groups of bands separately on multispectral imagery
   - [![Open In Colab][colab-badge]][band-colab]
-- - [](../notebooks/h2_add_intrinsic_factors.py)
-  - Apply DataEval's statistical outputs to
-    DataEval's {class}`.Metadata` object for bias analysis
-  - [![Open In Colab][colab-badge]][imd-colab]
 - - [](../notebooks/h2_control_factor_binning.py)
   - Declare, review and reuse a factor's bin edges so results
     are comparable across collections
@@ -151,9 +165,6 @@ datasets for machine learning.
   - Realign filtered metadata with its dataset, and cache the metadata
     so it is built once
   - [![Open In Colab][colab-badge]][sync-colab]
-- - [](../notebooks/h2_detect_undersampling.py)
-  - Detect undersampled subsets of datasets
-  - [![Open In Colab][colab-badge]][cov-colab]
 
 :::
 
@@ -199,7 +210,7 @@ datasets for machine learning.
 [algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_align_label_spaces.ipynb
 [cmrg-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.1.0/notebooks/h2_conform_and_merge_datasets.ipynb
 
-## Model Development
+## Model development
 
 These guides cover tasks related to assessing data feasibility and sufficiency
 for model training.
@@ -216,8 +227,8 @@ for model training.
 :header-rows: 0
 
 - - [](../notebooks/h2_measure_ic_feasibility.py)
-  - Calculate feasibility of performance requirements on
-    different datasets using {term}`Bayes Error Rate (BER)`
+  - Estimate the {term}`Bayes Error Rate (BER)` with {func}`.ber_mst` and check a classification
+    requirement against it
   - [![Open In Colab][colab-badge]][ber-colab]
 - - [](../notebooks/h2_measure_ic_sufficiency.py)
   - Determine the amount of data needed to meet
@@ -249,7 +260,7 @@ shifts in deployed systems.
 :header-rows: 0
 
 - - [](../notebooks/h2_measure_divergence.py)
-  - Display data distributions between 2 datasets
+  - Measure the divergence between two datasets, such as a training set and a test set
   - [![Open In Colab][colab-badge]][div-colab]
 - - [](../notebooks/h2_measure_label_independence.py)
   - Compare label distributions between 2 datasets
