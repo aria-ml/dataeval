@@ -25,7 +25,7 @@
 # Use it when you filter metadata and then pair it with embeddings or another evaluator, or when building the metadata
 # is slow.
 #
-# You need `dataeval` and `maite-datasets`. This guide uses 200 SeaDrone images and about 300 MB of disk for the
+# You need `dataeval` and `maite-datasets`. This guide uses 200 SeaDrone images and about 1.1 GB of disk for the
 # download.
 
 # %% tags=["remove_cell"]

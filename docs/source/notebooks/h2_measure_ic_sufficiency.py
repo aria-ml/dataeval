@@ -225,8 +225,9 @@ class MNISTEvaluationStrategy:
 # %% [markdown]
 # ### Reset strategy
 #
-# The `Sufficiency` class requires a `reset_strategy` that resets the model's parameters between runs. This ensures each
-# run starts from a fresh initialization. Here is a simple implementation for PyTorch models:
+# The `Sufficiency` class resets the model between runs with a `reset_strategy`. If you do not pass one, it restores a
+# copy of the model taken when you create `Sufficiency`. This notebook passes its own, which re-initializes the
+# parameters so that each run starts from a fresh initialization. Here is a simple implementation for PyTorch models:
 
 
 # %%
