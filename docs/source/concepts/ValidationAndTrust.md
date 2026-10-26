@@ -1163,11 +1163,13 @@ As of v{{ release }}:
 **Changed defaults** (the symbol is not deprecated; only the transitional
 warning goes away):
 
-- {class}`.Duplicates` — the `hash_radius` default of `0` will change in a
+- {class}`.Duplicates` — the image `hash_radius` default of `0` will change in a
   future major release, so that it finds perceptual near-duplicates rather than
-  only bit-identical images. Leaving it unset raises a plain `FutureWarning`, not
+  only bit-identical images. Leaving it unset when `evaluate` reads image data
+  raises a plain `FutureWarning`, not
   {class}`~dataeval.exceptions.DeprecatedWarning`, so a warning filter narrowed
   to that class will not catch it. Pass the argument explicitly to silence it.
+  Video already defaults to `6` and does not warn.
   The class itself is stable and is not scheduled for removal.
 
 Everything else in the public API is considered stable for the v1.x series.

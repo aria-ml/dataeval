@@ -1047,9 +1047,10 @@ def _near_variants(seed: int = 42, size: int = 64):
 class TestHashRadius:
     """Near-duplicate detection by Hamming distance rather than by digest equality."""
 
-    def test_defaults_to_zero_for_exact_digest_grouping(self):
-        assert Duplicates().hash_radius == 0
-        assert Duplicates.Config().hash_radius == 0
+    def test_unset_by_default(self):
+        """Left unset, the radius is chosen per evaluation from what the data is."""
+        assert Duplicates().hash_radius is None
+        assert Duplicates.Config().hash_radius is None
 
     def test_set_by_argument_and_by_config(self):
         assert Duplicates(hash_radius=6).hash_radius == 6
@@ -1058,9 +1059,11 @@ class TestHashRadius:
         assert Duplicates(hash_radius=2, config=Duplicates.Config(hash_radius=9)).hash_radius == 2
 
     def test_radius_zero_reproduces_digest_equality(self):
-        """The compatibility contract: the default path is the behavior that shipped."""
+        """The compatibility contract: an explicit 0, and the unset image default, are the behavior that shipped."""
         images = _near_variants()
         assert Duplicates(hash_radius=0).evaluate(images).near == []
+        with pytest.warns(FutureWarning, match="hash_radius will change"):
+            assert Duplicates().evaluate(images).near == []
 
     def test_radius_finds_re_encodes_that_equality_misses(self):
         images = _near_variants()
@@ -1396,6 +1399,8 @@ class TestTrackingDispatch:
         dataset = make_tracking_dataset([[base, noisy]], shape=(3, 64, 64))
         assert Duplicates(hash_radius=0).evaluate(dataset).near == []
         assert len(Duplicates(hash_radius=6).evaluate(dataset).near) == 1
+        unset = Duplicates().evaluate(dataset)
+        assert (unset.hash_radius, len(unset.near)) == (6, 1)  # video reads the video default
 
     def test_mixing_tracking_and_image_datasets_is_refused(self):
         dataset = make_tracking_dataset([[10, 20]])
@@ -2185,13 +2190,66 @@ class TestSequenceSummaryCounts:
 
 
 @pytest.mark.required
-class TestStrictRadiusNotice:
-    """Video meeting the still-image default is said out loud, not silently under-reported."""
+@pytest.mark.filterwarnings("ignore:The default value of hash_radius:FutureWarning")
+class TestRadiusResolvedPerEvaluation:
+    """Unset, the radius is 6 for video and 0 for images, decided per call and never stored."""
 
-    def test_a_tracking_dataset_at_radius_zero_is_warned_about(self, caplog):
+    def _images(self):
+        images = [np.full((3, 16, 16), value, dtype=np.uint8) for value in _fills(10, 4)]
+        return [*images, images[0]]
+
+    def _video(self):
+        return make_tracking_dataset([[*_fills(10, 4), 10]])
+
+    def test_images_read_zero(self):
+        assert Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(self._images()).hash_radius == 0
+
+    def test_video_reads_six_raw_or_wrapped(self):
+        detector = Duplicates(flags=ImageStats.HASH_XXHASH)
+        assert detector.evaluate(self._video()).hash_radius == 6
+        assert detector.evaluate(SequenceFrames(self._video())).hash_radius == 6
+
+    @pytest.mark.parametrize("radius", [0, 3])
+    def test_an_explicit_radius_is_kept_for_both(self, radius):
+        detector = Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=radius)
+        assert detector.evaluate(self._images()).hash_radius == radius
+        assert detector.evaluate(self._video()).hash_radius == radius
+
+    def test_the_evaluator_is_left_unset(self):
+        detector = Duplicates(flags=ImageStats.HASH_XXHASH)
+        detector.evaluate(self._video())
+        assert detector.hash_radius is None
+
+    def test_reuse_across_images_and_video_matches_fresh_evaluators(self):
+        reused = Duplicates(flags=ImageStats.HASH_XXHASH)
+        runs = [reused.evaluate(data) for data in (self._images(), self._video(), self._images())]
+        fresh = [
+            Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(data)
+            for data in (self._images(), self._video(), self._images())
+        ]
+        assert [run.hash_radius for run in runs] == [run.hash_radius for run in fresh] == [0, 6, 0]
+        assert all(a.data().equals(b.data()) for a, b in zip(runs, fresh, strict=True))
+
+    def test_statistics_are_read_as_images(self):
+        """Statistics carry no frame map, so even frame statistics read the image default."""
+        for data in (self._images(), SequenceFrames(self._video())):
+            stats = image_stats(data, stats=ImageStats.HASH_XXHASH)
+            assert Duplicates(flags=ImageStats.HASH_XXHASH).from_stats(stats).hash_radius == 0
+
+
+@pytest.mark.required
+class TestStrictRadiusNotice:
+    """A caller who asks video for radius 0 hears what it costs, not silently under-reported spans."""
+
+    def test_an_explicit_zero_on_video_is_warned_about(self, caplog):
+        caplog.set_level(logging.WARNING, logger="dataeval.quality")
+        Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0).evaluate(make_tracking_dataset([_fills(10, 4)]))
+        assert "or pass 6, for video" in caplog.text
+
+    def test_the_video_default_is_not_warned_about(self, caplog):
         caplog.set_level(logging.WARNING, logger="dataeval.quality")
         Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(make_tracking_dataset([_fills(10, 4)]))
-        assert "hash_radius=6 for video" in caplog.text
+        assert "hash_radius" not in caplog.text
 
     def test_a_radius_that_was_chosen_is_left_alone(self, caplog):
         caplog.set_level(logging.WARNING, logger="dataeval.quality")
@@ -2207,10 +2265,10 @@ class TestStrictRadiusNotice:
 
     def test_a_cross_dataset_call_warns_once_per_dataset(self, caplog):
         caplog.set_level(logging.WARNING, logger="dataeval.quality")
-        Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(
+        Duplicates(flags=ImageStats.HASH_XXHASH, hash_radius=0).evaluate(
             make_tracking_dataset([_fills(10, 4)]), make_tracking_dataset([_fills(10, 4)])
         )
-        assert caplog.text.count("hash_radius=6 for video") == 2
+        assert caplog.text.count("or pass 6, for video") == 2
 
 
 @pytest.mark.required
@@ -2530,7 +2588,7 @@ class TestDefaultRadiusWarning:
             )
 
     def test_video_is_left_to_its_own_notice(self, recwarn):
-        """For video the strict default does not miss relations, it measures them wrongly."""
+        """Video reads its own default, so the coming image change has nothing to say to it."""
         Duplicates(flags=ImageStats.HASH_XXHASH).evaluate(make_tracking_dataset([_fills(10, 4)]))
         assert self._futures(recwarn) == []
 

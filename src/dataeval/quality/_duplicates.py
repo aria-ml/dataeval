@@ -80,7 +80,10 @@ _logger = get_logger(__name__)
 DEFAULT_DUPLICATES_FLAGS = ImageStats.HASH_DUPLICATES_BASIC
 DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR: float | None = None
 DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES = True
+# The radius an unset ``hash_radius`` reads as. Images keep the strict 0 until v2.0 moves it (#1429); video starts
+# at 6, where a re-encoded copy of a frame still matches itself.
 DEFAULT_DUPLICATES_HASH_RADIUS = 0
+DEFAULT_DUPLICATES_VIDEO_HASH_RADIUS = 6
 DEFAULT_DUPLICATES_REDUNDANCY_RADIUS = DEFAULT_REDUNDANCY_RADIUS
 DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES = 30
 DEFAULT_DUPLICATES_MAX_SEGMENT_GAP = 5
@@ -2298,23 +2301,23 @@ def _is_tracking(data: Any) -> bool:
 
 
 def _warn_strict_radius(hash_radius: int, caller: str) -> None:
-    """Say so when video meets the still-image default.
+    """Say so when a caller asks video for radius 0.
 
-    A default carried over from still imagery is the most expensive mistake available here, and it
-    is expensive precisely because it does not look like one: matching only bit-identical frames
-    still finds a transcoded pair, it just reports the wrong stretch and a fraction of the real
-    overlap. A leak measured at 60% of a test split when it is really 100% reads like a finding,
-    not like a misconfiguration.
+    Matching only bit-identical frames is the most expensive mistake available here, and it is
+    expensive precisely because it does not look like one: it still finds a transcoded pair, it
+    just reports the wrong stretch and a fraction of the real overlap. A leak measured at 60% of a
+    test split when it is really 100% reads like a finding, not like a misconfiguration.
 
-    Said out loud rather than corrected by dispatch, so what the call does stays predictable from
-    what the call says. See :attr:`~dataeval.quality.Duplicates.hash_radius`.
+    An unset radius reads as :data:`DEFAULT_DUPLICATES_VIDEO_HASH_RADIUS` for video, so this fires
+    only when 0 was asked for explicitly. Kept rather than refused, since 0 is a legitimate choice
+    for a caller who wants bit-identical frames. See :attr:`~dataeval.quality.Duplicates.hash_radius`.
     """
     if hash_radius:
         return
     _logger.warning(
         "%s: hash_radius=0 requires video frames to hash bit-identically, which survives almost "
         "no re-encode. Relations across transcoded copies are under-reported rather than missed "
-        "-- spans and containment both read low. Pass hash_radius=6 for video.",
+        "-- spans and containment both read low. Leave hash_radius unset, or pass 6, for video.",
         caller,
     )
 
@@ -3969,11 +3972,19 @@ class Duplicates(Evaluator):
         methods are merged into unified groups. Each group tracks which methods
         detected it, providing confidence information. If False, groups from
         each method are kept separate.
-    hash_radius : int, default 0
+    hash_radius : int or None, default None
         Maximum Hamming distance, in bits, for two perceptual hashes to be treated as
-        near duplicates. ``0`` -- the default -- groups only *identical* digests, which is
-        how this detector has always behaved: a re-saved PNG frequently reproduces its
-        perceptual hash exactly, so a great deal of real redundancy is found at radius 0.
+        near duplicates. None -- the default -- chooses per :meth:`evaluate` call: ``6`` for
+        video (a tracking dataset or a :class:`~dataeval.data.SequenceFrames`) and ``0`` for
+        images. Every explicit value, ``0`` included, is used as given, and the result's own
+        ``hash_radius`` records the radius a call used. :meth:`from_stats` and
+        :meth:`from_clusters` read as images.
+
+        ``0`` groups only *identical* digests, which is how this detector has always behaved on
+        images: a re-saved PNG frequently reproduces its perceptual hash exactly, so a great deal
+        of real redundancy is found at radius 0. The image default moves off ``0`` in a future
+        major release, and leaving it unset on images warns of that. Re-encoded video moves a bit
+        or two in most frames, which is why video starts at ``6``.
 
         Raising it finds re-encodes that moved a few bits. For the 64-bit hashes DataEval
         computes, ``1-5`` is very similar and ``6-10`` possibly similar; above roughly 12
@@ -4068,8 +4079,11 @@ class Duplicates(Evaluator):
         Expected number of clusters.
     merge_near_duplicates : bool
         Whether to merge overlapping near duplicate groups.
-    hash_radius : int
-        Hamming radius, in bits, for hash-based near duplicate detection.
+    hash_radius : int or None
+        Hamming radius, in bits, for hash-based near duplicate detection, or None to choose it per
+        :meth:`evaluate` call: 6 for video, 0 for images (:meth:`from_stats` and
+        :meth:`from_clusters` read as images). The result's own ``hash_radius`` records the radius
+        it used; the execution record's state keeps the configured value.
     redundancy_radius : int
         Hamming radius, in bits, for temporal redundancy between consecutive video frames.
     min_segment_frames : int
@@ -4141,9 +4155,11 @@ class Duplicates(Evaluator):
             Must be provided together with extractor to enable clustering.
         merge_near_duplicates : bool, default True
             Whether to merge overlapping near duplicate groups.
-        hash_radius : int, default 0
+        hash_radius : int or None, default None
             Maximum Hamming distance, in bits, for two perceptual hashes to be treated as
-            near duplicates. 0 groups only identical digests.
+            near duplicates. 0 groups only identical digests. None chooses per ``evaluate`` call: 6
+            for video (a tracking dataset or a :class:`~dataeval.data.SequenceFrames`) and 0 for
+            images; ``from_stats`` and ``from_clusters`` read as images.
         redundancy_radius : int, default 4
             Maximum Hamming distance, in bits, for a video frame to be treated as carrying
             nothing new over the frame before it. Tracking datasets only.
@@ -4176,7 +4192,7 @@ class Duplicates(Evaluator):
         flags: ImageStats = DEFAULT_DUPLICATES_FLAGS
         cluster_sensitivity: PositiveFloat | None = DEFAULT_DUPLICATES_CLUSTER_DISTANCE_FACTOR
         merge_near_duplicates: bool = DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES
-        hash_radius: NonNegativeInt = DEFAULT_DUPLICATES_HASH_RADIUS
+        hash_radius: NonNegativeInt | None = None
         redundancy_radius: NonNegativeInt = DEFAULT_DUPLICATES_REDUNDANCY_RADIUS
         min_segment_frames: PositiveInt = DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES
         max_segment_gap: NonNegativeInt = DEFAULT_DUPLICATES_MAX_SEGMENT_GAP
@@ -4188,7 +4204,7 @@ class Duplicates(Evaluator):
     flags: ImageStats
     cluster_sensitivity: float | None
     merge_near_duplicates: bool
-    hash_radius: int
+    hash_radius: int | None
     redundancy_radius: int
     min_segment_frames: int
     max_segment_gap: int
@@ -4220,12 +4236,16 @@ class Duplicates(Evaluator):
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
-        # Whether the caller *chose* this radius or simply did not choose one. Only the second is
-        # warned about: an explicit 0 goes on meaning 0 after the default moves, so there is
-        # nothing coming for that caller to prepare for.
-        self._radius_chosen: bool = hash_radius is not None or (
-            config is not None and "hash_radius" in config.model_fields_set
-        )
+
+    def _radius_for(self, tracking: bool) -> int:
+        """Return the radius one evaluation uses: the one asked for, or the default for its data.
+
+        Read per call and never stored, so one detector reused across image and video data gives
+        each the answer a fresh detector would. The result records the radius it used.
+        """
+        if self.hash_radius is not None:
+            return self.hash_radius
+        return DEFAULT_DUPLICATES_VIDEO_HASH_RADIUS if tracking else DEFAULT_DUPLICATES_HASH_RADIUS
 
     def _warn_default_radius(self, tracking: bool) -> None:
         """Announce the coming change to the image ``hash_radius`` default.
@@ -4235,11 +4255,12 @@ class Duplicates(Evaluator):
         default, finds none. Raising the default fixes that and changes results for every existing
         caller, so it waits for a major release and is announced ahead of it.
 
-        Tracking datasets are left to :func:`_warn_strict_radius`, which says something sharper --
-        for video the strict default does not miss relations, it measures them wrongly. A run that
-        asks for no hash statistic never reads the radius, so nothing changes for that caller either.
+        Only an unset radius is warned about: an explicit 0 goes on meaning 0 after the default
+        moves, so there is nothing coming for that caller to prepare for. Video already reads its
+        own default, and an explicit 0 there is :func:`_warn_strict_radius`'s to point out. A run
+        that asks for no hash statistic never reads the radius, so nothing changes for it either.
         """
-        if tracking or self._radius_chosen or self.hash_radius != 0 or not self.flags & ImageStats.HASH:
+        if tracking or self.hash_radius is not None or not self.flags & ImageStats.HASH:
             return
         warnings.warn(
             "The default value of hash_radius will change from 0 in a future major release, so "
@@ -4250,20 +4271,20 @@ class Duplicates(Evaluator):
             stacklevel=3,
         )
 
-    def _detection_policy(self, plan: LevelPlan) -> _DetectionPolicy:
+    def _detection_policy(self, plan: LevelPlan, radius: int) -> _DetectionPolicy:
         """Bundle every knob one pass of detection consults."""
         return _DetectionPolicy(
             levels=plan.levels,
-            hash_radius=self.hash_radius,
+            hash_radius=radius,
             redundancy_radius=self.redundancy_radius,
-            segment=self._segment_policy(),
-            track=self._track_policy(),
+            segment=self._segment_policy(radius),
+            track=self._track_policy(radius),
         )
 
-    def _segment_policy(self) -> _SegmentPolicy:
+    def _segment_policy(self, radius: int) -> _SegmentPolicy:
         """Bundle every knob deciding what counts as a stretch two sequences share."""
         return _SegmentPolicy(
-            radius=self.hash_radius,
+            radius=radius,
             min_length=self.min_segment_frames,
             max_gap=self.max_segment_gap,
             offset_tolerance=self.segment_offset_tolerance,
@@ -4271,9 +4292,9 @@ class Duplicates(Evaluator):
             track_length=self.min_track_frames,
         )
 
-    def _track_policy(self) -> _SegmentPolicy:
+    def _track_policy(self, radius: int) -> _SegmentPolicy:
         """Return the same policy one level down, where a shared stretch is measured in detections."""
-        policy = self._segment_policy()
+        policy = self._segment_policy(radius)
         return policy._replace(min_length=policy.track_length, verify_alignment=None)
 
     @overload
@@ -4349,6 +4370,15 @@ class Duplicates(Evaluator):
         --------
         :meth:`~dataeval.quality.Duplicates.evaluate` : Compute hashes and find duplicates in one call
         :meth:`~dataeval.quality.Duplicates.from_clusters` : Find duplicates using cluster-based detection
+
+        Notes
+        -----
+        An unset ``hash_radius`` means ``0`` here, whatever the statistics were measured over.
+        Statistics carry no frame map, so this method cannot tell frames from images and reads
+        them as images, with image-level groups and no segments. For statistics measured over a
+        :class:`~dataeval.data.SequenceFrames`, pass ``hash_radius=6`` to match what
+        :meth:`evaluate` uses on video. The radius used is recorded on the output's
+        ``hash_radius``.
         """
         # Normalize to a single or list of StatsResults
         calc_results: StatsResult | list[StatsResult]
@@ -4356,7 +4386,7 @@ class Duplicates(Evaluator):
 
         hash_stats, source_index, available_stats, dataset_steps = _prepare_hash_inputs(calc_results)
         (item_exact, item_near), (target_exact, target_near) = _detect_hash_duplicates(
-            hash_stats, source_index, self.hash_radius
+            hash_stats, source_index, self._radius_for(tracking=False)
         )
 
         df, _ = _build_duplicates_dataframe(
@@ -4373,7 +4403,7 @@ class Duplicates(Evaluator):
             calculation_results=calc_results,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
-            hash_radius=self.hash_radius,
+            hash_radius=self._radius_for(tracking=False),
             redundancy_radius=self.redundancy_radius,
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
@@ -4446,7 +4476,7 @@ class Duplicates(Evaluator):
             cluster_sensitivity=threshold,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
-            hash_radius=self.hash_radius,
+            hash_radius=self._radius_for(tracking=False),
             redundancy_radius=self.redundancy_radius,
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
@@ -4704,11 +4734,12 @@ class Duplicates(Evaluator):
         tracking = _yields_frames(data) or any(_yields_frames(dataset) for dataset in other)
         self._warn_default_radius(tracking)
         plan = resolve_levels(levels, per_image, per_target, tracking, caller="Duplicates.evaluate")
+        radius = self._radius_for(tracking)
 
         if other:
-            return self._evaluate_multi([data, *other], plan)
+            return self._evaluate_multi([data, *other], plan, radius)
 
-        return self._evaluate_single(data, plan, factor_groups, factor_cardinality)
+        return self._evaluate_single(data, plan, radius, factor_groups, factor_cardinality)
 
     def _evaluate_metadata(
         self,
@@ -4742,7 +4773,7 @@ class Duplicates(Evaluator):
             df,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
-            hash_radius=self.hash_radius,
+            hash_radius=self._radius_for(tracking=False),
             redundancy_radius=self.redundancy_radius,
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
@@ -4760,6 +4791,7 @@ class Duplicates(Evaluator):
         self,
         data: _DatasetInput,
         plan: LevelPlan,
+        radius: int,
         factor_groups: MethodGroups | None = None,
         factor_cardinality: Mapping[str, int] | None = None,
     ) -> SingleDuplicatesOutput:
@@ -4780,7 +4812,7 @@ class Duplicates(Evaluator):
 
         # Bound to a new name rather than over `data`: for a tracking dataset this is the frame
         # view, which is image-shaped, and rebinding the parameter would keep its declared type.
-        measured, frame_map, track_map = _as_frames(data, type(self).__name__, self.hash_radius)
+        measured, frame_map, track_map = _as_frames(data, type(self).__name__, radius)
 
         # Read off the targets before any hashing, and whether or not there is any. The annotation
         # axis costs no decode. So a cluster-only run has the same claim on it as a hashing one.
@@ -4815,7 +4847,7 @@ class Duplicates(Evaluator):
                 source_index,
                 frame_map,
                 track_map,
-                self._detection_policy(plan),
+                self._detection_policy(plan, radius),
                 annotation_digests=annotation_digests,
             )
 
@@ -4857,7 +4889,7 @@ class Duplicates(Evaluator):
             cluster_sensitivity=self.cluster_sensitivity,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
-            hash_radius=self.hash_radius,
+            hash_radius=radius,
             redundancy_radius=self.redundancy_radius,
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
@@ -4873,7 +4905,7 @@ class Duplicates(Evaluator):
             factor_cardinality=factor_cardinality,
         )
 
-    def _evaluate_multi(self, datasets: Sequence[_DatasetInput], plan: LevelPlan) -> MultiDuplicatesOutput:
+    def _evaluate_multi(self, datasets: Sequence[_DatasetInput], plan: LevelPlan, radius: int) -> MultiDuplicatesOutput:
         """Multi-dataset evaluate: compute stats per dataset, then combine."""
         has_hash_detection = bool(self.flags & ImageStats.HASH)
         has_cluster_detection = self.extractor is not None and self.cluster_sensitivity is not None
@@ -4883,7 +4915,7 @@ class Duplicates(Evaluator):
                 "cluster_sensitivity must be provided for cluster-based detection.",
             )
 
-        measured, frame_map, track_map = _as_frames_multi(datasets, type(self).__name__, self.hash_radius)
+        measured, frame_map, track_map = _as_frames_multi(datasets, type(self).__name__, radius)
 
         # Hash-based: compute stats per dataset, delegate to from_stats
         calc_results: list[StatsResult] = []
@@ -4953,7 +4985,7 @@ class Duplicates(Evaluator):
                 source_index,
                 frame_map,
                 track_map,
-                self._detection_policy(plan),
+                self._detection_policy(plan, radius),
                 dataset_steps,
                 annotation_digests=annotation_digests,
             )
@@ -4976,7 +5008,7 @@ class Duplicates(Evaluator):
             cluster_sensitivity=self.cluster_sensitivity,
             merge_near_duplicates=self.merge_near_duplicates,
             flags=self.flags,
-            hash_radius=self.hash_radius,
+            hash_radius=radius,
             redundancy_radius=self.redundancy_radius,
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,

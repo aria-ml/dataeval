@@ -28,7 +28,7 @@
 # ## What you will do
 #
 # - Build a small video dataset with known duplicates
-# - Set `hash_radius` and `min_segment_frames` for video
+# - Check the `hash_radius` and `min_segment_frames` settings for video
 # - Triage the dataset with a per-sequence summary
 # - Find duplicate sequences and measure how much they overlap
 # - Detect train-test leakage
@@ -252,21 +252,21 @@ test = VideoDataset({"test_clip": transcode(frames_a[30:50], seed=3)}, dataset_i
 # %% [markdown]
 # ## Adjust the settings for video datasets
 #
-# `hash_radius` is the largest Hamming distance, in bits, at which two frame hashes still count as the same frame. It
-# defaults to `0`, an exact match across all 64 bits of the hash. That default suits still images, where a duplicated
-# file is often byte for byte identical. Re-encoded video is not: compression artifacts and noise move a bit or two
-# in most frames, and only some frames survive an exact match.
+# `hash_radius` is the largest Hamming distance, in bits, at which two frame hashes still count as the same frame. On
+# video it defaults to `6`. On still images it defaults to `0`, an exact match across all 64 bits of the hash, which
+# suits images because a duplicated file is often byte for byte identical. Re-encoded video is not: compression
+# artifacts and noise move a bit or two in most frames, and only some frames survive an exact match.
 #
-# Leaving the default in place does not make the evaluation miss video duplicates outright, and it does not report
-# relations that are not there. It finds fewer of the frames that make up each relation, so the spans and containment
-# it reports understate the relation it did find.
+# The code below runs the exact match explicitly beside the video default to show what it costs. It does not make the
+# evaluation miss video duplicates outright, and it does not report relations that are not there. It finds fewer of the
+# frames that make up each relation, so the spans and containment it reports understate the relation it did find.
 #
 # The sequences here are short, so the code below also lowers `min_segment_frames` from its default of `30` to `10`.
 # Otherwise the 20-frame stretch that sequence 3 reuses falls below the reporting threshold.
 #
 
 # %%
-strict = Duplicates(min_segment_frames=10).evaluate(train)
+strict = Duplicates(hash_radius=0, min_segment_frames=10).evaluate(train)
 relaxed = Duplicates(hash_radius=6, min_segment_frames=10).evaluate(train)
 
 for name, result in (("hash_radius=0", strict), ("hash_radius=6", relaxed)):
@@ -306,13 +306,13 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
 # drops 10 frames and leaves the other 10 leaked frames in the test split.
 #
 # ````{note}
-# Start at `hash_radius=6` for video. The perceptual hash is 64 bits wide. DataEval reads a distance of 1-5 bits as
+# Video defaults to `hash_radius=6`. The perceptual hash is 64 bits wide. DataEval reads a distance of 1-5 bits as
 # highly similar and 6-10 bits as possibly similar, and published video hashing work puts its threshold near 10% of
-# the hash length, which is about 6 bits here. The default stays at `0` so that the parameter means the same thing on
-# every dataset, rather than changing behavior depending on what it was handed.
+# the hash length, which is about 6 bits here. Still images keep `0` for now. Each result's `hash_radius` reports the
+# radius its run used.
 #
-# `Duplicates` logs a warning when it runs on video with `hash_radius=0`. To see it, configure the standard library
-# `logging` module as described in [How to configure logging](./h2_configure_logging.py):
+# `Duplicates` logs a warning when it runs on video with an explicit `hash_radius=0`. To see it, configure the
+# standard library `logging` module as described in [How to configure logging](./h2_configure_logging.py):
 #
 # ```python
 # import logging
@@ -404,7 +404,7 @@ display(
 #
 
 # %%
-leakage = Duplicates(hash_radius=6, min_segment_frames=10).evaluate(train, test)
+leakage = Duplicates(min_segment_frames=10).evaluate(train, test)
 leaks = leakage.crossing.aggregate_by_pair("sequence")
 display(leaks)
 
@@ -488,10 +488,10 @@ source = scene(1, 40)
 slowed = [frame for frame in source for _ in (0, 1)]
 repackaged = VideoDataset({"source": source, "slowed_export": transcode(slowed, seed=4)}, dataset_id="repack")
 
-without = Duplicates(hash_radius=6, min_segment_frames=20).evaluate(repackaged)
+without = Duplicates(min_segment_frames=20).evaluate(repackaged)
 print(f"segments only:              {without.sequences.data().shape[0]} relation(s) found")
 
-warped = Duplicates(hash_radius=6, min_segment_frames=20, verify_alignment=8).evaluate(repackaged)
+warped = Duplicates(min_segment_frames=20, verify_alignment=8).evaluate(repackaged)
 print(f"with verify_alignment=8:    {warped.sequences.data().shape[0]} relation(s) found")
 
 # %%
@@ -521,7 +521,7 @@ display(
 #
 
 # %%
-tracked = Duplicates(hash_radius=6, min_track_frames=10).evaluate(train, levels="track")
+tracked = Duplicates(min_track_frames=10).evaluate(train, levels="track")
 display(
     tracked.tracks.data().select("dup_type", "item_indices", "track_indices", "span_start", "span_end", "containment")
 )
@@ -642,7 +642,7 @@ print(f"sequence {sequence} without the shared stretch: {len(without_leak)} of {
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-# hash_radius matters: the strict default under-reports the relation rather than missing it
+# hash_radius matters: an explicit hash_radius=0 under-reports the relation rather than missing it
 strict_pair = strict.sequences.data().filter(pl.col("item_indices") == [0, 1]).row(0, named=True)
 assert strict_pair["containment"][0] < 0.6
 
@@ -719,6 +719,6 @@ assert set(tracked.data()["level"].to_list()) == {"track"}
 # ## On your own
 #
 # To run the same analysis on your own footage, present it as a MAITE multi-object tracking dataset, as in the section
-# "Build a dataset with known duplicates". Start with `hash_radius=6` and keep the default `min_segment_frames` of `30`
-# unless your sequences are short. To check for leakage, pass your training and test splits to `evaluate` together, then
-# read the sequence-level rows first and the frame numbers behind them second.
+# "Build a dataset with known duplicates". Keep the video default `hash_radius` of `6` and the default
+# `min_segment_frames` of `30` unless your sequences are short. To check for leakage, pass your training and test splits
+# to `evaluate` together, then read the sequence-level rows first and the frame numbers behind them second.
