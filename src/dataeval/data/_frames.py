@@ -276,6 +276,12 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     factor through the ordinary path. ``sequence`` as a factor is what
     ``split_on="sequence"`` needs to keep every frame of one video on one side of a split.
 
+    Frames of one video are not independent samples, so :class:`~dataeval.bias.Parity` clusters
+    them by their source video, and :class:`~dataeval.bias.Balance` counts a video as one
+    observation of any factor that is constant within it. The grouping holds through a
+    :class:`~dataeval.data.View` and through :func:`~dataeval.data.merge_datasets`, where frame views
+    built over the same dataset object share its videos.
+
     **Weights matter more than they look.** A frame kept out of 300 near-identical ones is not one
     observation. ``frames_represented`` records what it stands for so a reader can weight by it;
     nothing in DataEval consumes a sample weight yet, so an unweighted read of a thinned view
@@ -488,6 +494,11 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         shape = as_numpy(frame).shape
         values = as_numpy(target.boxes).reshape(-1, 4).astype(np.float64)
         return [BoundingBox(box[0], box[1], box[2], box[3], image_shape=shape) for box in values]
+
+    @property
+    def _source_items(self) -> NDArray[np.intp]:
+        """The source sequence behind each frame -- the private hook ``root_items`` walks."""
+        return self.frame_map[:, 0]
 
     @property
     def frame_map(self) -> NDArray[np.intp]:

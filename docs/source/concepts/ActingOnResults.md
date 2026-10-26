@@ -327,7 +327,8 @@ appear: as a cell with `observed` 0. Finding conditions the dataset lacks
 entirely is a coverage question.
 
 Check `group_source` before citing a p-value. `"level"`, `"item"` and `"rows"`
-mean the independent unit came from the dataset's own structure. `"declared"`
+mean the independent unit came from the dataset's own structure. `"source"`
+means a derived view's rows were grouped by the video or image they came from. `"declared"`
 means the caller passed `assume_independent=True`, and the p-values hold only if
 that declaration is true. Dependence between groups, such as consecutive
 sequences from one flight, is not corrected in any case.

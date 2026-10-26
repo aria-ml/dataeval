@@ -959,11 +959,45 @@ def kept_factors(metadata: Any, excluded: Sequence[int]) -> tuple[list[str], lis
     return [names[index] for index in kept], kept
 
 
+def _constant_within(column: NDArray[Any], groups: NDArray[np.intp]) -> bool:
+    """Whether every group holds a single value in ``column``, NaN equal to NaN."""
+    _, codes = np.unique(column, return_inverse=True, equal_nan=True)
+    pairs = np.unique(np.stack([groups, codes.ravel()]), axis=1)
+    return pairs.shape[1] == np.unique(groups).size
+
+
+def _source_groups(metadata: Any) -> NDArray[np.intp] | None:
+    """Read the root source item of each row at the current view, or None when it records none."""
+    # Read `item_indices` first, which structures the metadata and so records its root items.
+    item_indices = getattr(metadata, "item_indices", None)
+    roots = getattr(metadata, "_root_items", None)
+    return None if roots is None or item_indices is None else roots[np.asarray(item_indices, dtype=np.intp)]
+
+
+def _constant_columns(metadata: Any, axis: LabelAxis, names: Sequence[str], groups: NDArray[np.intp]) -> list[bool]:
+    """Whether the label axis, then each named factor, never changes within a group."""
+    # Every branch reads values as measured, never codes: a bin can hold a factor that changes
+    # within a video. Only a ground-truth axis has just its labels, which are exact.
+    values = metadata.factor_values
+    columns = list(metadata.factor_names)
+    if axis.source != "derived":
+        axis_constant = _constant_within(axis.values, groups)
+    else:
+        # A factor pivoted into the axis by `classed_by` is no longer among the factors.
+        measured = values[:, list(axis.excluded)] if axis.excluded else metadata._axis_values()
+        axis_constant = all(_constant_within(column, groups) for column in measured.T)
+    return [axis_constant] + [_constant_within(values[:, columns.index(name)], groups) for name in names]
+
+
 def effective_entity_counts(metadata: Any, axis: LabelAxis, names: Sequence[str]) -> NDArray[np.intp] | None:
     """Calculate distinct entity counts for label and factor columns.
 
     Indexed matching factor arrays: label axis at index 0, followed by factor names.
     Adjusts sample size for factors defined at coarser levels than the active view.
+
+    On a derived view the rows come from a root source item (a video or an image), and a
+    column that never changes within one is a property of that source rather than of the
+    row, so it counts the sources if they are fewer than its level's entities.
 
     Returns
     -------
@@ -971,21 +1005,27 @@ def effective_entity_counts(metadata: Any, axis: LabelAxis, names: Sequence[str]
         Array of entity counts per column, or None if metadata has no hierarchical
         levels or all factors match the current row level.
     """
+    groups = _source_groups(metadata)
     counter = getattr(metadata, "_entity_counts", None)
     info = getattr(metadata, "factor_info", None)
-    if counter is None or info is None or axis.level is None:
-        return None
     levels = [axis.level]
     for name in names:
-        entry = info.get(name)
-        level = None if entry is None else getattr(entry, "level", None)
-        if level is None:
-            # Abort effective_n calculation if any factor's hierarchy level cannot be determined.
-            return None
-        levels.append(level)
-    counts = np.asarray(counter(levels), dtype=np.intp)
+        entry = None if info is None else info.get(name)
+        levels.append(getattr(entry, "level", None))
+    known = [level for level in levels if level is not None]
+    # Abort the effective-n calculation if any level cannot be determined, unless the source
+    # groups can still count a column on their own.
+    if groups is None and (counter is None or len(known) < len(levels)):
+        return None
+    rows = len(axis.values)
+    counts = np.full(len(levels), rows, dtype=np.intp)
+    if counter is not None and known:
+        counts[[level is not None for level in levels]] = counter(known)
+    if groups is not None:
+        constant = _constant_columns(metadata, axis, names, groups)
+        counts = np.where(constant, np.minimum(counts, np.unique(groups).size), counts).astype(np.intp)
     # Return None if all factors have at least as many entities as rows.
-    return None if bool(np.all(counts >= len(axis.values))) else counts
+    return None if bool(np.all(counts >= rows)) else counts
 
 
 class IndependenceGroups(NamedTuple):
@@ -995,15 +1035,16 @@ class IndependenceGroups(NamedTuple):
     ----------
     groups : NDArray[np.intp] or None
         One group id per row, or None when each row is its own unit.
-    source : {"level", "item", "rows", "declared"}
-        Where the unit came from: the metadata's item level, declared ``item_indices``,
-        rows the recorded structure establishes as independent, or the caller's word.
+    source : {"source", "level", "item", "rows", "declared"}
+        Where the unit came from: the root source item a derived view's items came from,
+        the metadata's item level, declared ``item_indices``, rows the recorded structure
+        establishes as independent, or the caller's word.
     level : str or None
         The item level for ``"level"``, None otherwise.
     """
 
     groups: NDArray[np.intp] | None
-    source: Literal["level", "item", "rows", "declared"]
+    source: Literal["source", "level", "item", "rows", "declared"]
     level: str | None
 
 
@@ -1013,14 +1054,17 @@ def independence_groups(metadata: Any, assume_independent: bool) -> Independence
     The recorded structure always wins; ``assume_independent`` is consulted only when
     nothing records one. In order:
 
-    1. A :class:`~dataeval.Metadata` groups by its ``item_indices`` at the current view
-       (``"level"``), the item-level view included: rows that share an item id are one unit,
-       and ids that are one-to-one with the rows leave each row its own item (``"rows"``).
-    2. Any other container with ``item_indices`` groups by them (``"item"``). The protocol's
+    1. A :class:`~dataeval.Metadata` built over a derived view (the frames of a video, the
+       crops of an image) groups by each item's root source item (``"source"``), however the
+       view was thinned or reordered, so the frames of one video are one unit.
+    2. Any other :class:`~dataeval.Metadata` groups by its ``item_indices`` at the current
+       view (``"level"``), the item-level view included: rows that share an item id are one
+       unit, and ids that are one-to-one with the rows leave each row its own item (``"rows"``).
+    3. Any other container with ``item_indices`` groups by them (``"item"``). The protocol's
        default of one label per item is *not* applied to a container that lacks them.
-    3. ``item_indices`` that are one-to-one from either source make the rows the unit
-       (``"rows"``): there is nothing to cluster.
-    4. ``assume_independent`` declares the rows independent (``"declared"``).
+    4. ``item_indices`` or root items that are one-to-one with the rows make the rows the
+       unit (``"rows"``): there is nothing to cluster.
+    5. ``assume_independent`` declares the rows independent (``"declared"``).
 
     Parameters
     ----------
@@ -1064,18 +1108,26 @@ def _recorded_groups(metadata: Any) -> IndependenceGroups | None:
             f"{list(parents)}), so the dataset item is not the coarsest grouping and the "
             "independent sampling unit cannot be inferred from it."
         )
+    # Read after `item_level`, which structures the metadata and so records its root items.
+    if getattr(metadata, "_root_items", None) is not None:
+        return _grouped_by("source", None, metadata)
     # Read at every view, the item level included: `Metadata.from_factors` can record
     # repeated item ids at a view that equals its item level.
     return _grouped_by("level", item_level, metadata)
 
 
-def _grouped_by(source: Literal["level", "item"], level: str | None, metadata: Any) -> IndependenceGroups | None:
-    indices = metadata.item_indices if source == "level" else getattr(metadata, "item_indices", None)
+def _grouped_by(
+    source: Literal["source", "level", "item"], level: str | None, metadata: Any
+) -> IndependenceGroups | None:
+    if source == "source":
+        indices = metadata._root_items[np.asarray(metadata.item_indices, dtype=np.intp)]
+    else:
+        indices = metadata.item_indices if source == "level" else getattr(metadata, "item_indices", None)
     if indices is None:
         return None
     groups = np.asarray(indices, dtype=np.intp)
     # A `Metadata` counts its rows at the view; class_labels is undefined above its label level.
-    rows = len(metadata) if source == "level" else len(metadata.class_labels)
+    rows = len(metadata) if source != "item" else len(metadata.class_labels)
     if len(groups) != rows:
         # Refused rather than read as unique: a record that does not cover the rows says
         # nothing about which are independent, and 1:1 would certify all of them.

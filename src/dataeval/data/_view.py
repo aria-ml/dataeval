@@ -4,6 +4,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any, TypeVar
 
+import numpy as np
+from numpy.typing import NDArray
+
 from dataeval.data._reads import Reads, skeleton
 from dataeval.flags import ImageStats
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
@@ -324,6 +327,11 @@ class View(AnnotatedDataset[_TDatum]):
         root : the dataset at the *bottom* of the chain, however deep.
         """
         return self._dataset
+
+    @property
+    def _source_items(self) -> NDArray[np.intp]:
+        """The source item behind each view item -- the private hook ``root_items`` walks."""
+        return np.asarray(self.selection, dtype=np.intp)
 
     @property
     def root(self) -> Dataset[_TDatum]:

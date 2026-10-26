@@ -357,6 +357,12 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
     - ``box`` (``list[float]``) — the detection's absolute-pixel ``[x0, y0, x1, y1]`` in the
       source image.
 
+    Crops cut from one image are not independent samples, so :class:`~dataeval.bias.Parity`
+    clusters them by their source image, and :class:`~dataeval.bias.Balance` counts an image
+    as one observation of any factor that is constant within it. The grouping holds through a
+    :class:`~dataeval.data.View` and through :func:`~dataeval.data.merge_datasets`, where crop views
+    built over the same dataset object share its images.
+
     Examples
     --------
     Wrap an object-detection dataset and run the classification-only tools on it:
@@ -481,6 +487,11 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         ``View(DetectionCrops(base))`` is walkable through one public attribute.
         """
         return self._dataset
+
+    @property
+    def _source_items(self) -> NDArray[np.intp]:
+        """The source image behind each crop -- the private hook ``root_items`` walks."""
+        return self.item_indices
 
     @property
     def item_indices(self) -> NDArray[np.intp]:

@@ -114,9 +114,11 @@ class ParityOutput(DictOutput):
 
         .. versionadded:: 1.2
     group_source : str or None
-        Where the independent sampling unit came from: ``"level"`` (the metadata's item
-        level), ``"item"`` (declared ``item_indices``), ``"rows"`` (the recorded structure
-        has one row per item) or ``"declared"`` (``assume_independent=True``).
+        Where the independent sampling unit came from: ``"source"`` (the root source item
+        of a derived view: the video behind a frame, the image behind a crop), ``"level"``
+        (the metadata's item level), ``"item"`` (declared ``item_indices``), ``"rows"``
+        (the recorded structure has one row per item) or ``"declared"``
+        (``assume_independent=True``).
 
         .. versionadded:: 1.2
     group_level : str or None
@@ -206,7 +208,12 @@ class Parity(Evaluator):
     Notes
     -----
     **The independent sampling unit (D2).** Parity must know which rows are independent.
-    A :class:`~dataeval.Metadata` groups by its ``item_indices`` at any view: detections
+    A :class:`~dataeval.Metadata` built over a derived view groups by each item's root
+    source item, the video behind a frame or the image behind a crop
+    (``group_source="source"``), however the view was thinned or reordered; a
+    :class:`~dataeval.data.View` that repeats items groups the copies the same way. A
+    :func:`~dataeval.data.merge_datasets` of frame or crop views keeps each view's grouping. Any other
+    :class:`~dataeval.Metadata` groups by its ``item_indices`` at any view: detections
     by image, frames by sequence (``group_source="level"``). A container with
     many-to-one ``item_indices`` groups by them (``"item"``). One row per item makes the
     rows the unit (``"rows"``). A container recording neither raises ``ValueError``

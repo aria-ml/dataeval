@@ -67,6 +67,7 @@ from dataeval._metadata._reductions import (
 )
 from dataeval._metadata._serialize import restore as _restore
 from dataeval._metadata._serialize import save as _save
+from dataeval._metadata._source_groups import root_items
 from dataeval._metadata._store import LevelStore
 from dataeval._metadata._structurers import (
     LEVEL_KEY_COLUMNS,
@@ -734,6 +735,11 @@ class Metadata(Array, FeatureExtractor):
         # Memoized flat frame, dropped by the ``_store`` setter on every rebind.
         self._flat: pl.DataFrame | None = None
         self._store = LevelStore.empty(self._structurer.levels)
+        # Each dataset item's root source item, where the bound dataset is a derived view (frames
+        # of a video, crops of an image) and None where it is not. Read-only, so every derived
+        # copy shares it: their `item_indices` stay positions in the original dataset, which
+        # makes `_root_items[item_indices]` the unit of each row at any view or filter.
+        self._root_items: NDArray[np.intp] | None = None
         self._factors_by_level: dict[FactorLevel, set[str]] = {}
         # Two containers, deliberately not one: ``_factors`` is what the current view
         # analyses, ``_factor_cache`` what binning computed. Merging them would lose a
@@ -2134,6 +2140,18 @@ class Metadata(Array, FeatureExtractor):
             columns.append(self._store.column(view, to_col(name, info)).to_numpy())
             encodings.append(info.encoding)
         return columns, encodings
+
+    def _axis_values(self) -> NDArray[np.float64]:
+        """Read the class axis's factors as measured, with nothing cut, off the view's rows.
+
+        The counterpart of :attr:`factor_values` for the factors that serve as the axis,
+        which it no longer lists. Callers must have read :meth:`_axis_columns` first, which
+        is what bins them.
+        """
+        schema = {name: self._store.dtype_of(name) for name in self._class_axis}
+        return self._project(
+            [float_col(name, self._factor_cache[name], schema) for name in self._class_axis], np.float64
+        )
 
     def _axis_resolution(self) -> tuple[NDArray[np.intp], Mapping[int, str]]:
         """Resolve the class axis to dense codes and their names, once per view.
@@ -5130,6 +5148,12 @@ class Metadata(Array, FeatureExtractor):
         unique_labels = np.unique(data.class_labels) if len(data.class_labels) else np.array([], dtype=np.intp)
         self._index2label = build_index2label(self._dataset.metadata.get("index2label", None), unique_labels)
         self._adopt(structurer, data)
+        # From the bound dataset rather than the `_structuring_source` replacement: the replacement holds
+        # the datums of a view, and it is the view's own chain that says which items share a root.
+        roots = root_items(self._dataset)
+        # A map that never repeats a root leaves each item its own unit, which the levels already record, so it
+        # is dropped: a subset, shuffle or filter then resolves exactly as the unwrapped dataset does.
+        self._root_items = None if roots is not None and np.unique(roots).size == roots.size else roots
 
         _logger.debug(
             "Metadata structured as %s: %s rows per level, %d factors, %d dropped",

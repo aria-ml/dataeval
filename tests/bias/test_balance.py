@@ -249,3 +249,27 @@ class TestBalanceAcrossLevels:
         assert md.levels == ("unit",)
         # Reaches the statistic with no entity counts at all, so it is scored as it always was.
         assert self._pair(md)[0] >= 0.0
+
+
+@pytest.mark.required
+class TestBalanceOverDerivedViews:
+    def test_frame_view_scales_video_constant_factor_by_videos(self, monkeypatch):
+        """Balance over a frame view hands the statistic the video count for a video-constant factor."""
+        from dataeval.bias import _balance
+        from dataeval.data import SequenceFrames
+        from tests.data.test_frames import make_dataset
+
+        seen = []
+        real = _balance.mutual_info
+
+        def spy(*args):
+            seen.append(args[-1])
+            return real(*args)
+
+        monkeypatch.setattr(_balance, "mutual_info", spy)
+        md = Metadata(SequenceFrames(make_dataset()[0]))  # 10 frames in 2 videos
+        Balance().evaluate(md)
+        names = list(md.factor_names)
+        assert seen[0] is not None
+        assert seen[0][1 + names.index("sequence_n_frames")] == 2
+        assert seen[0][1 + names.index("frame")] == 10
