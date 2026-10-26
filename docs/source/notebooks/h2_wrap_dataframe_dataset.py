@@ -356,6 +356,9 @@ assert lazy_seconds < eager_seconds
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact model reliability.
-# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
-# - [How to build a MetadataLike object from a DataFrame](./h2_metadata_from_dataframe.py) — Build a MetadataLike object from a DataFrame for bias analysis without loading images.
+# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact
+#   model reliability.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
+#   dataset bias.
+# - [How to build a MetadataLike object from a DataFrame](./h2_metadata_from_dataframe.py) — Build a MetadataLike object
+#   from a DataFrame for bias analysis without loading images.

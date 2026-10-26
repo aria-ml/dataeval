@@ -980,9 +980,12 @@ assert min(hard, key=lambda model: hard[model]) == "VAE"
 # %% [markdown]
 # ## Next steps
 #
-# - [Out-of-distribution detection](../concepts/DistributionShift.md#out-of-distribution-detection) — Learn about the reconstruction-based and distance-based methods.
-# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect drift on image embeddings and across chunks of incoming data.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free extractor.
+# - [Out-of-distribution detection](../concepts/DistributionShift.md#out-of-distribution-detection) — Learn about the
+#   reconstruction-based and distance-based methods.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect drift on image embeddings and across chunks of
+#   incoming data.
+# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free
+#   extractor.
 
 # %% [markdown]
 # ## On your own

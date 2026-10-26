@@ -46,8 +46,8 @@
 # | Basic Hashes (phash, dhash)    | Same-orientation near-duplicates          | Fastest | No                  |
 #
 # D4 hashes handle only the 8 symmetries of a square: the rotations by 0°, 90°, 180° and 270°, each with and without a
-# flip. BoVW with SIFT features is invariant to rotation by any angle, so it can detect duplicates that are rotated by an
-# arbitrary angle.
+# flip. BoVW with SIFT features is invariant to rotation by any angle, so it can detect duplicates that are rotated by
+# an arbitrary angle.
 #
 # ## What you will need
 #
@@ -614,7 +614,8 @@ print(
 # - BoVW detects the 15° and 45° rotations, which D4 hashes miss.
 # - No detector, alone or combined, detects the center or random crops or the random erasing transformations.
 # - The combined detector finds more than either method alone, including some transformations that neither finds alone.
-# - No transformation is detected at a `cluster_sensitivity` of 0.75, and the number found never falls as the threshold rises.
+# - No transformation is detected at a `cluster_sensitivity` of 0.75, and the number found never falls as the threshold
+#   rises.
 #
 # The lists show how to compare the methods on a dataset. They are not a ranking of the methods: the counts change with
 # the image, the transformation parameters and the thresholds.
@@ -677,7 +678,9 @@ print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 # %% [markdown]
 # ## Next steps
 #
-# - [Duplicate detection: hashing and clustering](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering) — Read how exact hashes, perceptual hashes and clustering find redundant images.
+# - [Duplicate detection: hashing and
+#   clustering](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering) — Read how exact hashes,
+#   perceptual hashes and clustering find redundant images.
 # - [Clean a dataset](./tt_clean_dataset.py) — Identify label noise and corrupt samples in a labeled dataset.
 # - [How to identify duplicates](./h2_deduplicate.py) — Learn how to remove duplicate images from a PyTorch dataset.
 

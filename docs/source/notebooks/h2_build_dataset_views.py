@@ -239,4 +239,5 @@ assert nested.root is mnist
 #
 # - [Ontology](../concepts/Ontology.md) — Learn about taxonomic ontologies and label space mapping.
 # - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand coverage and balance in dataset views.
-# - [How to conform and merge datasets with different label vocabularies](./h2_conform_and_merge_datasets.py) — Conform and merge datasets with disparate label vocabularies into a unified view.
+# - [How to conform and merge datasets with different label vocabularies](./h2_conform_and_merge_datasets.py) — Conform
+#   and merge datasets with disparate label vocabularies into a unified view.

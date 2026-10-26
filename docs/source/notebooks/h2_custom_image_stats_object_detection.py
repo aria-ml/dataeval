@@ -176,6 +176,9 @@ assert "instance_background_sharpness" in metadata.dropped_factors
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level, target-level, and background-level statistics to identify data quality issues.
-# - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across unit, instance, and background factors.
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors such as dimensions and pixel statistics to dataset metadata.
+# - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level, target-level, and background-level statistics
+#   to identify data quality issues.
+# - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across
+#   unit, instance, and background factors.
+# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors
+#   such as dimensions and pixel statistics to dataset metadata.

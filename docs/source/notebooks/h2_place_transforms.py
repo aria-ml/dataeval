@@ -148,6 +148,9 @@ assert warned == {"DIMENSION": False, "VISUAL": True}
 # %% [markdown]
 # ## Next steps
 #
-# - [Image Statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across channels.
-# - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional space.
-# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view transformations.
+# - [Image Statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across
+#   channels.
+# - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional
+#   space.
+# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view
+#   transformations.

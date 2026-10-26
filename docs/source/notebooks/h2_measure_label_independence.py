@@ -19,8 +19,9 @@
 # A discrepancy in label frequencies between training and test datasets can hurt model performance. The
 # [label parity](../concepts/DistributionShift.md#label-parity) test compares the label distributions of two datasets.
 #
-# Use {func}`.label_parity` when you want to know whether two datasets have statistically independent labels. It is a symmetric
-# two-sample test of homogeneity: the null hypothesis is that both datasets draw their labels from one class distribution.
+# Use {func}`.label_parity` when you want to know whether two datasets have statistically independent labels. It is a
+# symmetric two-sample test of homogeneity: the null hypothesis is that both datasets draw their labels from one class
+# distribution.
 #
 # You need `dataeval` and a labeled training dataset and test dataset. This guide uses MNIST.
 
@@ -94,6 +95,9 @@ assert abs(results["p_value"] - 0.97) < 0.01  # and about 0.97
 # %% [markdown]
 # ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md) — Learn about types of shift and techniques to quantify distribution changes.
-# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential dataset bias.
-# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics between baseline and operational data distributions.
+# - [Distribution Shift](../concepts/DistributionShift.md) — Learn about types of shift and techniques to quantify
+#   distribution changes.
+# - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
+#   dataset bias.
+# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics
+#   between baseline and operational data distributions.

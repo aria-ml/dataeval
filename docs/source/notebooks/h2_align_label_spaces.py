@@ -17,16 +17,16 @@
 # # How to align two label spaces
 #
 # Two datasets rarely name things the same way. {func}`.label_alignment` relates each class of a source vocabulary to a
-# reference {class}`.Ontology` as equivalent, narrower or broader, and reports whether the source can be expressed in the
-# target without loss. See [Ontology](../concepts/Ontology.md).
+# reference {class}`.Ontology` as equivalent, narrower or broader, and reports whether the source can be expressed in
+# the target without loss. See [Ontology](../concepts/Ontology.md).
 #
 # Use it when you have two label vocabularies and want to:
 #
 # - find which source classes are equivalent, narrower or broader than a target class
 # - get a `class_remap` (`source -> target`) for your labels and a `mergeability` verdict
 #
-# You need a source vocabulary (a list of class names or an `Ontology`) and a target `Ontology`. The optional fuzzy matcher
-# needs `rapidfuzz`.
+# You need a source vocabulary (a list of class names or an `Ontology`) and a target `Ontology`. The optional fuzzy
+# matcher needs `rapidfuzz`.
 
 # %% tags=["remove_cell"]
 try:
@@ -277,6 +277,9 @@ for labels in sources.values():
 # %% [markdown]
 # ## Next steps
 #
-# - [Ontology](../concepts/Ontology.md) — Learn about the taxonomic model, correspondences, relations, matchers, and mergeability.
-# - [Distribution Shift](../concepts/DistributionShift.md) — Understand distributional differences between sources that remain after label alignment.
-# - [How to reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Match class names against a reference ontology and recover their hierarchy.
+# - [Ontology](../concepts/Ontology.md) — Learn about the taxonomic model, correspondences, relations, matchers, and
+#   mergeability.
+# - [Distribution Shift](../concepts/DistributionShift.md) — Understand distributional differences between sources that
+#   remain after label alignment.
+# - [How to reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Match class names against a
+#   reference ontology and recover their hierarchy.

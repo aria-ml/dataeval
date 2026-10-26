@@ -16,9 +16,9 @@
 # %% [markdown]
 # # How to trace a finding back to its source
 #
-# An evaluator tells you that something is wrong and where, but not what it looks like. {class}`.Outliers` returns a mapping keyed on
-# {class}`.SourceIndex`, an address naming one row of your dataset, and the next question is to see that row. See
-# [Metadata levels](../concepts/MetadataLevels.md#naming-a-row-keys-or-addresses).
+# An evaluator tells you that something is wrong and where, but not what it looks like. {class}`.Outliers` returns a
+# mapping keyed on {class}`.SourceIndex`, an address naming one row of your dataset, and the next question is to see
+# that row. See [Metadata levels](../concepts/MetadataLevels.md#naming-a-row-keys-or-addresses).
 #
 # Use this guide to:
 #
@@ -61,8 +61,8 @@ print(dataset)
 # %% [markdown]
 # ## Read an address
 #
-# Run {class}`.Outliers` over the detections and look at what comes back. With `per_target=True` the keys are {class}`.SourceIndex`
-# objects and not plain integers, because an item index alone cannot name one box out of several.
+# Run {class}`.Outliers` over the detections and look at what comes back. With `per_target=True` the keys are
+# {class}`.SourceIndex` objects and not plain integers, because an item index alone cannot name one box out of several.
 
 # %%
 stats = image_stats(
@@ -74,8 +74,8 @@ for address, metrics in list(outliers.outliers.items())[:5]:
     print(f"{address!r:<24} {', '.join(metrics)}")
 
 # %% [markdown]
-# Each address has three fields: `item`, `key` and `level`. {func}`.image_stats` leaves `level` unstated, so a null key is an item's own
-# row and a key is one of its labels.
+# Each address has three fields: `item`, `key` and `level`. {func}`.image_stats` leaves `level` unstated, so a null key
+# is an item's own row and a key is one of its labels.
 
 # %% [markdown]
 # The result holds whole-image findings, keyed `SourceIndex(24)` with no key, alongside per-detection ones:
@@ -101,8 +101,8 @@ print(f"str   = {address}")
 # %% [markdown]
 # ## Follow one address
 #
-# {class}`.SourceLocator` binds a dataset once and resolves addresses against it. Hand it the same object you computed the statistics
-# over, because an address's `item` is a position in whatever {func}`.image_stats` walked.
+# {class}`.SourceLocator` binds a dataset once and resolves addresses against it. Hand it the same object you computed
+# the statistics over, because an address's `item` is a position in whatever {func}`.image_stats` walked.
 
 # %%
 locator = SourceLocator(dataset)
@@ -118,11 +118,11 @@ print(f"  image = {found.pixels.shape}")
 
 
 # %% [markdown]
-# The address resolved to `instance` without stating a level, because this is an image task and a keyed address names a label. An
-# accessor a level does not carry, such as `.box` on a whole-image address, raises a `TypeError`.
+# The address resolved to `instance` without stating a level, because this is an image task and a keyed address names a
+# label. An accessor a level does not carry, such as `.box` on a whole-image address, raises a `TypeError`.
 #
-# Retrieval is lazy: building a `SourceItem` reads nothing. `found.pixels` is the whole image, because context is most of what you need
-# to judge a finding, and {meth}`.SourceItem.crop` is the cut-out.
+# Retrieval is lazy: building a `SourceItem` reads nothing. `found.pixels` is the whole image, because context is most
+# of what you need to judge a finding, and {meth}`.SourceItem.crop` is the cut-out.
 
 
 # %% tags=["hide-input"]
@@ -145,9 +145,9 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# `crop()` shares its implementation with {class}`.DetectionCrops`, but the defaults differ: `crop()` leaves the detection's aspect
-# ratio alone, while `DetectionCrops` squares crops for a model. To reproduce what an embedding saw, pass
-# {attr}`.DetectionCrops.policy`:
+# `crop()` shares its implementation with {class}`.DetectionCrops`, but the defaults differ: `crop()` leaves the
+# detection's aspect ratio alone, while `DetectionCrops` squares crops for a model. To reproduce what an embedding saw,
+# pass {attr}`.DetectionCrops.policy`:
 #
 # ```python
 # crops = DetectionCrops(dataset)
@@ -174,15 +174,15 @@ for sibling in siblings:
     print(f"  {sibling.address!r:<20} key={sibling.key:<4} label={sibling.label:<3} {mark}")
 
 # %% [markdown]
-# The keys of an evaluator's result and the addresses the locator produces are the same objects, so membership works. Only the minimal
-# spelling matches: `SourceIndex(3, 7)` and `SourceIndex(3, 7, "instance")` name one row but are different dictionary keys, which is
-# why producers leave the level unstated.
+# The keys of an evaluator's result and the addresses the locator produces are the same objects, so membership works.
+# Only the minimal spelling matches: `SourceIndex(3, 7)` and `SourceIndex(3, 7, "instance")` name one row but are
+# different dictionary keys, which is why producers leave the level unstated.
 
 # %% [markdown]
 # ## See what the view did
 #
-# Statistics are computed over a view, so a finding is about transformed data. {attr}`.SourceItem.datum` is what was measured and
-# {attr}`.SourceItem.source_datum` is what sits underneath, with no transform applied.
+# Statistics are computed over a view, so a finding is about transformed data. {attr}`.SourceItem.datum` is what was
+# measured and {attr}`.SourceItem.source_datum` is what sits underneath, with no transform applied.
 
 # %%
 resized = View(dataset, Resize(128))
@@ -195,13 +195,15 @@ print(f"source box      = {np.round(on_resized.source_datum[1].boxes[found.key],
 print(f"source item     = {on_resized.source_item_index}")
 
 # %% [markdown]
-# `source_item_index` walks the whole view chain, so it names a row of the original dataset however deep the views are stacked.
+# `source_item_index` walks the whole view chain, so it names a row of the original dataset however deep the views are
+# stacked.
 
 # %% [markdown]
 # ## Feed a finding back
 #
-# The addresses an evaluator returns and the addresses {meth}`.Metadata.add_factors` accepts are the same vocabulary, so a finding
-# goes back in as a factor without a translation step. Bias, balance and diversity analysis can then see it as an ordinary column.
+# The addresses an evaluator returns and the addresses {meth}`.Metadata.add_factors` accepts are the same vocabulary, so
+# a finding goes back in as a factor without a translation step. Bias, balance and diversity analysis can then see it as
+# an ordinary column.
 
 # %%
 metadata = Metadata(dataset)
@@ -241,5 +243,7 @@ assert "unit_is_outlier" in metadata.rows_at("unit").columns
 # ## Next steps
 #
 # - [Metadata Levels](../concepts/MetadataLevels.md) — Learn the level graph that an address names a row in.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Choose flags and read `source_index`.
-# - [How to find outliers in metadata factors](./h2_find_factor_outliers.py) — Threshold measured factors at each level and trace the flagged rows.
+# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) —
+#   Choose flags and read `source_index`.
+# - [How to find outliers in metadata factors](./h2_find_factor_outliers.py) — Threshold measured factors at each level
+#   and trace the flagged rows.

@@ -16,15 +16,15 @@
 # %% [markdown]
 # # How to measure train and test dataset divergence
 #
-# When you evaluate new test data or compare two datasets, you often want a quantitative measure of the shift in covariates. HP
-# [divergence](../concepts/Divergence.md) is a nonparametric measure of the distance between two datasets: 0 means they are
-# approximately identically distributed, and 1 means they are completely separable.
+# When you evaluate new test data or compare two datasets, you often want a quantitative measure of the shift in
+# covariates. HP [divergence](../concepts/Divergence.md) is a nonparametric measure of the distance between two
+# datasets: 0 means they are approximately identically distributed, and 1 means they are completely separable.
 #
-# Use {func}`.divergence_fnn` or {func}`.divergence_mst` when you want to know how far apart two datasets are, for example to
-# measure [operational drift](../concepts/DistributionShift.md#drift-detection).
+# Use {func}`.divergence_fnn` or {func}`.divergence_mst` when you want to know how far apart two datasets are, for
+# example to measure [operational drift](../concepts/DistributionShift.md#drift-detection).
 #
-# You need `dataeval`, `maite-datasets` and a set of image embeddings for each dataset. This guide builds them from the pixels
-# of MNIST images.
+# You need `dataeval`, `maite-datasets` and a set of image embeddings for each dataset. This guide builds them from the
+# pixels of MNIST images.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -121,6 +121,9 @@ assert div["divergence"] > 0.95
 # %% [markdown]
 # ## Next steps
 #
-# - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional space.
-# - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across datasets.
-# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and operational data.
+# - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional
+#   space.
+# - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across
+#   datasets.
+# - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and
+#   operational data.

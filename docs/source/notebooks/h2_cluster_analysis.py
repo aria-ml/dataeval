@@ -16,8 +16,8 @@
 # %% [markdown]
 # # How to run clustering analysis
 #
-# Data does not typically come labeled, and labeling or verifying labels takes time and resources. Clustering groups data of
-# shape (samples, features) into similar groups with an algorithm based on HDBSCAN, and {class}`.Outliers` and
+# Data does not typically come labeled, and labeling or verifying labels takes time and resources. Clustering groups
+# data of shape (samples, features) into similar groups with an algorithm based on HDBSCAN, and {class}`.Outliers` and
 # {class}`.Duplicates` can analyze the result to find outliers and near duplicates. See
 # [Clustering](../concepts/Clustering.md).
 #
@@ -27,8 +27,8 @@
 # - verify labeling as a quality control
 # - find outliers and duplicates in your dataset
 #
-# You need a two-dimensional array of samples and features, such as flattened images or, preferably, image embeddings with a
-# feature dimension below 500. The example needs `dataeval` and `matplotlib`.
+# You need a two-dimensional array of samples and features, such as flattened images or, preferably, image embeddings
+# with a feature dimension below 500. The example needs `dataeval` and `matplotlib`.
 
 # %% tags=["remove_cell"]
 try:
@@ -135,5 +135,6 @@ assert len(duplicates_result.near) == 2
 # ## Next steps
 #
 # - [Embeddings](../concepts/Embeddings.md) — Understand feature extraction and vector embeddings for clustering.
-# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate unlabeled image datasets using clustering and coverage metrics.
+# - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate unlabeled image datasets using clustering and
+#   coverage metrics.
 # - [How to identify duplicates](./h2_deduplicate.py) — Detect exact and near-duplicate images in dataset collections.

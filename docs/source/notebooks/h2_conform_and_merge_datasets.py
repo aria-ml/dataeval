@@ -16,14 +16,14 @@
 # %% [markdown]
 # # How to conform and merge datasets with different label vocabularies
 #
-# A second, incoming dataset can arrive labeled under a different scheme: different class names, reordered indices and an
-# overlapping but not identical set of classes. You cannot concatenate it with your reference dataset, because index `0`
-# might mean `"sedan"` in one and `"submarine"` in the other. This guide conforms the incoming dataset to the reference
-# vocabulary, an {class}`.Ontology`, with {func}`.label_alignment` and {class}`.Relabel`, then merges the two with
-# {func}`.merge_datasets`. See [ontology alignment](./h2_align_label_spaces.py).
+# A second, incoming dataset can arrive labeled under a different scheme: different class names, reordered indices and
+# an overlapping but not identical set of classes. You cannot concatenate it with your reference dataset, because index
+# `0` might mean `"sedan"` in one and `"submarine"` in the other. This guide conforms the incoming dataset to the
+# reference vocabulary, an {class}`.Ontology`, with {func}`.label_alignment` and {class}`.Relabel`, then merges the two
+# with {func}`.merge_datasets`. See [ontology alignment](./h2_align_label_spaces.py).
 #
-# Use it to combine annotation sources that name or index their classes differently, or to bring an incoming dataset into a
-# fixed reference taxonomy before analysis.
+# Use it to combine annotation sources that name or index their classes differently, or to bring an incoming dataset
+# into a fixed reference taxonomy before analysis.
 #
 # You need a reference ontology and two datasets.
 
@@ -194,5 +194,7 @@ except ValueError:
 # %% [markdown]
 # ## Next steps
 #
-# - [Ontology](../concepts/Ontology.md) — Explore the taxonomic model the reference is built on, correspondences, relations, and mergeability.
-# - [How to align two label spaces](./h2_align_label_spaces.py) — Relate class names and categories between different dataset label spaces.
+# - [Ontology](../concepts/Ontology.md) — Explore the taxonomic model the reference is built on, correspondences,
+#   relations, and mergeability.
+# - [How to align two label spaces](./h2_align_label_spaces.py) — Relate class names and categories between different
+#   dataset label spaces.
