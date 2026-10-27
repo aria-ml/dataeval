@@ -8,7 +8,7 @@ primary backends.
 
 ## Supported Python Versions
 
-We currently support Python `3.11` through `3.14`.
+DataEval currently supports Python `3.11` through `3.14`.
 
 ## PyTorch Dependency
 
@@ -17,7 +17,7 @@ pulls PyTorch from PyPI, which bundles CUDA support on Linux and is a much
 larger download than the CPU build.
 
 To choose a specific PyTorch variant, install `torch` from that variant's wheel
-index **first**, then install DataEval — it accepts the build already present in
+index first, then install DataEval, which accepts the build already present in
 the environment:
 
 ```bash
@@ -31,11 +31,11 @@ pip install dataeval
 See the [PyTorch installation guide](https://pytorch.org/get-started/locally/) for all available PyTorch installation options.
 
 :::{warning}
-Do **not** reach for `--extra-index-url` to select a CUDA variant. It *adds* an
+Do not use `--extra-index-url` to select a CUDA variant. It adds an
 index rather than replacing PyPI, and pip then picks the highest version across
 both. The CUDA indexes lag the latest PyTorch release, so PyPI usually wins and
 you silently get the default CUDA-bundled build instead of the one you asked
-for — the install succeeds and nothing warns you.
+for. The install succeeds and nothing warns you.
 
 `--index-url` (as above) replaces the index outright, which is why it is
 reliable.
@@ -49,14 +49,14 @@ pip install dataeval --extra-index-url https://download.pytorch.org/whl/cpu
 ```
 
 :::{important}
-The `cpu`, `cu126`, and `cu130` extras are **not** a way to select a PyTorch
-variant with pip. All three declare exactly the same requirements (`torch` and
+The `cpu`, `cu126`, and `cu130` extras are not a way to select a PyTorch
+variant with pip. All three declare the same requirements (`torch` and
 `torchvision`); what distinguishes them is `[tool.uv.sources]` in the project's
 `pyproject.toml`, which routes those two packages to the right wheel index. That
-routing is project metadata — uv applies it when resolving **from a source
-checkout**, and it is not part of the published wheel. Installing
-`dataeval[cu130]` from PyPI therefore only adds `torchvision` — and adds it from
-PyPI, which will *not* match a torch you installed from a wheel index — while
+routing is project metadata: uv applies it when resolving from a source
+checkout, and it is not part of the published wheel. Installing
+`dataeval[cu130]` from PyPI therefore only adds `torchvision`, and adds it from
+PyPI (which will not match a torch you installed from a wheel index), while
 PyTorch still resolves from whichever index pip is pointed at.
 
 Select the variant with `--index-url` under pip, `--torch-backend` under
@@ -66,9 +66,9 @@ Select the variant with `--index-url` under pip, `--torch-backend` under
 ### torchvision (optional)
 
 `torchvision` is not a DataEval dependency, and nothing in the library imports it
-until you reach for {class}`.TorchvisionTransform` — the escape hatch for running
+until you use {class}`.TorchvisionTransform`, which runs
 a torchvision v2 transform across a dataset view. If you want that class, install
-torchvision yourself, from the **same index as your torch build**:
+torchvision yourself, from the same index as your torch build:
 
 ```bash
 pip install torchvision --index-url https://download.pytorch.org/whl/cu130
@@ -84,7 +84,7 @@ RuntimeError: operator torchvision::nms does not exist
 
 torchvision's compiled ops are built against one specific torch build, so both
 packages have to come from the same index. This is also why `pip install
-dataeval[cpu]` is the wrong way to obtain torchvision — see the note above.
+dataeval[cpu]` is the wrong way to obtain torchvision. See the note above.
 :::
 
 ## Installing DataEval
@@ -148,7 +148,7 @@ Install DataEval with development dependencies.
 
 Optionally, you can specify the version of Python and PyTorch CPU/CUDA
 support (cpu, cu126, cu130) using -p and --extra respectively. This is the one
-place the PyTorch variant extras take effect — uv applies the `[tool.uv.sources]`
+place the PyTorch variant extras take effect: uv applies the `[tool.uv.sources]`
 index routing when resolving from a source checkout.
 
 For example, the following command installs DataEval in a Python 3.11

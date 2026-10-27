@@ -31,7 +31,7 @@ developers for a better metric in a Kaggle-style AI competition.
    }
 ```
 
-*Consensus machine-learning lifecycle derivation* [^1] [^2] [^3]
+Consensus machine-learning lifecycle derivation [^1] [^2] [^3]
 
 * not a linear, sequential process
 * roles and responsibilities across stages and personnel are dynamic

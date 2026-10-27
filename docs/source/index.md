@@ -4,7 +4,7 @@
 
 # DataEval documentation
 
-**Version**: {{ release }} | {{ date_label }}: {sub-ref}`today`
+Version: {{ release }} | {{ date_label }}: {sub-ref}`today`
 
 ::::{grid}
 :reverse:
@@ -65,8 +65,8 @@ It contains an introduction to DataEval's main concepts.
 **Roles Guide**
 ^^^
 Not sure how DataEval fits into your daily routine?
-Check out our Roles Guide which shows some of the ways
-in which we use DataEval.
+Check out the Roles Guide, which shows some of the ways
+to use DataEval.
 
 :::
 

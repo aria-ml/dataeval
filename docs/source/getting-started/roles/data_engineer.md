@@ -10,7 +10,7 @@ They are often involved across multiple stages of a project:
 - monitoring operational pipelines for distribution shift.
 
 While they share the goal of creating and maintaining excellent datasets with [data scientists](data_scientist.md),
-their role is less research-oriented and more production-oriented — ensuring that
+their role is less research-oriented and more production-oriented: ensuring that
 the data pipeline is reliable and that the data quality is built in at every stage
 for trustworthy datasets.
 
@@ -58,7 +58,7 @@ be leveraged in order to accomplish the task.
 
 ### Validate incoming data against protocol requirements
 
-Ensure that raw datasets — whether image collections, text embeddings, or tabular telemetry — conform
+Ensure that raw datasets, whether image collections, text embeddings, or tabular telemetry, conform
 to the structural requirements of DataEval's evaluation tools before they reach downstream analysis.
 
 Use `dataeval.protocols` to verify that datasets meet the interface contracts expected by drift
@@ -75,7 +75,7 @@ pipeline errors.
 Use {class}`.Duplicates` to flag exact and near-duplicate images using perceptual hashing,
 including rotation-invariant variants for datasets where images may be re-oriented during
 ingestion. Use {class}`.Outliers` to identify samples with unusual brightness, blur, contrast,
-or dimension properties — common signatures of sensor malfunctions or encoding errors.
+or dimension properties, common signatures of sensor malfunctions or encoding errors.
 
 ### Audit label structure before training begins
 
@@ -97,7 +97,7 @@ preprocessing across collection events is a common source of spurious drift sign
 
 Use `dataeval.utils.preprocessing` to apply consistent normalization across batches and
 `dataeval.utils.arrays` to handle format conversions. Use {func}`.image_stats` with
-`channels={"r": 0, "g": 1, "b": 2}` — or whichever band groups your sensor produces — to
+`channels={"r": 0, "g": 1, "b": 2}` (or whichever band groups your sensor produces) to
 verify that band-level statistics are consistent before and after normalization passes.
 
 ### Configure hardware and execution settings for large-scale evaluation
@@ -114,7 +114,7 @@ in T&E programs.
 
 Track whether new data arriving through an operational pipeline remains consistent with
 the reference distribution used to qualify the model. Distribution shift introduced silently
-at ingestion — by sensor changes, format conversions, or upstream pipeline updates — can
+at ingestion (by sensor changes, format conversions, or upstream pipeline updates) can
 degrade model performance without any obvious error.
 
 DataEval provides a set of [drift](../../concepts/DistributionShift.md#drift-detection)
