@@ -1,7 +1,7 @@
 # Embeddings
 
 This page explains the role and importance of embeddings in vision tasks and
-guides you through understanding how to work with them using our tools.
+guides you through understanding how to work with them using DataEval's tools.
 
 ## What are they
 
@@ -10,29 +10,28 @@ meaningful visual and semantic features in a dense numerical format. Instead
 of working with raw pixel values, machine learning systems use embeddings as
 compressed representations that preserve what matters most about image content.
 
-An embedding transforms an image (millions of pixels) into a vector of
-typically 128 to 2048 numbers. The dimensionality of these vectors affects
-their capabilities: higher-dimensional embeddings can capture more nuanced
-visual and semantic distinctions, while lower-dimensional embeddings are more
-efficient to compute and visualize but may lose subtle details. These vectors
-encode image content such that similar vectors represent *meaningfully* similar
-images.
+An embedding transforms an image (millions of pixels) into a vector of typically
+128 to 2048 dimensions. The dimensionality of these vectors affects their
+capabilities: higher-dimensional embeddings can capture more nuanced visual and
+semantic distinctions, while lower-dimensional embeddings are more efficient to
+compute and visualize but may lose subtle details. These vectors capture image
+content such that similar vectors represent meaningfully similar images.
 
 ## Why are they important
 
 Embeddings solve a fundamental problem in computer vision: how do you
 quantitatively compare images in a meaningful way? Raw pixel operations like
-image subtraction are dominated by irrelevant variations—lighting changes,
+image subtraction are dominated by irrelevant variations: lighting changes,
 small spatial shifts, noise, and compression artifacts can make identical
-scenes appear completely different computationally. Meanwhile, genuinely
+scenes appear completely different computationally. Meanwhile,
 important differences like object identity or scene context might produce
 smaller pixel-level changes.
 
 Embeddings transform images from a representation where all visual information
 has equal importance to one where task-relevant visual and semantic patterns
 are emphasized and irrelevant variations are suppressed. They learn to extract
-and combine visual features hierarchically—from edges to textures to shapes to
-objects to scenes—in ways that capture what actually matters for understanding
+and combine visual features hierarchically, from edges to textures to shapes to
+objects to scenes, in ways that capture what actually matters for understanding
 image content.
 
 This transformation enables geometric operations that align with human
@@ -69,26 +68,26 @@ raw pixels.
 
 Common applications include:
 
-- **Similarity analysis**: Finding images with similar content or visual
+- Similarity analysis: finding images with similar content or visual
   characteristics
-- **Clustering**: Grouping images by shared semantic or visual properties
-- **Outlier detection**: Identifying unusual or anomalous images in your
+- Clustering: grouping images by shared semantic or visual properties
+- Outlier detection: identifying unusual or anomalous images in your
   dataset
-- **Distribution comparison**: Measuring how different two sets of images are
+- Distribution comparison: measuring how different two sets of images are
   from each other
-- **Duplicate detection**: Finding near-identical images that might indicate
+- Duplicate detection: finding near-identical images that might indicate
   data leakage
-- **Drift monitoring**: Detecting when production data differs systematically
+- Drift monitoring: detecting when production data differs systematically
   from training data
 
 Although DataEval can work with raw image data, it is inadvisable to do so.
 DataEval treats embeddings geometrically as vectors in a high-dimensional
 space. Raw image data treated as vectors have much higher dimensionality, and
 furthermore their geometric properties do not map cleanly to perceptual
-properties. Imperceptible differences in pixel data-- from e.g. a 1 pixel
-shift, or a slight rescaling or rotation--can result in large measured
-distances. Therefore we strongly recommend that you first convert your images
-to embeddings.
+properties. Imperceptible differences in pixel data (from e.g. a 1 pixel
+shift, or a slight rescaling or rotation) can result in large measured
+distances. Therefore DataEval strongly recommends that you first convert your
+images to embeddings.
 
 ## Creating embeddings
 
@@ -137,13 +136,13 @@ for a task close to yours. The training objective shapes which patterns the
 embeddings capture. The table shows examples of models for a range of metrics
 and tasks.
 
-| Model Type               | Example Models                           | Best for These Metrics                       | Why                                                                                                      |
-| ------------------------ | ---------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Image Classification** | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection        | Embeddings emphasize features that distinguish between labeled categories, making class boundaries clear |
-| **Object Detection**     | YOLO, R-CNN variants, DETR               | Spatial Drift, Localization Quality          | Embeddings capture spatial relationships and localized features, ideal when object position matters      |
-| **Self-Supervised**      | DINO, MAE, SimCLR                        | Drift, Prioritization, Duplicate Detection   | Embeddings capture general visual patterns without class bias, good for broad visual similarity          |
-| **Contrastive Learning** | CLIP, SwAV, MoCo                         | Similarity Search, Nearest Neighbor Analysis | Embeddings optimized for distinguishing similar vs. dissimilar pairs, excellent for comparison tasks     |
-| **Segmentation**         | U-Net, Mask R-CNN, DeepLab               | Fine-grained Analysis, Pixel-level Quality   | Embeddings understand detailed spatial structure and boundaries within images                            |
+| Model type           | Example models                           | Best for these metrics                       | Why                                                                                                      |
+| -------------------- | ---------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Image Classification | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection        | Embeddings emphasize features that distinguish between labeled categories, making class boundaries clear |
+| Object Detection     | YOLO, R-CNN variants, DETR               | Spatial Drift, Localization Quality          | Embeddings capture spatial relationships and localized features, ideal when object position matters      |
+| Self-Supervised      | DINO, MAE, SimCLR                        | Drift, Prioritization, Duplicate Detection   | Embeddings capture general visual patterns without class bias, good for broad visual similarity          |
+| Contrastive Learning | CLIP, SwAV, MoCo                         | Similarity Search, Nearest Neighbor Analysis | Embeddings optimized for distinguishing similar vs. dissimilar pairs, excellent for comparison tasks     |
+| Segmentation         | U-Net, Mask R-CNN, DeepLab               | Fine-grained Analysis, Pixel-level Quality   | Embeddings understand detailed spatial structure and boundaries within images                            |
 
 ### Select the layer
 
@@ -179,7 +178,7 @@ dataset is an RGB dataset, and `channels` would describe the model's input layer
 argument, in the extractor or in {func}`dataeval.config.set_batch_size`. Pass
 `batch_size=` every time, so the value is visible where you use it.
 
-The value on `Embeddings` is how many images are loaded, encoded and stored in
+The value on `Embeddings` is how many images are loaded, embedded and stored in
 one step. {class}`.TorchExtractor` and {class}`.OnnxExtractor` have a
 `batch_size` of their own, which is how many images go through the model in one
 forward pass. When both are set, the smaller value limits the forward pass. Set
@@ -212,10 +211,10 @@ extractor you give them, so they have the same requirement. Send these extractor
 to a drift detector instead:
 
 - Pass the extractor as the detector's `extractor=`, or call the extractor and
-  pass the array it returns.
-- For {class}`.ClasswiseUncertaintyExtractor`, call it, select the array of one
-  class, and give that array to a detector. Do not pass it as `extractor=`.
-  Fitting succeeds, because encoding is lazy, and `predict` raises a `TypeError`.
+pass the array it returns. - For {class}`.ClasswiseUncertaintyExtractor`, call
+it, select the array of one class, and give that array to a detector. Do not
+pass it as `extractor=`. Fitting succeeds, because embedding is lazy, and
+`predict` raises a `TypeError`.
 
 [Validation and Trust](ValidationAndTrust.md#extractors-that-embed-a-models-predictions)
 describes what each of these extractors produces.

@@ -22,7 +22,7 @@ Data Integrity is a comprehensive condition of a dataset, not a single metric. A
 high integrity when every sample it contains is loadable, non-redundant, within
 the expected statistical range, and relevant to the problem domain. Conversely,
 a dataset has low integrity when it contains a significant proportion of samples
-that are duplicated, corrupted, or anomalous — even if those samples are
+that are duplicated, corrupted, or anomalous, even if those samples are
 technically valid files.
 
 DataEval approaches data integrity through four complementary tools:
@@ -38,13 +38,13 @@ embedding-based clustering as a third detection mode alongside its hash methods.
 
 ### Redundancy and duplication
 
-A {term}`duplicate <Duplicates>` is not simply "a sample identical or
-near-identical to another" — that description only covers content, and content
-is one of three projections a duplicate can be found in. A duplicate is a
-**collision in some projection of the datum**: reduce a sample through its
+A {term}`duplicate <Duplicates>` is more than "a sample identical or
+near-identical to another". That description only covers content, and content is
+one of three projections a duplicate can be found in. A duplicate is
+a **collision in some projection of the datum**: reduce a sample through its
 content, through its annotation, or through its coded metadata factors, and two
-samples whose reduction agrees are duplicates in that projection, whether or
-not they agree in any other.
+samples whose reduction agrees are duplicates in that projection, whether or not
+they agree in any other.
 
 | Projection | What it reduces to |
 | --- | --- |
@@ -52,22 +52,22 @@ not they agree in any other.
 | Annotation | a digest over boxes, labels, and track ids |
 | Metadata factors | the coded {class}`.Metadata` factor row |
 
-**Content** is the common case and the one most tooling assumes — for images
-and video frames, the pixels. Near-duplicates here include images with minor
+**Content** is the common case and the one most tooling assumes: for images and
+video frames, the pixels. Near-duplicates here include images with minor
 lighting shifts, JPEG re-compression artifacts, slight crops of the same
 underlying scene, or rotated and flipped versions of the same image.
 
 **Annotation** duplicates share a box/label/track-id digest even when their
 content differs or was never compared. **Factor** duplicates share a named
-{class}`.Metadata` factor row — a capture timestamp, GPS fix, or source
-filename — even before either image is decoded.
+{class}`.Metadata` factor row (a capture timestamp, GPS fix, or source filename)
+even before either image is decoded.
 
 Which projections agree, and which disagree, is itself the finding: two
 samples agreeing on content but disagreeing on annotation is one collect
 carrying two conflicting label passes; agreeing on annotation while
 disagreeing on content is a synthetically augmented copy; agreeing on both is a
-plain re-ingest under a new name. {class}`.Duplicates` reports which
-projections it checked and which of those agreed on every group — see
+plain re-ingest under a new name. {class}`.Duplicates` reports which projections
+it checked and which of those agreed on every group. See
 [Duplicates and near-duplicates](ActingOnResults.md#duplicates-and-near-duplicates)
 for how to read that against a specific result.
 
@@ -75,24 +75,25 @@ The training impact of redundancy is well established. When a sample appears
 multiple times, the model receives repeated gradient updates from information
 it has already processed. This creates two compounding problems. First,
 redundant samples inflate the effective size of the training set without adding
-new signal, making training less compute-efficient. Second — and more
-importantly for T&E — duplicate samples in a validation set cause its metrics
-to be non-representative. If 30% of your validation images are near-duplicates
-of training images, your reported accuracy is not a valid estimate of
+new signal, making training less compute-efficient. Second, and more importantly
+for T&E, duplicate samples in a validation set cause its metrics to be
+non-representative. If 30% of your validation images are near-duplicates of
+training images, your reported accuracy is not a valid estimate of
 out-of-distribution generalization.
 
-[Birodkar et al. (2019)](#ref1) demonstrated that large benchmark datasets contain
-substantial rates of semantic redundancy, and that removing it does not degrade
-— and in some cases improves — model performance.
+[Birodkar et al. (2019)](#ref1) demonstrated that large benchmark datasets
+contain substantial rates of semantic redundancy, and that removing it does not
+degrade, and in some cases improves, model performance.
 
 This is not an argument against data augmentation. Augmentation and deduplication
 address different problems and operate at different points in the pipeline.
 Deduplication is a pre-training step applied to the raw dataset: removing
 near-duplicates before splitting reduces the risk of accidental train/validation
-leakage and ensures that held-out metrics reflect genuine generalization. Runtime
-augmentation — applied to the clean, split dataset during training — introduces
-controlled variation that the model has not already memorized, which is precisely
-what improves generalization. The two practices are complementary, not competing.
+leakage and ensures that held-out metrics reflect genuine generalization.
+Runtime augmentation, applied to the clean, split dataset during training,
+introduces controlled variation that the model has not already memorized, which
+is precisely what improves generalization. The two practices are complementary,
+not competing.
 
 ### Statistical outliers and semantic anomalies
 
@@ -100,21 +101,21 @@ Not all anomalous samples are the same, and the distinction matters for how
 you handle them.
 
 **Statistical outliers** are samples that fall at the extreme edges of a
-measurable distribution — an extremely overexposed image, a frame with
-near-zero entropy, a dimension ratio far outside the norm for the dataset.
+measurable distribution, such as an extremely overexposed image, a frame with
+near-zero entropy, or a dimension ratio far outside the norm for the dataset.
 These samples may or may not be semantically valid. A statistically extreme
 image might be a rare but operationally important edge case, or it might be a
 broken sensor frame. The statistical test alone cannot tell you which; it can
 only flag the sample for inspection.
 
 **Semantic anomalies** are samples that are statistically unremarkable but
-belong to the wrong problem domain entirely — an image of a domestic animal in
-an industrial inspection dataset, or a clear daytime frame in a dataset
-intended for low-light detection. These pass all pixel-level quality checks but
-actively harm the model by introducing irrelevant class structure. Embedding-
-based outlier detection catches many semantic anomalies that statistical linting
-misses, because the samples arrange differently in the embedding space, even when
-their pixel statistics look normal.
+belong to the wrong problem domain entirely, such as an image of a domestic
+animal in an industrial inspection dataset, or a clear daytime frame in a
+dataset intended for low-light detection. These pass all pixel-level quality
+checks but actively harm the model by introducing irrelevant class structure.
+Embedding-based outlier detection catches many semantic anomalies that
+statistical linting misses, because the samples arrange differently in the
+embedding space, even when their pixel statistics look normal.
 
 An outlier, like a duplicate, can be found in any projection of the datum:
 its content, its annotation (box geometry, labels, tracks), or its metadata
@@ -132,7 +133,7 @@ The marginal kind is the one most tooling implements, and it misses the other
 three. A timestamp is roughly uniform over a dataset, so a wrong one is
 unremarkable until it is compared with its neighbors. A large, centered box is
 unremarkable if other classes are also large and centered. Most annotation and
-metadata defects are *conditional*: a value that is improbable only given the
+metadata defects are **conditional**: a value that is improbable only given the
 rest of the datum.
 
 ### Corruption and sensor artifacts
@@ -144,11 +145,11 @@ exposure, dead pixel rows from sensor damage, and blocking artifacts from
 aggressive JPEG compression in transmission pipelines.
 
 The integrity concern is subtler than simple corruption. A model that trains on
-a dataset with a consistent rate of blur artifacts may train successfully — but
+a dataset with a consistent rate of blur artifacts may train successfully, but
 against the wrong distribution. If blur is consistently associated with a
 particular collection scenario, the model can learn blur as a feature rather
 than noise, creating a form of sensor-conditioned bias that only manifests when
-the deployment sensor differs from the collection sensor. In situations, where
+the deployment sensor differs from the collection sensor. In situations where
 collection hardware is often upgraded or substituted over multiple phases, this
 is a practical risk rather than an edge case.
 
@@ -156,7 +157,8 @@ is a practical risk rather than an edge case.
 
 Image-level and pixel-level integrity checks catch problems with the data
 itself. A fourth category of integrity failure is quieter and harder to detect:
-**label noise** — samples that are correctly captured but incorrectly annotated.
+**label noise**, meaning samples that are correctly captured but incorrectly
+annotated.
 
 Label noise is common in large-scale annotation pipelines. Annotators make
 mistakes, instructions are interpreted inconsistently, class boundaries are
@@ -165,27 +167,27 @@ errors in particular categories. In T&E datasets where labels may be generated
 from automated pipelines or inherited from third parties, label quality is
 often assumed rather than verified ([Sculley et al., 2015](#ref3)).
 
-The consequences are severe. A mislabeled sample is not just useless — it
+The consequences are severe. A mislabeled sample is not just useless: it
 actively injects false gradient signal during training, pushing the model toward
 the wrong decision boundary. Clusters of mislabeled samples around class
 boundaries can shift the learned boundary significantly. In evaluation data,
-mislabeled samples produce incorrect assessments of model performance:
-a correct model prediction on a mislabeled sample counts as an error, and a
-wrong model prediction counts as correct.
+mislabeled samples produce incorrect assessments of model performance: a correct
+model prediction on a mislabeled sample counts as an error, and a wrong model
+prediction counts as correct.
 
 {func}`.label_errors` detects potential mislabeling by examining embedding
 geometry. A correctly labeled sample should be closer to other samples of its
-own class than to samples of any other class. The metric is the
-**intra/extra class distance ratio**: the mean distance to the $k$ nearest
+own class than to samples of any other class. The metric is
+the **intra/extra class distance ratio**: the mean distance to the $k$ nearest
 neighbors within the same class, divided by the mean distance to the $k$ nearest
 neighbors in any other class. A ratio ≥ 1.0 means the sample is closer to a
-different class than to its own — strong evidence of a labeling problem.
+different class than to its own, which is strong evidence of a labeling problem.
 
 **Label statistics** ({func}`.label_stats`) address a different but related
 concern: structural problems in the label distribution that are not about
 correctness but about completeness and consistency. The function counts
 `label_counts_per_class`, `image_counts_per_class`, `label_counts_per_image`,
-and — critically for object detection — `empty_image_indices` (images with no
+and, critically for object detection, `empty_image_indices` (images with no
 annotations). Empty images are a common annotation error: an image that was
 included in the dataset but never labeled, or one where annotators missed all
 objects. An unlabeled image trains the model to predict nothing, which is
@@ -196,43 +198,43 @@ situation dependent and often wrong.
 ### Information density and gradient efficiency
 
 From an information theory perspective, the goal of data integrity work is to
-maximize the **information density** of the training set — the ratio of novel
-signal to total sample count.
+maximize the **information density** of the training set, meaning the ratio of
+novel signal to total sample count.
 
 Consider a training set of $N$ samples, of which a fraction $r$ are
 near-duplicates of existing samples. The effective number of unique training
 examples is $N(1 - r)$. The duplicate samples still contribute gradients during
 training, but those gradients point in directions the optimizer has already
-processed. In the best case this wastes compute. In the worse case, on samples
-that are nearly but not exactly identical, it biases the gradient toward the
-over-represented region of the input space, effectively re-weighting the loss
-landscape without the practitioner realizing it.
+processed. In the best case this wastes compute. In the worse case, on
+near-identical samples, it biases the gradient toward the over-represented
+region of the input space, effectively re-weighting the loss landscape without
+the practitioner realizing it.
 
 ### Duplicate detection: hashing and clustering
 
 {class}`.Duplicates` computes the content projection through three complementary
 approaches, each suited to a different kind of redundancy. Two further
-projections — annotation and metadata factors — are covered afterward.
+projections, annotation and metadata factors, are covered afterward.
 
 **Exact duplicate detection** uses xxHash, a fast non-cryptographic hash of
 the raw image bytes. Two images with identical xxHash values are guaranteed to
 be pixel-for-pixel identical. This is the most reliable signal: no threshold
 tuning is required and there are no false positives.
 
-**Near-duplicate detection** uses perceptual hashing, where two images that
-are visually similar but not pixel-identical — due to compression, minor
-cropping, or brightness adjustment — produce similar hash values. DataEval
-supports two perceptual hash algorithms:
+**Near-duplicate detection** uses perceptual hashing, where two images that are
+visually similar but not pixel-identical, due to compression, minor cropping, or
+brightness adjustment, produce similar hash values. DataEval supports two
+perceptual hash algorithms:
 
-- **pHash (perceptual hash):** The image is resized to a square $N \times N$
-  grid, a discrete cosine transform (DCT) is applied, and the lowest-frequency
-  components are encoded as a bit array relative to the median coefficient value.
-  The result is a compact hex string that is robust to minor photometric
+- pHash (perceptual hash): the image is resized to a square $N \times N$ grid, a
+  discrete cosine transform (DCT) is applied, and the lowest-frequency
+  components are encoded as a bit array relative to the median coefficient
+  value. The result is a compact hex string that is robust to minor photometric
   perturbations. [Zauner (2010)](#ref4) provides the foundational treatment.
 
-- **dHash (difference hash):** Horizontal adjacent-pixel differences are
-  computed on a downsampled image and encoded as a bit string. This approach
-  is particularly robust to brightness and contrast shifts.
+- dHash (difference hash): horizontal adjacent-pixel differences are computed on
+  a downsampled image and encoded as a bit string. This approach is particularly
+  robust to brightness and contrast shifts.
 
 Both algorithms are available in **D4 variants** (`phash_d4`, `dhash_d4`) that
 apply the hash across all eight orientations of the dihedral group (four
@@ -254,22 +256,22 @@ space, clustered, and pairs whose embeddings fall within the threshold distance
 are treated as near-duplicates. Because embeddings are approximate
 representations, cluster-based matches are always reported as near rather than
 exact duplicates, even when their embedding distance is zero. This mode catches
-**semantic duplicates** — distinct photographs of the same object or scene that
-are not similar at the pixel level but occupy the same region of embedding
-space.
+**semantic duplicates**, which are distinct photographs of the same object or
+scene that are not similar at the pixel level but occupy the same region of
+embedding space.
 
 **Annotation detection** is on by default whenever a dataset carries targets
-(object detection boxes and labels). Each item's annotation — its boxes,
-labels, and, for tracking data, track ids — is reduced to a digest; items
-whose digest agrees are grouped as an annotation duplicate, whether or not
-their content does. Because it runs alongside content detection rather than
-instead of it, the same pair of items can be checked on both projections at
-once: a pair agreeing on content but not on annotation surfaces as an exact
-content match whose annotation disagreed (one collect carrying two conflicting
-label passes); a pair agreeing on annotation but not on content surfaces as an
-annotation duplicate whose content disagreed (a synthetically augmented copy).
-No feature extractor or threshold is needed — it is an exact, transitive
-comparison, like xxHash for pixels.
+(object detection boxes and labels). Each item's annotation (its boxes, labels,
+and, for tracking data, track ids) is reduced to a digest; items whose digest
+agrees are grouped as an annotation duplicate, whether or not their content
+does. Because it runs alongside content detection rather than instead of it, the
+same pair of items can be checked on both projections at once: a pair agreeing
+on content but not on annotation surfaces as an exact content match whose
+annotation disagreed (one collect carrying two conflicting label passes); a pair
+agreeing on annotation but not on content surfaces as an annotation duplicate
+whose content disagreed (a synthetically augmented copy). No feature extractor
+or threshold is needed: it is an exact, transitive comparison, like xxHash for
+pixels.
 
 **Factor detection** is the only projection that is opt-in. Passing
 `duplicate_factors` to {meth}`.Duplicates.evaluate` names one or more
@@ -340,11 +342,12 @@ accordingly.
 extractor is provided, images are projected into embedding space and clustered.
 For each sample, the distance to its nearest cluster center is computed.
 Samples exceeding the `cluster_threshold` (default: 2.5) are flagged with a
-`cluster_distance` metric value — the distance itself, reported beside that
+`cluster_distance` metric value: the distance itself, reported beside that
 cluster's own `population_mean` and `population_std`, so the number of standard
 deviations it sits out by is `(metric_value - population_mean) /
-population_std`. This path catches semantic anomalies — samples that look statistically normal at the pixel level but do
-not belong to any established class or scene type in the dataset.
+population_std`. This path catches semantic anomalies: samples that look
+statistically normal at the pixel level but do not belong to any established
+class or scene type in the dataset.
 
 Both detection paths can run simultaneously and their results are merged into
 a single output DataFrame. A sample flagged by both paths warrants immediate
@@ -370,8 +373,8 @@ value can be an outlier, and how small a population can support a finding.
 #### Which columns can be thresholded
 
 A {class}`.Metadata` holds whatever was attached to it. Several kinds of column
-are numeric without being measurements -- identifiers, booleans, and the codes
-a categorical factor is stored as -- and thresholding them produces findings
+are numeric without being measurements, such as identifiers, booleans, and the
+codes a categorical factor is stored as, and thresholding them produces findings
 that are hard to act on.
 
 The tempting rule is to threshold only factors that {class}`.Metadata`
@@ -386,50 +389,50 @@ a lattice or number fewer than 20:
 | track duration in frames (integers, n = 3000) | no | yes |
 | mean speed (floating point, n = 3000) | yes | yes |
 | per-video factor, 12 videos | no (under 20 rows) | no (below the floor: listed in `result.populations`, not judged) |
-| capture time in epoch seconds at 1 Hz | no — a lattice | yes, sequentially |
+| capture time in epoch seconds at 1 Hz | no (a lattice) | yes, sequentially |
 
 Gating on that classification would silently exclude every integer count a
 track produces and every factor at the sequence level. Eligibility is instead
 decided by the **raw column's type**:
 
-- **Ordered** — integers, floats, datetimes, durations. Thresholded on the raw
-  values with the same tests the image path uses.
-- **Categorical** — strings, booleans, and integers the caller has declared as
-  a fixed vocabulary. Never given a location or scale; judged by rarity within a
+- Ordered: integers, floats, datetimes, durations. Thresholded on the raw values
+  with the same tests the image path uses.
+- Categorical: strings, booleans, and integers the caller has declared as a
+  fixed vocabulary. Never given a location or scale; judged by rarity within a
   stratum (below).
-- **Ineligible** — list-valued columns, and the reserved addressing columns
-  (row indices, `track_id`, `item_id`), by construction rather than by
-  heuristic. List-valued columns are still read when several columns are
-  judged together (see [Combinations of factors](#combinations-of-factors)).
+- Ineligible: list-valued columns, and the reserved addressing columns (row
+  indices, `track_id`, `item_id`), by construction rather than by heuristic.
+  List-valued columns are still read when several columns are judged together
+  (see [Combinations of factors](#combinations-of-factors)).
 
-Integer identifiers are the one case a type check cannot catch -- a numeric
+Integer identifiers are the one case a type check cannot catch: a numeric
 `camera_serial` looks ordered. Declare it as a fixed vocabulary, or name the
-factors to analyze explicitly. A cardinality heuristic is deliberately not
-used: it would add a threshold to tune and defend.
+factors to analyze explicitly. A cardinality heuristic is deliberately not used:
+it would add a threshold to tune and defend.
 
 #### Why bins are never used
 
-A factor's coded form — its bin indices — describes the cut, not the
-measurement: a z-score over bin codes `[0, 1, 2, 3]` measures the bin edges.
-Two further problems exist. A categorical factor's numeric reading is its
-codes, and a missing categorical value is stored as one code past the last
-level rather than as NaN, so a missing value would read as the highest level
-instead of being excluded. Stratifying on a binned continuous factor makes
-every stratum depend on the bin edges.
+A factor's coded form (its bin indices) describes the cut, not the measurement:
+a z-score over bin codes `[0, 1, 2, 3]` measures the bin edges. Two further
+problems exist. A categorical factor's numeric reading is its codes, and a
+missing categorical value is stored as one code past the last level rather than
+as NaN, so a missing value would read as the highest level instead of being
+excluded. Stratifying on a binned continuous factor makes every stratum depend
+on the bin edges.
 
 Detection therefore reads raw values only, and stratifies only on categorical
 columns. A continuous conditioning variable is a joint relationship, not a
-stratum, so you pass it to `given=` (see [Combinations of
-factors](#combinations-of-factors)). As a result, **re-binning a metadata does not change an outlier
-result.**
+stratum, so you pass it to `given=` (see
+[Combinations of factors](#combinations-of-factors)). As a result, re-binning a
+metadata does not change an outlier result.
 
 #### Relative box geometry
 
 Box width, height, area, and position are measured in pixels. Stratifying them
 by class compares a box in a 4K frame against one in a 640-pixel frame, and
-resolution dominates the comparison. Geometry relative to the image — area as a
+resolution dominates the comparison. Geometry relative to the image (area as a
 fraction of the frame, offsets as fractions of width and height, distance from
-the center as a fraction of the half-diagonal — turns "this class is usually a
+the center as a fraction of the half-diagonal) turns "this class is usually a
 small box near the corner" into a statement about composition, not the camera.
 Absolute size remains its own question: it determines whether an object is
 detectable at all.
@@ -473,15 +476,15 @@ column's. The robust Mahalanobis distance flags 0.12 % of clean rows at 20 rows 
 and 2 dimensions, and 0.01 % at 500 rows and 10 dimensions. The distribution distance flags 0.18 % at 20 rows and
 0.08 % at 50 rows.
 
-**Why skip, and not warn or rank.** A warning on every population below the floor fires on every video dataset, where
-a per-video factor has a dozen rows, and a warning that always fires is ignored. A ranking of a small population asserts
+Why skip, and not warn or rank? A warning on every population below the floor fires on every video dataset, where a
+per-video factor has a dozen rows, and a warning that always fires is ignored. A ranking of a small population asserts
 nothing you can act on, because with no threshold the top of the ranking is always some row. Skipping the population and
 saying so in a table states the limit of the evidence and leaves the findings meaning something.
 
 A `ConstantThreshold` is exempt. Its bounds do not depend on the data, so a small population supports it. The floor
 does not apply to cluster-distance detection.
 
-**See what was skipped.** `result.populations` has one row per level, metric and population, with the number of rows,
+See what was skipped in `result.populations`. It has one row per level, metric and population, with the number of rows,
 whether a threshold was fitted and, when it was not, the reason. Besides `below 20 rows` and `below 93 rows`, the reason
 can be `no spread` (no threshold can be derived, as when every value is the same) or `no upper bound`. A residual or a
 Mahalanobis distance that core could not score reports its own reason, such as `exact fit` or `too few rows`. When the
@@ -507,7 +510,7 @@ Every flagged row then names the stratum it was judged in, such as `weather=rain
 the strata of a result you already have, call `result.stratified(metadata, "time_of_day")`. It replaces the current
 strata and equals a new `evaluate` call with the same arguments and `strata=`. `itemwise()` removes the strata.
 
-**What a stratum is.**
+What a stratum is:
 
 - A stratum is a categorical factor, or one of the reserved columns `item_index`, `unit_index` and `track_id`. The
   reserved columns are paired with `item_index`, so a population is one frame or one track of one video, such as
@@ -521,14 +524,13 @@ strata and equals a new `evaluate` call with the same arguments and `strata=`. `
 - A null stratum value is a population of its own, labeled `weather=null`, and every check scores it. A detection with
   no track, read for a track stratum, joins `track_id=null`.
 
-**What `strata=` adds.** Besides fitting each threshold within the stratum, `strata=` turns on rarity for the
-categorical factors at the levels the strata reach (next section), and it is the condition for judging a group of
-categorical factors in `combinations=`. A factor named in `strata=` is not also judged.
+What `strata=` adds: besides fitting each threshold within the stratum, `strata=` turns on rarity for the categorical
+factors at the levels the strata reach (next section), and it is the condition for judging a group of categorical
+factors in `combinations=`. A factor named in `strata=` is not also judged.
 
-**What it does not do.** Cluster-distance detection is not stratified. `classwise()` is stratification by the class
-label: it re-fits the threshold checks and any combination checks within each class, runs no rarity, and on tracking
-data leaves sequence, frame and track rows whole. `strata=` and `per_class=True` are two spellings of the same thing,
-so passing both raises.
+Cluster-distance detection is not stratified. `classwise()` is stratification by the class label: it re-fits the
+threshold checks and any combination checks within each class, runs no rarity, and on tracking data leaves sequence,
+frame and track rows whole. `strata=` and `per_class=True` are two spellings of the same thing, so passing both raises.
 
 #### Categorical rarity within a stratum
 
@@ -542,10 +544,9 @@ and whylogs flag values outside a known domain or shares the user sets; none
 flags a rare value with a default frequency cutoff, and none uses a minimum
 count. The default below is derived rather than borrowed.
 
-**The test.** For a stratum of $n$ rows in which level $v$ appears $k$ times
-(counting the row being judged), the value is flagged when the exact one-sided
-binomial test rejects "$v$ occurs in this stratum with probability at least
-$p$":
+For a stratum of $n$ rows in which level $v$ appears $k$ times (counting the row
+being judged), the value is flagged when the exact one-sided binomial test
+rejects "$v$ occurs in this stratum with probability at least $p$":
 
 $$P(X \le k \mid X \sim \mathrm{Binomial}(n, p)) \le \alpha$$
 
@@ -555,39 +556,39 @@ the number reported, because it reads directly as "this level occurs in at most
 this share of its stratum". Every row of a level within a stratum shares one
 test, so the unit of the test is the (stratum, level) cell.
 
-**Defaults.** Rarity $p = 0.05$ at 95 % confidence ($\alpha = 0.05$). The
+The defaults are rarity $p = 0.05$ at 95 % confidence ($\alpha = 0.05$). The
 confidence level follows the conventional limit used for zero- and
 small-numerator bounds ([Hanley & Lippman-Hand, 1983](#ref6)). The rarity is a
-judgment: of $p \in \{0.01, 0.02, 0.05\}$ it is the only value under which
-three wrong-sensor frames in a 300-frame sequence are flagged.
+judgment: of $p \in \{0.01, 0.02, 0.05\}$ it is the only value under which three
+wrong-sensor frames in a 300-frame sequence are flagged.
 
-**The minimum group size.** A singleton can only be flagged once the stratum is
-large enough for $P(X \le 1) \le \alpha$, which at the defaults is $n \ge 93$
-— approximately $4.74 / p$, the one-occurrence extension of the "rule of
-three" for zero occurrences. [Das & Schneider (2007)](#ref7) derive the minimum
-support of their categorical detector from its significance level in the same
-way. The setting $p$ sets both the rarity and the minimum. Strata below the
-minimum are listed in `result.populations` with the reason `below 93 rows` and
-without a verdict, and are left out of the multiple-testing count, because a
-discrete test that cannot reach significance need not count against the ones that
-can ([Tarone, 1990](#ref8)). Across the observed cells of the testable strata at a
+The minimum group size: a singleton can only be flagged once the stratum is
+large enough for $P(X \le 1) \le \alpha$, which at the defaults is $n \ge 93$,
+approximately $4.74 / p$, the one-occurrence extension of the "rule of three"
+for zero occurrences. [Das & Schneider (2007)](#ref7) derive the minimum support
+of their categorical detector from its significance level in the same way. The
+setting $p$ sets both the rarity and the minimum. Strata below the minimum are
+listed in `result.populations` with the reason `below 93 rows` and without a
+verdict, and are left out of the multiple-testing count, because a discrete test
+that cannot reach significance need not count against the ones that can
+([Tarone, 1990](#ref8)). Across the observed cells of the testable strata at a
 level, the Benjamini–Hochberg procedure controls the false discovery rate at
 0.05 ([Benjamini & Hochberg, 1995](#ref9)). The cells of a level are counted
 together across all of its categorical checks, and a cell withheld as rare
 everywhere (below) still counts, because it was tested.
 
-**Levels rare everywhere are not outliers.** A class that is rare in every
-stratum is a finding about the dataset's balance (see [Dataset Bias and
-Coverage](DatasetBias.md)). [Das & Schneider (2007)](#ref7) make the same
-argument — a pairing that is rare because both of its parts are rare "can be
-explained" — and divide by the marginal frequencies to remove it. That
-correction fails a common video case: with 100 sequences each captured on its
-own sensor, every sensor has a global share of about 1 %, so three frames of
+Levels rare everywhere are not outliers. A class that is rare in every stratum
+is a finding about the dataset's balance (see
+[Dataset Bias and Coverage](DatasetBias.md)). [Das & Schneider (2007)](#ref7)
+make the same argument (a pairing that is rare because both of its parts are
+rare "can be explained") and divide by the marginal frequencies to remove it.
+That correction fails a common video case: with 100 sequences each captured on
+its own sensor, every sensor has a global share of about 1 %, so three frames of
 sensor B inside sequence A look expected. The rule used instead: a level is
-withheld as rare everywhere only when it is rare in *every* stratum large enough
-to test. A stratum where the level does not occur at all counts as rare for
-this rule, so a level seen in only one testable stratum is withheld: it is rare
-in the dataset. A level common in at least one stratum and also seen in another
+withheld as rare everywhere only when it is rare in every stratum large enough
+to test. A stratum where the level does not occur at all counts as rare for this
+rule, so a level seen in only one testable stratum is withheld: it is rare in
+the dataset. A level common in at least one stratum and also seen in another
 (the snow videos, sensor B's own sequence) stays flagged for its rare
 appearances elsewhere. The rule is applied to the cells that survive the
 Benjamini–Hochberg correction, and every row of a flagged cell is one finding.
@@ -596,47 +597,46 @@ Benjamini–Hochberg correction, and every row of a flagged cell is one finding.
 | --- | --- | --- |
 | 1 snow frame in a clear 300-frame sequence | 0.016 | yes |
 | 3 wrong-sensor frames in a 300-frame sequence | 0.026 | yes |
-| 2 "truck" frames in a 60-frame "car" track | 0.101 | no — 60 rows cannot support it |
+| 2 "truck" frames in a 60-frame "car" track | 0.101 | no (60 rows cannot support it) |
 
 The last case is not a coverage gap. Label drift within a track is already
-measured as an ordered, per-track quantity — the chosen label's share of the
-track — and thresholded against other tracks. The categorical test covers strata
+measured as an ordered, per-track quantity (the chosen label's share of the
+track) and thresholded against other tracks. The categorical test covers strata
 too large for such a summary to exist.
 
-**The rejected alternative.** A conformal p-value — the share of the stratum
-made of levels at least as rare as the row's own — is the other candidate, and
-is what the "q-value" of [Das & Schneider (2007)](#ref7) computes. Its validity
-is exact at any sample size ([Laxhammar, 2014](#ref10); [Bates et al., 2023]
-(#ref11)), and it can flag a singleton in a stratum of $1/\alpha$ rows. But
-scored within the stratum it bounds the *number* of flags — at most
-$\lfloor \alpha n \rfloor$ rows per stratum — rather than giving evidence that
-the value is improbable. [Laxhammar (2014)](#ref10) notes that a conformal
-anomaly may be "a relatively rare … example generated from the same probability
-distribution".
+The rejected alternative: a conformal p-value (the share of the stratum made of
+levels at least as rare as the row's own) is the other candidate, and is what
+the "q-value" of [Das & Schneider (2007)](#ref7) computes. Its validity is exact
+at any sample size ([Laxhammar, 2014](#ref10); [Bates et al., 2023](#ref11)),
+and it can flag a singleton in a stratum of $1/\alpha$ rows. But scored within
+the stratum it bounds the number of flags (at most $\lfloor \alpha n \rfloor$
+rows per stratum) rather than giving evidence that the value is improbable.
+[Laxhammar (2014)](#ref10) notes that a conformal anomaly may be "a relatively
+rare … example generated from the same probability distribution".
 
 | | Conformal p-value | Exact binomial |
 | --- | --- | --- |
 | What a flag claims | the row is in the rarest $\alpha$ of its stratum | its level's share is below $p$, with 95 % confidence |
 | Smallest stratum that can flag a singleton | $1/\alpha$ (20 at $\alpha$ = 0.05) | 93 at $p$ = 0.05 |
-| Rows flagged in a clean stratum of 20 classes with Zipf-distributed shares | about $\alpha$ of them — 0.8 % at $\alpha$ = 0.01 | 0.07–0.26 % |
+| Rows flagged in a clean stratum of 20 classes with Zipf-distributed shares | about $\alpha$ of them (0.8 % at $\alpha$ = 0.01) | 0.07–0.26 % |
 | A legitimate level with true share 0.5 %, $n$ = 300, $\alpha$ = 0.01 | flagged in 71 % of simulations | flagged only if its share is truly below $p$ |
 | Benjamini–Hochberg across strata | loses power: no p-value can fall below $1/n$ | usable |
 
 The binomial rule is the one that does not flood a clean, diverse dataset with
 findings about its rare classes.
 
-**Calibration beside the ordered tests.** On clean data the default adaptive
+Calibration beside the ordered tests: on clean data the default adaptive
 threshold flags about 0.0004 % of normal values, 0.09 % of gamma-distributed
 values, and 0.6 % of log-normal values (5,000 values, 50 draws each). The
 binomial rule's 0.07–0.26 % on a clean stratum is the same order, so ordered and
 categorical findings carry comparable weight in one result.
 
-**Known limits.** Both tests assume the rows of a stratum are exchangeable.
-Consecutive video frames are not: a three-frame burst of a wrong value is
-closer to one event than to three independent ones. A stratum smaller than the
-minimum cannot support a verdict on its own; borrowing strength across strata
-with an empirical-Bayes prior is the principled route to judging them, and is
-not part of the default.
+Known limits: both tests assume the rows of a stratum are exchangeable.
+Consecutive video frames are not: a three-frame burst of a wrong value is closer
+to one event than to three independent ones. A stratum smaller than the minimum
+cannot support a verdict on its own; borrowing strength across strata with an
+empirical-Bayes prior is the principled route to judging them, and is not part
+of the default.
 
 #### Combinations of factors
 
@@ -654,24 +654,22 @@ Each group is scored by the method that fits its columns:
 | one sample of values per row | distance to the typical distribution, adjusted for sample length | higher is more unusual |
 | one number given another | robust z against the nearest rows of the other | larger magnitude is more unusual |
 
-**Why numbers and not findings.** Deciding what counts as an outlier needs a threshold, a minimum population and a
+Why numbers and not findings? Deciding what counts as an outlier needs a threshold, a minimum population and a
 correction for running many tests. Those are judgments, so they belong to the evaluator that reads these scores, as they
 do for single columns.
 
-**The tail of the distance.** The textbook reference for a squared Mahalanobis distance is a chi-square distribution.
-With a robust fit on a few dozen rows it is too optimistic: on clean normal data, 19 % of rows fell below 0.01 at
-10 rows and 2 columns, where 1 % should. The tail reported here uses the finite-sample distribution of reweighted
-minimum covariance determinant distances ([Cerioli, 2010](#ref12)). From 50 rows per dimension, 0.5–2 % of clean rows
-fall below 0.01. A vector adds one dimension per element. Below that, and whenever a sample column is in the group, no
-tail is reported and only the distance is.
+The tail of the distance: the textbook reference for a squared Mahalanobis distance is a chi-square distribution. With a
+robust fit on a few dozen rows it is too optimistic: on clean normal data, 19 % of rows fell below 0.01 at 10 rows and 2
+columns, where 1 % should. The tail reported here uses the finite-sample distribution of reweighted minimum covariance
+determinant distances ([Cerioli, 2010](#ref12)). From 50 rows per dimension, 0.5–2 % of clean rows fall below 0.01. A
+vector adds one dimension per element. Below that, and whenever a sample column is in the group, no tail is reported and
+only the distance is.
 
-**Curved relationships.** One column given another is fitted locally, against the rows nearest in the conditioning
-column, not with a straight line. Brightness rises and falls over a day, so a straight line through it is nearly flat
-and leaves the daily curve in every residual. Each row is compared with its nearest 30 rows, or $\lceil\sqrt{n}\rceil$
-when that is larger, so a population needs at least 31 rows. Fewer neighbors make
-the spread too noisy and flag clean rows too often. With `y = 0.5x + noise`, the
-share of clean rows flagged by the default threshold depends on the smallest
-window:
+Curved relationships: one column given another is fitted locally, against the rows nearest in the conditioning column,
+not with a straight line. Brightness rises and falls over a day, so a straight line through it is nearly flat and leaves
+the daily curve in every residual. Each row is compared with its nearest 30 rows, or $\lceil\sqrt{n}\rceil$ when that is
+larger, so a population needs at least 31 rows. Fewer neighbors make the spread too noisy and flag clean rows too often.
+With `y = 0.5x + noise`, the share of clean rows flagged by the default threshold depends on the smallest window:
 
 | Smallest window | 50 rows | 100 rows | 200 rows | 1,000 rows |
 | --- | --- | --- | --- | --- |
@@ -683,8 +681,8 @@ With 10 neighbors the spread estimate is noisy and the z-scores are heavy-tailed
 (0.89 % of rows at 50 rows on a cosine relationship). A window of 30 brings the
 rate to the single-column level.
 
-**How `Outliers` flags a combination.** Pass `combinations=` (groups of columns, or `"all"` for every pair at each
-judged level), `given=` (`{y: x}`) and, to declare how a column is read, `kinds=` to {meth}`.Outliers.evaluate`:
+To have `Outliers` flag a combination, pass `combinations=` (groups of columns, or `"all"` for every pair at each judged
+level), `given=` (`{y: x}`) and, to declare how a column is read, `kinds=` to {meth}`.Outliers.evaluate`:
 
 ```python
 result = Outliers().evaluate(
@@ -718,30 +716,30 @@ A scalar `outlier_threshold` reaches these checks only when it is statistical an
 threshold is in the units of the image statistics, so the combination checks use the default instead. To set one
 check, key a mapping by its name, such as `outlier_threshold={"rel_size, rel_offset_y": 4.0}`.
 
-**Why the tail is not used.** {func}`.combination_scores` also reports the tail of the distance, and it is the natural
-cut. At 0.01 it meets its band: 1.3 to 1.8 % of clean rows fall below 0.01 at (100 rows, 2 dimensions), (250, 5) and
-(500, 10). Further out it is liberal, most of all near the edge of 50 rows per dimension. At (100 rows, 2 dimensions)
-the share of clean rows below the nominal level is 1.82 times that level at 0.01, 2.98 times at 0.001 and 4.25 times at
+Why the tail is not used: {func}`.combination_scores` also reports the tail of the distance, and it is the natural cut.
+At 0.01 it meets its band: 1.3 to 1.8 % of clean rows fall below 0.01 at (100 rows, 2 dimensions), (250, 5) and (500,
+10). Further out it is liberal, most of all near the edge of 50 rows per dimension. At (100 rows, 2 dimensions) the
+share of clean rows below the nominal level is 1.82 times that level at 0.01, 2.98 times at 0.001 and 4.25 times at
 0.0001. At (250, 5) it is 1.43, 1.64 and 1.80 times. `Outliers` fits its threshold to the distances of each population
-instead, as it does for any column, so a finding never relies on that deep tail. The clean-data rates are in [Small
-populations](#small-populations).
+instead, as it does for any column, so a finding never relies on that deep tail. The clean-data rates are in
+[Small populations](#small-populations).
 
-**A combination finding is kept beside single-column findings.** A row flagged on a combination is kept when one of the
+A combination finding is kept beside single-column findings. A row flagged on a combination is kept when one of the
 group's columns is also flagged alone. There is no shared error budget between the checks, since each population has its
 own threshold, so reporting both counts nothing twice. The two are separate rows in the result.
 
 Scoring every pair with `"all"` is slow, and the result keeps every score so it can refit thresholds. Such a result is
 large to hold and to pickle, so use `"all"` to look for pairs and name the groups you keep.
 
-**Category and value together.** To ask whether a value is unusual for its category, pass the category as a stratum.
-A group that mixes numbers and categories is refused, since it would only repeat that split.
+Category and value together: to ask whether a value is unusual for its category, pass the category as a stratum. A group
+that mixes numbers and categories is refused, since it would only repeat that split.
 
-**Rejected approaches.** One model over every column at once, such as an isolation forest on a mixed-type distance,
-gives scores without a calibrated meaning and cannot say which combination made a row unusual. Encoding categories as
-numbers and fitting one distance makes the covariance singular and lets rare categories dominate it.
+Rejected approaches: one model over every column at once, such as an isolation forest on a mixed-type distance, gives
+scores without a calibrated meaning and cannot say which combination made a row unusual. Encoding categories as numbers
+and fitting one distance makes the covariance singular and lets rare categories dominate it.
 
-**Known limits.** The conditioning column of a residual does not wrap, so hour 23 is not next to hour 0. Consecutive
-frames are not exchangeable, so a burst of rows inflates counts and fits, as it does for single columns.
+Known limits: the conditioning column of a residual does not wrap, so hour 23 is not next to hour 0. Consecutive frames
+are not exchangeable, so a burst of rows inflates counts and fits, as it does for single columns.
 
 #### Neighbors along a sequence
 
@@ -752,10 +750,10 @@ against its level, or within a stratum, cannot find these. {func}`.sequence_resi
 frames before and after it in its video, and each detection with the detections before and after it in its track,
 ordered by `unit_index`.
 
-**Where the neighbors put a value.** Each row is compared with up to five rows on each side. The candidates for where
-it should sit are the median of the rows before it, the median of the rows after it, and the line through those two
-medians read at the row's position. The candidate nearest the row's value is its expected value, so each kind of
-change matches the candidate that follows it:
+Where the neighbors put a value: each row is compared with up to five rows on each side. The candidates for where it
+should sit are the median of the rows before it, the median of the rows after it, and the line through those two medians
+read at the row's position. The candidate nearest the row's value is its expected value, so each kind of change matches
+the candidate that follows it:
 
 | Along the sequence | Left median | Right median | Line between them | Flagged |
 | --- | --- | --- | --- | --- |
@@ -766,28 +764,27 @@ change matches the candidate that follows it:
 The first and last row of a sequence have one side. For them, the line runs through the medians of the near half and the
 far half of that side, so a sequence that ends on a trend does not flag its last frame.
 
-**Why interpolate and not extrapolate.** The other way to follow a trend is to project each side's own slope into the
-row. The slope then comes from a few steps between noisy rows, and projected several rows, its error is as large as
-the glitches the check looks for. In measurements, a spike of 8 standard deviations was caught in 62 to 100 % of runs by
-extrapolation and in 100 % of runs by the line on most shapes. A clock rounded to milliseconds flagged 15 % of its
-clean frames by extrapolation and none by the line. The line through the two side medians uses no slope estimated from
-steps, only the two medians the side candidates already compute.
+Why interpolate and not extrapolate? The other way to follow a trend is to project each side's own slope into the row.
+The slope then comes from a few steps between noisy rows, and projected several rows, its error is as large as the
+glitches the check looks for. In measurements, a spike of 8 standard deviations was caught in 62 to 100 % of runs by
+extrapolation and in 100 % of runs by the line on most shapes. A clock rounded to milliseconds flagged 15 % of its clean
+frames by extrapolation and none by the line. The line through the two side medians uses no slope estimated from steps,
+only the two medians the side candidates already compute.
 
-**One scale for every sequence.** The residual is the value minus its expected value. Each residual is divided by its
+One scale for every sequence: the residual is the value minus its expected value. Each residual is divided by its
 sequence's spread, shrunk toward the spread of every sequence with a weight of 30 rows, and the scores of every sequence
 are judged together. A quiet video is not judged by a noisy video's jitter, and a short track is scaled mostly by the
 pooled spread instead of by a dozen rows. Pooling raw residuals instead flagged about 2 % of clean rows once videos
 differed in noise; the shrunk scale flags 0.1 to 0.9 %.
 
-**Timestamps.** A date, datetime or duration factor is detrended by its median interval per frame before the comparison,
-and so are `time_s` and `pts`. A steady rise, a varying frame rate and a dropped frame then do not read as departures,
-and a residual within the clock's own rounding is set to zero. Each timestamp is also checked for order. The fewest
-frames to remove for the sequence to be non-decreasing are flagged when there are at most five, so one bad stamp flags
-only its own frame. A larger set is a reset, and only the frame where the clock went back is flagged. A timestamp held
-as plain numbers under another name is read as an ordinary factor, so cast it to a Datetime or Duration before you
-add it.
+Timestamps: a date, datetime or duration factor is detrended by its median interval per frame before the comparison, and
+so are `time_s` and `pts`. A steady rise, a varying frame rate and a dropped frame then do not read as departures, and a
+residual within the clock's own rounding is set to zero. Each timestamp is also checked for order. The fewest frames to
+remove for the sequence to be non-decreasing are flagged when there are at most five, so one bad stamp flags only its
+own frame. A larger set is a reset, and only the frame where the clock went back is flagged. A timestamp held as plain
+numbers under another name is read as an ordinary factor, so cast it to a Datetime or Duration before you add it.
 
-**How `Outliers` flags a neighbor.** Pass `neighbors=` to {meth}`.Outliers.evaluate`:
+To have `Outliers` flag a neighbor, pass `neighbors=` to {meth}`.Outliers.evaluate`:
 
 ```python
 result = Outliers().evaluate(metadata, levels=("unit", "instance"), neighbors=["brightness", "box_size"])
@@ -801,12 +798,12 @@ result = Outliers().evaluate(metadata, levels=("unit", "instance"), neighbors=["
 A frame's row is named `brightness along sequence` and a detection's `box_size along track`. A pool needs at least 20
 scored rows, and `strata=` splits the pool as it does for any check.
 
-**Known limits.** A run of more than five departing frames is read as a segment, which the per-level threshold or the
-sequence-level `variability` reduction judges. A run of exactly five can still flag a frame in its middle. On a steep
-ramp, a glitch in the ramp's own direction must exceed the ramp's rise over about three frames: on a ramp of one
-standard deviation per frame, a spike of eight was caught in 60 to 90 % of runs. On a steep trend, a glitch can also
-flag the clean frames next to it, because it shifts the median of each nearby frame's side. A clock that runs
-backwards throughout flags every frame but the first. A video that is noisy throughout is not flagged frame by frame.
+Known limits: a run of more than five departing frames is read as a segment, which the per-level threshold or the
+sequence-level `variability` reduction judges. A run of five can still flag a frame in its middle. On a steep ramp, a
+glitch in the ramp's own direction must exceed the ramp's rise over about three frames: on a ramp of one standard
+deviation per frame, a spike of eight was caught in 60 to 90 % of runs. On a steep trend, a glitch can also flag the
+clean frames next to it, because it shifts the median of each nearby frame's side. A clock that runs backwards
+throughout flags every frame but the first. A video that is noisy throughout is not flagged frame by frame.
 
 ### Image statistics as a linting vocabulary
 
@@ -814,7 +811,7 @@ backwards throughout flags every frame but the first. A video that is noisy thro
 statistics in DataEval. It accepts any iterable of images or a MAITE-compliant
 `Dataset` and computes whichever statistics are requested via the
 {class}`.ImageStats` flag parameter. `ImageStats` is a selector, not a
-processor — it is a `Flag` enum whose values you combine with bitwise OR to
+processor: it is a `Flag` enum whose values you combine with bitwise OR to
 specify which statistics you want, and `image_stats` handles the rest.
 
 The four flag categories and their integrity signals:
@@ -831,24 +828,25 @@ Some flags have dependencies that are resolved automatically: requesting
 requesting `VISUAL_BRIGHTNESS`, `VISUAL_CONTRAST`, or `VISUAL_DARKNESS`
 also enables `VISUAL_PERCENTILES`.
 
-For **object detection** datasets, `image_stats` can compute statistics
-separately for each bounding box (`per_target=True`, the default when boxes are
-present) and for the full image (`per_image=True`). The `source_index` field in
-the output identifies whether each row corresponds to a full image or to a
-specific bounding box within an image.
+For object detection datasets, `image_stats` can compute statistics separately
+for each bounding box (`per_target=True`, the default when boxes are present)
+and for the full image (`per_image=True`). The `source_index` field in the
+output identifies whether each row corresponds to a full image or to a specific
+bounding box within an image.
 
 Bands are addressed with `channels=`, which names groups of them and measures
-each group jointly, returning `<group>_<statistic>` columns on the same rows —
+each group jointly, returning `<group>_<statistic>` columns on the same rows:
 `channels={"r": 0, "g": 1, "b": 2}` for RGB, or
 `channels={"visible": range(0, 30), "nir": range(30, 70)}` for a hyperspectral
 cube. Because they are columns rather than rows, band statistics reach
 {class}`.Metadata` and are visible to {class}`.Balance` and {class}`.Diversity`
 like any other factor.
 
-Object detection datasets can also be measured on the pixels that *are not*
+Object detection datasets can also be measured on the pixels that are not
 annotated. `per_background=True` unions every box in an image into a mask,
-excludes those pixels, and reduces the requested statistics over what is left —
-the scene an image was captured in, rather than the things annotated inside it:
+excludes those pixels, and reduces the requested statistics over what is left,
+meaning the scene an image was captured in, rather than the things annotated
+inside it:
 
 ```python
 stats = image_stats(
@@ -865,22 +863,20 @@ stats["stats"]["background_brightness"]
 
 Background values are returned under `background_`-prefixed names on the same
 rows as the whole-image ones, because they describe the same thing a whole-image
-statistic describes — the image — and so belong at the `unit` level (see
+statistic describes, the image, and so belong at the `unit` level (see
 [Metadata Levels](MetadataLevels.md)). Three properties are worth knowing:
 
-- **`background_fraction` is always returned**, and should be read before the
-  rest. It is the share of the image left unmasked, and a background statistic
-  measured over a few percent of an image is noise wearing a measurement's
-  clothes. Where an image's boxes cover it entirely, every other background
-  statistic for that image is `NaN`.
-- **Only `PIXEL` and `VISUAL` statistics are computed for the background.** A
-  masked region has no meaningful hash and no geometry of its own, so `HASH` and
-  `DIMENSION` flags are computed for the image and its boxes as usual and skipped
-  for the background.
-- **Boxes are rounded outwards and unioned**, so the background excludes slightly
-  more than the annotations strictly cover. This is deliberate: a retained pixel
-  is background with high confidence, at the cost of discarding a boundary ring
-  of genuine background along with the object.
+- `background_fraction` is always returned, and should be read before the rest.
+It is the share of the image left unmasked, and a background statistic measured
+over a few percent of an image is noise that looks like a measurement. Where an
+image's boxes cover it entirely, every other background statistic for that image
+is `NaN`. - Only `PIXEL` and `VISUAL` statistics are computed for the
+background. A masked region has no meaningful hash and no geometry of its own,
+so `HASH` and `DIMENSION` flags are computed for the image and its boxes as
+usual and skipped for the background. - Boxes are rounded outwards and unioned,
+so the background excludes slightly more than the annotations strictly cover.
+This is deliberate: a retained pixel is background with high confidence, at the
+cost of discarding a boundary ring of genuine background along with the object.
 
 The default configuration for {class}`.Outliers` uses `DIMENSION | PIXEL |
 VISUAL`, covering the full space of sensor-level integrity failures without
@@ -900,18 +896,19 @@ defaults to 50, capped at `min_class_size - 1`).
 
 The output contains three fields:
 
-**`errors`**: a dictionary mapping sample index to `(original_label, [suggested_labels])`
-for all samples with score ≥ 1.0. Suggested labels are derived from
-rank-weighted voting over the $k$ nearest out-of-class neighbors — closer
-neighbors receive higher weight. The suggestion logic applies two thresholds:
-if the top candidate's vote share is below `min_confidence` (default 0.4), no
-suggestion is returned; if the margin between the top two candidates is smaller
-than `ambiguity_threshold` (default 0.2), both are returned as a tie.
+`errors`: a dictionary mapping sample index to
+`(original_label, [suggested_labels])` for all samples with score ≥ 1.0.
+Suggested labels are derived from rank-weighted voting over the $k$ nearest
+out-of-class neighbors: closer neighbors receive higher weight. The suggestion
+logic applies two thresholds: if the top candidate's vote share is below
+`min_confidence` (default 0.4), no suggestion is returned; if the margin between
+the top two candidates is smaller than `ambiguity_threshold` (default 0.2), both
+are returned as a tie.
 
-**`error_rank`**: all sample indices sorted by descending score — a triage
-list for human review, starting with the samples most likely to be mislabeled.
+`error_rank`: all sample indices sorted by descending score (a triage list for
+human review, starting with the samples most likely to be mislabeled).
 
-**`scores`**: the raw distance ratio for every sample, useful for setting custom
+`scores`: the raw distance ratio for every sample, useful for setting custom
 thresholds or examining the distribution of scores.
 
 A score well above 1.0 is stronger evidence of mislabeling than a score just
@@ -923,21 +920,21 @@ practical threshold.
 
 Data Integrity assessment is appropriate at three points in the data lifecycle.
 
-**Before any training run.** Running the full integrity pipeline on a new or
-merged dataset is standard practice before committing compute to training.
-Integrity failures caught here cost a data review. Integrity failures caught
-after a failed training run cost a training run plus a data review.
+Before any training run: running the full integrity pipeline on a new or merged
+dataset is standard practice before committing compute to training. Integrity
+failures caught here cost a data review. Integrity failures caught after a
+failed training run cost a training run plus a data review.
 
-**After merging datasets.** Near-duplicate rates spike when datasets from
-different collection events or public sources are combined without
-deduplication. A dataset assembled from three sources with 10% internal
-redundancy each can easily reach 25–30% redundancy at the merged level.
+After merging datasets: near-duplicate rates spike when datasets from different
+collection events or public sources are combined without deduplication. A
+dataset assembled from three sources with 10% internal redundancy each can
+easily reach 25–30% redundancy at the merged level.
 
-**When evaluation metrics look suspicious.** Anomalously high validation
-accuracy — especially accuracy that degrades sharply in operational testing —
-is a common symptom of validation set contamination by training-set duplicates.
-If your held-out metrics seem too good, run deduplication across the
-train/validation split boundary.
+When evaluation metrics look suspicious: anomalously high validation accuracy,
+especially accuracy that degrades sharply in operational testing, is a common
+symptom of validation set contamination by training-set duplicates. If your
+held-out metrics seem too good, run deduplication across the train/validation
+split boundary.
 
 To better understand what to do after running an assessment, review the
 [Data Integrity section in the Acting on Results explanation page](ActingOnResults.md#data-integrity-findings).
@@ -948,21 +945,22 @@ Statistical linting and perceptual hashing are effective at catching the
 integrity failures they were designed to detect, but both have blind spots
 practitioners should understand.
 
-Hash-based detection will not catch **semantic duplicates** — two different
+Hash-based detection will not catch semantic duplicates, meaning two different
 photographs of the same object taken from different angles or lighting
-conditions that are genuinely different images at the pixel level. Cluster-based
-duplicate detection in embedding space addresses this, but requires a feature
-extractor whose embedding space is meaningful for the target domain.
+conditions that are different images at the pixel level. Cluster-based duplicate
+detection in embedding space addresses this, but requires a feature extractor
+whose embedding space is meaningful for the target domain.
 
 Image statistics-based outlier detection is only sensitive to pixel-level and
 dimensional anomalies. A semantically incorrect image with normal brightness,
 contrast, and dimensions will not be flagged by statistical tests. Cluster-based
 outlier detection addresses this case, again contingent on embedding quality.
 
-Neither approach addresses label quality and fails to detect **label errors** —
-images that are correctly exposed, non-duplicated, and statistically normal but
-assigned the wrong class label. To understand label quality, the functions
-{func}`.label_stats` and {func}`.label_errors` have to be run independently.
+Neither approach addresses label quality and fails to detect label errors,
+meaning images that are correctly exposed, non-duplicated, and statistically
+normal but assigned the wrong class label. To understand label quality, the
+functions {func}`.label_stats` and {func}`.label_errors` have to be run
+independently.
 
 The statistical outlier tests flag samples relative to the distribution of the
 dataset being evaluated. Results are therefore dataset-dependent: adding or
@@ -973,9 +971,9 @@ flags remain valid.
 Stratified and categorical outlier tests assume the rows of a stratum are
 exchangeable, which consecutive video frames are not, and they return no
 verdict on strata too small to support one. Relationships between two ordered
-quantities — box size against distance from the camera, image brightness
-against capture hour — are joint and are not found by testing one column at a
-time, within a stratum or not. The neighbor check (`neighbors=`) is the test that
+quantities (box size against distance from the camera, image brightness against
+capture hour) are joint and are not found by testing one column at a time,
+within a stratum or not. The neighbor check (`neighbors=`) is the test that
 reads consecutive frames in order: it judges a frame against the frames next to
 it, and reads a run of more than five departing frames as a segment.
 

@@ -4,23 +4,23 @@
 
 Before investing in model architecture, hyperparameter tuning, or additional
 data collection, a T&E engineer needs to answer a more fundamental question:
-*what is this dataset capable of producing?* Performance Limits analysis
-addresses three questions: is a requirement out of reach on this data, has
-some model already shown that it is reachable, and where do additional samples
-stop producing meaningful improvement? {class}`.Feasibility`
-answers the first two with finite-sample bounds and records the evidence behind
-each answer. The BER estimators estimate the first asymptotically for
-classification, UAP shows what one crop classifier reaches on correctly
-localized detection boxes, and {class}`.Sufficiency` answers the third.
+what is this dataset capable of producing? Performance Limits analysis addresses
+three questions: is a requirement out of reach on this data, has some model
+already shown that it is reachable, and where do additional samples stop
+producing meaningful improvement? {class}`.Feasibility` answers the first two
+with finite-sample bounds and records the evidence behind each answer. The BER
+estimators estimate the first asymptotically for classification, UAP shows what
+one crop classifier reaches on correctly localized detection boxes, and
+{class}`.Sufficiency` answers the third.
 
 Understanding these limits has direct program consequences. If the irreducible
 error of a dataset exceeds the allowance of an operational accuracy requirement,
-no model trained on that data can meet the requirement — the problem must change,
+no model trained on that data can meet the requirement: the problem must change,
 not the model. If the learning curve has already saturated, budget directed at
-data collection will yield diminishing returns, and engineering effort is
-better spent elsewhere. Both findings are as valuable as a positive result:
-they prevent programs from pursuing improvements that are mathematically
-impossible given the current data.
+data collection will yield diminishing returns, and engineering effort is better
+spent elsewhere. Both findings are as valuable as a positive result: they
+prevent programs from pursuing improvements that are mathematically impossible
+given the current data.
 
 ```{important}
 The Bayes Error Rate (BER) metric is applicable to **classification tasks only**.
@@ -35,26 +35,25 @@ release; object detection and tracking datasets raise `NotImplementedError`.
 
 ### Bayes Error Rate — the irreducible floor
 
-The {term}`Bayes Error Rate (BER)` is the lowest possible error rate
-achievable by *any* classifier on a given probability distribution. It is not
-a property of any particular model — it is a property of the data. No matter
-how large the model, how long it trains, or how well it is tuned, it cannot
-achieve error below the BER on that distribution.
+The {term}`Bayes Error Rate (BER)` is the lowest possible error rate achievable
+by any classifier on a given probability distribution. It is not a property of
+any particular model. It is a property of the data. No matter how large the
+model, how long it trains, or how well it is tuned, it cannot achieve error
+below the BER on that distribution.
 
 BER arises from **class overlap in the feature space**. When two classes share
-regions of the input space — when the same image features are legitimately
-associated with more than one class — no deterministic classifier can resolve
-the ambiguity. The probability of misclassification in those regions is
-irreducible.
+regions of the input space, meaning the same image features are legitimately
+associated with more than one class, no deterministic classifier can resolve the
+ambiguity. The probability of misclassification in those regions is irreducible.
 
-In computer vision, class overlap has several common sources. **Label
-ambiguity** occurs when human annotators genuinely disagree about the correct
-class for an image. **Sensor noise and resolution limits** cause images that
-are semantically distinct to become perceptually identical at the pixel level.
-**Incomplete feature sets** occur when the data simply does not contain
-enough information to distinguish the classes — trying to predict vehicle type
-from low-resolution thumbnails where distinguishing features are not
-resolvable. In all cases, the result is the same: overlapping class
+In computer vision, class overlap has several common sources.
+**Label ambiguity** occurs when human annotators disagree about the correct
+class for an image. **Sensor noise and resolution limits** cause images that are
+semantically distinct to become perceptually identical at the pixel level.
+**Incomplete feature sets** occur when the data does not contain enough
+information to distinguish the classes, for example when trying to predict
+vehicle type from low-resolution thumbnails where distinguishing features are
+not resolvable. In all cases, the result is the same: overlapping class
 distributions in embedding space, and a non-zero floor on error.
 
 In operational contexts, BER is a pre-development diagnostic, and its two bounds answer different questions. The
@@ -102,15 +101,15 @@ stated false-positive limit.
 ### Sufficiency — the diminishing returns curve
 
 Where Feasibility, BER and UAP concern what level the data allows or a model reaches, {class}`.Sufficiency`
-characterizes how performance grows with the amount of training data. It answers the question: *given the
-data we have, how much of our budget should go toward collecting more?*
+characterizes how performance grows with the amount of training data. It answers the question: given the data you have,
+how much of your budget should go toward collecting more?
 
-Sufficiency trains a model on progressively larger subsets of the training
-data — at 10%, 25%, 50%, 75%, and 100% of available samples, for example —
-evaluates it at each step, and fits a power law curve to the resulting
-learning trajectory. That curve can then be used to project performance at
-larger dataset sizes and to invert the projection: given a target accuracy,
-how many samples are required to reach it?
+Sufficiency trains a model on progressively larger subsets of the training data
+(at 10%, 25%, 50%, 75%, and 100% of available samples, for example), evaluates
+it at each step, and fits a power law curve to the resulting learning
+trajectory. That curve can then be used to project performance at larger dataset
+sizes and to invert the projection: given a target accuracy, how many samples
+are required to reach it?
 
 ## Theory
 
@@ -121,17 +120,17 @@ optimal classifier:
 
 $$\text{BER} = E_X\!\left[P\!\left(Y \neq \underset{i}{\arg\max}\; P(Y=i \mid X=x)\right)\right]$$
 
-This expectation cannot be computed exactly in practice — it requires knowing
-the true conditional class distribution $P(Y \mid X)$, which is what the model
-is trying to learn. DataEval instead computes **bounds** on BER using two
-graph-theoretic estimators that operate on the {term}`embedding
+This expectation can only be estimated in practice: it requires knowing the true
+conditional class distribution $P(Y \mid X)$, which is what the model is trying
+to learn. DataEval instead computes **bounds** on BER using two graph-theoretic
+estimators that operate on the {term}`embedding
 <Embeddings>` space of the dataset.
 
 Both estimators measure the rate of class label mismatches in the local
 neighborhood structure of the embedding space. The intuition is that samples
-near the class boundary — where the same image features are associated with
-multiple classes — will have neighbors with different labels. The frequency
-of these mismatches in the neighborhood graph estimates the confusion in the
+near the class boundary, where the same image features are associated with
+multiple classes, will have neighbors with different labels. The frequency of
+these mismatches in the neighborhood graph estimates the confusion in the
 feature space.
 
 **MST-based estimation** (`ber_mst`) constructs a minimum spanning tree over
@@ -495,17 +494,17 @@ $$f(n) = c \cdot n^{-m} + c_0$$
 
 where $n$ is the training set size, $c$ is the scale coefficient, $m > 0$ is
 the decay exponent, and $c_0$ is the asymptote. DataEval works internally with
-the *error* form of this curve (higher is worse), then converts to the
-*performance* form for output:
+the error form of this curve (higher is worse), then converts to the performance
+form for output:
 
 $$\text{performance}(n) = 1 - f(n) = 1 - c \cdot n^{-m} - c_0$$
 
 The asymptote $c_0$ is what makes this model useful for program decisions. As
-$n \to \infty$, $f(n) \to c_0$, meaning performance converges to $1 - c_0$.
-If $c_0 > 0$, performance will never reach 1.0 regardless of dataset size —
-reflecting the same irreducible error that BER measures directly, now
-estimated from the shape of the learning curve rather than from the embedding
-space geometry.
+$n \to \infty$, $f(n) \to c_0$, meaning performance converges to $1 - c_0$. If
+$c_0 > 0$, performance will never reach 1.0 regardless of dataset size,
+reflecting the same irreducible error that BER measures directly, now estimated
+from the shape of the learning curve rather than from the embedding space
+geometry.
 
 The three parameters are fitted by minimizing the sum of squared residuals:
 
@@ -522,20 +521,20 @@ For unit-interval metrics (accuracy, precision, recall), the asymptote $c_0$
 is constrained to $[0, 1]$. For unbounded metrics (loss), no constraint is
 applied. The `unit_interval` parameter controls this.
 
-**Forward projection** evaluates $\text{performance}(n)$ at arbitrary $n$
-values using the fitted parameters. This answers: *if we had $N$ samples, what
-accuracy would we expect?*
+**Forward projection** evaluates $\text{performance}(n)$ at arbitrary $n$ values
+using the fitted parameters. This answers: if you had $N$ samples, what accuracy
+would you expect?
 
 **Inverse projection** solves $\text{performance}(n) = t$ for $n$ given a
 target $t$:
 
 $$n = \left(\frac{t - (1 - c_0)}{-c}\right)^{-1/m}$$
 
-This answers: *how many samples do we need to reach accuracy $t$?* When the
+This answers: how many samples do you need to reach accuracy $t$? When the
 target exceeds $1 - c_0$ (the asymptotic ceiling), the inverse projection
 returns $-1$, indicating the target is unachievable with more data of the same
-type. This is the sufficiency equivalent of the BER bound — the learning
-curve has told you that this requirement cannot be met by scaling data alone.
+type. This is the sufficiency equivalent of the BER bound: the learning curve
+has told you that this requirement cannot be met by scaling data alone.
 
 Multiple independent runs (controlled by `runs`) average the learning curves
 before fitting, reducing the variance introduced by random subset sampling.
@@ -571,21 +570,20 @@ For a per-class operating condition, state it as a recall target with its false-
 policy before the audit, and put that policy's decisions in its own call. When the requirement is about a coarser class
 than the model was trained on, relabel the dataset and fold the model's scores through the same `Relabel`.
 
-**Sufficiency** is most useful at two points: early in a program, when
-deciding how much data to collect before beginning training; and after an
-initial training run, when deciding whether more data will help. The inverse
-projection (`inv_project`) is the primary tool for the first case — it
-translates a target accuracy directly into a required sample count. The
-forward projection (`project`) is the primary tool for the second case — it
-shows where the learning curve is headed and whether the current trajectory
-will reach the operational requirement.
+Sufficiency is most useful at two points: early in a program, when deciding how
+much data to collect before beginning training; and after an initial training
+run, when deciding whether more data will help. The inverse projection
+(`inv_project`) is the primary tool for the first case: it translates a target
+accuracy directly into a required sample count. The forward projection
+(`project`) is the primary tool for the second case: it shows where the learning
+curve is headed and whether the current trajectory will reach the operational
+requirement.
 
 When the inverse projection returns $-1$ for a target's sample count, the interpretation
-depends on context. If BER has already been run and returns a high upper
-bound, the two findings are consistent — the data has a fundamental
-separability problem. If BER is low but sufficiency projects $-1$, the issue
-is more likely the model architecture or training procedure rather than the
-data itself.
+depends on context. If BER has already been run and returns a high upper bound,
+the two findings are consistent: the data has a fundamental separability
+problem. If BER is low but sufficiency projects $-1$, the issue is more likely
+the model architecture or training procedure rather than the data itself.
 
 To better understand what to do after assessing performance limits, review the
 [Performance Limits section in the Acting on Results explanation page](ActingOnResults.md#performance-limits-findings).
@@ -597,25 +595,25 @@ overlap in embedding space is only as meaningful as the embedding's ability to
 represent the semantic distinctions relevant to the classification task. An
 embedding model that is poorly suited to the target domain may project
 separable classes into overlapping regions, producing an artificially high BER
-estimate, or may separate classes that are genuinely confusable at the pixel
-level, producing an artificially low estimate. A BER estimate is therefore a
-statement about the embedding as much as about the data, and it carries no
-signal about whether that embedding suited the task (see the
-[Embeddings](Embeddings.md) concept page).
+estimate, or may separate classes that are confusable at the pixel level,
+producing an artificially low estimate. A BER estimate is therefore a statement
+about the embedding as much as about the data, and it carries no signal about
+whether that embedding suited the task (see the [Embeddings](Embeddings.md)
+concept page).
 
 The MST and KNN estimators produce bounds, not point estimates. The gap
 between upper and lower bounds can be wide, particularly for small datasets or
-high-dimensional embeddings. A wide gap means the true BER could be anywhere
-in a large range — the result is informative but not precise. Increasing
-sample count narrows the bounds.
+high-dimensional embeddings. A wide gap means the true BER could be anywhere in
+a large range. The result is informative but not precise. Increasing sample
+count narrows the bounds.
 
-BER is a classification-only metric and UAP is a object detection metric that
+BER is a classification-only metric and UAP is an object detection metric that
 reduces the problem to a classification metric. They do not assess feasibility
-for regression tasks, generative tasks, or object detection beyond the
-UAP reduction. For object detection, UAP scores the classification part
-only: a program can see a high UAP and still face localization challenges that
-prevent meeting its mAP requirement, and a UAP below the requirement does not
-rule the requirement out, since a better crop classifier can score higher.
+for regression tasks, generative tasks, or object detection beyond the UAP
+reduction. For object detection, UAP scores the classification part only: a
+program can see a high UAP and still face localization challenges that prevent
+meeting its mAP requirement, and a UAP below the requirement does not rule the
+requirement out, since a better crop classifier can score higher.
 
 Feasibility is experimental, and its first release leaves out several things:
 
@@ -645,8 +643,8 @@ learning curve data before trusting the projection.
 
 The power law model assumes that performance will continue improving
 monotonically with more data of the same type. If the limiting factor is
-something other than sample count — label noise, model capacity, distribution
-mismatch between train and test — the projection will be optimistic.
+something other than sample count, such as label noise, model capacity, or
+distribution mismatch between train and test, the projection will be optimistic.
 
 ## Related concept pages
 

@@ -4,7 +4,7 @@
 
 {class}`.Parity` ⚠️ tests whether metadata factors are associated with the class
 labels. It reports a test for each factor as a whole, and a test for each
-*cell*, one combination of a factor level and a class, of whether the cell
+**cell**, one combination of a factor level and a class, of whether the cell
 holds more or fewer rows than it would if the factor and the class were
 independent. The evaluator calls the core function {func}`.parity` ⚠️. Both are
 experimental, and their API may change or be removed in a later release.
@@ -58,9 +58,9 @@ $$E_{ij} = \frac{n_{i\cdot}\, n_{\cdot j}}{n}$$
 the level's row count times the class's share of all rows. Parity reports two
 measures of how far a cell departs from $E_{ij}$:
 
-- **lift** $= O_{ij} / E_{ij}$: 1 under independence, 0 for an empty cell, and
-  2 for a cell holding twice its expected count.
-- **deficit** $= E_{ij} - O_{ij}$: the number of rows the cell is short of
+- lift $= O_{ij} / E_{ij}$: 1 under independence, 0 for an empty cell, and 2 for
+  a cell holding twice its expected count.
+- deficit $= E_{ij} - O_{ij}$: the number of rows the cell is short of
   independence, negative for a surplus. It counts rows, and on detection data
   the rows are detections.
 
@@ -292,13 +292,13 @@ in {attr}`~.ParityOutput.group_source` and the level it grouped by in
   - Nothing: the caller declares each row independent
   - `"declared"`
 - - A custom container that records neither, without the declaration
-  - —
+  - None
   - raises `ValueError`
 
 :::
 
 Grouping by the dataset item is valid at any level a factor was measured at,
-because every row belongs to exactly one item. A per-image factor and a
+because every row belongs to a single item. A per-image factor and a
 per-detection factor are tested over the same groups. A factor whose level is
 unknown is also tested over the item groups and does not change how the other
 factors are grouped. Parity raises an error for a {class}`.Metadata` with a
@@ -522,13 +522,13 @@ as the larger of two estimates:
 
 For a group at the cell's level, none of the four estimates uses the cell: the
 first two are computed at other levels, and the last two from other classes at
-that level. With few
-classes, the other classes' counts at a level mirror the class's own (exactly,
-with two classes), so the last two can raise the floor but do not protect a
-cell that falls short; the first two do. A level with larger groups keeps its
-larger variance through $m$. Groups at other levels also contribute to a cell's
-variance, weighted by the square of the level's share, and the correlation
-estimates for those groups include the cell's own groups.
+that level. With few classes, the other classes' counts at a level mirror the
+class's own (with two classes, the mirror is exact), so the last two can raise
+the floor but do not protect a cell that falls short; the first two do. A level
+with larger groups keeps its larger variance through $m$. Groups at other levels
+also contribute to a cell's variance, weighted by the square of the level's
+share, and the correlation estimates for those groups include the cell's own
+groups.
 
 Taking the larger of the two variances can only widen a cell's reference
 distribution. The factor test uses neither. The model's assumptions, the case
@@ -569,12 +569,12 @@ condition under which Benjamini–Hochberg controls the false discovery rate
 ([Benjamini & Yekutieli, 2001](#ref2)). The adjusted p-values therefore carry
 no unconditional false-discovery-rate guarantee.
 
-In a table with any association, almost no cell's true lift is exactly 1, so
-the error that matters is a false actionable finding: a cell reported as under-
-or overrepresented whose true lift lies inside the lift band. In 1,000
-simulated 4×5 tables of 4,000 rows, each with two planted deviations among
-dependent cells, 1.8% of the actionable cells were false in this sense. Flagging
-on significance alone, without the band, 12.7% were.
+In a table with any association, almost no cell's true lift equals 1, so the
+error that matters is a false actionable finding: a cell reported as under- or
+overrepresented whose true lift lies inside the lift band. In 1,000 simulated
+4×5 tables of 4,000 rows, each with two planted deviations among dependent
+cells, 1.8% of the actionable cells were false in this sense. Flagging on
+significance alone, without the band, 12.7% were.
 
 ## Reading the output
 
@@ -832,21 +832,21 @@ The cluster-model floor on a grouped cell's variance (see
 [The grouped cell variance floor](#the-grouped-cell-variance-floor)) rests on
 three assumptions.
 
-**Correlation does not depend on group size.** Size enters only through
+Correlation does not depend on group size. Size enters only through
 $1 + (m - 1)\rho$. In checks with sticky sequences of 4 to 100 frames, and
 log-normal image sizes with $\sigma$ up to 2, at most 5% of null tables had a
 flagged cell, against up to 91% with the sandwich variance alone.
 
-**For each level and class, at least one of the four estimates is at least the
-cell's own correlation.** This fails when a class comes in bursts at one level
-of the factor only and that level's other classes do not burst. With two
-classes there are no other classes. The cell's own groups are then the only
-evidence of its variance. A cell that by chance holds none of the class's bursts
-looks the same as a cell whose class is truly scarce at that level, and no
-variance estimated from the data can distinguish them.
+For each level and class, at least one of the four estimates is at least the
+cell's own correlation. This fails when a class comes in bursts at one level of
+the factor only and that level's other classes do not burst. With two classes
+there are no other classes. The cell's own groups are then the only evidence of
+its variance. A cell that by chance holds none of the class's bursts looks the
+same as a cell whose class is truly scarce at that level, and no variance
+estimated from the data can distinguish them.
 
-**Only the between-group part is modeled.** When a factor's value varies inside
-a group, the within-group part of a cell's deviation is covered by the sandwich
+Only the between-group part is modeled. When a factor's value varies inside a
+group, the within-group part of a cell's deviation is covered by the sandwich
 variance alone.
 
 #### Contraindication: a class that bursts at one level only

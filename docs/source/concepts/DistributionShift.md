@@ -3,7 +3,7 @@
 # Distribution Shift
 
 A model trained and validated on one dataset is deployed into a world that does
-not hold still. Operational environments shift — seasons change, sensors degrade,
+not hold still. Operational environments shift: seasons change, sensors degrade,
 mission parameters evolve, target populations shift. When the statistical
 properties of data encountered during deployment diverge from the properties of
 training data, model performance degrades. The model's learned decision
@@ -15,11 +15,11 @@ operational distribution. It is not a rare edge case. For systems with long
 fielded lifespans, it is a planning assumption.
 
 DataEval provides two related but distinct capabilities for managing this gap.
-**Drift detection** operates at the population level — it monitors whether a
+**Drift detection** operates at the population level: it monitors whether a
 batch of incoming data as a whole is statistically consistent with the training
 reference. **Out-of-distribution (OOD) detection** operates at the instance
-level — it scores individual samples for how anomalous they are relative to
-what the model was trained on. Both are necessary; neither is sufficient alone.
+level: it scores individual samples for how anomalous they are relative to what
+the model was trained on. Both are necessary; neither is sufficient alone.
 
 ## Taxonomy of shift
 
@@ -39,7 +39,7 @@ the input distribution changes but the class-conditional relationship is stable:
 
 $$P_t(Y \mid X) = P_d(Y \mid X), \quad P_t(X) \neq P_d(X)$$
 
-The model's decision boundaries are still correct — if only it could see the
+The model's decision boundaries are still correct, if only it could see the
 right inputs. The problem is that it encounters inputs in regions of the feature
 space it saw rarely or never during training. For a vehicle detection system
 trained predominantly on clear daytime imagery, a deployment in heavy fog
@@ -76,8 +76,8 @@ because it identifies what has changed and therefore what can be done about it.
 
 ## Drift detection
 
-Drift detection answers a population-level question: *is this batch of incoming
-data drawn from the same distribution as my training data?* All of DataEval's
+Drift detection answers a population-level question: is this batch of incoming
+data drawn from the same distribution as my training data? All of DataEval's
 drift detectors follow the same two-phase pattern: a **fit** phase on reference
 (training) data, followed by repeated **predict** calls on operational batches,
 each returning a p-value and a binary drift flag.
@@ -108,11 +108,11 @@ two empirical CDFs:
 
 $$\text{KS} = \sup_x \left| F(x) - F_\text{ref}(x) \right|$$
 
-The supremum statistic makes KS most sensitive to shifts in the central
-(modal) region of the distribution — where the CDF is steepest and the
-difference is largest. It is the standard baseline test: well-understood, widely
-supported, and appropriate when shift is expected to move the bulk of the
-distribution. It is less sensitive to changes in the tails.
+The supremum statistic makes KS most sensitive to shifts in the central (modal)
+region of the distribution, where the CDF is steepest and the difference is
+largest. It is the standard baseline test: well-understood, widely supported,
+and appropriate when shift is expected to move the bulk of the distribution. It
+is less sensitive to changes in the tails.
 
 **Cramér-von Mises (CVM)** measures the sum of squared CDF differences over the
 full joint sample:
@@ -129,20 +129,20 @@ one sample to produce larger values than the other:
 
 $$U = n_1 n_2 + \frac{n_1(n_1+1)}{2} - R_1$$
 
-where $R_1$ is the sum of ranks for the reference sample. Because it operates
-on ranks rather than raw values, MWU is robust to outliers and heavy-tailed
+where $R_1$ is the sum of ranks for the reference sample. Because it operates on
+ranks rather than raw values, MWU is robust to outliers and heavy-tailed
 distributions, and is most sensitive to shifts in the median. Its limitation is
-the converse: if the median is stable but the variance has changed — for
-example, a sensor producing wider spread without shifting the mean — MWU will
-not detect it.
+the converse: if the median is stable but the variance has changed (for example,
+a sensor producing wider spread without shifting the mean), MWU will not detect
+it.
 
 **Anderson-Darling (AD)** modifies the CVM weighting to emphasize the tails:
 
 $$A^2 = -n - \sum_{i=1}^n \frac{2i-1}{n} \left[\ln F(z_i) + \ln(1 - F(z_{n+1-i}))\right]$$
 
 The $1/F(1-F)$ weighting makes AD more powerful than KS for tail differences,
-which corresponds to detecting rare but extreme events — unusual lighting
-conditions, rare target classes, weather extremes. The cost is sensitivity:
+which corresponds to detecting rare but extreme events, such as unusual lighting
+conditions, rare target classes, and weather extremes. The cost is sensitivity:
 AD may trigger on tail noise that does not affect model performance.
 
 **Baumgartner-Weiss-Schindler (BWS)** is a modern rank-weighted test that
@@ -155,7 +155,7 @@ higher statistical power than KS, CVM, or MWU across a range of shift types,
 making it the strongest general-purpose choice when computational cost is
 not a constraint.
 
-**Test selection guidance:**
+Use the expected shift type to select a test:
 
 | Expected shift type                           | Recommended test |
 | --------------------------------------------- | ---------------- |
@@ -168,24 +168,24 @@ not a constraint.
 ### Multivariate tests
 
 Univariate tests examine features independently and can miss shift that
-manifests only in the *relationships* between features — for example, a sensor
-that now produces correlated noise across channels where noise was previously
-independent. Two multivariate approaches are available.
+manifests only in the relationships between features (for example, a sensor that
+now produces correlated noise across channels where noise was previously
+independent). Two multivariate approaches are available.
 
 **Maximum Mean Discrepancy (`DriftMMD`)** measures the distance between
 distribution mean embeddings in a reproducing kernel Hilbert space (RKHS):
 
 $$\text{MMD}^2(p, q) = \| \mu_p - \mu_q \|_\mathcal{F}^2$$
 
-With the RBF kernel $k(x,y) = \exp(-\|x-y\|^2 / 2\sigma^2)$, MMD can detect
-any distributional difference (it is a *universal* kernel). Statistical
-significance is assessed by a permutation test: the reference and test samples
-are pooled, randomly split many times, and the observed MMD is compared to the
-permutation distribution. MMD is the natural choice for detecting shift in
-high-dimensional {term}`embedding <Embeddings>` spaces from deep networks, where
-univariate feature-by-feature testing would require thousands of individual
-tests. Its limitation is quadratic scaling in sample size and the need to
-select a kernel bandwidth $\sigma$.
+With the RBF kernel $k(x,y) = \exp(-\|x-y\|^2 / 2\sigma^2)$, MMD can detect any
+distributional difference (it is a universal kernel). Statistical significance
+is assessed by a permutation test: the reference and test samples are pooled,
+randomly split many times, and the observed MMD is compared to the permutation
+distribution. MMD is the natural choice for detecting shift in high-dimensional
+{term}`embedding <Embeddings>` spaces from deep networks, where univariate
+feature-by-feature testing would require thousands of individual tests. Its
+limitation is quadratic scaling in sample size and the need to select a kernel
+bandwidth $\sigma$.
 
 **Domain Classifier (`DriftDomainClassifier`)** takes a discriminative
 approach: train a binary classifier to distinguish reference from analysis data,
@@ -193,13 +193,13 @@ then measure how well it succeeds:
 
 $$\text{DC} = \text{AUROC}\!\left(C(X_\text{ref},\, X_\text{analysis})\right)$$
 
-An AUROC near 0.5 means the classifier cannot tell the two distributions apart —
+An AUROC near 0.5 means the classifier cannot tell the two distributions apart:
 no drift. An AUROC approaching 1.0 means the distributions are highly
-distinguishable. DataEval uses LightGBM with stratified k-fold
-cross-validation to prevent overfitting. The domain classifier is particularly
-effective at detecting subtle non-linear shifts in joint feature distributions
-that MMD or univariate tests might miss, and it provides an intuitive magnitude
-score. Its cost is computational: it trains multiple classifiers per call.
+distinguishable. DataEval uses LightGBM with stratified k-fold cross-validation
+to prevent overfitting. The domain classifier is particularly effective at
+detecting subtle non-linear shifts in joint feature distributions that MMD or
+univariate tests might miss, and it provides an intuitive magnitude score. Its
+cost is computational: it trains multiple classifiers per call.
 
 ### K-nearest neighbor drift detection (`DriftKNeighbors`)
 
@@ -216,14 +216,14 @@ the baseline distribution.
 
 During predict, each test sample's mean distance to its $k$ nearest reference
 neighbors is computed and the full per-sample distance distributions are
-compared with a **Mann-Whitney U test** (one-sided, `alternative="greater"`):
-are test distances stochastically greater than reference self-distances?
+compared with a Mann-Whitney U test (one-sided, `alternative="greater"`): are
+test distances stochastically greater than reference self-distances?
 
 $$U = n_1 n_2 + \frac{n_1(n_1+1)}{2} - R_1$$
 
 A p-value below the threshold (default: 0.05) flags drift. The MWU test is
 appropriate here because it is non-parametric, robust to outliers, and compares
-the full distribution of distances rather than just means — making it less
+the full distribution of distances rather than just means, which makes it less
 susceptible to false positives from a few distant test points.
 
 This detector is lightweight and training-free beyond fitting the neighbor
@@ -274,7 +274,7 @@ The detectors above operate on input features and are blind to whether detected
 shift affects model predictions. **Uncertainty-based drift detection** takes a
 model-aware approach: it monitors changes in the model's prediction confidence
 rather than the inputs directly. The {class}`.UncertaintyExtractor` turns any
-classifier — or the classification head of a detector — into an uncertainty
+classifier (or the classification head of a detector) into an uncertainty
 feature, which a downstream drift detector then monitors.
 
 For each prediction, the model produces class probabilities. The
@@ -285,22 +285,22 @@ $$H(p) = -\sum_{i=1}^k p_i \log p_i$$
 
 Low entropy means the model is confident; high entropy means it is not. If the
 entropy distribution of incoming data is significantly higher than that of the
-reference set — detected by applying a univariate test (such as KS) or a
+reference set, as detected by applying a univariate test (such as KS) or a
 {term}`Wasserstein-distance<Wasserstein Distance>` test (see
 [below](#wasserstein-based-drift-detection-driftwasserstein)) to the entropy
-scores — the model is encountering data in its uncertainty regions, which
+scores, the model is encountering data in its uncertainty regions, which
 directly predicts performance degradation.
 
 For object detectors, {class}`.ClasswiseUncertaintyExtractor` groups detections
 by their predicted class so uncertainty can be tracked per class rather than
-only in aggregate, revealing *which* classes a shift most affects.
+only in aggregate, revealing which classes a shift most affects.
 
-This approach has a specific, important advantage: it is **insensitive to
-irrelevant shift**. A lighting change that modifies pixel values but does not
-move the model's predictions into uncertain territory will not trigger an alert.
+This approach has a specific, important advantage: it is insensitive to
+irrelevant shift. A lighting change that modifies pixel values but does not move
+the model's predictions into uncertain territory will not trigger an alert.
 Feature-based detectors would flag it. The trade-off is that uncertainty-based
 detection requires a trained classifier and will miss shift that the model
-confidently misclassifies — the model remains certain, but wrong.
+confidently misclassifies: the model remains certain, but wrong.
 
 ### Wasserstein-based drift detection (`DriftWasserstein`)
 
@@ -310,60 +310,61 @@ between the reference distribution and incoming data. Unlike a hypothesis test
 that returns a p-value, it compares this distance against a **calibrated
 baseline** to decide whether a shift is meaningful.
 
-That calibration is what sets it apart: `fit()` takes *two* same-distribution
-references — a training set and a validation set — and records the per-feature
-Wasserstein distance between them as the expected, benign amount of variation. At
-prediction time, the distance from training to the incoming data is divided by
-this baseline, and drift is flagged when the ratio exceeds `ratio_threshold`
+That calibration is what sets it apart: `fit()` takes two same-distribution
+references (a training set and a validation set) and records the per-feature
+Wasserstein distance between them as the expected, benign amount of variation.
+At prediction time, the distance from training to the incoming data is divided
+by this baseline, and drift is flagged when the ratio exceeds `ratio_threshold`
 (default 1.4) for any feature:
 
 $$\text{drift} \iff \max_j \frac{W_j(\text{train}, \text{test})}{W_j(\text{train}, \text{val})} > \tau$$
 
-Anchoring the decision to train-vs-validation variation makes the detector robust
-to benign sampling noise: it alarms only when incoming data is meaningfully more
-different from training than validation already was. Because the Wasserstein
-distance is sensitive to *how far* probability mass moves (not just whether
-distributions differ), it is well suited to low-dimensional features such as the
-{term}`prediction uncertainty<Prediction Uncertainty>` scores described above.
+Anchoring the decision to train-vs-validation variation makes the detector
+robust to benign sampling noise: it alarms only when incoming data is
+meaningfully more different from training than validation already was. Because
+the Wasserstein distance is sensitive to how far probability mass moves (not
+just whether distributions differ), it is well suited to low-dimensional
+features such as the {term}`prediction uncertainty<Prediction Uncertainty>`
+scores described above.
 
 ### Label parity
 
 All the drift detectors above operate on input features $P(X)$ or model
-confidence scores. A separate but complementary question is whether the
-*class frequency distribution* has changed between two datasets — training vs.
-operational, or one collection period vs. another. This is label shift in its
+confidence scores. A separate but complementary question is whether the class
+frequency distribution has changed between two datasets (training vs.
+operational, or one collection period vs. another). This is label shift in its
 simplest measurable form, and it is the specific question that
 {func}`.label_parity` addresses.
 
-**A two-sample test of homogeneity.** The labels of both datasets form a
+The test is a two-sample test of homogeneity. The labels of both datasets form a
 2 × K table of class counts, K being the classes that occur in either. The null
 hypothesis is that both samples were drawn from one class distribution. Without
 groups the test is Pearson's chi-squared test of homogeneity without continuity
-correction, identical to `scipy.stats.chi2_contingency(table, correction=False)`.
-It is symmetric: swapping the two datasets gives the same result, and neither is
-treated as the known population. Before v1.2, `label_parity` treated the
-expected sample as the exact population, which with both samples drawn from one
-distribution rejected 27–87% of the time at α = 0.05 (see
+correction, identical to
+`scipy.stats.chi2_contingency(table, correction=False)`. It is symmetric:
+swapping the two datasets gives the same result, and neither is treated as the
+known population. Before v1.2, `label_parity` treated the expected sample as the
+exact population, which with both samples drawn from one distribution rejected
+27–87% of the time at α = 0.05 (see
 [the migration notes](../migration/v1.2.md#label_parity-tests-homogeneity)).
 
 When the test returns a significant result, the class prior $P(Y)$ has shifted:
 certain classes appear more or less frequently in the operational data than in
 the reference. A model calibrated on training class frequencies will be
-miscalibrated for the new distribution — it will over-predict previously common
+miscalibrated for the new distribution: it will over-predict previously common
 classes and under-predict now-more-common ones.
 
-**Detections and tracks need groups.** One image contributes many detection
-labels, and one sequence many frames of the same tracks. Labels from one image
-share its scene and resemble each other, so they are not independent draws.
-Pass one group id per label, the item index for detections or the sequence id
-for tracks, as `expected_groups` and `observed_groups`. Give both or neither:
-one dataset's labels cannot be clustered while the other's are assumed
-independent. The two datasets' groups are always kept distinct, however they
-are numbered. With groups the test is the second-order Rao–Scott F that
-{class}`.Parity` ⚠️ uses, with dataset membership as a two-level factor;
-[the Parity page](Parity.md#the-factor-test) explains
-the design effect and effective groups. Dependence between groups is not
-corrected.
+Detections and tracks need groups. One image contributes many detection labels,
+and one sequence many frames of the same tracks. Labels from one image share its
+scene and resemble each other, so they are not independent draws. Pass one group
+id per label, the item index for detections or the sequence id for tracks, as
+`expected_groups` and `observed_groups`. Give both or neither: one dataset's
+labels cannot be clustered while the other's are assumed independent. The two
+datasets' groups are always kept distinct, however they are numbered. With
+groups the test is the second-order Rao–Scott F that {class}`.Parity` ⚠️ uses,
+with dataset membership as a two-level factor;
+[the Parity page](Parity.md#the-factor-test) explains the design effect and
+effective groups. Dependence between groups is not corrected.
 
 The groups matter. Two detection datasets were drawn from one class
 distribution but differed in image count and in detections per image: 500
@@ -380,24 +381,24 @@ without groups raises now. The `num_classes` argument is ignored, since the
 classes are the ones that occur in either sample; passing it warns with
 `DeprecatedWarning`, and it is removed in 2.0.
 
-**The population and the vocabulary.** The test is about the frequency of
-detection labels. Images with no detections contribute no labels and are
-outside it. Whether a class is *present* in an image is a different question,
-answered by `image_counts_per_class` from {func}`.label_stats`. Both inputs must
-use one class vocabulary, because equal integer codes do not make equal
-classes. Use {class}`.Relabel` to conform two datasets first.
+The test is about the frequency of detection labels. Images with no detections
+contribute no labels and are outside it. Whether a class is present in an image
+is a different question, answered by `image_counts_per_class` from
+{func}`.label_stats`. Both inputs must use one class vocabulary, because equal
+integer codes do not make equal classes. Use {class}`.Relabel` to conform two
+datasets first.
 
-**The effect size.** Besides `chi_squared` and `p_value`, the result carries
-`score`: the bias-corrected Cramér's V between dataset membership and class,
-with its null bias matched to the design effect when groups are given, from 0
-(one shared class distribution) to 1 (no class in common). On a large sample a
+Besides `chi_squared` and `p_value`, the result carries `score`, the effect
+size: the bias-corrected Cramér's V between dataset membership and class, with
+its null bias matched to the design effect when groups are given, from 0 (one
+shared class distribution) to 1 (no class in common). On a large sample a
 trivially small shift is significant, so read `score` beside `p_value`. The
 result also carries `insufficient`, the same Cochran and effective-groups screen
 as {class}`.Parity`'s `has_insufficient_data`; the degrees of freedom `df_num`
 and `df_den`; and `test`, `"pearson"` or `"rao_scott_f"`.
 
-**No shift observed is not parity.** A non-significant result says the samples
-did not show a shift at the power they had. It is not evidence that the two
+No shift observed is not parity. A non-significant result says the samples did
+not show a shift at the power they had. It is not evidence that the two
 distributions match. With a single class across both inputs, `label_parity`
 returns a chi-squared of 0, a p-value of 1 and a score of 0, flagged
 `insufficient`: no shift was observed in the sampled labels, and the test cannot
@@ -416,8 +417,8 @@ shift.
 
 ## Out-of-distribution detection
 
-While drift detection asks whether a *batch* has shifted, OOD detection asks
-whether a *specific sample* is anomalous relative to the training distribution.
+While drift detection asks whether a batch has shifted, OOD detection asks
+whether a specific sample is anomalous relative to the training distribution.
 The two capabilities are complementary: while a batch may pass drift detection,
 it might contain a handful of genuine anomalies whose effect is diluted below
 the detection threshold of a drift test, or contain instances that will cause
@@ -433,36 +434,37 @@ Reconstruction-based detection trains an autoencoder-family model on
 reference data and uses the model's failure to reconstruct a test sample as the
 anomaly signal.
 
-The core assumption: a model trained to compress and reconstruct *in-distribution*
-images learns the manifold of normal data. When it encounters an OOD sample —
-one that lies off that manifold — it cannot reconstruct it accurately, producing
+The core assumption: a model trained to compress and reconstruct in-distribution
+images learns the manifold of normal data. When it encounters an OOD sample (one
+that lies off that manifold), it cannot reconstruct it accurately, producing
 high reconstruction error. The per-pixel squared error serves as both an
-instance-level score (mean error across the image) and a **feature-level
-anomaly map** (the spatial distribution of error), which identifies *where* in
-the image the anomaly is located.
+instance-level score (mean error across the image) and a
+**feature-level anomaly map** (the spatial distribution of error), which
+identifies where in the image the anomaly is located.
 
 DataEval supports three reconstruction architectures, selected automatically or
 explicitly via `model_type`:
 
 **Autoencoder (AE)** learns a deterministic encoding. Each input maps to a
 single point in the latent space. The OOD score is mean squared error between
-input and reconstruction. AEs are most effective for *structural* anomalies —
-local defects, sensor corruption, image artifacts — where the abnormality is a
+input and reconstruction. AEs are most effective for structural anomalies (local
+defects, sensor corruption, image artifacts), where the abnormality is a
 specific localized departure from normal image structure.
 
 **Variational Autoencoder (VAE)** adds a probabilistic constraint: the latent
 representation is a distribution (mean and variance) rather than a point. The
 training objective includes an Evidence Lower Bound (ELBO) term that penalizes
 latent distributions deviating from a standard Normal. VAEs are more effective
-for *statistical* anomalies — samples that are structurally plausible but
-represent a rare or unlikely combination of features.
+for statistical anomalies: samples that are structurally plausible but represent
+a rare or unlikely combination of features.
 
-**AE or VAE with Gaussian Mixture Model (GMM)** extends either architecture
-by modeling the latent space as a mixture of $K$ Gaussians rather than a single
-distribution. This is appropriate when the reference data is **multimodal** —
-when normal data clusters into distinct subpopulations (day vs. night imagery,
-multiple sensor modes, different operational environments). A GMM can learn each
-mode separately; a unimodal model would have to compromise between them.
+**AE or VAE with Gaussian Mixture Model (GMM)** extends either architecture by
+modeling the latent space as a mixture of $K$ Gaussians rather than a single
+distribution. This is appropriate when the reference data is **multimodal**,
+that is, when normal data clusters into distinct subpopulations (day vs. night
+imagery, multiple sensor modes, different operational environments). A GMM can
+learn each mode separately; a unimodal model would have to compromise between
+them.
 
 When GMM is used, the GMM energy is calculated in addition to the reconstruction
 error. The GMM energy for a latent point $z$ measures how unlikely it is under the
@@ -485,18 +487,18 @@ for each sample.
 ### Distance-based detection (`OODKNeighbors`)
 
 Distance-based OOD detection requires no model training. It stores reference
-{term}`embeddings <Embeddings>` and at inference time computes the distance
-from a test sample's embedding to its $k$ nearest neighbors in the reference
-set. Samples far from their nearest neighbors — in sparse regions of the
-embedding space — receive high OOD scores.
+{term}`embeddings <Embeddings>` and at inference time computes the distance from
+a test sample's embedding to its $k$ nearest neighbors in the reference set.
+Samples far from their nearest neighbors (in sparse regions of the embedding
+space) receive high OOD scores.
 
 The mean distance to $k$ nearest neighbors is the OOD score. A threshold
 calibrated at fit time (typically the $p$-th percentile of reference-set
 self-distances) converts this to a binary in/out-of-distribution prediction.
 
-Distance-based detection is **training-free** beyond the feature extractor. It
-is fast to deploy, easy to update (adding new reference samples requires only
-re-indexing, not retraining), and interpretable — the score directly corresponds
+Distance-based detection is training-free beyond the feature extractor. It is
+fast to deploy, easy to update (adding new reference samples requires only
+re-indexing, not retraining), and interpretable: the score directly corresponds
 to geometric distance in a meaningful space. The limitation is that it inherits
 the strengths and weaknesses of the embedding model: if the feature extractor
 does not represent the anomaly dimension well, the distance will not be
@@ -506,32 +508,31 @@ not feature-level maps.
 ### Domain Classifier OOD detection (`OODDomainClassifier`)
 
 {class}`.OODDomainClassifier` applies the same discriminative principle as
-`DriftDomainClassifier` — but at the instance level rather than the batch
-level. Where the drift detector produces a single AUROC score for an entire
-batch, the OOD detector produces a **per-sample class-1 prediction rate**: how
-consistently does the classifier identify this specific sample as "not
-reference"?
+`DriftDomainClassifier`, but at the instance level rather than the batch level.
+Where the drift detector produces a single AUROC score for an entire batch, the
+OOD detector produces a **per-sample class-1 prediction rate**: how consistently
+does the classifier identify this specific sample as "not reference"?
 
 The fit phase establishes a null distribution. The reference set is split
 randomly into two halves, labeled pseudo-class-0 and pseudo-class-1, and
 repeated stratified k-fold cross-validation is run on this internal split.
 Because both halves come from the same reference distribution, the resulting
-class-1 rates represent what the classifier sees when there is no real signal
-to learn — they capture baseline discrimination due to noise alone. The OOD
-threshold is set at $\mu_{null} + n_\sigma \cdot \sigma_{null}$
-(default $n_\sigma = 2.0$), placing it approximately two standard deviations
-above the null mean.
+class-1 rates represent what the classifier sees when there is no real signal to
+learn: they capture baseline discrimination due to noise alone. The OOD
+threshold is set at $\mu_{null} + n_\sigma \cdot \sigma_{null}$ (default
+$n_\sigma = 2.0$), placing it approximately two standard deviations above the
+null mean.
 
 The predict phase concatenates reference and test data, labels reference
 samples 0 and test samples 1, and runs the same repeated k-fold procedure.
 Each test sample's average class-1 probability across folds is its OOD score.
 Samples whose scores exceed the threshold are flagged as out-of-distribution.
 
-This approach is particularly sensitive to **semantic** anomalies — samples
-representing classes or object types not present in reference data — rather
-than structural defects. Because LightGBM operates on features directly, it
-works well on both raw low-dimensional features and on pre-computed embeddings
-where distance-based methods may be less discriminative due to the curse of
+This approach is particularly sensitive to semantic anomalies (samples
+representing classes or object types not present in reference data) rather than
+structural defects. Because LightGBM operates on features directly, it works
+well on both raw low-dimensional features and on pre-computed embeddings where
+distance-based methods may be less discriminative due to the curse of
 dimensionality. The cost is the same as `DriftDomainClassifier`: multiple
 classifier training runs per call, scaling with `n_folds × n_repeats`.
 
@@ -539,30 +540,30 @@ classifier training runs per call, scaling with `n_folds × n_repeats`.
 
 |                           | Reconstruction (`OODReconstruction`)                      | Distance (`OODKNeighbors`)                     | Domain Classifier (`OODDomainClassifier`)        |
 | ------------------------- | --------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ |
-| Training required         | Yes — autoencoder on reference data                       | No — only indexes embeddings                   | No — fits classifier each call                   |
+| Training required         | Yes, autoencoder on reference data                        | No, only indexes embeddings                    | No, fits classifier each call                    |
 | Input                     | Raw images                                                | Pre-computed embeddings                        | Raw features or embeddings                       |
 | Anomaly score granularity | Instance + feature map                                    | Instance only                                  | Instance only                                    |
 | Best for                  | Structural defects, learned task-specific representations | Fast deployment, strong pre-trained embeddings | Semantic anomalies, complex feature interactions |
-| Multimodal reference data | Yes — via GMM extension                                   | Only if embedding separates modes              | Yes — classifier learns any decision boundary    |
+| Multimodal reference data | Yes, via GMM extension                                    | Only if embedding separates modes              | Yes, classifier learns any decision boundary     |
 | Update cost               | Retrain autoencoder                                       | Re-index reference set                         | Re-run fit on new reference data                 |
 | Interpretability          | Feature-level error map                                   | Distance score                                 | Class-1 probability score                        |
 
 In practice, reconstruction and distance-based methods are often complementary:
 distance-based detection provides fast initial screening; reconstruction-based
 detection provides detailed feature-level analysis for flagged samples. The
-domain classifier is most useful when neither reconstruction error nor
-embedding distance cleanly separates normal from anomalous samples — for
-example, when anomalies are semantically coherent images of unseen object types
-that an autoencoder can reconstruct plausibly and that are not spatially distant
-in embedding space.
+domain classifier is most useful when neither reconstruction error nor embedding
+distance cleanly separates normal from anomalous samples, for example, when
+anomalies are semantically coherent images of unseen object types that an
+autoencoder can reconstruct plausibly and that are not spatially distant in
+embedding space.
 
 ## When to use it
 
-**Drift detection** should begin as soon as a model enters operational
-deployment. Every batch of data the model processes is a candidate for drift
-monitoring. The monitoring cadence depends on operational tempo — for
-high-throughput real-time systems, monitoring may run on statistical samples;
-for batch processing systems, each batch should be tested.
+Drift detection should begin as soon as a model enters operational deployment.
+Every batch of data the model processes is a candidate for drift monitoring. The
+monitoring cadence depends on operational tempo: for high-throughput real-time
+systems, monitoring may run on statistical samples; for batch processing
+systems, each batch should be tested.
 
 For choosing among drift detectors: start with a univariate test (KS as a
 baseline) on pre-computed embedding dimensions or image statistics for
@@ -571,16 +572,17 @@ correlations are important or when univariate tests fail to detect known drift.
 Add uncertainty-based detection when you have a deployed classifier and want to
 monitor specifically for performance-degrading shift.
 
-**OOD detection** is most valuable at two points: during post-training data ingestion
-(to flag anomalous samples before they reach a model) and during operational
-monitoring (to identify individual predictions that should be flagged for human
-review because the input is outside the training distribution). Reconstruction-
-based detection is preferred when the reference data has complex structure that
-must be learned and when feature-level localization is needed. Distance-based
-detection is preferred for fast deployment, frequent reference updates, or when
-high-quality pre-trained embeddings are available. The domain classifier is
-preferred when anomalies are semantically coherent samples of unseen types that
-neither reconstruction error nor embedding distance readily separates.
+OOD detection is most valuable at two points: during post-training data
+ingestion (to flag anomalous samples before they reach a model) and during
+operational monitoring (to identify individual predictions that should be
+flagged for human review because the input is outside the training
+distribution). Reconstruction-based detection is preferred when the reference
+data has complex structure that must be learned and when feature-level
+localization is needed. Distance-based detection is preferred for fast
+deployment, frequent reference updates, or when high-quality pre-trained
+embeddings are available. The domain classifier is preferred when anomalies are
+semantically coherent samples of unseen types that neither reconstruction error
+nor embedding distance readily separates.
 
 To better understand what to do after detecting drift or OOD samples, review the
 [Distribution Shift section in the Acting on Results explanation page](ActingOnResults.md#distribution-shift-findings).
@@ -595,7 +597,7 @@ quality.
 
 Statistical drift tests produce p-values, not certainties. A very large batch
 will produce statistically significant drift detections for differences that
-have no practical impact on model performance — the tests become sensitive to
+have no practical impact on model performance: the tests become sensitive to
 trivial distributional variation at scale. Conversely, small batches reduce
 statistical power and may miss real shift. The operational significance of a
 drift detection always requires judgment about the magnitude and nature of the
@@ -606,9 +608,9 @@ manifests only in feature correlations. Multivariate tests address this but at
 higher computational cost and with reduced interpretability.
 
 Uncertainty-based detection is blind to shift that the model confidently
-mishandles. It detects *uncertain* failure modes, not *confident wrong*
-failure modes — the latter require performance monitoring with ground truth
-labels, which is a separate capability.
+mishandles. It detects uncertain failure modes, not confident wrong failure
+modes. The latter require performance monitoring with ground truth labels, which
+is a separate capability.
 
 Reconstruction-based OOD detection requires training a model on reference data.
 If the reference distribution changes substantially over time, the model must be
