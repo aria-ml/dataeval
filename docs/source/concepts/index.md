@@ -1,6 +1,6 @@
 # Explanations
 
-These pages explain the core concepts behind DataEval's evaluators —
+These pages explain the core concepts behind DataEval's evaluators:
 what each measures, the theory it rests on, and when to apply it.
 They are organized by the major themes in DataEval rather than individual tools.
 Each page may cover several evaluators that work together to answer questions about your data.

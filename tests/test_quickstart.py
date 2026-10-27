@@ -4,9 +4,9 @@ Nothing else executes ``quickstart.md``. Sphinx renders its fences, and ``test_d
 reads the roles around them, so ``Duplicates(cluster_threshold=...)`` stayed in the guide after the
 argument became ``cluster_sensitivity`` and every reader who copied it got a ``TypeError``.
 
-The CIFAR-10 step downloads data, so it is parsed but not run. The evaluation step runs unchanged
-against the Step 1 example dataset class and a few synthetic images, three of which are near
-copies of earlier ones.
+The CIFAR-10 block downloads data, so it is parsed but not run. The evaluation block runs unchanged
+against the example dataset class from the "Image classification dataset" section and a few
+synthetic images, three of which are near copies of earlier ones.
 """
 
 import ast

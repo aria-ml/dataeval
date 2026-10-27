@@ -14,7 +14,7 @@ addresses it.
 
 The sections below follow the operational ML lifecycle stages where DataEval
 applies. DataEval does not provide tools specific to the Deployment or Analysis
-stages of the lifecycle — those stages are addressed by the
+stages of the lifecycle. Those stages are addressed by the
 [Acting on Results concept page](../concepts/ActingOnResults.md), which explains
 how to interpret findings and what actions they support.
 
@@ -22,8 +22,8 @@ how to interpret findings and what actions they support.
 
 ## Data Engineering
 
-Data quality problems — duplicates, corrupted images, mislabeled samples, and
-statistical outliers — inflate benchmark scores and produce models that
+Data quality problems (duplicates, corrupted images, mislabeled samples, and
+statistical outliers) inflate benchmark scores and produce models that
 underperform in deployment. Catching these problems before training is orders of
 magnitude cheaper than discovering them after deployment. See the
 [Data Integrity concept page](../concepts/DataIntegrity.md) for an explanation
@@ -44,7 +44,7 @@ See the [clean a dataset tutorial](../notebooks/tt_clean_dataset.py).
 
 ### Are there samples that are statistical outliers in embedding space?
 
-Use {class}`.Outliers` in cluster mode. This detects semantic anomalies —
+Use {class}`.Outliers` in cluster mode. This detects semantic anomalies:
 samples that look statistically normal at the pixel level but do not belong
 to any established class or scene type.
 See the [Data Integrity concept page](../concepts/DataIntegrity.md) for when
@@ -102,8 +102,8 @@ curation problem, not a monitoring problem.
 
 ## Model Development
 
-Model development decisions — architecture selection, training data curation,
-and pre-deployment evaluation — depend on understanding what the current dataset
+Model development decisions (architecture selection, training data curation,
+and pre-deployment evaluation) depend on understanding what the current dataset
 is capable of producing. See the
 [Performance Limits concept page](../concepts/PerformanceLimits.md).
 
@@ -117,7 +117,7 @@ as a classification problem. See the
 
 ### Can a model plausibly learn to classify this dataset at all?
 
-Use {func}`.ber_knn` or {func}`.ber_mst` to estimate the Bayes Error Rate (BER) — the theoretical
+Use {func}`.ber_knn` or {func}`.ber_mst` to estimate the Bayes Error Rate (BER), the theoretical
 lower bound on classification error given the data as it is. A high BER means
 the dataset is the limiting factor, not the model architecture.
 
@@ -137,22 +137,22 @@ size and whether collecting more data is likely to improve results.
 
 Use {class}`.Prioritize` to rank unlabeled samples by how novel they are
 relative to already-labeled data. Hard-first ranking identifies the samples
-most unlike the current training distribution — the additions most likely to
+most unlike the current training distribution, the additions most likely to
 improve coverage and generalization.
 
 ### Should I collect more data, or is my current dataset already saturated?
 
 Run {class}`.Sufficiency` first to assess the learning curve trajectory. If
 the curve has flattened, also run {class}`.Coverage` and
-{func}`.completeness` to determine whether gaps in the feature space — rather than
-total sample count — are the binding constraint.
+{func}`.completeness` to determine whether gaps in the feature space, rather than
+total sample count, are the binding constraint.
 
 ---
 
 ## Monitoring
 
-Distribution Shift — the gap between training distribution and operational
-distribution — is a planning assumption for any long-fielded system. See the
+Distribution Shift, the gap between training distribution and operational
+distribution, is a planning assumption for any long-fielded system. See the
 [Distribution Shift concept page](../concepts/DistributionShift.md) for a
 taxonomy of shift types and guidance on choosing the right detector.
 
@@ -188,9 +188,9 @@ See [Label parity](../concepts/DistributionShift.md#label-parity).
 
 ### How far has my operational data shifted from training, quantitatively?
 
-Use {func}`.divergence_fnn` or {func}`.divergence_mst` to compute HP divergence —
-a continuous score between 0 and 1. Drift detectors tell you *whether* a shift
-occurred; divergence tells you *how much*. Tracking divergence over time reveals
+Use {func}`.divergence_fnn` or {func}`.divergence_mst` to compute HP divergence,
+a continuous score between 0 and 1. Drift detectors tell you whether a shift
+occurred; divergence tells you how much. Tracking divergence over time reveals
 gradual drift that may never trigger a single-batch test but is nonetheless eroding
 the relevance of the training distribution.
 See the [Divergence concept page](../concepts/Divergence.md) and the
@@ -224,8 +224,8 @@ performance drops.
 
 If you are new to DataEval, start with the
 [data cleaning tutorial](../notebooks/tt_clean_dataset.py). It walks through
-the most common first-pass analysis tasks — duplicates, outliers, and image
-quality — and gives you a working foundation before moving on to bias analysis,
+the most common first-pass analysis tasks (duplicates, outliers, and image
+quality) and gives you a working foundation before moving on to bias analysis,
 performance limits, or drift detection.
 
 Once you have results, the

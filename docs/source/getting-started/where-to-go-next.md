@@ -21,7 +21,7 @@ Not sure where to begin? Pick the description that fits your situation:
 ^^^
 Never used DataEval before. The **Beginner's Guide** walks through the basics
 of downloading DataEval, setting up your dataset, and checking your dataset
-for duplicates and outliers — no prior DataEval experience needed.
+for duplicates and outliers. No prior DataEval experience is needed.
 :::
 
 :::{grid-item-card}
@@ -35,7 +35,7 @@ for duplicates and outliers — no prior DataEval experience needed.
 **Know what problem you have**
 ^^^
 Use the **Which Tool Guide** to find the right evaluator for your situation,
-organized by the question you're trying to answer.
+organized by the question you are trying to answer.
 :::
 
 :::{grid-item-card}
@@ -48,8 +48,8 @@ organized by the question you're trying to answer.
 
 **Know what data you have**
 ^^^
-Use the **Input Requirements** table to see what every evaluator consumes —
-images, labels, metadata, embeddings, or a model — and which tools your data
+Use the **Input Requirements** table to see what every evaluator consumes
+(images, labels, metadata, embeddings, or a model) and which tools your data
 can already run. For task applicability, see the
 [Functional Overview](../reference/FunctionalOverview.md).
 :::
@@ -76,7 +76,7 @@ can already run. For task applicability, see the
 **Tutorials**
 ^^^
 End-to-end walkthroughs for common T&E tasks. Start here if you want guided
-practice — each tutorial takes you from a dataset to a decision.
+practice. Each tutorial takes you from a dataset to a decision.
 :::
 
 :::{grid-item-card}
@@ -115,7 +115,7 @@ you need to do and want the steps without the explanation.
 
 **Concept Pages**
 ^^^
-In-depth explanations of the theory behind each evaluator — what it measures,
+In-depth explanations of the theory behind each evaluator: what it measures,
 why it matters, and how to interpret what it finds.
 :::
 

@@ -6,7 +6,7 @@ specific role, but a common thread of data-centric analysis that connects manage
 the technical team, and the end user. It is designed to apply to multiple stages
 of the lifecycle to facilitate creating robust, reliable, and generalizable AI products.
 
-We have created a few entry-level guides for common roles found in
+This section contains a few entry-level guides for common roles found in
 {term}`machine learning<Machine Learning (ML)>` and AI development, that expound
 upon how DataEval can assist in many of the day-to-day tasks. For example personas
 related to these roles, see the [JATIC roles and personas webpage](https://cdao.pages.jatic.net/public/program/roles-personas/).
@@ -42,26 +42,26 @@ a [Machine Learning (ML) Engineer](ml_engineer.md), and a
 the team generates a list of questions that will need to be answered to ensure
 a successful project.
 
-*Example Questions*:
+Example questions:
 
-- "Is our initial dataset good enough to build on?"
+- "Is the initial dataset good enough to build on?"
 - "Are there hidden biases or correlations in the data?"
-- "Does our test data truly represent the operational environment,
+- "Does the test data represent the operational environment,
   including rare edge cases and adverse conditions?"
-- "Is our target performance achievable?"
+- "Is the target performance achievable?"
 - "Does the existing model meet performance requirements?"
 - "Since this will be deployed in a resource-constrained system, how small can my
   model be and still achieve the target performance?"
 - "Is the model's performance equitable across all classes in all relevant environments?"
 - "Which specific data points are the most difficult for the model to learn,
   and what makes them unique?"
-- "How can we increase the model's performance?"
+- "How can the team increase the model's performance?"
 - "Why did the model give this result? What was the key driver?"
 - "How robust is the model to operational conditions?"
 - "How does the model's performance degrade?"
-- "Are we ready to deploy? What's the operational risk?"
-- "How will we know when the model needs to be retrained?"
-- "How can we version our system to ensure that the model results are reproducible?"
+- "Is the system ready to deploy? What is the operational risk?"
+- "How will the team know when the model needs to be retrained?"
+- "How can the team version the system to ensure that the model results are reproducible?"
 
 After generating the list, the team reviews the list and determines which questions
 can be answered right away and which ones will be answered during development

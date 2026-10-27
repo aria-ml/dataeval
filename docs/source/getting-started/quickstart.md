@@ -21,7 +21,7 @@ for details.
 
 ---
 
-## Step 1: Install DataEval
+## Install DataEval
 
 DataEval requires Python 3.11 or higher. It has been tested on Ubuntu and Windows.
 macOS users may encounter platform-specific issues; report these via the issue
@@ -56,12 +56,12 @@ see [Installation](installation.md).
 
 ---
 
-## Step 2: Prepare your dataset
+## Prepare your dataset
 
 DataEval has two input paths depending on which part of the library you are using.
 
 **`dataeval.core`** provides stateless functions that operate directly on NumPy
-arrays — embeddings, labels, image hashes, and statistics. No dataset object is
+arrays: embeddings, labels, image hashes, and statistics. No dataset object is
 required. Call these functions with arrays and get results back directly. Examples
 include {func}`.image_stats`, {func}`.label_errors`, {func}`.divergence_mst`,
 and {func}`.ber_knn`.
@@ -231,7 +231,7 @@ dataset: ic.Dataset = MyCIFAR10Wrapper(tv_cifar10)
 
 ---
 
-## Step 3: Run your first evaluation
+## Run your first evaluation
 
 The example below uses {class}`.Duplicates` from `dataeval.quality` to detect
 near-duplicate images by finding groups of embeddings that are similar in
@@ -298,5 +298,5 @@ table of every algorithm's inputs, and the
 
 If you prefer to learn by doing, start with the
 [data cleaning tutorial](../notebooks/tt_clean_dataset.py). It walks through
-the most common first-pass analysis tasks — duplicates, outliers, and image
-quality — using a realistic dataset.
+the most common first-pass analysis tasks (duplicates, outliers, and image
+quality) using a realistic dataset.

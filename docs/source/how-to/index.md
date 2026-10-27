@@ -3,8 +3,8 @@
 These guides help you accomplish specific tasks with DataEval. Each one addresses
 a practical problem and walks you through the solution step by step.
 
-In addition to viewing them in our documentation, these notebooks can also be
-opened in Google Colab to be used interactively!
+In addition to viewing them in the documentation, you can open these notebooks
+in Google Colab and use them interactively.
 
 The guides are organized by where they fall in the
 [machine learning life cycle](../getting-started/roles/ML_Lifecycle.md):
@@ -295,9 +295,9 @@ The notebook sources live as `py:percent` scripts in
 `docs/source/notebooks/`. To get runnable `.ipynb` files for local
 editing, choose one of:
 
-- **With nox (recommended):** `uv run nox -s docs` — builds the
+- With nox (recommended), `uv run nox -s docs` builds the
   documentation and writes a runnable `.ipynb` next to each script.
-- **With jupytext directly:** `jupytext --to notebook docs/source/notebooks/<name>.py`
+- With jupytext directly, `jupytext --to notebook docs/source/notebooks/<name>.py`
   converts one notebook, and `docs/source/notebooks/*.py` converts all of them.
 
 The generated `.ipynb` files are gitignored, so edits stay local to
