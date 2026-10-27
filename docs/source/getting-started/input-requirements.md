@@ -22,7 +22,7 @@ supply and the table below narrows to a handful of candidates.
 
 | Input shape | What you assemble | Evaluators |
 | ----------- | ----------------- | ---------- |
-| Dataset only (raw images) | A `Dataset` of images; nothing else | {class}`.Duplicates`, {class}`.Outliers` |
+| Dataset only (raw images) | A `Dataset` of images. Nothing else is required; the Evaluators table lists the optional inputs | {class}`.Duplicates`, {class}`.Outliers` |
 | Dataset + extractor (embeddings) | A dataset plus a {class}`.FeatureExtractor`, or pre-computed {class}`.Embeddings` | {class}`.Coverage`, {class}`.Prioritize`, every `Drift*` and `OOD*` detector |
 | Dataset + binning (metadata) | A {class}`.Metadata` (or {class}`.MetadataLike`) whose factors are already binned | {class}`.Balance`, {class}`.Diversity`, {class}`.Parity` |
 | Labels + ontology | Class-label counts plus an {class}`.Ontology` | {class}`.Representation` |
@@ -46,8 +46,8 @@ for not used.
 | `bias` | {class}`.Balance` | Metadata factors{sup}`1` | Required{sup}`2` | Required | | | |
 | `bias` | {class}`.Diversity` | Metadata factors{sup}`1` | Required{sup}`2` | Required | | | |
 | `bias` | {class}`.Parity` | Metadata factors{sup}`1` | Required{sup}`2` | Required{sup}`9` | | | |
-| `quality` | {class}`.Duplicates` | Raw images{sup}`3` | | | Optional (cluster mode) | | |
-| `quality` | {class}`.Outliers` | Raw images{sup}`3` | | Optional (`per_class`) | Optional (cluster mode) | | |
+| `quality` | {class}`.Duplicates` | Raw images{sup}`3` | | Optional (`duplicate_factors`) | Optional (cluster mode) | | |
+| `quality` | {class}`.Outliers` | Raw images{sup}`3` | | Optional (`per_class`, `strata`) | Optional (cluster mode) | | |
 | `scope` | {class}`.Coverage` | Embeddings | Required | | Required{sup}`4` | | |
 | `scope` | {class}`.Prioritize` | Embeddings | Optional (`class_balanced`) | | Required{sup}`4` | | |
 | `scope` | {class}`.Representation` | Class labels + {class}`.Ontology` | Required | | | | |
@@ -94,8 +94,11 @@ item.
 
 Two shortcuts are worth knowing. {class}`.Duplicates` and {class}`.Outliers`
 can skip images entirely: `from_stats()` takes a pre-computed `StatsResult`
-from {func}`.image_stats` in their place. Both also accept `per_target=True`
-to score individual detections rather than whole images.
+from {func}`.image_stats` in their place, and `evaluate` accepts a
+{class}`.Metadata` instead of a dataset. `Duplicates` then requires
+`duplicate_factors`, and `Outliers` thresholds the metadata factors. Both also
+accept `per_target=True` to score individual detections rather than whole
+images.
 
 ## How each tool takes embeddings
 
