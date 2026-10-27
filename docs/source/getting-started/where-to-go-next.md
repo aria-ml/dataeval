@@ -21,7 +21,7 @@ Not sure where to begin? Pick the description that fits your situation:
 ^^^
 Never used DataEval before. The **Beginner's Guide** walks through the basics
 of downloading DataEval, setting up your dataset, and checking your dataset
-for duplicates and outliers. No prior DataEval experience is needed.
+for duplicates. No prior DataEval experience is needed.
 :::
 
 :::{grid-item-card}
@@ -129,8 +129,8 @@ why it matters, and how to interpret what it finds.
 
 **Roles Guide**
 ^^^
-Role-specific guidance for data scientists, ML engineers, and T&E engineers,
-organized around the analysis tasks you encounter day-to-day.
+Role-specific guidance for data engineers, data scientists, ML engineers, and
+T&E engineers, organized around the analysis tasks you encounter day-to-day.
 :::
 ::::
 

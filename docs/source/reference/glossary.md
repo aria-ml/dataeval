@@ -670,7 +670,7 @@ Minimum Pooling
 
 Modular AI Trustworthy Engineering (MAITE)
     A toolbox of common types, protocols (a.k.a. structural subtypes) and tooling to support AI test
-    and evaluation (T&E) workflows. Part of the Joint AI T&E Infrastructure Capability (JATIC) program.
+    and evaluation (T&E) workflows. Part of the Joint AI Test Infrastructure Capability (JATIC) program.
     Its goal is to streamline the development of JATIC Python projects by ensuring seamless,
     synergistic workflows when working with MAITE-conforming Python packages for different T&E tasks.
 

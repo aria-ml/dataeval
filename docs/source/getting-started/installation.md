@@ -89,8 +89,7 @@ dataeval[cpu]` is the wrong way to obtain torchvision. See the note above.
 
 ## Installing DataEval
 
-Now that you have chosen which DataEval to install, the following methods
-will show you how to install using your preferred method.
+Install DataEval with the method that fits your environment.
 
 :::::{tab-set}
 
