@@ -513,7 +513,8 @@ seed. See the
 [Configuring the seed](../notebooks/h2_configure_defaults.py#set-the-seed)
 how-to for an example of how to set and use seeds in DataEval. For continuous
 metadata factors, KNN-based MI estimation introduces additional variance that
-grows with the number of neighbors $k$ relative to sample count.
+falls as the number of neighbors $k$ grows, but a $k$ that is large relative to
+sample count inflates the estimate for a factor associated with the class.
 
 All coverage and completeness analyses are contingent on embedding quality. The
 same data projected through a weak or domain-inappropriate feature extractor

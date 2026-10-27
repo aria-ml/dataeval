@@ -150,10 +150,13 @@ combines the location sensitivity of MWU with the tail sensitivity of AD:
 
 $$B = \frac{1}{n_1 n_2} \sum_{i,j} \psi(F(x_i), F(y_j))$$
 
-where $\psi$ is a weighting function emphasizing tail regions. BWS provides
-higher statistical power than KS, CVM, or MWU across a range of shift types,
-making it the strongest general-purpose choice when computational cost is
-not a constraint.
+where $\psi$ is a weighting function emphasizing tail regions. BWS often has
+higher statistical power than KS, CVM, or MWU, particularly against differences
+in the tails, which makes it a sound default when the shift type is unknown. No
+test is most powerful against every kind of shift, so a test chosen for the
+expected shift can match or exceed it. BWS is also the most expensive of the
+five: its p-value comes from a permutation test, which is orders of magnitude
+slower than the others and is paid for every feature.
 
 Use the expected shift type to select a test:
 

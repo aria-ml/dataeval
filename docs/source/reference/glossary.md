@@ -90,8 +90,8 @@ Balance
 
 Baumgartner-Weiss-Schindler Test
     A modern non-parametric statistical test for comparing two distributions. The Baumgartner-Weiss-Schindler
-    (BWS) test combines advantages of several classical tests and has particularly high statistical
-    power for detecting distributional differences. It has strong sensitivity to tail differences
+    (BWS) test combines advantages of several classical tests and has high statistical
+    power against many kinds of distributional difference. It has strong sensitivity to tail differences
     similar to the {term}`Anderson-Darling test<Anderson-Darling Test>` while also being effective
     at detecting location and scale shifts. In the context of {term}`drift<Drift>` detection, BWS is
     recommended for critical applications where missing drift is costly, such as production computer
