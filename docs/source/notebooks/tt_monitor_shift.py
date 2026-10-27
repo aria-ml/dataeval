@@ -475,7 +475,7 @@ for name, result in chunked_results.items():
 # %% [markdown]
 # ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md) — Read about covariate shift, concept drift, and label parity
+# - [Distribution shift](../concepts/DistributionShift.md) — Read about covariate shift, concept drift, and label parity
 #   in deployed ML models.
 # - [Identify out-of-distribution samples](./tt_identify_ood_samples.py) — Compare how many images autoencoder and k-NN
 #   detectors flag as unlike the training data.

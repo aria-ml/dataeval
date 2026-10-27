@@ -616,7 +616,7 @@ display(duplicates)
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Understand core principles of dataset integrity, duplicates, and
+# - [Data integrity](../concepts/DataIntegrity.md) — Understand core principles of dataset integrity, duplicates, and
 #   outliers.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate coverage, bias, and dimensionality across
 #   dataset splits.

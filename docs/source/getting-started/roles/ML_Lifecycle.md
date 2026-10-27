@@ -1,4 +1,4 @@
-# Operational Machine-Learning Lifecycle
+# Operational machine-learning lifecycle
 
 Unlike a competition lifecycle of model development, the operational lifecycle
 is an iterative process and has workflows and metrics associated with each
@@ -6,7 +6,7 @@ stage, and also cuts across multiple stages. The competition is between
 near-peer nations for superior operational capability, not between model
 developers for a better metric in a Kaggle-style AI competition.
 
-## Stages/Steps of the Lifecycle
+## Stages/steps of the lifecycle
 
 ```{graphviz}
    
@@ -39,7 +39,7 @@ Consensus machine-learning lifecycle derivation [^1] [^2] [^3]
 
 (scope-and-objectives)=
 
-## Scope And Objectives
+## Scope and objectives
 
 ```{graphviz}
    
@@ -91,7 +91,7 @@ Consensus machine-learning lifecycle derivation [^1] [^2] [^3]
 
 (data-engineering)=
 
-## Data Engineering
+## Data engineering
 
 ```{graphviz}
    
@@ -141,7 +141,7 @@ Consensus machine-learning lifecycle derivation [^1] [^2] [^3]
 
 (model-development)=
 
-## Model Development
+## Model development
 
 ```{graphviz}
    
@@ -328,7 +328,7 @@ Consensus machine-learning lifecycle derivation [^1] [^2] [^3]
 * perform analysis on model predictions to generate operational insight that
   drive refinement of scope and objectives for future iterations
 
-## *Always we begin again...*
+## Continuous iteration
 
 ```{epigraph}
 

@@ -4,7 +4,7 @@
 
 If you already know which metric or class you need, see
 [What data does each tool need?](input-requirements.md) for its inputs, the
-[Functional Overview](../reference/FunctionalOverview.md) for task
+[Functional overview](../reference/FunctionalOverview.md) for task
 applicability, or the
 [API reference](../reference/autoapi/dataeval/index.rst). This page is for
 practitioners who know where they are in the
@@ -20,7 +20,7 @@ how to interpret findings and what actions they support.
 
 ---
 
-## Data Engineering
+## Data engineering
 
 Data quality problems (duplicates, corrupted images, mislabeled samples, and
 statistical outliers) inflate benchmark scores and produce models that
@@ -100,7 +100,7 @@ curation problem, not a monitoring problem.
 
 ---
 
-## Model Development
+## Model development
 
 Model development decisions (architecture selection, training data curation,
 and pre-deployment evaluation) depend on understanding what the current dataset
@@ -220,7 +220,7 @@ performance drops.
 
 ---
 
-## I'm not sure where to start
+## I am not sure where to start
 
 If you are new to DataEval, start with the
 [data cleaning tutorial](../notebooks/tt_clean_dataset.py). It walks through

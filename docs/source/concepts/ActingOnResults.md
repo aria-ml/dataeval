@@ -1,4 +1,4 @@
-# Acting on Results
+# Acting on results
 
 DataEval produces evidence and judgment calls, not decisions. Every evaluator
 returns evidence, such as scores, indices, p-values and bounds, and many add a
@@ -23,7 +23,7 @@ determination is a judgment on the evidence it cites, under its recorded
 assumptions. It is not a decision to build or to stop. Every DataEval output is
 a prompt to investigate, not a verdict.
 
-## Data Integrity findings
+## Data integrity findings
 
 ### Duplicates and near-duplicates
 
@@ -242,7 +242,7 @@ and are the prerequisite for {class}`.ClassBalance`.
 
 ---
 
-## Dataset Bias and Coverage findings
+## Dataset bias and coverage findings
 
 ### Balance and diversity
 
@@ -499,7 +499,7 @@ collection: acquiring more data for the underrepresented classes.
 
 ---
 
-## Performance Limits findings
+## Performance limits findings
 
 ### BER upper and lower bounds
 
@@ -586,7 +586,7 @@ violate that assumption.
 
 ---
 
-## Distribution Shift findings
+## Distribution shift findings
 
 ### Drift detection results
 
@@ -789,15 +789,15 @@ threat to the established performance bounds.
 
 ## Related concept pages
 
-- [Data Integrity](DataIntegrity.md) — what the cleaning, label error, and label
+- [Data integrity](DataIntegrity.md) — what the cleaning, label error, and label
   statistics diagnostics measure
 - [Clustering](Clustering.md) — the algorithm underlying cluster-based
   Duplicates, Outliers, label_errors, and Prioritize
-- [Dataset Bias and Coverage](DatasetBias.md) — what the bias diagnostics
+- [Dataset bias and coverage](DatasetBias.md) — what the bias diagnostics
   measure
-- [Performance Limits](PerformanceLimits.md) — what BER, UAP, and Sufficiency
+- [Performance limits](PerformanceLimits.md) — what BER, UAP, and Sufficiency
   tell you about achievability
-- [Distribution Shift](DistributionShift.md) — what drift and OOD detection
+- [Distribution shift](DistributionShift.md) — what drift and OOD detection
   measure and how detectors work
 - [Divergence](Divergence.md) — the quantitative distance metric covered in the
   divergence scores section above

@@ -1,4 +1,4 @@
-# Functional Overview
+# Functional overview
 
 The following tables summarize which computer vision tasks each algorithm in
 the DataEval library supports. Each algorithm targets different types of data
@@ -9,7 +9,7 @@ For what data each algorithm consumes — images, labels, metadata, embeddings,
 or a model — see
 [What data does each tool need?](../getting-started/input-requirements.md).
 
-## Computer Vision Task Compatibility
+## Computer vision task compatibility
 
 The following tables show the compatible computer vision tasks that have support
 in DataEval. The tables are split into categories based on usage and follow

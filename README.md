@@ -44,20 +44,20 @@ communities.
 
 <!-- end needs -->
 
-### Target Audience
+### Target audience
 
 <!-- start JATIC interop -->
 
 DataEval is intended to help data scientists, developers, and T&E engineers
 who want to evaluate and enhance their datasets for optimum performance. For
-users of the JATI product suite, DataEval has native interoperability when
+users of the JATIC product suite, DataEval has native interoperability when
 using MAITE-compliant datasets and models.
 
 <!-- end JATIC interop -->
 
 ---
 
-## Getting Started
+## Getting started
 
 **Python versions:** 3.11 - 3.14
 
@@ -69,7 +69,7 @@ Choose your preferred method of installation below or follow our
 - [Installing with conda/mamba](#installing-with-conda)
 - [Installing from GitHub](#installing-from-github)
 
-### **Installing with pip**
+### Installing with pip
 
 You can install DataEval directly from pypi.org using the following command.
 
@@ -107,7 +107,7 @@ pip install dataeval
 > `--index-url` under pip, `--torch-backend` under `uv pip`, and use the extras
 > only for source installs.
 
-### **torchvision (optional)**
+### torchvision (optional)
 
 `torchvision` is not a DataEval dependency, and nothing imports it until you reach
 for `TorchvisionTransform` — the escape hatch for running a torchvision v2
@@ -126,13 +126,13 @@ pip install torchvision --index-url https://download.pytorch.org/whl/cu130
 > the same index — which is also why `pip install dataeval[cpu]` is the wrong way
 > to obtain it.
 
-### **Installing with uv**
+### Installing with uv
 
 ```bash
 uv pip install dataeval --torch-backend cpu   # or cu126 / cu130 / auto
 ```
 
-### **Installing with conda**
+### Installing with conda
 
 DataEval can be installed from conda-forge:
 
@@ -149,7 +149,7 @@ variant.
 micromamba create -f environment.yml
 ```
 
-### **Installing from GitHub**
+### Installing from GitHub
 
 To install DataEval from source locally on Ubuntu, pull the source down and
 change to the DataEval project directory.
@@ -164,7 +164,7 @@ cd dataeval
 > linting, type checking and docs tooling included. See
 > [Development Setup](./CONTRIBUTING.md#development-setup) for the options it takes.
 
-#### **Using uv**
+#### Using uv
 
 Install DataEval with dependencies for development.
 
@@ -411,20 +411,20 @@ guide to find the right evaluator for your situation.
 
 Know which tool to use, then check out [What data does each tool need?](./docs/source/getting-started/input-requirements.md)
 for a quick-reference table of every algorithm's inputs, and the
-[Functional Overview](./docs/source/reference/FunctionalOverview.md) for task applicability.
+[Functional overview](./docs/source/reference/FunctionalOverview.md) for task applicability.
 
 Want to just explore the documentation? The [Where to go next](./docs/source/getting-started/where-to-go-next.md)
 page allows you to jump around between the different areas of the documentation with small summaries of what each page covers.
 
 ---
 
-## Contact Us
+## Contact us
 
 If you have any questions, feel free to reach out to [us](mailto:dataeval@ariacoustics.com)!
 
 ## Acknowledgment
 
-### CDAO Funding Acknowledgment
+### CDAO funding acknowledgment
 
 <!-- start acknowledgment -->
 

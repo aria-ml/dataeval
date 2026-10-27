@@ -462,7 +462,7 @@ print(f"stratified on: {splits.class_axis.name} ({splits.class_axis.source})")
 #   consistent factor levels across collections.
 # - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Measure coverage across custom groups and
 #   classes.
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about mutual information, parity, and diversity
+# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Learn about mutual information, parity, and diversity
 #   metrics.
 
 # %% [markdown]

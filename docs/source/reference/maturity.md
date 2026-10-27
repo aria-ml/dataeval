@@ -1,4 +1,4 @@
-# JATIC Maturity
+# JATIC maturity
 
 The JATIC program grades each product on a maturity scale. This page records the
 maturity level DataEval holds, the releases that level applies to, and what the
@@ -10,7 +10,7 @@ software, and the program's draft release, validation, and deployment standards.
 Version 1.3 has not been released. A release's maturity is governed by the
 standards in force when that release was assessed, not by this draft.
 
-## Maturity Levels
+## Maturity levels
 
 ```{list-table}
 :widths: 15 85
@@ -30,7 +30,7 @@ standards in force when that release was assessed, not by this draft.
   - Product is mature. Validated and adopted by many users.
 ```
 
-## Current Status
+## Current status
 
 ```{list-table}
 :widths: 35 65
@@ -51,7 +51,7 @@ requirements. DataEval publishes no container images. For containerized use, see
 [DataEval-Flow](https://github.com/aria-ml/dataeval-flow), which packages DataEval
 in a container-based workflow.
 
-## Maturity by Release
+## Maturity by release
 
 A release carries the maturity label `JATIC Maturity I` only if it was assessed
 and approved by the Program Direction Group as a mature release. Other releases
@@ -82,7 +82,7 @@ A mature release is supported with CI and hotfixes for at least six months, or
 until a newer mature release is issued, and for as long as the product
 documentation lists it as a mature release.
 
-## Requirements by Level
+## Requirements by level
 
 The SDP Requirements v1.3 draft maps each software requirement area to the
 maturity levels at which it applies. At Maturity S, the program requires only
@@ -230,7 +230,7 @@ Several requirements set a different threshold at each level:
 A mature release is approved by the Program Direction Group after an assessment
 of its functional requirements and standards compliance (RS-5-H-1, RS-5-H-2).
 
-## Assessment Records
+## Assessment records
 
 Assessments, requirement exceptions, and the verification cross-reference matrix
 for each release are kept in the DataEval directory of the ARiA metadata

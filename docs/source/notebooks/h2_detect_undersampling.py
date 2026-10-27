@@ -238,7 +238,7 @@ assert (wonky / 20) > 0.4
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Learn about dataset bias, representation, and coverage
+# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Learn about dataset bias, representation, and coverage
 #   geometry.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover structure, clusters, and coverage in
 #   unlabeled datasets.

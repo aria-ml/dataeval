@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD051 -->
 
-# Data Leakage
+# Data leakage
 
 Data leakage is a leading cause of overoptimistic and irreproducible
 machine-learning results. In a survey across 17 scientific fields,
@@ -57,7 +57,7 @@ modes; each is described in the sections that follow.
 | L3.2 Non-independence                  | train and test share the same underlying units                   |
 | L3.3 Sampling bias                     | the test set is not representative of the population of interest |
 
-### L1 — Lack of clean separation of training and test data
+### L1: lack of clean separation of training and test data
 
 If the training set is not held fully apart from the test set through every
 pre-processing, modeling, and evaluation step, the model gains access to test
@@ -99,9 +99,9 @@ boundary.
 One caveat the L1 framing alone misses: clean separation is not only about
 disjoint samples but about temporal ordering. A split that is sample-disjoint
 can still leak the future into the past. See
-[L3.1](#l3--test-set-not-drawn-from-the-distribution-of-interest) below.
+[L3.1](#l3-test-set-not-drawn-from-the-distribution-of-interest) below.
 
-### L2 — Illegitimate features
+### L2: illegitimate features
 
 L2 leakage occurs when the model uses a feature that should not legitimately be
 available, most often a **proxy for the outcome** that would not be present at
@@ -124,7 +124,7 @@ crossing a boundary it should not, so neither is leakage.
 
 (leakage-l3)=
 
-### L3 — Test set not drawn from the distribution of interest
+### L3: test set not drawn from the distribution of interest
 
 In L3, the train/test boundary may be clean, yet the test distribution differs
 from the population the scientific or operational claim is about. Measured

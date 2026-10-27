@@ -18,7 +18,7 @@
 #
 # Embedding-space drift detection reports that features drifted but not what changed. Metadata factors such as altitude
 # and camera angle give checkable, human-readable drift statements: a {class}`.Metadata` extractor plugs into a drift
-# detector, and the p-values map back to named factors. See [Distribution Shift](../concepts/DistributionShift.md).
+# detector, and the p-values map back to named factors. See [Distribution shift](../concepts/DistributionShift.md).
 #
 # Use it to:
 #
@@ -246,7 +246,7 @@ assert set(comparison.filter(pl.col("changed"))["factor"]) == {"drone", "gimbal_
 # %% [markdown]
 # ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across
+# - [Distribution shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across
 #   datasets.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and
 #   operational data.

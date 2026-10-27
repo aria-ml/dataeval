@@ -620,7 +620,7 @@ assert by_source["group-based ceiling", "recall"]["information_scope"] == "parti
 # `observed` is a model's score on the `n` evaluation images. DataEval's two built-in models answer with the
 # highest-scoring category. They find about three quarters of the tanks, but their false alarms could be as high as 25
 # to 30% (k-NN) and about 15% (linear probe), so neither counts.
-# [Feasibility Evidence](../concepts/FeasibilityEvidence.md) explains how each bound is built.
+# [Feasibility evidence](../concepts/FeasibilityEvidence.md) explains how each bound is built.
 #
 # In the evidence chart, each row is one source. The dot is its score on the evaluation images and the tick its "at
 # least" number. Sources that are not counted, and the group-based ceiling, are drawn faint.
@@ -640,9 +640,9 @@ dep.plot(tank_result, plot_evidence=True)
 # %% [markdown]
 # ## Next steps
 #
-# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand the determinations, information scopes and
+# - [Performance limits](../concepts/PerformanceLimits.md) — Understand the determinations, information scopes and
 #   recommendations of `Feasibility`.
-# - [Feasibility Evidence](../concepts/FeasibilityEvidence.md) — Learn how each kind of evidence is built and what its
+# - [Feasibility evidence](../concepts/FeasibilityEvidence.md) — Learn how each kind of evidence is built and what its
 #   details hold.
 # - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Estimate the Bayes error rate
 #   with `ber_mst` and check an accuracy requirement against it.

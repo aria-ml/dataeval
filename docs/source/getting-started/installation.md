@@ -2,15 +2,14 @@
 
 # Installation
 
-DataEval is a library that offers powerful metric classes and dataset analysis
-functions using {term}`NumPy` and {term}`PyTorch<Torch (PyTorch)>` as the
-primary backends.
+DataEval is a library of metric classes and dataset analysis functions. It uses
+{term}`NumPy` and {term}`PyTorch<Torch (PyTorch)>` as its primary backends.
 
-## Supported Python Versions
+## Supported Python versions
 
 DataEval currently supports Python `3.11` through `3.14`.
 
-## PyTorch Dependency
+## PyTorch dependency
 
 DataEval requires PyTorch to be installed. By default, `pip install dataeval`
 pulls PyTorch from PyPI, which bundles CUDA support on Linux and is a much
@@ -135,18 +134,18 @@ Python environment management.
 Pull the source down and change to the DataEval project directory.
 
 ```bash
-    git clone https://github.com/aria-ml/dataeval.git
-    cd dataeval
+git clone https://github.com/aria-ml/dataeval.git
+cd dataeval
 ```
 
 Install DataEval with development dependencies.
 
 ```bash
-    uv sync
+uv sync
 ```
 
 Optionally, you can specify the version of Python and PyTorch CPU/CUDA
-support (cpu, cu126, cu130) using -p and --extra respectively. This is the one
+support (cpu, cu126, cu130) using `-p` and `--extra` respectively. This is the one
 place the PyTorch variant extras take effect: uv applies the `[tool.uv.sources]`
 index routing when resolving from a source checkout.
 
@@ -155,7 +154,7 @@ environment using only PyTorch with CPU support, and no development
 dependencies:
 
 ```bash
-    uv sync -p 3.11 --extra cpu --no-default-groups
+uv sync -p 3.11 --extra cpu --no-default-groups
 ```
 
 Now that DataEval is installed, you can run commands in the uv virtual
@@ -163,7 +162,7 @@ environment by prefixing shell commands with uv run, or activate the
 virtual environment directly in the shell.
 
 ```bash
-    source .venv/bin/activate
+source .venv/bin/activate
 ```
 
 ::::

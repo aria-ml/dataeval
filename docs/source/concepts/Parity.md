@@ -11,7 +11,7 @@ experimental, and their API may change or be removed in a later release.
 
 {class}`.Balance` measures the same factor–class dependence as a normalized
 mutual information score (see
-[Dataset Bias and Coverage](DatasetBias.md#measuring-bias-mutual-information-and-evenness)).
+[Dataset bias and coverage](DatasetBias.md#measuring-bias-mutual-information-and-evenness)).
 Parity adds a hypothesis test, results for individual cells, and p-values that
 account for rows grouped into images or sequences.
 
@@ -1115,7 +1115,7 @@ over 2,000 images, the planted deficit was always found.
 
 ## Acting on a result
 
-[Acting on Results](ActingOnResults.md#parity) covers each finding in detail.
+[Acting on results](ActingOnResults.md#parity) covers each finding in detail.
 In brief:
 
 - `underrepresented` cells are collection candidates, ranked by `deficit`:
@@ -1136,18 +1136,18 @@ In brief:
 
 ## Related concept pages
 
-- [Dataset Bias and Coverage](DatasetBias.md) — Balance and Diversity, which
+- [Dataset bias and coverage](DatasetBias.md) — Balance and Diversity, which
   score factor–class dependence and sampling evenness, and coverage in
   embedding space
 - [Binning](Binning.md) — how continuous factors are cut into the levels
   Parity tests
-- [Metadata Levels](MetadataLevels.md) — the item levels Parity groups rows by
-- [Distribution Shift](DistributionShift.md#label-parity) — `label_parity`,
+- [Metadata levels](MetadataLevels.md) — the item levels Parity groups rows by
+- [Distribution shift](DistributionShift.md#label-parity) — `label_parity`,
   which compares the class distributions of two datasets with the same grouped
   test
-- [Acting on Results](ActingOnResults.md#parity) — what to do with each
+- [Acting on results](ActingOnResults.md#parity) — what to do with each
   finding
-- [Validation and Trust](ValidationAndTrust.md) — Parity's evidence and
+- [Validation and trust](ValidationAndTrust.md) — Parity's evidence and
   stability status
 
 ## See this in practice

@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD051 -->
 
-# Distribution Shift
+# Distribution shift
 
 A model trained and validated on one dataset is deployed into a world that does
 not hold still. Operational environments shift: seasons change, sensors degrade,
@@ -508,7 +508,7 @@ does not represent the anomaly dimension well, the distance will not be
 informative. Distance-based detection also produces only instance-level scores,
 not feature-level maps.
 
-### Domain Classifier OOD detection (`OODDomainClassifier`)
+### Domain classifier OOD detection (`OODDomainClassifier`)
 
 {class}`.OODDomainClassifier` applies the same discriminative principle as
 `DriftDomainClassifier`, but at the instance level rather than the batch level.
@@ -633,12 +633,12 @@ high-dimensional embeddings.
   classifier, distance-based OOD, and uncertainty-based drift all operate in
 - [Divergence](Divergence.md) — the quantitative distance metric measuring
   distribution gaps
-- [Data Integrity](DataIntegrity.md) — when anomalous samples are a
+- [Data integrity](DataIntegrity.md) — when anomalous samples are a
   collection artifact rather than an operational distribution shift
-- [Dataset Bias and Coverage](DatasetBias.md) — when the training reference
+- [Dataset bias and coverage](DatasetBias.md) — when the training reference
   distribution is itself unrepresentative, drift detection baselines are
   miscalibrated
-- [Performance Limits](PerformanceLimits.md) — when persistent shift indicates
+- [Performance limits](PerformanceLimits.md) — when persistent shift indicates
   the model must be retrained rather than monitored
 
 ## See this in practice

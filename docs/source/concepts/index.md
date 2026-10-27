@@ -5,23 +5,23 @@ what each measures, the theory it rests on, and when to apply it.
 They are organized by the major themes in DataEval rather than individual tools.
 Each page may cover several evaluators that work together to answer questions about your data.
 
-- [Data Integrity](DataIntegrity.md)
-- [Image Statistics](ImageStatistics.md)
+- [Data integrity](DataIntegrity.md)
+- [Image statistics](ImageStatistics.md)
 - [Ontology](Ontology.md)
-- [Metadata Levels](MetadataLevels.md)
+- [Metadata levels](MetadataLevels.md)
 - [Binning](Binning.md)
-- [Recommended Extrinsic Metadata Factors](ExtrinsicFactors.md)
+- [Recommended extrinsic metadata factors](ExtrinsicFactors.md)
 - [Embeddings](Embeddings.md)
 - [Clustering](Clustering.md)
-- [Dataset Bias and Coverage](DatasetBias.md)
+- [Dataset bias and coverage](DatasetBias.md)
 - [Parity](Parity.md)
-- [Performance Limits](PerformanceLimits.md)
-- [Feasibility Evidence](FeasibilityEvidence.md)
-- [Distribution Shift](DistributionShift.md)
+- [Performance limits](PerformanceLimits.md)
+- [Feasibility evidence](FeasibilityEvidence.md)
+- [Distribution shift](DistributionShift.md)
 - [Divergence](Divergence.md)
-- [Data Leakage](Leakage.md)
-- [Acting on Results](ActingOnResults.md)
-- [Validation and Trust](ValidationAndTrust.md)
+- [Data leakage](Leakage.md)
+- [Acting on results](ActingOnResults.md)
+- [Validation and trust](ValidationAndTrust.md)
 
 :::{toctree}
 :hidden:

@@ -92,7 +92,7 @@ print(f"Computed statistics: {sorted(results_background['stats'])}")
 # dimension flag is skipped for it. Read `background_fraction`, the share of the image left unmasked, before the rest. A
 # background statistic measured over a few percent of an image is unreliable, and where boxes cover an image entirely
 # every background statistic for it is NaN. See
-# [Data Integrity](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
+# [Data integrity](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
 
 # %%
 # The result spans image rows and target rows; only the image rows carry a background, so the
@@ -176,7 +176,7 @@ assert "instance_background_sharpness" in metadata.dropped_factors
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level, target-level, and background-level statistics
+# - [Data integrity](../concepts/DataIntegrity.md) — Analyze image-level, target-level, and background-level statistics
 #   to identify data quality issues.
 # - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across
 #   unit, instance, and background factors.

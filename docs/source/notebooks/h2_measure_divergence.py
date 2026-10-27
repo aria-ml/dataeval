@@ -123,7 +123,7 @@ assert div["divergence"] > 0.95
 #
 # - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional
 #   space.
-# - [Distribution Shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across
+# - [Distribution shift](../concepts/DistributionShift.md) — Understand covariate shift and drift detection across
 #   datasets.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and
 #   operational data.

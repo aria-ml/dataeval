@@ -173,7 +173,8 @@ teaching heading, and warns on more than 600 words of prose. Review checks the r
 
 ## Write headings
 
-These rules apply to every heading in a notebook. Apply them to the headings of other pages as well.
+These rules apply to every heading in a notebook. Apply them to the headings of other pages as well, including page
+titles, the sidebar titles and captions of a toctree, and card titles.
 
 | Rule | Statement | Example |
 | ---- | --------- | ------- |

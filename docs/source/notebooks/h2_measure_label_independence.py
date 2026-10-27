@@ -95,7 +95,7 @@ assert abs(results["p_value"] - 0.97) < 0.01  # and about 0.97
 # %% [markdown]
 # ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md) — Learn about types of shift and techniques to quantify
+# - [Distribution shift](../concepts/DistributionShift.md) — Learn about types of shift and techniques to quantify
 #   distribution changes.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
 #   dataset bias.

@@ -20,7 +20,7 @@
 # but nothing from its dataset, so anything computed from the dataset, embeddings above all, no longer
 # lines up with it. {meth}`.Metadata.selected_items` returns the items that survived so you can build a matching
 # {class}`.View`, and {meth}`.Metadata.save` caches the metadata so it is built once. See
-# [Metadata Levels](../concepts/MetadataLevels.md).
+# [Metadata levels](../concepts/MetadataLevels.md).
 #
 # Use it when you filter metadata and then pair it with embeddings or another evaluator, or when building the metadata
 # is slow.
@@ -142,7 +142,7 @@ assert reloaded.rows_at("instance")["item_index"].to_list() == metadata.rows_at(
 # %% [markdown]
 # ## Next steps
 #
-# - [Metadata Levels](../concepts/MetadataLevels.md) — Explore dataset, datum, and factor levels in DataEval metadata.
+# - [Metadata levels](../concepts/MetadataLevels.md) — Explore dataset, datum, and factor levels in DataEval metadata.
 # - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across
 #   unit, instance, and background factors.
 # - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view

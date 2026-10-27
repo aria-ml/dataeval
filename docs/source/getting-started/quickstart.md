@@ -1,4 +1,4 @@
-# Getting Started
+# Quickstart
 
 DataEval helps you evaluate image datasets for quality, bias, scope, distribution
 shift, and performance limits. It implements [Modular AI Trustworthy Engineering
@@ -15,7 +15,7 @@ and channel count (1+).
 :::{important}
 Some DataEval functions and classes apply only to image classification tasks, while
 others apply only to object detection tasks. For more information regarding when to use
-each function or class see the [Functional Overview page](../reference/FunctionalOverview.md)
+each function or class see the [Functional overview page](../reference/FunctionalOverview.md)
 for details.
 :::
 
@@ -23,9 +23,9 @@ for details.
 
 ## Install DataEval
 
-DataEval requires Python 3.11 or higher. It has been tested on Ubuntu and Windows.
-macOS users may encounter platform-specific issues; report these via the issue
-tracker.
+DataEval requires Python 3.11 or higher. It has been tested on Ubuntu, including
+Ubuntu on Windows through WSL. macOS users may encounter platform-specific
+issues; report these via the issue tracker.
 
 :::::{tab-set}
 
@@ -300,7 +300,7 @@ guide to find the right evaluator for your situation.
 Know which tool to use, then check out
 [What data does each tool need?](input-requirements.md) for a quick-reference
 table of every algorithm's inputs, and the
-[Functional Overview](../reference/FunctionalOverview.md) for task applicability.
+[Functional overview](../reference/FunctionalOverview.md) for task applicability.
 
 If you prefer to learn by doing, start with the
 [data cleaning tutorial](../notebooks/tt_clean_dataset.py). It walks through

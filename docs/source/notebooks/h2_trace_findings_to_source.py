@@ -242,7 +242,7 @@ assert "unit_is_outlier" in metadata.rows_at("unit").columns
 # %% [markdown]
 # ## Next steps
 #
-# - [Metadata Levels](../concepts/MetadataLevels.md) — Learn the level graph that an address names a row in.
+# - [Metadata levels](../concepts/MetadataLevels.md) — Learn the level graph that an address names a row in.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) —
 #   Choose flags and read `source_index`.
 # - [How to find outliers in metadata factors](./h2_find_factor_outliers.py) — Threshold measured factors at each level

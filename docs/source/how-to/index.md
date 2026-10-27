@@ -1,4 +1,4 @@
-# How-to Guides
+# How-to guides
 
 These guides help you accomplish specific tasks with DataEval. Each one addresses
 a practical problem and walks you through the solution step by step.

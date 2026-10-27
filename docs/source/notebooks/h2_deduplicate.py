@@ -218,7 +218,7 @@ assert annotation_results.augmented().data()["item_indices"].item().to_list() ==
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data
+# - [Data integrity](../concepts/DataIntegrity.md) — Analyze image-level and target-level statistics to identify data
 #   quality issues.
 # - [Identify duplicate video](./tt_identify_duplicate_video.py) — Find duplicate footage, train/test leakage, and
 #   redundant frames in video and MOT datasets.

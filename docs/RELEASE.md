@@ -1,6 +1,6 @@
-# Release and Documentation Workflow
+# Release and documentation workflow
 
-## Notebook Architecture
+## Notebook architecture
 
 Notebooks live in `docs/source/notebooks/` as paired `.py` and `.ipynb` files managed by
 [jupytext](https://jupytext.readthedocs.io/). The pairing is configured in
@@ -10,34 +10,34 @@ Notebooks live in `docs/source/notebooks/` as paired `.py` and `.ipynb` files ma
 - **`.ipynb` files** are gitignored and generated locally for editing in VS Code / Jupyter
 - **Google Colab** links reference `.ipynb` files stored on `docs-artifacts/*` orphan branches
 
-## Working with Notebooks
+## Working with notebooks
 
-### Initial Setup (after cloning)
+### Initial setup (after cloning)
 
 ```bash
 nox -e docsync    # generates .ipynb files from .py source
 ```
 
-### Creating a New Notebook
+### Creating a new notebook
 
 1. Create `docs/source/notebooks/<name>.ipynb` in VS Code or Jupyter
 2. Edit cells and run them
 3. Run `nox -e docsync -- adopt <name>` to generate the `.py` pair
 4. Commit only the `.py` file
 
-### Editing an Existing Notebook
+### Editing an existing notebook
 
 1. Open the `.ipynb` in VS Code or Jupyter
 2. Make changes, save
 3. Run `nox -e docsync` to sync changes back to `.py`
 4. Commit the `.py` changes
 
-### Editing Scripts Directly
+### Editing scripts directly
 
 1. Edit the `.py` file in any editor
 2. Run `nox -e docsync` to regenerate the `.ipynb`
 
-### How `docsync` Works
+### How `docsync` works
 
 `nox -e docsync` runs two steps in order:
 
@@ -58,7 +58,7 @@ nox -e docsync -- adopt <name>     # generate the .py pair for a genuinely new n
 Both accept one or more notebook names (stems, without the extension) to act on a subset;
 with no names, they act on every orphan.
 
-## Documentation Build
+## Documentation build
 
 `nox -e docs` builds the full documentation site:
 
@@ -69,7 +69,7 @@ with no names, they act on every orphan.
 4. Pushes updated cache and generated `.ipynb` files to the artifact branch
    (`docs/push-docs-cache.sh`)
 
-## Artifact Branches (`docs-artifacts/*`)
+## Artifact branches (`docs-artifacts/*`)
 
 Orphan branches named `docs-artifacts/<ref>` store build artifacts that are too large or too
 transient for the main branch:
@@ -106,7 +106,7 @@ During a release, [`scripts/release.py`](../scripts/release.py) rewrites these t
 https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v0.96.0/notebooks/<file>.ipynb
 ```
 
-## Release Process
+## Release process
 
 Releases are cut locally with [`scripts/release.py`](../scripts/release.py) and published by pushing the tag.
 See [BRANCHING.md](../BRANCHING.md) for the full strategy; this section covers what happens to the docs.
@@ -148,12 +148,12 @@ pip and uv skip prereleases unless the specifier asks for them, so a downstream 
 "dataeval>=1.0.0a0",   # accepts 1.0.0a1, 1.0.0rc0 and the final 1.0.0
 ```
 
-### MR Title Prefixes
+### MR title prefixes
 
 Every MR targeting `main` must have a `[type]` prefix on its title; CI rejects the rest. The prefix decides the
 changelog section and the version bump. See [Commit Prefixes](../BRANCHING.md#commit-prefixes) for the full table.
 
-## CI Jobs
+## CI jobs
 
 ### Documentation stage
 
@@ -173,7 +173,7 @@ changelog section and the version bump. See [Commit Prefixes](../BRANCHING.md#co
 | `export-merged-sbom`            | Version tags | Exports the merged SBOM                             |
 | `remove docs artifact branches` | Main commits | Cleans up artifact branches for merged MRs          |
 
-## Key Files
+## Key files
 
 | File                                               | Purpose                                                                |
 | -------------------------------------------------- | ---------------------------------------------------------------------- |

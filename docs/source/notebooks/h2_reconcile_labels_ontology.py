@@ -260,4 +260,4 @@ assert watercraft.roots == ("watercraft",)
 # ## Next steps
 #
 # - [Ontology](../concepts/Ontology.md) — Learn about ontologies, taxonomies, and label reconciliation concepts.
-# - [Data Integrity](../concepts/DataIntegrity.md) — Understand label-quality checks and data consistency validation.
+# - [Data integrity](../concepts/DataIntegrity.md) — Understand label-quality checks and data consistency validation.
