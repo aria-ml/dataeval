@@ -3,7 +3,7 @@
 DataEval helps you evaluate image datasets for quality, bias, scope, distribution
 shift, and performance limits. It implements [Modular AI Trustworthy Engineering
 (MAITE)](https://mit-ll-ai-technology.github.io/maite/)-compliant metrics that
-integrate with the broader [Joint AI T&E Infrastructure Capability (JATIC)](https://cdao.pages.jatic.net/public/)
+integrate with the broader [Joint AI Test Infrastructure Capability (JATIC)](https://cdao.pages.jatic.net/public/)
 suite of tools.
 
 :::{note}
@@ -183,8 +183,14 @@ class MyObjectDetectionDataset(od.Dataset):
 ### Wrapping a PyTorch dataset
 
 If your data is in a PyTorch `Dataset`, wrap it to conform to the MAITE
-protocol. Note that `torchvision` tensors are `(C, H, W)` which is the
-supported format by DataEval.
+protocol. torchvision tensors are `(C, H, W)`, which is the format DataEval
+supports.
+
+:::{note}
+The example below uses `torchvision`, which DataEval does not install. Install
+it from the same index as your torch build before you run the code. See
+[torchvision (optional)](installation.md#torchvision-optional).
+:::
 
 ```python
 import maite.protocols as mp
@@ -217,13 +223,13 @@ class MyCIFAR10Wrapper(ic.Dataset):
         )
 
     def __len__(self) -> int:
-        return len(tv_cifar10)
+        return len(self._source)
 
     def __getitem__(self, idx: int) -> tuple[ic.InputType, ic.TargetType, ic.DatumMetadataType]:
-        tv_datum: tuple[torch.Tensor, int] = tv_cifar10[idx]
+        tv_datum: tuple[torch.Tensor, int] = self._source[idx]
         image = tv_datum[0].numpy()
         label = np.eye(10, dtype=np.float32)[tv_datum[1]]  # Convert label to one-hot encoding
-        return image, label, mp.DatumMetadata(id=idx)
+        return image, label, ic.DatumMetadataType(id=idx)
 
 
 dataset: ic.Dataset = MyCIFAR10Wrapper(tv_cifar10)
