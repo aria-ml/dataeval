@@ -14,8 +14,8 @@ each factor can be found.
 
 ## Why extrinsic factors matter
 
-An *extrinsic* factor describes how the data was collected and processed, not what it depicts. Extrinsic factors are
-easy to overlook because they have no obvious connection to the task, but they are exactly what a model can use as a
+An **extrinsic** factor describes how the data was collected and processed, not what it depicts. Extrinsic factors are
+easy to overlook because they have no obvious connection to the task, but they are what a model can use as a
 shortcut.
 
 Suppose an older camera records most of the videos of class A, while class B is recorded by a newer camera. The two
@@ -229,7 +229,7 @@ collection process provides.
 
 The data stream is usually, but not always, stream `0:d:0`. Check its position before extracting from it.
 
-**Precision timestamps in the video stream.** In H.264, these are carried in user data unregistered SEI messages that
+In H.264, precision timestamps in the video stream are carried in user data unregistered SEI messages that
 begin with the 16-byte identifier `MISPmicrosectime`. MPEG-2 carries the same identifier in picture user data instead.
 The snippet below handles H.264. Decode the 12 bytes that follow each identifier according to ST 0604:
 
@@ -260,7 +260,7 @@ ident = b"MISPmicrosectime"
 sei = [raw[m.end() : m.end() + 12] for m in re.finditer(re.escape(ident), raw)]
 ```
 
-**Precision timestamps in the data stream.** Each ST 0601 packet carries its timestamp as item 2, a 64-bit count of
+In the data stream, each ST 0601 packet carries its precision timestamp as item 2, a 64-bit count of
 microseconds. Split the stream into KLV packets by the 16-byte key and BER length, and read item 2 from each packet's
 value with the `items()` helper from the platform section:
 
@@ -279,7 +279,7 @@ while pos + 17 <= len(raw):
     pos = start + length
 ```
 
-**PTS.** Both streams report PTS on the container clock, in seconds:
+Both streams report PTS on the container clock, in seconds:
 
 ```python
 frame_pts = [
@@ -304,9 +304,9 @@ in_display_order = sorted(zip((float(p["pts_time"]) for p in vpkts), sei, strict
 ## Known factor names
 
 A few of the recommended factors have a name that DataEval gives one fixed meaning, listed in
-{data}`dataeval.types.KNOWN_FACTORS`. Names are lowercase and matched exactly against the final column name, so
-`TIMESTAMP` or `gps_latitude` is an ordinary factor. Analytics will build on these names, so providing them now means
-your metadata is ready for them.
+{data}`dataeval.types.KNOWN_FACTORS`. Names are lowercase and matched against the final column name character for
+character, so `TIMESTAMP` or `gps_latitude` is an ordinary factor. Analytics will build on these names, so providing
+them now means your metadata is ready for them.
 
 | Name             | Meaning                             | Unit                          | Levels             | Valid values          |
 | ---------------- | ----------------------------------- | ----------------------------- | ------------------ | --------------------- |
@@ -317,20 +317,20 @@ your metadata is ready for them.
 | `longitude`      | Longitude of the sensor (WGS 84)    | decimal degrees               | `sequence`, `unit` | from -180 to 180      |
 
 DataEval checks the type, range and level of a known factor. Every value must be a real number (integers count,
-booleans and text don't) within the range above, and the factor must be at one of the listed levels. Missing values
-(`None` or NaN) aren't checked; infinity is invalid.
+booleans and text do not) within the range above, and the factor must be at one of the listed levels. Missing values
+(`None` or NaN) are not checked; infinity is invalid.
 
-When a column of the dataset's own metadata fails a check, it is held back: it isn't a factor, and
+When a column of the dataset's own metadata fails a check, it is held back: it is not a factor, and
 {attr}`.Metadata.unusable` and {attr}`.Metadata.dropped_factors` list it with the reason `invalid_known_factor`. Fix it
 with {meth}`.Metadata.repair`. A column that mixes text and numbers is reported as `mixed_types`, as for any factor.
-A known factor at a level it isn't defined at, such as a `frame_rate` given per frame, can't be repaired, since a
+A known factor at a level it is not defined at, such as a `frame_rate` given per frame, cannot be repaired, since a
 repair changes values and never their level. Supply it at a listed level instead: fix it at the source, or pass its
 values to {meth}`.Metadata.add_factors` at that level, such as one `frame_rate` per video with `level="sequence"`.
 
 {meth}`.Metadata.add_factors`, {meth}`.Metadata.from_factors`, {meth}`.Metadata.agg` and {meth}`.Metadata.aggregate`
 raise a `ValueError` instead.
 
-Using a known name is a promise that the data follows the definition above. The checks can't verify units: a
+Using a known name is a promise that the data follows the definition above. The checks cannot verify units: a
 `timestamp` in milliseconds since the stream started passes them. If a factor means something else, give it a
 different name.
 
@@ -341,12 +341,12 @@ measured values and returns a report of where they disagree with the reported on
 `overwrite=False`, a measured factor whose name the dataset already reports is stored under a new name, such as
 `video_duration_added`. The report holds a {class}`.FactorCollision` for each factor that disagrees on at least one
 video. Here `video_duration` differs when the two values are more than 1% apart, and a reported `frame_rate`, which the
-tolerance doesn't name, differs on any difference. Each entry's `differing` frame lists those videos by `item_index`,
+tolerance does not name, differs on any difference. Each entry's `differing` frame lists those videos by `item_index`,
 with the `existing` value, the `incoming` one and their `relative_difference`. A video without a reported value, or one
-that couldn't be measured, isn't compared.
+that could not be measured, is not compared.
 
 A `timestamp` column of ISO 8601 text or of datetimes is held back, and `repair([ParseDateTime("timestamp")])` reads it
-as seconds since the Unix epoch, which passes. A period such as `every="hour"` isn't a capture time, and its text labels
+as seconds since the Unix epoch, which passes. A period such as `every="hour"` is not a capture time, and its text labels
 keep the column held back. Give a column you mean to read as periods a different name, such as `capture_time`. With
 {meth}`.Metadata.add_factors` or {meth}`.Metadata.from_factors`, convert datetimes to epoch seconds first, or use
 another name to keep them as datetimes. For a NumPy array, `(stamps - np.datetime64("1970-01-01")) / np.timedelta64(1, "s")`
