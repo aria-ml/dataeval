@@ -906,7 +906,12 @@ statistical and computational.
     [Image statistics as a linting vocabulary](DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
   - Cross-checked (skew, kurtosis, and entropy verified against SciPy in CI)
   - Descriptive only. A statistic being unusual is not evidence a sample is
-    bad.
+    bad. Every pixel counts, so a part of the vehicle in frame shifts the
+    statistics. On real drone footage, a hood covering about a fifth of the
+    frame lowered sharpness to 89% of the clean value, against 93% for lens
+    vignetting alone. Compare absolute values only within footage from one
+    platform. Within one video, a part did not change which frames a sharpness
+    gate dropped.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored
@@ -944,12 +949,16 @@ statistical and computational.
     content: a light one gets pans refused, and a dense one drags a pan's reading
     toward a still camera, which stays trusted when the drag is mild and is
     refused when it splits the samples into two motions. Passing the overlay as
-    `mask=` excludes it. A mover pulling the fit toward its own motion is refused
-    once its pull stands well above the flow noise, so a slow mover in noisy
-    footage can still read as a trusted zoom of a pixel or two. A mover holding
-    most of the samples the fit sees (with a mask, most of what the mask leaves)
-    can be read as the camera; one pair cannot tell the two apart, and the
-    temporal gate catches it only when it is brief.
+    `mask=` excludes it. A part of the vehicle in view, such as a hood or a bow,
+    reads as scene content the same way. On real drone footage, an unmasked hood
+    covering about a fifth of the frame read about one pair in nine wrong while
+    trusting it, and a mask brought that under one in a hundred. A mover pulling
+    the fit toward its own motion is refused once its pull stands well above the
+    flow noise, so a slow mover in noisy footage can still read as a trusted
+    zoom of a pixel or two. A mover holding most of the samples the fit sees
+    (with a mask, most of what the mask leaves) can be read as the camera; one
+    pair cannot tell the two apart, and the temporal gate catches it only when
+    it is brief.
 - - {func}`.phash`, {func}`.phash_d4`, {func}`.dhash`, {func}`.dhash_d4`,
     {func}`.xxhash`
   - Perceptual hashing ([Zauner, 2010](DataIntegrity.md#references)); xxHash
@@ -1136,6 +1145,30 @@ cite their sources, so citation coverage cannot regress.
 
 What the suite does not do is reproduce published benchmark results on
 public datasets. See [Known gaps](#known-gaps-in-this-pages-evidence).
+
+### Studies on real footage
+
+Internal testing in October 2026, on the development code that followed v1.1.4,
+demonstrated the findings below for {func}`.ego_stats` and the sharpness of
+{func}`.image_stats`. The scripts, saved outputs and footage checksums are
+available on request.
+
+The footage is eleven public drone clips of 120 to 600 frames each: seven
+low-altitude urban sequences from the VisDrone2019-MOT validation set and four
+landscape and town clips from Wikimedia Commons. Burned-in overlays and parts of
+the vehicle are rendered onto it with a known mask. Ego motion is scored only
+where the clean footage's reading is trusted. A pair is wrong while trusted when
+`ego_stats` trusts it and reads more than 0.5 px from the clean reading.
+
+| Study | Result |
+| --- | --- |
+| `ego_stats` on 3,489 frame pairs, before and after the two-motion check | The same 3,363 pairs are trusted before and after. |
+| Four overlay layouts covering 3% to 20% of the frame, on 1,957 pairs | The densest layout, with telemetry in all four corners and two scrolling tapes, read 135 pairs (6.9%) wrong while trusted, and 21 (1.1%) with the overlay passed as `mask=`. The three lighter layouts read at most 2 pairs wrong unmasked and at most 6 masked. A mask reduced refusals in all four. |
+| Four parts of the vehicle, on 1,557 pairs | An unmasked hood (about a fifth of the frame) read 173 pairs (11%) wrong while trusted, and a bow (15%) read 73 (4.7%). Masked, each read 14 or fewer. A wing (5%) and skids (4%) read at most 5 wrong, masked or not. |
+| `image_stats` sharpness on unblurred frames, with and without each part | A hood with lens vignetting lowered sharpness to 89% of the clean value, and vignetting alone to 93%. |
+| A gate that drops the lowest 10% of sharpness, on 60 frames per clip with six blurred by 5, 9 or 21 px | With or without a part, the gate dropped all six blurred frames on 10 clips and none of them on the eleventh. |
+| Constructed scenes: the two-motion check on 2,095 cases of still, panning, zooming and rolling cameras, with and without movers | Still-camera readings that were wrong while trusted fell from 255 to 3, each with a mover covering 71% to 85% of the samples. One correct camera motion was newly refused. |
+| Constructed scenes: a half-frame mover in front of a still camera, pixel noise with a standard deviation of 3, five seeds | The pair read as a trusted zoom in every seed at 1 and 2 px per frame and in four of five at 3 px. It was refused at 4 and 5 px. |
 
 ### API stability discipline
 
