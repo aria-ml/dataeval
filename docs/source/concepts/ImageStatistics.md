@@ -1,4 +1,4 @@
-# Image Statistics
+# Image statistics
 
 `image_stats` measures four families of statistics about an image (pixel, visual,
 dimension, and hash), and two of them, pixel and visual, answer fundamentally

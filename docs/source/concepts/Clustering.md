@@ -195,10 +195,10 @@ into a test report.
 
 ## Related concept pages
 
-- [Data Integrity](DataIntegrity.md) — how clustering feeds into Duplicates,
+- [Data integrity](DataIntegrity.md) — how clustering feeds into Duplicates,
   Outliers, and label_errors
 - [Embeddings](Embeddings.md) — the representation clustering operates on
-- [Acting on Results](ActingOnResults.md) — how to interpret and respond to
+- [Acting on results](ActingOnResults.md) — how to interpret and respond to
   cluster-based findings
 
 ## See this in practice

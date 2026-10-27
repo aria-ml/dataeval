@@ -1,4 +1,4 @@
-# DataEval for Data Scientists
+# DataEval for data scientists
 
 A data scientist is focused on exploration and analysis to extract actionable insights
 from data. While they share the goal of building effective models with [ML engineers](ml_engineer.md),

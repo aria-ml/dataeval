@@ -56,7 +56,7 @@
 # - Basic familiarity with [polars](https://docs.pola.rs) expressions
 # - Roughly 1.1 GB of disk for the dataset download
 #
-# Reading [Metadata Levels](../concepts/MetadataLevels.md) first is helpful but not required. This tutorial builds the
+# Reading [Metadata levels](../concepts/MetadataLevels.md) first is helpful but not required. This tutorial builds the
 # same ideas from data.
 
 # %% [markdown]
@@ -619,7 +619,7 @@ print("altitude > 60 m:", high.level_counts)
 #
 # ## Next steps
 #
-# - [Metadata Levels](../concepts/MetadataLevels.md) — The full level model, including the four-level graph used by
+# - [Metadata levels](../concepts/MetadataLevels.md) — The full level model, including the four-level graph used by
 #   tracking datasets.
 # - [Identify bias and correlations](./tt_identify_bias.py) — The bias evaluators used here, in depth.
 # - [How to keep metadata in sync with its dataset and cache it](./h2_sync_and_cache_metadata.py) — Realign a filtered

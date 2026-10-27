@@ -1,4 +1,4 @@
-# DataEval for Testing and Evaluation Engineers
+# DataEval for testing and evaluation engineers
 
 An AI test and evaluation (T&E) engineer is responsible for the independent and
 rigorous testing of AI systems:

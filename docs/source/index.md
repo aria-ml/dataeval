@@ -43,14 +43,14 @@ and the resulting impact on models.
 :text-align: center
 :link: ./getting-started/quickstart
 :link-type: doc
-:link-alt: "Beginner's Guide Link"
+:link-alt: "Quickstart Link"
 :img-top: _static/images/icons/icon_quick_start.svg
 :class-header: sd-fs-4
 
-**Getting Started**
+**Getting started**
 ^^^
-New to DataEval? Check out the Beginner's Guide.
-It contains an introduction to DataEval's main concepts.
+New to DataEval? Start with the quickstart. It installs DataEval, prepares your
+dataset and runs a first evaluation.
 
 :::
 
@@ -62,10 +62,10 @@ It contains an introduction to DataEval's main concepts.
 :img-top: _static/images/icons/icon_roles.svg
 :class-header: sd-fs-4
 
-**Roles Guide**
+**Roles guide**
 ^^^
 Not sure how DataEval fits into your daily routine?
-Check out the Roles Guide, which shows some of the ways
+Check out the Roles guide, which shows some of the ways
 to use DataEval.
 
 :::
@@ -92,7 +92,7 @@ Learn DataEval through guided end-to-end examples.
 :img-top: _static/images/icons/icon_howto.svg
 :class-header: sd-fs-4
 
-**How-to Guides**
+**How-to guides**
 ^^^
 Task-based instructions and workflow recipes.
 
@@ -135,7 +135,7 @@ be used. It assumes that you have an understanding of the key concepts.
 :end-before: <!-- end needs -->
 :::
 
-## Key Features
+## Key features
 
 DataEval empowers professionals across domains with tools designed to
 enhance their workflows. Explore capabilities specific to your role:
@@ -236,16 +236,16 @@ Welcome <self>
 :::
 
 :::{toctree}
-:caption: Getting Started
+:caption: Getting started
 :hidden:
 
-Beginner's Guide <getting-started/quickstart>
+getting-started/quickstart
 getting-started/installation
 getting-started/where-to-go-next
 getting-started/which-tool
-Input Requirements <getting-started/input-requirements>
+Input requirements <getting-started/input-requirements>
 Migration <migration/index>
-Roles Guide <getting-started/roles/index>
+Roles guide <getting-started/roles/index>
 :::
 
 :::{toctree}
@@ -256,7 +256,7 @@ Overview <tutorials/index>
 :::
 
 :::{toctree}
-:caption: How-to Guides
+:caption: How-to guides
 :hidden:
 
 Overview <how-to/index>
@@ -273,9 +273,9 @@ Overview <concepts/index>
 :caption: Reference
 :hidden:
 
-API Reference <reference/autoapi/dataeval/index>
-Functional Overview <reference/FunctionalOverview>
-JATIC Maturity <reference/maturity>
+API reference <reference/autoapi/dataeval/index>
+Functional overview <reference/FunctionalOverview>
+JATIC maturity <reference/maturity>
 reference/glossary
 :::
 
@@ -284,5 +284,5 @@ reference/glossary
 :hidden:
 
 getting-started/contributing
-Change Log <getting-started/changelog>
+Change log <getting-started/changelog>
 :::

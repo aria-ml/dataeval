@@ -20,7 +20,7 @@
 # label, the image-classification shape. An object detection image holds many objects of different classes, so one
 # whole-image embedding cannot be colored by one class. {class}`.DetectionCrops` presents the ground-truth boxes as an
 # image-classification dataset, one crop per detection, so every per-(image, label) tool works on it unchanged. See
-# [Performance Limits](../concepts/PerformanceLimits.md).
+# [Performance limits](../concepts/PerformanceLimits.md).
 #
 # Use it when you want to embed the objects in a detection dataset, for example to see how the classes cluster in
 # embedding space.

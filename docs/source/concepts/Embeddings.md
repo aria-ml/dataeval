@@ -122,7 +122,7 @@ with PyTorch, with ONNX and with the extractors that need no model.
 
 Flattened pixels are a baseline and not an assessment, because distances between
 raw pixels follow brightness and alignment more than content.
-[Validation and Trust](ValidationAndTrust.md#extractors-that-embed-the-data)
+[Validation and trust](ValidationAndTrust.md#extractors-that-embed-the-data)
 lists what each extractor embeds and how each can mislead a metric.
 
 ### Choose a model
@@ -165,7 +165,7 @@ type adapt the images to the model. Give them to the extractor's `transforms=`, 
 Do not put them in the {class}`.View`. Every evaluator would see them, and {class}`.Outliers` would report brightness
 on normalized tensors, which are not numbers about your data. A transform that defines the dataset, such as the
 resolution you deploy at, goes in the view instead.
-[Image Statistics](ImageStatistics.md#transforms-and-the-statistics-they-invalidate) has the rule and the statistics
+[Image statistics](ImageStatistics.md#transforms-and-the-statistics-they-invalidate) has the rule and the statistics
 each view operation invalidates.
 
 The same rule settles a case that looks like a view operation. A model that needs three channels from a one-channel
@@ -216,7 +216,7 @@ it, select the array of one class, and give that array to a detector. Do not
 pass it as `extractor=`. Fitting succeeds, because embedding is lazy, and
 `predict` raises a `TypeError`.
 
-[Validation and Trust](ValidationAndTrust.md#extractors-that-embed-a-models-predictions)
+[Validation and trust](ValidationAndTrust.md#extractors-that-embed-a-models-predictions)
 describes what each of these extractors produces.
 
 ### Give the embeddings to a tool
@@ -228,13 +228,13 @@ lists them in one table.
 ## Related concept pages
 
 - [Clustering](Clustering.md) — how the data are grouped in the embedding space
-- [Dataset Bias and Coverage](DatasetBias.md) — how coverage and completeness
+- [Dataset bias and coverage](DatasetBias.md) — how coverage and completeness
   analyze the embedding space
-- [Distribution Shift](DistributionShift.md) — monitoring shifts in the embedding space
-- [Validation and Trust](ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers)
+- [Distribution shift](DistributionShift.md) — monitoring shifts in the embedding space
+- [Validation and trust](ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers)
   — every extractor DataEval ships, what each one embeds, and how each can
   mislead a downstream metric
-- [Acting on Results](ActingOnResults.md) — how to interpret and respond to
+- [Acting on results](ActingOnResults.md) — how to interpret and respond to
   analyses that rely on embeddings
 
 ## See this in practice

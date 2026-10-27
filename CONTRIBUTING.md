@@ -3,7 +3,7 @@
 Thank you for your interest in being part of our community of active
 developers!
 
-## Development Setup
+## Development setup
 
 DataEval uses [uv](https://docs.astral.sh/uv/) for environment management and
 [nox](https://nox.thea.codes/) as its task runner. `uv` is the only thing you need
@@ -90,14 +90,14 @@ Once `.venv` exists, `uv run nox ...` is the convenient form for everything exce
 `dev` itself; `uvx --with nox-uv nox ...` works from anywhere and needs no project
 environment at all.
 
-## How Can I Contribute?
+## How can I contribute?
 
-### Reporting Bugs
+### Reporting bugs
 
 Bug reports can be submitted in several forms. Here are some general guidelines
 to keep in mind when submitting a bug report for consideration.
 
-#### Crafting a Bug Report
+#### Crafting a bug report
 
 The bug report should be in the following format and contain as much detail as
 possible.
@@ -116,13 +116,13 @@ Actual Behavior:
 Frequency of Behavior:
 ```
 
-#### Submitting a Bug Report
+#### Submitting a bug report
 
 Bugs are tracked via issues in our internal GitLab repository, but issues can
 be reported via GitHub or by emailing us at <dataeval@ariacoustics.com>. For
 issues created in GitHub, please follow the above bug report template.
 
-#### Making it Good(tm)
+#### Making it good(tm)
 
 Bugs can be notoriously difficult to pin down and eliminate, but following the
 tips below can help the maintainers do the best they can.
@@ -134,7 +134,7 @@ tips below can help the maintainers do the best they can.
 - Explain what was the expected behavior compared to what was observed
 - Include full callstacks and error messages when possible
 
-### Suggestions for Improvement
+### Suggestions for improvement
 
 We are always excited to hear back from our users for ideas for new features
 and/or improvement of existing features and workflows.

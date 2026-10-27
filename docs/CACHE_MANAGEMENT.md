@@ -1,4 +1,4 @@
-# Documentation Cache Management
+# Documentation cache management
 
 This directory contains scripts for managing Jupyter notebook execution cache using Git orphan branches.
 
@@ -24,7 +24,7 @@ main branch (code only)
 docs-artifacts/main (orphan branch, cache only)
 ```
 
-### Orphan Branches
+### Orphan branches
 
 Orphan branches have no parent commits and are disconnected from main branch history:
 
@@ -77,7 +77,7 @@ Pushes the generated `.jupyter_cache` to the artifact branch after building docu
 - Includes metadata (timestamp, file count, size) in commit message
 - Force pushes (safe because orphan branch has no shared history)
 
-## CI/CD Integration
+## CI/CD integration
 
 ### GitHub Actions
 
@@ -108,9 +108,9 @@ variables:
   GIT_STRATEGY: clone # Full clone needed for artifact branch operations
 ```
 
-## Cache Policy
+## Cache policy
 
-### When Cache is Pushed
+### When cache is pushed
 
 Successful GitLab docs builds push cache to:
 
@@ -120,7 +120,7 @@ Successful GitLab docs builds push cache to:
 
 Release branches only publish to a version tag on HEAD. Orphaned feature artifact branches are removed after merge.
 
-### Cache Invalidation
+### Cache invalidation
 
 Normal main, merge request, and tag builds reuse cached notebook outputs when their execution inputs match.
 Jupyter's code-cell hashes decide which individual notebooks need execution, so a notebook edit reruns that notebook
@@ -158,7 +158,7 @@ git push origin :docs-artifacts/main
 
 The next CI run will create a fresh cache.
 
-## Local Usage
+## Local usage
 
 ### Fetch cache for local builds
 
@@ -215,7 +215,7 @@ du -sh cache-check
 git push origin --delete docs-artifacts/main
 ```
 
-## Implementation Details
+## Implementation details
 
 ### Why orphan branches?
 

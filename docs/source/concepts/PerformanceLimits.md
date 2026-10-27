@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD051 -->
 
-# Performance Limits
+# Performance limits
 
 Before investing in model architecture, hyperparameter tuning, or additional
 data collection, a T&E engineer needs to answer a more fundamental question:
@@ -33,7 +33,7 @@ release; object detection and tracking datasets raise `NotImplementedError`.
 
 ## What they are
 
-### Bayes Error Rate — the irreducible floor
+### Bayes error rate: the irreducible floor
 
 The {term}`Bayes Error Rate (BER)` is the lowest possible error rate achievable
 by any classifier on a given probability distribution. It is not a property of
@@ -62,7 +62,7 @@ accuracy requirement, the requirement is out of reach for that representation. T
 classifier already achieves; if it is within the allowance, the requirement is reachable. Between the two, the data
 alone does not decide.
 
-### Upper-bound Average Precision — feasibility for object detection
+### Upper-bound average precision: feasibility for object detection
 
 {term}`Upper-bound Average Precision (UAP)` extends the feasibility concept
 to object detection tasks, where the primary metric is mean average precision
@@ -98,7 +98,7 @@ Feasibility does not ask whether training on this many examples will reach the t
 accuracy, AP per class or macro-averaged over classes, and, for image classification, the recall of one class at a
 stated false-positive limit.
 
-### Sufficiency — the diminishing returns curve
+### Sufficiency: the diminishing returns curve
 
 Where Feasibility, BER and UAP concern what level the data allows or a model reaches, {class}`.Sufficiency`
 characterizes how performance grows with the amount of training data. It answers the question: given the data you have,
@@ -436,7 +436,7 @@ each endpoint, for programmatic access. A call can produce four kinds of evidenc
 - `builtin_witness/v1`, the k-NN and probe witnesses;
 - `user_witness/v1`, from a frozen model's `predictions=`, class scores or class decisions.
 
-[Feasibility Evidence](FeasibilityEvidence.md) documents each kind's basis, `details` and error budget.
+[Feasibility evidence](FeasibilityEvidence.md) documents each kind's basis, `details` and error budget.
 
 #### Recommendations
 
@@ -651,16 +651,16 @@ distribution mismatch between train and test, the projection will be optimistic.
 - [Embeddings](Embeddings.md) — the representation space that BER and UAP
   operate in; embedding quality directly affects the reliability of both
   estimates
-- [Data Integrity](DataIntegrity.md) — label errors and sensor corruption
+- [Data integrity](DataIntegrity.md) — label errors and sensor corruption
   raise BER by introducing noise into the class boundary; fix integrity
   problems before interpreting BER results
-- [Dataset Bias and Coverage](DatasetBias.md) — poor coverage raises
+- [Dataset bias and coverage](DatasetBias.md) — poor coverage raises
   effective BER on held-out data even when the training distribution appears
   separable; bias causes BER on the operational distribution to exceed BER
   measured on the training set
-- [Acting on Results](ActingOnResults.md) — what to do when BER is high or
+- [Acting on results](ActingOnResults.md) — what to do when BER is high or
   sufficiency projection falls short of the operational requirement
-- [Feasibility Evidence](FeasibilityEvidence.md) — each kind of evidence behind
+- [Feasibility evidence](FeasibilityEvidence.md) — each kind of evidence behind
   Feasibility's determinations, with its basis, details and error budget
 
 ## See this in practice

@@ -1,4 +1,4 @@
-# DataEval Roadmap
+# DataEval roadmap
 
 **Last updated:** September 2026
 **Horizon:** v1.3 (Q1 2027), with a longer-term vision beyond it
@@ -99,7 +99,7 @@ finely binned factor no longer reports a correlation with everything.
 
 ---
 
-## v1.2 — target Q4 2026
+## v1.2: target Q4 2026
 
 **Theme: video-ready metadata.** v1.1 introduced the metadata levels; v1.2 makes them
 carry analysis. Factors roll up from frame to track to sequence, the bias statistics stop
@@ -197,7 +197,7 @@ The August revision of this roadmap planned more for v1.2 than the release above
 
 ---
 
-## v1.3 — target Q1 2027
+## v1.3: target Q1 2027
 
 v1.3 runs the evaluators on video and measures what is intrinsic to it. The work lies
 along four threads.
@@ -270,7 +270,7 @@ The long-term focus is comprehensive, scalable, data-centric AI/ML evaluation ac
 advanced computer vision, temporal, generative, and multi-modal workflows. The first five
 directions follow the pillars; the last two cut across them.
 
-### 1. Advanced FMV and intrinsic video metadata
+### Advanced FMV and intrinsic video metadata
 
 - **Advanced track analysis and MHT**: extend the tracking-aware tools to
   multiple-hypothesis tracking analyses and time-series alignment, generalizing the
@@ -279,7 +279,7 @@ directions follow the pillars; the last two cut across them.
   compression artifacts using motion vector statistics and container-level signaling.
 - **Tracking drift**: detect tracker behavior degrading over time.
 
-### 2. Ontology depth
+### Ontology depth
 
 Moved from v1.2 and not yet scheduled. The v1.1 ontology stack supplies the facts; this
 work turns them into analyses.
@@ -293,7 +293,7 @@ work turns them into analyses.
 - **Ontology-based coverage over metadata hierarchies**, the remaining axis beyond
   `label_coverage` and `Representation`.
 
-### 3. Simulated, augmented, and synthetic data metrics
+### Simulated, augmented, and synthetic data metrics
 
 - **Dataset augmentation guidance**: coverage- and prioritization-based evaluators that
   determine when, where, and how to augment real-world datasets with synthetic data.
@@ -302,7 +302,7 @@ work turns them into analyses.
 - **Generative model evaluation**: metrics and tools for assessing and benchmarking
   generative models directly.
 
-### 4. Multi-modal, text, audio, and tabular support
+### Multi-modal, text, audio, and tabular support
 
 The v1.1 metadata restructure removed the vision-specific assumptions from the metadata
 layer; the work below builds the modality-specific metrics on top of it.
@@ -318,14 +318,14 @@ layer; the work below builds the modality-specific metrics on top of it.
   completeness, distribution shift, and representation balance across arbitrary tabular
   formats.
 
-### 5. Large-scale integration and cloud scalability
+### Large-scale integration and cloud scalability
 
 - **Scalability**: design and optimize execution performance across all core evaluators to
   handle massive datasets.
 - **Lakehouse connectors**: native interfaces from DataEval to large-data lakehouses and
   cloud data-platform APIs (e.g., Databricks).
 
-### 6. Weighted and output-driven evaluation
+### Weighted and output-driven evaluation
 
 - **Sample weights in the bias evaluators.** Frame selection, variable frame rates, collect
   structure, and resampling views all make rows stand for unequal amounts of the world.
@@ -337,7 +337,7 @@ layer; the work below builds the modality-specific metrics on top of it.
   uncertainty, and label-quality analyses applied through it. Every finding must read
   "your dataset has X", not "your model is Y".
 
-### 7. Automated data remediation
+### Automated data remediation
 
 Expand the image and video metrics and detectors to a broader range of distortions, and
 provide algorithms that correct the data and label anomalies they detect, not only report

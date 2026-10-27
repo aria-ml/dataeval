@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD051 -->
 
-# Data Integrity
+# Data integrity
 
 The performance of any machine learning (ML) model is strictly bounded by the
 quality of its training data. This is the **garbage in, garbage out** principle:
@@ -579,7 +579,7 @@ everywhere (below) still counts, because it was tested.
 
 Levels rare everywhere are not outliers. A class that is rare in every stratum
 is a finding about the dataset's balance (see
-[Dataset Bias and Coverage](DatasetBias.md)). [Das & Schneider (2007)](#ref7)
+[Dataset bias and coverage](DatasetBias.md)). [Das & Schneider (2007)](#ref7)
 make the same argument (a pairing that is rare because both of its parts are
 rare "can be explained") and divide by the marginal frequencies to remove it.
 That correction fails a common video case: with 100 sequences each captured on
@@ -864,7 +864,7 @@ stats["stats"]["background_brightness"]
 Background values are returned under `background_`-prefixed names on the same
 rows as the whole-image ones, because they describe the same thing a whole-image
 statistic describes, the image, and so belong at the `unit` level (see
-[Metadata Levels](MetadataLevels.md)). Three properties are worth knowing:
+[Metadata levels](MetadataLevels.md)). Three properties are worth knowing:
 
 - `background_fraction` is always returned, and should be read before the rest.
 It is the share of the image left unmasked, and a background statistic measured
@@ -981,11 +981,11 @@ it, and reads a run of more than five departing frames as a segment.
 
 - [Clustering](Clustering.md) — the underlying algorithm used by Duplicates
   (cluster mode), Outliers (cluster mode), and label_errors
-- [Dataset Bias and Coverage](DatasetBias.md) — when your data is clean but
+- [Dataset bias and coverage](DatasetBias.md) — when your data is clean but
   still unrepresentative
-- [Distribution Shift](DistributionShift.md) — when your data was clean at
+- [Distribution shift](DistributionShift.md) — when your data was clean at
   training time but the deployment distribution has changed
-- [Acting on Results](ActingOnResults.md) — how to prioritize remediation
+- [Acting on results](ActingOnResults.md) — how to prioritize remediation
   across integrity, bias, and performance findings
 
 ## See this in practice

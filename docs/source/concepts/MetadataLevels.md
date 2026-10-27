@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD051 -->
 
-# Metadata Levels
+# Metadata levels
 
 A dataset's metadata does not fit cleanly in one table. Brightness is a property of an image; a
 bounding box is a property of one detection inside that image; a frame rate is a
@@ -1060,15 +1060,15 @@ level question.
 
 - [Binning](Binning.md) — what the discretization on this page's factors actually
   does to them, and why the cut points are a choice rather than a detail.
-- [Image Statistics](ImageStatistics.md) — more factors that can be calculated
+- [Image statistics](ImageStatistics.md) — more factors that can be calculated
   from raw data and added to Metadata on demand.
-- [Dataset Bias and Coverage](DatasetBias.md) — the evaluators that consume
+- [Dataset bias and coverage](DatasetBias.md) — the evaluators that consume
   {class}`.Metadata`, and where the choice of view changes what they measure.
 - [Ontology](Ontology.md) — the other graph, over label concepts rather than
   granularities.
-- [Validation and Trust](ValidationAndTrust.md) — how the level a factor is judged
+- [Validation and trust](ValidationAndTrust.md) — how the level a factor is judged
   at affects the confidence you can place in a result.
-- [Acting on Results](ActingOnResults.md) — mapping findings back onto the rows
+- [Acting on results](ActingOnResults.md) — mapping findings back onto the rows
   they came from.
 
 ## See this in practice

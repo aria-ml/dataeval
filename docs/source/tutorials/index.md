@@ -1,4 +1,4 @@
-# DataEval Tutorials
+# DataEval tutorials
 
 The tutorials on this page aim to teach important concepts one can come across
 as a machine learning testing and evaluation engineer through easy-to-follow

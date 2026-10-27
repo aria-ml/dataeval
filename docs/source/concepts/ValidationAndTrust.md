@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD051 -->
 
-# Validation and Trust
+# Validation and trust
 
 ## When should you trust a DataEval result?
 

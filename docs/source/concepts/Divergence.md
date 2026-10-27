@@ -149,13 +149,13 @@ sparse relative to the dimensionality of the embedding space.
 
 ## Related concept pages
 
-- [Distribution Shift](DistributionShift.md) — formal hypothesis tests for
+- [Distribution shift](DistributionShift.md) — formal hypothesis tests for
   drift detection
-- [Performance Limits](PerformanceLimits.md) — BER shares the same estimators
+- [Performance limits](PerformanceLimits.md) — BER shares the same estimators
   and is the within-dataset analog of HP divergence
 - [Embeddings](Embeddings.md) — the feature representation both estimators
   depend on
-- [Acting on Results](ActingOnResults.md) — how to use divergence scores in
+- [Acting on results](ActingOnResults.md) — how to use divergence scores in
   practice
 
 ## See this in practice

@@ -1,4 +1,4 @@
-# Supported Roles
+# Supported roles
 
 DataEval is a versatile toolkit that provides critical value at every stage
 of an [AI project's lifecycle](ML_Lifecycle.md). It is not just a tool for one
@@ -19,19 +19,19 @@ related to these roles, see the [JATIC roles and personas webpage](https://cdao.
 :::{toctree}
 :hidden:
 
-Operational Machine Learning Lifecycle <ML_Lifecycle.md>
-Testing & Evaluation Engineer <te_engineer.md>
-Machine Learning Engineer <ml_engineer.md>
-Data Scientist <data_scientist.md>
-Data Engineer <data_engineer.md>
+Operational machine learning lifecycle <ML_Lifecycle.md>
+Testing & evaluation engineer <te_engineer.md>
+Machine learning engineer <ml_engineer.md>
+Data scientist <data_scientist.md>
+Data engineer <data_engineer.md>
 :::
 
 Below is an example of how DataEval supports a project from conception to deployment,
 along with the different roles that may be involved:
 
-## DataEval in AI Projects Example
+## DataEval in AI projects example
 
-### Project Inception & Planning
+### Project inception & planning
 
 A Program Manager (PM) is tasked with developing a model for a new ATR project.
 They are given a small set of images with the target present from other operations
@@ -72,7 +72,7 @@ Before committing millions in funding, the PM asks the Data Scientist
 to analyze the small dataset they have and the ML Engineer to analyze the given
 model to determine if the provided data and model are satisfactory.
 
-#### DataEval in Planning
+#### DataEval in planning
 
 The Data Scientist begins with [data cleaning](../../notebooks/tt_clean_dataset.py)
 to ensure that the dataset is free of duplicates and errors. They follow this up
@@ -98,12 +98,12 @@ the PM has a clear understanding of the data gaps. They approve a portion of
 the funds of the project to focus on targeted data collection, mitigating a
 huge risk from the outset.
 
-### Development & Training
+### Development & training
 
 After receiving the newly collected data, the Data Scientist and ML Engineer
 can now begin data analysis on the full dataset and model development.
 
-#### DataEval in Development
+#### DataEval in development
 
 To begin phase 2, the Data Scientist curates the dataset by repeating the process
 from phase 1. They [clean the data](../../notebooks/tt_clean_dataset.py),
@@ -130,7 +130,7 @@ After receiving the reports the manager is able to approve the collection of
 some additional imagery for the specific truck in the specific environments
 outlined in the data report.
 
-### Test & Evaluation
+### Test & evaluation
 
 After receiving the additional data for the specific truck class, two of the models'
 performance improves and reaches the performance requirement for all classes.
@@ -155,13 +155,13 @@ model has an unexpected failure mode: the model fails to detect objects that are
 farther away. After testing the models, they generate a report for the manager
 highlighting the failure modes of each model.
 
-### Deployment & Monitoring
+### Deployment & monitoring
 
 Based on the results of the T&E report, the PM makes a risk-informed decision
 to deploy the transformer-based model with a specific operational constraint
 that the model be used only in close detection scenarios.
 
-#### DataEval in Deployment
+#### DataEval in deployment
 
 Now that a model is being deployed, the ML Engineer is tasked with monitoring the
 model to ensure that the model continues to meet the performance requirements.

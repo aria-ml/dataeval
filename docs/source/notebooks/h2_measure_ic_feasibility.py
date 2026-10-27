@@ -18,7 +18,7 @@
 #
 # A classification requirement is reachable only if the classes are separable in your features. The Bayes error rate
 # (BER) measures how much they overlap, and {func}`.ber_mst` estimates it from image embeddings. See
-# [Performance Limits](../concepts/PerformanceLimits.md#bayes-error-rate--the-irreducible-floor).
+# [Performance limits](../concepts/PerformanceLimits.md#bayes-error-rate-the-irreducible-floor).
 #
 # Use it to check an accuracy requirement against the imagery before you invest in modeling. If the estimated lower end
 # of the achievable accuracy falls short of the requirement, the estimate does not show that the requirement is
@@ -139,7 +139,7 @@ assert 0.99 < 1 - ber_binary["upper_bound"] < 0.998
 # %% [markdown]
 # ## Next steps
 #
-# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand Bayes Error Rate and theoretical performance
+# - [Performance limits](../concepts/PerformanceLimits.md) — Understand Bayes Error Rate and theoretical performance
 #   ceilings for classification tasks.
 # - [Assess whether a classification requirement is reachable](./tt_assess_ic_feasibility.py) — Judge whether
 #   classification requirements are reachable, with the evidence behind each answer.

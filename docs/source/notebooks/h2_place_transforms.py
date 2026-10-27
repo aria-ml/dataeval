@@ -20,7 +20,7 @@
 # some of the statistics you asked for measure. Every operation declares the {class}`.ImageStats` it invalidates, and
 # evaluators such as {class}`.Outliers` intersect that with your `flags=`. Nothing is blocked, but the invalidated
 # statistics now describe the transform and not your data. See
-# [Image Statistics](../concepts/ImageStatistics.md#transforms-and-the-statistics-they-invalidate).
+# [Image statistics](../concepts/ImageStatistics.md#transforms-and-the-statistics-they-invalidate).
 #
 # Use it when you see the warning, or before you put a resize in a view.
 #
@@ -148,7 +148,7 @@ assert warned == {"DIMENSION": False, "VISUAL": True}
 # %% [markdown]
 # ## Next steps
 #
-# - [Image Statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across
+# - [Image statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across
 #   channels.
 # - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional
 #   space.

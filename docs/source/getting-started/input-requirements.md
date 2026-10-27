@@ -7,7 +7,7 @@ want, read across its row, and you know what to assemble before you can run it.
 If you do not yet know which tool you need, start with
 [Which DataEval tool should I use?](which-tool.md). For which computer-vision
 tasks each algorithm supports, see the
-[Functional Overview](../reference/FunctionalOverview.md).
+[Functional overview](../reference/FunctionalOverview.md).
 
 :::{note}
 DataEval imposes no restrictions on image type. It accepts any image modality
@@ -158,7 +158,7 @@ over raw images using {class}`.Embeddings`.
 {sup}`d` These scores are the raw outputs of a model.  
 {sup}`e` These scores are retrieved by DataEval's Out Of Distribution (OOD) functions.  
 {sup}`f` Two label samples, a reference and a comparison: {func}`.label_parity` is a
-label-shift test (see [Distribution Shift](../concepts/DistributionShift.md#label-parity)). For
+label-shift test (see [Distribution shift](../concepts/DistributionShift.md#label-parity)). For
 detection or tracking labels, also pass one group id per label (the image or sequence it came from).  
 {sup}`g` Binned factor codes, plus `groups` (one independent group id per row) or
 `assume_independent=True`.  

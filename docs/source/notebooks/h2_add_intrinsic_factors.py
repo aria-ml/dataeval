@@ -20,7 +20,7 @@
 # {func}`.image_stats` measures intrinsic factors from the pixels, such as brightness, sharpness and contrast, and
 # {meth}`.Metadata.add_factors` attaches them to the {class}`.Metadata` so {class}`.Balance` and {class}`.Diversity` can
 # analyze them. See
-# [Dataset Bias and Coverage](../concepts/DatasetBias.md#measuring-bias-mutual-information-and-evenness).
+# [Dataset bias and coverage](../concepts/DatasetBias.md#measuring-bias-mutual-information-and-evenness).
 #
 # Use it when the dataset carries little or no metadata, or when you want to test a property it does not record.
 #
@@ -140,7 +140,7 @@ assert moments.sort("diversity_value")["factor_name"][0] == "kurtosis"
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact
+# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact
 #   model reliability.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
 #   dataset bias.

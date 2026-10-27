@@ -544,11 +544,11 @@ a model is queried with rather than a fixed integer label map.
 
 ## Related concept pages
 
-- [Data Integrity](DataIntegrity.md) — where reconciliation sits among the other
+- [Data integrity](DataIntegrity.md) — where reconciliation sits among the other
   label-quality checks (duplicates, outliers, label errors).
 - [Embeddings](Embeddings.md) — the space in which extensional, instance-based
   matching compares concepts.
-- [Distribution Shift](DistributionShift.md) and [Divergence](Divergence.md) — the
+- [Distribution shift](DistributionShift.md) and [Divergence](Divergence.md) — the
   distributional differences between sources that remain once labels are
   reconciled, and that alignment does not address.
 

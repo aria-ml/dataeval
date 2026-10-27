@@ -1,4 +1,4 @@
-# Recommended Extrinsic Metadata Factors
+# Recommended extrinsic metadata factors
 
 DataEval reads datasets through the {term}`MAITE<Modular AI Trustworthy Engineering (MAITE)>` interface, which means
 every frame has already been decoded by the time DataEval sees it. Anything that lives in the video container rather
@@ -355,11 +355,11 @@ number that passes as a real time.
 
 ## Related concept pages
 
-- [Metadata Levels](MetadataLevels.md) — the sequence, unit, track and instance levels, and why a factor is stored once
+- [Metadata levels](MetadataLevels.md) — the sequence, unit, track and instance levels, and why a factor is stored once
 at its own level.
 - [Binning](Binning.md) — how continuous factors such as altitude and timestamps are discretized, and how to declare
 cut points that come from the world.
-- [Image Statistics](ImageStatistics.md) — factors DataEval can compute from the decoded frames and add to `Metadata` on
+- [Image statistics](ImageStatistics.md) — factors DataEval can compute from the decoded frames and add to `Metadata` on
 demand, as a complement to the factors on this page.
-- [Acting on Results](ActingOnResults.md) — how to diagnose and respond to a correlation between a metadata factor and
+- [Acting on results](ActingOnResults.md) — how to diagnose and respond to a correlation between a metadata factor and
 the class label.

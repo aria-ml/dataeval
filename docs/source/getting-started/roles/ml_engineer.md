@@ -1,4 +1,4 @@
-# DataEval for Machine Learning Engineers
+# DataEval for machine learning engineers
 
 A machine learning (ML) engineer is focused on the practical application
 of machine learning models:

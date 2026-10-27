@@ -1,4 +1,4 @@
-# Where to Go Next
+# Where to go next
 
 <!-- SECTION START | Entry-point routing. Not a strict Diataxis section — stays lean. -->
 
@@ -13,13 +13,13 @@ Not sure where to begin? Pick the description that fits your situation:
 :text-align: center
 :link: quickstart
 :link-type: doc
-:link-alt: "Beginner's Guide Link"
+:link-alt: "Quickstart Link"
 :img-top: ../_static/images/icons/icon_question.svg
 :class-header: sd-fs-5
 
 **New to DataEval**
 ^^^
-Never used DataEval before. The **Beginner's Guide** walks through the basics
+Never used DataEval before. The **Quickstart** walks through the basics
 of downloading DataEval, setting up your dataset, and checking your dataset
 for duplicates. No prior DataEval experience is needed.
 :::
@@ -34,7 +34,7 @@ for duplicates. No prior DataEval experience is needed.
 
 **Know what problem you have**
 ^^^
-Use the **Which Tool Guide** to find the right evaluator for your situation,
+Use the **Which tool guide** to find the right evaluator for your situation,
 organized by the question you are trying to answer.
 :::
 
@@ -48,10 +48,10 @@ organized by the question you are trying to answer.
 
 **Know what data you have**
 ^^^
-Use the **Input Requirements** table to see what every evaluator consumes
+Use the **Input requirements** table to see what every evaluator consumes
 (images, labels, metadata, embeddings, or a model) and which tools your data
 can already run. For task applicability, see the
-[Functional Overview](../reference/FunctionalOverview.md).
+[Functional overview](../reference/FunctionalOverview.md).
 :::
 
 ::::
@@ -87,7 +87,7 @@ practice. Each tutorial takes you from a dataset to a decision.
 :img-top: ../_static/images/icons/icon_howto.svg
 :class-header: sd-fs-5
 
-**How-To Guides**
+**How-to guides**
 ^^^
 Focused, goal-oriented guides for specific tasks. Start here if you know what
 you need to do and want the steps without the explanation.
@@ -113,7 +113,7 @@ you need to do and want the steps without the explanation.
 :img-top: ../_static/images/icons/icon_concept.svg
 :class-header: sd-fs-5
 
-**Concept Pages**
+**Concept pages**
 ^^^
 In-depth explanations of the theory behind each evaluator: what it measures,
 why it matters, and how to interpret what it finds.
@@ -127,7 +127,7 @@ why it matters, and how to interpret what it finds.
 :img-top: ../_static/images/icons/icon_roles.svg
 :class-header: sd-fs-5
 
-**Roles Guide**
+**Roles guide**
 ^^^
 Role-specific guidance for data engineers, data scientists, ML engineers, and
 T&E engineers, organized around the analysis tasks you encounter day-to-day.
@@ -153,7 +153,7 @@ T&E engineers, organized around the analysis tasks you encounter day-to-day.
 :img-top: ../_static/images/icons/icon_api.svg
 :class-header: sd-fs-5
 
-**API Reference**
+**API reference**
 ^^^
 Complete technical documentation for every function and class in DataEval.
 :::
@@ -174,13 +174,13 @@ Definitions of key terms used throughout the documentation.
 
 <!-- SECTION END -->
 
-## JATIC Interoperability
+## JATIC interoperability
 
 DataEval is part of the [Joint AI Test Infrastructure Capability (JATIC)](https://cdao.pages.jatic.net/public/)
-product suite for AI Test & Evaluation. The goal of the program is to deliver a suite of tools that interoperate
+product suite. The goal of the program is to deliver a suite of tools that interoperate
 using a standardized interface that enables modular, reproducible assessments for ease-of-use, performance, and reliability.
 
-- MAITE (Modular AI Trustworthy Engineering): Standardized protocols for AI T&E workflows. <https://mit-ll-ai-technology.github.io/maite/>
+- MAITE (Modular AI Trustworthy Engineering): Standardized protocols for AI test and evaluation workflows. <https://mit-ll-ai-technology.github.io/maite/>
 
 - NRTK (Natural Robustness Toolkit): Perturbation toolkit for applying realistic perturbations to evaluate
 model natural robustness. <https://nrtk.readthedocs.io/>

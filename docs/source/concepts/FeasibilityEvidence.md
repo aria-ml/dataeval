@@ -1,4 +1,4 @@
-# Feasibility Evidence
+# Feasibility evidence
 
 A determination of {class}`.Feasibility` cites the evidence items behind it in `evidence_ids`, and every evidence item
 names the theorems it rests on. This page describes the evidence in `FeasibilityOutput.evidence`: the spine that every
@@ -144,7 +144,7 @@ Hoeffding (1963) steps, valid for independent terms that are not identically dis
   model that gives one answer per cell reaches at a false-positive rate of at most $f_0$:
   $U_r = \min_j \max_{\pi \in [\pi^-, \pi^+]} \left[1 - \lambda_j f_0 - (\ell_j - \lambda_j f_0)/\pi\right]$, each term
   clipped to $[0, 1]$ (a term whose maximum is unbounded, because $\ell_j < \lambda_j f_0$ and $\pi^- = 0$, is 1). The
-  derivation and the three cases are in [Performance Limits](PerformanceLimits.md#recall-at-a-false-positive-limit).
+  derivation and the three cases are in [Performance limits](PerformanceLimits.md#recall-at-a-false-positive-limit).
   The target is excluded if and only if $U_r < r_0$. Allowances are not applied to recall.
 
 Its information scope depends on the allowances. Without allowances, the consensus bounds only models that give one
@@ -362,7 +362,7 @@ class, such as a threshold on one class's score applied as a complete multiclass
 decisions feed every target in it, so a second operating point needs its own call with the error budget split across
 the planned calls. Scores for a relabeled dataset come from `Relabel.fold_scores`, which sums the columns of source
 classes that map to one target class (see
-[Performance Limits](PerformanceLimits.md#decision-arrays-and-folded-scores)).
+[Performance limits](PerformanceLimits.md#decision-arrays-and-folded-scores)).
 
 The information scope comes from `provenance["reads"]`, the model class the witness belongs to:
 
@@ -432,7 +432,7 @@ Had its false-positive upper endpoint exceeded 10%, the lower cell would still s
 
 ## Related concept pages
 
-- [Performance Limits](PerformanceLimits.md) — the determinations, information scopes and recommendations these
+- [Performance limits](PerformanceLimits.md) — the determinations, information scopes and recommendations these
   evidence items feed
 - [Embeddings](Embeddings.md) — the representation that local panels partition and the built-in witnesses read
 

@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD051 -->
 
-# Dataset Bias and Coverage
+# Dataset bias and coverage
 
 A model is only as good as the data it learned from. Two distinct but related
 problems determine whether a dataset will produce a model that generalizes to
@@ -423,7 +423,7 @@ representation space the data occupies. Isotropy divides by the numerical rank
 $r$, yielding directional evenness within the occupied subspace. Neither
 normalization is inherited from the works above, and neither has been validated
 against an external implementation; see
-[Validation and Trust](ValidationAndTrust.md#core-functions).
+[Validation and trust](ValidationAndTrust.md#core-functions).
 
 Completeness also returns **nearest neighbor pairs** sorted by decreasing
 distance, identifying the samples that are most isolated from any neighbor.
@@ -468,7 +468,7 @@ The connection to coverage is direct: samples ranked highest by difficulty-based
 policies (KNN, HDBSCAN distance) are those that fall in sparse regions of the
 embedding space, the regions that coverage analysis flags as uncovered. The full
 treatment of Prioritization, including policy selection and ordering, is in the
-[Acting on Results](ActingOnResults.md) concept page.
+[Acting on results](ActingOnResults.md) concept page.
 
 ## When to use it
 
@@ -549,11 +549,11 @@ effective groups at each level; see
   so the cut points decide what these evaluators can see
 - [Embeddings](Embeddings.md) — understanding the representation space that
   coverage and completeness operate in
-- [Data Integrity](DataIntegrity.md) — when your data has sample-level quality
+- [Data integrity](DataIntegrity.md) — when your data has sample-level quality
   problems rather than population-level bias
-- [Performance Limits](PerformanceLimits.md) — when bias and coverage problems
+- [Performance limits](PerformanceLimits.md) — when bias and coverage problems
   have been addressed but performance is still bounded by the task itself
-- [Acting on Results](ActingOnResults.md) — how to use Prioritization to close
+- [Acting on results](ActingOnResults.md) — how to use Prioritization to close
   coverage gaps through targeted data collection
 
 ## See this in practice

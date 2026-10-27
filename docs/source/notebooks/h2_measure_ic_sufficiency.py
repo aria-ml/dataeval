@@ -18,7 +18,7 @@
 #
 # When data collection is expensive, you can evaluate a model on a small, preliminary dataset and extrapolate its
 # performance to a larger one. {class}`.Sufficiency` trains your model on growing subsets of the data to build
-# [sufficiency](../concepts/PerformanceLimits.md#sufficiency--the-diminishing-returns-curve) curves, then projects them.
+# [sufficiency](../concepts/PerformanceLimits.md#sufficiency-the-diminishing-returns-curve) curves, then projects them.
 #
 # Use it when you want to know whether collecting more data is worthwhile.
 #
@@ -340,7 +340,7 @@ assert needed["TPR at 0.5 Fixed FPR"][0] > 0
 # %% [markdown]
 # ## Next steps
 #
-# - [Performance Limits](../concepts/PerformanceLimits.md) — Understand sufficiency curves and diminishing returns in
+# - [Performance limits](../concepts/PerformanceLimits.md) — Understand sufficiency curves and diminishing returns in
 #   dataset scaling.
 # - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Measure Bayes Error Rate to
 #   evaluate classification task difficulty.

@@ -1,9 +1,9 @@
-# DataEval Branching and Release Strategy
+# DataEval branching and release strategy
 
 DataEval follows **GitLab Flow with Release Branches**. Releases are cut from a local checkout with
 [`scripts/release.py`](scripts/release.py) and published by pushing the resulting tag.
 
-## Table of Contents
+## Table of contents
 
 - [Overview](#overview)
 - [Branch Structure](#branch-structure)
@@ -19,7 +19,7 @@ Our branching strategy balances the simplicity of trunk-based development with t
 production release versions. All development flows through the `main` branch, while long-lived `release/vX.X`
 branches enable ongoing patch support for deployed versions.
 
-### Key Principles
+### Key principles
 
 - **Single source of truth**: All features and fixes merge to `main` first
 - **Semantic versioning**: Clear version increments based on change type
@@ -28,23 +28,23 @@ branches enable ongoing patch support for deployed versions.
 - **The tag is the release**: Nothing publishes until a maintainer pushes a version tag
 - **GitHub does the publishing**: GitLab mirrors the tag to GitHub, whose workflow uploads to PyPI
 
-## Branch Structure
+## Branch structure
 
-### Primary Branches
+### Primary branches
 
 | Branch         | Purpose                                                            | Lifetime   | Protected |
 | -------------- | ------------------------------------------------------------------ | ---------- | --------- |
 | `main`         | Primary development branch, always releasable                      | Permanent  | Yes       |
 | `release/vX.X` | Maintenance branch for major.minor version (e.g., `release/v0.74`) | Long-lived | Yes       |
 
-### Temporary Branches
+### Temporary branches
 
 | Branch Pattern             | Purpose                            | Lifetime    | Creator    |
 | -------------------------- | ---------------------------------- | ----------- | ---------- |
 | `feature/*`, `fix/*`, etc. | Feature/fix development branches   | Short-lived | Developers |
 | `cherry-pick/fix-to-X-X`   | Manual hotfix cherry-pick branches | Short-lived | Maintainer |
 
-### Branch Naming Conventions
+### Branch naming conventions
 
 While not strictly enforced, we recommend the following patterns for clarity:
 
@@ -53,7 +53,7 @@ While not strictly enforced, we recommend the following patterns for clarity:
 - **Documentation**: `docs/<description>`
 - **Chores**: `chore/<description>`
 
-## Release Process
+## Release process
 
 Every release -- major, minor, patch or prerelease -- is cut the same way: run the script from the branch you want
 to release, review what it produced, then push. The branch you are on decides the bump.
@@ -103,7 +103,7 @@ arrives there, not when you push to GitLab.
 4. Computes the next version, refusing to reuse a tag that already exists
 5. Rewrites `CHANGELOG.md` and the Colab links in the docs indexes, commits, and creates an annotated tag
 
-### Release Types
+### Release types
 
 | Command                                  | Run from       | Result                              |
 | -----------------------------------      | -------------- | ----------------------------------- |
@@ -121,7 +121,7 @@ Prereleases order as `1.2.0a0 < 1.2.0rc0 < 1.2.0`. Repeated `prerelease a` runs 
 `prerelease` run promotes to `-rc0` on the same base version. Going back down the ladder is refused, since it would
 publish a version that sorts before one already on PyPI.
 
-### Patch Releases
+### Patch releases
 
 Release branches carry fixes and housekeeping only. The script refuses to cut a patch when a `[feat]`, `[major]` or
 `[depr]` commit is present -- those belong on `main`.
@@ -129,7 +129,7 @@ Release branches carry fixes and housekeeping only. The script refuses to cut a 
 A `release/vX.Y` branch must already have a `vX.Y.*` tag reachable from it; the branch is cut from its release tag,
 so this holds unless the branch was created by hand from the wrong commit.
 
-### Hotfix Cherry-Pick (from `main` to releases)
+### Hotfix cherry-pick (from `main` to releases)
 
 **Purpose**: Distribute critical fixes to active release branches.
 
@@ -157,7 +157,7 @@ git push -u origin cherry-pick/fix-to-v0-74
 # open MR targeting release/v0.74, titled "[fix] ..."
 ```
 
-### Cutting a Release Branch
+### Cutting a release branch
 
 **Purpose**: Open a `release/vX.Y` line so a release can receive backported fixes independently of `main`.
 
@@ -168,7 +168,7 @@ git switch -c release/v1.2 v1.2.0
 git push -u origin release/v1.2
 ```
 
-## Commit Prefixes
+## Commit prefixes
 
 Every merge request to `main` **must** have a `[type]` prefix on its title. CI enforces this with
 [`validate_commit_prefix.py`](.gitlab/scripts/validate_commit_prefix.py), because the MR title becomes the commit
@@ -177,7 +177,7 @@ rather than being filed under Miscellaneous, which is how a typo like `[imrp]` u
 
 Direct commits to `main` follow the same convention.
 
-### Available Prefixes
+### Available prefixes
 
 | Prefix                                                                                | Version Bump  | Use Case                                     | Changelog Section             |
 | ---------------------                                                                 | ------------- | ------------------------------------         | ---------------------------   |
@@ -191,7 +191,7 @@ Direct commits to `main` follow the same convention.
 The full accepted vocabulary lives in `TAG_CATEGORIES` in [`scripts/release.py`](scripts/release.py); the CI check
 imports it, so the two cannot drift.
 
-### Prefix Selection Guide
+### Prefix selection guide
 
 **Choose `[fix]` when**:
 
@@ -221,7 +221,7 @@ imports it, so the two cannot drift.
 
 ## Workflows
 
-### Complete Release Flow Diagram
+### Complete release flow diagram
 
 ```mermaid
 gitGraph
@@ -248,7 +248,7 @@ gitGraph
     merge "cherry-pick/fix-to-v0-75" tag: "v0.75.1"
 ```
 
-### Developer Workflow
+### Developer workflow
 
 ```mermaid
 flowchart TD
@@ -265,7 +265,7 @@ flowchart TD
     J --> K
 ```
 
-### Maintainer Workflow: Creating a Release
+### Maintainer workflow: creating a release
 
 ```mermaid
 flowchart TD
@@ -313,13 +313,13 @@ links, and the tag pushed alongside it already runs everything a release needs.
 | [`validate_commit_prefix.py`](.gitlab/scripts/validate_commit_prefix.py) | Enforce MR title prefixes             | CI                  |
 | [`push_verification.py`](.gitlab/scripts/push_verification.py)           | Publish verification artifacts        | CI                  |
 
-### Docs Notebook Cache
+### Docs notebook cache
 
 The docs build reuses cached notebook outputs and re-executes only the notebooks whose code cells changed. It runs
 every notebook again when a shared input changes (`src/`, the lock file, the docs CI configuration and similar), and
 in the scheduled nightly build. [`docs/CACHE_MANAGEMENT.md`](docs/CACHE_MANAGEMENT.md) lists the inputs.
 
-### What Requires Manual Action
+### What requires manual action
 
 - Deciding when to release, and running `scripts/release.py`
 - Reviewing the release commit before pushing the tag
@@ -327,9 +327,9 @@ in the scheduled nightly build. [`docs/CACHE_MANAGEMENT.md`](docs/CACHE_MANAGEME
 - Cutting a `release/vX.Y` branch when a release line needs to receive backports
 - Approving MRs to main
 
-## Version Management
+## Version management
 
-### Semantic Versioning
+### Semantic versioning
 
 We follow [Semantic Versioning 2.0.0](https://semver.org/):
 
@@ -341,7 +341,7 @@ vMAJOR.MINOR.PATCH
 - **MINOR**: New features, backward compatible (`[feat]`, `[impr]`, `[depr]`)
 - **PATCH**: Backward compatible bug fixes (`[fix]`)
 
-### Version Calculation Logic
+### Version calculation logic
 
 A release from `main` is a minor bump unless a `[major]` commit is pending or `major` is passed explicitly. A release
 from `release/vX.Y` is always a patch bump. Housekeeping commits are recorded in the changelog but never drive the
@@ -353,7 +353,7 @@ bump on their own.
 - Current `v0.74.5` on main, changes include 1x `[major]` -> `release.py` requires `release.py major` -> next `v1.0.0`
 - Current `v0.74.5` on `release/v0.74`, changes: 1x `[fix]` -> next `v0.74.6`
 
-### Version Tag Format
+### Version tag format
 
 - All version tags start with `v` prefix (e.g., `v0.74.0`, `v1.0.0`)
 - Tags are annotated git tags
@@ -361,7 +361,7 @@ bump on their own.
 - Pushing a tag triggers everything: the GitLab tag pipeline (docs artifacts, verification, SBOM) and, via the
   push mirror, the GitHub workflow that uploads to PyPI and creates the GitHub Release
 
-### Release Branch Lifecycle
+### Release branch lifecycle
 
 **Creation**: Release branches are cut on demand by a maintainer -- see
 [Cutting a Release Branch](#cutting-a-release-branch)
@@ -384,9 +384,9 @@ git push origin archived/release/v0.70
 git push origin --delete release/v0.70
 ```
 
-## Best Practices
+## Best practices
 
-### For Developers
+### For developers
 
 1. **Title every MR `[type] Summary`** -- the title becomes the commit subject and the changelog entry
 2. **Flag fixes that may need backport** - `[fix]` MRs are candidates for manual cherry-pick into releases
@@ -394,7 +394,7 @@ git push origin --delete release/v0.70
 4. **Write clear MR titles** - They are what users read in the changelog
 5. **Test thoroughly** - Fixes cherry-picked to release branches land in production patch releases
 
-### For Maintainers
+### For maintainers
 
 1. **Always `--dry-run` first** - It costs nothing and shows the exact changelog and version
 2. **Review before pushing** - The tag is the point of no return; the commit before it is free to discard
@@ -402,14 +402,14 @@ git push origin --delete release/v0.70
 4. **Cherry-pick fixes promptly** - When a `[fix]` lands on `main`, decide quickly whether it needs backport
 5. **Define EOL policy** - Decide which release branches to actively maintain
 
-### For the Team
+### For the team
 
 1. **Document breaking changes** - Use MR descriptions to explain impact
 2. **Coordinate deprecations** - Give users advance notice
 3. **Test on release branches** - Don't just test on `main`
 4. **Keep this document updated** - Process improvements should be reflected here
 
-## Comparison to Other Strategies
+## Comparison to other strategies
 
 Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 
@@ -430,7 +430,7 @@ Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 
 ## Troubleshooting
 
-### Common Issues
+### Common issues
 
 **Issue**: MR blocked because the title has no `[type]` prefix, or an unknown one
 
@@ -489,7 +489,7 @@ Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 - Project CI/CD Configuration: [`.gitlab-ci.yml`](.gitlab-ci.yml)
 - Release script: [`scripts/release.py`](scripts/release.py)
 
-## Questions or Feedback
+## Questions or feedback
 
 If you have questions about the branching strategy or suggestions for improvements:
 

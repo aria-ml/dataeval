@@ -18,7 +18,7 @@
 #
 # Some values are ordinary across the whole dataset and wrong only in context. A threshold fitted to a whole level
 # passes them, because each value is common somewhere. {class}`~dataeval.quality.Outliers` judges a value against its
-# context instead. See [Data Integrity](../concepts/DataIntegrity.md).
+# context instead. See [Data integrity](../concepts/DataIntegrity.md).
 #
 # Use it after [How to find outliers in metadata factors](./h2_find_factor_outliers.py), when a single threshold per
 # factor is not enough.
@@ -309,7 +309,7 @@ assert along.data().filter(pl.col("metric_name") == "time_s along sequence")["ta
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Learn the population floor, stratification, rarity, combinations
+# - [Data integrity](../concepts/DataIntegrity.md) — Learn the population floor, stratification, rarity, combinations
 #   and neighbor checks.
 # - [How to find outliers in metadata factors](./h2_find_factor_outliers.py) — Threshold single factors at each level.
 # - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or

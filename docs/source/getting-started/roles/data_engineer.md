@@ -1,4 +1,4 @@
-# DataEval for Data Engineers
+# DataEval for data engineers
 
 A data engineer is focused on the collection, manipulation and storage of data streams.
 They are often involved across multiple stages of a project:

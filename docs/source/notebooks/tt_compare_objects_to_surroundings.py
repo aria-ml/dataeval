@@ -537,9 +537,9 @@ assert max(row["mi_value"] for (_, factor), row in cells.items() if factor == "u
 # %% [markdown]
 # ## Next steps
 #
-# - [Data Integrity](../concepts/DataIntegrity.md) — Learn about the full statistics vocabulary and what per_background
+# - [Data integrity](../concepts/DataIntegrity.md) — Learn about the full statistics vocabulary and what per_background
 #   computes.
-# - [Metadata Levels](../concepts/MetadataLevels.md) — Understand why the background is stored at the unit level and how
+# - [Metadata levels](../concepts/MetadataLevels.md) — Understand why the background is stored at the unit level and how
 #   it reaches instance rows.
 # - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Learn
 #   how to choose flags and read source_index for object detection statistics.

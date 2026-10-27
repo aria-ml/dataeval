@@ -160,7 +160,7 @@ assert result_label.drifted
 # %% [markdown]
 # ## Next steps
 #
-# - [Distribution Shift](../concepts/DistributionShift.md) — Explore types of distribution shift and strategies for
+# - [Distribution shift](../concepts/DistributionShift.md) — Explore types of distribution shift and strategies for
 #   detecting drift.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Track dataset shift and covariate drift in operational
 #   streams over time.

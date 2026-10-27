@@ -277,7 +277,7 @@ for balance in (ic_balance, od_balance):
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset Bias and Coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact
+# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Understand how class imbalance and missing data impact
 #   model reliability.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
 #   dataset bias.
