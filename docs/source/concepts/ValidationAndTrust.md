@@ -1149,11 +1149,11 @@ Two mechanisms make stability observable rather than a matter of trust:
   if any deprecated public object lacks a `.. deprecated::` directive in its
   docstring. A deprecated symbol cannot ship silently. The symbols deprecated in
   v1.1 (notably `ClassifierUncertaintyExtractor`) were removed in v1.2. Deprecated
-  in v1.2 and removed in v2.0: `compute_stats` (renamed {func}`.image_stats`),
-  {func}`.compute_ratios` and `ClassFilter`. See the
-  [v1.2 migration guide](../migration/v1.2.md). Transitional warnings for changed
-  parameter defaults are a separate mechanism and use a plain `FutureWarning`.
-  See [Changed defaults](#stability-status) below.
+  in v1.2 and removed in v2.0: `compute_stats` (renamed {func}`.image_stats`)
+  and `ClassFilter`. {func}`.compute_ratios` is deprecated in v1.2 and removed
+  in v1.3. See the [v1.2 migration guide](../migration/v1.2.md). Transitional
+  warnings for changed parameter defaults are a separate mechanism and use a
+  plain `FutureWarning`. See [Changed defaults](#stability-status) below.
 
 ## Stability status
 

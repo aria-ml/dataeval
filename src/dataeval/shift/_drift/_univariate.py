@@ -82,7 +82,7 @@ class DriftUnivariate(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftUnivar
     - Use **cvm** for higher sensitivity to overall distributional changes
     - Use **mwu** for robust detection of median shifts, especially with outliers
     - Use **anderson** when tail behavior is critical (SLA violations, rare events)
-    - Use **bws** for best overall power with tail sensitivity and directional testing
+    - Use **bws** when the shift type is unknown and its slower, permutation-based p-value is acceptable
 
     Parameters
     ----------

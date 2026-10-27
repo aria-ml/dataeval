@@ -118,9 +118,9 @@ different in appearance but represent the same concept in the embedding space.
 
 {class}`.Outliers` cluster mode runs clustering and flags samples whose distance
 to their nearest cluster center exceeds a threshold derived from that cluster's
-distance distribution (mean + n·std, default n=3). This identifies samples that
-are semantically isolated: not just statistically unusual in image statistics,
-but unlike the rest of the cluster they were assigned to.
+distance distribution (mean + n·std, default n=2.5). This identifies samples
+that are semantically isolated: not just statistically unusual in image
+statistics, but unlike the rest of the cluster they were assigned to.
 
 {func}`.label_errors` does not call `cluster()` directly, but uses the same MST
 infrastructure (`compute_neighbor_distances`) to find intra-class and

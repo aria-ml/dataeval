@@ -273,7 +273,7 @@ The view chooses which rows are projected. `inherited` chooses which factors are
 analyzed on them.
 
 With `inherited=True`, the default, a view analyzes every factor it can read:
-its own, plus everything propagated down from more granular levels. With
+its own, plus everything propagated down from coarser levels. With
 `inherited=False` it analyzes only the factors defined at the view itself.
 
 On an object detection dataset with image metadata plus per-image and
