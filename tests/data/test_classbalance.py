@@ -365,6 +365,50 @@ class TestClassBalanceLabelYielding:
         assert len(select) == 4
 
 
+class _FrameTarget:
+    def __init__(self, labels):
+        self.labels = np.array(labels)
+        self.boxes = np.zeros((len(labels), 4))
+        self.scores = np.ones(len(labels))
+        self.track_ids = np.arange(len(labels))
+
+
+class _TrackingTarget:
+    def __init__(self, frame_labels):
+        self.frame_tracks = [_FrameTarget(labels) for labels in frame_labels]
+
+
+class TestClassBalanceTracking:
+    """A tracking dataset has one item per video, and its classes are the labels of every frame."""
+
+    @pytest.fixture
+    def tracking_dataset(self):
+        # Videos 0-5 hold class 0, videos 6-7 hold class 1, video 8 holds class 2 in one frame of two.
+        mock = MagicMock()
+        mock.__len__.return_value = 9
+
+        def get_item(idx):
+            frames = [[2], [0]] if idx == 8 else [[1], [1]] if idx >= 6 else [[0], [0]]
+            return (np.zeros((3, 8, 8)), _TrackingTarget(frames), {"id": idx})
+
+        mock.__getitem__.side_effect = get_item
+        return mock
+
+    def test_videos_are_attributed_the_classes_of_their_frames(self, tracking_dataset):
+        class_balance = ClassBalance(method="interclass", num_samples=6)
+        select = View(tracking_dataset, operations=[class_balance])
+
+        assert set(class_balance._images_per_class) == {0, 1, 2}
+        assert class_balance._images_per_class[2] == [8]
+        assert class_balance._images_per_class[0] == [0, 1, 2, 3, 4, 5, 8]
+        assert len(select) == 6
+
+    def test_global_balance_keeps_the_view_size(self, tracking_dataset):
+        select = View(tracking_dataset, operations=[ClassBalance(method="global", num_samples=9)])
+
+        assert len(select) == 9
+
+
 @pytest.mark.required
 class TestClassBalanceEmptyRepeatSampling:
     """Cover the with-repeat empty-image sampling branch (lines 191-192)."""

@@ -14,7 +14,7 @@ from dataeval._log import get_logger
 from dataeval.protocols import Array, Transform
 from dataeval.types import ReprMixin
 from dataeval.utils._array import as_numpy, resize_chw
-from dataeval.utils.data import iter_images
+from dataeval.utils.data import as_image, iter_images
 
 if TYPE_CHECKING:
     from onnxruntime import InferenceSession
@@ -275,6 +275,9 @@ class OnnxExtractor(ReprMixin):
             If the model file does not exist.
         ImportError
             If onnxruntime is not installed.
+        MaiteShapeError
+            If an image is a video stream, as the image slot of a tracking dataset is. Present the
+            dataset as frames with :class:`~dataeval.data.SequenceFrames`.
 
         Notes
         -----
@@ -289,7 +292,7 @@ class OnnxExtractor(ReprMixin):
         # Collect and preprocess images
         batch_images: list[NDArray[Any]] = []
         for img in iter_images(data):
-            image_array = as_numpy(img)
+            image_array = as_image(img)
             processed = self._preprocess(image_array)
             batch_images.append(processed)
 

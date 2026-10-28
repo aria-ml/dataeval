@@ -9,8 +9,8 @@ from numpy.typing import NDArray
 
 from dataeval.protocols import Array
 from dataeval.types import ReprMixin
-from dataeval.utils._array import as_numpy, flatten_samples
-from dataeval.utils.data import iter_images
+from dataeval.utils._array import flatten_samples
+from dataeval.utils.data import as_image, iter_images
 
 
 class FlattenExtractor(ReprMixin):
@@ -52,8 +52,14 @@ class FlattenExtractor(ReprMixin):
         -------
         Array
             Flattened embeddings array of shape (n_images, flattened_dim).
+
+        Raises
+        ------
+        MaiteShapeError
+            If an image is a video stream, as the image slot of a tracking dataset is. Present the
+            dataset as frames with :class:`~dataeval.data.SequenceFrames`.
         """
-        batch_images: list[NDArray[Any]] = [as_numpy(img) for img in iter_images(data)]
+        batch_images: list[NDArray[Any]] = [as_image(img) for img in iter_images(data)]
         if not batch_images:
             return np.empty((0,), dtype=np.float32)
         batch_array = np.stack(batch_images)

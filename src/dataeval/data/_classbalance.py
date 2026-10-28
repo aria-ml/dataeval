@@ -9,7 +9,13 @@ import numpy as np
 from dataeval.config import get_seed
 from dataeval.core._label_stats import label_stats
 from dataeval.data._view import Operation, View
-from dataeval.protocols import AnnotatedDataset, Array, ObjectDetectionTarget, SegmentationTarget
+from dataeval.protocols import (
+    AnnotatedDataset,
+    Array,
+    MultiobjectTrackingTarget,
+    ObjectDetectionTarget,
+    SegmentationTarget,
+)
 from dataeval.utils._array import argmax_label, as_numpy
 from dataeval.utils.data import DatasetKind
 
@@ -19,8 +25,10 @@ class ClassBalance(Operation):
     Select a balanced subset of images based on class distribution.
 
     This selection strategy balances class representation in datasets for classification,
-    object detection, and segmentation tasks. It supports two balancing methods: global
-    (weighted sampling by inverse class frequency) and interclass (equal samples per class).
+    object detection, segmentation and multi-object tracking tasks. It supports two balancing
+    methods: global (weighted sampling by inverse class frequency) and interclass (equal samples
+    per class). For a tracking dataset, an item is a video and its classes are the labels of
+    every frame.
 
     Parameters
     ----------
@@ -100,6 +108,11 @@ class ClassBalance(Operation):
                 labels_raw = target.labels if isinstance(target.labels, Iterable) else [target.labels]
                 for lbl in labels_raw:
                     yield (int(as_numpy(lbl)), img_idx)
+            elif isinstance(target, MultiobjectTrackingTarget):
+                # One item is a video, holding the labels of every frame
+                for frame in target.frame_tracks:
+                    for lbl in np.atleast_1d(as_numpy(frame.labels)):
+                        yield (int(lbl), img_idx)
 
     def _compute_label_stats(
         self,
@@ -109,7 +122,7 @@ class ClassBalance(Operation):
         Compute label statistics for the dataset using core label_stats.
 
         Analyzes the dataset to extract relationships between images and their class labels,
-        supporting classification, object detection, and segmentation tasks.
+        supporting classification, object detection, segmentation and tracking tasks.
 
         Parameters
         ----------
@@ -131,6 +144,7 @@ class ClassBalance(Operation):
         -----
         For classification tasks, each image has exactly one label.
         For detection/segmentation, images may have multiple labels or be empty.
+        For tracking, each item is a video, with the labels of every frame.
         Empty images are tracked separately, not as a class.
         """
         # Get index2label mapping if available
