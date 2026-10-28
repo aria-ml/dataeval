@@ -615,6 +615,12 @@ class TestDuplicatesEdgeCases:
         with pytest.raises(ValueError, match="Either flags must contain hash stats"):
             detector.evaluate(data)
 
+    def test_a_zero_dimensional_array_reaches_the_config_check(self):
+        """Asking whether a 0-d array is a tracking dataset answers no instead of raising, as for Outliers."""
+        detector = Duplicates(flags=ImageStats.NONE, extractor=None)
+        with pytest.raises(ValueError, match="Either flags must contain hash stats"):
+            detector.evaluate(np.zeros(()))
+
     def test_build_dataframe_orientation_with_many_exact_rows(self):
         """Regression: ≥100 exact rows then a near row with string orientation must not
         trigger a polars schema-inference ComputeError."""

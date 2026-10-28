@@ -140,7 +140,11 @@ class TestFrameViewProvenance:
         assert invalidated_stats(View(SequenceFrames(cast(Any, below)), Reverse())) == ImageStats.VISUAL_SHARPNESS
 
     def test_an_outlier_frame_resolves_through_the_frame_view(self):
-        """`Outliers` addresses a frame by its flat position in the frame view."""
+        """`Outliers` over the frame view addresses a frame in the source video's coordinates.
+
+        The flagged address is a keyed `unit` row of the *source* tracking dataset, (video,
+        frame), not a position in the frame view, so it resolves against the source dataset.
+        """
         from dataeval.quality import Outliers
         from verification.helpers import make_tracking_dataset
 
@@ -151,20 +155,19 @@ class TestFrameViewProvenance:
 
         frames = SequenceFrames(dataset)
         flagged = cast(list[Any], list(Outliers().evaluate(frames).outliers))
-        assert len(flagged) == 1
+        assert flagged == [SourceIndex(0, 3, "unit")]
 
-        locator = SourceLocator(frames)
-        assert _located(frames, locator, flagged[0]) == (0, 3)
-        np.testing.assert_array_equal(locator[flagged[0]].pixels, dataset.frame_pixels(0, 3))
+        found = SourceLocator(dataset)[flagged[0]]
+        assert found.level == "unit"
+        np.testing.assert_array_equal(found.pixels, dataset.frame_pixels(0, 3))
 
     def test_a_duplicate_frame_is_reported_in_the_source_videos_coordinates(self):
         """`Duplicates` reads `frame_map` and reports (sequence, frame), not a view position.
 
-        This is the second of two address spaces that meet at the frame view, and the pair
-        is deliberately pinned side by side with the `Outliers` case above: the same object,
-        measured by two evaluators, hands back addresses that resolve against two different
-        datasets. A group member here is a bare tuple rather than a `SourceIndex`, so it
-        cannot be handed to a locator as it stands -- it has to be spelled as an address
+        Like the `Outliers` case above, the same frame view hands back addresses in the
+        source videos' coordinates, which resolve against the source tracking dataset rather
+        than the frame view. A group member here is a bare tuple rather than a `SourceIndex`,
+        so it cannot be handed to a locator as it stands -- it has to be spelled as an address
         against the *source* tracking dataset, where a frame is a keyed `unit` row.
         """
         from dataeval.quality import Duplicates
