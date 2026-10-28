@@ -38,6 +38,7 @@ __all__ = [
     "SegmentationDataset",
     "SegmentationTarget",
     "SequenceLike",
+    "SharpnessMeasure",
     "SingleFrameObjectTrackingTarget",
     "Threshold",
     "ThresholdBounds",
@@ -1004,6 +1005,74 @@ class NamedFeatureExtractor(FeatureExtractor, Protocol):
         NotFittedError
             May be raised if the extractor has not been fitted and cannot yet know
             which columns it will produce.
+        """
+        ...
+
+
+@runtime_checkable
+class SharpnessMeasure(Protocol):
+    """
+    Protocol for the per-cell sharpness measure inside the `PERSISTENCE` blur maps.
+
+    :func:`~dataeval.core.video_stats` compares the same content's sharpness at two places
+    in the frame, so a measure is called on whole frames and answers once per cell of a
+    grid. Pass one as ``blur_measure`` to study another definition of sharpness without
+    touching the rest of the blur maps.
+
+    The maps rely on two properties of a measure. The same content under the same optics
+    gives the same value wherever it sits in the frame, and the ratio of two values means
+    how much sharper one is than the other, so the maps do not change when a measure is
+    multiplied by a constant. Alignment of the frames, the per-pair correction for
+    frame-wide sharpness changes, the solve and the detrending do not depend on the
+    measure.
+
+    The default measure is the per-cell standard deviation of
+    :func:`~dataeval.utils.preprocessing.edge_filter`, the sharpness
+    :func:`~dataeval.core.image_stats` reports.
+
+    A measure that returns another shape than ``grid``, or a non-finite or negative value,
+    makes :func:`~dataeval.core.video_stats` raise a :class:`ValueError` naming it. Videos are
+    measured on several threads at once when :func:`~dataeval.config.set_max_processes`
+    allows, so a measure that keeps state must be safe to call from several threads.
+
+    Example
+    -------
+    A Tenengrad measure, the root mean squared Sobel gradient per cell, with SciPy only:
+
+    >>> import numpy as np
+    >>> from scipy import ndimage
+    >>> from dataeval.protocols import SharpnessMeasure
+    >>>
+    >>> def tenengrad(gray, grid, /):
+    ...     energy = ndimage.sobel(gray, axis=0) ** 2 + ndimage.sobel(gray, axis=1) ** 2
+    ...     rows = np.linspace(0, gray.shape[0], grid[0] + 1).astype(int)
+    ...     cols = np.linspace(0, gray.shape[1], grid[1] + 1).astype(int)
+    ...     sums = np.add.reduceat(np.add.reduceat(energy, rows[:-1], axis=0), cols[:-1], axis=1)
+    ...     return np.sqrt(sums / np.outer(np.diff(rows), np.diff(cols))).astype(np.float32)
+    >>>
+    >>> tenengrad(np.zeros((90, 160), np.float32), (4, 8)).shape
+    (4, 8)
+    >>> isinstance(tenengrad, SharpnessMeasure)
+    True
+    >>> video_stats(videos, stats=VideoStats.PERSISTENCE, blur_measure=tenengrad)  # doctest: +SKIP
+    """
+
+    def __call__(self, gray: NDArray[np.float32], grid: tuple[int, int], /) -> NDArray[np.float32]:
+        """
+        Measure the sharpness of each cell of one frame.
+
+        Parameters
+        ----------
+        gray : NDArray[np.float32]
+            One full-resolution grayscale frame, shape ``(H, W)``, with values in [0, 255].
+        grid : tuple[int, int]
+            The number of rows and columns of cells the frame is divided into.
+
+        Returns
+        -------
+        NDArray[np.float32]
+            One finite, non-negative value per cell, shape ``grid``, higher meaning sharper.
+            Zero is allowed, as on a flat cell such as a letterbox bar.
         """
         ...
 

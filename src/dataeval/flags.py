@@ -289,21 +289,37 @@ class VideoStats(Flag):
     - `EGO_ROLL_EXCURSION` : Total absolute roll (``roll_rate_excursion``)
     - `EGO_MOTION` : Most common per-frame motion label (``motion_mode``)
 
+    Persistence Statistics (experimental: the map shape, column names and keywords may change,
+    and selecting any of them raises :class:`~dataeval.exceptions.ExperimentalWarning` once
+    per process; per-video maps of 48 x 85 cells, measured where the scene moves behind the
+    camera; need OpenCV, from the ``dataeval[opencv]`` extra):
+
+    - `PERSISTENCE_EGO` : Share of each cell's pixels that stay unchanged while the scene behind
+      them moves, such as a burned-in overlay or a part of the vehicle; this is what is fixed to
+      the camera, not ego motion (``ego_map``)
+    - `PERSISTENCE_BLUR` : Natural log of how much each cell softens the same content, relative to
+      the video's average, with blur wider than `blur_sigma` cells removed (``blur_map``)
+    - `PERSISTENCE_BLUR_RAW` : The same, before that removal (``blur_map_raw``)
+
     Convenience Groups
     ------------------
     - `NONE` : No statistics
     - `DESCRIPTIVE` : All descriptive statistics
     - `REDUNDANCY` : All redundancy statistics
     - `EGO` : All ego-motion statistics
-    - `NO_EGO` : All statistics that do not need camera ego-motion. The default for
+    - `PERSISTENCE` : All persistence statistics (experimental)
+    - `NO_EGO` : All statistics that need no OpenCV. The default for
       :func:`~dataeval.core.video_stats`
-    - `ALL` : All available statistics
+    - `ALL` : All available statistics, including the experimental persistence statistics
 
     Notes
     -----
     Every `EGO` statistic comes out of one optical-flow fit per frame pair, and the flow fit
     dominates the cost. Selecting any one `EGO` flag pays for the whole fit; the rest only
     choose which columns come back.
+
+    Selecting any `PERSISTENCE` flag computes ``ego_map``, which the blur maps rely on, and
+    selecting either blur flag pays for one solve that gives both blur maps.
 
     Examples
     --------
@@ -341,6 +357,11 @@ class VideoStats(Flag):
     EGO_ROLL_EXCURSION = auto()
     EGO_MOTION = auto()
 
+    # ===== PERSISTENCE STATS =====
+    PERSISTENCE_EGO = auto()
+    PERSISTENCE_BLUR = auto()
+    PERSISTENCE_BLUR_RAW = auto()
+
     # ===== GROUPS =====
     DESCRIPTIVE = DESCRIPTIVE_FRAME_COUNT | DESCRIPTIVE_DURATION | DESCRIPTIVE_FRAME_RATE
     REDUNDANCY = REDUNDANCY_FRACTION | REDUNDANCY_LONGEST_RUN
@@ -358,7 +379,9 @@ class VideoStats(Flag):
         | EGO_MOTION
     )
 
+    PERSISTENCE = PERSISTENCE_EGO | PERSISTENCE_BLUR | PERSISTENCE_BLUR_RAW
+
     NO_EGO = DESCRIPTIVE | REDUNDANCY
 
     # Ultimate convenience
-    ALL = NO_EGO | EGO
+    ALL = NO_EGO | EGO | PERSISTENCE

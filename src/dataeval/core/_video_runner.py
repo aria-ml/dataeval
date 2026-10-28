@@ -20,7 +20,7 @@ from numpy.typing import NDArray
 from dataeval.config import get_max_processes
 from dataeval.core._hash import _phash
 from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
-from dataeval.protocols import AnnotatedDataset, Dataset, ProgressCallback, VideoStream
+from dataeval.protocols import AnnotatedDataset, Dataset, ProgressCallback, SharpnessMeasure, VideoStream
 from dataeval.utils._array import as_numpy
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import normalize_image_shape, to_canonical_grayscale
@@ -93,6 +93,10 @@ class VideoOptions(NamedTuple):
     ego_flow: Literal["dis", "lk"] = "dis"
     ego_grid_target: int = 40
     ego_mask: NDArray[np.bool_] | None = None
+    # None when no blur map is wanted, so a calculator never pays for a measure nobody reads.
+    blur_measure: SharpnessMeasure | None = None
+    blur_sigma: float = 6.0
+    persistence_samples: int = 64
 
 
 class FrameView:
