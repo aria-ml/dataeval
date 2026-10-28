@@ -323,3 +323,53 @@ def test_rows_stay_in_item_order_when_videos_finish_out_of_order():
     assert finished[-1] == 0, "the first video must finish last for this test to mean anything"
     assert result["stats"]["n_frames"].tolist() == sizes
     assert [s.item for s in result["source_index"]] == [0, 1, 2]
+
+
+def test_persistence_is_in_all_but_not_the_default():
+    assert VideoStats.PERSISTENCE == (
+        VideoStats.PERSISTENCE_EGO | VideoStats.PERSISTENCE_BLUR | VideoStats.PERSISTENCE_BLUR_RAW
+    )
+    assert VideoStats.PERSISTENCE in VideoStats.ALL
+    assert not VideoStats.PERSISTENCE & VideoStats.NO_EGO
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error", "match"),
+    [
+        ({"blur_sigma": 0.0}, ValueError, "blur_sigma"),
+        ({"blur_sigma": float("nan")}, ValueError, "blur_sigma"),
+        ({"blur_sigma": float("inf")}, ValueError, "blur_sigma"),
+        ({"persistence_samples": 0}, ValueError, "persistence_samples"),
+        ({"blur_measure": "edge"}, TypeError, "blur_measure"),
+    ],
+)
+def test_bad_persistence_parameters_are_refused_before_reading(kwargs, error, match):
+    with pytest.raises(error, match=match):
+        video_stats(cast(Any, _Unreadable()), stats=VideoStats.PERSISTENCE, **kwargs)
+
+
+def test_persistence_parameters_are_ignored_without_persistence_flags():
+    video_stats(
+        _stream(3),
+        stats=VideoStats.DESCRIPTIVE,
+        blur_sigma=0.0,
+        persistence_samples=0,
+        blur_measure=cast(Any, "edge"),
+    )
+
+
+def test_missing_opencv_fails_before_reading_for_persistence(monkeypatch):
+    import dataeval.core._ego_stats as ego
+
+    monkeypatch.setattr(ego, "_require_cv2", lambda: (_ for _ in ()).throw(ImportError("opencv")))
+    with pytest.raises(ImportError):
+        video_stats(cast(Any, _Unreadable()), stats=VideoStats.PERSISTENCE_EGO)
+
+
+def test_map_columns_stack_on_the_report_grid():
+    from dataeval.core._video_stats import _column
+
+    column = _column("ego_map", [np.zeros((48, 85)), np.ones((48, 85))])
+    assert column.shape == (2, 48, 85)
+    assert column.dtype == np.float64
+    assert _column("blur_map", []).shape == (0, 48, 85)

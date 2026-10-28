@@ -129,6 +129,7 @@ def test_shared_views_are_computed_once_per_frame(monkeypatch):
     assert len(calls) == 5
 
 
+@pytest.mark.filterwarnings("ignore:.*PERSISTENCE.* experimental:dataeval.exceptions.ExperimentalWarning")
 def test_a_walk_holds_a_bounded_number_of_frames():
     alive: list[weakref.ref[Any]] = []
     peak = 0

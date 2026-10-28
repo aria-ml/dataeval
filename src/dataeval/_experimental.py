@@ -31,6 +31,22 @@ def quiet_experimental() -> Iterator[None]:
         _QUIET.reset(token)
 
 
+_WARNED: set[str] = set()
+
+
+def warn_experimental_once(name: str, *, details: str | None = None, stacklevel: int = 3) -> None:
+    """Warn once per process that `name` is experimental, for what ``@experimental`` cannot mark, such as a flag.
+
+    Silent, and not marked as given, inside :func:`quiet_experimental`. The default `stacklevel` points at the
+    caller of the function that calls this helper.
+    """
+    if name in _WARNED or _QUIET.get():
+        return
+    _WARNED.add(name)
+    msg = _make_warning_message(name, "experimental", details=details)
+    warnings.warn(msg, ExperimentalWarning, stacklevel=stacklevel)
+
+
 def _make_warning_message(  # noqa: C901
     name: str,
     kind: str,
