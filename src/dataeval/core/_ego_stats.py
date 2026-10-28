@@ -838,7 +838,8 @@ class EgoFactors(TypedDict):
     item_index : Sequence[int]
         Dataset item the frame belongs to.
     unit_index : Sequence[int]
-        Frame's position within its own sequence, zero-based.
+        Frame's own number within its sequence: its ``frame_index`` where it declares one, otherwise
+        its zero-based position.
     pan_x, pan_y : Sequence[float]
         Signed pan/tilt at the image center, full-resolution pixels per frame.
     pan_speed : Sequence[float]
@@ -929,7 +930,7 @@ EGO_AGGREGATIONS: tuple[Aggregator, ...] = (
 def _frame_rows(
     readings: Sequence[_PairReading | None],
     scales: Sequence[float],
-    n_frames: int,
+    numbers: Sequence[int],
     gap: int,
     half_diagonal: float,
 ) -> dict[str, list[Any]]:
@@ -940,15 +941,16 @@ def _frame_rows(
     frame of the new shot is accurate, because that frame is discontinuous from its
     predecessor. Attributing it to the last frame of the old shot would not be.
 
+    `numbers` holds each frame's own number, which keys its row; pairs and the gap count stream positions.
     `scales` only puts each pair in the first frame's units for the temporal gate. The rows
     report every pixel quantity in the pixels of the pair it was measured on.
     """
     temporal = _temporal_outliers(readings, half_diagonal, scales)
     rows: dict[str, list[Any]] = {name: [] for name in EgoFactors.__annotations__ if name != "item_index"}
-    for frame in range(n_frames):
+    for frame in range(len(numbers)):
         pair = readings[frame - gap] if frame >= gap else None
         trusted = pair is not None and pair.trusted and not temporal[frame - gap]
-        rows["unit_index"].append(frame)
+        rows["unit_index"].append(numbers[frame])
         rows["ego_trusted"].append(bool(trusted))
         rows["mover_frac"].append(pair.mover_frac if pair is not None else np.nan)
         rows["mover_speed"].append(pair.mover_speed if pair is not None else np.nan)
@@ -1152,20 +1154,20 @@ class _EgoEngine:
         self._scales: list[float] = []
         self._overlay = None if options.ego_mask is None else _OverlayMask(options.ego_mask, mask_name)
         self._full_wh: tuple[int, int] | None = None
-        self._n_frames = 0
+        self._numbers: list[int] = []
 
     def update(self, view: FrameView) -> None:
         """Measure the pair the frame closes, if any."""
         full_wh = (int(view.pixels.shape[-1]), int(view.pixels.shape[-2]))
         if self._full_wh is None:
             self._full_wh = full_wh
-        self._n_frames += 1
+        self._numbers.append(view.number)
         current = _flow_frame(view)
         # Fitted before the pair is measured, so a bad geometry raises at the first frame of a size.
         fitted = None if self._overlay is None or current is None else self._overlay.fit(full_wh, current.gray.shape)
         previous = self._pairs.push(current)
         gap = self._options.ego_gap
-        if self._n_frames <= gap:
+        if len(self._numbers) <= gap:
             return
         # An unreadable frame refuses both pairs it is in.
         reading = (
@@ -1183,7 +1185,7 @@ class _EgoEngine:
     def frame_rows(self) -> dict[str, list[Any]]:
         """Lay the video's pair readings out as one row per frame."""
         half_diagonal = 0.0 if self._full_wh is None else 0.5 * float(np.hypot(*self._full_wh))
-        return _frame_rows(self._readings, self._scales, self._n_frames, self._options.ego_gap, half_diagonal)
+        return _frame_rows(self._readings, self._scales, self._numbers, self._options.ego_gap, half_diagonal)
 
 
 def _measure_video(options: VideoOptions, max_frames: int | None, stream: VideoStream) -> dict[str, list[Any]]:
@@ -1258,7 +1260,7 @@ def ego_stats(
         The cost is more independent movement inside the pair. Every rate is divided by
         `gap`, so the reported units are per frame either way. A reading is attributed to
         the later frame of its pair, so the leading `gap` frames of every sequence are
-        NaN.
+        NaN. Gaps and rates count stream steps (decoded frames), not source frame numbers.
     proc_short_side : int, default 360
         Frames are downscaled to this short side before flow is computed. Rates are
         resolution-free and speeds are scaled back up, so each speed is in the full-resolution

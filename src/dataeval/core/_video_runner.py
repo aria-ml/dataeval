@@ -21,6 +21,7 @@ from dataeval.config import get_max_processes
 from dataeval.core._hash import _phash
 from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
 from dataeval.protocols import AnnotatedDataset, Dataset, ProgressCallback, SharpnessMeasure, VideoStream
+from dataeval.types._track import frame_number
 from dataeval.utils._array import as_numpy
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import normalize_image_shape, to_canonical_grayscale
@@ -109,6 +110,8 @@ class FrameView:
     def __init__(self, frame: Any, index: int, options: VideoOptions) -> None:
         self._frame = frame
         self.index = index
+        # The frame's own number, which Metadata keys the frame by; `index` stays the stream position.
+        self.number = frame_number(frame, index)
         self.options = options
         # Read off the frame object, never through the pixels, so timing costs no decode.
         self.time_s: float | None = getattr(frame, "time_s", None)
