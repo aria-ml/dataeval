@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval import Embeddings, Metadata
 from dataeval._helpers import _get_index2label, _get_item_indices, lexical_categorical, reject_filtered_metadata
+from dataeval._log import get_logger
 from dataeval.core import (
     ClusterResult,
     ClusterStats,
@@ -20,6 +21,7 @@ from dataeval.core import (
     compute_cluster_stats,
 )
 from dataeval.core._combination_scores import _named_groups
+from dataeval.data import SequenceFrames
 from dataeval.exceptions import MaiteShapeError
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
@@ -77,6 +79,7 @@ from dataeval.quality._shared import (
     resolve_levels,
     row_kinds,
     selected_by_flags,
+    yields_frames,
 )
 from dataeval.types import (
     ArrayND,
@@ -96,6 +99,8 @@ from dataeval.utils.thresholds import ZScoreThreshold, resolve_threshold
 
 DEFAULT_OUTLIERS_FLAGS = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
 DEFAULT_OUTLIERS_CLUSTER_THRESHOLD: Threshold = ZScoreThreshold(upper_multiplier=2.5, lower_multiplier=None)
+
+_logger = get_logger(__name__)
 
 
 OutlierReasons = Sequence[str]
@@ -1785,6 +1790,93 @@ def _annotated_metadata(data: Any) -> Metadata | None:
         return None
 
 
+def _add_measured_factors(
+    built: Metadata, stats: StatsResult, source_index: Sequence[SourceIndex] | None = None
+) -> list[str]:
+    """Add a stats result's scalar statistics to `built` as factors, returning the ordered ones added."""
+    before = set(built.factor_names)
+    # A factor is one value per row; the vector-valued statistics (histogram, percentiles) are not thresholded.
+    scalar = {name: values for name, values in stats["stats"].items() if np.ndim(values) == 1}
+    built.add_factors(cast(Any, {**stats, "stats": scalar}), source_index=source_index)
+    # A stat that is a flag rather than a quantity, such as an invalid box, is not thresholded.
+    return [name for name in built.factor_names if name not in before and factor_kind(built, name) == "ordered"]
+
+
+def _roll_up(built: Metadata, added: Sequence[str], plan: LevelPlan) -> tuple[Metadata, list[str]]:
+    """Roll the frame and detection statistics up to the videos and tracks the plan judges, by their median."""
+    at = factor_levels(built)
+    names: list[str] = []
+    pairs: tuple[tuple[FactorLevel, FactorLevel, str], ...] = (
+        ("unit", "sequence", "unit_"),
+        ("instance", "track", "instance_"),
+    )
+    for source, target, prefix in pairs:
+        stems = {name: name.removeprefix(prefix) for name in added if at[name] == source}
+        if target not in plan.levels or not stems:
+            continue
+        exprs = [pl.col(name).median().alias(f"{target}_{stem}") for name, stem in stems.items()]
+        built = built.agg(source, target, *exprs)
+        names.extend(f"{target}_{stem}" for stem in stems.values())
+    return built, names
+
+
+def _refuse_unjudged(measured: Mapping[str, FactorLevel], plan: LevelPlan, n_rows: int) -> None:
+    """Refuse a video plan that judges none of the measured statistics, saying why."""
+    if not n_rows:
+        # `_video_frames` refused a view that keeps no frames, and any kept frame is a row unless per_image=False,
+        # so only detections were measured, and there are none.
+        raise ValueError(
+            "Outliers.evaluate: this dataset has no detections to judge; pass per_image=True to judge its frames."
+        )
+    if not measured:
+        raise ValueError(
+            "Outliers.evaluate: the statistics `flags` asks for hold no ordered value to threshold; "
+            "include ImageStats.PIXEL or ImageStats.VISUAL, for example."
+        )
+    # Called only for its raise: no measured statistic lives at a planned level.
+    _factors_at_planned_levels(measured, plan, {level: level for level in measured.values()}, named=False)
+
+
+def _refuse_foreign_metadata(metadata: MetadataLike | None, built: Metadata) -> None:
+    """Refuse a `metadata=` that is not the Metadata of the tracking dataset evaluated.
+
+    Checked before it supplies classes or strata, whose rows would otherwise be matched to the wrong frames and
+    detections, or to none, without a word.
+    """
+    if metadata is None:
+        return
+    if not has_level_schema(metadata) or "sequence" not in cast(Metadata, metadata).levels:
+        raise ValueError(
+            "Outliers.evaluate: metadata= must be the Metadata of this tracking dataset, Metadata(dataset); "
+            "this one has no tracking levels."
+        )
+    held, expected = dict(cast(Metadata, metadata).level_counts), dict(built.level_counts)
+    if held != expected:
+        raise ValueError(
+            f"Outliers.evaluate: metadata= holds {held} rows by level and this tracking dataset holds {expected}; "
+            "pass the metadata of the data evaluated, Metadata(dataset)."
+        )
+
+
+def _video_frames(data: Any) -> SequenceFrames:
+    """Present a tracking dataset as every one of its frames; a frame view is measured as given."""
+    frames = data if isinstance(data, SequenceFrames) else SequenceFrames(data)
+    # Read before `n_dropped`, which a selector that cannot plan only learns by walking -- and
+    # asking for the map is what walks it.
+    kept = len(frames.frame_map)
+    if not kept:
+        raise ValueError(f"Outliers.evaluate: {frames.selector!r} kept no frames, so there is nothing to judge.")
+    if frames.n_dropped:
+        _logger.info(
+            "Outliers: measuring %d of %d frame(s); %r dropped the rest. Every unweighted statistic "
+            "therefore describes the frames kept rather than the source stream.",
+            kept,
+            frames.n_source_frames,
+            frames.selector,
+        )
+    return frames
+
+
 def _check_metadata_evaluate_preconditions(data: Any, other: Sequence[Any], has_extractor: bool) -> None:
     """Validate a metadata `evaluate()` call before any factor is read."""
     if other:
@@ -1811,14 +1903,15 @@ def _plan_for(
     tracking: bool,
     subject: str,
 ) -> LevelPlan:
-    """Resolve which levels to judge, refusing a tracking name on a dataset."""
-    if subject == "dataset" and levels is not None:
+    """Resolve which levels to judge, refusing a tracking name on an image dataset."""
+    if subject == "dataset" and not tracking and levels is not None:
         named = {levels} if isinstance(levels, str) else set(levels)
         tracking_only = sorted(named & set(TRACKING_LEVEL_NAMES))
         if tracking_only:
             raise ValueError(
-                f"Outliers.evaluate: levels {tracking_only} are tracking levels, which a dataset does not report "
-                "yet. Pass a Metadata (Metadata(dataset) plus add_factors) to judge them."
+                f"Outliers.evaluate: levels {tracking_only} are tracking levels, which an image dataset does not "
+                "have; it accepts ['item', 'target']. Pass a tracking dataset, or a Metadata of one "
+                "(Metadata(dataset) plus add_factors), to judge them."
             )
     return resolve_levels(levels, per_image, per_target, tracking, caller="Outliers.evaluate", subject=subject)
 
@@ -1934,16 +2027,47 @@ class _Requested(NamedTuple):
     neighbors: Sequence[str] | Literal["all"] | None
 
 
+_METADATA_ROUTE = (
+    "pass the Metadata itself as `data`: Metadata(dataset), with the statistics to judge added by add_factors "
+    "(for a tracking dataset, placed on its rows by SequenceFrames.to_source)."
+)
+
+
 def _refuse_factor_arguments(factors: Sequence[str] | None, checks: _Requested) -> None:
-    """Refuse the arguments that read metadata factors on a dataset."""
+    """Refuse the arguments that read metadata factors on a dataset, image or tracking, naming the Metadata route."""
     if factors is not None:
-        raise ValueError(
-            "Outliers.evaluate: `factors` names metadata factors to threshold; pass the Metadata itself as `data`."
-        )
+        raise ValueError(f"Outliers.evaluate: `factors` names metadata factors to threshold; {_METADATA_ROUTE}")
     if any(value is not None for value in checks):
         raise ValueError(
-            "Outliers.evaluate: combinations=, given=, kinds= and neighbors= read metadata factors; pass the Metadata."
+            f"Outliers.evaluate: combinations=, given=, kinds= and neighbors= read metadata factors; {_METADATA_ROUTE}"
         )
+
+
+def _refuse_video_arguments(
+    data: Any,
+    other: Sequence[Any],
+    extractor: FeatureExtractor | None,
+    factors: Sequence[str] | None,
+    checks: _Requested,
+) -> None:
+    """Refuse what a tracking dataset does not support, before any frame is decoded."""
+    if not all(yields_frames(dataset) for dataset in (data, *other)):
+        raise ValueError(
+            "Outliers.evaluate: cannot combine tracking datasets with image datasets in one call. A tracking "
+            "dataset's item index is a video and an image dataset's is an image, so the rows would address two "
+            "different things under one column."
+        )
+    if other:
+        raise ValueError(
+            "Outliers.evaluate: several datasets are not supported for tracking datasets yet; evaluate each."
+        )
+    if extractor is not None:
+        raise ValueError(
+            "Outliers.evaluate: cluster-based detection on a tracking dataset is not supported; the frames of one "
+            "video cluster together, so a frame's cluster distance mostly says which video it is from. Use "
+            "`from_clusters` over `Embeddings(SequenceFrames(dataset))`."
+        )
+    _refuse_factor_arguments(factors, checks)
 
 
 def _family(data: Any, name: str, kinds: Mapping[str, ColumnKind]) -> str | None:
@@ -2163,6 +2287,8 @@ class Outliers(Evaluator):
        outliers based on distance from cluster centers in embedding space.
 
     Both methods can be used together or independently based on the ``flags`` parameter.
+    A tracking dataset is judged by image statistics only, in video terms: its videos,
+    frames, tracks and detections. See :meth:`evaluate`.
 
     Parameters
     ----------
@@ -2213,6 +2339,9 @@ class Outliers(Evaluator):
     stats : StatsResult
         Statistics computed during the last evaluate() call.
         Contains dimension, pixel, and/or visual statistics based on the flags.
+        On a tracking dataset these are the frame view's statistics, addressed by position in
+        the frame view rather than by video; the result's rows are the same statistics
+        addressed in the source dataset.
     flags : ImageStats
         Statistics to compute for outlier detection.
     outlier_threshold : ThresholdLike | Mapping[str, ThresholdLike] | None
@@ -2889,10 +3018,22 @@ class Outliers(Evaluator):
             A plain array or list of image arrays also structurally satisfies
             :class:`~dataeval.protocols.Dataset` and is accepted directly.
 
+            A multi-object-tracking dataset is measured frame by frame, every frame, and judged in
+            video terms: its videos, frames, tracks and detections (see `levels`). To measure fewer
+            frames, pass a :class:`~dataeval.data.SequenceFrames` whose selector chooses them, such
+            as ``SequenceFrames(dataset, Stride(5))``; it is judged in the same terms, and every
+            unweighted statistic then describes the frames kept. Statistics are computed once per
+            measured frame, plus once per detection with ``per_target=True`` or a track or
+            detection level in `levels`. Each video's stream
+            is read more than once per call; selecting fewer frames reduces the statistics
+            computed, not the reads.
+
             `data` may instead be a :class:`~dataeval.Metadata` as a whole, whose ordered
             factors at the judged levels (see `levels`) are thresholded, each against the rows
             at the level it was measured at (a track against tracks, a frame against frames).
             Only raw values are read; bins never are.
+
+            .. versionadded:: 1.2
         *other : Dataset
             Zero or more additional datasets for cross-dataset outlier
             detection, each accepting the same forms as ``data``. When provided,
@@ -2900,16 +3041,39 @@ class Outliers(Evaluator):
             item's originating dataset.
         levels : str or Sequence[str] or None, default None
             Which levels to judge. An image or detection dataset, or a :class:`~dataeval.Metadata` of
-            one, accepts ``"item"`` and ``"target"``; a tracking metadata accepts ``"sequence"``,
-            ``"unit"`` (a frame), ``"track"`` and ``"instance"`` (a detection).
+            one, accepts ``"item"`` and ``"target"``; a tracking dataset or a tracking metadata
+            accepts ``"sequence"`` (a video), ``"unit"`` (a frame), ``"track"`` and ``"instance"``
+            (a detection).
 
             This and ``per_image``/``per_target`` are two spellings of one thing, so passing both
-            raises. Without either, a tracking metadata judges its sequence and frame levels, as
-            :class:`~dataeval.quality.Duplicates` does, so judge track factors with
+            raises. Without either, a tracking dataset or metadata judges its sequence and frame
+            levels, as :class:`~dataeval.quality.Duplicates` does, so judge track factors with
             ``levels="track"``. ``per_target=True`` adds every detection and track.
 
-            A dataset accepts only ``"item"`` and ``"target"`` until it can report tracking levels;
-            pass a :class:`~dataeval.Metadata` to judge the others.
+            On a tracking dataset, a video's value of a statistic is its median over the video's
+            measured frames, named ``sequence_<statistic>``, and a track's is its median over the
+            track's measured detections, named ``track_<statistic>``. A statistic measured at one
+            level has its plain name, such as ``brightness``, unless the tracking metadata
+            already holds that name (the frame size it records as ``width`` and ``height``, or a
+            key of a video's datum metadata); it is then named ``<statistic>_added``, such as
+            ``width_added`` and ``sequence_width_added``. When frames and detections are both
+            measured, as with ``per_target=True`` or a track or detection level in `levels`, the
+            names carry their level: ``unit_brightness``, ``instance_brightness`` and
+            ``unit_width``. A statistic's name therefore depends on what was measured;
+            :attr:`OutliersOutput.populations` lists every name judged in its ``metric_name``
+            column, so filter on those. By
+            default each level is judged against all of its rows in the dataset. A statistical
+            threshold needs at least 20 rows, so with a statistical threshold the sequence level is
+            judged only with 20 or more videos; with fewer, :attr:`OutliersOutput.populations`
+            shows it with ``judged`` false and the reason ``"below 20 rows"``.
+
+            Because frames are judged against every frame of the dataset, a video that is dark
+            throughout, such as one shot at night, is a sequence row and also a row for each of
+            its frames. To judge the videos against each other and each frame against its own
+            video, make two calls: ``levels=["sequence", "track"]``, then ``levels="unit",
+            strata="item_index"``. The second call names only the frame level because `strata`
+            applies to every level judged: with a statistical threshold, a video's own stratum
+            holds one sequence row, too few to judge.
 
             .. versionadded:: 1.2
         per_image : bool or None, default None
@@ -2920,14 +3084,21 @@ class Outliers(Evaluator):
             When True, the ``.outliers`` accessor uses :class:`SourceIndex` keys;
             when False, it uses plain ``int`` item indices.
             Has no effect for datasets without targets or for cluster-based detection.
-            None is False, unless `levels` is given.
+            None is False, unless `levels` is given. On a tracking dataset, True measures every
+            detection of every measured frame and adds the track and detection levels.
         per_class : bool, default False
             Whether to compute outlier thresholds within each class separately,
             rather than globally across the entire dataset. When True, ``metadata``
-            must be provided. Only applies to image statistics-based detection,
+            must be provided, except for a tracking dataset, which reads its classes from
+            ``metadata`` when given and from the metadata it builds otherwise; there only
+            detections have a class, so the other levels are judged as one population. Only
+            applies to image statistics-based detection,
             not cluster-based detection.
         metadata : MetadataLike or None, default None
-            Metadata object containing class labels. Required when ``per_class=True``.
+            Metadata object containing class labels. Required when ``per_class=True``, except
+            for a tracking dataset, which reads its classes and strata from this when given and
+            from the metadata it builds otherwise; this one is read, not changed, and must be the
+            ``Metadata(dataset)`` of the dataset evaluated, with the same rows at every level.
             This is a secondary, per-class grouping input for image-statistics
             detection only; it is not an alternative to ``data`` and does not
             itself supply the images to scan.
@@ -2944,8 +3115,15 @@ class Outliers(Evaluator):
             fitted within each stratum, and every flagged row names its stratum in a
             ``population`` column. Several names cross. A bare string is one name. See
             :meth:`OutliersOutput.stratified`, which this equals on the result of a call
-            without it. On a dataset, `metadata` must be a :class:`~dataeval.Metadata` that
-            holds the strata. Cluster-based detection is not stratified.
+            without it. On an image dataset, `metadata` must be a :class:`~dataeval.Metadata`
+            that holds the strata; a tracking dataset reads them from `metadata` when given and
+            from the metadata it builds otherwise. Cluster-based detection is not stratified.
+
+            On a tracking dataset the strata apply to every level judged, and a stratum reaches
+            its own level and the levels below it. ``strata="item_index"`` therefore makes each
+            video a sequence population of one row and, with a statistical threshold, leaves it
+            unjudged and judges a video's frames only when it has 20 or more measured frames. See
+            `levels` for the two calls that judge videos together and frames within their video.
 
             On a :class:`~dataeval.Metadata`, the categorical factors (see `factors`) are judged
             by rarity within the strata, apart from the strata themselves; see
@@ -3035,14 +3213,27 @@ class Outliers(Evaluator):
             ``level`` column, and its ``target_index`` holds the level's own key:
             ``track_id`` for a track, ``unit_index`` for a unit.
 
+            For a tracking dataset, or a :class:`~dataeval.data.SequenceFrames` over one, rows are
+            addressed in the source dataset. ``item_index`` is the video's position in it, and
+            ``target_index`` holds the frame's own ``frame_index`` for a frame, the ``track_id``
+            for a track, the detection's position among its video's detections for a detection,
+            and null for a video. ``level`` is ``"unit"`` for a frame and ``"track"`` for a
+            track, and null for a video and for a detection. The result holds the source dataset
+            and the tracking metadata built for it, and :attr:`OutliersOutput.sequences`,
+            :attr:`~OutliersOutput.frames`, :attr:`~OutliersOutput.tracks` and
+            :attr:`~OutliersOutput.detections` select the rows of one level. A statistic whose name
+            the tracking metadata already holds (the frame size it records as ``width`` and
+            ``height``, or a key of a video's datum metadata) has the ``metric_name``
+            ``<statistic>_added``; :attr:`OutliersOutput.populations` lists every name judged.
+
         Raises
         ------
         ValueError
             If ``flags`` is ``ImageStats.NONE`` and no ``extractor`` is provided.
             If both ``per_image`` and ``per_target`` are False.
-            If ``per_class`` is True and ``metadata`` is None.
+            If ``per_class`` is True and ``metadata`` is None for an image dataset.
             If `levels` is given together with `per_image` or `per_target`, is empty, or names a
-            level the data does not have; if `levels` names a tracking level for a dataset.
+            level the data does not have; if `levels` names a tracking level for an image dataset.
             If `factors` is given without a Metadata as `data`, or is empty; if a named factor
             is ineligible, categorical without `strata`, or lives at a level `levels` or the
             flags do not judge; if a named categorical factor lives at a level `strata` do not
@@ -3050,8 +3241,15 @@ class Outliers(Evaluator):
             if the levels judged hold no ordered factor and no other check runs; if a Metadata is
             evaluated with an ``extractor``.
             If `strata` is given with ``per_class=True``, names a continuous factor, reaches
-            none of the judged levels, or is given for a dataset without a
+            none of the judged levels, or is given for an image dataset without a
             :class:`~dataeval.Metadata` as `metadata`.
+            For a tracking dataset, or a :class:`~dataeval.data.SequenceFrames` over one: if an
+            ``extractor`` is set, since cluster-based detection is not supported there; if
+            `other` is given, or tracking and image datasets are mixed in one call; if ``flags``
+            is ``ImageStats.NONE`` or measures no ordered statistic; if the frame view keeps no
+            frames; if only detections are judged and the dataset has none; if `metadata` has no
+            tracking levels or holds other row counts by level than the dataset; or if a video
+            repeats a ``frame_index``.
             If `combinations`, `given` or `kinds` is given for a dataset; if a group has one column,
             mixes levels on different branches of the level schema, or is scored at a level the call
             does not judge; if a categorical group has no stratum reaching its level, or holds a
@@ -3160,6 +3358,29 @@ class Outliers(Evaluator):
         ╞════════════╪══════════════╪═══════════════════════════╪══════════════╪═══════════╡
         │ 2          ┆ 30           ┆ brightness along sequence ┆ 162.805554   ┆ neighbors │
         └────────────┴──────────────┴───────────────────────────┴──────────────┴───────────┘
+
+        Judge a tracking dataset in video terms. In 24 videos of 30 frames, the last of which is
+        dark throughout, that video is one row per flagged statistic at the sequence level:
+
+        >>> result = Outliers().evaluate(tracking_dataset)  # doctest: +SKIP
+        >>> result.sequences.data().select("item_index", "metric_name", "metric_value")  # doctest: +SKIP
+        shape: (3, 3)
+        ┌────────────┬─────────────────────┬──────────────┐
+        │ item_index ┆ metric_name         ┆ metric_value │
+        │ ---        ┆ ---                 ┆ ---          │
+        │ i64        ┆ cat                 ┆ f64          │
+        ╞════════════╪═════════════════════╪══════════════╡
+        │ 23         ┆ sequence_brightness ┆ 40.5         │
+        │ 23         ┆ sequence_darkness   ┆ 40.5         │
+        │ 23         ┆ sequence_mean       ┆ 40.5         │
+        └────────────┴─────────────────────┴──────────────┘
+
+        Each of its frames is flagged too, against every frame of the dataset. Judged against
+        the frames of its own video instead, none is:
+
+        >>> frames = Outliers().evaluate(tracking_dataset, levels="unit", strata="item_index")  # doctest: +SKIP
+        >>> len(frames)  # doctest: +SKIP
+        0
         """
         # Every input, not just the first: a filtered metadata among ``other`` misaligns
         # the same way, and is the one an evaluator handed several datasets is likeliest
@@ -3167,6 +3388,7 @@ class Outliers(Evaluator):
         for candidate in (metadata, data, *other):
             reject_filtered_metadata(candidate, "Outliers")
         strata = _strata_names(strata, per_class)
+        checks = _Requested(combinations, given, kinds, neighbors)
 
         if is_metadata(data):
             return self._evaluate_metadata(
@@ -3179,9 +3401,20 @@ class Outliers(Evaluator):
                 metadata=metadata,
                 factors=factors,
                 strata=strata,
-                checks=_Requested(combinations, given, kinds, neighbors),
+                checks=checks,
             )
-        _refuse_factor_arguments(factors, _Requested(combinations, given, kinds, neighbors))
+        if any(yields_frames(dataset) for dataset in (data, *other)):
+            _refuse_video_arguments(data, other, self.extractor, factors, checks)
+            return self._evaluate_video(
+                data,
+                levels=levels,
+                per_image=per_image,
+                per_target=per_target,
+                per_class=per_class,
+                metadata=metadata,
+                strata=strata,
+            )
+        _refuse_factor_arguments(factors, checks)
 
         plan = _plan_for(levels, per_image, per_target, tracking=False, subject="dataset")
         if other:
@@ -3316,12 +3549,7 @@ class Outliers(Evaluator):
             per_target=per_target,
             normalize_pixel_values=False,
         )[0]
-        before = set(built.factor_names)
-        # A factor is one value per row; the vector-valued statistics (histogram, percentiles) are not thresholded.
-        scalar = {name: values for name, values in self.stats["stats"].items() if np.ndim(values) == 1}
-        built.add_factors(cast(Any, {**self.stats, "stats": scalar}))
-        # A stat that is a flag rather than a quantity, such as an invalid box, is not thresholded.
-        added = [name for name in built.factor_names if name not in before and factor_kind(built, name) == "ordered"]
+        added = _add_measured_factors(built, self.stats)
         result = self._evaluate_metadata(
             built,
             (),
@@ -3344,6 +3572,67 @@ class Outliers(Evaluator):
             result.cluster_threshold = self.cluster_threshold
             result = result._redetect()
         return result._attach(data, built)
+
+    def _evaluate_video(
+        self,
+        data: Any,
+        *,
+        levels: str | Sequence[str] | None,
+        per_image: bool | None,
+        per_target: bool | None,
+        per_class: bool,
+        metadata: MetadataLike | None,
+        strata: Sequence[str] | None,
+    ) -> OutliersOutput[Any]:
+        """Judge a tracking dataset in video terms, through the tracking metadata of its source, and attach both.
+
+        Equivalent to ``Metadata(dataset)`` with ``add_factors`` of the frame view's statistics, placed on the source
+        rows by :meth:`~dataeval.data.SequenceFrames.to_source`, then :meth:`evaluate` of that metadata. `metadata`
+        supplies the classes and strata when given, and the metadata built here does otherwise.
+        """
+        _refuse_no_flag(levels, per_image, per_target)
+        plan = _plan_for(levels, per_image, per_target, tracking=True, subject="dataset")
+        if self.flags == ImageStats.NONE:
+            raise ValueError("Outliers.evaluate: flags must not be ImageStats.NONE for a tracking dataset.")
+        frames = _video_frames(data)
+        self.stats = checked_compute_stats(
+            [frames],
+            stats=self.flags,
+            caller=type(self).__name__,
+            per_image=plan.per_image,
+            per_target=plan.per_target,
+            normalize_pixel_values=False,
+        )[0]
+        built = Metadata(frames.source)
+        added = _add_measured_factors(built, self.stats, frames.to_source(self.stats["source_index"]))
+        built, rolled = _roll_up(built, added, plan)
+        # `levels` measures frames even when it judges none (only per_image=False skips them), and a track level
+        # measures its detections, so a statistic can live at a level this call does not judge.
+        at = factor_levels(built)
+        measured: dict[str, FactorLevel] = {name: at[name] for name in [*added, *rolled]}
+        judged = [name for name, level in measured.items() if level in plan.levels]
+        if not judged:
+            _refuse_unjudged(measured, plan, len(self.stats["source_index"]))
+        result = self._evaluate_metadata(
+            built,
+            (),
+            levels=levels,
+            per_image=per_image,
+            per_target=per_target,
+            per_class=False,
+            metadata=None,
+            factors=judged,
+            strata=None,
+            checks=_Requested(None, None, None, None),
+            built=True,
+        )
+        _refuse_foreign_metadata(metadata, built)
+        labels = built if metadata is None else metadata
+        if strata is not None:
+            result = result.stratified(cast(Metadata, labels), *strata)
+        elif per_class:
+            result = result.classwise(labels)
+        return result._attach(frames.source, built)
 
     def _evaluate_single(
         self,

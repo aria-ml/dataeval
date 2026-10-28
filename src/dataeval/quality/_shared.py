@@ -3,16 +3,17 @@
 __all__ = []
 
 import warnings
-from collections.abc import Sequence
+from collections.abc import Sequence, Sized
 from typing import Any, NamedTuple
 
 import polars as pl
 
 from dataeval.core import StatsResult, image_stats
+from dataeval.data import SequenceFrames
 from dataeval.data._invalidates import invalidating_sources
 from dataeval.exceptions import StatsInvalidatedWarning
 from dataeval.flags import ImageStats
-from dataeval.protocols import MetadataLike, _is_protocol_instance
+from dataeval.protocols import Dataset, MetadataLike, MultiobjectTrackingTarget, _is_protocol_instance
 from dataeval.types import FactorLevel, SourceIndex
 
 # What :attr:`SourceIndex.kind` reports for a row that is one of an item's labels. An
@@ -385,3 +386,31 @@ def drop_null_index_columns(df: pl.DataFrame, columns: Sequence[str]) -> pl.Data
         if all_null:
             df = df.drop(col)
     return df
+
+
+def is_tracking(data: Any) -> bool:
+    """Whether `data` is a tracking dataset, asked without raising on anything else.
+
+    ``evaluate`` accepts a bare sequence of images as readily as a MAITE 3-tuple dataset, so this
+    has to be a question rather than an assertion. The shape validators raise on anything that is
+    not the kind they were asked about, which would reject the image-only inputs that are
+    perfectly valid here.
+    """
+    try:
+        if not isinstance(data, Sized) or len(data) == 0:
+            return False
+    except TypeError:  # Sized by its class yet unsized, such as a 0-d array
+        return False
+    datum = data[0] if isinstance(data, Dataset) else None
+    return isinstance(datum, tuple) and len(datum) == 3 and _is_protocol_instance(datum[1], MultiobjectTrackingTarget)
+
+
+def yields_frames(data: Any) -> bool:
+    """Whether measuring `data` produces video frames, and so the tracking level names.
+
+    True for a tracking dataset and for a frame view already built over one. The two arrive by
+    different routes -- one gets wrapped here, the other was wrapped by the caller -- and asking
+    only the first would give a hand-wrapped view the image level vocabulary, which then matches
+    nothing.
+    """
+    return isinstance(data, SequenceFrames) or is_tracking(data)

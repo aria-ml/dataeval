@@ -3,7 +3,7 @@
 __all__ = []
 
 import warnings
-from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from itertools import combinations, groupby
 from typing import Any, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar, cast, overload
 
@@ -42,7 +42,6 @@ from dataeval.protocols import (
     FeatureExtractor,
     MetadataLike,
     MultiobjectTrackingDataset,
-    MultiobjectTrackingTarget,
     ObjectDetectionTarget,
     _is_protocol_instance,
     _optional_attr,
@@ -57,8 +56,10 @@ from dataeval.quality._shared import (
     drop_null_index_columns,
     get_dataset_step_from_idx,
     is_metadata,
+    is_tracking,
     reported_level,
     resolve_levels,
+    yields_frames,
 )
 from dataeval.types import (
     ClusterConfigMixin,
@@ -2286,20 +2287,6 @@ def _metadata_item_count(metadata: Any) -> int | None:
     return int(metadata.rows_at(item_level).height)
 
 
-def _is_tracking(data: Any) -> bool:
-    """Whether `data` is a tracking dataset, asked without raising on anything else.
-
-    ``evaluate`` accepts a bare sequence of images as readily as a MAITE 3-tuple dataset, so this
-    has to be a question rather than an assertion. The shape validators raise on anything that is
-    not the kind they were asked about, which would reject the image-only inputs that are
-    perfectly valid here.
-    """
-    if not isinstance(data, Sized) or len(data) == 0:
-        return False
-    datum = data[0] if isinstance(data, Dataset) else None
-    return isinstance(datum, tuple) and len(datum) == 3 and _is_protocol_instance(datum[1], MultiobjectTrackingTarget)
-
-
 def _warn_strict_radius(hash_radius: int, caller: str) -> None:
     """Say so when a caller asks video for radius 0.
 
@@ -2322,17 +2309,6 @@ def _warn_strict_radius(hash_radius: int, caller: str) -> None:
     )
 
 
-def _yields_frames(data: Any) -> bool:
-    """Whether measuring `data` produces video frames, and so the tracking level names.
-
-    True for a tracking dataset and for a frame view already built over one. The two arrive by
-    different routes -- one gets wrapped here, the other was wrapped by the caller -- and asking
-    only the first would give a hand-wrapped view the image level vocabulary, which then matches
-    nothing.
-    """
-    return isinstance(data, SequenceFrames) or _is_tracking(data)
-
-
 def _as_frames(
     data: Any,
     caller: str,
@@ -2353,7 +2329,7 @@ def _as_frames(
     """
     if isinstance(data, SequenceFrames):
         frames = data
-    elif not _is_tracking(data):
+    elif not is_tracking(data):
         return _FrameView(data, None, None)
     else:
         frames = SequenceFrames(data)
@@ -4731,7 +4707,7 @@ class Duplicates(Evaluator):
             _find_factor_duplicates(metadata, duplicate_factors) if duplicate_factors else (None, None)
         )
 
-        tracking = _yields_frames(data) or any(_yields_frames(dataset) for dataset in other)
+        tracking = yields_frames(data) or any(yields_frames(dataset) for dataset in other)
         self._warn_default_radius(tracking)
         plan = resolve_levels(levels, per_image, per_target, tracking, caller="Duplicates.evaluate")
         radius = self._radius_for(tracking)

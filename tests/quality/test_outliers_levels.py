@@ -536,7 +536,7 @@ class TestEvaluateLevelsOverDatasets:
         assert by_levels.data().rows() == by_flags.data().rows()
 
     def test_a_tracking_name_on_a_dataset_says_to_pass_a_metadata(self, get_od_dataset):
-        with pytest.raises(ValueError, match="Pass a Metadata"):
+        with pytest.raises(ValueError, match="Pass a tracking dataset, or a Metadata of one"):
             Outliers().evaluate(_od(get_od_dataset), levels="track")
 
     def test_no_flag_at_all_is_still_refused_on_a_dataset(self, get_od_dataset):
