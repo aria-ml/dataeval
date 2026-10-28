@@ -19,6 +19,21 @@ class TestCoverageUnit:
         result = coverage_naive(embs, num_observations=1)
         assert abs(result["coverage_radius"] - math.sqrt(2 / 3) / math.sqrt(math.pi)) < 0.01
 
+    def test_naive_radius_closed_form(self):
+        """The radius equals the closed form wherever the gamma function is still representable."""
+        n, k, d = 30, 5, 340
+        embs = np.random.default_rng(0).random((n, d))
+        expected = (1 / math.sqrt(math.pi)) * ((2 * k * math.gamma(d / 2 + 1)) / n) ** (1 / d)
+        assert coverage_naive(embs, num_observations=k)["coverage_radius"] == pytest.approx(expected, rel=1e-9)
+
+    @pytest.mark.parametrize("d", [342, 1000])
+    def test_naive_wide_embeddings(self, d):
+        """The radius is finite where the gamma function overflows a float, from 342 dimensions."""
+        embs = np.random.default_rng(0).random((30, d))
+        radius = coverage_naive(embs, num_observations=5)["coverage_radius"]
+        # Stirling: (Γ(d/2 + 1))^(1/d) ~ sqrt(d / 2e), so the radius is about sqrt(d / 2πe).
+        assert radius == pytest.approx(math.sqrt(d / (2 * math.pi * math.e)), rel=0.05)
+
     def test_adaptive(self):
         """Checks pvals, crit, rho are all acceptable values."""
         embs = np.zeros((100, 2))

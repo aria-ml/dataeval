@@ -115,6 +115,17 @@ class TestPrioritize:
         with pytest.raises(ValueError, match="extractor"):
             p.evaluate(self.get_dataset(n=50))
 
+    def test_evaluate_extractor_error_propagates(self):
+        """An error raised while embedding is the caller's to see, not recast as a dataset type error."""
+
+        class _Failing(torch.nn.Module):
+            def forward(self, x):
+                raise RuntimeError("extractor failed")
+
+        p = Prioritize(extractor=TorchExtractor(_Failing(), device="cpu"))
+        with pytest.raises(RuntimeError, match="extractor failed"):
+            p.evaluate(self.get_dataset(n=50))
+
     def test_prioritize_default_method_and_policy(self, extractor):
         """Test that default method (knn) and order (easy_first) are used."""
         p = Prioritize(extractor=extractor)
@@ -335,9 +346,9 @@ class TestPrioritizeEdgeCases:
         # Use dummy extractor for instantiation
         p = Prioritize(extractor=MagicMock(), method="knn", policy="class_balanced")
 
-        # If we pass a dataset that isn't annotated/embeddings (Line 759)
-        with pytest.raises(TypeError, match="must be either an AnnotatedDataset or Array"):
-            p.evaluate("invalid_string_dataset")  # type: ignore
+        # A dataset that is neither annotated nor embeddings is refused by Embeddings
+        with pytest.raises(TypeError, match="not Sized"):
+            p.evaluate(5)  # type: ignore
 
     def test_evaluate_error_invalid_method(self):
         # We bypass __init__ validation by modifying attribute directly or sub-classing
