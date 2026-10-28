@@ -483,6 +483,70 @@ class TestPerFrameOutput:
         assert list(result["stats"]["item_index"]) == [0] * 4 + [1] * 6
         assert list(result["stats"]["unit_index"]) == list(range(4)) + list(range(6))
 
+    @staticmethod
+    def _renumbered(frames: Sequence[FakeFrame], numbers: Sequence[int]) -> list[FakeFrame]:
+        return [FakeFrame(frame.pixels[0], number) for frame, number in zip(frames, numbers, strict=True)]
+
+    def test_rows_are_keyed_by_the_frames_own_number(self):
+        numbers = [100, 102, 104, 106, 108, 110]
+        stream = self._renumbered(_pan(3, 6), numbers)
+        stats = ego_stats(cast("VideoStream", stream))["stats"]
+        assert list(stats["unit_index"]) == numbers
+
+    @pytest.mark.parametrize("gap", [1, 2])
+    def test_offset_numbers_change_only_the_key(self, gap: int):
+        plain = ego_stats(cast("VideoStream", _pan(3, 6)), gap=gap)["stats"]
+        shifted = ego_stats(cast("VideoStream", self._renumbered(_pan(3, 6), [100, 102, 104, 106, 108, 110])), gap=gap)[
+            "stats"
+        ]
+        assert list(plain["unit_index"]) == list(range(6))
+        assert list(shifted["unit_index"]) == [100, 102, 104, 106, 108, 110]
+        assert plain.keys() == shifted.keys()
+        for name in plain.keys() - {"unit_index"}:
+            if name == "motion":
+                assert list(plain[name]) == list(shifted[name])
+            else:
+                np.testing.assert_array_equal(np.asarray(plain[name]), np.asarray(shifted[name]), err_msg=name)
+
+    def test_a_frame_without_frame_index_keys_by_position(self):
+        class Bare:
+            def __init__(self, gray: NDArray[Any]) -> None:
+                self.pixels = gray[np.newaxis]
+
+        stream = [Bare(frame.pixels[0]) for frame in _pan(3, 5)]
+        assert list(ego_stats(cast("VideoStream", stream))["stats"]["unit_index"]) == list(range(5))
+
+    def test_repeated_numbers_are_kept_in_stream_order(self):
+        stream = self._renumbered(_pan(3, 4), [5, 5, 6, 6])
+        assert list(ego_stats(cast("VideoStream", stream))["stats"]["unit_index"]) == [5, 5, 6, 6]
+
+    def test_ego_rows_attach_to_the_metadata_rows(self):
+        from dataeval import Metadata
+        from tests.data.conftest import FactorVideos
+
+        numbers = [100, 102, 104, 106, 108, 110]
+        shifts = [2, 4, 6, 8, 10]  # a different pan on each pair, so each frame's reading is its own
+        base = texture(0)
+        offsets = np.concatenate([[0], np.cumsum(shifts)])
+        pixels = [np.roll(base, int(offset), axis=1) for offset in offsets]
+
+        class Renumbered(FactorVideos):
+            def __getitem__(self, index: int) -> tuple[Any, Any, Any]:
+                _, target, metadata = super().__getitem__(index)
+                return [FakeFrame(g, n) for g, n in zip(pixels, numbers, strict=True)], target, metadata
+
+        dataset = Renumbered([[[(0, 1)]] * 6], [{}])
+        result = ego_stats(cast("MultiobjectTrackingDataset", dataset))
+        metadata = Metadata(cast("Any", dataset))
+        metadata.add_factors(result, level="unit", key="unit_index")
+        rows = metadata.rows_at("unit")
+        assert list(rows["unit_index"]) == numbers
+        assert rows["pan_speed"].is_null().sum() == 0  # every row matched
+        assert np.isnan(rows["pan_speed"][0])  # frame 100 alone has no pair
+        by_frame = dict(zip(rows["unit_index"], rows["pan_speed"], strict=True))
+        assert by_frame[102] == pytest.approx(2.0, abs=0.5)
+        assert by_frame[110] == pytest.approx(10.0, abs=0.5)
+
     def test_signed_components_are_reported(self):
         # Direction, not just magnitude: a leftward pan must be distinguishable.
         right = ego_stats(cast("VideoStream", panning_stream(shift=3, n_frames=6)))
