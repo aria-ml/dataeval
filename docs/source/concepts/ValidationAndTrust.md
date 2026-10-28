@@ -1264,13 +1264,24 @@ As of v{{ release }}:
 
 Experimental ⚠️ (API may change or be removed):
 
-- {func}`.parity`, {class}`.Parity`, {func}`.uap` and `ParityOutput` raise
+- {func}`.parity`, {class}`.Parity`, {func}`.uap`, {class}`.Feasibility`,
+  `ParityOutput` and `FeasibilityOutput` raise
   {class}`~dataeval.exceptions.ExperimentalWarning` on first call or
   instantiation.
 - {func}`.video_stats` with any `VideoStats.PERSISTENCE` flag (`PERSISTENCE_EGO`, `PERSISTENCE_BLUR`,
   `PERSISTENCE_BLUR_RAW`, selected directly, through the group or through `ALL`) raises
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process. Every other
   {func}`.video_stats` statistic is stable.
+- The inputs and evidence of {class}`.Feasibility` ({class}`.TargetSpec`,
+  {class}`.SamplingPlan`, {class}`.Evidence` and {class}`.Endpoint`), the core
+  functions behind its bounds ({func}`.ap_lower_staircase`,
+  {func}`.ap_upper_envelope`, {func}`.binomial_endpoint`,
+  {func}`.consensus_max`, {func}`.cost_consensus`, {func}`.cost_consensus_max`,
+  {func}`.disjoint_panels`, {func}`.fit_partition`, {func}`.kink_costs`,
+  {func}`.local_panel_bound`, {func}`.mean_endpoint`, {func}`.ratio_endpoint`,
+  {func}`.units_to_cross`, {func}`.witness_thresholds` and
+  {func}`.zero_one_consensus`) and the `fold_scores` method of
+  {class}`.Relabel` are experimental in the same way.
 - `ParityResult` and `ParityCells` carry the same experimental status but raise
   nothing on their own: they are `TypedDict`s describing {func}`.parity`'s
   return value, and the warning comes from the call that produced it.
