@@ -744,6 +744,10 @@ def _resolve_stat_flags(
     return mapping.get(None, ImageStats(0)), group_flags
 
 
+# Marks the iterable that ran out first; `None` is not usable, as a boxes entry of `None` is an unannotated image.
+_END = object()
+
+
 def _enumerate_datum(
     images: Iterable[ArrayLike],
     boxes: Iterable[Iterable[BoxLike] | None] | None,
@@ -752,11 +756,13 @@ def _enumerate_datum(
         for i, image in enumerate(images):
             yield i, np.asarray(image), None
     else:
-        for i, (image, box) in enumerate(zip_longest(images, boxes, fillvalue=None)):
-            if image is None:
-                continue
+        for i, (image, box) in enumerate(zip_longest(images, boxes, fillvalue=_END)):
+            if image is _END or box is _END:
+                ran_out = "images" if image is _END else "boxes"
+                raise ValueError(f"images and boxes differ in length: {ran_out} ran out at index {i}")
             np_image = np.asarray(image)
-            bboxes = [to_bounding_box(b, image_shape=np_image.shape) for b in box or ()]
+            entries = () if box is None else cast("Iterable[BoxLike]", box)
+            bboxes = [to_bounding_box(b, image_shape=np_image.shape) for b in entries]
             yield i, np_image, bboxes
 
 
