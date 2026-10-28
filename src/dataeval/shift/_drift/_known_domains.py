@@ -237,7 +237,7 @@ class DriftKnownDomains(ChunkableMixin, BaseDrift[_DriftKnownDomainsStats]):
     """
 
     class Stats(_DriftKnownDomainsStats):
-        """Statistics from known-domains drift detection.
+        r"""Statistics from known-domains drift detection.
 
         Attributes
         ----------
@@ -251,7 +251,7 @@ class DriftKnownDomains(ChunkableMixin, BaseDrift[_DriftKnownDomainsStats]):
             Name of the domain with the highest mean probability.
         domain_probabilities : dict[str, float]
             Mean probability the classifier gives each domain over the samples.
-        predicted_domains : NDArray[np.str_]
+        predicted_domains : NDArray[np.str\_]
             The most likely domain of each sample, shape ``(n_samples,)``.
         domains : pl.DataFrame
             One row per declared domain in the batch, in domain order, then one with a null

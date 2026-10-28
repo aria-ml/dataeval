@@ -191,6 +191,7 @@ only in the [API reference](autoapi/dataeval/index.rst).
   - ✔
 * - {class}`Drift domain classifier <.DriftDomainClassifier>`\
 {class}`Drift K-nearest neighbors <.DriftKNeighbors>`\
+{class}`Drift known domains <.DriftKnownDomains>` ⚠️\
 {class}`Drift MMD <.DriftMMD>`\
 {class}`Drift reconstruction <.DriftReconstruction>`\
 {class}`Drift univariate <.DriftUnivariate>`\

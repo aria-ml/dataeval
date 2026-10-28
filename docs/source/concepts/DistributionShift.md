@@ -204,6 +204,11 @@ detecting subtle non-linear shifts in joint feature distributions that MMD or
 univariate tests might miss, and it provides an intuitive magnitude score. Its
 cost is computational: it trains multiple classifiers per call.
 
+When the reference is several known domains (sensors, sites, seasons) and new data
+should still belong to one of them, the experimental {class}`.DriftKnownDomains`
+trains a multi-class classifier on the domains and reports which one the new data
+is closest to, rather than comparing it with the reference as a whole.
+
 ### K-nearest neighbor drift detection (`DriftKNeighbors`)
 
 {class}`.DriftKNeighbors` detects drift by comparing the distances of test

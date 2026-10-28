@@ -4,6 +4,7 @@ __all__ = [
     "ChunkedDrift",
     "ChunkResult",
     "DriftKNeighbors",
+    "DriftKnownDomains",
     "DriftMMD",
     "DriftDomainClassifier",
     "DriftOutput",
@@ -22,6 +23,7 @@ from dataeval.shift import update_strategies
 from dataeval.shift._drift._base import ChunkedDrift, ChunkResult, DriftOutput
 from dataeval.shift._drift._domain_classifier import DriftDomainClassifier
 from dataeval.shift._drift._kneighbors import DriftKNeighbors
+from dataeval.shift._drift._known_domains import DriftKnownDomains
 from dataeval.shift._drift._mmd import DriftMMD
 from dataeval.shift._drift._reconstruction import DriftReconstruction
 from dataeval.shift._drift._univariate import DriftUnivariate
