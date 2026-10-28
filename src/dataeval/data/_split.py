@@ -424,6 +424,43 @@ def _get_groups(metadata: MetadataLike, split_on: Sequence[str] | None) -> NDArr
     return np.unique(binned_features, axis=0, return_inverse=True)[1]
 
 
+def _item_groups(metadata: MetadataLike, split_on: Sequence[str], n_items: int) -> NDArray[np.intp]:
+    """Return one dense group id per item, for splitting a detection dataset by group.
+
+    :func:`_get_groups` reads the label-level rows, which a detection dataset has one of per
+    detection and none of for an item without detections. The ids are read off the item-level
+    rows instead, so every item is placed, once no ``split_on`` factor is found to differ
+    between the rows of one item: such an item could not be kept in one group.
+
+    Raises
+    ------
+    ValueError
+        When the metadata is not a :class:`~dataeval.Metadata`, which alone has item-level
+        rows to read, or when a ``split_on`` factor varies within one item.
+    """
+    from dataeval import Metadata
+
+    if not isinstance(metadata, Metadata):
+        raise ValueError(
+            "`split_on` on a detection dataset needs a Metadata, which reads one row per item; a bare "
+            "metadata container has no row for an item without detections, so it cannot place one. "
+            "Pass the dataset, or a Metadata built from it.",
+        )
+    names, rows, codes = list(metadata.factor_names), metadata.item_indices, metadata.factor_data
+    n_items_with_rows = len(np.unique(rows))
+    for name in (name for name in split_on if name in names):
+        # More distinct (item, value) pairs than items means some item holds two values.
+        if len(np.unique(np.column_stack([rows, codes[:, names.index(name)]]), axis=0)) > n_items_with_rows:
+            raise ValueError(
+                f"`split_on` factor {name!r} varies within one item, so the item cannot be kept in one group. "
+                "Group on factors recorded per item or above, such as `sequence` on a frame view.",
+            )
+    items = metadata.at(metadata.item_level)
+    groups = np.empty(n_items, dtype=np.intp)
+    groups[_dense_item_positions(items.item_indices, n_items)] = cast(NDArray[np.intp], _get_groups(items, split_on))
+    return groups
+
+
 def _make_splits(
     index: NDArray[np.intp],
     labels: NDArray[np.intp],
@@ -592,27 +629,38 @@ def _split_od(  # noqa: C901
     test_frac: float,
     val_frac: float,
     total_partitions: int,
-    split_on: Sequence[str] | None,
+    groups: NDArray[np.intp] | None,
 ) -> tuple[TrainValSplit, list[TrainValSplit]]:
-    """Split an object detection (multi-label) dataset at the image level."""
-    n_images = len(multilabel)
-    index = np.arange(n_images)
+    """Split an object detection (multi-label) dataset at the image level.
 
-    if n_images <= total_partitions:
+    With ``groups``, one id per image, each group is collapsed to one row holding every class
+    its images do, so the split, its validation and its fractions all count groups, and the
+    result is expanded back to every image of each group.
+    """
+    unit, needed = "images", total_partitions
+    if groups is not None:
+        unit, image_multilabel = "groups", multilabel
+        multilabel = np.zeros((groups.max() + 1, multilabel.shape[1]), dtype=np.int8)
+        np.maximum.at(multilabel, groups, image_multilabel)
+        # A class needs a group in every partition, and total_partitions leaves out the
+        # validation side of a single split.
+        needed = total_partitions + 1 if num_folds == 1 else total_partitions
+    n_rows = len(multilabel)
+    index = np.arange(n_rows)
+
+    if n_rows <= total_partitions:
         raise ValueError(
-            f"Total number of images must be greater than the total number of partitions. "
-            f"Got {n_images} images and {total_partitions} total [train, val, test] partitions.",
+            f"Total number of {unit} must be greater than the total number of partitions. "
+            f"Got {n_rows} {unit} and {needed} total [train, val, test] partitions.",
         )
     if stratify:
         class_counts = multilabel.sum(axis=0)
         min_count = int(class_counts[class_counts > 0].min()) if (class_counts > 0).any() else 0
-        if min_count < total_partitions:
+        if min_count < needed:
             raise ValueError(
-                f"Unable to stratify: the rarest class has only {min_count} images, "
-                f"fewer than the {total_partitions} partitions requested.",
+                f"Unable to stratify: the rarest class has only {min_count} {unit}, "
+                f"fewer than the {needed} partitions requested.",
             )
-    if split_on is not None:
-        _logger.warning("split_on is not supported for object detection datasets; ignoring.")
 
     # --- Test split ---
     if test_frac:
@@ -640,7 +688,29 @@ def _split_od(  # noqa: C901
             tv_splits = _make_splits(tvs.train, tv_labels, num_folds, None, False)
     _logger.debug("OD train/val: %d fold(s)", len(tv_splits))
 
-    return tvs, tv_splits
+    if groups is None:
+        return tvs, tv_splits
+
+    # A whole group goes to one side, so a fold over too few groups of a class can leave a side
+    # with none at all, which the splitters return without complaint.
+    sides = [("test", tvs.val)] if test_frac else []
+    for i, s in enumerate(tv_splits):
+        sides += [(f"fold {i} train", s.train), (f"fold {i} val", s.val)]
+    if not all(len(part) for _, part in sides):
+        sizes = ", ".join(f"{name} {len(part)}" for name, part in sides)
+        raise ValueError(
+            f"Splitting {n_rows} groups left a partition empty ({sizes} groups). Ask for fewer partitions or "
+            "less extreme fractions, or split on a finer grouping.",
+        )
+
+    def members(chosen: NDArray[np.intp], within: NDArray[np.intp]) -> NDArray[np.intp]:
+        """Positions in ``within`` of the images whose group is in ``chosen``."""
+        return np.flatnonzero(np.isin(groups[within], chosen)).astype(np.intp)
+
+    # The folds index into the test split's train side, so they are expanded against its images.
+    train = members(tvs.train, np.arange(len(groups)))
+    folds = [TrainValSplit(members(tvs.train[s.train], train), members(tvs.train[s.val], train)) for s in tv_splits]
+    return TrainValSplit(train, members(tvs.val, np.arange(len(groups)))), folds
 
 
 def _split_ic(
@@ -744,6 +814,19 @@ def split_dataset(
         A grouped partition is divided such that no group is present within both the training and
         validation set. Split_on groups should be selected to mitigate validation bias.
         Requires factor metadata; not supported when ``dataset`` is a raw label array.
+
+        On a detection dataset, a :class:`~dataeval.data.SequenceFrames` view among them, or a
+        :class:`~dataeval.Metadata` built from one, each group is split as one unit, however few
+        detections the dataset holds. ``test_frac`` and ``val_frac`` then count groups rather
+        than images: over five videos, ``test_frac=0.2`` aims at one whole video, however many
+        frames it has. An image without detections stays with its group. A ``sequence`` factor
+        with more than 20 distinct values is binned automatically, so a group is then a run of
+        consecutive videos (a video is still never split); for one group per video, pass
+        ``Metadata(frames, factor_levels={"sequence": range(n_videos)})``.
+
+        .. versionchanged:: 1.2
+            Honored on detection datasets. v1.1 logged a warning, ignored ``split_on`` and
+            split by image, so one group could land in several partitions.
     test_frac : float, default 0.0
         Fraction of data to be optionally held out for test set
     val_frac : float, default 0.0
@@ -761,6 +844,13 @@ def split_dataset(
     ValueError
         If ``split_on`` is requested but ``dataset`` is a raw label array with no
         factor metadata to group on.
+    ValueError
+        If ``split_on`` is requested on a detection dataset and names a factor that varies
+        within one image, has too few groups to give each partition one, leaves a partition
+        without a group, or, with ``stratify``, has a class in fewer groups than there are
+        partitions; or if ``dataset`` is a metadata container
+        other than :class:`~dataeval.Metadata` holding more labels than items, which has no row
+        for an image without detections.
 
     Notes
     -----
@@ -812,7 +902,11 @@ def split_dataset(
     item_indices: NDArray[np.intp] = getattr(metadata, "item_indices", np.arange(len(class_labels), dtype=np.intp))
     n_images: int = getattr(metadata, "item_count", len(class_labels))
     item_indices = _dense_item_positions(item_indices, n_images)
-    is_od = len(item_indices) > 0 and len(class_labels) > n_images
+    # A grouped split also takes the detection path for any Metadata that declares detections,
+    # however sparse: the classification path would split its detection rows as if they were
+    # images. Only split_on is rerouted, so the numbers of an ungrouped split do not move.
+    grouped_detections = split_on is not None and isinstance(metadata, Metadata) and metadata.multi_target
+    is_od = len(item_indices) > 0 and (len(class_labels) > n_images or grouped_detections)
 
     n_classes = len(np.unique(class_labels))
     if is_od:
@@ -823,7 +917,8 @@ def split_dataset(
             len(class_labels),
         )
         multilabel = _build_multilabel_matrix(class_labels, item_indices, n_images)
-        tvs, tv_splits = _split_od(multilabel, num_folds, stratify, test_frac, val_frac, total_partitions, split_on)
+        groups = None if split_on is None else _item_groups(metadata, split_on, n_images)
+        tvs, tv_splits = _split_od(multilabel, num_folds, stratify, test_frac, val_frac, total_partitions, groups)
     else:
         _logger.info(
             "Detected Image Classification dataset: %d samples, %d classes",

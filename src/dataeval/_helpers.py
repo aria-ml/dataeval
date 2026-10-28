@@ -840,10 +840,9 @@ def resolve_label_axis(metadata: Any, label: str | Sequence[str] | None) -> Labe
 
     Resolution mirrors ``split_dataset``'s ``split_on=``, which also selects factors by
     name out of :attr:`~dataeval.Metadata.factor_data` and combines several into one
-    grouping. The two are deliberately not the same call: ``split_on`` ignores a name the
-    metadata does not have and never needs the groups named, while this rejects the name
-    and names every group, so sharing an implementation would make each pay for the
-    other's contract.
+    grouping. The two are deliberately not the same call: both reject a name the metadata
+    does not have, but ``split_on`` never needs the groups named while this names every
+    group, so sharing an implementation would make split_on pay for this contract.
 
     Parameters
     ----------

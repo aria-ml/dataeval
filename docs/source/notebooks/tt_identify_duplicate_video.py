@@ -642,6 +642,20 @@ print(f"sequence {sequence} without the shared stretch: {len(without_leak)} of {
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
+# split_on=["sequence"] keeps every frame of a video in one partition, and every video is placed
+from dataeval.data import split_dataset
+
+train_frames = SequenceFrames(train)
+video_of = np.asarray(train_frames.frame_map)[:, 0]
+by_sequence = split_dataset(train_frames, split_on=["sequence"], test_frac=0.25, val_frac=0.25)
+partitions = [
+    set(video_of[p].tolist()) for p in (by_sequence.folds[0].train, by_sequence.folds[0].val, by_sequence.test)
+]
+assert all(a.isdisjoint(b) for i, a in enumerate(partitions) for b in partitions[i + 1 :])
+assert set().union(*partitions) == set(range(len(train)))
+
+# %% tags=["remove_cell"]
+# TEST ASSERTION CELL ###
 # hash_radius matters: an explicit hash_radius=0 under-reports the relation rather than missing it
 strict_pair = strict.sequences.data().filter(pl.col("item_indices") == [0, 1]).row(0, named=True)
 assert strict_pair["containment"][0] < 0.6

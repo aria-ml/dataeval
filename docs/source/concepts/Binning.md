@@ -301,8 +301,8 @@ reasons: most of them mathematically, one as a consequence of what it is handed.
     resolution.
 - - {func}`.split_dataset` with `split_on`
   - Required
-  - Grouping needs discrete group identities. Note that `split_on` is ignored
-    outright on object detection datasets, with a log message and no error.
+  - Grouping needs discrete group identities. On object detection datasets each
+    group is split as one unit, so the split fractions count groups, not images.
 - - {class}`.Balance`
   - Required in practice
   - It reads `factor_data`, which is bin and category indices throughout, so the

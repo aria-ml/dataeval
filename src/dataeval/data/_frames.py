@@ -277,7 +277,12 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     Because this presents object detection, ``Metadata(SequenceFrames(ds))`` structures as
     ``unit`` = frame and ``instance`` = detection, so every one of those keys is a ``unit``-level
     factor through the ordinary path. ``sequence`` as a factor is what
-    ``split_on="sequence"`` needs to keep every frame of one video on one side of a split.
+    ``split_on=["sequence"]`` needs to keep every frame of one video on one side of a split. The
+    split's fractions then count videos rather than frames: over five videos, ``test_frac=0.2``
+    aims at one whole video, however many frames it has. With more than 20 distinct values
+    :class:`~dataeval.Metadata` bins ``sequence`` automatically, so a group is then a run of
+    consecutive videos (a video is still never split) and the fractions count those runs. For one
+    group per video, pass ``Metadata(frames, factor_levels={"sequence": range(n_videos)})``.
 
     Frames of one video are not independent samples, so :class:`~dataeval.bias.Parity` clusters
     them by their source video, and :class:`~dataeval.bias.Balance` counts a video as one
