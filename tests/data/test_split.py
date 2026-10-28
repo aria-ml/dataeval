@@ -1,16 +1,19 @@
-import logging
 import re
+from collections.abc import Sequence
+from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval import Metadata
 from dataeval.data import DatasetSplits, TrainValSplit, split_dataset
 from dataeval.data._split import (
     _build_multilabel_matrix,
     _calculate_validation_fraction,
+    _item_groups,
     _IterativeStratifiedKFold,
     _multilabel_find_best_split,
     _multilabel_make_splits,
@@ -43,6 +46,7 @@ def groups(_base, RNG):
 def get_metadata(labels, groups=None) -> Metadata:
     metadata = MagicMock(spec=Metadata)
     metadata.class_labels = labels
+    metadata.multi_target = False  # classification, as a real Metadata would declare
     if groups is not None:
         metadata.factor_names = ["Discrete", "Binned"]
         metadata.factor_data = np.column_stack(tuple(groups.values()))
@@ -547,13 +551,6 @@ class TestODSplitDataset:
         # All classes should appear in the test split
         assert (test_classes > 0).all(), f"Missing classes in test: {test_classes}"
 
-    def test_od_split_on_warns(self, caplog):
-        """split_on should emit a warning for OD datasets."""
-        meta = _make_od_metadata(n_images=100, n_classes=5)
-        with caplog.at_level(logging.WARNING):
-            split_dataset(meta, num_folds=1, stratify=True, test_frac=0.15, val_frac=0.15, split_on=["foo"])
-        assert "split_on is not supported for object detection" in caplog.text
-
     def test_ic_dataset_unchanged(self, labels):
         """IC datasets should still use the standard single-label path."""
         metadata = get_metadata(labels)
@@ -605,3 +602,171 @@ class TestSplitOnNamesAFactorTheMetadataDoesNotCarry:
 
     def test_a_factor_the_metadata_carries_still_groups(self):
         assert split_dataset(self._md(), num_folds=2, split_on=["site"]) is not None
+
+
+def _videos(classes: ArrayLike, empty_frame: int | None = None, extra: Sequence[list[list[tuple[int, int]]]] = ()):
+    """One 20-frame video per ``(a, b)``: track 1 of class ``a`` and track 2 of class ``b`` in every frame.
+
+    ``empty_frame`` names a frame left without detections in every such video. ``extra`` appends
+    videos given frame by frame, as lists of ``(label, track_id)`` detections.
+    """
+    from dataeval.data import SequenceFrames
+    from tests.data.conftest import FactorVideos
+
+    pairs = np.asarray(classes).reshape(-1, 2).tolist()
+    videos = [[[] if f == empty_frame else [(a, 1), (b, 2)] for f in range(20)] for a, b in pairs] + list(extra)
+    return SequenceFrames(cast(Any, FactorVideos(videos, [{} for _ in videos])))
+
+
+def _partitions(splits: DatasetSplits) -> list[tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.intp]]]:
+    """``(train, val, test)`` for every fold."""
+    return [(fold.train, fold.val, splits.test) for fold in splits.folds]
+
+
+def _assert_groups_disjoint(splits: DatasetSplits, group: NDArray[np.intp]) -> None:
+    for parts in _partitions(splits):
+        train, val, test = (set(group[p].tolist()) for p in parts)
+        assert train.isdisjoint(val), "a group is in both train and val"
+        assert train.isdisjoint(test), "a group is in both train and test"
+        assert val.isdisjoint(test), "a group is in both val and test"
+
+
+@pytest.mark.required
+class TestSplitOnForDetectionAndFrames:
+    """``split_on`` on detection and frame data keeps each group in one partition; v1.1 ignored it (#1619)."""
+
+    @pytest.mark.parametrize("seed", range(5))
+    @pytest.mark.parametrize("num_folds", [1, 2])
+    def test_split_on_sequence_keeps_every_video_whole(self, seed, num_folds):
+        rng = np.random.default_rng(seed)
+        frames = _videos(rng.integers(2, size=(4 + seed % 3, 2)))
+        val_frac = 0.2 if num_folds == 1 else 0.0
+        splits = split_dataset(
+            frames, num_folds=num_folds, stratify=False, split_on=["sequence"], test_frac=0.2, val_frac=val_frac
+        )
+        assert len(splits.folds) == num_folds
+        _assert_groups_disjoint(splits, np.asarray(frames.frame_map)[:, 0])
+
+    def test_a_detection_free_frame_stays_with_its_video(self):
+        frames = _videos([(0, 1)] * 5, empty_frame=5)
+        splits = split_dataset(frames, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+        for parts in _partitions(splits):
+            partition_of = {int(i): k for k, p in enumerate(parts) for i in p}
+            for v in range(5):
+                assert partition_of.get(v * 20 + 5) == partition_of[v * 20], f"frame 5 of video {v} left its video"
+
+    @pytest.mark.parametrize("num_folds", [1, 2])
+    def test_every_frame_is_assigned_once(self, num_folds):
+        frames = _videos([(0, 1)] * 6, empty_frame=5)
+        val_frac = 0.2 if num_folds == 1 else 0.0
+        splits = split_dataset(frames, num_folds=num_folds, split_on=["sequence"], test_frac=0.2, val_frac=val_frac)
+        for parts in _partitions(splits):
+            np.testing.assert_array_equal(np.sort(np.concatenate(parts)), np.arange(len(frames)))
+
+    def test_a_factor_varying_within_an_item_raises(self):
+        md = Metadata(_videos([(0, 1)] * 4))
+        md.add_factors({"side": np.arange(md.level_counts[md.label_level]) % 2}, level=md.label_level)
+        with pytest.raises(ValueError, match="'side' varies within"):
+            split_dataset(md, split_on=["side"], test_frac=0.2, val_frac=0.2)
+
+    def test_too_few_groups_raises(self):
+        with pytest.raises(ValueError, match=re.escape("Got 2 groups and 3 total [train, val, test] partitions")):
+            split_dataset(_videos([(0, 1)] * 2), num_folds=2, split_on=["sequence"], test_frac=0.2)
+
+    def test_too_few_groups_for_a_single_split_counts_the_validation_partition(self):
+        with pytest.raises(ValueError, match=re.escape("Got 2 groups and 3 total [train, val, test] partitions")):
+            split_dataset(_videos([(0, 1)] * 2), split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+
+    @pytest.mark.filterwarnings("ignore:`sequence` was binned automatically:UserWarning")
+    @pytest.mark.filterwarnings("ignore:Declared encodings are finer:UserWarning")
+    def test_past_20_videos_groups_are_runs_of_videos_unless_levels_are_declared(self):
+        n = 25
+        frames = _videos([(0, 1)] * n)
+        video = np.asarray(frames.frame_map)[:, 0]
+
+        binned = _item_groups(Metadata(frames), ["sequence"], len(frames))
+        assert len(np.unique(binned)) < n
+        for v in range(n):  # a video is never split, binned or not
+            assert len(np.unique(binned[video == v])) == 1
+
+        declared = Metadata(frames, factor_levels={"sequence": range(n)})
+        assert len(np.unique(_item_groups(declared, ["sequence"], len(frames)))) == n
+        splits = split_dataset(declared, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+        _assert_groups_disjoint(splits, video)
+        assert len(set(video[splits.test].tolist())) == round(0.2 * n)
+
+    def test_stratified_grouped_split_keeps_each_class(self):
+        """Sorted single-class videos, so unstratified blocks would miss a class.
+
+        Class 1 reaches exactly as many videos as there are partitions only by counting the last
+        video, whose class-1 detections are all in frames 10-19: a group holds a class if any of
+        its frames does.
+        """
+        late = [[(0, 1), (0 if f < 10 else 1, 2)] for f in range(20)]
+        frames = _videos([(0, 0)] * 6 + [(1, 1)] * 2, extra=[late])
+        classes_of = [{0}] * 6 + [{1}] * 2 + [{0, 1}]
+        video = np.asarray(frames.frame_map)[:, 0]
+        splits = split_dataset(frames, stratify=True, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+        for parts in _partitions(splits):
+            assert all(set().union(*(classes_of[v] for v in set(video[p].tolist()))) == {0, 1} for p in parts)
+        _assert_groups_disjoint(splits, video)
+
+    def test_a_class_in_fewer_groups_than_partitions_raises(self):
+        """Class 1 in 2 of 10 videos cannot reach train, val and test; this once returned an empty train."""
+        frames = _videos([(0, 1)] * 2 + [(0, 0)] * 8)
+        message = "the rarest class has only 2 groups, fewer than the 3 partitions requested"
+        with pytest.raises(ValueError, match=re.escape(message)):
+            split_dataset(frames, stratify=True, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+
+    def test_a_grouped_split_that_empties_a_partition_raises(self):
+        """Class 1 in 3 of 6 videos passes the count, but holding out half leaves its train side none to split."""
+        frames = _videos([(0, 1)] * 3 + [(0, 0)] * 3)
+        message = "Splitting 6 groups left a partition empty (test 3, fold 0 train 0, fold 0 val 3 groups)"
+        with pytest.raises(ValueError, match=re.escape(message)):
+            split_dataset(frames, stratify=True, split_on=["sequence"], test_frac=0.5, val_frac=0.2)
+
+    def test_a_sparse_frame_view_is_split_by_frame(self):
+        """Fewer detections than frames once sent a frame view down the classification path, which split rows."""
+        sparse = [[[] if f % 4 == 3 else [(0, 1)] for f in range(20)] for _ in range(5)]
+        frames = _videos([], extra=sparse)  # 75 detections over 100 frames
+        splits = split_dataset(frames, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+        _assert_groups_disjoint(splits, np.asarray(frames.frame_map)[:, 0])
+        for parts in _partitions(splits):
+            np.testing.assert_array_equal(np.sort(np.concatenate(parts)), np.arange(len(frames)))
+
+    def test_a_factor_the_frames_do_not_carry_is_refused(self):
+        with pytest.raises(ValueError, match=re.escape("['weather']")):
+            split_dataset(_videos([(0, 1)] * 4), split_on=["weather"], test_frac=0.2, val_frac=0.2)
+
+    def test_a_metadata_container_is_refused_on_detections(self):
+        """A bare container has no item-level rows, so a detection-free item could not be placed."""
+        md = Metadata(_videos([(0, 1)] * 4))
+        container = SimpleNamespace(
+            class_labels=md.class_labels,
+            factor_names=md.factor_names,
+            factor_data=md.factor_data,
+            is_binned=[True] * len(md.factor_names),
+            item_indices=md.item_indices,
+            item_count=md.item_count,
+        )
+        with pytest.raises(ValueError, match="Metadata"):
+            split_dataset(cast(Any, container), split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+
+    def test_split_on_for_image_classification_is_unchanged(self):
+        site = np.arange(60) % 6
+        md = Metadata.from_factors({"site": site.astype(str)}, class_labels=np.arange(60) % 2)
+        _assert_groups_disjoint(split_dataset(md, split_on=["site"], test_frac=0.2, val_frac=0.2), site)
+
+    def test_an_image_classification_dataset_does_not_take_the_detection_path(self, monkeypatch):
+        """Its label level differs from its item level too, so routing on levels would send it down the grouped path."""
+        from tests.data.conftest import MockICDataset
+
+        md = Metadata(cast(Any, MockICDataset([i % 2 for i in range(60)], {0: "a", 1: "b"})))
+        site = np.arange(60) % 6
+        md.add_factors({"site": site}, level=md.item_level)
+
+        def detection_path(*args, **kwargs):
+            raise AssertionError("an image classification dataset took the detection path")
+
+        monkeypatch.setattr("dataeval.data._split._split_od", detection_path)
+        _assert_groups_disjoint(split_dataset(md, split_on=["site"], test_frac=0.2, val_frac=0.2), site)
