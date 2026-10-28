@@ -2553,11 +2553,11 @@ class Outliers(Evaluator):
 
         Returns
         -------
-        OutliersOutput[IndexIssueMap]
-            Output containing outlier indices and their issue details. Each outlier
-            includes:
-            - 'cluster_distance': the distance from the cluster mean
-            - 'std_devs': the number of standard deviations from the mean
+        SingleOutliersOutput
+            Output containing a DataFrame of outlier issues. For each outlier,
+            ``metric_value`` is the raw distance to its nearest cluster center, and the
+            number of standard deviations it sits from its cluster's mean is
+            ``(metric_value - population_mean) / population_std``.
 
         See Also
         --------
@@ -3024,7 +3024,9 @@ class Outliers(Evaluator):
             - metric_name: str - Name of the metric that flagged this item/target.
               Includes "cluster_distance" when extractor is provided.
             - metric_value: float - Value of the metric for this item/target.
-              For cluster_distance, this is the number of std devs from cluster mean.
+              For cluster_distance, this is the raw distance to the nearest cluster center; the
+              number of standard deviations it sits from its cluster's mean is
+              ``(metric_value - population_mean) / population_std``.
 
             For multi-dataset input, includes a ``dataset_index`` column.
 
