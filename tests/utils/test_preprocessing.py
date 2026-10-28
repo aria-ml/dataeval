@@ -257,7 +257,12 @@ class TestBoundingBox:
 
     def test_to_bounding_box_image_shape_fallback(self):
         result = to_bounding_box(None, image_shape=(3, 100, 200))
-        assert result.xyxy == (0, 0, 100, 200)
+        assert result.xyxy == (0, 0, 200, 100)
+
+    def test_to_bounding_box_none_covers_a_non_square_image(self):
+        result = to_bounding_box(None, (3, 20, 50))
+        assert result.x1 == 50
+        assert result.y1 == 20
 
     def test_to_bounding_box_invalid_with_warning(self, caplog):
         import logging
@@ -301,6 +306,11 @@ class TestBoxesToMask:
         mask = boxes_to_mask((3, 8, 6), [(0, 0, 2, 2)])
         assert mask.shape == (8, 6)
         assert mask.dtype == np.bool_
+
+    def test_boxes_to_mask_none_entry_masks_the_whole_non_square_image(self):
+        mask = boxes_to_mask((3, 20, 50), [None])  # type: ignore[list-item]
+        assert mask.shape == (20, 50)
+        assert mask.all()
 
     def test_no_boxes_is_all_false(self):
         assert not boxes_to_mask((3, 4, 4), []).any()
