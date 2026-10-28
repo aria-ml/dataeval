@@ -808,8 +808,8 @@ class Prioritize(Evaluator):
             If class_balanced policy is used with a dataset that lacks metadata
             (e.g., raw arrays).
             If stratified policy is used with complexity methods (no scores).
-        TypeError
-            If dataset is neither an AnnotatedDataset nor Array.
+        MaiteShapeError
+            If dataset is neither an AnnotatedDataset nor Array. This is a ``TypeError``.
 
         Examples
         --------
@@ -837,15 +837,10 @@ class Prioritize(Evaluator):
                     "Provide pre-computed embeddings (pass an Embeddings or Array as `dataset`), "
                     "or configure an extractor to compute them."
                 )
-            try:
-                embeddings_array = np.asarray(Embeddings(dataset, extractor=self.extractor, batch_size=self.batch_size))
-                if class_labels is None:
-                    self._metadata = Metadata(dataset)
-                    class_labels = self._metadata.class_labels
-            except Exception as e:
-                raise TypeError(
-                    f"dataset must be either an AnnotatedDataset or Array, but got {type(dataset).__name__}",
-                ) from e
+            embeddings_array = np.asarray(Embeddings(dataset, extractor=self.extractor, batch_size=self.batch_size))
+            if class_labels is None:
+                self._metadata = Metadata(dataset)
+                class_labels = self._metadata.class_labels
 
         labels = None if class_labels is None else BareLabels(np.asarray(class_labels, dtype=np.intp))
         return self.from_embeddings(embeddings_array, labels)

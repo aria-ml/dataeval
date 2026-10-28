@@ -123,11 +123,10 @@ def coverage_naive(
     critical_value_radii = _calculate_critical_value_radii(embeddings_np, num_observations)
 
     # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
-    coverage_radius = float(
-        (1 / math.sqrt(math.pi))
-        * ((2 * num_observations * math.gamma(embeddings_np.shape[1] / 2 + 1)) / (len(embeddings_np)))
-        ** (1 / embeddings_np.shape[1]),
-    )
+    # Taken in log space, as Γ(d/2 + 1) overflows a float from 342 dimensions.
+    dim = embeddings_np.shape[1]
+    log_radius = (math.log(2 * num_observations) + math.lgamma(dim / 2 + 1) - math.log(len(embeddings_np))) / dim
+    coverage_radius = math.exp(log_radius) / math.sqrt(math.pi)
     uncovered_indices = np.where(critical_value_radii > coverage_radius)[0]
 
     _logger.info(

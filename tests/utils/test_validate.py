@@ -544,6 +544,11 @@ class TestIntegrationUnzip:
         with pytest.raises(MaiteShapeError, match="ObjectDetectionTarget"):
             unzip_dataset(_ICDataset(), per_target=True)
 
+    def test_tracking_dataset_points_to_sequence_frames(self) -> None:
+        # Its images are video streams, which would otherwise reach the readers as an object array.
+        with pytest.raises(MaiteShapeError, match="SequenceFrames"):
+            unzip_dataset(_MOTDataset(), per_target=False)
+
     def test_per_target_false_accepts_bare_image(self) -> None:
         images, targets = unzip_dataset(_ImageOnly(), per_target=False)
         assert targets is None

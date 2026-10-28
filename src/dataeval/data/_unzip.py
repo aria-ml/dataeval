@@ -8,7 +8,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.protocols import Array, Dataset, ObjectDetectionTarget
+from dataeval.exceptions import MaiteShapeError
+from dataeval.protocols import Array, Dataset, MultiobjectTrackingTarget, ObjectDetectionTarget, _is_protocol_instance
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data import unwrap_image, validate_dataset
 from dataeval.utils.preprocessing import BoundingBox
@@ -27,6 +28,23 @@ class _SizedIterator:
 
     def __len__(self) -> int:
         return self._length
+
+
+def _reject_tracking(dataset: Dataset[Any], per_target: bool) -> None:
+    """Refuse a tracking dataset, which an image-only read would otherwise pass.
+
+    An image-only read accepts any 3-tuple, so a tracking dataset gets through with its video
+    streams as the images, and fails in the first reader that treats one as an array. A read of
+    targets is already refused by validation, which names the target it expected.
+    """
+    if per_target or len(dataset) == 0:
+        return
+    datum = dataset[0]
+    if isinstance(datum, tuple) and len(datum) == 3 and _is_protocol_instance(datum[1], MultiobjectTrackingTarget):
+        raise MaiteShapeError(
+            "unzip_dataset: argument 'dataset' is a multi-object tracking dataset, whose images are "
+            "video streams rather than arrays. Present it as frames first, with SequenceFrames(dataset)."
+        )
 
 
 def unzip_dataset(
@@ -59,6 +77,8 @@ def unzip_dataset(
         expected="object_detection" if per_target else "image_only",
         caller="unzip_dataset",
     )
+
+    _reject_tracking(dataset, per_target)
 
     def _generate_pairs() -> Iterator[tuple[NDArray[Any], list[BoundingBox] | None]]:
         for i in range(len(dataset)):
