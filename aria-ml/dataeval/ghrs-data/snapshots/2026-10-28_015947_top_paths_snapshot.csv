@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,35,21
+/aria-ml/dataeval/releases,3,3
+/aria-ml/dataeval/commits,2,1
+/aria-ml/dataeval/tree/main/src,2,1
+/aria-ml/dataeval/tree/main/src/dataeval,2,1
+/aria-ml/dataeval/blob/main/docs/generate_parity_figures.py,1,1
+/aria-ml/dataeval/blob/main/docs/source/getting-started/where-to-go-next.md,1,1
+/aria-ml/dataeval/blob/main/noxfile.py,1,1
+/aria-ml/dataeval/blob/main/pyproject.toml,1,1
+/aria-ml/dataeval/commit/256e98e4110b8d7d39210dafba1590283d710412,1,1
