@@ -1,6 +1,6 @@
 # DataEval roadmap
 
-**Last updated:** September 2026
+**Last updated:** October 2026
 **Horizon:** v1.3 (Q1 2027), with a longer-term vision beyond it
 
 This roadmap captures the long-term technical vision and release plan for the core
@@ -55,14 +55,15 @@ Two principles run through all five:
 |---------|------------|------------------------------------------------------------------------------------------------|
 | v1.0    | Mar 2026 ✓ | Quality, performance, bias, and shift modules; API freeze                                      |
 | v1.1    | Aug 2026 ✓ | Scope and ontology stacks; object-tracking foundation; MAITE protocol adoption                 |
-| v1.2    | Q4 2026    | Video-ready metadata: level aggregation, structure-aware statistics, metadata-aware quality    |
+| v1.2    | Q4 2026    | Evaluate image and video datasets in context; a release candidate comes first                  |
 | v1.3    | Q1 2027    | Evaluators on video; intrinsic video quality and codec metadata; annotation diagnostics        |
 | Future  | Long-term  | Ontology depth; weighted and output-driven evaluation; multi-modal; synthetic data; scale      |
 
 Releases are cut when a coherent capability is complete and its public API has settled,
-not on a fixed interval. v1.1 followed v1.0 by five months; v1.2 follows v1.1 by about
-three, because the metadata work reached a natural boundary ahead of the video evaluators
-that build on it.
+not on a fixed interval. v1.1 followed v1.0 by five months; v1.2 follows v1.1 by about a
+quarter, because the metadata work and the first video tools reached a natural boundary
+ahead of the evaluators on video that build on them. A release candidate precedes v1.2.0,
+so the release can be tried on real data before it is final.
 
 ---
 
@@ -101,12 +102,25 @@ finely binned factor no longer reports a correlation with everything.
 
 ## v1.2: target Q4 2026
 
-**Theme: video-ready metadata.** v1.1 introduced the metadata levels; v1.2 makes them
-carry analysis. Factors roll up from frame to track to sequence, the bias statistics stop
-reading 300 frames of one clip as 300 independent samples, and the quality evaluators
-read metadata at every level. Most of this is already merged. The release waits on the
-items that would otherwise change a public API after it ships, and on two correctness
-fixes.
+**Theme: evaluate image and video datasets in context.** v1.2 analyzes quality and
+metadata across frames, objects, tracks, and sequences; investigates duplicate footage,
+unusual conditions, and dataset bias; and traces each finding back to the source data.
+Three benefits follow:
+
+1. **Choose the level of analysis.** Factors roll up from frame to track to sequence, and
+   any factor can be the class axis the bias evaluators read.
+2. **Investigate concrete quality problems.** Duplicates are found from single frames to
+   whole sequences, and outliers are judged in context: within a category, against their
+   neighbors in a sequence, or as a combination of ordinary values that is improbable
+   together.
+3. **Keep the relationships behind each observation.** A frame stays tied to the video it
+   came from, a selected frame records how it was selected and how much of the video it
+   stands for, and any row resolves back to its source item.
+
+In support of all three, the statistics follow the same structure: `Parity` clusters
+frames by their source video, and `Balance` counts a source as one observation of a factor
+that is constant within it, and counts the level's own entities for factors that vary by
+frame.
 
 ### Metadata across levels
 
@@ -115,11 +129,18 @@ fixes.
   producers declare how their own factors roll up, so frame statistics reach track and
   sequence level without hand-written reductions.
 - **Corrections and repair.** `Metadata` accepts mixed inputs and applies declared
-  corrections; `Metadata.repair` returns a corrected copy, and `Metadata.unusable_rows`
-  names the items and rows behind a factor that could not be used.
+  corrections; `Metadata.repair` returns a corrected copy, `Metadata.unusable_rows` names
+  the items and rows behind a factor that could not be used, and `Metadata.add_factors`
+  reports where new values disagree with existing ones.
 - **Metadata as an analysis input.** `Metadata.classed_by` makes any factor the class axis
   for the bias evaluators, and `Metadata` feeds the drift detectors directly as a feature
   extractor.
+- **Known factors and filtering.** `KNOWN_FACTORS` gives common factor names (such as
+  `timestamp`, `frame_rate`, and `latitude`) one fixed meaning that `Metadata` checks.
+  `Filter` keeps the items and detections that match a predicate over class labels and
+  metadata factors, replacing `ClassFilter`.
+- **Factor and label summaries.** `Metadata.factor_stats` summarizes each factor, per class
+  on request, and `label_cooccurrence` reports which classes appear together.
 - **A universal address.** `SourceIndex` identifies a row at any level (sequence, frame,
   track, or instance), and `SourceLocator` retrieves the source item behind it.
 
@@ -128,19 +149,33 @@ fixes.
 - `mutual_info`, `Balance`, and `Parity` count distinct entities rather than rows when they
   correct for chance and judge significance, so replication no longer reads as
   correlation.
-- `Parity` computes Pearson's chi-square and judges sufficiency by Cochran's rule.
+- Over frame, crop, and merged views, `Parity` groups rows by their source video or image,
+  and `Balance` counts that source as one observation of a factor that is constant within
+  it.
+- `Parity` tests each factor and each (factor value, class) cell. Independent rows get Pearson's
+  chi-square, with sufficiency judged by Cochran's rule; grouped rows get a design-corrected
+  test (the second-order Rao-Scott F). `label_parity` is a two-sample homogeneity test.
 
 ### Video data handling
 
-- **Frame selection.** `SequenceFrames` and its selectors (`Stride`, `EvenlySpaced`,
-  `FrameRate`, `Window`, `Cuts`, `Redundancy`, `Representative`) turn a video into the
-  frames the statistical tools analyze, and record how much of the video each selected
-  frame stands for.
-- **Segments and stitching.** `VideoSegments`, `VideoStitch`, and `SegmentPlanner` cut long
-  videos into clips and reassemble them.
-- **Video statistics and embeddings.** `ego_stats` measures per-frame camera motion,
-  `track_stats` runs directly on a tracking dataset, and `VideoTorchExtractor` embeds
-  clips.
+- **Frame selection.** `SequenceFrames` and its selectors turn a video into the frames the
+  statistical tools analyze. Selectors choose by position or rate (`Stride` and
+  `EvenlySpaced`, either one jittered on request, `FrameRate`, and `FrameIndices`), by
+  content (`Redundancy`, `Representative`, `CameraTravel`, and `QualityGate`), or by
+  annotation (`TrackEvents`, `BestPerTrack`, and `HasLabels`), and `Chain` composes them.
+- **Selection provenance.** Each selected frame records how many source frames it stands
+  for, each selection stage reports what it kept, and `SequenceFrames.to_source` translates
+  a finding on the frame view back to its source video.
+- **Segments and stitching.** `VideoSegments`, `VideoStitch`, and the segment planners
+  (`Window` and `Cuts`) cut long videos into clips and reassemble them.
+- **Video statistics.** `video_stats` reports one row per video, selected through
+  `VideoStats`: descriptive statistics (frame count, duration, and frame rate), redundancy
+  between consecutive frames, and summaries of camera ego motion.
+- **Camera ego motion.** `ego_stats` measures per-frame camera motion and refuses a
+  reading that optical flow cannot make reliably. A mask (`mask=` on `ego_stats` and
+  `CameraTravel`, `ego_mask=` on `video_stats`) excludes a burned-in overlay.
+- **Tracks and embeddings.** `track_stats` runs directly on a tracking dataset, and
+  `VideoTorchExtractor` embeds clips.
 - **Up-front validation.** `validate_dataset` rejects a MOT dataset whose per-frame
   detection arrays disagree, before any frame is decoded.
 
@@ -149,36 +184,74 @@ fixes.
 - **Duplicates** finds a collision in any projection: content, metadata factors, or
   annotations. Annotation fingerprints report a collect carrying two disagreeing
   annotations, and augmented copies that share an annotation but differ in pixels. On
-  tracking datasets it matches whole sequences and segments as well as frames.
+  tracking datasets it matches whole sequences and segments as well as frames. Left unset,
+  its hash radius is 6 for video and 0 for images, and the output records the radius used.
 - **Outliers** thresholds metadata factors as well as image statistics, each at its own
   level (frame, track, or sequence), and box statistics report geometry relative to the
   image.
+- **Outliers in context.** `Outliers` stratifies its thresholds by any categorical factor,
+  judges a categorical value by how rare it is within its stratum, and does not threshold a
+  population of fewer than 20 rows. It flags combinations of factors that are ordinary one
+  by one but improbable together (`dataeval.core.combination_scores`), and judges a value
+  against its neighbors in the sequence (`neighbors=`, `dataeval.core.sequence_residuals`),
+  at the levels named with `levels=`. A guide covers finding conditional outliers.
+- **Removal plans.** `DuplicatesOutput.deduplicate` and `OutliersOutput.prune` return a
+  `RemovalPlan` of items, detections, and tracks, which `Indices(plan, exclude=True)`
+  applies.
 
 ### Also in v1.2
 
+- The `Feasibility` evaluator decides whether a classification accuracy or AP target is
+  reachable on a dataset, and returns the evidence behind each answer.
 - Statistics over band groups, for multispectral channels.
 - `ChunkedDrift` accepts any chunker the protocol describes and handles a short final
   chunk explicitly.
 - Bag-of-visual-words extraction runs on threads and scales with `set_max_processes`.
 - **Breaking:** Python 3.11 or later is required, and the functionality deprecated in v1.1
-  is removed.
+  is removed. The [v1.2 migration guide](docs/source/migration/v1.2.md) lists every
+  behavior change, including calls that now raise and results whose numbers moved.
+- **Deprecated:** `compute_stats` is renamed `image_stats` and `ClassFilter` gives way to
+  `Filter`; the old names remain until v2.0, as do `label_parity`'s `num_classes` argument
+  and its calls without groups or `assume_independent=True`. `compute_ratios` and the
+  `SourceIndex.target` spelling (now `SourceIndex.key`) are removed in v1.3.0.
 - **Announced:** `Duplicates` warns that its image `hash_radius` default changes from 0.
   The default itself changes in v2.0.
 
-### Remaining before release
+### Experimental in v1.2
 
-- Metadata in `Outliers` (in review), and restraint when a level has too few rows to
-  threshold.
-- A settled frame-selection API. Chaining selectors is done (`Chain`); what remains is
-  removing `frame_sample` from `Duplicates`, so frames are selected through
-  `SequenceFrames` everywhere.
-- A video default for `hash_radius` in `Duplicates`. Left unset, the radius is 6 for
-  video and 0 for images, and the output records the radius used. This is separate from
-  the image default announced above, which waits for v2.0.
-- Frame views keep the source video as the independent unit, so the bias statistics over
-  a `SequenceFrames` view count videos rather than frames.
-- Ego motion stops trusting a compromise between a moving object and the background. This
-  is time-boxed: if no rule meets the bar, v1.2 ships with the limit documented.
+These names warn with an `ExperimentalWarning`, and they may change or be removed without
+a deprecation cycle:
+
+- `Parity` and `dataeval.core.parity` (experimental since v1.1).
+- `dataeval.core.uap` (experimental since v1.1).
+- `Feasibility`, its evidence and target types (`Endpoint`, `Evidence`, `SamplingPlan`,
+  and `TargetSpec`), and the `dataeval.core` functions it builds on (AP bounds,
+  concentration endpoints, consensus bounds, and local panels).
+- `Relabel.fold_scores`.
+- `VideoStats.PERSISTENCE`: per-video maps of what is fixed to the camera, such as a
+  burned-in overlay, and of local blur.
+
+### Known limits at release
+
+v1.2 ships with these limits. They are stated here so results can be read with them in
+mind, not as promises of a fix:
+
+- **Camera motion.** Without a `mask=`, a burned-in overlay can bias an ego-motion reading
+  that is still marked trusted, and a slow mover in noisy footage can read as a trusted
+  zoom. `image_stats` takes no pixel mask yet.
+- **Selection weights stop before analysis.** `SequenceFrames` records how many source
+  frames each selected frame stands for, but no evaluator reads a sample weight yet, so
+  results over selected frames describe the selection, not the source stream's
+  distribution.
+- **Source identity is not every independent unit.** Clips from one flight or collection
+  can still depend on each other, while `Parity` assumes that its source groups do not.
+  There is no public way yet to declare a physical grouping across evaluators.
+- **Grouped splits count groups.** On detection and frame datasets,
+  `split_dataset(split_on=)` keeps each group of the named factor in one partition, so the
+  split fractions count groups, not images or frames, and a few groups give uneven
+  fractions. Splitting a frame view of more than 20 videos on `sequence` groups runs of
+  consecutive videos (a video is still never split) unless `Metadata` is given
+  `factor_levels={"sequence": range(n)}`.
 
 ### Moved out of v1.2
 
@@ -187,9 +260,10 @@ The August revision of this roadmap planned more for v1.2 than the release above
 - **After v1.2:** rotation- and flip-invariant (D4) hashes reaching sequence, segment, and
   track matching in `Duplicates`. It adds relations without changing an API, so it can
   land in any later release.
-- **To v1.3:** container and codec metadata, video quality statistics, video-aware
-  splitting, ego-motion removal, MOT labeling error detection, and import and startup
-  cost.
+- **To v1.3:** container and codec metadata, video quality statistics, splitting that
+  keeps sequence identity by default, ego-motion removal, MOT labeling error detection, import and startup cost,
+  and four new statistics families (annotation crowding and box geometry; local context,
+  saturation, and noise; frame events and track steps; and an experimental color family).
 - **Unscheduled:** the ontology track (hierarchical taxonomies in the bias evaluators,
   ontology drift, compliance and alignment evaluators, and ontology coverage over metadata
   hierarchies) and generalizing the estimators to any classifier output. Neither is in
@@ -199,8 +273,9 @@ The August revision of this roadmap planned more for v1.2 than the release above
 
 ## v1.3: target Q1 2027
 
-v1.3 runs the evaluators on video and measures what is intrinsic to it. The work lies
-along four threads.
+v1.3 runs the evaluators on video, measures what is intrinsic to it, and adds new
+statistics families. The work lies along five threads, plus design work that addresses
+two limits v1.2 ships with.
 
 ### Evaluators on video
 
@@ -208,32 +283,47 @@ along four threads.
   bring (leakage, collect-level deduplication, and redundancy within a sequence) in place
   of four interacting radius and tolerance parameters, and a hash search that scales past
   all pairs.
-- **Video leakage and splitting.** Detect clips of one source video, or near-duplicate
-  footage, on both sides of a split, and carry sequence identity through splitting so
-  that it cannot happen.
-- **Outliers in context.** Judge a value within its category or against its neighbors in
-  the sequence (a timestamp that jumps three hours for one frame), and flag combinations
-  that are ordinary column by column but improbable together.
+- **Video leakage and splitting.** Carry sequence identity through splitting by default,
+  so clips of one source video cannot land on both sides of a split unless asked to. v1.2
+  already finds footage that crosses a split (`DuplicatesOutput.crossing`) and keeps each
+  video whole when splitting on `sequence`.
 - **Bias and coverage on video.** `Balance` and `Diversity` over track- and
   sequence-level factors; `Coverage` and `Representation` over clip embeddings.
 - **Drift on video.** Drift over clip embeddings and over aggregated video statistics,
   starting from a decision on the unit of drift: frame, key frame, clip, or sequence.
-- **Selection criteria.** Budget-constrained frame selection, and pixel-domain criteria
-  such as inter-frame difference and a sharpness gate.
+- **Selection checks and cost.** Budget-constrained frame selection; a check that a
+  selection is representative of its sequence, which compares the selected frames with the
+  whole video and plots both by density and along the timeline; and frame descriptors
+  reused across `Representative` counts, so trying another count does not recompute them.
 - **Guides** for applying each tool to video data.
 
 ### Intrinsic video metadata
 
-- **Descriptive statistics:** resolution and a sequence-level statistic family.
-- **Motion:** camera motion magnitude, building on `ego_stats`.
+- **Descriptive statistics:** resolution, beside the frame count, duration, and frame
+  rate that `VideoStats` reports in v1.2.
+- **Motion:** background motion, and each object's motion relative to the background once
+  camera motion is removed. v1.2's `VideoStats` summarizes only the share and speed of the
+  motion the camera does not explain.
 - **Quality:** compression (blockiness, GOP length and variability, interlacing, frame
-  independence, quantization) and artifacts (noise, flicker, flashing, ringing, chromatic
-  aberration, ghost contours), each with guidance on reading it.
+  independence, quantization), artifacts (noise, flicker, flashing, ringing, chromatic
+  aberration, ghost contours), and blur updates, each with guidance on reading it.
 - **Container and codec metadata:** codec, GOP structure, frame types, and quantization
   read from the encoded stream, so capture and transmission anomalies surface without
   full decoding. Datasets that yield only decoded frames do not carry the encoded stream;
   for those, the statistics that can be estimated from frames fall back to that path.
 - **Fingerprinting, scene, and occlusion characteristics**, at investigation stage.
+
+### Statistics families
+
+New statistics for images and video, each meant to produce factors that the evaluators
+can read through `Metadata`:
+
+- Annotation crowding and box geometry.
+- Local context, saturation, and noise.
+- Frame events and track steps.
+- Color, as an experimental family.
+- The result plumbing these share: a `details` field and measurement descriptors on
+  statistics results, and `ImageStatsConfig`.
 
 ### Annotation diagnostics for video
 
@@ -261,6 +351,17 @@ proves out on the planted-defect evaluation corpus, and some will land after v1.
   `dataeval.config`; the scikit-learn and scipy chain reached through `dataeval.core` is
   the next largest block. Making both lazy has been deferred twice as too broad for a
   release eve, and belongs early in a cycle.
+- Verification coverage for video, ego motion, and `Feasibility`, none of which the
+  verification suite covers yet.
+
+### Design items
+
+Design work in v1.3 addresses two questions that v1.2's known limits leave open:
+
+- **Sample weights in the bias evaluators**, starting with `Diversity` and discrete counts,
+  and kept separate from the correction for rows that are not independent.
+- **A declared physical grouping.** One consistent public way to declare a grouping, such
+  as a flight, a collection, or a patient, meant for all the evaluators to read.
 
 ---
 
@@ -331,7 +432,8 @@ layer; the work below builds the modality-specific metrics on top of it.
   structure, and resampling views all make rows stand for unequal amounts of the world.
   `SequenceFrames` already records how much of a video each frame represents; `Balance`,
   `Diversity`, `Parity`, and `mutual_info` do not yet read it. The gap predates video and
-  applies to resampled image data as well.
+  applies to resampled image data as well. Design work on it is in v1.3 (see
+  [Design items](#design-items)); delivery across the evaluators is not yet scheduled.
 - **Evaluation from model outputs alone.** A predictions table (scores and ground truth,
   with no raw data or runnable model) as a first-class input, with coverage, parity,
   uncertainty, and label-quality analyses applied through it. Every finding must read
