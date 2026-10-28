@@ -1,5 +1,26 @@
 # DataEval Change Log
 
+## v1.1.5
+
+👾 **Fixes**
+
+- `69a02b872` - [fix] Return a full-image box with its width and height the right way round for a missing box on a non-square image
+- `75d6eebc7` - [fix] Cap xdist workers at the CPUs the container may use
+- `d4401a423` - [fix] Re-baseline the DriftKNeighbors time budget for the 2-CPU k8s medium runner
+- `a547110e4` - [fix] Read xdist workers from TEST_WORKERS, 2 on the medium CI runner
+- `81d336f03` - [fix] Mark the project dir as a git safe.directory on the k8s runners
+- `875f69bd3` - [fix] Report the right dataset_index and item_index for every dataset of a per_target multi-dataset Outliers evaluate
+- `5e14e2c4c` - [fix] Match parametrized tests by their bare reference when reading verification evidence
+
+📝 **Miscellaneous**
+
+- `35239014d` - [misc] Run verify on k8s-medium-cpu
+- `d65f8d252` - [misc] Run typecheck on k8s-medium-cpu
+- `470007001` - [misc] Move CI jobs to k8s runners, medium for test, conda, doctest and deps
+- `d9b793951` - [misc] Report a verification test case with skipped steps as skipped, not passed
+- `e37778168` - [misc] Cite the real CI job names in the verification registry and check them in tests
+- `6d72c237c` - [misc] Generate requirements, test cases, and VCRM from a step-based verification registry
+
 ## v1.1.4
 
 🛠️ **Improvements and Enhancements**
