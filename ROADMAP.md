@@ -188,7 +188,9 @@ frame.
   its hash radius is 6 for video and 0 for images, and the output records the radius used.
 - **Outliers** thresholds metadata factors as well as image statistics, each at its own
   level (frame, track, or sequence), and box statistics report geometry relative to the
-  image.
+  image. On a tracking dataset it reports outliers in video terms, as `Duplicates` does: it
+  measures every frame and judges whole videos and frames, and with `per_target=True`
+  tracks and detections.
 - **Outliers in context.** `Outliers` stratifies its thresholds by any categorical factor,
   judges a categorical value by how rare it is within its stratum, and does not threshold a
   population of fewer than 20 rows. It flags combinations of factors that are ordinary one
@@ -201,6 +203,8 @@ frame.
 
 ### Also in v1.2
 
+- `DriftKnownDomains` tells which of several known reference domains (a sensor, a site, a
+  season) new data is closest to, and flags data that belongs to none of them.
 - The `Feasibility` evaluator decides whether a classification accuracy or AP target is
   reachable on a dataset, and returns the evidence behind each answer.
 - Statistics over band groups, for multispectral channels.
@@ -227,6 +231,7 @@ a deprecation cycle:
 - `Feasibility`, its evidence and target types (`Endpoint`, `Evidence`, `SamplingPlan`,
   and `TargetSpec`), and the `dataeval.core` functions it builds on (AP bounds,
   concentration endpoints, consensus bounds, and local panels).
+- `DriftKnownDomains`.
 - `Relabel.fold_scores`.
 - `VideoStats.PERSISTENCE`: per-video maps of what is fixed to the camera, such as a
   burned-in overlay, and of local blur.
@@ -239,6 +244,18 @@ mind, not as promises of a fix:
 - **Camera motion.** Without a `mask=`, a burned-in overlay can bias an ego-motion reading
   that is still marked trusted, and a slow mover in noisy footage can read as a trusted
   zoom. `image_stats` takes no pixel mask yet.
+- **Persistence maps.** `VideoStats.PERSISTENCE` reads NaN for a still camera, one that
+  moves less than 2 pixels a frame pair at a 360-pixel short side, and a textureless
+  video. One mover that fills most of the frame and moves as one can still pass for the
+  camera. The blur maps of one video can read areas as soft that no lens defect caused;
+  compare them across many videos from one camera.
+- **Outliers on video.** On a tracking dataset `Outliers` judges against baselines pooled
+  over the whole dataset, so a night video among day videos is judged against all of them
+  (a two-call recipe in the `evaluate` docstring judges a subset on its own). `per_class`
+  judges detections within their class and tracks stay pooled. It refuses `extractor=`
+  (cluster mode), the factor checks (`factors`, `combinations`, `given`, `kinds`,
+  `neighbors`), and several datasets in one call, with an error that names the alternative.
+  Each video is read more than once per call.
 - **Selection weights stop before analysis.** `SequenceFrames` records how many source
   frames each selected frame stands for, but no evaluator reads a sample weight yet, so
   results over selected frames describe the selection, not the source stream's
