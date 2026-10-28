@@ -313,7 +313,7 @@ def deps(session: nox.Session) -> None:
     """Run unit tests against minimum supported Python with lowest declared dependencies."""
     session.run_install("uv", "pip", "install", ".[cpu]", "--resolution=lowest-direct")
     session.run_install("uv", "pip", "install", "pytest")
-    session.run("pytest", "-m", "not (optional or ffmpeg)")
+    session.run("pytest", "-q", "-m", "not (optional or ffmpeg)")
 
 
 @session(uv_only_groups=["lint"], uv_no_install_project=True)
@@ -331,6 +331,7 @@ def doctest(session: nox.Session) -> None:
     target = session.posargs if session.posargs else ["src/dataeval"]
     session.run(
         "pytest",
+        "-q",
         "--doctest-modules",
         "--doctest-continue-on-failure",
         "--disable-warnings",
