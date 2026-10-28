@@ -282,8 +282,8 @@ def to_bounding_box(boxlike: BoxLike, image_shape: tuple[int, ...] | None = None
             return BoundingBox(boxlike[0], boxlike[1], boxlike[2], boxlike[3], image_shape=image_shape)
         if isinstance(boxlike, Iterable):
             return BoundingBox(*boxlike, image_shape=image_shape)
-        if isinstance(image_shape, tuple) and len(image_shape) > 2:
-            return BoundingBox(0, 0, image_shape[-2], image_shape[-1], image_shape=image_shape)
+        if isinstance(image_shape, tuple) and len(image_shape) >= 2:
+            return BoundingBox(0, 0, image_shape[-1], image_shape[-2], image_shape=image_shape)
     except (TypeError, ValueError):
         _logger.warning(f"Invalid bounding box format: {boxlike}. Expected a BoundingBox or a tuple/list of 4 numbers.")
 
