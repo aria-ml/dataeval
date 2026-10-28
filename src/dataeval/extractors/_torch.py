@@ -12,8 +12,7 @@ from dataeval._log import get_logger
 from dataeval.config import get_device
 from dataeval.protocols import Array, DeviceLike, Transform
 from dataeval.types import ReprMixin
-from dataeval.utils._array import as_numpy
-from dataeval.utils.data import iter_images
+from dataeval.utils.data import as_image, iter_images
 from dataeval.utils.training import PostprocessFn
 
 _logger = get_logger(__name__)
@@ -195,7 +194,7 @@ class TorchExtractor(ReprMixin):
             if isinstance(img, torch.Tensor):
                 tensor = img
             else:
-                array = as_numpy(img)
+                array = as_image(img)
                 tensor = torch.as_tensor(array if array.flags.writeable else array.copy())
             for transform in self._transforms:
                 tensor = transform(tensor)
@@ -249,6 +248,12 @@ class TorchExtractor(ReprMixin):
         -------
         Array
             Embeddings array of shape (n_images, embedding_dim).
+
+        Raises
+        ------
+        MaiteShapeError
+            If an image is a video stream, as the image slot of a tracking dataset is. Present the
+            dataset as frames with :class:`~dataeval.data.SequenceFrames`.
 
         Notes
         -----

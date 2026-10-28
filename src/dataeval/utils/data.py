@@ -440,3 +440,26 @@ def iter_images(data: Iterable[AnyDatum] | Dataset[AnyDatum]) -> Iterator[ArrayL
     """
     for item in data:
         yield unwrap_image(item)
+
+
+def as_image(image: ArrayLike) -> NDArray[Any]:
+    """Return ``image`` as a numpy array, refusing a value that holds no pixels.
+
+    A tracking dataset has a video stream in its image slot: an iterable of frame objects, which
+    numpy reads as an array of objects. Feature extractors that read images use this where they
+    convert one, so that stream is refused with the way to its frames instead of flowing on as a
+    row of objects.
+
+    Raises
+    ------
+    MaiteShapeError
+        If ``image`` converts to an array of objects.
+    """
+    array = as_numpy(image)
+    if array.dtype == object:
+        raise MaiteShapeError(
+            f"Expected an image array but got {type(image).__name__}, which is not made of pixels. A tracking "
+            "dataset holds video streams in place of images: present it as frames with SequenceFrames(dataset), "
+            "or use an extractor that reads video, such as VideoTorchExtractor."
+        )
+    return array

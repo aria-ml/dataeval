@@ -12,6 +12,7 @@ pytest.importorskip("onnx")
 pytest.importorskip("onnxruntime")
 
 import dataeval.extractors._onnx as onnx_mod
+from dataeval.exceptions import MaiteShapeError
 from dataeval.extractors import OnnxExtractor
 from dataeval.protocols import FeatureExtractor
 
@@ -236,6 +237,16 @@ class TestOnnxExtractorCall:
         result = extractor(images)
         assert result.shape[0] == 1
         assert result.shape[1] == 128
+
+    def test_call_refuses_a_video_stream(self, extractor: OnnxExtractor) -> None:
+        """A video stream holds frames rather than pixels, so it is refused with the route to frames."""
+
+        class _Stream:
+            def __iter__(self):
+                return iter([object(), object()])
+
+        with pytest.raises(MaiteShapeError, match="SequenceFrames"):
+            extractor([_Stream()])
 
     def test_call_empty_list(self, extractor: OnnxExtractor) -> None:
         """Test extracting features from empty list."""
