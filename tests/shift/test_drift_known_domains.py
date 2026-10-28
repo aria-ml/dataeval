@@ -68,13 +68,12 @@ def _dataset(x, **factors):
 
 
 @pytest.mark.required
-class TestNotYetPublic:
+class TestPublic:
     def test_is_marked_experimental(self):
         assert "DriftKnownDomains" in getattr(DriftKnownDomains, "__experimental__", "")
 
-    def test_is_not_exported_from_the_public_package(self):
-        assert "DriftKnownDomains" not in dataeval.shift.__all__
-        assert not hasattr(dataeval.shift, "DriftKnownDomains")
+    def test_is_exported_from_the_public_package(self):
+        assert dataeval.shift.DriftKnownDomains is DriftKnownDomains
 
 
 @pytest.mark.required
